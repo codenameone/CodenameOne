@@ -138,6 +138,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private String editorBuffer;
     private String editorBufferOnDisk;
+    /** Which pane the shared buffer belongs to: "source", "model", "css" or null when none is open. */
+    private String editorBufferKind;
     private String lastObservedCss;
     private com.codename1.ui.util.UITimer cssLiveTimer;
     private int cssEditRevision;
@@ -683,8 +685,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param editor the editor being shown
      * @param content the text it was opened with
      */
-    private void trackEditorBuffer(final CodeEditor editor, String content) {
+    private void trackEditorBuffer(final CodeEditor editor, String content, String kind) {
         editorBuffer = content;
+        editorBufferKind = kind;
         // Only the reopen path carries a buffer forward; a fresh open agrees with disk by
         // definition, and after a save the caller resets this to the text it wrote.
         if (!reopeningEditor) editorBufferOnDisk = content;
@@ -742,6 +745,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         activeEditorReopen = null;
         editorBuffer = null;
         editorBufferOnDisk = null;
+        editorBufferKind = null;
         refreshEditor();
     }
 
@@ -3257,7 +3261,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // An open model pane still shows the previous strategy and its clean baseline still
             // refers to the old text, so the next Save there would write the stale model back over
             // what was just generated. Reopen it on the new content.
-            if (activeCodeEditor != null && activeEditorReopen != null) {
+            // Only the model pane. This used to match any open editor, so changing strategy with
+            // the companion source open replaced its buffer with the model and reopened it as the
+            // source pane -- saving from there would have written the model over the form's Java.
+            if ("model".equals(editorBufferKind) && activeEditorReopen != null) {
                 editorBuffer = regenerated;
                 editorBufferOnDisk = regenerated;
                 reopenActiveEditor();
@@ -3382,8 +3389,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     Math.max(0, tableRowLimit(document.parentOf(element)))));
             fields.add(numericPropertyField("Table column", "tableColumn", "0", 0,
                     Math.max(0, tableColumnLimit(document.parentOf(element)))));
-            fields.add(numericPropertyField("Horizontal span", "tableHorizontalSpan", "1", 1, 100));
-            fields.add(numericPropertyField("Vertical span", "tableVerticalSpan", "1", 1, 100));
+            // Capped at the cells left from the anchor. TableLayout keeps adding the last column's
+            // width for a span that runs past the edge, drawing the component outside the table,
+            // and the same out-of-range constraint is emitted into the generated source.
+            Element tableParent = document.parentOf(element);
+            fields.add(numericPropertyField("Horizontal span", "tableHorizontalSpan", "1", 1,
+                    Math.max(1, spanRoom(tableParent, element, "tableColumn", "tableLayoutColumns"))));
+            fields.add(numericPropertyField("Vertical span", "tableVerticalSpan", "1", 1,
+                    Math.max(1, spanRoom(tableParent, element, "tableRow", "tableLayoutRows"))));
             fields.add(numericPropertyField("Column width %", "tableWidth", "-1", -1, 100));
             fields.add(numericPropertyField("Row height %", "tableHeight", "-1", -1, 100));
         }
@@ -3868,6 +3881,22 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param spanAttribute the matching span attribute
      * @return the smallest declared size that still contains every child
      */
+    /**
+     * How far a child may span from its anchor before leaving the table.
+     *
+     * @param parent the table
+     * @param child the child being edited
+     * @param cellAttribute {@code tableRow} or {@code tableColumn}
+     * @param sizeAttribute the matching declared-size attribute
+     * @return the largest span that still fits
+     */
+    private int spanRoom(Element parent, Element child, String cellAttribute, String sizeAttribute) {
+        if (parent == null) return 1;
+        int declared = Math.max(1, integer(parent.getAttribute(sizeAttribute), 2));
+        Integer anchor = parseInteger(child.getAttribute(cellAttribute));
+        return declared - (anchor == null ? 0 : anchor.intValue());
+    }
+
     private int occupiedTableExtent(Element parent, String cellAttribute, String spanAttribute) {
         int extent = 0;
         for (Element child : componentChildren(parent)) {
@@ -4323,6 +4352,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // The CSS editor already observes its own text to recompile live, so it mirrors the
             // buffer from that path instead of registering a second change listener here.
             editorBuffer = css;
+            editorBufferKind = "css";
             if (!reopeningEditor) editorBufferOnDisk = css;
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
@@ -4390,7 +4420,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (reopeningEditor && editorBuffer != null) source = editorBuffer;
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
-            trackEditorBuffer(editor, source);
+            trackEditorBuffer(editor, source, "model");
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             editor.onReady(editor::focusEditor);
@@ -4439,7 +4469,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (handler != null) source = ensureHandler(source, javaIdentifier(handler));
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
-            trackEditorBuffer(editor, source);
+            trackEditorBuffer(editor, source, "source");
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             // No protected regions here. Marking the generated blocks read-only meant the caret
