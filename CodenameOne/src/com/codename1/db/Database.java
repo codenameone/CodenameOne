@@ -91,6 +91,10 @@ public abstract class Database {
     /// re-derived from each engine's very different native semantics.
     protected boolean inTransaction;
 
+    /// The savepoint that opened the current transaction, when a savepoint did. Releasing that one
+    /// ends the transaction; releasing any other leaves it open.
+    private String outermostSavepoint;
+
     /// Checks if this platform supports custom database paths.  On platforms that
     /// support this, you can pass a file path to `#openOrCreate(java.lang.String)`, `#exists(java.lang.String)`,
     /// `#delete(java.lang.String)`, and `#getDatabasePath(java.lang.String)`.
@@ -675,10 +679,91 @@ public abstract class Database {
             String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
                 inTransaction = true;
-            } else if (keyword != null) {
-                inTransaction = false;
+                outermostSavepoint = null;
+                continue;
             }
+            if (keyword != null) {
+                inTransaction = false;
+                outermostSavepoint = null;
+                continue;
+            }
+            noteSavepointControl(statement);
         }
+    }
+
+    /// Reads a SAVEPOINT or RELEASE, which start and end a transaction when they are the outer one.
+    ///
+    /// A savepoint inside a transaction is a mark within it and changes nothing here. A savepoint
+    /// outside one starts a real transaction, which SQLite holds open until that same savepoint is
+    /// released -- so `SAVEPOINT s` followed by writes leaves work uncommitted exactly as `BEGIN`
+    /// does, and a key change allowed underneath it installs rows that were never committed.
+    ///
+    /// Only the outermost name ends it: releasing an inner savepoint leaves the transaction open,
+    /// and a `RELEASE` naming something else entirely is not this transaction's ending.
+    private void noteSavepointControl(String statement) {
+        String keyword = leadingKeyword(statement);
+        if ("SAVEPOINT".equals(keyword)) {
+            if (!inTransaction) {
+                inTransaction = true;
+                outermostSavepoint = savepointName(statement, false);
+            }
+            return;
+        }
+        if ("RELEASE".equals(keyword) && outermostSavepoint != null
+                && outermostSavepoint.equals(savepointName(statement, true))) {
+            inTransaction = false;
+            outermostSavepoint = null;
+        }
+    }
+
+    /// The savepoint a SAVEPOINT or RELEASE names, upper cased, or null.
+    ///
+    /// `RELEASE` takes an optional `SAVEPOINT` keyword before the name. Quoting is stripped rather
+    /// than honoured: SQLite compares savepoint names without case, so `SAVEPOINT s` is released by
+    /// `RELEASE "S"`, and comparing the quoted spellings literally would leave the transaction
+    /// looking open forever.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a single statement whose first keyword is SAVEPOINT or RELEASE
+    /// - `optionalSavepointKeyword`: whether to skip a `SAVEPOINT` word before the name
+    private static String savepointName(String statement, boolean optionalSavepointKeyword) {
+        int at = endOfKeyword(statement, skipLeadingTrivia(statement, 0));
+        at = skipLeadingTrivia(statement, at);
+        if (optionalSavepointKeyword && "SAVEPOINT".equals(keywordAt(statement, at))) {
+            at = skipLeadingTrivia(statement, endOfKeyword(statement, at));
+        }
+        int length = statement.length();
+        if (at >= length) {
+            return null;
+        }
+        char quote = statement.charAt(at);
+        if (quote == '"' || quote == '\'' || quote == '`' || quote == '[') {
+            char closing = quote == '[' ? ']' : quote;
+            int end = at + 1;
+            StringBuilder name = new StringBuilder();
+            while (end < length) {
+                char c = statement.charAt(end);
+                if (c == closing) {
+                    if (quote != '[' && end + 1 < length && statement.charAt(end + 1) == closing) {
+                        name.append(c);
+                        end += 2;
+                        continue;
+                    }
+                    break;
+                }
+                name.append(c);
+                end++;
+            }
+            return name.toString().toUpperCase();
+        }
+        int end = at;
+        while (end < length && (isKeywordChar(statement.charAt(end))
+                || (statement.charAt(end) >= '0' && statement.charAt(end) <= '9')
+                || statement.charAt(end) == '_' || statement.charAt(end) == '$')) {
+            end++;
+        }
+        return end > at ? statement.substring(at, end).toUpperCase() : null;
     }
 
     /// Records the transaction state a port read back from its engine.
@@ -726,6 +811,35 @@ public abstract class Database {
             return "ROLLBACK";
         }
         return null;
+    }
+
+    /// The locking mode a `BEGIN` asks for: `IMMEDIATE`, `EXCLUSIVE` or `DEFERRED`.
+    ///
+    /// Reads the word after `BEGIN` rather than searching the statement for those names. The words
+    /// are ordinary text anywhere else, so `/* IMMEDIATE migration */ BEGIN` and
+    /// `BEGIN /* EXCLUSIVE note */ TRANSACTION` are both deferred -- and a port that searched would
+    /// take a write lock on them that the same SQL does not take on any other platform.
+    ///
+    /// Anything that is not one of the three, including a bare `BEGIN` and the optional
+    /// `TRANSACTION` keyword, is deferred, which is what SQLite does with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a statement whose first keyword is `BEGIN`
+    ///
+    /// #### Returns
+    ///
+    /// `IMMEDIATE`, `EXCLUSIVE` or `DEFERRED`
+    protected static String beginTransactionMode(String statement) {
+        if (statement == null) {
+            return "DEFERRED";
+        }
+        int after = endOfKeyword(statement, skipLeadingTrivia(statement, 0));
+        String next = keywordAt(statement, skipLeadingTrivia(statement, after));
+        if ("IMMEDIATE".equals(next) || "EXCLUSIVE".equals(next)) {
+            return next;
+        }
+        return "DEFERRED";
     }
 
     /// The first word of a statement, upper cased, or an empty string.
@@ -829,6 +943,66 @@ public abstract class Database {
     /// A rewrite takes longer than that, so the answer has to be held for its whole length or a
     /// connection opened a moment later still ends up reading a file that changed underneath it.
     private static final java.util.Hashtable REKEYING_DATABASES = new java.util.Hashtable();
+
+    /// A path reduced to one spelling, for use as an open-database registry key.
+    ///
+    /// Two names for one file have to reach the registry as one entry, or the claim a key change
+    /// takes does not cover the other connection and the file is rewritten underneath it. The ports
+    /// with a real filesystem behind them (Android, the simulator) ask it to canonicalize, which
+    /// also resolves symlinks. The ports translated ahead of time have no such call to make, so
+    /// this collapses what can be collapsed without touching the disk: repeated separators, `.`
+    /// segments, and `..` against the segment before it.
+    ///
+    /// A symlink still reaches the registry under two names. That is a smaller hole than `/a/./b`
+    /// and `/a/b` counting as different databases, which is what an application writing a custom
+    /// path actually produces.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a native filesystem path, or null
+    ///
+    /// #### Returns
+    ///
+    /// the reduced path, or null for a null input
+    protected static String normalizeDatabasePathKey(String path) {
+        if (path == null) {
+            return null;
+        }
+        boolean absolute = path.length() > 0 && path.charAt(0) == '/';
+        java.util.Vector segments = new java.util.Vector();
+        int at = 0;
+        int length = path.length();
+        while (at < length) {
+            int slash = path.indexOf('/', at);
+            String segment = slash < 0 ? path.substring(at) : path.substring(at, slash);
+            at = slash < 0 ? length : slash + 1;
+            if (segment.length() == 0 || ".".equals(segment)) {
+                continue;
+            }
+            if ("..".equals(segment) && !segments.isEmpty()
+                    && !"..".equals(segments.elementAt(segments.size() - 1))) {
+                segments.removeElementAt(segments.size() - 1);
+                continue;
+            }
+            if ("..".equals(segment) && absolute) {
+                // The root has no parent, so this segment names nothing and SQLite would not find
+                // it either. Dropping it keeps two spellings of the same nonexistent path equal.
+                continue;
+            }
+            segments.addElement(segment);
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < segments.size(); iter++) {
+            if (iter > 0 || absolute) {
+                out.append('/');
+            }
+            out.append((String) segments.elementAt(iter));
+        }
+        if (out.length() == 0) {
+            return absolute ? "/" : path;
+        }
+        return out.toString();
+    }
 
     /// Records that a connection to a database file has been opened.
     ///

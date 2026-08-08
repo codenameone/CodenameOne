@@ -6711,6 +6711,23 @@ function cn1SqliteGuard(fn, failureValue) {
   }
 }
 
+/**
+ * The page size every platform's databases use, set before the file has any pages.
+ *
+ * This build creates databases with 8192-byte pages, and SQLCipher 4 -- the on-disk format all the
+ * ports share -- is defined at 4096. The mismatch does not show up until the database is encrypted:
+ * a rekey has to change the page size, which SQLite refuses on a database that already has pages,
+ * so "Rekeying failed. Pagesize cannot be changed for an encrypted database." A page size set on a
+ * database that already has pages is silently ignored, which is exactly what makes this safe to
+ * issue on every open and useless to issue anywhere later.
+ */
+const CN1_SQLITE_PAGE_SIZE = 4096;
+
+/** Puts a newly opened connection on the shared page size, before anything writes to it. */
+function cn1SqlitePrepareConnection(db) {
+  db.exec("PRAGMA page_size = " + CN1_SQLITE_PAGE_SIZE);
+}
+
 /** Applies the key, if there is one, selecting the portable cipher scheme first. */
 function cn1SqliteApplyKey(db, key) {
   if (key !== null && key !== undefined && key !== "") {
@@ -6772,6 +6789,7 @@ function cn1SqliteOpen(name, key) {
             vfs: cn1SqlitePoolVfs })
         : new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
     try {
+      cn1SqlitePrepareConnection(pooled);
       cn1SqliteApplyKeyAndProbe(pooled, key);
     } catch (err) {
       try {
@@ -6789,6 +6807,7 @@ function cn1SqliteOpen(name, key) {
   const anchored = cn1SqliteMemoryAnchors.has(name);
   const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
   try {
+    cn1SqlitePrepareConnection(db);
     cn1SqliteApplyKeyAndProbe(db, key);
   } catch (err) {
     // Closing releases the store if this connection was the one that created it, so a rejected
@@ -7139,7 +7158,10 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_lon
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_int_R_byte_1ARRAY", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob___long_int_R_byte_1ARRAY"],
   function(stmtId, col) {
     return cn1SqliteGuard(function() {
-      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, new Uint8Array(0).constructor);
+      // SQLITE_BLOB, not the Uint8Array constructor: this API takes a type code there, and a
+      // constructor makes it answer "Don't know how to translate type of result column" for every
+      // blob read rather than returning the bytes.
+      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0, cn1Sqlite.capi.SQLITE_BLOB);
       if (v === null || v === undefined) {
         return null;
       }

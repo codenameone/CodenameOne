@@ -133,12 +133,12 @@ public class SEDatabase extends Database {
     /// Restored to the driver's default once the transaction ends, so a later plain `BEGIN` is
     /// deferred again rather than inheriting a mode from the statement before it.
     private void applyBeginMode(String statement) {
-        String rest = statement.toUpperCase();
+        String named = beginTransactionMode(statement);
         org.sqlite.SQLiteConfig.TransactionMode mode =
                 org.sqlite.SQLiteConfig.TransactionMode.DEFERRED;
-        if (rest.indexOf("IMMEDIATE") >= 0) {
+        if ("IMMEDIATE".equals(named)) {
             mode = org.sqlite.SQLiteConfig.TransactionMode.IMMEDIATE;
-        } else if (rest.indexOf("EXCLUSIVE") >= 0) {
+        } else if ("EXCLUSIVE".equals(named)) {
             mode = org.sqlite.SQLiteConfig.TransactionMode.EXCLUSIVE;
         }
         setTransactionMode(mode);

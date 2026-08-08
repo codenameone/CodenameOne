@@ -64,7 +64,9 @@ class WindowsDatabase extends Database {
 
     WindowsDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
-        this.openKey = path;
+        // Normalized, so two spellings of one path are one registry entry: the claim a key
+        // change takes is worth nothing if the other connection is filed under "/a/./b".
+        this.openKey = normalizeDatabasePathKey(path);
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.

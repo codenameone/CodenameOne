@@ -26,7 +26,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -213,6 +215,83 @@ class ScriptTransactionTrackingTest {
     void aFailedScriptWithNoBeginChangesNothing() {
         db.failedPartway("INSERT INTO missing_table VALUES(1)");
         assertFalse(db.isInTransaction());
+    }
+
+    @Test
+    void anOutermostSavepointIsATransaction() {
+        // SAVEPOINT outside a transaction starts a real one, held open until that same savepoint is
+        // released. Reading it as nothing lets a key change replace the database underneath writes
+        // that were never committed.
+        db.ran("SAVEPOINT outer");
+        assertTrue(db.isInTransaction(), "an outermost savepoint opens a transaction");
+
+        db.ran("SAVEPOINT inner");
+        db.ran("RELEASE inner");
+        assertTrue(db.isInTransaction(), "releasing an inner savepoint leaves it open");
+
+        db.ran("RELEASE outer");
+        assertFalse(db.isInTransaction(), "releasing the outermost one ends it");
+    }
+
+    @Test
+    void aSavepointInsideATransactionIsJustAMark() {
+        db.ran("BEGIN");
+        db.ran("SAVEPOINT s");
+        db.ran("RELEASE s");
+        assertTrue(db.isInTransaction(), "the BEGIN still owns the transaction");
+        db.ran("COMMIT");
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
+    void aSavepointNameIsReadWithoutCaseOrQuotes() {
+        // SQLite compares savepoint names as identifiers, so these all name the one savepoint.
+        String[] releases = {"RELEASE outer", "RELEASE OUTER", "RELEASE SAVEPOINT outer",
+            "RELEASE \"Outer\"", "RELEASE [outer]", "RELEASE `OUTER`", "RELEASE 'outer'"};
+        for (String release : releases) {
+            db.ran("SAVEPOINT Outer");
+            assertTrue(db.isInTransaction(), "opened before: " + release);
+            db.ran(release);
+            assertFalse(db.isInTransaction(), "ended by: " + release);
+        }
+    }
+
+    @Test
+    void releasingSomethingElseLeavesTheTransactionOpen() {
+        db.ran("SAVEPOINT outer");
+        db.ran("RELEASE unrelated");
+        assertTrue(db.isInTransaction(), "that was not this transaction's ending");
+        db.ran("ROLLBACK");
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
+    void aBeginModeIsReadFromTheKeywordAfterBegin() {
+        // The words are ordinary text anywhere else, and a port that searched the statement for
+        // them would take a write lock that the same SQL takes on no other platform.
+        assertEquals("DEFERRED", Database.beginTransactionMode("BEGIN"));
+        assertEquals("DEFERRED", Database.beginTransactionMode("BEGIN TRANSACTION"));
+        assertEquals("IMMEDIATE", Database.beginTransactionMode("BEGIN IMMEDIATE"));
+        assertEquals("EXCLUSIVE", Database.beginTransactionMode("begin exclusive transaction"));
+        assertEquals("IMMEDIATE", Database.beginTransactionMode("BEGIN /* go */ IMMEDIATE"));
+        assertEquals("DEFERRED", Database.beginTransactionMode("/* IMMEDIATE migration */ BEGIN"));
+        assertEquals("DEFERRED",
+                Database.beginTransactionMode("BEGIN /* EXCLUSIVE note */ TRANSACTION"));
+        assertEquals("DEFERRED", Database.beginTransactionMode(null));
+    }
+
+    @Test
+    void aPathIsReducedToOneSpellingForTheRegistry() {
+        // Two names for one file have to be one registry entry, or the claim a key change takes
+        // does not cover the connection filed under the other name.
+        assertEquals("/data/app.db", Database.normalizeDatabasePathKey("/data/./app.db"));
+        assertEquals("/data/app.db", Database.normalizeDatabasePathKey("/data//app.db"));
+        assertEquals("/data/app.db", Database.normalizeDatabasePathKey("/data/tmp/../app.db"));
+        assertEquals("/app.db", Database.normalizeDatabasePathKey("/../app.db"));
+        assertEquals("data/app.db", Database.normalizeDatabasePathKey("data/app.db"));
+        assertEquals("/", Database.normalizeDatabasePathKey("/"));
+        assertNull(Database.normalizeDatabasePathKey(null));
+        assertEquals("/data/app.db", Database.normalizeDatabasePathKey("/data/app.db"));
     }
 
     @Test

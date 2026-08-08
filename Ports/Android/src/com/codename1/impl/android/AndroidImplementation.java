@@ -11502,7 +11502,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // The converted file is in place but was never shown to open, and the conversion could
             // not take it back out. Both files existing is not evidence of success here, so the
             // backup goes back rather than away: deleting it would drop the last readable copy.
-            File displaced = new File(path + ".unvalidated");
+            File displaced = unusedSibling(path + ".unvalidated");
+            if (displaced == null) {
+                throw new IOException("The database " + path + " holds a converted file that was "
+                        + "never shown to open, and there is nowhere to move it aside to. The "
+                        + "original is intact at " + backup + "; nothing was overwritten.");
+            }
             if (!live.renameTo(displaced) || !backup.renameTo(live)) {
                 throw new IOException("The database " + path + " holds a converted file that was "
                         + "never shown to open, and the original at " + backup + " could not be "
@@ -11522,6 +11527,27 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "relying on this database being encrypted.");
         }
         marker.delete();
+    }
+
+    /// A path near `preferred` that no file occupies, or null if too many are taken.
+    ///
+    /// The recovery moves the rejected file aside before putting the original back, and on these
+    /// filesystems a rename replaces whatever is at the destination. A custom database path can put
+    /// that destination anywhere the application also keeps files, so writing to it blind would let
+    /// a failed conversion destroy an unrelated file of the application's while reporting that it
+    /// recovered cleanly.
+    private static File unusedSibling(String preferred) {
+        File candidate = new File(preferred);
+        if (!candidate.exists()) {
+            return candidate;
+        }
+        for (int iter = 1; iter < 100; iter++) {
+            candidate = new File(preferred + "." + iter);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /// Removes the working files for a database, reporting anything it could not remove.
