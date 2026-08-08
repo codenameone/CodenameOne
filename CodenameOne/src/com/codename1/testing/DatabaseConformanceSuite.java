@@ -1227,10 +1227,10 @@ public final class DatabaseConformanceSuite {
         // databases somewhere the checks above cannot read, this is what is left to say the
         // contents are not simply sitting there for anyone who opens the database.
         //
-        // On its own database, because asking is destructive: Android hands an unkeyed open to
-        // the platform SQLite, which reports the ciphertext as corruption, and the default error
-        // handler answers corruption by deleting the file. Every assertion after this one would
-        // then be run against whatever was left.
+        // On its own database, because the answer is allowed to cost the database. Android hands
+        // an unkeyed open to the platform SQLite, which reports the ciphertext as corruption; the
+        // port keeps the file rather than letting the platform delete it, but a port that did not
+        // would leave every assertion after this one running against whatever was left.
         String unkeyedName = databaseName + "-nokey";
         deleteQuietly(unkeyedName);
         Database unkeyed = Database.openOrCreate(unkeyedName, DatabaseConfig.passphrase(passphrase));
@@ -1253,6 +1253,20 @@ public final class DatabaseConformanceSuite {
             closeQuietly(unkeyed);
         }
         r.check(noKeyRejected, "an encrypted database does not give up its rows without a key");
+        // The refused open must not have destroyed it: the data is intact and one correct key away,
+        // and a port that answered a wrong key by deleting the file would have thrown that away.
+        Database survived = null;
+        try {
+            survived = Database.openOrCreate(unkeyedName, DatabaseConfig.passphrase(passphrase));
+            Cursor rows = survived.executeQuery("SELECT v FROM secret WHERE id = 1");
+            r.check(rows.next() && "classified".equals(rows.getRow().getString(0)),
+                    "a refused open leaves the database readable with the right key");
+            rows.close();
+        } catch (IOException err) {
+            r.check(false, "a refused open destroyed the database: " + err.getMessage());
+        } finally {
+            closeQuietly(survived);
+        }
         deleteQuietly(unkeyedName);
 
         // ---- the wrong passphrase is rejected

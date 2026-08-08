@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ScriptTransactionTrackingTest {
 
     /** Exposes the protected hooks; nothing here reaches an engine. */
-    private static final class TrackingDatabase extends Database {
+    private static class TrackingDatabase extends Database {
         @Override
         public void execute(String sql) throws IOException {
         }
@@ -99,6 +99,14 @@ class ScriptTransactionTrackingTest {
             // run everything before the statement that failed, so its control statements are read
             // exactly as a completed script's are.
             noteScriptTransactionControl(sql);
+        }
+    }
+
+    /** As Android is: the wrapper ref-counts begins and ends. */
+    private static final class NestingDatabase extends TrackingDatabase {
+        @Override
+        protected boolean supportsNestedTransactions() {
+            return true;
         }
     }
 
@@ -347,14 +355,15 @@ class ScriptTransactionTrackingTest {
         // Under the legacy hint Android allows nesting because it used to, and its engine
         // ref-counts. Clearing the flag on the first commit would report no transaction while the
         // outer one still held uncommitted rows, and a key change would be allowed over them.
+        NestingDatabase nesting = new NestingDatabase();
         Database.setLegacyBehavior(true);
         try {
-            db.beginTransaction();
-            db.beginTransaction();
-            db.commitTransaction();
-            assertTrue(db.isInTransaction(), "the outer transaction is still open");
-            db.commitTransaction();
-            assertFalse(db.isInTransaction(), "now both have ended");
+            nesting.beginTransaction();
+            nesting.beginTransaction();
+            nesting.commitTransaction();
+            assertTrue(nesting.isInTransaction(), "the outer transaction is still open");
+            nesting.commitTransaction();
+            assertFalse(nesting.isInTransaction(), "now both have ended");
         } finally {
             Database.setLegacyBehavior(false);
         }
@@ -365,12 +374,13 @@ class ScriptTransactionTrackingTest {
         // A COMMIT in a script ends the transaction outright, whatever the count says: the engine
         // has ended it, so holding the flag would block every key change until the connection
         // closed.
+        NestingDatabase nesting = new NestingDatabase();
         Database.setLegacyBehavior(true);
         try {
-            db.beginTransaction();
-            db.beginTransaction();
-            db.ran("COMMIT");
-            assertFalse(db.isInTransaction(), "the engine ended it, count or no count");
+            nesting.beginTransaction();
+            nesting.beginTransaction();
+            nesting.ran("COMMIT");
+            assertFalse(nesting.isInTransaction(), "the engine ended it, count or no count");
         } finally {
             Database.setLegacyBehavior(false);
         }
@@ -394,6 +404,27 @@ class ScriptTransactionTrackingTest {
         db.ranFirstStatementOnly("");
         db.ranFirstStatementOnly(null);
         assertFalse(db.isInTransaction(), "nothing to read, nothing to change");
+    }
+
+    @Test
+    void anEngineThatCannotNestStillRejectsTheSecondBegin() throws IOException {
+        // The legacy hint does not make nesting work where it never worked. On those engines the
+        // second BEGIN reaches SQLite and fails, and the port clears its flag on the way out --
+        // so accepting the call here would report no transaction over one that is still open.
+        Database.setLegacyBehavior(true);
+        try {
+            db.beginTransaction();
+            boolean rejected = false;
+            try {
+                db.beginTransaction();
+            } catch (IOException expected) {
+                rejected = true;
+            }
+            assertTrue(rejected, "a port that cannot nest rejects the second begin, hint or no hint");
+            assertTrue(db.isInTransaction(), "and the first transaction is untouched");
+        } finally {
+            Database.setLegacyBehavior(false);
+        }
     }
 
     @Test

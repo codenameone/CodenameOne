@@ -261,6 +261,18 @@ public class ThreadSafeDatabase extends Database {
             // either queues before this point or is rejected by checkOpen() after it. In between
             // it would hand work to a dead worker and wait on it forever.
             closed = true;
+            if (et.isThisIt()) {
+                // Already on the worker. Handing it work and waiting for the same thread to run it
+                // waits forever: the hand-off queues behind the task making this call. The thread
+                // that would do the work is the one asking for it, so it does the work here --
+                // which is also what makes the wait below safe to keep for everybody else.
+                try {
+                    underlying.close();
+                } finally {
+                    et.kill();
+                }
+                return;
+            }
             // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
             // return while the database was still open, and a delete() on the next line would race
             // it and fail with the file still in use.

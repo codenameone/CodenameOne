@@ -124,6 +124,13 @@ class AndroidCipherDB extends Database {
     }
 
     @Override
+    protected boolean supportsNestedTransactions() {
+        // The platform wrapper ref-counts begins and ends, which is what the legacy behaviour on
+        // this port relied on. No other engine here does.
+        return true;
+    }
+
+    @Override
     public void beginTransaction() throws IOException {
         checkOpen();
         checkBeginTransaction();

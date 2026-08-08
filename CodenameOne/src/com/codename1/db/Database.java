@@ -1199,8 +1199,18 @@ public abstract class Database {
     /// #### Throws
     ///
     /// - `IOException`: if a transaction is already open
+    /// Whether this engine counts nested transactions rather than rejecting the second one.
+    ///
+    /// Only Android's wrapper does, and only that port's legacy behaviour allowed nesting. On the
+    /// others a second BEGIN reaches SQLite and fails, and the port clears its flag on the way out
+    /// -- so allowing the call would report no transaction while the first one is still open, and
+    /// a caller that caught the expected failure could then change the key across it.
+    protected boolean supportsNestedTransactions() {
+        return false;
+    }
+
     protected void checkBeginTransaction() throws IOException {
-        if (inTransaction && !isLegacyBehavior()) {
+        if (inTransaction && !(isLegacyBehavior() && supportsNestedTransactions())) {
             throw new IOException("A transaction is already in progress on this database. "
                     + "Transactions do not nest; commit or roll back the current one first.");
         }

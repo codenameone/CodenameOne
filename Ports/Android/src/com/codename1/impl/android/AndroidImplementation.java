@@ -10987,9 +10987,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // top of the real data, which nothing afterwards could undo.
             recoverInterruptedDatabaseMigration(nativePath);
             if (databaseName.startsWith("file://")) {
-                db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
+                db = SQLiteDatabase.openOrCreateDatabase(
+                        FileSystemStorage.getInstance().toNativePath(databaseName), null,
+                        KEEP_ON_CORRUPTION);
             } else {
-                db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+                db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE,
+                        null, KEEP_ON_CORRUPTION);
             }
         } catch (RuntimeException didNotOpen) {
             databaseConnectionClosed(nativePath);
@@ -11596,6 +11599,35 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         File backup = readDatabaseMigrationBackup(path);
         return backup != null && backup.isFile();
     }
+
+    /// Leaves a database that will not open where it is.
+    ///
+    /// The platform default answers corruption by deleting the file. An encrypted database opened
+    /// without its key is ciphertext to the plain engine, which is indistinguishable from
+    /// corruption -- so a single accidental openOrCreate(name) against an encrypted database
+    /// destroyed it, and destroyed it in the one case where the data was perfectly intact and one
+    /// correct-key open away from being readable.
+    ///
+    /// Keeping the file turns that into a failed open, which is what a wrong key should be. A
+    /// genuinely corrupt database is kept too, which is the answer every other port gives:
+    /// reporting the failure and leaving the bytes for a backup or a repair tool beats deleting
+    /// them on the application's behalf.
+    ///
+    /// Named rather than anonymous on purpose: an anonymous class here renumbers every later
+    /// `AndroidImplementation$N` in this file, and the cast-semantics baseline is keyed on those
+    /// names, so it would report a pre-existing entry as a new one.
+    private static final class KeepDatabaseOnCorruption
+            implements android.database.DatabaseErrorHandler {
+        @Override
+        public void onCorruption(SQLiteDatabase databaseObject) {
+            com.codename1.io.Log.p("Database " + databaseObject.getPath() + " could not be read. "
+                    + "It was left in place rather than deleted: an encrypted database opened "
+                    + "without its key looks exactly like this.");
+        }
+    }
+
+    private static final android.database.DatabaseErrorHandler KEEP_ON_CORRUPTION =
+            new KeepDatabaseOnCorruption();
 
     private String resolveNativeDatabasePath(String databaseName) {
         if (databaseName.startsWith("file://")) {
