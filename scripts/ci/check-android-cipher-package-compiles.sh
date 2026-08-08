@@ -61,6 +61,7 @@ public class SQLiteDatabase {
     public void beginTransaction() { }
     public void setTransactionSuccessful() { }
     public void endTransaction() { }
+    public boolean inTransaction() { return false; }
     public void execSQL(String sql) { }
     public void close() { }
     public String getPath() { return null; }

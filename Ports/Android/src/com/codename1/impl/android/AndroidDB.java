@@ -114,6 +114,14 @@ public class AndroidDB extends Database {
         checkOpen();
         checkEndTransaction();
         try {
+            if (!db.inTransaction()) {
+                // A SAVEPOINT opened this one, and the wrapper's transaction stack knows nothing
+                // about it, so setTransactionSuccessful() would throw that there is none. SQLite
+                // ends a savepoint-started transaction with an ordinary COMMIT.
+                endThroughSql("COMMIT");
+                markTransactionEnded();
+                return;
+            }
             db.setTransactionSuccessful();
             // A deferred constraint is checked here, so this is where a commit fails. The engine
             // reports it as an unchecked SQLiteException, while the contract for this API is that
@@ -144,6 +152,15 @@ public class AndroidDB extends Database {
     /// is passed through to the engine unexamined, so a leading comment is what gets the rollback
     /// to the connection that actually needs it. Verified against all of the above on API 34:
     /// this is the only one that recovers.
+    /// Ends a transaction the wrapper does not know it is in.
+    ///
+    /// Behind the same comment the rollback recovery needs: the session layer classifies a
+    /// statement by its first three characters, so a bare COMMIT or ROLLBACK is turned into its
+    /// own endTransaction() and throws rather than reaching SQLite.
+    private void endThroughSql(String keyword) {
+        db.execSQL("/* not " + keyword + " to the statement classifier */ " + keyword);
+    }
+
     private void rollbackQuietly() {
         try {
             db.execSQL("/* not ROLLBACK to the statement classifier */ ROLLBACK");
@@ -158,6 +175,12 @@ public class AndroidDB extends Database {
         checkOpen();
         checkEndTransaction();
         try {
+            if (!db.inTransaction()) {
+                // See commitTransaction(): a savepoint opened this, so it ends in SQL.
+                endThroughSql("ROLLBACK");
+                markTransactionEnded();
+                return;
+            }
             // Ending without setTransactionSuccessful is what rolls back.
             db.endTransaction();
         } catch (Exception err) {

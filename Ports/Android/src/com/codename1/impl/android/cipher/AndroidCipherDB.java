@@ -140,6 +140,14 @@ class AndroidCipherDB extends Database {
         checkOpen();
         checkEndTransaction();
         try {
+            if (!db.inTransaction()) {
+                // A SAVEPOINT opened this one, and the wrapper's transaction stack knows nothing
+                // about it, so setTransactionSuccessful() would throw that there is none. SQLite
+                // ends a savepoint-started transaction with an ordinary COMMIT.
+                endThroughSql("COMMIT");
+                markTransactionEnded();
+                return;
+            }
             db.setTransactionSuccessful();
             // A deferred constraint is checked here, so this is where a commit fails. The engine
             // reports it as an unchecked SQLiteException, while the contract for this API is that
@@ -173,6 +181,15 @@ class AndroidCipherDB extends Database {
     ///
     /// That measurement was taken against the stock engine. SQLCipher's SQLiteDatabase is a fork
     /// of the same AOSP sources and classifies statements the same way, so the same applies here.
+    /// Ends a transaction the wrapper does not know it is in.
+    ///
+    /// Behind the same comment the rollback recovery needs: the session layer classifies a
+    /// statement by its first three characters, so a bare COMMIT or ROLLBACK is turned into its
+    /// own endTransaction() and throws rather than reaching SQLite.
+    private void endThroughSql(String keyword) {
+        db.execSQL("/* not " + keyword + " to the statement classifier */ " + keyword);
+    }
+
     private void rollbackQuietly() {
         try {
             db.execSQL("/* not ROLLBACK to the statement classifier */ ROLLBACK");
@@ -187,6 +204,12 @@ class AndroidCipherDB extends Database {
         checkOpen();
         checkEndTransaction();
         try {
+            if (!db.inTransaction()) {
+                // See commitTransaction(): a savepoint opened this, so it ends in SQL.
+                endThroughSql("ROLLBACK");
+                markTransactionEnded();
+                return;
+            }
             db.endTransaction();
         } catch (RuntimeException err) {
             throw new IOException(err.getMessage(), err);

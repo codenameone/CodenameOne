@@ -449,13 +449,17 @@ public class SEDatabase extends Database {
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        if (runAsTransactionControl(sql)) {
-            return;
-        }
         PreparedStatement s = null;
         try {
+            // Prepared before the transaction-control branch: see execute(String, Object...).
             s = conn.prepareStatement(sql);
             checkParameterCount(s, params == null ? 0 : params.length);
+            if (transactionControlKeyword(sql) != null) {
+                cleanup(s);
+                s = null;
+                runAsTransactionControl(sql);
+                return;
+            }
             if (params != null) {
                 for (int i = 0; i < params.length; i++) {
                     if (params[i] == null) {
