@@ -23,6 +23,7 @@
 package com.codename1.retrace;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import org.junit.Test;
@@ -130,6 +131,25 @@ public class MappingFileTest {
         // No reported name -> synthesized from the retraced class.
         assertEquals("Screen.java",
                 mf.retrace(new Frame("a", "b", "", 5)).getFileName());
+    }
+
+    @Test
+    public void ambiguousFrameWithNoLineEmitsAllCandidates() throws Exception {
+        // Two unrelated methods share one obfuscated name with no obfuscated line ranges. A frame
+        // with no usable line can't disambiguate, so retraceAll must emit BOTH originals rather than
+        // fabricating the first.
+        MappingFile mf = MappingFile.parse(
+                "com.example.C -> x:\n"
+                + "    void alpha() -> a\n"
+                + "    void beta() -> a\n");
+        java.util.List<Frame> frames = mf.retraceAll(new Frame("x", "a", "", 0));
+        assertEquals(2, frames.size());
+        java.util.Set<String> names = new java.util.HashSet<String>();
+        for (Frame f : frames) {
+            names.add(f.getMethodName());
+        }
+        assertTrue(names.contains("alpha"));
+        assertTrue(names.contains("beta"));
     }
 
     @Test

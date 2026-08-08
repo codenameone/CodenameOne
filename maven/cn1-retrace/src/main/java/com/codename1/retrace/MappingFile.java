@@ -229,7 +229,13 @@ public final class MappingFile {
                 }
             }
             if (out.isEmpty()) {
-                out.add(frameFor(candidates.get(0), originalClass, file, observed));
+                // No line to disambiguate (Unknown Source, or the mapping records omit obfuscated
+                // ranges). ProGuard/R8 can reuse one obfuscated name for several overloads, so picking
+                // the first would name the wrong original method. Emit every candidate to preserve the
+                // ambiguity rather than fabricate a single answer.
+                for (MethodMapping m : candidates) {
+                    out.add(frameFor(m, originalClass, file, observed));
+                }
             }
         } else {
             out.add(new Frame(originalClass, obfuscated.getMethodName(), file, observed));

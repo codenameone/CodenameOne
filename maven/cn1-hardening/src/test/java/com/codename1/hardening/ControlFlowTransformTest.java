@@ -77,6 +77,36 @@ public class ControlFlowTransformTest {
         assertEquals(5, c.getMethod("compute", int.class, int.class).invoke(null, 2, 3));
     }
 
+    @Test
+    public void guardsAClassThatAlreadyDeclaresAGuardFieldName() throws Exception {
+        // A class already declares a field named exactly like the guard field. It must still be
+        // guarded (with a non-colliding field), not returned unchanged on a false "already
+        // transformed" assumption.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/GuardClash", null, "java/lang/Object", null);
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE | org.objectweb.asm.Opcodes.ACC_STATIC,
+                ControlFlowTransform.GUARD_FIELD, "I", null, null).visitEnd();
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "add", "(II)I", null, null);
+        m.visitCode();
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 0);
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 1);
+        m.visitInsn(org.objectweb.asm.Opcodes.IADD);
+        m.visitInsn(org.objectweb.asm.Opcodes.IRETURN);
+        m.visitMaxs(2, 2);
+        m.visitEnd();
+        w.visitEnd();
+
+        ControlFlowTransform t = new ControlFlowTransform();
+        byte[] out = t.transform(w.toByteArray());
+        assertTrue("the clashing class must still be guarded, not skipped", t.getGuardedMethods() >= 1);
+        CheckClassAdapter.verify(new ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.GuardClash", out);
+        assertEquals(5, c.getMethod("add", int.class, int.class).invoke(null, 2, 3));
+    }
+
     // Renames the class internal name so the intense variant can load beside the plain one.
     private static byte[] rename(byte[] bytes, String from, String to) {
         org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader(bytes);

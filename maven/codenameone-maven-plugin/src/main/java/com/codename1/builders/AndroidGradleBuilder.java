@@ -5498,15 +5498,14 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String keepOverride = request.getArg("android.proguardKeepOverride", "Exceptions, InnerClasses, Signature, Deprecated, SourceFile, LineNumberTable, *Annotation*, EnclosingMethod");
-        // On a hardened build, strip SourceFile from R8's kept attributes for DexGuard parity (the
-        // crash retrace reconstructs the file name from the retraced class; LineNumberTable is kept so
-        // lines still retrace). Only when the developer didn't supply their own attribute list.
-        String hardenLvl = request.getArg("harden.level", "off");
-        boolean hardeningOn = hardenLvl != null && hardenLvl.trim().length() > 0
-                && !"off".equalsIgnoreCase(hardenLvl.trim())
-                && !"false".equalsIgnoreCase(request.getArg("harden.and.enabled", "true"))
-                && request.getArg("android.proguardKeepOverride", null) == null;
-        if (hardeningOn) {
+        // On a build the engine actually hardened, strip SourceFile from R8's kept attributes for
+        // DexGuard parity (the retrace reconstructs the file name from the retraced class;
+        // LineNumberTable is kept so lines still retrace). Gate on the VERIFIED cn1.hardened output
+        // (set only after a successful, entitled engine run), so an opt-out build (harden.and.enabled
+        // =off/0, or a level whose transforms are all disabled -> engine declines) keeps its
+        // metadata. Only when the developer didn't supply their own attribute list.
+        if ("true".equals(request.getArg("cn1.hardened", "false"))
+                && request.getArg("android.proguardKeepOverride", null) == null) {
             keepOverride = keepOverride.replace("SourceFile, ", "").replace(", SourceFile", "").replace("SourceFile,", "");
         }
 

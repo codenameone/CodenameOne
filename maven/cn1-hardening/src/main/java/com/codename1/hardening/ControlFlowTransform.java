@@ -90,9 +90,11 @@ public final class ControlFlowTransform {
         if ((cn.access & Opcodes.ACC_INTERFACE) != 0) {
             return classBytes;
         }
-        if (hasGuardField(cn)) {
-            return classBytes;
-        }
+        // Pick a guard field name that collides with no existing member, so a class that happens to
+        // declare a zq$cf field (reachable on Android, where the engine doesn't rename first, or in a
+        // pre-obfuscated dependency) is still guarded instead of being returned unchanged on the false
+        // assumption that the collision means it was already transformed.
+        String guardField = resolveGuardField(cn);
 
         boolean changed = false;
         if (cn.methods != null) {
@@ -101,7 +103,7 @@ public final class ControlFlowTransform {
                     continue;
                 }
                 for (int i = 0; i < intensity; i++) {
-                    prependGuard(cn, mn);
+                    prependGuard(cn, mn, guardField);
                 }
                 guardedMethods++;
                 changed = true;
@@ -111,8 +113,8 @@ public final class ControlFlowTransform {
             return classBytes;
         }
 
-        addGuardField(cn);
-        initGuardField(cn);
+        addGuardField(cn, guardField);
+        initGuardField(cn, guardField);
 
         ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
@@ -134,10 +136,10 @@ public final class ControlFlowTransform {
         return true;
     }
 
-    private void prependGuard(ClassNode cn, MethodNode mn) {
+    private void prependGuard(ClassNode cn, MethodNode mn, String guardField) {
         InsnList pre = new InsnList();
         LabelNode ok = new LabelNode();
-        pre.add(new FieldInsnNode(Opcodes.GETSTATIC, cn.name, GUARD_FIELD, GUARD_DESC));
+        pre.add(new FieldInsnNode(Opcodes.GETSTATIC, cn.name, guardField, GUARD_DESC));
         // if (zq$cf > 0) goto ok;  -- always taken at runtime, unprovable statically.
         pre.add(new JumpInsnNode(Opcodes.IFGT, ok));
         // dead arm: throw new RuntimeException();  -- never reached.
@@ -149,27 +151,34 @@ public final class ControlFlowTransform {
         mn.instructions.insert(pre);
     }
 
-    private boolean hasGuardField(ClassNode cn) {
-        if (cn.fields == null) {
-            return false;
-        }
-        for (FieldNode fn : cn.fields) {
-            if (GUARD_FIELD.equals(fn.name)) {
-                return true;
+    /** A guard field name not already declared by {@code cn} (lengthens the suffix until free). */
+    private String resolveGuardField(ClassNode cn) {
+        String name = GUARD_FIELD;
+        if (cn.fields != null) {
+            boolean clash = true;
+            while (clash) {
+                clash = false;
+                for (FieldNode fn : cn.fields) {
+                    if (name.equals(fn.name)) {
+                        name = name + "$";
+                        clash = true;
+                        break;
+                    }
+                }
             }
         }
-        return false;
+        return name;
     }
 
-    private void addGuardField(ClassNode cn) {
+    private void addGuardField(ClassNode cn, String guardField) {
         if (cn.fields == null) {
             cn.fields = new java.util.ArrayList<FieldNode>();
         }
         cn.fields.add(new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                GUARD_FIELD, GUARD_DESC, null, null));
+                guardField, GUARD_DESC, null, null));
     }
 
-    private void initGuardField(ClassNode cn) {
+    private void initGuardField(ClassNode cn, String guardField) {
         InsnList init = new InsnList();
         // zq$cf = Runtime.getRuntime().availableProcessors();  -- contractually >= 1 on every JVM,
         // and a runtime call the optimizer/decompiler cannot fold, so the guard is always taken and
@@ -178,7 +187,7 @@ public final class ControlFlowTransform {
                 "()Ljava/lang/Runtime;", false));
         init.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Runtime", "availableProcessors",
                 "()I", false));
-        init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, GUARD_FIELD, GUARD_DESC));
+        init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, guardField, GUARD_DESC));
 
         MethodNode clinit = null;
         if (cn.methods != null) {
