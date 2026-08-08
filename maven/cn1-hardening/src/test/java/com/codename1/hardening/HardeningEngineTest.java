@@ -100,6 +100,103 @@ public class HardeningEngineTest {
         return cw.toByteArray();
     }
 
+    /** A class with a SourceFile and a static run() that instantiates each referenced type (keeping it reachable). */
+    private static byte[] mainReferencing(String internal, String sourceFile, String... refs) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(
+                org.objectweb.asm.ClassWriter.COMPUTE_FRAMES);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, "java/lang/Object", null);
+        cw.visitSource(sourceFile, null);
+        org.objectweb.asm.MethodVisitor init = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 0);
+        init.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESPECIAL, "java/lang/Object",
+                "<init>", "()V", false);
+        init.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+        org.objectweb.asm.MethodVisitor m = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "run", "()V", null, null);
+        m.visitCode();
+        for (String ref : refs) {
+            m.visitTypeInsn(org.objectweb.asm.Opcodes.NEW, ref);
+            m.visitInsn(org.objectweb.asm.Opcodes.DUP);
+            m.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESPECIAL, ref, "<init>", "()V", false);
+            m.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        m.visitMaxs(2, 0);
+        m.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    /** A class carrying a {@code SourceFile} attribute plus a constructor and a method to rename. */
+    private static byte[] classWithSource(String internal, String sourceFile) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(
+                org.objectweb.asm.ClassWriter.COMPUTE_FRAMES);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, "java/lang/Object", null);
+        cw.visitSource(sourceFile, null);
+        org.objectweb.asm.MethodVisitor init = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 0);
+        init.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESPECIAL, "java/lang/Object",
+                "<init>", "()V", false);
+        init.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+        org.objectweb.asm.MethodVisitor m = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "doThing", "()V", null, null);
+        m.visitCode();
+        m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        m.visitMaxs(0, 1);
+        m.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    @Test
+    public void engineMappingRecordsNonDefaultSourceFiles() throws Exception {
+        org.junit.Assume.assumeTrue("ProGuard renamer needs JDK <=20", HardeningEngine.proguardCanRunHere());
+        // Screen is a Kotlin class (Screen.kt) whose name can't reconstruct the file; Widget's Widget.java
+        // IS the synthesized default. The engine strips SourceFile, so it must record Screen.kt in the
+        // mapping (else a retrace points Screen at a non-existent Screen.java) but need not record Widget.
+        File jar = tmp.newFile("srcfile.jar");
+        FileOutputStream fo = new FileOutputStream(jar);
+        ZipOutputStream zos = new ZipOutputStream(fo);
+        zos.putNextEntry(new ZipEntry("app/Main.class"));
+        // Main (kept) references Screen and Widget so ProGuard reaches and renames them.
+        zos.write(mainReferencing("app/Main", "Main.java", "app/Screen", "app/Widget"));
+        zos.closeEntry();
+        zos.putNextEntry(new ZipEntry("app/Screen.class"));
+        zos.write(classWithSource("app/Screen", "Screen.kt"));
+        zos.closeEntry();
+        zos.putNextEntry(new ZipEntry("app/Widget.class"));
+        zos.write(classWithSource("app/Widget", "Widget.java"));
+        zos.closeEntry();
+        zos.finish();
+        fo.close();
+
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "standard");   // rename on (engine-renamed target)
+        File mapping = tmp.newFile("srcfile-map.txt");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(jar).outputJar(tmp.newFile("srcfile-out.jar")).mappingFile(mapping)
+                .workDir(tmp.newFolder("srcfile-work"))
+                .config(HardeningConfig.from(hints, "ios", true))
+                .mainClass("app.Main");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertTrue(r.isHardened());
+        String map = new String(java.nio.file.Files.readAllBytes(mapping.toPath()), "UTF-8");
+        assertTrue("the Kotlin source file must be recorded: " + map,
+                map.contains("\"fileName\":\"Screen.kt\""));
+        assertFalse("the default Widget.java need not be recorded",
+                map.contains("\"fileName\":\"Widget.java\""));
+    }
+
     /** A class whose {@code run()} method loads each given string literal (and discards it). */
     private static byte[] classWithLiterals(String internal, String... literals) {
         org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);

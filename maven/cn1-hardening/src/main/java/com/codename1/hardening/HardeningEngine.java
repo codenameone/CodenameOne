@@ -355,6 +355,10 @@ public final class HardeningEngine {
         // engine mapping is empty -- hashing it would stamp a meaningless constant id. Leave it empty.
         String mappingId = "";
         if (mappingFile != null && cfg.isRenameEnabled()) {
+            // Record the real source filename for classes whose SourceFile the engine just stripped and
+            // whose name cannot reconstruct it (Kotlin Screen.kt, a package-private class in Main.java),
+            // captured from the INPUT classes before the strip. Done before finalize so the id covers it.
+            MappingWriter.injectSourceFiles(mappingFile, collectSourceFiles(inClasses));
             mappingId = MappingWriter.finalizeMapping(mappingFile, ENGINE_VERSION, PROGUARD_VERSION,
                     cfg.getPlatform(), req.getBuildKey());
         }
@@ -552,6 +556,46 @@ public final class HardeningEngine {
      */
     static boolean compilesCarriedSource(String platform) {
         return "and".equals(platform) || "android".equals(platform);
+    }
+
+    /**
+     * Maps the original (dotted) class name to its {@code SourceFile} attribute, for the classes worth
+     * recording in the mapping: those whose filename differs from the synthesized {@code <SimpleName>.java}
+     * default, i.e. Kotlin sources and package-private classes declared in a differently named file. Read
+     * from the INPUT classes, before the engine strips the attribute.
+     */
+    private static java.util.Map<String, String> collectSourceFiles(java.util.Map<String, byte[]> classes) {
+        java.util.Map<String, String> out = new java.util.HashMap<String, String>();
+        for (java.util.Map.Entry<String, byte[]> e : classes.entrySet()) {
+            final String[] sf = new String[1];
+            new org.objectweb.asm.ClassReader(e.getValue()).accept(
+                    new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                        @Override
+                        public void visitSource(String source, String debug) {
+                            sf[0] = source;
+                        }
+                    // NOT SKIP_DEBUG -- that flag skips the SourceFile attribute, which is exactly what
+                    // visitSource reports and what we are here to capture.
+                    }, org.objectweb.asm.ClassReader.SKIP_CODE | org.objectweb.asm.ClassReader.SKIP_FRAMES);
+            if (sf[0] != null && sf[0].length() > 0 && !sf[0].equals(defaultSourceFile(e.getKey()))) {
+                out.put(e.getKey().replace('/', '.'), sf[0]);
+            }
+        }
+        return out;
+    }
+
+    /** The {@code <SimpleName>.java} a retrace synthesizes from an internal class name (its default). */
+    private static String defaultSourceFile(String internalName) {
+        String simple = internalName;
+        int slash = simple.lastIndexOf('/');
+        if (slash >= 0) {
+            simple = simple.substring(slash + 1);
+        }
+        int dollar = simple.indexOf('$');
+        if (dollar > 0) {
+            simple = simple.substring(0, dollar);
+        }
+        return simple + ".java";
     }
 
     /** Adds every Java/Kotlin identifier token in {@code source} to {@code out} (a safe over-set). */

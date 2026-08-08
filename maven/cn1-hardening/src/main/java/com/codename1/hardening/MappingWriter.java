@@ -77,6 +77,55 @@ public final class MappingWriter {
         }
     }
 
+    /**
+     * Injects R8-style {@code sourceFile} metadata comments into the mapping so a retrace can report the
+     * real source filename. The engine strips the {@code SourceFile} attribute and ProGuard's mapping
+     * records no filename, so without this a Kotlin class ({@code Screen.kt}) or a package-private class
+     * declared in a differently named file retraces to a synthesized {@code <Class>.java} that does not
+     * exist. Only classes whose recorded filename differs from that synthesized default are written (the
+     * ordinary {@code Foo}/{@code Foo.java} case needs no comment). The comment is INDENTED so the retrace
+     * parser attaches it to the preceding class line, matching R8's own emission.
+     *
+     * @param sourceFileByFqcn original dotted class name to its {@code SourceFile}, for the classes worth
+     *                         recording; captured before the attribute was stripped.
+     */
+    static void injectSourceFiles(File mappingFile, java.util.Map<String, String> sourceFileByFqcn)
+            throws HardeningException {
+        if (sourceFileByFqcn == null || sourceFileByFqcn.isEmpty() || mappingFile == null
+                || !mappingFile.isFile()) {
+            return;
+        }
+        try {
+            java.util.List<String> lines = Files.readAllLines(mappingFile.toPath(),
+                    Charset.forName("UTF-8"));
+            StringBuilder out = new StringBuilder();
+            for (String line : lines) {
+                out.append(line).append('\n');
+                // A class line is unindented, contains " -> ", and ends with ':'. Its members follow
+                // indented, so inject the metadata comment right after it (also indented).
+                if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0)) && line.endsWith(":")) {
+                    int arrow = line.indexOf(" -> ");
+                    if (arrow > 0) {
+                        String original = line.substring(0, arrow).trim();
+                        String sf = sourceFileByFqcn.get(original);
+                        if (sf != null) {
+                            out.append("    # {\"id\":\"sourceFile\",\"fileName\":\"")
+                                    .append(jsonEscape(sf)).append("\"}\n");
+                        }
+                    }
+                }
+            }
+            Files.write(mappingFile.toPath(), out.toString().getBytes(Charset.forName("UTF-8")));
+        } catch (IOException e) {
+            throw new HardeningException("Could not inject source-file metadata into the mapping", e);
+        }
+    }
+
+    /** Escapes the two characters that would break a JSON string value; filenames rarely need it. */
+    private static String jsonEscape(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
     static String sha256Hex(byte[] data) throws HardeningException {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
