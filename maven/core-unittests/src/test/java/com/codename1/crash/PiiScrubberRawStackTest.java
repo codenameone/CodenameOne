@@ -77,6 +77,27 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void customScrubMessageOverrideReachesRawStack() {
+        // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
+        // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by
+        // the override so coordinates survive.
+        PiiScrubber custom = new PiiScrubber() {
+            public String scrubMessage(String message) {
+                if (message == null) {
+                    return null;
+                }
+                return super.scrubMessage(message).replace("SECRET", "[redacted]");
+            }
+        };
+        String stack = "java.lang.RuntimeException: token SECRET rejected\n"
+                + "    at run (http://host/app.js:1:98765)\n";
+        String scrubbed = custom.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("[redacted]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("SECRET") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:1:98765") >= 0, scrubbed);
+    }
+
+    @Test
     void messageDigitsAndEmailsStillScrubbed() {
         // The leading message line is free-form and can carry PII: a long id/phone is masked and an
         // email is partially redacted, even though frame coordinates below are preserved.

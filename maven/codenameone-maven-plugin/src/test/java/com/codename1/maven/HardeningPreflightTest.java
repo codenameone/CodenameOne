@@ -80,4 +80,42 @@ public class HardeningPreflightTest {
         assertTrue(r.isFailed());
         assertTrue(r.getMessage().contains("on-device-debug"));
     }
+
+    @Test
+    public void levelWithEveryTransformOverriddenOffRequestsNothing() {
+        // standard defaults to rename + constant-string encryption; overriding all of them off leaves
+        // nothing for the engine to do (SKIPPED_NOT_REQUESTED), so the mojo must treat it as off and
+        // not reject a local/source build for a "hardening" it isn't asking for.
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty("codename1.arg.harden.rename", "false");
+        p.setProperty("codename1.arg.harden.strings", "off");
+        p.setProperty("codename1.arg.harden.controlFlow", "false");
+        assertFalse(CN1BuildMojo.hardeningRequestsAnyTransform(p, "standard"));
+        assertFalse(CN1BuildMojo.hardeningRequestsAnyTransform(p, "aggressive"));
+        assertFalse(CN1BuildMojo.hardeningRequestsAnyTransform(p, "paranoid"));
+    }
+
+    @Test
+    public void aRemainingTransformStillCounts() {
+        // Any single transform left on means hardening IS requested.
+        java.util.Properties strings = new java.util.Properties();
+        strings.setProperty("codename1.arg.harden.rename", "false");
+        strings.setProperty("codename1.arg.harden.strings", "all");
+        strings.setProperty("codename1.arg.harden.controlFlow", "false");
+        assertTrue(CN1BuildMojo.hardeningRequestsAnyTransform(strings, "standard"));
+
+        java.util.Properties rename = new java.util.Properties();
+        rename.setProperty("codename1.arg.harden.strings", "off");
+        rename.setProperty("codename1.arg.harden.controlFlow", "false");
+        // rename unset -> defaults on at standard.
+        assertTrue(CN1BuildMojo.hardeningRequestsAnyTransform(rename, "standard"));
+    }
+
+    @Test
+    public void defaultsAtStandardRequestHardening() {
+        // No overrides at a non-off level requests hardening (rename + constant strings by default).
+        assertTrue(CN1BuildMojo.hardeningRequestsAnyTransform(new java.util.Properties(), "standard"));
+        // off requests nothing regardless of overrides.
+        assertFalse(CN1BuildMojo.hardeningRequestsAnyTransform(new java.util.Properties(), "off"));
+    }
 }

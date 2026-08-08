@@ -205,6 +205,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true"))) {
             level = "off";
         }
+        // Even at a non-off level, a build that has overridden every individual transform off
+        // (e.g. harden.rename=false, harden.strings=off, harden.controlFlow=false) requests nothing:
+        // the engine treats that as SKIPPED_NOT_REQUESTED, which is equivalent to off. Resolve the
+        // overrides to the effective transform set so such a build is not rejected on a local/source
+        // or on-device-debug target for a "hardening" it isn't actually asking for.
+        if (!"off".equalsIgnoreCase(level.trim()) && !hardeningRequestsAnyTransform(settings, level)) {
+            level = "off";
+        }
         boolean allowLocal = "true".equalsIgnoreCase(
                 settings.getProperty("codename1.arg.harden.allowUnhardenedLocalBuild", "false").trim());
         boolean onDeviceDebug = "true".equalsIgnoreCase(
@@ -273,6 +281,90 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         String t = value.trim().toLowerCase();
         return "false".equals(t) || "0".equals(t) || "off".equals(t);
+    }
+
+    /**
+     * True when, at this level, at least one hardening transform is still requested once the
+     * individual {@code harden.*} overrides are applied -- mirroring the engine's
+     * {@code HardeningConfig}/{@code willApplyAnyTransform} "is anything requested" decision (the
+     * platform-safety refinement is the server's, and only ever narrows this). A level whose every
+     * transform is overridden off requests nothing and is equivalent to {@code off}, so the preflight
+     * must not reject it.
+     */
+    static boolean hardeningRequestsAnyTransform(Properties settings, String level) {
+        int rank = hardenLevelRank(level);
+        if (rank <= 0) {
+            return false;
+        }
+        // rank is 1..3 here (standard/aggressive/paranoid), so the standard-level defaults -- renaming
+        // and constant-string encryption -- are on unless explicitly overridden off. Control-flow is a
+        // default only from aggressive up.
+        boolean atLeastAggressive = rank >= 2;
+        boolean rename = hardenBoolTri(
+                settings.getProperty("codename1.arg.harden.rename"), true);
+        boolean stringsOn = hardenStringsRequested(
+                settings.getProperty("codename1.arg.harden.strings"), true);
+        boolean controlFlow = hardenBoolTri(
+                settings.getProperty("codename1.arg.harden.controlFlow"), atLeastAggressive);
+        return rename || stringsOn || controlFlow;
+    }
+
+    /** off/empty/unknown = 0, standard = 1, aggressive = 2, paranoid = 3. */
+    private static int hardenLevelRank(String level) {
+        if (level == null) {
+            return 0;
+        }
+        String v = level.trim().toLowerCase();
+        if ("standard".equals(v)) {
+            return 1;
+        }
+        if ("aggressive".equals(v)) {
+            return 2;
+        }
+        if ("paranoid".equals(v)) {
+            return 3;
+        }
+        return 0;
+    }
+
+    /** Tri-state boolean matching the engine's {@code HardeningConfig.boolTri}. */
+    private static boolean hardenBoolTri(String value, boolean def) {
+        if (value == null) {
+            return def;
+        }
+        String t = value.trim().toLowerCase();
+        if (t.isEmpty()) {
+            return def;
+        }
+        if ("true".equals(t) || "1".equals(t) || "2".equals(t) || "3".equals(t) || "on".equals(t)) {
+            return true;
+        }
+        if ("false".equals(t) || "0".equals(t) || "off".equals(t)) {
+            return false;
+        }
+        return def;
+    }
+
+    /**
+     * Whether string encryption is requested, matching {@code HardeningConfig}'s {@code harden.strings}
+     * parsing: {@code off} disables; {@code constants}/{@code all} enable; anything else (including an
+     * unset value) falls back to the level default, which the CLI validates up front.
+     */
+    private static boolean hardenStringsRequested(String strings, boolean def) {
+        if (strings == null) {
+            return def;
+        }
+        String v = strings.trim().toLowerCase();
+        if (v.isEmpty()) {
+            return def;
+        }
+        if ("off".equals(v)) {
+            return false;
+        }
+        if ("constants".equals(v) || "all".equals(v)) {
+            return true;
+        }
+        return def;
     }
 
     /** Maps {@code codename1.platform} to the {@code harden.<platform>.enabled} opt-out key. */

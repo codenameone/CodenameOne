@@ -100,6 +100,12 @@ public class PiiScrubber {
     /// #### Returns
     ///
     /// the scrubbed stack string, or `null` if `rawStack` is `null`.
+    ///
+    /// A free-form (non-frame) line is routed through {@link #scrubMessage(String)}
+    /// -- the overridable method -- so an app that redacts app-specific tokens there
+    /// redacts them in `rawStack` too, not only in the separately-scrubbed message.
+    /// A frame line instead gets only the built-in email pass: the virtual scrubber
+    /// masks long digit runs, which would destroy a frame's line/column coordinate.
     public String scrubRawStack(String rawStack) {
         if (rawStack == null) {
             return null;
@@ -111,8 +117,7 @@ public class PiiScrubber {
             int nl = rawStack.indexOf('\n', i);
             int lineEnd = nl < 0 ? len : nl;
             String line = rawStack.substring(i, lineEnd);
-            String emailScrubbed = scrubEmails(line);
-            out.append(isFrameLine(line) ? emailScrubbed : scrubDigitRuns(emailScrubbed));
+            out.append(isFrameLine(line) ? scrubEmails(line) : scrubMessage(line));
             if (nl < 0) {
                 break;
             }
