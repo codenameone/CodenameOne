@@ -43,13 +43,32 @@ public class BrowserComponentScreenshotTest extends BaseTest {
     private boolean jsReady;
     private boolean jsCheckPending;
     private RGBImage visualBand;
-    /// Which attempt the state below belongs to. Incremented by every runTest(),
-    /// and captured by every asynchronous callback so a superseded attempt can
-    /// never answer for the current one. A page load, a pending execute() and an
-    /// in-flight screenshot all outlive the attempt that started them, and the
-    /// state they write -- loaded, jsReady, the emitted capture, a fail() -- is
-    /// shared. Guarding one of the three would just move the bug.
+    /// Which attempt the state below belongs to. Advanced by resetForRetry() and
+    /// by every runTest(), and captured by every asynchronous callback so a
+    /// superseded attempt can never answer for the current one. A page load, a
+    /// pending execute() and an in-flight screenshot all outlive the attempt
+    /// that started them, and the state they write -- loaded, jsReady, the
+    /// emitted capture, a fail() -- is shared. Guarding one of the three would
+    /// just move the bug.
+    ///
+    /// EDT-confined: the harness finalizes on the EDT and all three callbacks
+    /// are delivered there, so a plain int needs no further publication.
     private int attempt;
+
+    /// Retire the current generation the moment the harness decides to retry,
+    /// not when the queued runTest() eventually runs.
+    ///
+    /// finalizeTest() calls this and then queues the next runTest() through
+    /// CN.callSerially, so incrementing only in runTest() left a window in
+    /// between where a callback from the timed-out attempt still matched the
+    /// current generation -- and resetForRetry() has just cleared done, failed
+    /// and captureStarted, so an emitImage() or fail() arriving in that window
+    /// is honoured, completing or poisoning a retry that has not begun.
+    @Override
+    public synchronized void resetForRetry() {
+        attempt++;
+        super.resetForRetry();
+    }
 
     @Override
     public boolean runTest() throws Exception {
