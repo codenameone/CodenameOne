@@ -225,6 +225,10 @@ prefer plain files, extract it once and point at the directory.
   seen yet (an anonymous listener, say) resolves via the ClassPrepare
   events the proxy raises for every matching class.
 * Pause and resume from the IDE.
+* Stack frames in methods carrying no line information — synthetic
+  lambda bodies and `java.lang.Thread.runImpl`, for instance — appear
+  in the stack with their source line left blank, rather than ending
+  the stack view at that frame.
 
 === Pointing the IDE at the Codename One sources
 
@@ -361,8 +365,17 @@ firewall is blocking the port. Verify:
 This means an unsupported JDWP command was invoked. The session
 itself survives; the most common cause is the IDE asking for
 something the proxy explicitly stubs (see "Known limitations"
-above). If you hit a less obvious case, the proxy logs the unknown
-command code — file an issue with that code attached.
+above). The debugger's own message doesn't say which command it
+asked for, so the proxy logs it instead:
+
+[source]
+----
+[jdwp] declining unimplemented command set=2 cmd=13; the debugger
+may report "Unexpected JDWP Error: 100"
+----
+
+The line is printed once per command, in the proxy's console. File
+an issue with the command set and number attached.
 
 ==== The app launches but the breakpoint never fires
 
