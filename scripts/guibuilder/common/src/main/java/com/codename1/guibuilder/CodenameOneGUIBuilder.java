@@ -1966,6 +1966,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             document.setAttribute("tableRow", String.valueOf(destination[0]));
             document.setAttribute("tableColumn", String.valueOf(destination[1]));
         }
+        // The anchor being free is not enough when the dragged component spans: its whole
+        // rectangle has to fit and be clear. normalizeTableCells() only repairs duplicate anchors,
+        // so an intersecting span survived it and overlapped in the preview and generated form.
+        if (!draggedSpanFits(plan.parent, dragged, plan.occupied, row, column)) {
+            setStatus("That cell cannot hold this component's span");
+            return false;
+        }
         document.select(dragged);
         document.setAttribute("layoutConstraint", null);
         document.setAttribute("layeredInsets", null);
@@ -1973,6 +1980,38 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         document.setAttribute("tableColumn", String.valueOf(column));
         normalizeTableCells(plan.parent);
         document.select(dragged);
+        return true;
+    }
+
+    /**
+     * Whether the dragged component's span rectangle fits the table at the given anchor and is
+     * clear of the siblings that remain there.
+     *
+     * @param parent the table
+     * @param dragged the component being placed
+     * @param displaced a component already being moved out of the way, or null
+     * @param row the anchor row
+     * @param column the anchor column
+     * @return true when the whole rectangle is inside the table and unoccupied
+     */
+    private boolean draggedSpanFits(Element parent, Element dragged, Element displaced, int row, int column) {
+        int rowSpan = Math.max(1, integer(dragged.getAttribute("tableVerticalSpan"), 1));
+        int columnSpan = Math.max(1, integer(dragged.getAttribute("tableHorizontalSpan"), 1));
+        if (rowSpan == 1 && columnSpan == 1) return true;
+        int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
+        if (column + columnSpan > columns) return false;
+        for (Element child : componentChildren(parent)) {
+            if (child == dragged || child == displaced) continue;
+            Integer childRow = parseInteger(child.getAttribute("tableRow"));
+            Integer childColumn = parseInteger(child.getAttribute("tableColumn"));
+            if (childRow == null || childColumn == null) continue;
+            int childRowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
+            int childColumnSpan = Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1));
+            boolean rowsOverlap = row < childRow.intValue() + childRowSpan && childRow.intValue() < row + rowSpan;
+            boolean columnsOverlap = column < childColumn.intValue() + childColumnSpan
+                    && childColumn.intValue() < column + columnSpan;
+            if (rowsOverlap && columnsOverlap) return false;
+        }
         return true;
     }
 
@@ -3258,11 +3297,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (!com.codename1.ui.Dialog.show("Regenerate the binding model?",
                 "The existing model was generated for the previous strategy and will not bind"
-                + " correctly. Regenerate it? Your own changes to that file are replaced.",
-                "Regenerate", "Keep mine")) {
+                + " correctly. Regenerate it when you save? Your own changes to that file are"
+                + " replaced.", "Regenerate on save", "Keep mine")) {
+            regenerateModelOnSave = false;
             setStatus("Kept the existing model; it may not bind under the new strategy");
             return;
         }
+        // Deferred to Save, so the model and the companion change together. Writing it here left
+        // the on-disk pair mismatched until the form happened to be saved -- and permanently so if
+        // the picker change was undone or the form closed without saving.
+        regenerateModelOnSave = true;
+        setStatus("The binding model will be regenerated when you save");
+    }
+
+    /** Rewrites the model alongside the companion, when a strategy change asked for it. */
+    private void regenerateModelIfRequested(String sourcePath) {
+        if (!regenerateModelOnSave) return;
+        regenerateModelOnSave = false;
+        String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
         try {
             String regenerated = generatedModelSource();
             ProjectIO.write(modelPath, regenerated);
@@ -3282,6 +3334,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             ToastBar.showErrorMessage("Model regeneration failed: " + ex.getMessage());
         }
     }
+
+    /** Set when a strategy change agreed to rewrite the model, cleared once that has happened. */
+    private boolean regenerateModelOnSave;
 
     private Component toolbarCommandsEditor() {
         Container commands = new Container(BoxLayout.y());
@@ -4309,6 +4364,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // to "properties". Creating the model only when the Code pane is saved left an ordinary
             // Save producing source that referenced a class which did not exist.
             if (ensureBindingModel(sourcePath) == MODEL_FAILED) return false;
+            regenerateModelIfRequested(sourcePath);
             // Only now: marking the document clean after the .gui write but before the companion
             // one meant a failed companion write left isModified() false, so the next form switch
             // went ahead without retrying and the runtime source stayed stale.
@@ -5271,7 +5327,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int newEnd = generated.indexOf(endMarker);
         if (newStart < 0 || newEnd < newStart) return generated;
         String userCode = existing.substring(oldStart + startMarker.length(), oldEnd);
-        return generated.substring(0, newStart + startMarker.length()) + userCode + generated.substring(newEnd);
+        // Imports too. Migration adds them once, but every later save takes this branch, and
+        // keeping only the marker body dropped them again on the second ordinary Save while the
+        // methods that need them stayed.
+        String withImports = carriedImports(existing, generated);
+        int keepStart = withImports.indexOf(startMarker);
+        int keepEnd = withImports.indexOf(endMarker);
+        if (keepStart < 0 || keepEnd < keepStart) {
+            return generated.substring(0, newStart + startMarker.length()) + userCode + generated.substring(newEnd);
+        }
+        return withImports.substring(0, keepStart + startMarker.length()) + userCode + withImports.substring(keepEnd);
     }
 
     static final String LEGACY_GENERATED_START = "//-- DON'T EDIT BELOW THIS LINE!!!";
@@ -5617,6 +5682,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     String mcpOpenForm(String formName) {
         if (formName == null || formName.length() == 0) return "form is required";
         if (document != null && document.isModified()) return "Active form has unsaved changes";
+        // Not routed through switchForm(), so the prompt added there does not apply here; MCP
+        // cannot ask, so it refuses rather than dropping the buffer.
+        if (editorBufferIsDirty()) return "The open editor has unsaved changes";
         for (String path : guiFiles) {
             String relative = relativeFormName(path);
             String simple = relative.substring(relative.lastIndexOf('.') + 1);
