@@ -31,6 +31,8 @@ import com.codename1.components.ToastBar;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.javase.simulator.*;
 import com.codename1.impl.javase.ffmpeg.FFMPEGMedia;
 import com.codename1.impl.javase.util.MavenUtils;
@@ -86,6 +88,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import com.codename1.io.Properties;
@@ -13397,6 +13400,15 @@ public class JavaSEPort extends CodenameOneImplementation {
         if ("simulator.skin".equalsIgnoreCase(key)) {
             return getCurrentSkinName();
         }
+        if ("db.legacy".equals(key)) {
+            // No builder runs for the simulator, so the build hint has to be resolved here or
+            // testing the compatibility switch would need a device.
+            String legacy = buildHint("db.legacy");
+            if (legacy != null) {
+                return legacy;
+            }
+            return defaultValue;
+        }
         if(key.equalsIgnoreCase("cn1_push_prefix") 
                 || key.equalsIgnoreCase("cellId") 
                 || key.equalsIgnoreCase("IMEI") 
@@ -16662,11 +16674,18 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, DatabaseConfig config) throws IOException {
         try {
             // Load the sqlite database Engine JDBC driver
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException ex) {
         }
+        java.sql.Connection conn = null;
+        String openKey = null;
         try {
             // connect to the database.   This will load the db files and start the
             // database if it is not alread running.
@@ -16674,28 +16693,145 @@ public class JavaSEPort extends CodenameOneImplementation {
             // of the db.
             // It can contain directory names relative to the
             // current working directory
-            SQLiteConfig config = new SQLiteConfig();
-            config.enableLoadExtension(true);
             File file = getDatabaseFile(databaseName);
-             
-            
+
             File dir = file.getParentFile();
             if (!dir.exists()) {
                 dir.mkdirs();
             }
-            java.sql.Connection conn = DriverManager.getConnection("jdbc:sqlite:" +
-                    file.getAbsolutePath(),
-                    config.toProperties()
-            );
 
-            return new SEDatabase(conn);
+            // The claim comes before the driver opens the file: a key change in progress is
+            // rewriting it, and a connection that got in first would read pages from both sides of
+            // that rewrite before the refusal reached it.
+            openKey = canonicalDatabaseKey(file);
+            SEDatabase.reserveConnection(openKey);
+
+            java.util.Properties properties;
+            if (config != null && config.isEncrypted()) {
+                warnAboutSimulatorKeyStorage(config);
+                properties = sqlCipherProperties(databaseKeyMaterial(config, databaseName));
+            } else {
+                SQLiteConfig plain = new SQLiteConfig();
+                plain.enableLoadExtension(true);
+                properties = plain.toProperties();
+            }
+
+            conn = DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath(), properties);
+
+            if (config != null && config.isEncrypted()) {
+                probeKey(conn);
+            }
+            // The resolved file, not the name: a name is resolved against the storage directory
+            // unless it looks like a path, so two names can be one file and the registry a key
+            // change consults has to see them as one. The claim taken above moves to it.
+            SEDatabase result = new SEDatabase(conn, databaseName, openKey);
+            conn = null;
+            openKey = null;
+            return result;
         } catch (SQLException ex) {
-            ex.printStackTrace();
-            throw new IOException(ex.getMessage());
+            closeQuietly(conn);
+            // This driver applies the key while the connection is being set up, so a wrong key
+            // surfaces here rather than on the first read the way it does on the device ports.
+            if (isNotADatabase(ex) && config != null && config.isEncrypted()) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database", ex);
+            }
+            throw new IOException(ex.getMessage(), ex);
+        } catch (IOException ex) {
+            // probeKey turns a rejected key into a DatabaseEncryptionException, which is an
+            // IOException and so slipped past the SQLException handler above with the connection
+            // still open. Repeated passphrase attempts then piled up live handles and kept the
+            // file locked.
+            closeQuietly(conn);
+            throw ex;
+        } finally {
+            // Still set means the connection never reached an SEDatabase, so nothing else will
+            // give the claim back and the file would stay unopenable for the rest of the process.
+            SEDatabase.releaseConnection(openKey);
         }
     }
 
-    
+    /**
+     * Confirms the key really decrypts the database. SQLCipher applies a key lazily, so on the
+     * device ports a wrong key is only discovered on the first read.
+     */
+    private static void probeKey(java.sql.Connection conn) throws SQLException, IOException {
+        Statement s = null;
+        try {
+            s = conn.createStatement();
+            s.executeQuery("SELECT count(*) FROM sqlite_master").close();
+        } catch (SQLException ex) {
+            if (isNotADatabase(ex)) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                        "The supplied key does not decrypt this database", ex);
+            }
+            throw ex;
+        } finally {
+            if (s != null) {
+                try {
+                    s.close();
+                } catch (SQLException ignored) {
+                }
+            }
+        }
+    }
+
+    private static boolean isNotADatabase(SQLException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.indexOf("SQLITE_NOTADB") >= 0 || message.indexOf("not a database") >= 0);
+    }
+
+    private static void closeQuietly(java.sql.Connection conn) {
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
+    /**
+     * Resolves the key literal for a config. Package visible because SEDatabase needs it when
+     * re-keying an already open connection.
+     */
+    static String databaseKeyMaterial(DatabaseConfig config, String databaseName) throws IOException {
+        return config.resolveKeyMaterial(databaseName);
+    }
+
+    private static boolean simulatorKeyWarningShown;
+
+    /**
+     * The simulator has no hardware key store, so a managed key here is protected only by a
+     * software derived key in the desktop user profile. That is fine for development and must not
+     * be mistaken for the protection a real device provides, so say so out loud, once.
+     */
+    private static void warnAboutSimulatorKeyStorage(DatabaseConfig config) {
+        if (simulatorKeyWarningShown || config.getKeyMode() != DatabaseConfig.KEY_MANAGED) {
+            return;
+        }
+        simulatorKeyWarningShown = true;
+        System.out.println("**** Managed database keys in the simulator are protected by a "
+                + "software derived key in the desktop user profile, not by a hardware key store. "
+                + "Do not treat a simulator run as evidence that real user data is protected. ****");
+    }
+
+
+    /**
+     * The registry key for a database file: its canonical path where the filesystem can give one,
+     * and its absolute path otherwise. Canonical resolves "." segments and symlinks, which is what
+     * makes "/tmp/app.db" and "/tmp/./app.db" one entry rather than two.
+     */
+    private static String canonicalDatabaseKey(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException err) {
+            // A file that cannot be canonicalized has not been created yet or sits behind a
+            // permission wall. The absolute path still identifies it more precisely than the name.
+            return f.getAbsolutePath();
+        }
+    }
+
     private File getDatabaseFile(String databaseName) {
         File f = new File(getStorageDir() + File.separator+ "database" + File.separator + databaseName);
         if (exposeFilesystem) {
@@ -16711,14 +16847,83 @@ public class JavaSEPort extends CodenameOneImplementation {
         return f;
     }
     
-    //@Override
+    @Override
     public boolean isDatabaseCustomPathSupported() {
         return true;
     }
-    
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return isCipherCapableDriverPresent();
+    }
+
+    private static Boolean cipherCapableDriver;
+
+    /**
+     * Whether the SQLite JDBC driver on the classpath carries the encryption extension.
+     *
+     * The Maven build ships the cipher-capable driver, but the Ant build links whichever
+     * sqlite-jdbc is pinned in cn1-binaries, which may not. Probing rather than assuming means the
+     * simulator reports honestly instead of failing at open time.
+     */
+    private static boolean isCipherCapableDriverPresent() {
+        if (cipherCapableDriver == null) {
+            try {
+                Class.forName("org.sqlite.mc.SQLiteMCConfig");
+                cipherCapableDriver = Boolean.TRUE;
+            } catch (Throwable notPresent) {
+                cipherCapableDriver = Boolean.FALSE;
+            }
+        }
+        return cipherCapableDriver.booleanValue();
+    }
+
+    /**
+     * Connection properties selecting the SQLCipher 4 on-disk format.
+     *
+     * These are the values the driver's own SQLCipher-v4 preset produces, written out literally so
+     * that this file does not need the driver's builder API on its compile classpath. The Ant build
+     * links an older sqlite-jdbc without it, and importing the class would break that build even
+     * for applications that never encrypt anything.
+     *
+     * legacy=4 is the load-bearing value: it selects genuine SQLCipher 4. The driver's own default
+     * of 0 is a different scheme that no other Codename One platform, and no SQLCipher tool, can
+     * read.
+     */
+    private static java.util.Properties sqlCipherProperties(String key) {
+        java.util.Properties p = new java.util.Properties();
+        p.setProperty("config_class_name", "org.sqlite.mc.SQLiteMCConfig");
+        p.setProperty("cipher", "sqlcipher");
+        p.setProperty("legacy", "4");
+        p.setProperty("legacy_page_size", "4096");
+        p.setProperty("kdf_iter", "256000");
+        p.setProperty("fast_kdf_iter", "2");
+        p.setProperty("kdf_algorithm", "2");
+        p.setProperty("hmac_algorithm", "2");
+        p.setProperty("hmac_use", "1");
+        p.setProperty("hmac_pgno", "1");
+        p.setProperty("hmac_salt_mask", "58");
+        p.setProperty("plaintext_header_size", "0");
+        p.setProperty("hexkey_mode", "NONE");
+        p.setProperty("key", key);
+        p.setProperty("password", key);
+        return p;
+    }
+
+    @Override
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        // There is no hardware key store on the desktop; SecureStorage falls back to a key derived
+        // from the OS user account. Saying so lets security sensitive apps refuse to run here.
+        return false;
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
     @Override
     public void deleteDB(String databaseName) throws IOException {
-        System.out.println("**** Database.delete() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = getDatabaseFile(databaseName);
         if (f.exists()) {
             if (!f.delete()) {
@@ -16732,7 +16937,6 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public boolean existsDB(String databaseName) {
-        System.out.println("**** Database.exists() is not supported in the Javascript port.  If you plan to deploy to Javascript, you should avoid this method. *****");
         File f = getDatabaseFile(databaseName);
         return f.exists();
     }

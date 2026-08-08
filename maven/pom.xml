@@ -63,9 +63,6 @@
         there rather than repeating it, and fails loudly if it cannot, so bumping the
         pin cannot leave the seeding behind on an older version.
         -->
-        <!-- Last published com.codenameone:sqlite-jdbc. See the dependencyManagement
-             entry below for why this is pinned rather than tracking the release. -->
-        <cn1.sqlite.jdbc.version>7.0.263</cn1.sqlite.jdbc.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
@@ -174,21 +171,21 @@
                 <version>${project.version}</version>
             </dependency>
             <!--
-            Pinned, not ${project.version}: this artifact is a shaded repackage of
-            org.xerial:sqlite-jdbc:${sqlite.jdbc.version} and its contents only change
-            when that upstream version or the shade config does, yet it was 13.5MB of
-            every release. It is excluded from publication (see excludeArtifacts), so
-            codenameone-javase must depend on the last *published* coordinate -
-            otherwise every released codenameone-javase pom would point at a
-            sqlite-jdbc version that was never uploaded.
+            This used to be pinned to the last published build and excluded from
+            publication, because a shade of a fixed upstream driver never changed and
+            was 13.5MB of every release. That assumption no longer holds: the shaded
+            driver now carries the SQLite engine the simulator uses to read encrypted
+            databases, so it moves whenever we take a SQLite update - which, for a
+            crypto-carrying dependency, we want to be able to do promptly.
 
-            Bump cn1.sqlite.jdbc.version by hand, and remove it from excludeArtifacts
-            for that one release, whenever the shaded content actually changes.
+            Tracking ${project.version} again means a released codenameone-javase always
+            points at a coordinate that was actually uploaded, and a local build resolves
+            the module from the reactor instead of an older artifact from Central.
             -->
             <dependency>
                 <groupId>com.codenameone</groupId>
                 <artifactId>sqlite-jdbc</artifactId>
-                <version>${cn1.sqlite.jdbc.version}</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.codenameone</groupId>
@@ -562,10 +559,6 @@
                         <excludeArtifact>codenameone-designer</excludeArtifact>
                         <!-- Exists only to give the editor Batik SVG support. -->
                         <excludeArtifact>codenameone-javase-svg</excludeArtifact>
-                        <!-- Shaded repackage of org.xerial:sqlite-jdbc; consumers are
-                             pinned to ${cn1.sqlite.jdbc.version}. Drop this entry for the
-                             one release that bumps it. -->
-                        <excludeArtifact>sqlite-jdbc</excludeArtifact>
                     </excludeArtifacts>
                 </configuration>
             </plugin>

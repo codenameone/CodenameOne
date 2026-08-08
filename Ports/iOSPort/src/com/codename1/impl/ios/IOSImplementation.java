@@ -29,6 +29,8 @@ import com.codename1.codescan.ScanResult;
 import com.codename1.contacts.Address;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseEncryptionException;
+import com.codename1.db.DatabaseConfig;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.location.Location;
 import com.codename1.ui.Component;
@@ -11147,28 +11149,84 @@ public class IOSImplementation extends CodenameOneImplementation {
      */
     private static native boolean instanceofDoubleArrayI(Object o);
 
+    /**
+     * Resolves a database name to an absolute path. Bare names live in the documents directory;
+     * a file:// URL is resolved through FileSystemStorage, which is what makes custom database
+     * paths work here the way they already do on Android and the simulator.
+     */
+    private String resolveDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return FileSystemStorage.getInstance().toNativePath(databaseName);
+        }
+        return nativeInstance.sqlDbPath(databaseName);
+    }
+
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException{
-        return new DatabaseImpl(databaseName);
+        return new DatabaseImpl(databaseName, resolveDatabasePath(databaseName));
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            return openOrCreateDB(databaseName);
+        }
+        if (!isDatabaseEncryptionSupported()) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                    "This build was not compiled with encrypted database support");
+        }
+        return new DatabaseImpl(databaseName, resolveDatabasePath(databaseName),
+                config.resolveKeyMaterial(databaseName));
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        // The encryption-capable SQLite build is only linked in for applications that reference
+        // DatabaseConfig, so ask the engine rather than assuming.
+        return nativeInstance.sqlDbIsCipherAvailable();
+    }
+
+    @Override
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        // The managed key is a generic-password keychain item, so what backs it is the device's
+        // key hierarchy, which every iOS device since the A7 roots in the Secure Enclave. That is
+        // a real hardware guarantee on a device and none at all in the Simulator, where the
+        // keychain is an ordinary file on the host. Applications are told they may use this to
+        // refuse to store sensitive data, so answering true there would be a false assurance --
+        // and the security notes already say the simulator is the weaker case.
+        return !nativeInstance.isSimulator();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return true;
     }
 
     @Override
     public String getDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return databaseName;
+        }
         String s = nativeInstance.getDocumentsDir();
         if(!s.endsWith("/")) {
             s += "/";
         }
         return s + databaseName;
     }
-    
+
     @Override
     public void deleteDB(String databaseName) throws IOException{
-        nativeInstance.sqlDbDelete(databaseName);
+        nativeInstance.sqlDbDelete(resolveDatabasePath(databaseName));
     }
-    
+
     @Override
     public boolean existsDB(String databaseName){
-        return nativeInstance.sqlDbExists(databaseName);
+        return nativeInstance.sqlDbExists(resolveDatabasePath(databaseName));
     }
 
     /**

@@ -122,6 +122,7 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
         Display.getInstance().setProperty("AppVersion", APP_VERSION);
         Display.getInstance().setProperty("Platform", System.getProperty("os.name"));
         Display.getInstance().setProperty("OSVer", System.getProperty("os.version"));
+        Display.getInstance().setProperty("db.legacy", "__DB_LEGACY__");
 
         SwingUtilities.invokeLater(new __MAIN_NAME__Stub());
     }

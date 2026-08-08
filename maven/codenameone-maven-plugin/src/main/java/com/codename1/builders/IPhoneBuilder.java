@@ -114,6 +114,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesDatabase;
+    private boolean usesDatabaseCipher;
     private boolean usesBluetooth;
     private boolean usesBluetoothPeripheral;
 
@@ -933,6 +935,18 @@ public class IPhoneBuilder extends Executor {
         final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
         boolean excludeArm64Simulator = false;
 
+        // Attributed to the class that makes the reference, so the framework's own use of the
+        // database does not answer for the application's. Both payloads this gates are large --
+        // the cipher amalgamation replaces the system libsqlite3 -- so an application that never
+        // touches com.codename1.db must not carry either.
+        try {
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(classesDir);
+            usesDatabase = databaseUsage.usesDatabase();
+            usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for database usage", ex);
+        }
+
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 // iOS has no OS-relaunch delivery, but it does have cold
@@ -1010,6 +1024,11 @@ public class IPhoneBuilder extends Executor {
                             usesCryptoAPI = true;
                         }
                     }
+                    // Deliberately not scanned here. This callback cannot say which class made
+                    // the reference, and the tree it walks is the application merged with the
+                    // framework, where Display alone carries openOrCreate(String, DatabaseConfig)
+                    // -- so both database gates would answer yes for every application ever built.
+                    // scanForDatabaseUsage below attributes the reference instead.
                     if (!usesNfc && cls.indexOf("com/codename1/nfc/") == 0) {
                         usesNfc = true;
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
@@ -1855,6 +1874,7 @@ public class IPhoneBuilder extends Executor {
         if (request.getArg("ios.disableScreenshots", "false").equalsIgnoreCase("true")) {
             disableScreenshots = "        Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
         }
+        String dbLegacy = databaseLegacyStubProperty(request, usesDatabase);
 
         // If the build-time SVG transcoder produced a registry class, weave
         // its installGlobal() call into the Stub right before the first
@@ -2027,6 +2047,7 @@ public class IPhoneBuilder extends Executor {
                     + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                     + newStorage
                     + disableScreenshots
+                    + dbLegacy
                     + adPadding
                     + integrateFacebook
                     + integrateGoogleConnect
@@ -3489,6 +3510,8 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DsaveUnitTests=" + isUnitTestMode());
                 parparCmd.add("-DfieldNullChecks=" + fieldNullChecks);
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
+                parparCmd.add("-Dcn1.sqlite=" + usesDatabaseCipher);
+                parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
                 if (macNativeBuilder.isEnabled()) {

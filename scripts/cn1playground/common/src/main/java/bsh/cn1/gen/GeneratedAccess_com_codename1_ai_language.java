@@ -1,0 +1,697 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package bsh.cn1.gen;
+
+import bsh.cn1.CN1AccessException;
+
+public final class GeneratedAccess_com_codename1_ai_language {
+    private GeneratedAccess_com_codename1_ai_language() {
+    }
+
+    public static Class<?> findClass(String name) {
+        if (name == null) {
+            return null;
+        }
+        int dot = name.lastIndexOf('.');
+        int dollar = name.lastIndexOf('$');
+        int sep = dot > dollar ? dot : dollar;
+        if (sep < 0 || sep == name.length() - 1) {
+            return null;
+        }
+        return findClassBySimpleName(name.substring(sep + 1));
+    }
+
+    public static Class<?> findClassBySimpleName(String simpleName) {
+        Class<?> found0 = findClassChunk0(simpleName);
+        if (found0 != null) {
+            return found0;
+        }
+        return null;
+    }
+
+
+    private static Class<?> findClassChunk0(String simpleName) {
+        if ("LanguageBackend".equals(simpleName)) {
+            return com.codename1.ai.language.LanguageBackend.class;
+        }
+        if ("LanguageBackends".equals(simpleName)) {
+            return com.codename1.ai.language.LanguageBackends.class;
+        }
+        if ("LanguageCandidate".equals(simpleName)) {
+            return com.codename1.ai.language.LanguageCandidate.class;
+        }
+        if ("LanguageIdentifier".equals(simpleName)) {
+            return com.codename1.ai.language.LanguageIdentifier.class;
+        }
+        if ("Session".equals(simpleName)) {
+            return com.codename1.ai.language.LanguageIdentifier.Session.class;
+        }
+        if ("LanguageOptions".equals(simpleName)) {
+            return com.codename1.ai.language.LanguageOptions.class;
+        }
+        if ("SmartReply".equals(simpleName)) {
+            return com.codename1.ai.language.SmartReply.class;
+        }
+        if ("Session".equals(simpleName)) {
+            return com.codename1.ai.language.SmartReply.Session.class;
+        }
+        if ("SmartReplyMessage".equals(simpleName)) {
+            return com.codename1.ai.language.SmartReplyMessage.class;
+        }
+        if ("Translator".equals(simpleName)) {
+            return com.codename1.ai.language.Translator.class;
+        }
+        if ("Session".equals(simpleName)) {
+            return com.codename1.ai.language.Translator.Session.class;
+        }
+        return null;
+    }
+    public static Object construct(Class<?> type, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.ai.language.LanguageCandidate.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class}, false);
+                return new com.codename1.ai.language.LanguageCandidate((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
+            }
+        }
+        if (type == com.codename1.ai.language.LanguageOptions.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ai.language.LanguageOptions();
+            }
+        }
+        if (type == com.codename1.ai.language.SmartReplyMessage.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class, java.lang.Long.class}, false);
+                return new com.codename1.ai.language.SmartReplyMessage((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue(), ((Number) adaptedArgs[3]).longValue());
+            }
+        }
+        throw unsupportedConstruct(type, safeArgs);
+    }
+
+    public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        if (type == com.codename1.ai.language.LanguageBackends.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.ai.language.LanguageIdentifier.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.ai.language.SmartReply.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.ai.language.Translator.class) return invokeStatic3(name, safeArgs);
+        throw unsupportedStatic(type, name, safeArgs);
+    }
+
+    private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("appleNaturalLanguage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.LanguageBackends.appleNaturalLanguage();
+            }
+        }
+        if ("auto".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.LanguageBackends.auto();
+            }
+        }
+        if ("mlKitLanguageIdentification".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.LanguageBackends.mlKitLanguageIdentification();
+            }
+        }
+        if ("mlKitSmartReply".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.LanguageBackends.mlKitSmartReply();
+            }
+        }
+        if ("mlKitTranslation".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.LanguageBackends.mlKitTranslation();
+            }
+        }
+        throw unsupportedStatic(com.codename1.ai.language.LanguageBackends.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("identify".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.LanguageIdentifier.identify((java.lang.String) adaptedArgs[0], (com.codename1.ai.language.LanguageOptions) adaptedArgs[1]);
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.LanguageIdentifier.isSupported();
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.LanguageIdentifier.isSupported((com.codename1.ai.language.LanguageOptions) adaptedArgs[0]);
+            }
+        }
+        if ("open".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.LanguageIdentifier.open((com.codename1.ai.language.LanguageOptions) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.ai.language.LanguageIdentifier.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.SmartReply.isSupported();
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.SmartReply.isSupported((com.codename1.ai.language.LanguageOptions) adaptedArgs[0]);
+            }
+        }
+        if ("open".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.SmartReply.open((com.codename1.ai.language.LanguageOptions) adaptedArgs[0]);
+            }
+        }
+        if ("suggest".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.SmartReplyMessage[].class, com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.SmartReplyMessage[].class, com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.SmartReply.suggest((com.codename1.ai.language.SmartReplyMessage[]) adaptedArgs[0], (com.codename1.ai.language.LanguageOptions) adaptedArgs[1]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.ai.language.SmartReply.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ai.language.Translator.isSupported();
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.Translator.isSupported((com.codename1.ai.language.LanguageOptions) adaptedArgs[0]);
+            }
+        }
+        if ("open".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.Translator.open((com.codename1.ai.language.LanguageOptions) adaptedArgs[0]);
+            }
+        }
+        if ("translate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.ai.language.LanguageOptions.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, com.codename1.ai.language.LanguageOptions.class}, false);
+                return com.codename1.ai.language.Translator.translate((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (com.codename1.ai.language.LanguageOptions) adaptedArgs[3]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.ai.language.Translator.class, name, safeArgs);
+    }
+
+    public static Object invoke(Object target, String name, Object[] args) throws Exception {
+        Object[] safeArgs = safeArgs(args);
+        CN1AccessException unsupported = null;
+        if (target instanceof com.codename1.ai.language.LanguageCandidate) {
+            try {
+                return invoke0((com.codename1.ai.language.LanguageCandidate) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ai.language.LanguageIdentifier.Session) {
+            try {
+                return invoke1((com.codename1.ai.language.LanguageIdentifier.Session) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ai.language.LanguageOptions) {
+            try {
+                return invoke2((com.codename1.ai.language.LanguageOptions) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ai.language.SmartReply.Session) {
+            try {
+                return invoke3((com.codename1.ai.language.SmartReply.Session) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ai.language.SmartReplyMessage) {
+            try {
+                return invoke4((com.codename1.ai.language.SmartReplyMessage) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ai.language.Translator.Session) {
+            try {
+                return invoke5((com.codename1.ai.language.Translator.Session) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ai.language.LanguageBackend) {
+            try {
+                return invoke6((com.codename1.ai.language.LanguageBackend) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (unsupported != null) {
+            throw unsupported;
+        }
+        throw unsupportedInstance(target, name, safeArgs);
+    }
+
+    private static Object invoke0(com.codename1.ai.language.LanguageCandidate typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getConfidence".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getConfidence();
+            }
+        }
+        if ("getLanguageTag".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLanguageTag();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke1(com.codename1.ai.language.LanguageIdentifier.Session typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("identify".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.identify((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.ai.language.LanguageOptions typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("backend".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageBackend.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.LanguageBackend.class}, false);
+                return typedTarget.backend((com.codename1.ai.language.LanguageBackend) adaptedArgs[0]);
+            }
+        }
+        if ("getBackend".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBackend();
+            }
+        }
+        if ("getMinimumConfidence".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMinimumConfidence();
+            }
+        }
+        if ("minimumConfidence".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                return typedTarget.minimumConfidence(((Number) adaptedArgs[0]).floatValue());
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.ai.language.SmartReply.Session typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("suggest".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ai.language.SmartReplyMessage[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.language.SmartReplyMessage[].class}, false);
+                return typedTarget.suggest((com.codename1.ai.language.SmartReplyMessage[]) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.ai.language.SmartReplyMessage typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getParticipantId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getParticipantId();
+            }
+        }
+        if ("getText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getText();
+            }
+        }
+        if ("getTimestampMillis".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTimestampMillis();
+            }
+        }
+        if ("isLocalUser".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isLocalUser();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.ai.language.Translator.Session typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("translate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.translate((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.ai.language.LanguageBackend typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getId();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    public static Object getStaticField(Class<?> type, String name) throws Exception {
+        throw unsupportedStaticField(type, name);
+    }
+
+    public static Object getField(Object target, String name) throws Exception {
+        throw unsupportedField(target, name);
+    }
+
+    public static void setStaticField(Class<?> type, String name, Object value) throws Exception {
+        throw unsupportedStaticFieldWrite(type, name, value);
+    }
+
+    public static void setField(Object target, String name, Object value) throws Exception {
+        throw unsupportedFieldWrite(target, name, value);
+    }
+
+    private static Object[] safeArgs(Object[] args) {
+        return args == null ? new Object[0] : args;
+    }
+
+    private static Object[] adaptArgs(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (args == null || args.length == 0) {
+            return args == null ? new Object[0] : args;
+        }
+        Object[] adapted = args.clone();
+        if (!varArgs) {
+            for (int i = 0; i < Math.min(adapted.length, paramTypes.length); i++) {
+                adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+            }
+            return adapted;
+        }
+        if (paramTypes.length == 0) {
+            return adapted;
+        }
+        int fixedCount = paramTypes.length - 1;
+        for (int i = 0; i < Math.min(fixedCount, adapted.length); i++) {
+            adapted[i] = adaptValue(adapted[i], paramTypes[i]);
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < adapted.length; i++) {
+            adapted[i] = adaptValue(adapted[i], componentType);
+        }
+        return adapted;
+    }
+
+    private static boolean isSamInterface(Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return true;
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return true;
+        }
+        if (type == java.lang.Runnable.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return true;
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return true;
+        }
+        return false;
+    }
+
+    private static Object adaptLambdaValue(final bsh.cn1.CN1LambdaSupport.LambdaValue lambda, Class<?> type) {
+        if (type == com.codename1.util.OnComplete.class) {
+            return new com.codename1.util.OnComplete() {
+                public void completed(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.SuccessCallback.class) {
+            return new com.codename1.util.SuccessCallback() {
+                public void onSucess(java.lang.Object arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.util.FailureCallback.class) {
+            return new com.codename1.util.FailureCallback() {
+                public void onError(java.lang.Object arg0, java.lang.Throwable arg1, int arg2, java.lang.String arg3) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1, arg2, arg3});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.ActionListener.class) {
+            return new com.codename1.ui.events.ActionListener() {
+                public void actionPerformed(com.codename1.ui.events.ActionEvent arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == java.lang.Runnable.class) {
+            return new java.lang.Runnable() {
+                public void run() {
+                    try {
+                        lambda.invoke(new Object[0]);
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.DataChangedListener.class) {
+            return new com.codename1.ui.events.DataChangedListener() {
+                public void dataChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.ui.events.SelectionListener.class) {
+            return new com.codename1.ui.events.SelectionListener() {
+                public void selectionChanged(int arg0, int arg1) {
+                    try {
+                        lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        return lambda;
+    }
+
+    private static Object adaptValue(Object value, Class<?> type) {
+        if (!(value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue)) {
+            return value;
+        }
+        // Direct fit when LambdaValue already implements the target SAM
+        // (Runnable, Function, Comparator, ...).
+        if (type.isInstance(value)) {
+            return value;
+        }
+        return adaptLambdaValue((bsh.cn1.CN1LambdaSupport.LambdaValue) value, type);
+    }
+
+    private static int toIntValue(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof Character) return (int) ((Character) value).charValue();
+        throw new ClassCastException("Cannot coerce "
+            + (value == null ? "null" : value.getClass().getName()) + " to int");
+    }
+
+    private static boolean matches(Object[] args, Class<?>[] paramTypes, boolean varArgs) {
+        if (!varArgs) {
+            if (args.length != paramTypes.length) {
+                return false;
+            }
+            for (int i = 0; i < paramTypes.length; i++) {
+                if (!matchesType(args[i], paramTypes[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (paramTypes.length == 0) {
+            return true;
+        }
+        int fixedCount = paramTypes.length - 1;
+        if (args.length < fixedCount) {
+            return false;
+        }
+        for (int i = 0; i < fixedCount; i++) {
+            if (!matchesType(args[i], paramTypes[i])) {
+                return false;
+            }
+        }
+        Class<?> componentType = paramTypes[paramTypes.length - 1].getComponentType();
+        for (int i = fixedCount; i < args.length; i++) {
+            if (!matchesType(args[i], componentType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean matchesType(Object value, Class<?> type) {
+        if (type == Object.class) {
+            return true;
+        }
+        if (value == null) {
+            return !type.isPrimitive();
+        }
+        if (type.isArray()) {
+            return type.isInstance(value);
+        }
+        if ("boolean".equals(type.getName()) || type == Boolean.class) {
+            return value instanceof Boolean;
+        }
+        if ("char".equals(type.getName()) || type == Character.class) {
+            return value instanceof Character;
+        }
+        if ("byte".equals(type.getName()) || type == Byte.class || "short".equals(type.getName()) || type == Short.class
+                || "int".equals(type.getName()) || type == Integer.class || "long".equals(type.getName()) || type == Long.class
+                || "float".equals(type.getName()) || type == Float.class || "double".equals(type.getName()) || type == Double.class) {
+            // Java widens char to int implicitly, so accept Character
+            // for any int-or-larger numeric slot.
+            return value instanceof Number || value instanceof Character;
+        }
+        if (value instanceof bsh.cn1.CN1LambdaSupport.LambdaValue) {
+            // LambdaValue implements common SAMs directly (Runnable,
+            // Function, Predicate, Comparator, ...). Also accept any
+            // CN1 SAM the listener-bridge knows how to wrap.
+            return type.isInstance(value) || isSamInterface(type);
+        }
+        return type.isInstance(value);
+    }
+
+    private static CN1AccessException unsupportedConstruct(Class<?> type, Object[] args) {
+        return new CN1AccessException("Generated constructor dispatch not implemented for " + type.getName() + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedStatic(Class<?> type, String name, Object[] args) {
+        return new CN1AccessException("Generated static dispatch not implemented for " + type.getName() + "." + name + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedInstance(Object target, String name, Object[] args) {
+        return new CN1AccessException("Generated instance dispatch not implemented for " + target.getClass().getName() + "." + name + describeArgs(args));
+    }
+
+    private static CN1AccessException unsupportedStaticField(Class<?> type, String name) {
+        return new CN1AccessException("Generated static field access not implemented for " + type.getName() + "." + name);
+    }
+
+    private static CN1AccessException unsupportedField(Object target, String name) {
+        return new CN1AccessException("Generated field access not implemented for " + target.getClass().getName() + "." + name);
+    }
+
+    private static CN1AccessException unsupportedStaticFieldWrite(Class<?> type, String name, Object value) {
+        return new CN1AccessException("Generated static field write not implemented for " + type.getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static CN1AccessException unsupportedFieldWrite(Object target, String name, Object value) {
+        return new CN1AccessException("Generated field write not implemented for " + target.getClass().getName() + "." + name + " value=" + describeValue(value));
+    }
+
+    private static String describeArgs(Object[] args) {
+        if (args == null || args.length == 0) {
+            return "()";
+        }
+        StringBuilder sb = new StringBuilder("(");
+        for (int i = 0; i < args.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(describeValue(args[i]));
+        }
+        sb.append(')');
+        return sb.toString();
+    }
+
+    private static String describeValue(Object value) {
+        return value == null ? "null" : value.getClass().getName();
+    }
+}

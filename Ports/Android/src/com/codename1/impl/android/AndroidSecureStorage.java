@@ -392,6 +392,49 @@ public final class AndroidSecureStorage extends SecureStorage {
      * null when the key is absent and {@code create} is false, or when
      * generation fails.
      */
+    /**
+     * Whether the non-prompting tier's key is held in dedicated security hardware.
+     *
+     * An API level only says the AndroidKeyStore API exists; emulators and plenty of real devices
+     * back its keys in software. Callers use this to decide whether the platform is good enough
+     * for genuinely sensitive data, so it asks the key what it actually is.
+     *
+     * @return true when a TEE or StrongBox holds the key
+     */
+    static boolean isPlainKeyInsideSecureHardware() {
+        java.security.spec.KeySpec spec;
+        Object level = null;
+        try {
+            AndroidSecureStorage storage = new AndroidSecureStorage();
+            SecretKey key = storage.plainKey(true);
+            if (key == null) {
+                return false;
+            }
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance(
+                    key.getAlgorithm(), ANDROID_KEY_STORE);
+            spec = factory.getKeySpec(key,
+                    Class.forName("android.security.keystore.KeyInfo")
+                            .asSubclass(java.security.spec.KeySpec.class));
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                // getSecurityLevel() replaced the deprecated isInsideSecureHardware() in API 31.
+                // Reflective because the port compiles against an older SDK than it runs on.
+                level = spec.getClass().getMethod("getSecurityLevel").invoke(spec);
+            }
+        } catch (Throwable cannotTell) {
+            // Unable to determine, so report the weaker answer rather than overstating it.
+            return false;
+        }
+        // Both results are typed here rather than inside the try, and by instanceof rather than by
+        // a bare cast: a failed cast is not an exception everywhere this framework runs, so a cast
+        // in a block that catches Throwable is one whose failure nothing would catch.
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            // Anything above SECURITY_LEVEL_SOFTWARE (0) is a TEE or StrongBox.
+            return level instanceof Integer && ((Integer) level).intValue() > 0;
+        }
+        return spec instanceof android.security.keystore.KeyInfo
+                && ((android.security.keystore.KeyInfo) spec).isInsideSecureHardware();
+    }
+
     private SecretKey plainKey(boolean create) throws Exception {
         // The whole load-check-generate sequence is serialized, not just the
         // generation. Two first writers that each saw the alias absent would each

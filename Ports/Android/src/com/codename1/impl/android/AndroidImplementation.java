@@ -181,12 +181,15 @@ import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Callback;
 import java.io.File;
+import java.io.BufferedReader;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.Writer;
@@ -10970,24 +10973,711 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
+        // Reserved first, and recovery run inside the reservation. The slot has to be taken
+        // before the engine opens anything, or a conversion reading the count during the open
+        // starts replacing the file this is about to hand back -- and recovery has to be inside
+        // it too, because a conversion that has just installed its converted file leaves the live
+        // file and the backup both present, which recovery would otherwise read as a completed
+        // conversion and act on by deleting the backup.
+        String nativePath = resolveNativeDatabasePath(databaseName);
+        reserveDatabaseConnection(nativePath);
         SQLiteDatabase db;
-        if (databaseName.startsWith("file://")) {
-            db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
-        } else {
-            db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+        try {
+            // A plaintext open of a database mid-conversion would create an empty one over the
+            // top of the real data, which nothing afterwards could undo.
+            recoverInterruptedDatabaseMigration(nativePath);
+            if (databaseName.startsWith("file://")) {
+                db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
+            } else {
+                db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+            }
+        } catch (RuntimeException didNotOpen) {
+            databaseConnectionClosed(nativePath);
+            throw didNotOpen;
+        } catch (IOException didNotRecover) {
+            databaseConnectionClosed(nativePath);
+            throw didNotRecover;
         }
-        return new AndroidDB(db);
+        return new AndroidDB(db, nativePath);
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, com.codename1.db.DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            return openOrCreateDB(databaseName);
+        }
+        // The slot is taken before the engine opens anything, for the reason given in
+        // openOrCreateDB. AndroidCipherFactory hands back a connection that already holds it.
+        String nativePath = resolveNativeDatabasePath(databaseName);
+        reserveDatabaseConnection(nativePath);
+        // The SQLCipher-backed package is deleted at build time for apps that never touch
+        // DatabaseConfig, so it has to be reached reflectively - the same arrangement the
+        // ARCore-backed AR implementation uses.
+        Object opened;
+        try {
+            Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
+            java.lang.reflect.Method open = c.getMethod("open", String.class, String.class,
+                    String.class);
+            // Cast outside the try, below. ParparVM does not throw on a failed cast, so a cast
+            // inside a block that catches Throwable is a cast whose failure nothing can handle.
+            opened = open.invoke(null,
+                    resolveNativeDatabasePath(databaseName), databaseName,
+                    config.resolveKeyMaterial(databaseName));
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            releaseUnusedDatabaseConnection(nativePath);
+            Throwable cause = err.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
+        } catch (IOException err) {
+            releaseUnusedDatabaseConnection(nativePath);
+            throw err;
+        } catch (ClassNotFoundException notBundled) {
+            // The only benign reason to land here: the build pruned the package because the
+            // application never referenced DatabaseConfig.
+            releaseUnusedDatabaseConnection(nativePath);
+            throw new com.codename1.db.DatabaseEncryptionException(
+                    com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
+                    "This build does not include encrypted database support", notBundled);
+        } catch (NoSuchMethodException broken) {
+            // The package is present but does not expose the entry point this reaches through.
+            // That is a broken build, not an unsupported platform, and reporting it as
+            // NOT_SUPPORTED would hide it: every caller would be told encryption is unavailable
+            // on a device that ships the engine. This is the failure mode a compiler would have
+            // caught if the seam were not reflective, so it has to be loud.
+            releaseUnusedDatabaseConnection(nativePath);
+            throw new IOException("The encrypted database implementation is present but does not "
+                    + "expose the expected entry point. This build is inconsistent: "
+                    + broken.getMessage(), broken);
+        } catch (Throwable err) {
+            releaseUnusedDatabaseConnection(nativePath);
+            throw new com.codename1.db.DatabaseEncryptionException(
+                    com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
+                    "This build does not include encrypted database support", err);
+        }
+        if (!(opened instanceof Database)) {
+            releaseUnusedDatabaseConnection(nativePath);
+            throw new IOException("The encrypted database implementation returned "
+                    + (opened == null ? "nothing" : opened.getClass().getName())
+                    + " rather than a Database. This build is inconsistent.");
+        }
+        return (Database) opened;
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        Object available;
+        try {
+            Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
+            available = c.getMethod("isAvailable").invoke(null);
+        } catch (Throwable notPresent) {
+            return false;
+        }
+        // Tested rather than cast inside the try: ParparVM does not throw on a failed cast, so
+        // the handler above could never see one.
+        return available instanceof Boolean && ((Boolean) available).booleanValue();
+    }
+
+    @Override
+    public boolean isDatabaseManagedKeyHardwareBacked() {
+        // Ask the key itself. An API level says only that the API exists: emulators, and plenty of
+        // real devices, back AndroidKeyStore keys in software. Applications are told they may use
+        // this to refuse to store sensitive data, so it has to describe the actual key.
+        return AndroidSecureStorage.isPlainKeyInsideSecureHardware();
+    }
+
+    /**
+     * Absolute filesystem path for a database name, converting a custom file:// URL.
+     *
+     * getDatabasePath() deliberately echoes a file:// URL back unchanged, which is right for
+     * callers that hand it to FileSystemStorage but wrong for anything constructing a java.io.File
+     * from it.
+     */
+    /// Directory holding the encrypted-database migration's working files.
+    ///
+    /// A directory beside the database, so the rename that installs the converted file stays
+    /// within one filesystem and is therefore atomic.
+    ///
+    /// The location alone does not make these files ours. Custom paths mean an application can
+    /// point a database anywhere, including inside here, so ownership is established by the
+    /// marker's contents rather than by where a file sits or what it is called. Nothing is
+    /// deleted, renamed over or truncated without that proof.
+    public static final String DATABASE_MIGRATION_DIR = ".cn1migration";
+
+    /// Marker name for a database. Deterministic so recovery can find it; its contents, not its
+    /// name, are what establish that a conversion wrote it.
+    public static final String MIGRATION_MARKER = ".marker";
+
+    /// Fourth line of a marker whose installed file was never shown to open.
+    private static final String MIGRATION_UNVALIDATED = "unvalidated";
+
+    /// First line of a marker written by this port.
+    private static final String MIGRATION_MARKER_MAGIC = "codename1-database-migration-1";
+
+    /// The migration directory for a database, or null if the path has no parent.
+    public static File databaseMigrationDir(String path) {
+        File parent = new File(path).getParentFile();
+        return parent == null ? null : new File(parent, DATABASE_MIGRATION_DIR);
+    }
+
+    public static File databaseMigrationMarker(String path) {
+        File dir = databaseMigrationDir(path);
+        return dir == null ? null : new File(dir, new File(path).getName() + MIGRATION_MARKER);
+    }
+
+    /// Reads a marker written by this port, or null when the file is not one of ours.
+    ///
+    /// A marker is trusted only if it opens with the magic line. Anything else - including an
+    /// application database that happens to live at this path - is left alone.
+    ///
+    /// The two entries after it are the file holding the original and the export being built,
+    /// either of which may be absent: the marker is written before the export is filled in and
+    /// rewritten once the original has been moved aside, so which files exist depends on how far
+    /// the conversion got.
+    ///
+    /// @return the two names, either element null, or null if this is not our marker
+    private static String[] readDatabaseMigrationMarker(String path) {
+        File marker = databaseMigrationMarker(path);
+        if (marker == null || !marker.isFile()) {
+            return null;
+        }
+        BufferedReader reader = null;
+        try {
+            reader = new BufferedReader(new InputStreamReader(new FileInputStream(marker),
+                    "UTF-8"));
+            if (!MIGRATION_MARKER_MAGIC.equals(reader.readLine())) {
+                return null;
+            }
+            String backup = reader.readLine();
+            String target = reader.readLine();
+            String state = reader.readLine();
+            return new String[] {
+                backup == null || backup.length() == 0 ? null : backup,
+                target == null || target.length() == 0 ? null : target,
+                state == null || state.length() == 0 ? null : state,
+            };
+        } catch (IOException unreadable) {
+            return null;
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException ignored) {
+                    // Nothing useful to do.
+                }
+            }
+        }
+    }
+
+    /// Whether the marker for this database was written by this port.
+    ///
+    /// Distinct from having a backup: a marker written before the export was filled in names no
+    /// backup yet, and is still ours to rewrite.
+    private static boolean ownsDatabaseMigrationMarker(String path) {
+        return readDatabaseMigrationMarker(path) != null;
+    }
+
+    /// Reads the backup a marker claims, or null when there is none.
+    public static File readDatabaseMigrationBackup(String path) {
+        String[] entry = readDatabaseMigrationMarker(path);
+        if (entry == null || entry[0] == null) {
+            return null;
+        }
+        return new File(databaseMigrationMarker(path).getParentFile(), entry[0]);
+    }
+
+    /// Whether the marker says its installed file was never shown to open.
+    private static boolean isDatabaseMigrationUnvalidated(String path) {
+        String[] entry = readDatabaseMigrationMarker(path);
+        return entry != null && entry.length > 2 && MIGRATION_UNVALIDATED.equals(entry[2]);
+    }
+
+    /// Reads the export a marker claims, or null when there is none.
+    ///
+    /// The export is a second complete copy of the data, and a plaintext one when the conversion
+    /// was a decryption, so it is recorded before anything is written into it. Otherwise a process
+    /// death between creating it and finishing the conversion would leave readable data behind
+    /// under a name nothing knows to look for.
+    public static File readDatabaseMigrationTarget(String path) {
+        String[] entry = readDatabaseMigrationMarker(path);
+        if (entry == null || entry[1] == null) {
+            return null;
+        }
+        return new File(databaseMigrationMarker(path).getParentFile(), entry[1]);
+    }
+
+    /// Every database connection this port has open, by the file it is open on.
+    ///
+    /// Shared by both implementations on purpose. Only a conversion needs it, and a conversion is
+    /// not a statement: it renames a new file over the database while the process is running, and
+    /// Android lets that succeed while another connection holds the old one. That connection goes
+    /// on writing to a file that is no longer the database, is told each write succeeded, and
+    /// loses all of it when the backup is deleted.
+    ///
+    /// The connection it collides with is usually not another encrypted one -- the ordinary case
+    /// is an application holding `Database.openOrCreate(name)` open, which is a plaintext
+    /// connection, and then calling `Database.encrypt(name, ...)`. Counting only the encrypted
+    /// ones would miss exactly the case that happens.
+    private static final java.util.Map<String, Integer> OPEN_DATABASE_CONNECTIONS =
+            new java.util.HashMap<String, Integer>();
+
+    /// The key a database file is tracked under.
+    ///
+    /// Canonical, because two spellings of one file must not be two entries: a connection opened
+    /// as `/data/app/db.sqlite` has to be visible to a conversion started as
+    /// `/data/app/./db.sqlite`, or the file is replaced underneath it and its later writes -- each
+    /// one reported as successful -- disappear with the old inode. `toNativePath` only strips the
+    /// `file://` prefix, so a custom path arrives however the caller spelled it.
+    ///
+    /// Falls back to the absolute path when the file system cannot answer, which still collapses
+    /// the relative spellings; a canonical path that cannot be resolved is not a reason to refuse
+    /// to open a database.
+    private static String databaseKey(String path) {
+        if (path == null) {
+            return null;
+        }
+        try {
+            return new File(path).getCanonicalPath();
+        } catch (IOException cannotResolve) {
+            return new File(path).getAbsolutePath();
+        }
+    }
+
+    /// Records a connection opened on a database file.
+    public static synchronized void databaseConnectionOpened(String rawPath) {
+        String path = databaseKey(rawPath);
+        if (path == null) {
+            return;
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        OPEN_DATABASE_CONNECTIONS.put(path,
+                Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+    }
+
+    /// Records a connection closed on a database file.
+    public static synchronized void databaseConnectionClosed(String rawPath) {
+        String path = databaseKey(rawPath);
+        if (path == null) {
+            return;
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        if (count == null) {
+            return;
+        }
+        if (count.intValue() <= 1) {
+            OPEN_DATABASE_CONNECTIONS.remove(path);
+        } else {
+            OPEN_DATABASE_CONNECTIONS.put(path, Integer.valueOf(count.intValue() - 1));
+        }
+    }
+
+    /// Database files a conversion currently owns exclusively.
+    private static final java.util.Set<String> MIGRATING_DATABASES =
+            new java.util.HashSet<String>();
+
+    /// Claims a database for a conversion, or refuses.
+    ///
+    /// Counting the connections and then converting are one decision, not two. Between a count
+    /// read on its own and the rename that ends the conversion, another thread can open the
+    /// database, and that connection then holds the file the rename replaces: its writes are
+    /// accepted and disappear when the backup goes. So the count is read and the claim taken
+    /// under the same lock the opens take, and an open that arrives afterwards is refused for as
+    /// long as the conversion runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the database file
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database is open elsewhere, or already being converted
+    public static synchronized void beginDatabaseMigration(String rawPath) throws IOException {
+        String path = databaseKey(rawPath);
+        if (MIGRATING_DATABASES.contains(path)) {
+            throw new IOException("The database " + path + " is already being converted.");
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        if (count != null && count.intValue() > 1) {
+            throw new IOException("The database " + path + " is open more than once, and "
+                    + "converting it replaces the file underneath every connection to it. Close "
+                    + "the other connections first; writes made through them during the "
+                    + "conversion would be accepted and then lost.");
+        }
+        MIGRATING_DATABASES.add(path);
+    }
+
+    /// Whether a conversion currently owns a database file.
+    public static synchronized boolean isDatabaseBeingConverted(String rawPath) {
+        return MIGRATING_DATABASES.contains(databaseKey(rawPath));
+    }
+
+    /// Releases a database claimed by `#beginDatabaseMigration(String)`.
+    public static synchronized void endDatabaseMigration(String rawPath) {
+        MIGRATING_DATABASES.remove(databaseKey(rawPath));
+    }
+
+    /// Gives back a slot taken by `#reserveDatabaseConnection(String)` when no connection was
+    /// handed to the caller after all.
+    public static void releaseUnusedDatabaseConnection(String path) {
+        databaseConnectionClosed(path);
+    }
+
+    /// Takes a connection slot on a database, or refuses because a conversion owns it.
+    ///
+    /// The check and the count are one step. Checking that no conversion is running and then
+    /// registering afterwards leaves a gap: the engine's open sits between them, and a conversion
+    /// that reads the count during it sees only its own connection, takes its claim, and starts
+    /// replacing the file the open is about to return a connection to. Taking the slot inside the
+    /// same lock as the check closes that -- a conversion either sees the slot and refuses, or
+    /// holds the claim and the open refuses.
+    ///
+    /// The caller releases the slot with `#databaseConnectionClosed(String)` if the open itself
+    /// then fails, and the connection releases it on close.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a conversion currently owns the file
+    public static synchronized void reserveDatabaseConnection(String rawPath) throws IOException {
+        String path = databaseKey(rawPath);
+        if (path != null && MIGRATING_DATABASES.contains(path)) {
+            throw new IOException("The database " + path + " is being converted and cannot be "
+                    + "opened until that finishes.");
+        }
+        databaseConnectionOpened(path);
+    }
+
+    /// How many connections are open on a database file, encrypted or not.
+    public static synchronized int openDatabaseConnections(String rawPath) {
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(databaseKey(rawPath));
+        return count == null ? 0 : count.intValue();
+    }
+
+    /// Disposes of an export, and reports anything that survived.
+    ///
+    /// If the file cannot be unlinked it is truncated instead, which removes the contents even
+    /// where the directory entry survives.
+    ///
+    /// @return a sentence to append to a failure message, empty when nothing survived
+    public static String discardDatabaseMigrationExport(File target) {
+        if (target == null || !target.exists() || target.delete()) {
+            return "";
+        }
+        try {
+            new FileOutputStream(target).close();
+        } catch (IOException cannotEmptyIt) {
+            return " A complete copy of the data was left at " + target.getPath()
+                    + " and could not be removed; delete it.";
+        }
+        if (!target.exists() || target.delete()) {
+            return "";
+        }
+        return " An emptied file was left at " + target.getPath() + ".";
+    }
+
+    /// Records that a conversion is under way and which file holds the original.
+    ///
+    /// The marker is the one file here whose name has to be predictable, because recovery has to
+    /// find it without being told. So it is the one place something could already be sitting -
+    /// an application may point a database at this exact path - and writing over it would
+    /// destroy that database. Anything already there that this port did not write means the
+    /// conversion does not start.
+    /// Marks a conversion whose installed file was never shown to open.
+    ///
+    /// Recovery reads a live file and a backup both being present as a completed conversion and
+    /// removes the backup. That is right when the converted file opened, and catastrophic when it
+    /// did not and could not be taken back out either: the last readable copy would go. This
+    /// records the difference, and recovery puts the backup back instead.
+    public static void markDatabaseMigrationUnvalidated(String path, File backup)
+            throws IOException {
+        writeMarker(path, backup, null, true);
+    }
+
+    public static void writeDatabaseMigrationMarker(String path, File backup, File target)
+            throws IOException {
+        writeMarker(path, backup, target, false);
+    }
+
+    private static void writeMarker(String path, File backup, File target, boolean unvalidated)
+            throws IOException {
+        File marker = databaseMigrationMarker(path);
+        if (marker == null) {
+            throw new IOException("The database " + path + " has no directory to convert it in");
+        }
+        if (marker.exists() && !ownsDatabaseMigrationMarker(path)) {
+            throw new IOException("There is already a file at " + marker + " that this port did "
+                    + "not write, so the conversion was not started rather than overwriting it. "
+                    + "Move it aside if it is not a database you need.");
+        }
+        // Written beside the marker and renamed over it, never written into it. The second call
+        // updates a marker that is already valid and already naming a file holding data, and
+        // opening it for writing truncates it first: a process death in that window leaves a
+        // marker that recovery cannot recognise, so it acts on nothing and the export it named is
+        // orphaned. A rename is atomic, so the marker is only ever the old contents or the new.
+        // The marker's own name already carries the ".marker" suffix, so it is never short
+        // enough for createTempFile to reject the prefix.
+        File pending = File.createTempFile(marker.getName() + ".", ".pending",
+                marker.getParentFile());
+        Writer writer = new OutputStreamWriter(new FileOutputStream(pending), "UTF-8");
+        try {
+            writer.write(MIGRATION_MARKER_MAGIC);
+            writer.write("\n");
+            writer.write(backup == null ? "" : backup.getName());
+            writer.write("\n");
+            writer.write(target == null ? "" : target.getName());
+            writer.write("\n");
+            writer.write(unvalidated ? MIGRATION_UNVALIDATED : "");
+            writer.write("\n");
+        } finally {
+            writer.close();
+        }
+        // renameTo replaces an existing destination on the filesystems Android puts databases on.
+        // Deleting first would reopen exactly the window this is here to close.
+        if (!pending.renameTo(marker)) {
+            pending.delete();
+            throw new IOException("The record of the conversion at " + marker + " could not be "
+                    + "written, so the conversion was not started.");
+        }
+    }
+
+    /// Restores a database whose conversion was interrupted between the two renames.
+    ///
+    /// Called before every open, encrypted or not. Encrypt and decrypt move the original aside
+    /// and install the converted file in its place, so a process death in that gap leaves a
+    /// complete database in the migration directory and nothing under the live name. Putting it
+    /// back is what makes that window recoverable rather than a silent empty database.
+    ///
+    /// Acts only on a marker this port wrote, and only on the backup that marker names.
+    public static void recoverInterruptedDatabaseMigration(String path) throws IOException {
+        if (path == null) {
+            return;
+        }
+        File marker = databaseMigrationMarker(path);
+        if (marker == null || !marker.isFile() || !ownsDatabaseMigrationMarker(path)) {
+            // Nothing of ours is here, and nothing of anybody else's gets touched. A file at this
+            // name that this port did not write belongs to someone -- a custom database path can
+            // legitimately put another database here -- and this runs before every open, so acting
+            // on it would mean that opening one database destroys an unrelated one.
+            return;
+        }
+        // The export first, whatever else is true. It is a second complete copy of the data, and
+        // a plaintext one when the conversion was a decryption, so an interrupted conversion must
+        // not leave it lying in the migration directory. It is only ever installed by being
+        // renamed over the live database, so anything still under its own name is an orphan.
+        File orphanedExport = readDatabaseMigrationTarget(path);
+        if (orphanedExport != null && orphanedExport.exists()) {
+            String surviving = discardDatabaseMigrationExport(orphanedExport);
+            if (surviving.length() > 0) {
+                throw new IOException("The database " + path + " has an interrupted conversion "
+                        + "whose working copy could not be cleaned up." + surviving);
+            }
+        }
+        File backup = readDatabaseMigrationBackup(path);
+        if (backup == null) {
+            // No original was moved aside, so the conversion never reached the swap. Only the
+            // export existed, and it is gone.
+            marker.delete();
+            return;
+        }
+        File live = new File(path);
+        if (!backup.isFile()) {
+            // The marker outlived its backup, so there is nothing to put back or clean up.
+            marker.delete();
+            return;
+        }
+        if (!live.exists()) {
+            // Died between the two renames: the backup is the only copy. Put it back, and refuse
+            // to continue if that fails - opening would create an empty database over the top and
+            // the next conversion would remove the backup as stale, losing the data for good.
+            if (!backup.renameTo(live)) {
+                throw new IOException("The database " + path + " is mid-conversion and the copy "
+                        + "holding its contents, at " + backup + ", could not be moved back. The "
+                        + "data is intact in that file; the database was not opened rather than "
+                        + "replacing it with an empty one.");
+            }
+            marker.delete();
+            return;
+        }
+        if (isDatabaseMigrationUnvalidated(path)) {
+            // The converted file is in place but was never shown to open, and the conversion could
+            // not take it back out. Both files existing is not evidence of success here, so the
+            // backup goes back rather than away: deleting it would drop the last readable copy.
+            File displaced = unusedSibling(path + ".unvalidated");
+            if (displaced == null) {
+                throw new IOException("The database " + path + " holds a converted file that was "
+                        + "never shown to open, and there is nowhere to move it aside to. The "
+                        + "original is intact at " + backup + "; nothing was overwritten.");
+            }
+            if (!live.renameTo(displaced) || !backup.renameTo(live)) {
+                throw new IOException("The database " + path + " holds a converted file that was "
+                        + "never shown to open, and the original at " + backup + " could not be "
+                        + "put back. The data is in that file; it was left there rather than "
+                        + "removed.");
+            }
+            displaced.delete();
+            marker.delete();
+            return;
+        }
+        // Both exist, so the swap completed and only the cleanup was lost. The backup is the
+        // database in its previous form, which after an encrypt is a plaintext copy of an
+        // encrypted database - the encryption-at-rest hole in slow motion.
+        if (!backup.delete() && backup.exists()) {
+            throw new IOException("The database " + path + " was converted, but the copy of its "
+                    + "previous form at " + backup + " could not be removed. Delete it before "
+                    + "relying on this database being encrypted.");
+        }
+        marker.delete();
+    }
+
+    /// A path near `preferred` that no file occupies, or null if too many are taken.
+    ///
+    /// The recovery moves the rejected file aside before putting the original back, and on these
+    /// filesystems a rename replaces whatever is at the destination. A custom database path can put
+    /// that destination anywhere the application also keeps files, so writing to it blind would let
+    /// a failed conversion destroy an unrelated file of the application's while reporting that it
+    /// recovered cleanly.
+    private static File unusedSibling(String preferred) {
+        File candidate = new File(preferred);
+        if (!candidate.exists()) {
+            return candidate;
+        }
+        for (int iter = 1; iter < 100; iter++) {
+            candidate = new File(preferred + "." + iter);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /// Removes the working files for a database, reporting anything it could not remove.
+    ///
+    /// Used by delete, where the caller's intent is that the data goes away. A failure here has
+    /// to stop the deletion: continuing would report success while a complete copy of the
+    /// database survives, and a later open would restore it.
+    static void discardDatabaseMigrationArtifacts(String path) throws IOException {
+        if (path == null) {
+            return;
+        }
+        File export = readDatabaseMigrationTarget(path);
+        if (export != null && export.exists()) {
+            String surviving = discardDatabaseMigrationExport(export);
+            if (surviving.length() > 0) {
+                throw new IOException("The database " + path + " was not deleted, because the "
+                        + "working copy of its interrupted conversion could not be removed."
+                        + surviving);
+            }
+        }
+        File backup = readDatabaseMigrationBackup(path);
+        if (backup == null) {
+            File onlyMarker = databaseMigrationMarker(path);
+            if (onlyMarker != null && onlyMarker.isFile() && ownsDatabaseMigrationMarker(path)
+                    && !onlyMarker.delete() && onlyMarker.exists()) {
+                throw new IOException("The database " + path + " was not deleted, because the "
+                        + "record of its interrupted conversion at " + onlyMarker + " could not "
+                        + "be removed.");
+            }
+            return;
+        }
+        if (backup.exists() && !backup.delete() && backup.exists()) {
+            throw new IOException("The database " + path + " was not deleted, because the copy of "
+                    + "it at " + backup + " could not be removed and a later open would restore "
+                    + "it.");
+        }
+        File marker = databaseMigrationMarker(path);
+        if (marker.exists() && !marker.delete() && marker.exists()) {
+            throw new IOException("The database " + path + " was not deleted, because the record "
+                    + "of its interrupted conversion at " + marker + " could not be removed.");
+        }
+    }
+
+    /// Whether a marked migration backup is holding a database's contents.
+    static boolean hasRecoverableDatabaseBackup(String path) {
+        File backup = readDatabaseMigrationBackup(path);
+        return backup != null && backup.isFile();
+    }
+
+    private String resolveNativeDatabasePath(String databaseName) {
+        if (databaseName.startsWith("file://")) {
+            return FileSystemStorage.getInstance().toNativePath(databaseName);
+        }
+        return getDatabasePath(databaseName);
+    }
+
+    @Override
+    public Database openOrCreateDBForRekey(String databaseName) throws IOException {
+        // The stock android.database.sqlite engine has no cipher, so a plaintext database opened
+        // through it can never be encrypted in place. Route the migration through SQLCipher, which
+        // opens an unencrypted file when given an empty key and can then rekey it.
+        if (!isDatabaseEncryptionSupported()) {
+            return openOrCreateDB(databaseName);
+        }
+        // The slot is taken before the engine opens anything, for the reason given in
+        // openOrCreateDB. AndroidCipherFactory hands back a connection that already holds it.
+        String nativePath = resolveNativeDatabasePath(databaseName);
+        reserveDatabaseConnection(nativePath);
+        Object opened;
+        try {
+            Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
+            java.lang.reflect.Method open = c.getMethod("open", String.class, String.class, String.class);
+            // Cast below, outside the try, for the reason given in openOrCreateDB.
+            opened = open.invoke(null,
+                    resolveNativeDatabasePath(databaseName), databaseName, "");
+        } catch (java.lang.reflect.InvocationTargetException err) {
+            // The open threw, so no connection exists to release the slot later. A rekey open of
+            // a file that turns out to be encrypted lands here, and leaving the slot behind would
+            // make every later conversion of that database see a connection that is not there.
+            releaseUnusedDatabaseConnection(nativePath);
+            Throwable cause = err.getCause();
+            if (cause instanceof IOException) {
+                throw (IOException) cause;
+            }
+            throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
+        } catch (NoSuchMethodException broken) {
+            // Same reasoning as openOrCreateDB: falling back to the plaintext engine here would
+            // silently turn a re-key into a no-op on a build that does ship the cipher.
+            releaseUnusedDatabaseConnection(nativePath);
+            throw new IOException("The encrypted database implementation is present but does not "
+                    + "expose the expected entry point. This build is inconsistent: "
+                    + broken.getMessage(), broken);
+        } catch (Throwable err) {
+            releaseUnusedDatabaseConnection(nativePath);
+            return openOrCreateDB(databaseName);
+        }
+        if (!(opened instanceof Database)) {
+            releaseUnusedDatabaseConnection(nativePath);
+            throw new IOException("The encrypted database implementation returned "
+                    + (opened == null ? "nothing" : opened.getClass().getName())
+                    + " rather than a Database. This build is inconsistent.");
+        }
+        return (Database) opened;
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
     }
 
     @Override
     public boolean isDatabaseCustomPathSupported() {
         return true;
     }
-    
-    
+
+
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
+        String deletePath = resolveNativeDatabasePath(databaseName);
+        if (isDatabaseBeingConverted(deletePath)) {
+            // A conversion owns the file and its working copies. Deleting either underneath it
+            // would strand the data in whichever one the conversion has not installed yet.
+            throw new IOException("The database " + deletePath + " is being converted and cannot "
+                    + "be deleted until that finishes.");
+        }
+        // The working files first. They survive deleting the live file, and the next open runs
+        // recovery and puts the backup back - so a database the caller was told had been deleted
+        // reappears, and after an interrupted encryption what reappears is the plaintext copy.
+        discardDatabaseMigrationArtifacts(deletePath);
         if (databaseName.startsWith("file://")) {
             deleteFile(databaseName);
             return;
@@ -10997,6 +11687,24 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public boolean existsDB(String databaseName) {
+        // Recover first. A conversion interrupted between its two renames leaves the live name
+        // missing while the database itself sits complete in the migration directory, and
+        // reporting "does not exist" there would refuse a retry of encrypt or decrypt - the one
+        // operation that could put it right.
+        String path = resolveNativeDatabasePath(databaseName);
+        if (isDatabaseBeingConverted(path)) {
+            // A conversion is mid-flight and owns both the live file and its working copies.
+            // Recovering underneath it would act on a half-installed state, so this answers from
+            // what the conversion has not yet consumed instead.
+            return hasRecoverableDatabaseBackup(path) || new File(path).exists();
+        }
+        try {
+            recoverInterruptedDatabaseMigration(path);
+        } catch (IOException cannotRecover) {
+            // The data is still in the migration directory, so the database does exist even
+            // though it could not be moved back. Say so; the open will report the real problem.
+            return hasRecoverableDatabaseBackup(path);
+        }
         if (databaseName.startsWith("file://")) {
             return exists(databaseName);
         }

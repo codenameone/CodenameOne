@@ -67,7 +67,6 @@ import com.codename1.push.PushCallback;
 import com.codename1.teavm.ext.localforage.LocalForage;
 import com.codename1.teavm.ext.localforage.LocalForage.ItemSavedListener;
 import com.codename1.teavm.ext.usermedia.PhotoCapture;
-import com.codename1.teavm.ext.websql.WebSQL;
 import com.codename1.teavm.geom.JSAffineTransform;
 import com.codename1.teavm.geom.JSMatrix4;
 import com.codename1.teavm.io.BlobUtil;
@@ -11471,8 +11470,85 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        WebSQL.Database db = WebSQL.openDatabase(databaseName, "1.0", databaseName, defaultFileSystemSize);
-        return new DatabaseImpl(db);
+        return openOrCreateDB(databaseName, null);
+    }
+
+    @Override
+    public Database openOrCreateDB(String databaseName, com.codename1.db.DatabaseConfig config)
+            throws IOException {
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The SQLite engine could not be loaded");
+        }
+        String key = null;
+        if (config != null && config.isEncrypted()) {
+            key = config.resolveKeyMaterial(databaseName);
+        }
+        return new DatabaseImpl(databaseName, key);
+    }
+
+    @Override
+    public boolean isDatabaseEncryptionSupported() {
+        return com.codename1.impl.html5.database.SQLiteNative.init()
+                && com.codename1.impl.html5.database.SQLiteNative.isCipherAvailable();
+    }
+
+    @Override
+    public boolean isBlobQueryParameterSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        // Storage is a virtual pool keyed by name, not a filesystem, so there are no paths.
+        return false;
+    }
+
+    @Override
+    public boolean existsDB(String databaseName) {
+        return com.codename1.impl.html5.database.SQLiteNative.init()
+                && com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws IOException {
+        // A failed init is not "nothing to delete". The engine is unavailable - another tab
+        // holding the storage, most likely - and the database is still there, so returning
+        // normally would report a deletion that did not happen.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            throw new IOException("The database " + databaseName + " could not be deleted "
+                    + "because the SQLite engine is unavailable");
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.delete(databaseName)) {
+            throw new IOException("The database " + databaseName + " could not be deleted: "
+                    + com.codename1.impl.html5.database.SQLiteNative.lastError());
+        }
+    }
+
+    @Override
+    public int isDatabaseFileEncrypted(String databaseName) {
+        // Databases live in a browser storage pool, not a filesystem, so there is no header to
+        // read. Ask the engine: opening without a key succeeds only for a plaintext database.
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()
+                || !com.codename1.impl.html5.database.SQLiteNative.exists(databaseName)) {
+            return DATABASE_NOT_ENCRYPTED;
+        }
+        try {
+            long peer = com.codename1.impl.html5.database.SQLiteNative.open(databaseName, null);
+            if (peer == 0) {
+                return DATABASE_ENCRYPTED;
+            }
+            com.codename1.impl.html5.database.SQLiteNative.close(peer);
+            return DATABASE_NOT_ENCRYPTED;
+        } catch (IOException cannotOpenUnkeyed) {
+            return DATABASE_ENCRYPTED;
+        }
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        // The name inside the storage pool. Not a real filesystem path, and deliberately not
+        // presented as one: FileSystemStorage cannot open it.
+        return databaseName;
     }
 
     @Override

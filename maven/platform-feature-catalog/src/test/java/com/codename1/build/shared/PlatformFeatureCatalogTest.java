@@ -490,4 +490,37 @@ class PlatformFeatureCatalogTest {
         }
         return null;
     }
+
+    @Test
+    void plainDatabaseUsageDoesNotPullInTheCipher() {
+        // Every application that touches a database references com.codename1.db, so keying the
+        // entry on the package would bundle SQLCipher for all of them and raise the minimum SDK
+        // from 19 to 23 for people who never asked for encryption.
+        PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/db/Database");
+        acc.consume("com/codename1/db/Cursor");
+        acc.consume("com/codename1/db/Row");
+        for (PlatformFeatureCatalog.Entry e : acc.hits()) {
+            for (String gav : e.androidGradleDeps()) {
+                assertFalse(gav.contains("sqlcipher"),
+                        "plain database usage must not pull in SQLCipher, but got " + gav);
+            }
+        }
+    }
+
+    @Test
+    void encryptedDatabaseUsagePullsInTheCipherAndRaisesTheMinimumSdk() {
+        PlatformFeatureCatalog.Accumulator acc = new PlatformFeatureCatalog.Accumulator();
+        acc.consume("com/codename1/db/DatabaseConfig");
+
+        boolean foundCipher = false;
+        for (PlatformFeatureCatalog.Entry e : acc.hits()) {
+            for (String gav : e.androidGradleDeps()) {
+                foundCipher |= gav.contains("net.zetetic:sqlcipher-android");
+            }
+        }
+        assertTrue(foundCipher, "DatabaseConfig must bring in the SQLCipher AAR");
+        assertTrue(acc.minimumAndroidSdk() >= 23,
+                "SQLCipher requires API 23; the accumulator reported " + acc.minimumAndroidSdk());
+    }
 }

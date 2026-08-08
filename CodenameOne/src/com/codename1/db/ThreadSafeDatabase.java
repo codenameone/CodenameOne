@@ -23,22 +23,53 @@
 
 package com.codename1.db;
 
-import com.codename1.io.Log;
 import com.codename1.util.EasyThread;
 import com.codename1.util.RunnableWithResultSync;
 
 import java.io.IOException;
 
-/// Wraps all database calls in a single thread so they are all proxied thru that thread
+/// Confines a database and its cursors to a single thread.
+///
+/// A `Database` is not thread safe, and neither are the cursors it hands out. Wrapping one in this
+/// class routes every call through one worker thread, so several application threads can share a
+/// connection without coordinating.
+///
+/// ```java
+/// Database db = new ThreadSafeDatabase(Database.openOrCreate("shared.db"));
+/// ```
+///
+/// The cost is that every call is a thread handoff, so a tight loop over a large result set is
+/// meaningfully slower than using a connection per thread. Prefer one database per thread when the
+/// threads do not actually need to share state.
+///
+/// This class used to be deprecated, on the grounds that platform specific behaviour had defeated
+/// it. That behaviour has since been fixed: the iOS port no longer closes SQLite handles from the
+/// garbage collector thread, and it opens each connection in serialised mode rather than trying to
+/// configure the whole process.
 ///
 /// @author Shai Almog
-///
-/// #### Deprecated
-///
-/// platform specific nuances prevented this approach from working out, we improved the native iOS support for thread safety instead
 public class ThreadSafeDatabase extends Database {
     private final Database underlying;
     private final EasyThread et;
+
+    /// Guards against a second close. The worker is killed by the first one, so a synchronous
+    /// hand-off afterwards would queue work nothing is left to run and block forever.
+    ///
+    /// Only ever read or written while holding `#dispatchLock`.
+    private boolean closed;
+
+    /// Serializes the closed check against the hand-off it guards.
+    ///
+    /// Testing the flag and queueing the work have to be one step. Otherwise two threads both see
+    /// an open database, one of them closes it and kills the worker, and the other hands its task
+    /// to a worker that is already gone and waits for a result that can never arrive. This class
+    /// exists to be shared between threads, so that race is its main use case rather than an
+    /// exotic one.
+    ///
+    /// Holding the lock across the hand-off costs nothing: the worker is a single thread and the
+    /// hand-off is synchronous, so calls were already serialized. It is safe because no task
+    /// queued here calls back into this wrapper -- every task body runs against `#underlying`.
+    private final Object dispatchLock = new Object();
 
     /// Wraps the given database with a threadsafe version
     ///
@@ -70,40 +101,97 @@ public class ThreadSafeDatabase extends Database {
         });
     }
 
-    private void invokeWithException(final RunnableWithIOException r) throws IOException {
-        IOException err = et.run(new RunnableWithResultSync<IOException>() {
-            @Override
-            @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-            public IOException run() {
-                try {
-                    r.run();
-                    return null;
-                } catch (IOException err) {
-                    return err;
-                }
-            }
-        });
-        if (err != null) {
-            throw err;
+    /// Refuses to hand work to a worker that has been killed.
+    ///
+    /// Guarding only close() was not enough: every other method still queued work and waited
+    /// synchronously, so closing a cursor after its owning database had closed -- an ordinary
+    /// cleanup order -- blocked forever instead of throwing.
+    ///
+    /// Call only while holding `#dispatchLock`, and queue the work it guards without releasing it.
+    private void checkOpen() throws IOException {
+        if (closed) {
+            throw new IOException("This database has been closed");
         }
     }
 
-    private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
-        Object ret = et.run(new RunnableWithResultSync<Object>() {
-            @Override
-            @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-            public Object run() {
-                try {
-                    return r.run();
-                } catch (IOException err) {
-                    return err;
+    private void invokeWithException(final RunnableWithIOException r) throws IOException {
+        Object err;
+        synchronized (dispatchLock) {
+            checkOpen();
+            err = et.run(new RunnableWithResultSync<Object>() {
+                @Override
+                @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
+                public Object run() {
+                    try {
+                        r.run();
+                        return null;
+                    } catch (Throwable err) {
+                        // Throwable, not IOException. Anything escaping this callback is caught by
+                        // the worker's own loop, which never delivers a result, so the caller waits
+                        // forever holding dispatchLock and every later call queues behind it. An
+                        // unchecked exception from the engine -- Android raises
+                        // CursorIndexOutOfBoundsException for a bad column, for one -- is enough to
+                        // wedge the whole wrapper. Carrying it back keeps that a thrown error.
+                        return err;
+                    }
                 }
-            }
-        });
-        if (ret instanceof IOException) {
-            throw (IOException) ret;
+            });
+        }
+        rethrow(err);
+    }
+
+    /// Re-raises whatever the worker carried back, preserving its kind.
+    ///
+    /// An unchecked exception is rethrown as itself so callers see the same failure they would
+    /// from an unwrapped database; anything else that is not an IOException is wrapped, because
+    /// this API promises IOException.
+    private static void rethrow(Object err) throws IOException {
+        if (err == null) {
+            return;
+        }
+        if (err instanceof IOException) {
+            throw (IOException) err;
+        }
+        if (err instanceof RuntimeException) {
+            throw (RuntimeException) err;
+        }
+        if (err instanceof Error) {
+            throw (Error) err;
+        }
+        throw new IOException(((Throwable) err).getMessage(), (Throwable) err);
+    }
+
+    private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
+        Object ret;
+        synchronized (dispatchLock) {
+            checkOpen();
+            ret = et.run(new RunnableWithResultSync<Object>() {
+                @Override
+                @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
+                public Object run() {
+                    try {
+                        return r.run();
+                    } catch (Throwable err) {
+                        // See invokeWithException above: an escape here wedges the wrapper.
+                        return new Failure(err);
+                    }
+                }
+            });
+        }
+        if (ret instanceof Failure) {
+            rethrow(((Failure) ret).cause);
         }
         return ret;
+    }
+
+    /// Distinguishes a failure carried back from the worker from a result that happens to be a
+    /// Throwable, which a query returning one as a value could otherwise be mistaken for.
+    private static final class Failure {
+        private final Throwable cause;
+
+        Failure(Throwable cause) {
+            this.cause = cause;
+        }
     }
 
     @Override
@@ -127,19 +215,82 @@ public class ThreadSafeDatabase extends Database {
     }
 
     @Override
-    public void close() {
-        // close should NEVER throw an exception...
-        et.run(new Runnable() {
+    public boolean isInTransaction() {
+        // beginTransaction() runs against the underlying database, so it moves that object's
+        // flag, not this wrapper's. Without delegating, the wrapper always reported false --
+        // including immediately after a successful begin -- and a caller trusting it would skip
+        // the commit or rollback it still owed.
+        //
+        // Read under the dispatch lock, but without handing work to the worker. The lock is what
+        // publishes the write: every transaction call runs inside it, so acquiring it here gives
+        // the happens-before that a plain read of another thread's field does not, and without it
+        // a polling thread could keep seeing stale state indefinitely.
+        //
+        // Deliberately not a dispatch. This is the one method on Database with no IOException, so
+        // it reads as a cheap accessor and callers poll it from the event thread; queueing work
+        // would park that thread behind whatever statement is running, which on Android is an
+        // ANR. Taking the lock can still wait for an in-flight call, but only for as long as that
+        // call holds it, and the answer is then current rather than stale.
+        synchronized (dispatchLock) {
+            return underlying.isInTransaction();
+        }
+    }
+
+    @Override
+    public void changeKey(final DatabaseConfig config) throws IOException {
+        // Without this the wrapper inherits the base implementation, which always reports
+        // NOT_SUPPORTED, so a wrapped database could never be re-keyed however capable the
+        // underlying port is.
+        invokeWithException(new RunnableWithIOException() {
             @Override
-            public void run() {
-                try {
-                    underlying.close();
-                } catch (IOException err) {
-                    Log.e(err);
-                }
-                et.kill();
+            public void run() throws IOException {
+                underlying.changeKey(config);
             }
         });
+    }
+
+    @Override
+    public void close() throws IOException {
+        synchronized (dispatchLock) {
+            if (closed) {
+                // close() is idempotent by contract, and after the first call there is no worker
+                // left to service the hand-off below.
+                return;
+            }
+            // Flip the flag and shut down without releasing the lock, so a concurrent operation
+            // either queues before this point or is rejected by checkOpen() after it. In between
+            // it would hand work to a dead worker and wait on it forever.
+            closed = true;
+            // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
+            // return while the database was still open, and a delete() on the next line would race
+            // it and fail with the file still in use.
+            Object failure = et.run(new RunnableWithResultSync<Object>() {
+                @Override
+                public Object run() {
+                    try {
+                        underlying.close();
+                        return null;
+                    } catch (Exception err) {
+                        return new Failure(err);
+                    } catch (Error err) {
+                        // Wrapped, and caught in two clauses rather than as Throwable with an
+                        // instanceof test, because PMD forbids both that and returning a caught
+                        // local directly. Letting either escape is far worse than reporting it:
+                        // the worker's own loop would swallow it without delivering a result,
+                        // and this call is synchronous and holds dispatchLock, so close() would
+                        // block forever and never reach et.kill().
+                        return new Failure(err);
+                    }
+                }
+            });
+            // The worker is shut down either way. A close that failed still leaves this wrapper
+            // closed, so there is nothing to retry - but the caller has to be told, because on
+            // some ports a failing close means the data never reached storage.
+            et.kill();
+            if (failure instanceof Failure) {
+                rethrow(((Failure) failure).cause);
+            }
+        }
     }
 
     @Override
@@ -307,7 +458,12 @@ public class ThreadSafeDatabase extends Database {
         }
     }
 
-    private class CursorWrapper implements Cursor {
+    /// Implements `CursorExt` as well as `Cursor`, because every cursor a Codename One port
+    /// returns implements it and the wrapper is documented as transparent. Without it a wrapped
+    /// cursor silently lost the capability: `Database#count(Cursor)` answered -1 even on Android,
+    /// where the exact count is already known, and the extension calls bypassed the worker
+    /// thread this class exists to funnel everything through.
+    private class CursorWrapper implements CursorExt {
         private final Cursor underlyingCursor;
 
         public CursorWrapper(Cursor underlyingCursor) {
@@ -405,13 +561,47 @@ public class ThreadSafeDatabase extends Database {
         }
 
         @Override
-        public void close() throws IOException {
+        public void beforeFirst() throws IOException {
             invokeWithException(new RunnableWithIOException() {
                 @Override
                 public void run() throws IOException {
-                    underlyingCursor.close();
+                    Database.beforeFirst(underlyingCursor);
                 }
             });
+        }
+
+        @Override
+        public int getCount() throws IOException {
+            Integer count = (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
+                public Object run() throws IOException {
+                    return Integer.valueOf(Database.count(underlyingCursor));
+                }
+            });
+            // -1 is the documented "cannot say cheaply" answer, so it is also the right answer if
+            // the dispatch ever hands back nothing.
+            return count == null ? -1 : count.intValue();
+        }
+
+        @Override
+        public void close() throws IOException {
+            // Under the lock so the database cannot close between the check and the hand-off,
+            // which would turn this no-op into a spurious "database has been closed". The monitor
+            // is reentrant, so the nested acquisition inside invokeWithException is free.
+            synchronized (dispatchLock) {
+                if (closed) {
+                    // Closing the database already invalidated its cursors, and cursor close is
+                    // idempotent, so closing one afterwards is a no-op rather than an error.
+                    // Closing the cursor after the database is an ordinary cleanup order.
+                    return;
+                }
+                invokeWithException(new RunnableWithIOException() {
+                    @Override
+                    public void run() throws IOException {
+                        underlyingCursor.close();
+                    }
+                });
+            }
         }
 
         @Override

@@ -582,6 +582,314 @@ public abstract class Executor {
         }
     }
 
+    /// Reports whether this build came from a Maven project.
+    ///
+    /// The Maven plugin stamps its own version into the settings it hands over, and the legacy
+    /// Ant build client never has, so the presence of that argument is the discriminator. It has
+    /// been written since 2021, well before the Maven transition finished, so an ordinary Maven
+    /// build is not going to be missing it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    ///
+    /// #### Returns
+    ///
+    /// true if the request was produced by the Maven plugin
+    protected boolean isMavenBuild(BuildRequest request) {
+        return request.getArg("maven.codenameone-maven-plugin", null) != null
+                || request.getArg("maven.codenameone-core.version", null) != null;
+    }
+
+    /// Decides whether the database compatibility switch should be on for this build.
+    ///
+    /// An explicit `db.legacy` always wins, in either direction. Failing that, an Ant project is
+    /// defaulted to the old behaviour, because it predates the portable contract and its author
+    /// has no reason to expect a rebuild to change how their queries behave. A Maven project
+    /// gets the portable contract, which is the documented default.
+    ///
+    /// The default only applies when the application actually uses the database. Turning it on
+    /// for an app with no database is harmless but misleading, and it would show up in the build
+    /// log of every Ant project ever built.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// true if the generated stub should switch the database into legacy mode
+    protected boolean isDatabaseLegacyMode(BuildRequest request, boolean usesDatabase) {
+        String explicit = request.getArg("db.legacy", null);
+        if (explicit != null) {
+            return "true".equalsIgnoreCase(explicit);
+        }
+        if (!usesDatabase || isMavenBuild(request)) {
+            return false;
+        }
+        debug("This is an Ant project that uses com.codename1.db, so the database is being built "
+                + "in compatibility mode: it keeps the behaviour this project was written "
+                + "against rather than the portable contract. Set the db.legacy build hint to "
+                + "false to opt in to the portable contract, or to true to pin compatibility "
+                + "mode explicitly.");
+        return true;
+    }
+
+    /// The line a generated application stub needs in order to apply the decision above.
+    ///
+    /// Empty when the switch is off, so the stub is unchanged for the common case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// the source line to insert, or an empty string
+    protected String databaseLegacyStubProperty(BuildRequest request, boolean usesDatabase) {
+        if (!isDatabaseLegacyMode(request, usesDatabase)) {
+            return "";
+        }
+        return "        Display.getInstance().setProperty(\"db.legacy\", \"true\");\n";
+    }
+
+    /// The same decision, for a stub that runs before `Display` exists.
+    ///
+    /// A **direct** call, not reflection: ParparVM's dead-code elimination does not keep a member
+    /// reached only reflectively, so a reflective form would be culled and the lookup would fail
+    /// at runtime, silently leaving the application on the new behaviour. The launcher calls
+    /// `SVGRegistry.installGlobal` and `NativeLookup.register` directly for the same reason.
+    ///
+    /// It compiles everywhere because it is emitted only when the staged core actually has the
+    /// switch. A core that predates it has none to set, and its behaviour is already the old
+    /// behaviour, so emitting nothing there reaches the same result.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the build request
+    /// - `usesDatabase`: whether the scanned classes reference `com.codename1.db`
+    ///
+    /// #### Returns
+    ///
+    /// the source line to insert, or an empty string
+    protected String databaseLegacyStubCall(BuildRequest request, boolean usesDatabase,
+            boolean coreHasLegacySwitch) {
+        if (!coreHasLegacySwitch || !isDatabaseLegacyMode(request, usesDatabase)) {
+            return "";
+        }
+        return "        com.codename1.db.Database.setLegacyBehavior(true);\n";
+    }
+
+    /// Whether the staged framework carries the database compatibility switch.
+    ///
+    /// `DatabaseConfig` arrived with the portable database contract, so its presence is what
+    /// distinguishes a core that has `setLegacyBehavior` from one that predates the feature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `stageClasses`: the staged class tree, or null
+    ///
+    /// #### Returns
+    ///
+    /// true if the switch is available to call directly
+    protected boolean coreHasLegacySwitch(File stageClasses) {
+        return stageClasses != null
+                && new File(stageClasses, "com/codename1/db/DatabaseConfig.class").exists();
+    }
+
+    /// What an application's own classes say about its use of the database API.
+    ///
+    /// Two independent answers, because two different payloads hang off them: any reference to
+    /// `com.codename1.db` means the SQLite engine has to ship, and a reference to `DatabaseConfig`
+    /// additionally means the cipher does.
+    public static final class DatabaseUsage {
+
+        private final boolean database;
+
+        private final boolean cipher;
+
+        DatabaseUsage(boolean database, boolean cipher) {
+            this.database = database;
+            this.cipher = cipher;
+        }
+
+        /// Whether anything outside the framework references `com.codename1.db`.
+        public boolean usesDatabase() {
+            return database;
+        }
+
+        /// Whether anything outside the framework references `com.codename1.db.DatabaseConfig`.
+        public boolean usesDatabaseCipher() {
+            return cipher;
+        }
+    }
+
+    /// The database API itself. Every class in it names the package, so none of them says
+    /// anything about whether the application does.
+    private static final String DATABASE_PACKAGE = "com/codename1/db";
+
+    /// Framework classes whose reference to the database package is their own.
+    ///
+    /// Named one by one rather than by package, because a package is not a reliable statement
+    /// about who wrote a class: skipping `com/codename1/ui` wholesale would also skip an
+    /// application class under it, and a direct `DatabaseConfig` reference there would then go
+    /// unseen and the engine would be left out of a build that needs it. There are sixteen of
+    /// these in the framework and they are enumerated.
+    private static final String[] FRAMEWORK_DATABASE_CLASSES = {
+        "com/codename1/impl/AbstractDBCursor",
+        "com/codename1/impl/CodenameOneImplementation",
+        "com/codename1/orm/Dao",
+        "com/codename1/orm/EntityManager",
+        "com/codename1/properties/SQLMap",
+        "com/codename1/testing/DatabaseConformanceSuite",
+        "com/codename1/ui/Display"
+    };
+
+    /// The internal name of the database package, as every reference to a class in it is stored.
+    private static final byte[] DATABASE_MARKER = toAscii("com/codename1/db/");
+
+    /// The internal name of the class that turns encryption on.
+    private static final byte[] DATABASE_CIPHER_MARKER = toAscii("com/codename1/db/DatabaseConfig");
+
+    /// Framework classes that are a database by another name.
+    ///
+    /// An application can use one of these and never mention `com.codename1.db` itself --
+    /// `EntityManager` and `SQLMap` exist so that it does not have to -- so a reference to one is
+    /// a reference to the database. Without this the engine would be left out of exactly the
+    /// applications that took the framework's advice, and they would fail at runtime rather than
+    /// at build time.
+    private static final byte[][] DATABASE_FACADE_MARKERS = {
+        toAscii("com/codename1/orm/"),
+        toAscii("com/codename1/properties/SQLMap")
+    };
+
+    /// An internal class name as the bytes a constant pool holds, which are always ASCII here.
+    private static byte[] toAscii(String s) {
+        byte[] out = new byte[s.length()];
+        for (int iter = 0; iter < s.length(); iter++) {
+            out[iter] = (byte) s.charAt(iter);
+        }
+        return out;
+    }
+
+    /// Reports whether the application, as opposed to the framework, uses the database.
+    ///
+    /// Reads each class file directly rather than going through
+    /// `#scanClassesForPermissions(File,ClassScanner)`, which reports the class being scanned only
+    /// from `visitEnd` -- after its references have already been delivered -- so a reference cannot
+    /// be attributed to the class that made it. Walking one file at a time, and skipping the
+    /// framework by path, is what makes the distinction possible.
+    ///
+    /// The test is a constant-pool search for the package name, which is how every reference to a
+    /// class in it is stored, including the descriptor of a framework method that merely returns
+    /// one. A class mentioning the string for some other reason counts too, which errs towards
+    /// treating the application as a database user -- the safe direction, since the cost is bytes
+    /// rather than a missing engine.
+    ///
+    /// #### Parameters
+    ///
+    /// - `classesDir`: the staged class tree, application and framework together
+    ///
+    /// #### Returns
+    ///
+    /// what the application's own classes reference, never null
+    protected DatabaseUsage scanForDatabaseUsage(File classesDir) throws IOException {
+        boolean[] found = {false, false};
+        if (classesDir != null && classesDir.isDirectory()) {
+            scanForDatabaseUsage(classesDir, "", found);
+        }
+        return new DatabaseUsage(found[0], found[1]);
+    }
+
+    private void scanForDatabaseUsage(File dir, String relativePath, boolean[] found)
+            throws IOException {
+        File[] children = dir.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (int iter = 0; iter < children.length; iter++) {
+            if (found[0] && found[1]) {
+                return;
+            }
+            File child = children[iter];
+            String childPath = relativePath.length() == 0
+                    ? child.getName() : relativePath + "/" + child.getName();
+            if (child.isDirectory()) {
+                if (!DATABASE_PACKAGE.equals(childPath)) {
+                    scanForDatabaseUsage(child, childPath, found);
+                }
+            } else if (child.getName().endsWith(".class")
+                    && !isFrameworkDatabaseClass(childPath)) {
+                byte[] bytes = readAllBytes(child);
+                if (!found[0] && (containsBytes(bytes, DATABASE_MARKER)
+                        || referencesDatabaseFacade(bytes))) {
+                    found[0] = true;
+                }
+                if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)) {
+                    found[1] = true;
+                }
+            }
+        }
+    }
+
+    /// Whether this class file is one of the framework's own, by exact name.
+    ///
+    /// The `$` test catches a nested class, which belongs to the class that declares it --
+    /// `SQLMap$SqlType$8` is `SQLMap`.
+    private static boolean isFrameworkDatabaseClass(String path) {
+        String name = path.substring(0, path.length() - ".class".length());
+        for (int iter = 0; iter < FRAMEWORK_DATABASE_CLASSES.length; iter++) {
+            String framework = FRAMEWORK_DATABASE_CLASSES[iter];
+            if (name.equals(framework) || name.startsWith(framework + "$")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Whether these bytes reach the database through one of the framework's facades.
+    private static boolean referencesDatabaseFacade(byte[] bytes) {
+        for (int iter = 0; iter < DATABASE_FACADE_MARKERS.length; iter++) {
+            if (containsBytes(bytes, DATABASE_FACADE_MARKERS[iter])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static byte[] readAllBytes(File f) throws IOException {
+        byte[] bytes = new byte[(int) f.length()];
+        InputStream in = new FileInputStream(f);
+        try {
+            int read = 0;
+            while (read < bytes.length) {
+                int step = in.read(bytes, read, bytes.length - read);
+                if (step < 0) {
+                    break;
+                }
+                read += step;
+            }
+        } finally {
+            in.close();
+        }
+        return bytes;
+    }
+
+    private static boolean containsBytes(byte[] haystack, byte[] needle) {
+        outer:
+        for (int iter = 0; iter + needle.length <= haystack.length; iter++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[iter + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {

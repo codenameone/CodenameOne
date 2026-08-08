@@ -698,16 +698,58 @@ public final class IOSNative {
     
     native boolean sqlDbExists(String name);
     native long sqlDbCreateAndOpen(String name);
+    /**
+     * Applies an encryption key to an open connection, returning false when the key does not
+     * decrypt the database. Reporting rather than throwing keeps the distinction between a wrong
+     * key and a failure to open the file, without the native layer having to name a core class.
+     */
+    native boolean sqlDbApplyKey(long db, String key);
+
+    /// Applies the key and probes it, reporting the SQLite result rather than a bare pass or fail.
+    ///
+    /// 0 is SQLITE_OK and means the key worked. 26 is SQLITE_NOTADB, which is what a key that did
+    /// not decrypt the file looks like: the plaintext it produces has no valid header. Anything
+    /// else is a corrupt image or a read error, which no key repairs, so the caller must not
+    /// report those as a wrong key.
+    native int sqlDbApplyKeyStatus(long db, String key);
     native void sqlDbDelete(String name);
     native void sqlDbClose(long db);
+    /** Re-keys an open database, or removes the key when passed null. */
+    native void sqlDbRekey(long db, String key);
+    /** True when the linked SQLite build understands the cipher pragmas. */
+    native boolean sqlDbIsCipherAvailable();
+    /** Resolves a database name to its absolute path, honouring a file:// prefix. */
+    native String sqlDbPath(String name);
 
     native void sqlDbExec(long dbPeer, String sql, String[] args);
+    /** Whether the engine reports a transaction in progress, which is sqlite3_get_autocommit. */
+    native boolean sqlDbInTransaction(long dbPeer);
+
+    /** Runs an entire script through sqlite3_exec, which handles multiple statements. */
+    native void sqlDbExecScript(long dbPeer, String sql);
 
     native long sqlDbExecQuery(long dbPeer, String sql, String[] args);
 
+    /** Compiles a statement, returning the sqlite3_stmt peer. */
+    native long sqlStmtPrepare(long dbPeer, String sql);
+    native int sqlStmtParameterCount(long statementPeer);
+    native void sqlStmtBindNull(long statementPeer, int index);
+    /** Binds SQL text as UTF-8 bytes; see com.codename1.impl.SQLText for why not a String. */
+    native void sqlStmtBindText(long statementPeer, int index, byte[] utf8);
+    native void sqlStmtBindBlob(long statementPeer, int index, byte[] value);
+    native void sqlStmtBindLong(long statementPeer, int index, long value);
+    native void sqlStmtBindDouble(long statementPeer, int index, double value);
+    /** Steps a statement, returning true when it landed on a row. */
+    native boolean sqlStmtStep(long statementPeer);
+    /** Resets a statement back to before its first row, keeping its bindings. */
+    native void sqlStmtReset(long statementPeer);
+    native void sqlStmtFinalize(long statementPeer);
+    /** Steps a statement to completion and finalizes it, for non-query use. */
+    native void sqlStmtExecuteAndFinalize(long statementPeer);
+
     native boolean sqlCursorFirst(long statementPeer);
     native boolean sqlCursorNext(long statementPeer);
-    native String sqlGetColName(long statementPeer, int index);
+    native byte[] sqlGetColName(long statementPeer, int index);
     native void sqlCursorCloseStatement(long statement);
 
     native byte[] sqlCursorValueAtColumnBlob(long statement, int col);
@@ -716,7 +758,7 @@ public final class IOSNative {
     native int sqlCursorValueAtColumnInteger(long statement, int col);
     native long sqlCursorValueAtColumnLong(long statement, int col);
     native short sqlCursorValueAtColumnShort(long statement, int col);
-    native String sqlCursorValueAtColumnString(long statement, int col);
+    native byte[] sqlCursorValueAtColumnText(long statement, int col);
     native boolean sqlCursorNullValueAtColumn(long statement, int col); //Warning. This function only works if no automatic type conversions have occurred for the value in question. So it must be called before any of the sqlCursorValueAtColumn* methods. After a type conversion, the result of calling this method is undefined, though harmless
     
     native int sqlCursorGetColumnCount(long statementPeer);

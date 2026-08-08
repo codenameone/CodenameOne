@@ -22,9 +22,13 @@
  */
 package com.codename1.db;
 
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.impl.SQLStatementSplitter;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 /// Allows access to SQLite specifically connecting to a database and executing sql queries on the data.
 /// There is more thorough coverage of the `Database API here`.
@@ -37,36 +41,74 @@ import java.io.IOException;
 /// SQLite should be used for very large data handling, for small storage
 /// refer to `com.codename1.io.Storage` which is more portable.
 ///
-/// The sample code below presents a Database Explorer tool that allows executing arbitrary SQL and
-/// viewing the tabular results:
+/// #### Example
 ///
 /// ```java
-/// Toolbar.setGlobalToolbar(true);
-/// Style s = UIManager.getInstance().getComponentStyle("TitleCommand");
-/// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_QUERY_BUILDER, s);
-/// Form hi = new Form("SQL Explorer", new BorderLayout());
-/// hi.getToolbar().addCommandToRightBar("", icon, (e) -> {
-///     TextArea query = new TextArea(3, 80);
-///     Command ok = new Command("Execute");
-///     Command cancel = new Command("Cancel");
-///     if(Dialog.show("Query", query, ok, cancel) == ok) {
-///         Database db = null;
-///         Cursor cur = null;
-///         try {
-///             db = Display.getInstance().openOrCreate("MyDB.db");
-///             if(query.getText().startsWith("select")) {
-///                 cur = db.executeQuery(query.getText());
-///                 int columns = cur.getColumnCount();
-///                 hi.removeAll();
-///                 if(columns > 0) {
-///                     boolean next = cur.next();
-///                     if(next) {
-///                         ArrayList data = new ArrayList<>();
-///                         String[] columnNames = new String[columns];
-///                         for(int iter = 0 ; iter
+/// Database db = null;
+/// Cursor cur = null;
+/// try {
+///     db = Database.openOrCreate("MyDB.db");
+///     db.execute("CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT)");
+///     db.execute("INSERT INTO people (name) VALUES (?)", new Object[] {"Alice"});
+///
+///     cur = db.executeQuery("SELECT id, name FROM people ORDER BY id");
+///     while (cur.next()) {
+///         Row row = cur.getRow();
+///         System.out.println(row.getInteger(0) + " " + row.getString(1));
+///     }
+/// } finally {
+///     if (cur != null) {
+///         cur.close();
+///     }
+///     if (db != null) {
+///         db.close();
+///     }
+/// }
+/// ```
+///
+/// #### Encryption
+///
+/// Pass a `DatabaseConfig` to `#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)`
+/// to encrypt the database at rest. Check `#isEncryptionSupported()` first, and read the security
+/// notes on `DatabaseConfig` before choosing how to key it.
 ///
 /// @author Chen
 public abstract class Database {
+
+    /// The first 16 bytes of every unencrypted SQLite database file.
+    private static final byte[] PLAINTEXT_HEADER = {
+        'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3', 0
+    };
+
+    /// Backs `#isLegacyBehavior()`. Deliberately not volatile: it is read once, lazily, and
+    /// treated as a startup-time constant thereafter. PMD forbids volatile in the core anyway.
+    private static boolean legacyBehavior;
+
+    private static boolean legacyBehaviorChecked;
+
+    /// Tracks whether a transaction is open on this instance, so the flat-transaction rules in
+    /// the package documentation are enforced identically on every port rather than being
+    /// re-derived from each engine's very different native semantics.
+    protected boolean inTransaction;
+
+    /// The savepoint that opened the current transaction, when a savepoint did. Releasing that one
+    /// ends the transaction; releasing any other leaves it open.
+    private String outermostSavepoint;
+
+    /// How many savepoints of that name are stacked up.
+    ///
+    /// SQLite allows the same name twice, and `RELEASE` takes the nearest one, so
+    /// `SAVEPOINT s; SAVEPOINT s; RELEASE s` leaves the transaction open. Counting is what keeps
+    /// the first release from ending it.
+    private int outermostSavepointDepth;
+
+    /// How many nested `beginTransaction()` calls are outstanding.
+    ///
+    /// One, except under the legacy hint on Android, where nesting is allowed because that is what
+    /// the port used to do. The engine ref-counts there, so the first commit ends only the inner
+    /// one: clearing the flag on it would report no transaction while the outer still holds
+    /// uncommitted rows, and a key change would be allowed over them.
+    private int transactionDepth;
 
     /// Checks if this platform supports custom database paths.  On platforms that
     /// support this, you can pass a file path to `#openOrCreate(java.lang.String)`, `#exists(java.lang.String)`,
@@ -77,6 +119,61 @@ public abstract class Database {
     /// True on platorms that support custom database paths.
     public static boolean isCustomPathSupported() {
         return Display.getInstance().isDatabaseCustomPathSupported();
+    }
+
+    /// Returns whether the database API is running in legacy compatibility mode.
+    ///
+    /// The behaviour of this API used to differ substantially between platforms. Those
+    /// differences have been reconciled into the single contract documented in the
+    /// `com.codename1.db` package, but applications written against the old, divergent
+    /// behaviour may depend on it. Legacy mode restores each platform's previous behaviour
+    /// exactly, and is intended as a transition aid rather than a permanent setting.
+    ///
+    /// Enable it with the `db.legacy` build hint, or from code before the first database call:
+    ///
+    /// ```java
+    /// Database.setLegacyBehavior(true);
+    /// ```
+    ///
+    /// The package documentation lists precisely which behaviours the flag covers. Fixes for
+    /// outright defects, and capabilities that previously threw and now work, are **not**
+    /// covered, because no application can depend on those.
+    ///
+    /// #### Returns
+    ///
+    /// true when the pre-normalization behaviour is in effect
+    public static boolean isLegacyBehavior() {
+        if (!legacyBehaviorChecked) {
+            // Read lazily rather than in a static initializer. The generated application stubs
+            // on iOS and desktop call setProperty AFTER Display.init, and Android's runs inside
+            // an isInitialized guard, so an eager read would miss the build hint entirely.
+            try {
+                legacyBehavior = "true".equals(Display.getInstance().getProperty("db.legacy", "false"));
+                // Latch only once a real answer came back, so that a caller reaching a database
+                // before the display is up does not freeze the default in place.
+                legacyBehaviorChecked = true;
+            } catch (Throwable notReadyYet) {
+                return false;
+            }
+        }
+        return legacyBehavior;
+    }
+
+    /// Turns legacy compatibility mode on or off.
+    ///
+    /// Call this before opening any database; cursors and connections capture the mode as they
+    /// are created, so flipping it mid-session gives inconsistent results.
+    ///
+    /// #### Parameters
+    ///
+    /// - `legacy`: true to restore the pre-normalization behaviour
+    ///
+    /// #### See also
+    ///
+    /// - #isLegacyBehavior()
+    public static void setLegacyBehavior(boolean legacy) {
+        legacyBehavior = legacy;
+        legacyBehaviorChecked = true;
     }
 
     private static void validateDatabaseNameArgument(String databaseName) {
@@ -148,7 +245,9 @@ public abstract class Database {
     ///                     paths (i.e. `#isCustomPathSupported()` return true), will also accept a file path here.
     ///
     ///
-    /// **NOTE:** This method will return null in the Javascript port.
+    /// **NOTE:** Where `#isCustomPathSupported()` is false the databases are not filesystem
+    /// backed, so what comes back identifies the database inside the platform's storage but is
+    /// not a path `com.codename1.io.FileSystemStorage` can open.
     ///
     /// #### Returns
     ///
@@ -156,6 +255,308 @@ public abstract class Database {
     public static String getDatabasePath(String databaseName) {
         validateDatabaseNameArgument(databaseName);
         return Display.getInstance().getDatabasePath(databaseName);
+    }
+
+    /// Opens an encrypted database, creating it if it does not exist.
+    ///
+    /// The database is encrypted at rest using the key described by `config`. Every platform
+    /// that supports encryption writes the same on-disk format, so a database created on one
+    /// device can be opened on another and in the simulator.
+    ///
+    /// If `config` is null or describes a plaintext database this behaves exactly like
+    /// `#openOrCreate(java.lang.String)`.
+    ///
+    /// #### Example
+    ///
+    /// ```java
+    /// if (!Database.isEncryptionSupported()) {
+    ///     throw new IOException("This build cannot store data securely");
+    /// }
+    /// DatabaseConfig config = DatabaseConfig.managed();
+    /// Database db = Database.openOrCreate("secure.db", config);
+    /// config.wipe();
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: @param databaseName the name of the database. Platforms that support custom
+    ///                     database paths (see `#isCustomPathSupported()`) also accept a file path.
+    ///
+    /// - `config`: how to key the database, or null for plaintext
+    ///
+    /// #### Returns
+    ///
+    /// the open database
+    ///
+    /// #### Throws
+    ///
+    /// - `DatabaseEncryptionException`: @throws DatabaseEncryptionException with `DatabaseEncryptionException#NOT_SUPPORTED`
+    ///                     if encryption was requested on a platform that cannot provide it, or with
+    ///                     `DatabaseEncryptionException#WRONG_KEY` if the key does not decrypt an
+    ///                     existing database
+    ///
+    /// - `IOException`: if the database cannot be opened or created
+    public static Database openOrCreate(String databaseName, DatabaseConfig config) throws IOException {
+        validateDatabaseNameArgument(databaseName);
+        if (config == null || !config.isEncrypted()) {
+            return Display.getInstance().openOrCreate(databaseName);
+        }
+        // Refuse rather than silently handing back a plaintext database. An application that
+        // asked for encryption and got none is the worst possible outcome here.
+        if (!isEncryptionSupported()) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                    "Encrypted databases are not supported on this platform");
+        }
+        return Display.getInstance().openOrCreate(databaseName, config);
+    }
+
+    /// Indicates whether this platform can open encrypted databases.
+    ///
+    /// #### Returns
+    ///
+    /// true if `#openOrCreate(java.lang.String, com.codename1.db.DatabaseConfig)` accepts an
+    /// encrypting config
+    public static boolean isEncryptionSupported() {
+        return Display.getInstance().isDatabaseEncryptionSupported();
+    }
+
+    /// Indicates whether managed keys on this platform are held in hardware backed storage.
+    static boolean isManagedKeyHardwareBacked() {
+        return Display.getInstance().isDatabaseManagedKeyHardwareBacked();
+    }
+
+    /// Indicates whether a database file appears to be encrypted.
+    ///
+    /// This inspects the file header: an unencrypted SQLite database begins with the ASCII bytes
+    /// `SQLite format 3` followed by a zero byte, and an encrypted one does not. It is therefore a
+    /// **header sniff, not a cryptographic assertion** -- a truncated or corrupt file also reports
+    /// true, and a false result only means the file is a readable plaintext SQLite database.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of the database
+    ///
+    /// #### Returns
+    ///
+    /// false if the file exists and starts with a plaintext SQLite header, true otherwise
+    public static boolean isEncrypted(String databaseName) {
+        validateDatabaseNameArgument(databaseName);
+        if (!exists(databaseName)) {
+            return false;
+        }
+        // Ports whose databases are not files answer directly; reading a header that is not there
+        // would fail, and a failed read is indistinguishable from ciphertext.
+        int platformAnswer = Display.getInstance().isDatabaseFileEncrypted(databaseName);
+        if (platformAnswer != CodenameOneImplementation.DATABASE_ENCRYPTION_UNKNOWN) {
+            return platformAnswer == CodenameOneImplementation.DATABASE_ENCRYPTED;
+        }
+        String path = getDatabasePath(databaseName);
+        if (path == null) {
+            return false;
+        }
+        try {
+            InputStream in = FileSystemStorage.getInstance().openInputStream(path);
+            try {
+                byte[] header = new byte[PLAINTEXT_HEADER.length];
+                int offset = 0;
+                while (offset < header.length) {
+                    int read = in.read(header, offset, header.length - offset);
+                    if (read < 0) {
+                        return true;
+                    }
+                    offset += read;
+                }
+                for (int iter = 0; iter < PLAINTEXT_HEADER.length; iter++) {
+                    if (header[iter] != PLAINTEXT_HEADER[iter]) {
+                        return true;
+                    }
+                }
+                return false;
+            } finally {
+                in.close();
+            }
+        } catch (IOException err) {
+            // Unreadable or truncated. Reporting "encrypted" is the conservative answer, since the
+            // one thing we can say is that it is not a readable plaintext SQLite file.
+            return true;
+        }
+    }
+
+    /// Encrypts an existing plaintext database in place.
+    ///
+    /// The conversion is performed by the database engine as a single transaction, so an
+    /// interruption leaves the original file intact rather than half-converted. Schema metadata
+    /// such as `PRAGMA user_version` is preserved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of an existing plaintext database
+    ///
+    /// - `config`: how the encrypted database should be keyed
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be converted
+    public static void encrypt(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            throw new IllegalArgumentException("encrypt() requires a config that describes an encrypted database");
+        }
+        if (!isEncryptionSupported()) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                    "Encrypted databases are not supported on this platform");
+        }
+        // Not openOrCreate: on Android the system SQLite has no cipher, so a database opened
+        // through it could never be re-keyed. The platform decides which engine can do this.
+        validateDatabaseNameArgument(databaseName);
+        requireExistingDatabase(databaseName, "encrypt");
+        Database db = Display.getInstance().openOrCreateForRekey(databaseName);
+        try {
+            db.changeKey(config);
+        } finally {
+            db.close();
+        }
+    }
+
+    /// Decrypts an existing encrypted database in place, leaving a plain SQLite file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name of an existing encrypted database
+    ///
+    /// - `config`: the config that currently opens the database
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database cannot be converted
+    public static void decrypt(String databaseName, DatabaseConfig config) throws IOException {
+        if (config == null || !config.isEncrypted()) {
+            throw new IllegalArgumentException("decrypt() requires the config that currently opens the database");
+        }
+        validateDatabaseNameArgument(databaseName);
+        requireExistingDatabase(databaseName, "decrypt");
+        Database db = openOrCreate(databaseName, config);
+        try {
+            db.changeKey(DatabaseConfig.plain());
+        } finally {
+            db.close();
+        }
+    }
+
+    /// Refuses to migrate a database that is not there.
+    ///
+    /// Both migrations open their source through an open-or-create hook, so a missing or mistyped
+    /// name used to create an empty database, convert that, and report success -- leaving the
+    /// database the caller meant untouched while telling them it had been converted. Both
+    /// document an existing database as their input, so the absence is an error.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name to check
+    /// - `operation`: the calling method, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if no such database exists
+    private static void requireExistingDatabase(String databaseName, String operation)
+            throws IOException {
+        if (!exists(databaseName)) {
+            throw new IOException(operation + "() works on an existing database, and there is no "
+                    + "database named " + databaseName);
+        }
+    }
+
+    /// Removes the stored managed key for an alias.
+    ///
+    /// `#delete(java.lang.String)` deliberately leaves the managed key in place, because deleting
+    /// and recreating a database is a normal thing to do and should not discard the identity that
+    /// protects it. Call this explicitly when the key really should be forgotten -- after which any
+    /// remaining database encrypted with it is permanently unreadable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyAlias`: @param keyAlias the alias passed to `DatabaseConfig#managed(java.lang.String)`, or
+    ///                 the database name when `DatabaseConfig#managed()` was used
+    ///
+    /// #### Returns
+    ///
+    /// true if a key was removed
+    public static boolean forgetManagedKey(String keyAlias) {
+        return ManagedKeys.forget(keyAlias);
+    }
+
+    /// Rewinds a cursor to before its first row.
+    ///
+    /// Uses `CursorExt#beforeFirst()` when the cursor provides it, and falls back to
+    /// `Cursor#position(int)` with -1 otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cursor`: the cursor to rewind
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed or the rewind fails
+    public static void beforeFirst(Cursor cursor) throws IOException {
+        if (cursor instanceof CursorExt) {
+            ((CursorExt) cursor).beforeFirst();
+        } else {
+            cursor.position(-1);
+        }
+    }
+
+    /// Returns the number of rows a cursor holds, or -1 when that is not cheaply knowable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cursor`: the cursor to measure
+    ///
+    /// #### Returns
+    ///
+    /// the row count, or -1 when unknown
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the cursor is closed
+    public static int count(Cursor cursor) throws IOException {
+        if (cursor instanceof CursorExt) {
+            return ((CursorExt) cursor).getCount();
+        }
+        return -1;
+    }
+
+    /// Indicates whether `#executeQuery(java.lang.String, java.lang.Object[])` accepts `byte[]`
+    /// parameters on this platform.
+    ///
+    /// Blob values can always be written with `#execute(java.lang.String, java.lang.Object[])`.
+    /// Using one as a query parameter, for example in `WHERE digest = ?`, needs engine support
+    /// that not every port can provide.
+    ///
+    /// #### Returns
+    ///
+    /// true if blobs may be used as query parameters
+    public static boolean isBlobQueryParameterSupported() {
+        return Display.getInstance().isBlobQueryParameterSupported();
+    }
+
+    /// Changes the key of this open database, or removes it entirely.
+    ///
+    /// Passing a plaintext config decrypts the database. The engine performs the conversion as a
+    /// single transaction and preserves schema metadata such as `PRAGMA user_version`.
+    ///
+    /// Ports that support encryption override this. The default implementation reports that the
+    /// platform cannot do it; it is deliberately concrete rather than abstract, because `Database`
+    /// is public and is subclassed outside this repository.
+    ///
+    /// #### Parameters
+    ///
+    /// - `config`: the new key, or `DatabaseConfig#plain()` to decrypt
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the key cannot be changed
+    public void changeKey(DatabaseConfig config) throws IOException {
+        throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                "Changing the database key is not supported on this platform");
     }
 
     /// Checks if the last value accessed from a given row was null.  Not all platforms
@@ -213,13 +614,665 @@ public abstract class Database {
         return row instanceof RowExt;
     }
 
-    /// Starts a transaction
+    /// Reports whether a transaction is currently open on this database.
     ///
-    /// **NOTE:** Not supported in Javascript port.  This method will do nothing when running in Javascript.
+    /// #### Returns
+    ///
+    /// true between a successful `#beginTransaction()` and its commit or rollback
+    public boolean isInTransaction() {
+        return inTransaction;
+    }
+
+    /// Renders a key literal for use as a `PRAGMA` argument.
+    ///
+    /// Raw keys are already the blob literal `x'...'`, which has to reach the engine unquoted as a
+    /// literal rather than as a string. Passphrases are arbitrary text, so they are single quoted
+    /// with any embedded single quote doubled. Interpolating a passphrase directly would let one
+    /// containing a quote change the statement.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyMaterial`: the value from `DatabaseConfig#resolveKeyMaterial(java.lang.String)`
+    ///
+    /// #### Returns
+    ///
+    /// the text to place after `PRAGMA key =` or `PRAGMA rekey =`
+    protected static String toPragmaLiteral(String keyMaterial) {
+        if (keyMaterial == null) {
+            return "''";
+        }
+        if (keyMaterial.length() > 2 && keyMaterial.startsWith("x'") && keyMaterial.endsWith("'")) {
+            return keyMaterial;
+        }
+        StringBuilder b = new StringBuilder(keyMaterial.length() + 8);
+        b.append('\'');
+        for (int iter = 0; iter < keyMaterial.length(); iter++) {
+            char c = keyMaterial.charAt(iter);
+            if (c == '\'') {
+                b.append('\'');
+            }
+            b.append(c);
+        }
+        b.append('\'');
+        return b.toString();
+    }
+
+    /// Records what a script did to the transaction state.
+    ///
+    /// `#execute(java.lang.String)` hands SQL straight to the engine, so `execute("BEGIN")` opens
+    /// a real transaction that `#beginTransaction()` never saw. Left untracked, the two ways of
+    /// saying the same thing disagree: a key change would be allowed inside a transaction opened
+    /// this way, and `beginTransaction(); execute("COMMIT")` would leave the flag set over a
+    /// transaction that has already ended, so the next `commitTransaction()` addresses one that is
+    /// not there.
+    ///
+    /// Ports call this after `#execute(java.lang.String)`, and after a parameterized call, with
+    /// the SQL they ran. A `BEGIN` opening a trigger body is not transaction control -- the
+    /// splitter keeps a trigger together, so its body is never a statement here -- and SAVEPOINT
+    /// is not tracked at all, because it nests and this API's transactions do not.
+    ///
+    /// A script that failed partway had already run everything before the statement that failed,
+    /// and the engine does not undo it. The control statements are read in order either way: they
+    /// are the least likely statement to be the one that failed, since `BEGIN` and `COMMIT`
+    /// reference nothing that can be missing. So `BEGIN; INSERT INTO missing_table VALUES(1)` is
+    /// left open, which it is, and `BEGIN; COMMIT; INSERT INTO missing_table VALUES(1)` is left
+    /// closed, which it also is -- where treating any `BEGIN` as still open would hold the flag
+    /// over a committed transaction and block every key change until the connection was closed.
+    ///
+    /// The one case left wrong is a script whose own `BEGIN` failed, reported as open when nothing
+    /// is. That is the recoverable direction -- `#rollbackTransaction()` clears it -- and the one
+    /// that refuses a key change rather than allowing one underneath a live transaction.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the SQL that was run, whether or not it finished
+    protected void noteScriptTransactionControl(String sql) {
+        if (sql == null) {
+            return;
+        }
+        for (String statement : SQLStatementSplitter.split(sql)) {
+            String keyword = transactionControlKeyword(statement);
+            if ("BEGIN".equals(keyword)) {
+                inTransaction = true;
+                transactionDepth = 1;
+                forgetSavepoints();
+                continue;
+            }
+            if (keyword != null) {
+                endTransactionCompletely();
+                continue;
+            }
+            noteSavepointControl(statement);
+        }
+    }
+
+    /// Reads a SAVEPOINT or RELEASE, which start and end a transaction when they are the outer one.
+    ///
+    /// A savepoint inside a transaction is a mark within it and changes nothing here. A savepoint
+    /// outside one starts a real transaction, which SQLite holds open until that same savepoint is
+    /// released -- so `SAVEPOINT s` followed by writes leaves work uncommitted exactly as `BEGIN`
+    /// does, and a key change allowed underneath it installs rows that were never committed.
+    ///
+    /// Only the outermost name ends it: releasing an inner savepoint leaves the transaction open,
+    /// and a `RELEASE` naming something else entirely is not this transaction's ending.
+    ///
+    /// Releasing an intermediate savepoint also releases everything above it, including any reuse
+    /// of the outermost name, which this does not follow -- so a transaction can be reported open
+    /// after SQLite has ended it. That is the direction that refuses a key change rather than
+    /// allowing one over live work, and the ports that can ask their engine correct it on the next
+    /// statement anyway.
+    private void noteSavepointControl(String statement) {
+        String keyword = leadingKeyword(statement);
+        if ("SAVEPOINT".equals(keyword)) {
+            String name = savepointName(statement, false);
+            if (!inTransaction) {
+                inTransaction = true;
+                transactionDepth = 1;
+                outermostSavepoint = name;
+                outermostSavepointDepth = 1;
+            } else if (outermostSavepoint != null && outermostSavepoint.equals(name)) {
+                // The same name again, which SQLite allows and stacks. The release below takes the
+                // nearest one, so without counting the first release would end a transaction that
+                // is still open.
+                outermostSavepointDepth++;
+            }
+            return;
+        }
+        if ("RELEASE".equals(keyword) && outermostSavepoint != null
+                && outermostSavepoint.equals(savepointName(statement, true))) {
+            outermostSavepointDepth--;
+            if (outermostSavepointDepth <= 0) {
+                endTransactionCompletely();
+            }
+        }
+    }
+
+    /// The savepoint a SAVEPOINT or RELEASE names, upper cased, or null.
+    ///
+    /// `RELEASE` takes an optional `SAVEPOINT` keyword before the name. Quoting is stripped rather
+    /// than honoured: SQLite compares savepoint names without case, so `SAVEPOINT s` is released by
+    /// `RELEASE "S"`, and comparing the quoted spellings literally would leave the transaction
+    /// looking open forever.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a single statement whose first keyword is SAVEPOINT or RELEASE
+    /// - `optionalSavepointKeyword`: whether to skip a `SAVEPOINT` word before the name
+    private static String savepointName(String statement, boolean optionalSavepointKeyword) {
+        int at = endOfKeyword(statement, skipLeadingTrivia(statement, 0));
+        at = skipLeadingTrivia(statement, at);
+        if (optionalSavepointKeyword && "SAVEPOINT".equals(keywordAt(statement, at))) {
+            at = skipLeadingTrivia(statement, endOfKeyword(statement, at));
+        }
+        int length = statement.length();
+        if (at >= length) {
+            return null;
+        }
+        char quote = statement.charAt(at);
+        if (quote == '"' || quote == '\'' || quote == '`' || quote == '[') {
+            char closing = quote == '[' ? ']' : quote;
+            int end = at + 1;
+            StringBuilder name = new StringBuilder();
+            while (end < length) {
+                char c = statement.charAt(end);
+                if (c == closing) {
+                    if (quote != '[' && end + 1 < length && statement.charAt(end + 1) == closing) {
+                        name.append(c);
+                        end += 2;
+                        continue;
+                    }
+                    break;
+                }
+                name.append(c);
+                end++;
+            }
+            return name.toString().toUpperCase();
+        }
+        int end = at;
+        while (end < length && isIdentifierChar(statement.charAt(end))) {
+            end++;
+        }
+        return end > at ? statement.substring(at, end).toUpperCase() : null;
+    }
+
+    /// Records the transaction state a port read back from its engine.
+    ///
+    /// The reliable answer where a script runs as a whole. SQLite stops at the first statement
+    /// that fails and nothing outside can see which one that was, so reading the script cannot
+    /// tell an unexecuted trailing `COMMIT` from an executed one -- and getting that wrong either
+    /// clears the flag over a live transaction, which lets a key change replace the database
+    /// underneath uncommitted work, or holds it over a finished one, which blocks every key change
+    /// until the connection closes. The engine knows; ports that can ask it should.
+    ///
+    /// #### Parameters
+    ///
+    /// - `open`: whether the engine reports a transaction in progress
+    protected void noteEngineTransactionState(boolean open) {
+        if (open) {
+            inTransaction = true;
+            if (transactionDepth < 1) {
+                transactionDepth = 1;
+            }
+            return;
+        }
+        endTransactionCompletely();
+    }
+
+    /// The transaction-control keyword a statement starts with, or null if it is not one.
+    ///
+    /// Shared so that a port which has to act on transaction control -- the simulator routes it
+    /// through JDBC, because there the transaction is the connection's autocommit flag rather than
+    /// something the driver reads back out of the SQL -- classifies it exactly as the tracking
+    /// here does. Two copies of this drifted apart once already.
+    ///
+    /// Only a bare `ROLLBACK` counts: `ROLLBACK TO <savepoint>` unwinds within the transaction
+    /// rather than ending it, as SAVEPOINT and RELEASE do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a single statement
+    ///
+    /// #### Returns
+    ///
+    /// `BEGIN`, `COMMIT`, `END`, `ROLLBACK`, or null
+    protected static String transactionControlKeyword(String statement) {
+        if (statement == null) {
+            return null;
+        }
+        String keyword = leadingKeyword(statement);
+        if ("BEGIN".equals(keyword) || "COMMIT".equals(keyword) || "END".equals(keyword)) {
+            return keyword;
+        }
+        if ("ROLLBACK".equals(keyword) && !hasToSavepoint(statement)) {
+            return "ROLLBACK";
+        }
+        return null;
+    }
+
+    /// The locking mode a `BEGIN` asks for: `IMMEDIATE`, `EXCLUSIVE` or `DEFERRED`.
+    ///
+    /// Reads the word after `BEGIN` rather than searching the statement for those names. The words
+    /// are ordinary text anywhere else, so `/* IMMEDIATE migration */ BEGIN` and
+    /// `BEGIN /* EXCLUSIVE note */ TRANSACTION` are both deferred -- and a port that searched would
+    /// take a write lock on them that the same SQL does not take on any other platform.
+    ///
+    /// Anything that is not one of the three, including a bare `BEGIN` and the optional
+    /// `TRANSACTION` keyword, is deferred, which is what SQLite does with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a statement whose first keyword is `BEGIN`
+    ///
+    /// #### Returns
+    ///
+    /// `IMMEDIATE`, `EXCLUSIVE` or `DEFERRED`
+    protected static String beginTransactionMode(String statement) {
+        if (statement == null) {
+            return "DEFERRED";
+        }
+        int after = endOfKeyword(statement, skipLeadingTrivia(statement, 0));
+        String next = keywordAt(statement, skipLeadingTrivia(statement, after));
+        if ("IMMEDIATE".equals(next) || "EXCLUSIVE".equals(next)) {
+            return next;
+        }
+        return "DEFERRED";
+    }
+
+    /// The first word of a statement, upper cased, or an empty string.
+    ///
+    /// Comments count as whitespace here, because they do to the engine: `/* migration */ BEGIN`
+    /// opens a transaction, and reading the keyword as empty would leave this believing none was
+    /// opened. The Android port relies on the same fact deliberately, prefixing a comment to a
+    /// ROLLBACK to get it past a statement classifier that reads the first three characters.
+    private static String leadingKeyword(String statement) {
+        int start = skipLeadingTrivia(statement, 0);
+        int length = statement.length();
+        int end = start;
+        while (end < length && isKeywordChar(statement.charAt(end))) {
+            end++;
+        }
+        return statement.substring(start, end).toUpperCase();
+    }
+
+    /// Whether a character continues an unquoted identifier.
+    ///
+    /// SQLite takes anything above ASCII as part of one. Stopping at the first such character
+    /// would read two savepoints whose names share an ASCII prefix as one name, so releasing the
+    /// inner one would end the outer -- clearing the flag while SQLite still holds the
+    /// transaction, which is what lets a key change run underneath uncommitted work.
+    private static boolean isIdentifierChar(char c) {
+        return isKeywordChar(c) || (c >= '0' && c <= '9') || c == '_' || c == '$' || c >= 128;
+    }
+
+    private static boolean isKeywordChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    /// Skips whitespace and comments, which is what stands between a statement's start and its
+    /// first keyword.
+    private static int skipLeadingTrivia(String statement, int from) {
+        int length = statement.length();
+        int iter = from;
+        while (iter < length) {
+            char c = statement.charAt(iter);
+            if (c <= ' ') {
+                iter++;
+            } else if (c == '-' && iter + 1 < length && statement.charAt(iter + 1) == '-') {
+                iter += 2;
+                while (iter < length && statement.charAt(iter) != '\n') {
+                    iter++;
+                }
+            } else if (c == '/' && iter + 1 < length && statement.charAt(iter + 1) == '*') {
+                iter += 2;
+                while (iter + 1 < length
+                        && !(statement.charAt(iter) == '*' && statement.charAt(iter + 1) == '/')) {
+                    iter++;
+                }
+                iter = iter + 1 < length ? iter + 2 : length;
+            } else {
+                return iter;
+            }
+        }
+        return length;
+    }
+
+    /// Whether a ROLLBACK names a savepoint, which unwinds to it rather than ending anything.
+    ///
+    /// Reads keywords rather than searching for the text " TO". SQL separates words with any
+    /// whitespace or a comment, so `ROLLBACK\nTO x` and `ROLLBACK /* here */ TO x` are the same
+    /// statement to the engine -- and `TRANSACTION` is optional in between, so
+    /// `ROLLBACK TRANSACTION TO x` is that statement too. Missing any of them clears the flag
+    /// while SQLite stays inside the transaction: the caller's own commit is then rejected as
+    /// having nothing to commit, a key change is allowed underneath it, and on the simulator the
+    /// whole transaction is discarded by a `conn.rollback()` that should have been a savepoint
+    /// unwind.
+    private static boolean hasToSavepoint(String statement) {
+        int after = endOfKeyword(statement, skipLeadingTrivia(statement, 0));
+        String next = keywordAt(statement, after);
+        if ("TRANSACTION".equals(next)) {
+            after = endOfKeyword(statement, skipLeadingTrivia(statement, after));
+            next = keywordAt(statement, after);
+        }
+        return "TO".equals(next);
+    }
+
+    /// The index one past the keyword starting at `from`.
+    private static int endOfKeyword(String statement, int from) {
+        int length = statement.length();
+        int end = from;
+        while (end < length && isKeywordChar(statement.charAt(end))) {
+            end++;
+        }
+        return end;
+    }
+
+    /// The keyword following `from`, upper cased, or an empty string.
+    private static String keywordAt(String statement, int from) {
+        int start = skipLeadingTrivia(statement, from);
+        int end = endOfKeyword(statement, start);
+        return statement.substring(start, end).toUpperCase();
+    }
+
+    /// Connections open on each database file, by a key the port supplies.
+    ///
+    /// Only a key change needs this, and every port needs it: rotating a key rewrites the file's
+    /// pages under a new key and updates only the connection that asked. Another connection to the
+    /// same file keeps the old one, and its next read of a rewritten page fails -- on the engines
+    /// that convert by export and rename, that connection is left writing to a file that is no
+    /// longer the database at all. There is no way to rotate a key underneath a second connection,
+    /// so the ports refuse instead.
+    private static final java.util.Hashtable OPEN_DATABASES = new java.util.Hashtable();
+
+    /// Files whose key is being changed right now.
+    ///
+    /// Counting open connections answers "is anybody else here" only at the instant it is asked.
+    /// A rewrite takes longer than that, so the answer has to be held for its whole length or a
+    /// connection opened a moment later still ends up reading a file that changed underneath it.
+    private static final java.util.Hashtable REKEYING_DATABASES = new java.util.Hashtable();
+
+    /// A path reduced to one spelling, for use as an open-database registry key.
+    ///
+    /// Two names for one file have to reach the registry as one entry, or the claim a key change
+    /// takes does not cover the other connection and the file is rewritten underneath it. The ports
+    /// with a real filesystem behind them (Android, the simulator) ask it to canonicalize, which
+    /// also resolves symlinks. The ports translated ahead of time have no such call to make, so
+    /// this collapses what can be collapsed without touching the disk: repeated separators, `.`
+    /// segments, and `..` against the segment before it.
+    ///
+    /// A symlink still reaches the registry under two names. That is a smaller hole than `/a/./b`
+    /// and `/a/b` counting as different databases, which is what an application writing a custom
+    /// path actually produces.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a native filesystem path, or null
+    ///
+    /// #### Returns
+    ///
+    /// the reduced path, or null for a null input
+    protected static String normalizeDatabasePathKey(String path) {
+        if (path == null) {
+            return null;
+        }
+        boolean absolute = path.length() > 0 && path.charAt(0) == '/';
+        java.util.Vector segments = new java.util.Vector();
+        int at = 0;
+        int length = path.length();
+        while (at < length) {
+            int slash = path.indexOf('/', at);
+            String segment = slash < 0 ? path.substring(at) : path.substring(at, slash);
+            at = slash < 0 ? length : slash + 1;
+            if (segment.length() == 0 || ".".equals(segment)) {
+                continue;
+            }
+            if ("..".equals(segment) && !segments.isEmpty()
+                    && !"..".equals(segments.elementAt(segments.size() - 1))) {
+                segments.removeElementAt(segments.size() - 1);
+                continue;
+            }
+            if ("..".equals(segment) && absolute) {
+                // The root has no parent, so this segment names nothing and SQLite would not find
+                // it either. Dropping it keeps two spellings of the same nonexistent path equal.
+                continue;
+            }
+            segments.addElement(segment);
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < segments.size(); iter++) {
+            if (iter > 0 || absolute) {
+                out.append('/');
+            }
+            out.append((String) segments.elementAt(iter));
+        }
+        if (out.length() == 0) {
+            return absolute ? "/" : path;
+        }
+        return out.toString();
+    }
+
+    /// Records that a connection to a database file has been opened.
+    ///
+    /// Ports call this once they have a connection, and `#releaseOpenDatabase(String)` when they
+    /// let it go. A port whose engine cannot be given two connections to one file need not call
+    /// either.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: identifies the file, canonically enough that two spellings of one path agree
+    protected static synchronized void registerOpenDatabase(String key) throws IOException {
+        if (key == null) {
+            return;
+        }
+        if (REKEYING_DATABASES.containsKey(key)) {
+            // A key change is a file rewrite, and it is not over when the claim is taken -- it is
+            // over when the last page is written. Letting an open through in the middle hands back
+            // a connection keyed to whichever half of the file it happened to read.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + key + " is having its key changed. Opening it now would key"
+                    + " the connection to a file that is being rewritten under it. Retry once the"
+                    + " key change returns.");
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
+        OPEN_DATABASES.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+    }
+
+    /// Records that a connection to a database file has been closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key the connection was registered under
+    protected static synchronized void releaseOpenDatabase(String key) {
+        if (key == null) {
+            return;
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
+        if (count == null) {
+            return;
+        }
+        if (count.intValue() <= 1) {
+            OPEN_DATABASES.remove(key);
+        } else {
+            OPEN_DATABASES.put(key, Integer.valueOf(count.intValue() - 1));
+        }
+    }
+
+    /// Rejects a key change while the same file is open more than once.
+    ///
+    /// Ports call this from `#changeKey(DatabaseConfig)`, after
+    /// `#checkNoTransactionForKeyChange()`. The count includes the connection asking, so more than
+    /// one means somebody else holds the file too.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key this connection was registered under
     ///
     /// #### Throws
     ///
-    /// - `IOException`: if database is not opened
+    /// - `IOException`: if another connection has the same file open
+    protected static synchronized void requireSoleConnectionForKeyChange(String key)
+            throws IOException {
+        if (key == null) {
+            // A connection that never said which file it holds cannot be checked against the ones
+            // that did, so there is no answer to give -- and the failure of a wrong answer here is
+            // a database rewritten under another connection. Refusing is the only safe reading of
+            // "I do not know". The simulator's connection-taking constructor is how this arises.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "This database was opened from a connection rather than by name, so there is no"
+                    + " way to tell whether anything else has the same file open. Open it with"
+                    + " Database.openOrCreate to change its key.");
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
+        if (count != null && count.intValue() > 1) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + key + " is open more than once, and changing its key rewrites"
+                    + " it under the new one for this connection only. Close the others first;"
+                    + " reads through them would fail once they reached a rewritten page.");
+        }
+        if (REKEYING_DATABASES.put(key, key) != null) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + key + " is already having its key changed. Two rewrites of"
+                    + " one file interleave into a database that opens under neither key.");
+        }
+    }
+
+    /// Ends the exclusive claim `#requireSoleConnectionForKeyChange(String)` took.
+    ///
+    /// Ports call this from a `finally` around the rewrite, so a key change that throws does not
+    /// leave the file barred from opening for the rest of the process.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key the claim was taken under
+    protected static synchronized void releaseKeyChangeClaim(String key) {
+        if (key != null) {
+            REKEYING_DATABASES.remove(key);
+        }
+    }
+
+    /// Rejects a key change while a transaction is open.
+    ///
+    /// Ports call this at the top of `#changeKey(DatabaseConfig)`. Re-keying is not a statement
+    /// inside the transaction: depending on the engine it either rewrites the file in place or
+    /// exports into a new one and swaps it under the connection. Either way the open transaction
+    /// has nowhere to land -- an export copies the uncommitted rows into the file that becomes the
+    /// database, and a following commit or rollback addresses a connection that has no transaction
+    /// to end. Refusing is the only outcome that keeps `commit` and `rollback` meaning what they
+    /// say, and the caller loses nothing: it can end the transaction and change the key after.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a transaction is open
+    protected void checkNoTransactionForKeyChange() throws IOException {
+        if (inTransaction) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database key cannot be changed while a transaction is open, because the "
+                    + "conversion replaces the database under it. Commit or roll back first.");
+        }
+    }
+
+    /// Rejects a nested `#beginTransaction()`, then records that one is open.
+    ///
+    /// Transactions are flat: only that model is expressible on all of the engines behind this
+    /// API. Ports call this at the top of `#beginTransaction()`. In legacy mode the check is
+    /// skipped, because a nested begin used to be accepted on Android.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a transaction is already open
+    protected void checkBeginTransaction() throws IOException {
+        if (inTransaction && !isLegacyBehavior()) {
+            throw new IOException("A transaction is already in progress on this database. "
+                    + "Transactions do not nest; commit or roll back the current one first.");
+        }
+        if (inTransaction) {
+            // Legacy nesting: the engine ref-counts, so this begin has to be counted too.
+            transactionDepth++;
+            return;
+        }
+        inTransaction = true;
+        transactionDepth = 1;
+        forgetSavepoints();
+    }
+
+    /// Rejects a commit or rollback with no open transaction.
+    ///
+    /// Ports call this at the top of `#commitTransaction()` and `#rollbackTransaction()`, and
+    /// `#markTransactionEnded()` once the engine has ended it. The two are separate so that a
+    /// port can end the transaction on a path that does not commit it, which is what
+    /// `#abandonFailedCommit(Throwable)` does.
+    ///
+    /// In legacy mode the check is skipped.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if no transaction is open
+    protected void checkEndTransaction() throws IOException {
+        if (!inTransaction && !isLegacyBehavior()) {
+            throw new IOException("No transaction is in progress on this database");
+        }
+    }
+
+    /// Records that a transaction has actually ended. Call only after the engine has committed or
+    /// rolled back successfully.
+    protected void markTransactionEnded() {
+        if (transactionDepth > 1) {
+            // An inner end under the legacy hint. The engine is still holding the outer one.
+            transactionDepth--;
+            return;
+        }
+        endTransactionCompletely();
+    }
+
+    /// Drops what is remembered about savepoints, for a transaction that has ended by other means.
+    private void forgetSavepoints() {
+        outermostSavepoint = null;
+        outermostSavepointDepth = 0;
+    }
+
+    /// Ends the transaction outright, however many begins are outstanding.
+    ///
+    /// For the paths where the engine itself has ended it -- a COMMIT in a script, an engine that
+    /// reports autocommit -- rather than one nested end.
+    private void endTransactionCompletely() {
+        inTransaction = false;
+        transactionDepth = 0;
+        forgetSavepoints();
+    }
+
+    /// Discards a transaction whose commit failed, and builds the exception to report it with.
+    ///
+    /// A commit that fails cannot be retried, so the only remaining outcome is a rollback. The
+    /// engines disagree about what they leave behind: Android has already ended the transaction
+    /// by the time it reports the failure, while the SQLite C API and JDBC leave it open. Ports
+    /// call this from the failure path of `#commitTransaction()`, after making a best effort to
+    /// roll back, so that callers see one behavior everywhere -- no transaction is open, and
+    /// `#beginTransaction()` works again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cause`: the failure the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the exception the caller should throw
+    protected IOException abandonFailedCommit(Throwable cause) {
+        markTransactionEnded();
+        String message = cause == null ? null : cause.getMessage();
+        if (message == null) {
+            message = "The transaction could not be committed";
+        }
+        return new IOException(message, cause);
+    }
+
+    /// Starts a transaction.
+    ///
+    /// Transactions are flat. Calling this while a transaction is already open throws, and
+    /// committing or rolling back returns the connection to autocommit. Closing a database with
+    /// an open transaction rolls it back.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database is not open, or a transaction is already in progress
     public abstract void beginTransaction() throws IOException;
 
     /// Commits current transaction
@@ -291,25 +1344,48 @@ public abstract class Database {
     ///
     /// - `IOException`
     public void execute(String sql, Object... params) throws IOException {
-        if (params == null) {
+        if (params == null || params.length == 0) {
             execute(sql);
         } else {
-            //throw new RuntimeException("not implemented");
-            int len = params.length;
-            String[] strParams = new String[len];
-            for (int i = 0; i < len; i++) {
-                if (params[i] instanceof byte[]) {
-                    throw new RuntimeException("Blobs aren't supported on this platform");
-                }
-                if (params[i] == null) {
-                    strParams[i] = null;
-                } else {
-                    strParams[i] = params[i].toString();
-                }
-            }
-            execute(sql, strParams);
+            execute(sql, coerceToText(params, "execute"));
         }
+    }
 
+    /// Renders parameters as text for ports that have not implemented typed binding.
+    ///
+    /// This is the fallback path only. Ports that can bind by type override the varargs methods
+    /// and never reach here, which is why hitting a `byte[]` is an error rather than something to
+    /// paper over: silently storing the result of `byte[].toString()` would write the array's
+    /// identity hash into the database.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: the parameters supplied by the caller
+    ///
+    /// - `operation`: the calling method name, used in the error message
+    ///
+    /// #### Returns
+    ///
+    /// the parameters rendered as text, preserving nulls
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a parameter is a `byte[]` and this port cannot bind blobs
+    protected static String[] coerceToText(Object[] params, String operation) throws IOException {
+        int len = params.length;
+        String[] strParams = new String[len];
+        for (int i = 0; i < len; i++) {
+            if (params[i] instanceof byte[]) {
+                throw new IOException("This platform cannot bind a byte[] parameter in " + operation
+                        + "(). Check Database.isBlobQueryParameterSupported() before passing blobs.");
+            }
+            if (params[i] == null) {
+                strParams[i] = null;
+            } else {
+                strParams[i] = params[i].toString();
+            }
+        }
+        return strParams;
     }
 
     /// This method should be called with SELECT type statements that return
@@ -350,21 +1426,8 @@ public abstract class Database {
     public Cursor executeQuery(String sql, Object... params) throws IOException {
         if (params == null || params.length == 0) {
             return executeQuery(sql);
-        } else {
-            int len = params.length;
-            String[] strParams = new String[len];
-            for (int i = 0; i < len; i++) {
-                if (params[i] instanceof byte[]) {
-                    throw new RuntimeException("Blobs aren't supported on this platform");
-                }
-                if (params[i] == null) {
-                    strParams[i] = null;
-                } else {
-                    strParams[i] = params[i].toString();
-                }
-            }
-            return executeQuery(sql, strParams);
         }
+        return executeQuery(sql, coerceToText(params, "executeQuery"));
     }
 
     /// This method should be called with SELECT type statements that return

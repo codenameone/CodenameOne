@@ -93,6 +93,13 @@
                                      generated app after PlatformFeatureCatalog
                                      injects their ML Kit/LiteRT dependencies. -->
                                 <exclude>com/codename1/impl/android/ai/**</exclude>
+                                <!-- The SQLCipher-backed database impl compiles
+                                     against net.zetetic which is only on the
+                                     classpath of app builds that use encrypted
+                                     databases; AndroidGradleBuilder adds the
+                                     dependency and deletes the package for
+                                     everyone else. -->
+                                <exclude>com/codename1/impl/android/cipher/**</exclude>
                             </excludes>
                         </configuration>
                     </plugin>
