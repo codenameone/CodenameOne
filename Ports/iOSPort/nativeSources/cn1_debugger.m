@@ -479,6 +479,16 @@ static void bp_clear(int methodId, int line) {
 struct sus_state {
     pthread_mutex_t mu;
     pthread_cond_t  cv;
+    /*
+     * Thread this slot belongs to, 0 when unclaimed. Held explicitly because
+     * the table is indexed by a hash of the thread ID and the runtime hands
+     * out IDs from a counter that only ever climbs -- so an app that has
+     * created SUS_TABLE_SIZE threads gives two *live* ones the same slot.
+     * Sharing it let either thread's suspend flag and frame pointer overwrite
+     * the other's, so a stack or locals request could answer about the wrong
+     * thread and resuming one woke the other.
+     */
+    int64_t owner;
     int suspended;
     int stepKind;       // -1 = none, otherwise STEP_INTO/OVER/OUT
     int stepFromDepth;  // callStackOffset captured at suspend
@@ -502,6 +512,7 @@ static void susInitOnce(void) {
     for (int i = 0; i < SUS_TABLE_SIZE; i++) {
         pthread_mutex_init(&g_sus[i].mu, NULL);
         pthread_cond_init(&g_sus[i].cv, NULL);
+        g_sus[i].owner = 0;
         g_sus[i].suspended = 0;
         g_sus[i].stepKind = -1;
         g_sus[i].tsd = NULL;
@@ -522,9 +533,62 @@ static void ensureSusInit(void) {
     pthread_once(&g_susOnce, susInitOnce);
 }
 
+/* Serialises claiming, so two threads cannot take the same slot. */
+static pthread_mutex_t g_susTableMutex = PTHREAD_MUTEX_INITIALIZER;
+
+/*
+ * Whether a slot holds nothing worth keeping, so it can be handed to another
+ * thread. Everything here is at its initial value: no suspension, no frame,
+ * no pending step, no queued invocation. Checked under the slot's own lock.
+ */
+static int susSlotIsIdle(struct sus_state* s) {
+    int idle;
+    pthread_mutex_lock(&s->mu);
+    idle = !s->suspended && s->tsd == NULL && s->stepKind == -1
+            && s->invokeThunk == NULL;
+    pthread_mutex_unlock(&s->mu);
+    return idle;
+}
+
+/**
+ * The suspension slot for a thread, claiming one on first use.
+ *
+ * Probes from the hash rather than indexing by it: the ID space is unbounded
+ * and the table is not, so two live threads can hash together. The claim makes
+ * the slot that thread's own until it is reclaimed.
+ *
+ * A table with no free slot reclaims one that is idle -- a slot in its initial
+ * state carries nothing, so the thread that owned it loses nothing by being
+ * moved, and claims a fresh slot the next time it asks. Failing that, the
+ * hashed slot is returned unclaimed: degraded exactly as before, but never
+ * NULL, because every caller dereferences the result.
+ */
 static struct sus_state* susForThread(int64_t threadId) {
     ensureSusInit();
-    return &g_sus[((uint64_t)threadId) & (SUS_TABLE_SIZE - 1)];
+    unsigned start = (unsigned)(((uint64_t)threadId) & (SUS_TABLE_SIZE - 1));
+    pthread_mutex_lock(&g_susTableMutex);
+    struct sus_state* freeSlot = NULL;
+    for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+        struct sus_state* s = &g_sus[(start + (unsigned)i) & (SUS_TABLE_SIZE - 1)];
+        if (s->owner == threadId) {
+            pthread_mutex_unlock(&g_susTableMutex);
+            return s;
+        }
+        if (freeSlot == NULL && s->owner == 0) freeSlot = s;
+    }
+    if (freeSlot == NULL) {
+        for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+            struct sus_state* s = &g_sus[(start + (unsigned)i) & (SUS_TABLE_SIZE - 1)];
+            if (susSlotIsIdle(s)) { freeSlot = s; break; }
+        }
+    }
+    if (freeSlot != NULL) {
+        freeSlot->owner = threadId;
+        pthread_mutex_unlock(&g_susTableMutex);
+        return freeSlot;
+    }
+    pthread_mutex_unlock(&g_susTableMutex);
+    return &g_sus[start];
 }
 
 /* --------------------------------------------------------------------- */

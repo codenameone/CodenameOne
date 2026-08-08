@@ -164,27 +164,38 @@ struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
  * came back as Object[] whatever it held, and a flag saying "this is an array"
  * could not say how deeply.
  *
- * Walks arrayType down to the first class that is not itself an array, which
- * is the one the symbol table knows, counting the hops. Returns NULL if the
- * chain cannot be read or bottoms out somewhere unregistered.
+ * The depth comes from the class's own dimensions field rather than from
+ * following arrayType: the generated layout points arrayType straight at the
+ * scalar for every depth, so counting hops would call int[][] one-dimensional.
+ * A chain is still walked if one ever appears, since a layout that nests is
+ * cheap to tolerate and reading the target's memory is not something to make
+ * assumptions about.
  */
 struct clazz* cn1_debugger_array_component(struct clazz* arrayClass, int* dimsOut) {
-    int dims = 0;
-    struct clazz* at = arrayClass;
-    /* Bounded rather than while(1): the chain is read out of the target's
-     * memory and a corrupt arrayType must not spin here. */
-    for (int hop = 0; hop < 16 && at != NULL; hop++) {
-        _Alignas(struct clazz) unsigned char raw[sizeof(struct clazz)];
-        if (!cn1_debugger_safe_read(at, raw, sizeof(raw))) return NULL;
-        const struct clazz* header = (const struct clazz*)raw;
-        if (!header->isArray) {
-            if (!cn1_is_registered_class(at, header->classId)) return NULL;
+    _Alignas(struct clazz) unsigned char raw[sizeof(struct clazz)];
+    if (!cn1_debugger_safe_read(arrayClass, raw, sizeof(raw))) return NULL;
+    const struct clazz* header = (const struct clazz*)raw;
+    if (!header->isArray || header->arrayType == NULL) return NULL;
+
+    int declared = header->dimensions;
+    struct clazz* at = header->arrayType;
+    /* Bounded rather than open: the chain is read out of the target's memory
+     * and a corrupt arrayType must not spin here. */
+    for (int hop = 1; hop <= 16 && at != NULL; hop++) {
+        _Alignas(struct clazz) unsigned char componentRaw[sizeof(struct clazz)];
+        if (!cn1_debugger_safe_read(at, componentRaw, sizeof(componentRaw))) return NULL;
+        const struct clazz* component = (const struct clazz*)componentRaw;
+        if (!component->isArray) {
+            if (!cn1_is_registered_class(at, component->classId)) return NULL;
+            /* Whichever is deeper. The generated layout declares the real
+             * depth and reaches the scalar in one hop, so declared wins there;
+             * the hop count only stands in for a nested layout that declares
+             * nothing. */
+            int dims = declared > hop ? declared : hop;
             if (dimsOut != NULL) *dimsOut = dims;
             return at;
         }
-        if (header->arrayType == NULL) return NULL;
-        at = header->arrayType;
-        dims++;
+        at = component->arrayType;
     }
     return NULL;
 }
@@ -532,6 +543,39 @@ static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
  * lets end_thread_list tell what the current list still claims from what only
  * an older one did.
  */
+/*
+ * Extends the survives marks along the parent links until nothing more can be
+ * added. Anything hanging off something that survives survives too, however
+ * many hops down -- a field of a field of a live Thread object is no less
+ * reachable for the extra hop. Iterated because the table is in no particular
+ * order, so a chain is discovered one hop per pass.
+ */
+static void issued_propagate_parents(unsigned cap) {
+    int changed = 1;
+    while (changed) {
+        changed = 0;
+        for (unsigned i = 0; i < cap; i++) {
+            struct issued_entry* e = &g_issued[i];
+            if (e->key == 0 || e->survives) continue;
+            if (e->parentOverflow) {
+                /* Too many graphs reached it to say which; assume one of them
+                 * still does rather than reject an id in use. */
+                e->survives = 1;
+                changed = 1;
+                continue;
+            }
+            for (unsigned j = 0; j < e->parentCount; j++) {
+                struct issued_entry* parent = issued_find(e->parents[j]);
+                if (parent != NULL && parent->survives) {
+                    e->survives = 1;
+                    changed = 1;
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void cn1_debugger_begin_thread_list(void) {
     pthread_mutex_lock(&g_issuedMutex);
     g_listGen++;
@@ -566,29 +610,7 @@ void cn1_debugger_end_thread_list(void) {
                 e->survives = 1;
             }
         }
-        int changed = 1;
-        while (changed) {
-            changed = 0;
-            for (unsigned i = 0; i < cap; i++) {
-                struct issued_entry* e = &g_issued[i];
-                if (e->key == 0 || e->survives) continue;
-                if (e->parentOverflow) {
-                    /* Too many graphs reached it to say which; assume one of
-                     * them still does rather than reject an id in use. */
-                    e->survives = 1;
-                    changed = 1;
-                    continue;
-                }
-                for (unsigned j = 0; j < e->parentCount; j++) {
-                    struct issued_entry* parent = issued_find(e->parents[j]);
-                    if (parent != NULL && parent->survives) {
-                        e->survives = 1;
-                        changed = 1;
-                        break;
-                    }
-                }
-            }
-        }
+        issued_propagate_parents(cap);
         struct issued_entry* kept =
             (struct issued_entry*)calloc(cap, sizeof(struct issued_entry));
         if (kept) {
@@ -621,9 +643,19 @@ void cn1_debugger_forget_issued_for(int64_t owner) {
             (struct issued_entry*)calloc(cap, sizeof(struct issued_entry));
         if (kept) {
             unsigned keptCount = 0;
+            /* Two passes, because what an entry hangs off may be anywhere in
+             * the table. A descendant kept by a thread-list refresh carries no
+             * owner of its own and a generation stamp from before that refresh,
+             * so judging it on its own account alone dropped it the moment any
+             * thread resumed -- while the Thread object it hangs off was still
+             * being advertised. */
             for (unsigned i = 0; i < cap; i++) {
-                if (g_issued[i].key == 0) continue;
-                if (!entry_survives_resume(&g_issued[i], owner)) continue;
+                g_issued[i].survives =
+                    g_issued[i].key != 0 && entry_survives_resume(&g_issued[i], owner);
+            }
+            issued_propagate_parents(cap);
+            for (unsigned i = 0; i < cap; i++) {
+                if (g_issued[i].key == 0 || !g_issued[i].survives) continue;
                 int created = 0;
                 struct issued_entry* moved =
                     issued_put(kept, cap, g_issued[i].key, &created);

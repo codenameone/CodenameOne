@@ -333,6 +333,37 @@ class DebuggerObjectValidationTest {
         assertEquals("kept", probe("REFRESH_SHARED_DESCENDANT"));
     }
 
+    /**
+     * An array reports the depth its class declares, not the hops to its
+     * component.
+     *
+     * <p>The translator points {@code arrayType} straight at the scalar for
+     * every depth and puts the real one in {@code dimensions}, so following the
+     * link and counting calls {@code int[][]} one-dimensional — and the IDE
+     * then shows it as {@code int[]}.</p>
+     */
+    @Test
+    void anArrayReportsItsDeclaredDepthRatherThanTheHopsToItsComponent() throws Exception {
+        assertEquals("1", probe("ARRAY_DEPTH_1"));
+        assertEquals("2", probe("ARRAY_DEPTH_2"));
+        assertEquals("3", probe("ARRAY_DEPTH_3"));
+    }
+
+    /**
+     * A resume elsewhere does not drop what a live thread still reaches.
+     *
+     * <p>A descendant kept by a refresh carries no owner of its own and a
+     * generation stamp from before that refresh, so judged on its own account
+     * it looks unclaimed. The refresh knew to follow the parent link; the
+     * resume rebuild did not, and dropped the id the moment any thread ran
+     * again — while the IDE was still showing it under a thread the current
+     * list advertises.</p>
+     */
+    @Test
+    void aResumeKeepsDescendantsOfAThreadTheListStillAdvertises() throws Exception {
+        assertEquals("kept", probe("RESUME_KEEPS_LIVE_DESCENDANT"));
+    }
+
     /** Reached transitively: a field of a field is no less reachable. */
     @Test
     void aRefreshKeepsDescendantsSeveralHopsDown() throws Exception {
@@ -421,6 +452,7 @@ class DebuggerObjectValidationTest {
             "#include \"cn1_debugger.h\"\n" +
             "#include <stdio.h>\n" +
             "#include <string.h>\n" +
+            "#include <stdlib.h>\n" +
             "\n" +
             "static struct clazz registeredClass;\n" +
             "static struct clazz arrayClass;\n" +
@@ -551,6 +583,33 @@ class DebuggerObjectValidationTest {
             "        cn1_debugger_note_issued(threadA);   /* B is gone */\n" +
             "        cn1_debugger_end_thread_list();\n" +
             "        printf(\"%s\\n\", cn1_debugger_was_issued(shared) ? \"kept\" : \"gone\");\n" +
+            "        return 0;\n" +
+            "    } else if (strncmp(which, \"ARRAY_DEPTH_\", 12) == 0) {\n" +
+            "        /* The generated layout: arrayType points straight at the\n" +
+            "         * scalar whatever the depth, which lives in dimensions. */\n" +
+            "        int declared = atoi(which + 12);\n" +
+            "        arrayClass.dimensions = declared;\n" +
+            "        int dims = -1;\n" +
+            "        struct clazz* component = cn1_debugger_array_component(&arrayClass, &dims);\n" +
+            "        if (component != &registeredClass) { printf(\"wrong-component\\n\"); return 0; }\n" +
+            "        printf(\"%d\\n\", dims);\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"RESUME_KEEPS_LIVE_DESCENDANT\") == 0) {\n" +
+            "        /* A descendant kept alive by a Thread object the current\n" +
+            "         * list still advertises, when some other thread resumes. */\n" +
+            "        JAVA_OBJECT threadObj = (JAVA_OBJECT)(uintptr_t)0x15000;\n" +
+            "        JAVA_OBJECT child = (JAVA_OBJECT)(uintptr_t)0x15008;\n" +
+            "        JAVA_OBJECT parked = (JAVA_OBJECT)(uintptr_t)0x15010;\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        cn1_debugger_note_issued(threadObj);\n" +
+            "        cn1_debugger_end_thread_list();\n" +
+            "        cn1_debugger_note_issued_inheriting(child, threadObj);\n" +
+            "        cn1_debugger_note_issued_for(parked, 9);\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        cn1_debugger_note_issued(threadObj);   /* still advertised */\n" +
+            "        cn1_debugger_end_thread_list();\n" +
+            "        cn1_debugger_forget_issued_for(9);     /* an unrelated resume */\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(child) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"DERIVED_INHERITS_ALL_OWNERS\") == 0) {\n" +
             "        /* A parent both parked threads expose, and a child reached\n" +
