@@ -379,8 +379,6 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 #ifdef INCLUDE_GOOGLE_CONNECT
 #ifndef GOOGLE_SIGNIN
         ,GPPSignInDelegate
-#else
-        ,GIDSignInDelegate
 #endif
 #endif
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
@@ -424,10 +422,6 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 @property (readonly, nonatomic, getter=isAnimating) BOOL animating;
 @property (nonatomic) NSInteger animationFrameInterval;
 @property (readwrite, assign) GLUIImage* currentMutableImage;
-#ifdef GOOGLE_SIGNIN
-- (void)signIn:(GIDSignIn *)signIn didSignInForUser:(GIDGoogleUser *)user withError:(NSError *)error;
-- (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error;
-#endif
 
 -(EAGLView*)eaglView;
 -(void)startAnimation;

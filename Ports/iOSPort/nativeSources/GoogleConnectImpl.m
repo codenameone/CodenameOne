@@ -57,6 +57,11 @@ extern void releaseCN1(JAVA_OBJECT o);
 static JAVA_OBJECT googleLoginCallback = NULL;
 static NSString *accessToken;
 
+#ifdef GOOGLE_SIGNIN
+// Defined below, and called from the sign-in completion block above it.
+void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError *error);
+#endif
+
 
 void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
     if (googleLoginCallback == NULL) {
@@ -96,16 +101,33 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             }
         }
         
-        signIn.clientID = toNSString(CN1_THREAD_STATE_PASS_ARG jClientID);
+        NSString *clientId = toNSString(CN1_THREAD_STATE_PASS_ARG jClientID);
         NSString *scope = toNSString(CN1_THREAD_STATE_PASS_ARG get_field_com_codename1_social_GoogleConnect_scope(googleLoginCallback));
-
+        NSArray *scopeList = nil;
         if (scope != nil) {
-            signIn.scopes = [scope componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]; //@[scope];
+            scopeList = [scope componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
         }
+#ifndef GOOGLE_SIGNIN
+        signIn.clientID = clientId;
+        if (scopeList != nil) {
+            signIn.scopes = scopeList;
+        }
+#endif
         dispatch_async(dispatch_get_main_queue(), ^{
 #ifdef GOOGLE_SIGNIN
-            [GIDSignIn sharedInstance].presentingViewController = [CodenameOne_GLViewController instance];
-            [[GIDSignIn sharedInstance] signIn];
+            // The client id rides on a GIDConfiguration and the scopes on the call, and the result
+            // comes back to this block. Everything the old delegate did happens here.
+            [GIDSignIn sharedInstance].configuration =
+                [[[GIDConfiguration alloc] initWithClientID:clientId] autorelease];
+            [[GIDSignIn sharedInstance]
+                signInWithPresentingViewController:[CodenameOne_GLViewController instance]
+                                              hint:nil
+                                  additionalScopes:scopeList
+                                        completion:^(GIDSignInResult * _Nullable signInResult,
+                                                     NSError * _Nullable signInError) {
+                com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(signInResult.user,
+                        signInError);
+            }];
 #else
             [signIn authenticate];
 #endif
@@ -140,11 +162,14 @@ void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authenti
 }
 #else
 void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError *error) {
-    
-    if (user.authentication.accessToken != nil) {
+    // The token hangs off the user rather than an authentication object, and a failed sign-in
+    // hands back no user at all, so read through nil rather than off it.
+    NSString *token = user.accessToken.tokenString;
+    if (accessToken != nil) {
         [accessToken release];
+        accessToken = nil;
     }
-    accessToken = user.authentication.accessToken;
+    accessToken = token;
     if (accessToken != nil) {
         [accessToken retain];
     }
@@ -187,7 +212,10 @@ void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG 
     [[GPPSignIn sharedInstance] disconnect];
 #else
     dispatch_async(dispatch_get_main_queue(), ^{
-        [[GIDSignIn sharedInstance] disconnect];
+        [[GIDSignIn sharedInstance] disconnectWithCompletion:^(NSError * _Nullable disconnectError) {
+            // Nothing to report: the Java side has already been told the session ended, and a
+            // failure here means the token could not be revoked server-side.
+        }];
     });
 #endif
     if (accessToken != nil) {

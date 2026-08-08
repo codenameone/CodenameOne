@@ -924,8 +924,11 @@ public class IPhoneBuilder extends Executor {
         
                 
         if (useGoogleSignIn) {
-            iosPods += (((iosPods.length() > 0) ? ",":"") + "GoogleSignIn ~>5.0.0");
-            addMinDeploymentTarget("8.0");
+            // 5.x vendored a binary framework whose arm64 slice is device-only, so it cannot be
+            // linked into an arm64 simulator build at all -- which is every simulator build on an
+            // Apple Silicon machine. 7.x ships an xcframework that carries both.
+            iosPods += (((iosPods.length() > 0) ? ",":"") + "GoogleSignIn ~>7.1");
+            addMinDeploymentTarget("12.0");
         }
         
         // Accumulator for AI/ML class hits. After the scan we apply
