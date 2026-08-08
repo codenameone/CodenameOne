@@ -242,6 +242,56 @@ public class CN1WearableListenerService extends WearableListenerService {
             // putData came back through the peer-change path and an app acting on changes
             // processed its own write twice.
             boolean ownEcho = CN1WearableBridge.isLocallyAuthored(this, uri.getHost());
+            // The events that deliver NOTHING are filtered before the app is started.
+            //
+            // ensureAppRunning used to come first, so on a device that permits the background
+            // activity start, a sender tidying up an acknowledged or expired transfer -- which can
+            // be a day later -- brought the receiver's UI to the front to process an event that is
+            // discarded two lines on. The same went for this device's own removal echoing back.
+            boolean deleted = event.getType() == DataEvent.TYPE_DELETED;
+            if (transferItem && deleted) {
+                // Our own consumeTransfer, or the sender clearing up. Not an app-visible removal:
+                // the logical path may well still hold a replicated value.
+                continue;
+            }
+            String appPath = transferItem
+                    ? null
+                    : CN1WearableBridge.decode(
+                            path.substring(CN1WearableBridge.pathPrefix().length()));
+            // Read before anything is cleared, so the reset below can tell this device's own
+            // removal from a republish that landed while it was being processed.
+            String beforeTombstone = !transferItem && deleted
+                    ? CN1WearableBridge.deliveredStamp(appPath) : null;
+            if (!transferItem && deleted && openRemovals.contains(path)) {
+                // This device's own removeData coming back, for an ordinary value. The app made the
+                // call, so announcing it would break the peer-only contract in the other direction.
+                //
+                // The arrival snapshot is the ONLY test here, deliberately. ownEcho asks who published
+                // the item, which for a tombstone is the wrong question twice over: a wildcard
+                // removal produces a tombstone per replica and the peer-authority ones are not
+                // locally authored (so ownEcho misses them), while a peer deleting a path THIS
+                // device published leaves our authority on the tombstone (so ownEcho claims it as
+                // ours and swallowed a genuine peer removal, with no later event guaranteed to
+                // correct it). What matters is what this device ASKED to remove, which is what the
+                // removal markers record -- read at arrival, not at handler time.
+                //
+                // The cached value goes, or a latency-sensitive getData() would keep answering with
+                // a value this device has just deleted -- and so does the ordering baseline.
+                // Keeping the baseline was wrong for a peer whose logical clock never caught up
+                // with ours: an offline peer republishing the path draws a sequence LOWER than the
+                // winner we removed, deliverIfOutranks rejects it against a stamp describing an
+                // item that no longer exists anywhere, and both the listener and getData() stay
+                // empty with no later event to correct them. After a successful removal the path
+                // holds nothing, so anything that arrives next is by definition the new winner.
+                //
+                // Both are cleared as ONE step, anchored on a stamp read BEFORE either moves. A
+                // deferred resolution can deliver a peer republish concurrently with this
+                // tombstone, and clearing first and reading after would remove the republish's own
+                // stamp and snapshot -- leaving the app holding a value getData() no longer
+                // returns, with no baseline against a later stale replica.
+                CN1WearableBridge.forgetAfterLocalRemoval(appPath, beforeTombstone);
+                continue;
+            }
             if (!started) {
                 ensureAppRunning();
                 started = true;
@@ -250,11 +300,6 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // A file transfer arrives as a DataMap carrying an Asset rather than an inline
                 // payload. Turn it back into the WearableMessage the receiver expects; this callback
                 // already runs off the main thread, so resolving the asset here is fine.
-                if (event.getType() == DataEvent.TYPE_DELETED) {
-                    // Our own consumeTransfer, or the sender clearing up. Not an app-visible removal:
-                    // the logical path may well still hold a replicated value.
-                    continue;
-                }
                 CN1WearableBridge.Transfer transfer =
                         CN1WearableBridge.decodeTransfer(this, event.getDataItem());
                 long transferSeq = CN1WearableBridge.sequenceOf(
@@ -301,43 +346,7 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // which beats handing the listener DataMap bytes dressed up as a payload.
                 continue;
             }
-            String appPath = CN1WearableBridge.decode(
-                    path.substring(CN1WearableBridge.pathPrefix().length()));
-            // Read before anything is cleared, so the reset below can tell this device's own
-            // removal from a republish that landed while it was being processed.
-            String beforeTombstone = event.getType() == DataEvent.TYPE_DELETED
-                    ? CN1WearableBridge.deliveredStamp(appPath) : null;
-            if (event.getType() == DataEvent.TYPE_DELETED && openRemovals.contains(path)) {
-                // This device's own removeData coming back, for an ordinary value. The app made the
-                // call, so announcing it would break the peer-only contract in the other direction.
-                //
-                // The arrival snapshot is the ONLY test here, deliberately. ownEcho asks who published
-                // the item, which for a tombstone is the wrong question twice over: a wildcard
-                // removal produces a tombstone per replica and the peer-authority ones are not
-                // locally authored (so ownEcho misses them), while a peer deleting a path THIS
-                // device published leaves our authority on the tombstone (so ownEcho claims it as
-                // ours and swallowed a genuine peer removal, with no later event guaranteed to
-                // correct it). What matters is what this device ASKED to remove, which is what the
-                // removal markers record -- read at arrival, not at handler time.
-                //
-                // The cached value goes, or a latency-sensitive getData() would keep answering with
-                // a value this device has just deleted -- and so does the ordering baseline.
-                // Keeping the baseline was wrong for a peer whose logical clock never caught up
-                // with ours: an offline peer republishing the path draws a sequence LOWER than the
-                // winner we removed, deliverIfOutranks rejects it against a stamp describing an
-                // item that no longer exists anywhere, and both the listener and getData() stay
-                // empty with no later event to correct them. After a successful removal the path
-                // holds nothing, so anything that arrives next is by definition the new winner.
-                //
-                // Both are cleared as ONE step, anchored on a stamp read BEFORE either moves. A
-                // deferred resolution can deliver a peer republish concurrently with this
-                // tombstone, and clearing first and reading after would remove the republish's own
-                // stamp and snapshot -- leaving the app holding a value getData() no longer
-                // returns, with no baseline against a later stale replica.
-                CN1WearableBridge.forgetAfterLocalRemoval(appPath, beforeTombstone);
-                continue;
-            }
-            if (event.getType() == DataEvent.TYPE_DELETED) {
+            if (deleted) {
                 // The ordering stamp is dropped only once we know the path is genuinely empty --
                 // see the branches below. Dropping it here, before the query, meant a query that
                 // then FAILED left the path with no stamp at all, so an older item from another

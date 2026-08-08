@@ -695,8 +695,23 @@ public final class WearableConnection {
             public void run() {
                 WearableStateListener[] copy =
                         stateListenerSnapshot();
+                // Isolated per listener, as the three payload paths are. The platform raises this
+                // only on a TRANSITION -- reachability, pairing, installation -- so a listener
+                // passed over because an earlier one threw shows stale connection state until the
+                // next transition, which on a stable pairing may never come.
+                RuntimeException failure = null;
                 for (WearableStateListener l : copy) {
-                    l.connectionStateChanged();
+                    try {
+                        l.connectionStateChanged();
+                    } catch (RuntimeException listenerFailed) {
+                        if (failure == null) {
+                            failure = listenerFailed;
+                        }
+                    }
+                }
+                // Reported, not swallowed -- but only once every listener has been told.
+                if (failure != null) {
+                    throw failure;
                 }
             }
         });
