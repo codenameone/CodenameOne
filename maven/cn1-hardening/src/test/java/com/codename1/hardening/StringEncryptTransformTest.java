@@ -245,6 +245,32 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void oversizedLiteralIsCountedAsExcluded() throws Exception {
+        // A valid ASCII literal too large to encrypt (its ciphertext could overflow the constant pool)
+        // is left plaintext AND counted, so an strings:all build reports the exclusion.
+        StringBuilder big = new StringBuilder();
+        for (int i = 0; i < 30000; i++) {
+            big.append('x');
+        }
+        String huge = big.toString();
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Oversized", null, "java/lang/Object", null);
+        addStringGetter(w, "huge", huge);
+        addStringGetter(w, "small", "an encryptable small secret value");
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("the oversized literal must be counted as excluded", 1, t.getOversizedLiteralCount());
+        assertTrue("the small literal is still encrypted", t.getEncryptedCount() >= 1);
+        assertTrue("the oversized literal stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, huge));
+        assertFalse("the small literal is encrypted away",
+                StringEncryptTransform.containsStringLiteral(out, "an encryptable small secret value"));
+    }
+
+    @Test
     public void preJava8InterfaceConstantIsCountedAsExcluded() throws Exception {
         // A Java 7 interface cannot host a <clinit>/decoder, so its own static-final String constant
         // stays plaintext. The transform must not silently ship it: it leaves it and counts it so the

@@ -86,6 +86,7 @@ public final class StringEncryptTransform {
     private int encryptedCount;
     private int concatLiteralCount;
     private int legacyInterfaceConstantCount;
+    private int oversizedLiteralCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -160,6 +161,17 @@ public final class StringEncryptTransform {
         return legacyInterfaceConstantCount;
     }
 
+    /**
+     * The number of distinct string literals this transform would have encrypted but left in plaintext
+     * because their ciphertext could overflow the 65535-byte constant-pool limit (a valid ASCII literal
+     * longer than 21,845 characters can widen to a 3-byte-per-char modified-UTF-8 constant). A large
+     * embedded credential, JSON document or encoded blob therefore stays readable; counted and reported
+     * so an {@code strings:all} build is not believed to have encrypted everything.
+     */
+    public int getOversizedLiteralCount() {
+        return oversizedLiteralCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
@@ -200,6 +212,10 @@ public final class StringEncryptTransform {
         // engine turns a non-zero total into a build warning so plaintext concat fragments are never
         // silently shipped.
         concatLiteralCount += countConcatLiterals(cn);
+        // Count the distinct literals that would be encrypted but are too large to (their ciphertext
+        // could overflow the constant pool), so the engine can report the exclusion rather than let an
+        // strings:all build claim it encrypted everything.
+        oversizedLiteralCount += countOversizedLiterals(cn);
 
         int base = keyBase(cn.name);
         boolean changed = false;
@@ -332,6 +348,58 @@ public final class StringEncryptTransform {
             }
         }
         return false;
+    }
+
+    /**
+     * Counts the distinct literals in {@code cn} that this transform would encrypt but skips because
+     * their ciphertext could overflow the constant pool (see {@link #getOversizedLiteralCount()}).
+     * Covers both channels: method-body {@code LDC}s selected by the current mode, and
+     * {@code static final String} {@code ConstantValue}s (encrypted regardless of mode). Distinct by
+     * value within the class, mirroring how encryption dedups.
+     */
+    private int countOversizedLiterals(ClassNode cn) {
+        java.util.Set<String> skipped = new java.util.HashSet<String>();
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                if (mn.instructions == null) {
+                    continue;
+                }
+                for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                    if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
+                        String v = (String) ((LdcInsnNode) insn).cst;
+                        if (isOversized(v) && modeSelectsLiteral(v)) {
+                            skipped.add(v);
+                        }
+                    }
+                }
+            }
+        }
+        if (cn.fields != null) {
+            for (FieldNode fn : cn.fields) {
+                if ((fn.access & Opcodes.ACC_STATIC) != 0 && fn.value instanceof String) {
+                    String v = (String) fn.value;
+                    // encryptStaticFinalStrings uses shouldEncrypt (mode-independent), so any oversized
+                    // static-final String would be skipped.
+                    if (v.length() > 2 && isOversized(v)) {
+                        skipped.add(v);
+                    }
+                }
+            }
+        }
+        return skipped.size();
+    }
+
+    /** True when {@code s}'s worst-case ciphertext would overflow the 65535-byte constant-pool limit. */
+    private static boolean isOversized(String s) {
+        return s != null && (long) s.length() * 3 > 65535;
+    }
+
+    /** True when the current mode would select {@code s} for method-literal encryption (size aside). */
+    private boolean modeSelectsLiteral(String s) {
+        if (s == null || s.length() <= 2) {
+            return false;
+        }
+        return encryptAllStrings || (constantValues != null && constantValues.contains(s));
     }
 
     /**

@@ -184,6 +184,7 @@ public final class HardeningEngine {
         int encryptedStrings = 0;
         int concatLiterals = 0;
         int legacyInterfaceConstants = 0;
+        int oversizedLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -206,6 +207,7 @@ public final class HardeningEngine {
                 encryptedStrings += t.getEncryptedCount();
                 concatLiterals += t.getConcatLiteralCount();
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
+                oversizedLiterals += t.getOversizedLiteralCount();
             }
         }
 
@@ -305,6 +307,14 @@ public final class HardeningEngine {
             result.getWarnings().add(legacyInterfaceConstants + " static-final String constant(s) on "
                     + "pre-Java-8 interface(s) were not encrypted (such interfaces cannot host the "
                     + "decoder); recompile the interface at -target 8+ to encrypt its constant pool");
+        }
+        if (stringsApplied && oversizedLiterals > 0) {
+            // A literal longer than ~21,845 chars can widen to a 3-byte-per-char constant whose
+            // ciphertext overflows the 65535-byte constant pool, so it is left plaintext. Report it
+            // rather than let an strings:all build claim it encrypted everything.
+            result.getWarnings().add(oversizedLiterals + " string literal(s) were too large to encrypt "
+                    + "(their ciphertext would overflow the 65535-byte constant pool) and remain in "
+                    + "plaintext; move a large embedded secret/blob out of a string constant to hide it");
         }
         if (req.getReportFile() != null) {
             writeReport(req.getReportFile(), cfg, result);
