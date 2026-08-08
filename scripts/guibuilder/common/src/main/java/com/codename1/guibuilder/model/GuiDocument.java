@@ -408,10 +408,19 @@ public final class GuiDocument {
         return new XMLWriter(true).toXML(selected);
     }
 
+    /**
+     * @param xml the component XML to paste
+     * @return the pasted element, or null when there is nothing to paste or the target parent is a
+     *     BorderLayout with no free region
+     */
     public Element pasteXml(String xml) {
         if (xml == null || xml.length() == 0) return null;
         Element pasted = new XMLParser().parse(new StringReader(xml));
         if (pasted == null || !"component".equals(pasted.getTagName())) return null;
+        // Same rule as addComponent(): a sixth child does not stack up in a BorderLayout, it evicts
+        // one of the five while the XML keeps both.
+        Element target = acceptsChildren(selected) ? selected : findParent(root, selected);
+        if (borderLayoutIsFull(target == null ? root : target)) return null;
         beginTransaction();
         try {
             if (pasted.getParent() != null) removeChild(pasted.getParent(), pasted);

@@ -687,6 +687,25 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * Asks before an action replaces the open editor's unsaved text. The buffer is shared by the
+     * source, model and CSS panes, so opening any of them over a dirty one discards it just as
+     * surely as Close does.
+     *
+     * @param what a short description of what is about to happen, for the prompt
+     * @return true when the caller may proceed
+     */
+    private boolean confirmDiscardEditorBuffer(String what) {
+        if (reopeningEditor || !editorBufferIsDirty()) return true;
+        if (com.codename1.ui.Dialog.show("Unsaved changes",
+                "The open editor has changes you have not saved. " + what + " discards them.",
+                "Discard", "Keep editing")) {
+            return true;
+        }
+        setStatus("Kept your unsaved editor changes");
+        return false;
+    }
+
+    /**
      * Closes an open editor pane for good, rather than letting the next refresh restore it. The
      * buffer is the only copy of an unsaved edit -- reopening reads the file -- so closing without
      * asking discarded the user's work outright.
@@ -1937,7 +1956,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (skip) continue;
             Integer row = parseInteger(child.getAttribute("tableRow"));
             Integer column = parseInteger(child.getAttribute("tableColumn"));
-            if (row != null && column != null) taken.add(row + ":" + column);
+            if (row == null || column == null) continue;
+            // Every cell the sibling covers, not just the one it starts in: a displaced child
+            // placed inside somebody else's span reflows or overlaps on the next rebuild.
+            int rowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
+            int columnSpan = Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1));
+            for (int r = row.intValue(); r < row.intValue() + rowSpan; r++) {
+                for (int c = column.intValue(); c < column.intValue() + columnSpan; c++) {
+                    taken.add(r + ":" + c);
+                }
+            }
         }
         for (int cursor = 0; ; cursor++) {
             int row = cursor / columns;
@@ -3084,9 +3112,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         fields.add(booleanProperty("Enabled", "enabled", true));
         fields.add(booleanProperty("Visible", "visible", true));
         fields.add(booleanProperty("Right-to-left", "rtl", false));
-        if (hasText(type)) {
+        // Only offer what the preview and the generated source actually apply. Gap and ticker are
+        // Label-family setters and alignment is not a SpanLabel one, so showing them everywhere let
+        // the user change a value, dirty the document and save it while nothing moved.
+        if (isLabelType(type) || "SpanLabel".equals(type)) {
             fields.add(propertyField("Icon/text gap", "gap", "2"));
+        }
+        if (isLabelType(type) || "TextField".equals(type) || "TextArea".equals(type)) {
             fields.add(pickerProperty("Alignment", "alignment", new String[]{"left", "center", "right"}, "left"));
+        }
+        if (isLabelType(type)) {
             fields.add(booleanProperty("Ticker when clipped", "tickerEnabled", false));
         }
         if ("Button".equals(type)) fields.add(booleanProperty("Toggle button", "toggle", false));
@@ -3679,6 +3714,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private Component eventsTab(Element element) {
         Container fields = inspectorFields();
+        String type = value(element, "type", "Container");
+        if (!firesActionEvents(type)) {
+            // The generator registers a listener only for types that expose addActionListener, so
+            // accepting a handler here produced a stub the form compiles with and never calls.
+            fields.add(new SpanLabel("A " + type + " does not fire action events. Add a handler to a"
+                    + " button, check box, radio button, text field, text area or slider.", "BuilderHelp"));
+            return fields;
+        }
         fields.add(propertyField("Action handler", "actionEvent"));
         fields.add(new SpanLabel("Create or edit the selected handler here. The embedded Java editor keeps generated UI code separate and adds a handler stub only when it is missing.", "BuilderHelp"));
         Button code = new Button("Edit event handler", material(FontImage.MATERIAL_CODE, "BuilderInlineIcon"));
@@ -4123,7 +4166,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void paste() {
-        if (document != null && document.pasteXml(clipboardXml) != null) refreshEditor();
+        if (document == null) return;
+        if (document.pasteXml(clipboardXml) != null) {
+            refreshEditor();
+            return;
+        }
+        if (clipboardXml != null && clipboardXml.length() > 0) {
+            ToastBar.showErrorMessage("That container is a BorderLayout and all five regions are taken");
+            setStatus("Nothing pasted: the selected BorderLayout is full");
+        }
     }
 
     private void deleteSelection() {
@@ -4159,7 +4210,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // and cn1:create-gui-form does not write bindingStrategy, so a scaffolded form defaults
             // to "properties". Creating the model only when the Code pane is saved left an ordinary
             // Save producing source that referenced a class which did not exist.
-            ensureBindingModel(sourcePath);
+            if (ensureBindingModel(sourcePath) == MODEL_FAILED) return false;
             // Only now: marking the document clean after the .gui write but before the companion
             // one meant a failed companion write left isModified() false, so the next form switch
             // went ahead without retrying and the runtime source stayed stale.
@@ -4175,6 +4226,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void refreshProject() {
+        if (!confirmDiscardEditorBuffer("Reloading the project")) return;
         guiFiles = ProjectIO.findGuiFiles(binding.guiDir());
         refreshForms();
         if (document == null) return;
@@ -4204,6 +4256,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void openCss() {
         if (binding == null || binding.cssFile() == null) return;
+        if (!confirmDiscardEditorBuffer("Opening the stylesheet")) return;
         try {
             refreshEditor();
             String css = ProjectIO.read(binding.cssFile());
@@ -4270,6 +4323,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void openBindingModel() {
         if (document == null || binding == null || binding.sourceDir() == null) return;
+        if (!confirmDiscardEditorBuffer("Opening the binding model")) return;
         String formPath = companionSourcePath();
         String modelPath = formPath.substring(0, formPath.length() - 5) + "Model.java";
         try {
@@ -4310,6 +4364,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void openSourceEditor(String handler) {
         if (document == null || binding == null || binding.sourceDir() == null) return;
+        if (!confirmDiscardEditorBuffer("Opening the companion source")) return;
         String sourcePath = companionSourcePath();
         try {
             // Rebuild the canvas first: opening an editor over an already open one would nest
@@ -4499,8 +4554,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void saveSourceAndModel(String path, String source) {
         saveSource(path, source);
-        setStatus(ensureBindingModel(path)
-                ? "Saved form source and created its binding model"
+        int model = ensureBindingModel(path);
+        setStatus(model == MODEL_CREATED ? "Saved form source and created its binding model"
+                : model == MODEL_FAILED ? "Saved form source, but its binding model could not be written"
                 : "Saved form source • existing model left unchanged");
     }
 
@@ -4511,16 +4567,31 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param sourcePath the companion source path
      * @return true when a model was created by this call
      */
-    private boolean ensureBindingModel(String sourcePath) {
-        if ("none".equals(value(document.root(), "bindingStrategy", "properties"))) return false;
+    private static final int MODEL_NOT_NEEDED = 0;
+    private static final int MODEL_CREATED = 1;
+    private static final int MODEL_FAILED = 2;
+
+    /**
+     * Writes the binding model the generated companion refers to, when the form uses a binding
+     * strategy and the model is not already there.
+     *
+     * <p>Returns three states rather than a boolean: "already present" and "could not be written"
+     * are both "no model was created", but only the second must stop a save from reporting success
+     * while the companion references a class that does not exist.
+     *
+     * @param sourcePath the companion source path
+     * @return one of MODEL_NOT_NEEDED, MODEL_CREATED or MODEL_FAILED
+     */
+    private int ensureBindingModel(String sourcePath) {
+        if ("none".equals(value(document.root(), "bindingStrategy", "properties"))) return MODEL_NOT_NEEDED;
         String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
-        if (ProjectIO.exists(modelPath)) return false;
+        if (ProjectIO.exists(modelPath)) return MODEL_NOT_NEEDED;
         try {
             ProjectIO.write(modelPath, generatedModelSource());
-            return true;
+            return MODEL_CREATED;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Model save failed: " + ex.getMessage());
-            return false;
+            return MODEL_FAILED;
         }
     }
 
