@@ -1191,19 +1191,34 @@ public final class DatabaseConformanceSuite {
         // The proof of encryption that needs no access to the bytes. Where a port keeps its
         // databases somewhere the checks above cannot read, this is what is left to say the
         // contents are not simply sitting there for anyone who opens the database.
-        boolean noKeyRejected = false;
-        Database unkeyed = null;
+        //
+        // On its own database, because asking is destructive: Android hands an unkeyed open to
+        // the platform SQLite, which reports the ciphertext as corruption, and the default error
+        // handler answers corruption by deleting the file. Every assertion after this one would
+        // then be run against whatever was left.
+        String unkeyedName = databaseName + "-nokey";
+        deleteQuietly(unkeyedName);
+        Database unkeyed = Database.openOrCreate(unkeyedName, DatabaseConfig.passphrase(passphrase));
         try {
-            unkeyed = Database.openOrCreate(databaseName);
+            unkeyed.execute("CREATE TABLE secret (id INTEGER PRIMARY KEY, v TEXT)");
+            unkeyed.execute("INSERT INTO secret (id, v) VALUES (1, 'classified')");
+        } finally {
+            closeQuietly(unkeyed);
+        }
+        boolean noKeyRejected = false;
+        unkeyed = null;
+        try {
+            unkeyed = Database.openOrCreate(unkeyedName);
             Cursor probe = unkeyed.executeQuery("SELECT v FROM secret");
-            probe.next();
+            noKeyRejected = !probe.next() || !"classified".equals(probe.getRow().getString(0));
             probe.close();
         } catch (IOException err) {
             noKeyRejected = true;
         } finally {
             closeQuietly(unkeyed);
         }
-        r.check(noKeyRejected, "an encrypted database does not open without a key");
+        r.check(noKeyRejected, "an encrypted database does not give up its rows without a key");
+        deleteQuietly(unkeyedName);
 
         // ---- the wrong passphrase is rejected
         boolean wrongKeyRejected = false;
