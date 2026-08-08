@@ -1640,6 +1640,76 @@ class WatchNativeBuilder {
                     .append("end\n");
         }
 
+        // Everything else the PHONE target links, filtered by what the watch SDKs actually have.
+        //
+        // ios.add_libs and the dependency manager attach frameworks to the app target while it is
+        // generated; the watch target is created here, afterwards, and inherited none of them. That
+        // was invisible while the watch compiled the phone's translation, because it only ever
+        // built the shared CN1 sources. With a translation of its own it also compiles the native
+        // implementation of any NativeInterface the WATCH root reaches, and that implementation's
+        // framework was not on this target -- so the slice failed to link with undefined symbols
+        // and nothing in the build named the missing dependency.
+        //
+        // The filter is the SDK itself, not a hand-written list of iOS-only frameworks. A list has
+        // to be maintained against every OS release and is wrong in both directions: omitting one
+        // watchOS gained breaks a valid project, including one it never had breaks the build. Both
+        // watch SDKs are consulted and a framework must be in each -- they are NOT the same set,
+        // BackgroundTasks.framework ships in the device SDK and not the simulator one, and the
+        // target is built for both destinations, so satisfying only one produces a project that
+        // links on device and fails in the simulator with "framework not found".
+        //
+        // Weak-linked, as the optional-framework list treats anything a slice may not need: a
+        // symbol the watch code never calls costs it nothing.
+        s.append("watch_sdks = ['watchos', 'watchsimulator'].map { |sdk| "
+                        + "`xcrun --sdk #{sdk} --show-sdk-path 2>/dev/null`.strip }"
+                        + ".reject { |dir| dir.empty? || !File.directory?(dir) }\n")
+                .append("watch_fw_dirs = watch_sdks.map { |dir| "
+                        + "[File.join(dir, 'System/Library/Frameworks'), "
+                        + "File.join(dir, 'System/Library/SubFrameworks')] }\n")
+                .append("already = watch_target.frameworks_build_phase.files_references"
+                        + ".map { |r| r.path && File.basename(r.path) }.compact\n")
+                .append("app_target.frameworks_build_phase.files.to_a.each do |bf|\n")
+                .append("  ref = bf.file_ref\n")
+                .append("  next unless ref && ref.path\n")
+                .append("  base = File.basename(ref.path)\n")
+                .append("  next if already.include?(base)\n")
+                .append("  next if gl.include?(base)\n")
+                // Linkable inputs only. The app target's frameworks phase also carries entries that
+                // are not libraries -- the Info.plist and the prefix header are both in there.
+                //
+                // .a is deliberately absent. A static library is built, not provided by the SDK:
+                // CocoaPods' libPods-*.a and any vendored archive are compiled for iOS and have no
+                // watch slice, so linking one is a guaranteed failure rather than a possible one.
+                .append("  next unless base.end_with?('.framework') || base.end_with?('.dylib') "
+                        + "|| base.end_with?('.tbd')\n")
+                .append("  if base.end_with?('.framework')\n")
+                // Only a system framework can be checked against the SDK. An embedded or vendored
+                // .framework is the developer's own binary and nothing here can tell whether it has
+                // a watch slice, so it is left alone rather than guessed at.
+                .append("    next unless ref.source_tree == 'SDKROOT'\n")
+                .append("    present = !watch_fw_dirs.empty? && watch_fw_dirs.all? { |dirs| "
+                        + "dirs.any? { |d| File.directory?(File.join(d, base)) } }\n")
+                .append("  else\n")
+                .append("    stem = base.sub(/\\.(dylib|tbd)\\z/, '')\n")
+                .append("    present = !watch_sdks.empty? && watch_sdks.all? { |sdk| "
+                        + "[File.join(sdk, 'usr/lib', base), File.join(sdk, 'usr/lib', stem + '.tbd')]"
+                        + ".any? { |c| File.exist?(c) } }\n")
+                .append("  end\n")
+                .append("  unless present\n")
+                .append("    puts \"[watchNative] not linking #{base} into the watch target: "
+                        + "absent from a watchOS SDK\"\n")
+                .append("    next\n")
+                .append("  end\n")
+                .append("  added = watch_target.frameworks_build_phase.add_file_reference(ref)\n")
+                .append("  if added\n")
+                .append("    settings = (added.settings || {}).dup\n")
+                .append("    attrs = (settings['ATTRIBUTES'] || []).dup\n")
+                .append("    attrs << 'Weak' unless attrs.include?('Weak')\n")
+                .append("    settings['ATTRIBUTES'] = attrs\n")
+                .append("    added.settings = settings\n")
+                .append("  end\n")
+                .append("end\n");
+
         // Mirror the iOS app's bundle resources into the watch target. The CN1
         // runtime loads its theme + assets from the app bundle at runtime
         // (Resources.open(\"/iOS7Theme.res\"), the app theme.res / CN1Resource.res,
