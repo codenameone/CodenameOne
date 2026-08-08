@@ -187,8 +187,8 @@ public final class HardeningEngine {
         int oversizedLiterals = 0;
         int condyLiterals = 0;
         int clinitFullLiterals = 0;
-        int methodFullLiterals = 0;
         int annotationLiterals = 0;
+        int jarExcludedLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -201,22 +201,52 @@ public final class HardeningEngine {
                     StringEncryptTransform.collectConstantValues(cls, constantValues);
                 }
             }
+            // Pass 1 (from a snapshot of the input bytes): transform every class, tally the counts, and
+            // collect the values any class could NOT encrypt (a method too full for the decode call, or a
+            // class whose pool cannot fit the decoder). A value encrypted+interned in one class but left
+            // plaintext in another would fail a valid literal == on ParparVM's deduplicated pool, so
+            // those values must be excluded jar-wide -- encrypted everywhere or nowhere.
+            java.util.Map<String, byte[]> original = new java.util.HashMap<String, byte[]>(renamed);
+            java.util.Set<String> jarExcluded = new java.util.HashSet<String>();
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
                 StringEncryptTransform t = new StringEncryptTransform(
-                        cfg.isEncryptAllStrings(), seed, hierarchy, constantValues);
-                byte[] out = t.transform(e.getValue());
-                if (out != e.getValue()) {
-                    e.setValue(out);
-                }
+                        cfg.isEncryptAllStrings(), seed, hierarchy, constantValues, null);
+                e.setValue(t.transform(e.getValue()));
+                jarExcluded.addAll(t.getNewlyExcluded());
                 encryptedStrings += t.getEncryptedCount();
                 concatLiterals += t.getConcatLiteralCount();
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
                 oversizedLiterals += t.getOversizedLiteralCount();
                 condyLiterals += t.getCondyLiteralCount();
                 clinitFullLiterals += t.getClinitFullLiteralCount();
-                methodFullLiterals += t.getMethodFullLiteralCount();
                 annotationLiterals += t.getAnnotationLiteralCount();
             }
+            // Pass 2 only when pass 1 found values it could not consistently encrypt: re-transform every
+            // class from the original bytes with those values excluded (so a value is plaintext in all
+            // classes or none), replacing pass 1's outputs and re-tallying. In the common case the
+            // exclusion set is empty and pass 1's result stands -- one transform per class.
+            if (!jarExcluded.isEmpty()) {
+                encryptedStrings = 0;
+                concatLiterals = 0;
+                legacyInterfaceConstants = 0;
+                oversizedLiterals = 0;
+                condyLiterals = 0;
+                clinitFullLiterals = 0;
+                annotationLiterals = 0;
+                for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
+                    StringEncryptTransform t = new StringEncryptTransform(
+                            cfg.isEncryptAllStrings(), seed, hierarchy, constantValues, jarExcluded);
+                    e.setValue(t.transform(original.get(e.getKey())));
+                    encryptedStrings += t.getEncryptedCount();
+                    concatLiterals += t.getConcatLiteralCount();
+                    legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
+                    oversizedLiterals += t.getOversizedLiteralCount();
+                    condyLiterals += t.getCondyLiteralCount();
+                    clinitFullLiterals += t.getClinitFullLiteralCount();
+                    annotationLiterals += t.getAnnotationLiteralCount();
+                }
+            }
+            jarExcludedLiterals = jarExcluded.size();
         }
 
         int guardedMethods = 0;
@@ -338,10 +368,13 @@ public final class HardeningEngine {
                     + "because the class's static initializer is already near the 65535-byte method "
                     + "limit and could not hold the decode step");
         }
-        if (stringsApplied && methodFullLiterals > 0) {
-            result.getWarnings().add(methodFullLiterals + " string literal(s) were left in plaintext "
-                    + "because their enclosing method is already near the 65535-byte limit and the "
-                    + "per-access decode call would overflow it");
+        if (stringsApplied && jarExcludedLiterals > 0) {
+            // Values that at least one class could not encrypt (a method already near the 65535-byte
+            // limit, or a class whose constant pool cannot fit the decoder) are left plaintext in EVERY
+            // class, so a decoded+interned copy never compares != to a plaintext copy on ParparVM.
+            result.getWarnings().add(jarExcludedLiterals + " distinct string value(s) were left in "
+                    + "plaintext in every class because at least one class could not encrypt them (a "
+                    + "method or constant pool near the JVM limit); those literals stay readable");
         }
         if (stringsApplied && annotationLiterals > 0) {
             // Annotation element values live in the annotation metadata, not an LDC or a ConstantValue,

@@ -137,7 +137,11 @@ public class PiiScrubber {
     private String scrubFrameLine(String line) {
         int loc = trailingLocationStart(line);
         if (loc <= 0) {
-            return scrubEmails(line);
+            // A coordinate-free frame ((Native Method)/(Unknown Source)): there is no numeric coordinate
+            // to protect, so run the whole line through message scrubbing. A real such frame's identity
+            // is a dotted class.method with no long digit run, so it is unchanged; a message that merely
+            // mimics the shape (at account123456failed (Native Method)) has its id masked.
+            return scrubMessage(line);
         }
         return scrubMessage(line.substring(0, loc)) + line.substring(loc);
     }

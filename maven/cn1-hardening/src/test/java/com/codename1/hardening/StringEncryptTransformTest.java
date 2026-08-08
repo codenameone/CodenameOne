@@ -436,6 +436,61 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void jarExcludedValueIsLeftPlaintextEvenInAllMode() throws Exception {
+        // A value the engine marked as a jar-wide exclusion must be left plaintext here, so it is not
+        // encrypted in this class while a copy stays plaintext in the class that could not encrypt it.
+        String excluded = "a jar-wide excluded secret value";
+        String encrypted = "an ordinary encryptable secret value";
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Excl", null, "java/lang/Object", null);
+        addStringGetter(w, "excluded", excluded);
+        addStringGetter(w, "kept", encrypted);
+        w.visitEnd();
+
+        java.util.Set<String> jarExcluded = new java.util.HashSet<String>();
+        jarExcluded.add(excluded);
+        StringEncryptTransform t = new StringEncryptTransform(true, 3, null, null, jarExcluded);
+        byte[] out = t.transform(w.toByteArray());
+        assertTrue("the excluded value stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, excluded));
+        assertFalse("the ordinary value is still encrypted",
+                StringEncryptTransform.containsStringLiteral(out, encrypted));
+    }
+
+    @Test
+    public void poolTooFullForDecoderSkipsClassAndReportsJarWideExclusion() throws Exception {
+        // A class whose constant pool is already within the decoder's overhead of the 65535 limit cannot
+        // encrypt anything (the decoder itself would not fit). It is skipped, and its selected values are
+        // reported as jar-wide exclusions so they stay plaintext in every other class too.
+        int count = 30000; // ~60000 pool entries (Utf8 + String each) -> past the decoder-reserve gate
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/PoolFull", null, "java/lang/Object", null);
+        int perMethod = 250;
+        for (int start = 0; start < count; start += perMethod) {
+            org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                    | org.objectweb.asm.Opcodes.ACC_STATIC, "m" + start, "()V", null, null);
+            m.visitCode();
+            for (int i = start; i < start + perMethod && i < count; i++) {
+                m.visitLdcInsn("pool_full_secret_literal_number_" + i);
+                m.visitInsn(org.objectweb.asm.Opcodes.POP);
+            }
+            m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+            m.visitMaxs(1, 0);
+            m.visitEnd();
+        }
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 3);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("nothing can be encrypted when even the decoder would not fit", 0, t.getEncryptedCount());
+        assertTrue("its values are reported for jar-wide exclusion", t.getNewlyExcluded().size() > 0);
+        assertTrue("the class is returned unchanged (plaintext)",
+                StringEncryptTransform.containsStringLiteral(out, "pool_full_secret_literal_number_0"));
+    }
+
+    @Test
     public void interfaceMethodTooLargeSkipsAndReportsLiterals() throws Exception {
         // The interface path decodes per access (an INVOKESTATIC after each LDC). A method already near
         // the limit cannot take those, so its literals are left plaintext and reported; a normal method
@@ -472,6 +527,7 @@ public class StringEncryptTransformTest {
         StringEncryptTransform t = new StringEncryptTransform(true, 3);
         byte[] out = t.transform(w.toByteArray());
         assertEquals("the near-limit method's literals are reported", 5, t.getMethodFullLiteralCount());
+        assertEquals("and recorded for jar-wide exclusion", 5, t.getNewlyExcluded().size());
         assertTrue("the normal method's literal is still encrypted", t.getEncryptedCount() >= 1);
         CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
                 new java.io.PrintWriter(new java.io.StringWriter()));

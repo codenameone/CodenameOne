@@ -91,11 +91,28 @@ public final class StringEncryptTransform {
      * hoisting rather than discovering the overflow only when ASM writes the class.
      */
     private static final int POOL_ITEMS_PER_HOIST = 6;
+    /**
+     * Conservative constant-pool entries the synthetic decoder itself adds (its name/descriptor, the
+     * {@code Methodref} the encrypt sites share, and the {@code String.toCharArray}/{@code intern}
+     * references). Reserved from the pool budget, and gated: a class whose pool cannot fit even this
+     * fixed overhead cannot be encrypted at all.
+     */
+    private static final int DECODER_POOL_OVERHEAD = 32;
 
     private final boolean encryptAllStrings;
     private final int seed;
     private final ClassLoader hierarchy;
     private final java.util.Set<String> constantValues;
+    /**
+     * Values that must be left plaintext in EVERY class (a jar-wide exclusion). When a value cannot be
+     * encrypted in some class (a method too full for the per-access call, or a class whose pool cannot
+     * fit the decoder), encrypting it in the OTHER classes would break a valid literal {@code ==} on
+     * ParparVM (the decoded copy is interned, the plaintext copy is not). The engine collects these in a
+     * first pass and re-runs with them excluded so a value is encrypted everywhere or nowhere.
+     */
+    private final java.util.Set<String> jarExcluded;
+    /** Values this transform left plaintext for a size/pool reason, for the engine to exclude jar-wide. */
+    private final java.util.Set<String> newlyExcluded = new java.util.HashSet<String>();
     private int encryptedCount;
     private int concatLiteralCount;
     private int legacyInterfaceConstantCount;
@@ -108,11 +125,11 @@ public final class StringEncryptTransform {
     private int poolBaseItems;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
-        this(encryptAllStrings, seed, null, null);
+        this(encryptAllStrings, seed, null, null, null);
     }
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy) {
-        this(encryptAllStrings, seed, hierarchy, null);
+        this(encryptAllStrings, seed, hierarchy, null, null);
     }
 
     /**
@@ -127,10 +144,31 @@ public final class StringEncryptTransform {
      */
     public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy,
                                   java.util.Set<String> constantValues) {
+        this(encryptAllStrings, seed, hierarchy, constantValues, null);
+    }
+
+    /**
+     * @param jarExcluded values to force-leave plaintext in this class (a jar-wide exclusion collected
+     *                    by the engine so a value is encrypted everywhere or nowhere); may be
+     *                    {@code null}. See {@link #getNewlyExcluded()}.
+     */
+    public StringEncryptTransform(boolean encryptAllStrings, int seed, ClassLoader hierarchy,
+                                  java.util.Set<String> constantValues, java.util.Set<String> jarExcluded) {
         this.encryptAllStrings = encryptAllStrings;
         this.seed = seed;
         this.hierarchy = hierarchy;
         this.constantValues = constantValues;
+        this.jarExcluded = jarExcluded;
+    }
+
+    /**
+     * Values this transform left plaintext for a method-size or constant-pool reason. The engine unions
+     * these across the jar and re-runs the transform with them excluded, so a value that cannot be
+     * encrypted in one class is left plaintext in ALL classes -- keeping a valid literal {@code ==} on
+     * ParparVM (where a decoded literal is interned but a compile-time literal is not).
+     */
+    public java.util.Set<String> getNewlyExcluded() {
+        return newlyExcluded;
     }
 
     /** Collects the values of {@code static final String} fields in {@code classBytes} into {@code out}. */
@@ -288,6 +326,17 @@ public final class StringEncryptTransform {
         int base = keyBase(cn.name);
         boolean changed = false;
 
+        // The decoder method and its references are added whenever anything is encrypted, at a fixed
+        // constant-pool cost. If the class's pool is already so full that even that overhead would not
+        // fit, nothing can be encrypted here without ClassTooLargeException. Skip the class and record
+        // the values it would have selected as jar-wide exclusions, so those values are left plaintext in
+        // every OTHER class too -- otherwise a value encrypted+interned elsewhere would compare != to the
+        // plaintext copy here on ParparVM.
+        if (poolBaseItems + DECODER_POOL_OVERHEAD > SAFE_POOL_ITEMS) {
+            collectSelectedValues(cn, newlyExcluded);
+            return classBytes;
+        }
+
         // Channel 1: LDC string literals in method bodies. In "all" mode every literal is
         // encrypted; in "constants" mode only literals whose value was declared as a
         // static-final String constant somewhere in the jar -- which is exactly the set javac
@@ -359,7 +408,11 @@ public final class StringEncryptTransform {
                 LdcInsnNode ldc = (LdcInsnNode) insn;
                 if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
                     if (currentBytes + DECODER_CALL_BYTES > MethodSize.SAFE_LIMIT) {
+                        // This method cannot grow to hold the decode call. Record the value as a jar-wide
+                        // exclusion so the engine leaves it plaintext in every class -- encrypting it
+                        // elsewhere would break a valid literal == against this plaintext copy.
                         methodFullLiteralCount++;
+                        newlyExcluded.add((String) ldc.cst);
                     } else {
                         String plain = (String) ldc.cst;
                         // shouldEncrypt already rejected any value whose ciphertext could overflow the
@@ -606,6 +659,31 @@ public final class StringEncryptTransform {
         return skipped.size();
     }
 
+    /** Collects the distinct values the mode would encrypt (method LDCs + static-final constants). */
+    private void collectSelectedValues(ClassNode cn, java.util.Set<String> out) {
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                if (mn.instructions == null) {
+                    continue;
+                }
+                for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                    if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String
+                            && shouldEncryptLiteral((String) ((LdcInsnNode) insn).cst)) {
+                        out.add((String) ((LdcInsnNode) insn).cst);
+                    }
+                }
+            }
+        }
+        if (cn.fields != null) {
+            for (FieldNode fn : cn.fields) {
+                if ((fn.access & Opcodes.ACC_STATIC) != 0 && fn.value instanceof String
+                        && shouldEncrypt((String) fn.value)) {
+                    out.add((String) fn.value);
+                }
+            }
+        }
+    }
+
     /** True when {@code s}'s worst-case ciphertext would overflow the 65535-byte constant-pool limit. */
     private static boolean isOversized(String s) {
         return s != null && (long) s.length() * 3 > 65535;
@@ -614,6 +692,9 @@ public final class StringEncryptTransform {
     /** True when the current mode would select {@code s} for method-literal encryption (size aside). */
     private boolean modeSelectsLiteral(String s) {
         if (s == null || s.length() <= 2) {
+            return false;
+        }
+        if (jarExcluded != null && jarExcluded.contains(s)) {
             return false;
         }
         return encryptAllStrings || (constantValues != null && constantValues.contains(s));
@@ -668,7 +749,7 @@ public final class StringEncryptTransform {
         // encryption for the whole class: it adds no per-value field, so it does not grow the pool, and
         // -- crucially -- it keeps EVERY occurrence encrypted and interned rather than leaving some
         // plaintext, so a value hoisted in one class still compares == to its per-access copy here.
-        int budget = (SAFE_POOL_ITEMS - poolBaseItems) / POOL_ITEMS_PER_HOIST;
+        int budget = (SAFE_POOL_ITEMS - poolBaseItems - DECODER_POOL_OVERHEAD) / POOL_ITEMS_PER_HOIST;
         if (budget < 0) {
             budget = 0;
         }
@@ -1012,6 +1093,9 @@ public final class StringEncryptTransform {
      */
     private boolean shouldEncryptLiteral(String s) {
         if (!shouldEncrypt(s)) {
+            return false;
+        }
+        if (jarExcluded != null && jarExcluded.contains(s)) {
             return false;
         }
         if (encryptAllStrings) {

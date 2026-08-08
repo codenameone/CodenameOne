@@ -153,6 +153,22 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void coordinateFreeFrameMimicIsScrubbed() {
+        // A message mimicking a coordinate-free frame ("(Native Method)"/"(Unknown Source)") has no
+        // coordinate to protect, so the whole line is scrubbed; a real such frame's dotted identity has
+        // no long digit run and is unchanged.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account123456failed (Native Method)\n"
+                + "at other654321thing (Unknown Source)\n"
+                + "\tat com.foo.Bar.baz(Native Method)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account[num]failed") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("654321") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("com.foo.Bar.baz(Native Method)") >= 0, scrubbed);
+    }
+
+    @Test
     void customScrubMessageOverrideReachesRawStack() {
         // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
         // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by
