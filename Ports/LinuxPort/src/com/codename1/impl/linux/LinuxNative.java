@@ -50,6 +50,12 @@ public final class LinuxNative {
     /// do: a distribution that ships only plugins-base and plugins-good has no x264enc,
     /// and claiming H.264 anyway sent callers down a pipeline that cannot be built.
     public static native boolean videoFactoryAvailable(String factoryName);
+    /// True when the registry holds a decoder that accepts these caps on its sink pad --
+    /// the same question `decodebin` asks when it auto-plugs. Decoding must be answered
+    /// by capability rather than by factory name: a hardware-only install spells its
+    /// H.264 decoder `vah264dec` or `v4l2slh264dec` and its AAC decoder `fdkaacdec`, and
+    /// any list of names is a list of the installs someone happened to think of.
+    public static native boolean videoDecoderAvailable(String caps);
     // Reader (filesrc ! decodebin ! videoconvert ! appsink). The peer owns the pipeline.
     public static native long videoReaderOpen(String path);
     public static native int videoReaderWidth(long peer);

@@ -59,6 +59,14 @@ static __typeof__(gst_buffer_map)*                 p_gst_buffer_map;
 static __typeof__(gst_buffer_unmap)*               p_gst_buffer_unmap;
 static __typeof__(gst_buffer_new_allocate)*        p_gst_buffer_new_allocate;
 static __typeof__(gst_element_factory_find)*       p_gst_element_factory_find;
+static __typeof__(gst_element_factory_list_get_elements)* p_gst_element_factory_list_get_elements;
+static __typeof__(gst_element_factory_list_filter)* p_gst_element_factory_list_filter;
+static __typeof__(gst_plugin_feature_list_free)*   p_gst_plugin_feature_list_free;
+static __typeof__(gst_caps_from_string)*           p_gst_caps_from_string;
+/* gst_caps_unref is a static inline over gst_mini_object_unref, so the real
+   symbol to resolve is the latter -- nothing in this file is linked against
+   GStreamer. */
+static __typeof__(gst_mini_object_unref)*          p_gst_mini_object_unref;
 /* app: libgstapp-1.0.so.0 */
 static __typeof__(gst_app_sink_try_pull_sample)*   p_gst_app_sink_try_pull_sample;
 static __typeof__(gst_app_sink_try_pull_preroll)*  p_gst_app_sink_try_pull_preroll;
@@ -102,6 +110,11 @@ static int cn1LoadGstVideo(void) {
     CN1_GST_SYM(core, p_gst_buffer_unmap, "gst_buffer_unmap");
     CN1_GST_SYM(core, p_gst_buffer_new_allocate, "gst_buffer_new_allocate");
     CN1_GST_SYM(core, p_gst_element_factory_find, "gst_element_factory_find");
+    CN1_GST_SYM(core, p_gst_element_factory_list_get_elements, "gst_element_factory_list_get_elements");
+    CN1_GST_SYM(core, p_gst_element_factory_list_filter, "gst_element_factory_list_filter");
+    CN1_GST_SYM(core, p_gst_plugin_feature_list_free, "gst_plugin_feature_list_free");
+    CN1_GST_SYM(core, p_gst_caps_from_string, "gst_caps_from_string");
+    CN1_GST_SYM(core, p_gst_mini_object_unref, "gst_mini_object_unref");
     CN1_GST_SYM(app, p_gst_app_sink_try_pull_sample, "gst_app_sink_try_pull_sample");
     CN1_GST_SYM(app, p_gst_app_src_push_buffer, "gst_app_src_push_buffer");
     CN1_GST_SYM(app, p_gst_app_src_end_of_stream, "gst_app_src_end_of_stream");
@@ -348,6 +361,34 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_videoFactoryAvailable___java_l
     if (!factory) { return JAVA_FALSE; }
     p_gst_object_unref(factory);
     return JAVA_TRUE;
+}
+
+/*
+ * True when SOME decoder in the registry accepts these caps on its sink pad.
+ *
+ * Decoding runs through decodebin, which auto-plugs whatever the host has, so
+ * the question is a capability question and not a question about particular
+ * plugin names. Asking by name meant a hardware-only install answered "no
+ * H.264" while decodebin would have decoded it perfectly well: the VA plugin
+ * spells its decoder vah264dec, stateless V4L2 spells it v4l2slh264dec, and AAC
+ * arrives as avdec_aac_fixed or fdkaacdec depending on the build. Any list of
+ * names is a list of the installs someone happened to think of. Filter the
+ * registry by caps instead, which is the same question decodebin itself asks.
+ */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_videoDecoderAvailable___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT capsObj) {
+    if (!cn1LoadGstVideo() || capsObj == JAVA_NULL) { return JAVA_FALSE; }
+    GstCaps* caps = p_gst_caps_from_string(stringToUTF8(threadStateData, capsObj));
+    if (!caps) { return JAVA_FALSE; }
+    /* GST_RANK_MARGINAL rather than NONE: decodebin will autoplug anything at
+       marginal or above, and NONE would count decoders it never selects. */
+    GList* decoders = p_gst_element_factory_list_get_elements(
+            GST_ELEMENT_FACTORY_TYPE_DECODER, GST_RANK_MARGINAL);
+    GList* matching = p_gst_element_factory_list_filter(decoders, caps, GST_PAD_SINK, FALSE);
+    int found = (matching != NULL);
+    if (matching) { p_gst_plugin_feature_list_free(matching); }
+    if (decoders) { p_gst_plugin_feature_list_free(decoders); }
+    p_gst_mini_object_unref((GstMiniObject*) caps);
+    return found ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_videoReaderOpen___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pathObj) {

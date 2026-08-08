@@ -50,22 +50,19 @@ class LinuxVideoIO extends VideoIO {
     }
 
     /// Decoding runs through `decodebin`, which auto-plugs whatever decoder the host
-    /// has, so a codec is decodable when any one of its known GStreamer decoders is
-    /// installed. Encoding has no such freedom: the writer builds a fixed pipeline,
-    /// so an encoder is offered only when the exact factory that pipeline names is
-    /// present.
-    private static final String[] H264_DECODERS = {"avdec_h264", "openh264dec", "vaapih264dec", "nvh264dec", "v4l2h264dec"};
-    private static final String[] HEVC_DECODERS = {"avdec_h265", "vaapih265dec", "nvh265dec", "v4l2h265dec"};
-    private static final String[] AAC_DECODERS = {"avdec_aac", "faad"};
-
-    private static boolean anyFactory(String[] names) {
-        for (int i = 0; i < names.length; i++) {
-            if (LinuxNative.videoFactoryAvailable(names[i])) {
-                return true;
-            }
-        }
-        return false;
-    }
+    /// has, so decodability is a capability question and is asked of the registry by
+    /// caps -- exactly what decodebin itself asks. A name list cannot answer it: the
+    /// VA plugin spells H.264 `vah264dec`, stateless V4L2 spells it `v4l2slh264dec`,
+    /// and AAC arrives as `avdec_aac`, `avdec_aac_fixed`, `faad` or `fdkaacdec`
+    /// depending on the build.
+    ///
+    /// Encoding has no such freedom. The writer builds one fixed pipeline, so an
+    /// encoder is offered only when the exact factory that pipeline names is present:
+    /// answering "H.264 encodes" because some other H.264 encoder exists would send
+    /// the caller into a pipeline that still cannot be built.
+    private static final String H264_CAPS = "video/x-h264";
+    private static final String HEVC_CAPS = "video/x-h265";
+    private static final String AAC_CAPS = "audio/mpeg, mpegversion=(int)4";
 
     /// The codecs this host can really handle. Reporting H.264, HEVC and AAC
     /// unconditionally described the pipelines this port *would like* to build rather
@@ -83,15 +80,15 @@ class LinuxVideoIO extends VideoIO {
         // or parser disqualifies the codec just as surely as a missing encoder.
         boolean mux = LinuxNative.videoFactoryAvailable("mp4mux");
         if (encoder ? (mux && LinuxNative.videoFactoryAvailable("x264enc") && LinuxNative.videoFactoryAvailable("h264parse"))
-                : anyFactory(H264_DECODERS)) {
+                : LinuxNative.videoDecoderAvailable(H264_CAPS)) {
             out.add(new VideoCodec(CODEC_H264, "H.264 (GStreamer)", "video/avc", true, encoder, !encoder, false, -1, -1, mp4));
         }
         if (encoder ? (mux && LinuxNative.videoFactoryAvailable("x265enc") && LinuxNative.videoFactoryAvailable("h265parse"))
-                : anyFactory(HEVC_DECODERS)) {
+                : LinuxNative.videoDecoderAvailable(HEVC_CAPS)) {
             out.add(new VideoCodec(CODEC_HEVC, "HEVC (GStreamer)", "video/hevc", true, encoder, !encoder, false, -1, -1, mp4));
         }
         if (encoder ? (mux && LinuxNative.videoFactoryAvailable("avenc_aac") && LinuxNative.videoFactoryAvailable("aacparse"))
-                : anyFactory(AAC_DECODERS)) {
+                : LinuxNative.videoDecoderAvailable(AAC_CAPS)) {
             out.add(new VideoCodec(CODEC_AAC, "AAC (GStreamer)", "audio/mp4a-latm", false, encoder, !encoder, false, -1, -1, mp4));
         }
         return out.toArray(new VideoCodec[out.size()]);
