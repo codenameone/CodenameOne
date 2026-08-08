@@ -495,10 +495,18 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         edit.add(item("Copy", KeyEvent.VK_C, true, () -> editFocusedTextOrForm("copy")));
         edit.add(item("Paste", KeyEvent.VK_V, true, () -> editFocusedTextOrForm("paste")));
         edit.addSeparator();
-        // Bare Backspace, so it competes with typing: guard it, or deleting a character in the code
-        // editor deletes the selected component from the design instead.
-        edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false,
-                onCn1Edt(() -> { if (!isCodeEditorFocused()) CodenameOneGUIBuilder.deleteActiveSelection(); })));
+        // Bare Backspace, so it competes with typing. The accelerator consumes the key before the
+        // pure editor ever sees it, so guarding alone left Backspace doing nothing at all while
+        // text was focused; the keystroke is handed to the editor instead.
+        edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false, onCn1Edt(() -> {
+            com.codename1.ui.Form form = com.codename1.ui.CN.getCurrentForm();
+            com.codename1.ui.Component focused = form == null ? null : form.getFocused();
+            if (focused instanceof com.codename1.ui.editor.EditorView) {
+                ((com.codename1.ui.editor.EditorView) focused).deleteSurroundingText(1, 0);
+                return;
+            }
+            CodenameOneGUIBuilder.deleteActiveSelection();
+        })));
 
         JMenu view = new JMenu("View");
         JCheckBoxMenuItem dark = new JCheckBoxMenuItem("Dark Mode", CodenameOneGUIBuilder.isActiveDarkMode());

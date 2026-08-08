@@ -23,6 +23,7 @@
 
 package com.codename1.guibuilder.ui;
 
+import com.codename1.components.Accordion;
 import com.codename1.components.SpanLabel;
 import com.codename1.guibuilder.model.GuiDocument;
 import com.codename1.ui.Button;
@@ -131,6 +132,9 @@ public final class ComponentPreviewFactory {
                 break;
             case "Tabs":
                 component = sizedTabs(element, selected, handler, guidedWidth, guidedHeight);
+                break;
+            case "Accordion":
+                component = sizedAccordion(element, selected, handler, guidedWidth, guidedHeight);
                 break;
             default:
                 component = sizedContainer(element, selected, handler, guidedWidth, guidedHeight);
@@ -267,6 +271,39 @@ public final class ComponentPreviewFactory {
         }
         if (tabs.getTabCount() == 0) tabs.addTab("Tab", new Label("Drop content here"));
         return tabs;
+    }
+
+    /**
+     * Previews an Accordion as one, rather than letting it fall through to a plain Container. The
+     * document model accepts Accordion children and the generator emits {@code new Accordion()}
+     * with {@code addContent()}, so rendering its sections as ordinary layout children showed a
+     * canvas the running form would not match.
+     *
+     * @param element the accordion element
+     * @param selected the currently selected element
+     * @param handler the designer selection handler
+     * @param guidedWidth the guided width, or -1
+     * @param guidedHeight the guided height, or -1
+     * @return the preview component
+     */
+    private static Component sizedAccordion(Element element, Element selected, SelectionHandler handler,
+            int guidedWidth, int guidedHeight) {
+        Accordion accordion = new Accordion() {
+            @Override protected Dimension calcPreferredSize() {
+                return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
+            }
+        };
+        int sections = 0;
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            Object child = element.getChildAt(i);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
+                accordion.addContent(value(((Element) child), "name", "Section " + (i + 1)),
+                        create(((Element) child), selected, handler));
+                sections++;
+            }
+        }
+        if (sections == 0) accordion.addContent("Section", new Label("Drop content here"));
+        return accordion;
     }
 
     private static Layout layout(Element element) {
