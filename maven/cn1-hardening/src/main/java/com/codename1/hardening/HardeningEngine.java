@@ -364,9 +364,10 @@ public final class HardeningEngine {
                     + "plaintext; move a large embedded secret/blob out of a string constant to hide it");
         }
         if (stringsApplied && clinitFullLiterals > 0) {
-            result.getWarnings().add(clinitFullLiterals + " string literal(s) were left in plaintext "
-                    + "because the class's static initializer is already near the 65535-byte method "
-                    + "limit and could not hold the decode step");
+            result.getWarnings().add(clinitFullLiterals + " static-final String constant(s) were left in "
+                    + "plaintext because the class is near a JVM limit (its static initializer's size or "
+                    + "the constant pool) and could not hold the decode step; those field values are "
+                    + "dead once javac inlines their reads, so this is a disclosure note");
         }
         if (stringsApplied && jarExcludedLiterals > 0) {
             // Values that at least one class could not encrypt (a method already near the 65535-byte
@@ -386,8 +387,9 @@ public final class HardeningEngine {
         }
         if (controlFlowApplied && oversizedGuardMethods > 0) {
             result.getWarnings().add(oversizedGuardMethods + " method(s) were left with plain control "
-                    + "flow because they are already near the 65535-byte method limit and adding the "
-                    + "guard would overflow them");
+                    + "flow because their class is already near a JVM limit (a method near the "
+                    + "65535-byte limit, or a constant pool near the 65535-entry limit) and adding the "
+                    + "guard would overflow it");
         }
         if (req.getReportFile() != null) {
             writeReport(req.getReportFile(), cfg, result);

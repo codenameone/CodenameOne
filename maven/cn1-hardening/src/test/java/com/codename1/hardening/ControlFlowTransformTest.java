@@ -187,6 +187,38 @@ public class ControlFlowTransformTest {
         assertEquals(5, c.getMethod("add", int.class, int.class).invoke(null, 2, 3));
     }
 
+    @Test
+    public void classWithNearFullPoolIsSkippedNotOverflowed() throws Exception {
+        // A class whose constant pool is already near the 65535-entry limit cannot fit the guard's added
+        // field and references. It must be skipped (reported), not aborted with ClassTooLargeException.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/PoolFullGuard", null, "java/lang/Object", null);
+        // ~20000 distinct string constants (~3 pool entries each) push the pool past the guard gate.
+        for (int i = 0; i < 20000; i++) {
+            w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                    | org.objectweb.asm.Opcodes.ACC_FINAL, "F" + i, "Ljava/lang/String;", null,
+                    "constant pool filler string number " + i).visitEnd();
+        }
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "add", "(II)I", null, null);
+        m.visitCode();
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 0);
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 1);
+        m.visitInsn(org.objectweb.asm.Opcodes.IADD);
+        m.visitInsn(org.objectweb.asm.Opcodes.IRETURN);
+        m.visitMaxs(2, 2);
+        m.visitEnd();
+        w.visitEnd();
+
+        ControlFlowTransform t = new ControlFlowTransform();
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("no method is guarded when the pool cannot fit the guard", 0, t.getGuardedMethods());
+        assertTrue("the skipped guardable method is reported", t.getOversizedMethods() >= 1);
+        CheckClassAdapter.verify(new ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+    }
+
     // Renames the class internal name so the intense variant can load beside the plain one.
     private static byte[] rename(byte[] bytes, String from, String to) {
         org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader(bytes);

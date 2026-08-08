@@ -327,6 +327,32 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void staticFinalEncryptionIsCappedByConstantPoolBudget() throws Exception {
+        // A class with thousands of static-final String constants would overflow the 65535-entry pool if
+        // every one were encrypted (each adds a PUTSTATIC Fieldref + NameAndType). The transform caps it
+        // at the pool budget and leaves the rest plaintext (safe: the field value is dead once reads are
+        // inlined) rather than throwing ClassTooLargeException.
+        int count = 12000;
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/ManyConstants", null, "java/lang/Object", null);
+        for (int i = 0; i < count; i++) {
+            w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                    | org.objectweb.asm.Opcodes.ACC_FINAL, "F" + i, "Ljava/lang/String;", null,
+                    "a static final constant value number " + i).visitEnd();
+        }
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 3);
+        byte[] out = t.transform(w.toByteArray());
+        assertTrue("some constants are encrypted within the pool budget", t.getEncryptedCount() > 0);
+        assertTrue("the rest are left plaintext and reported", t.getClinitFullLiteralCount() > 0);
+        // The class assembles and verifies -- no ClassTooLargeException.
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+    }
+
+    @Test
     public void staticFinalConstantWithFullClinitStaysPlaintextAndReports() throws Exception {
         // A static-final ConstantValue can only be moved into <clinit>; when <clinit> is already full it
         // cannot, so the field keeps its plaintext. That is safe (javac inlined every read as an LDC,

@@ -61,6 +61,13 @@ public final class ControlFlowTransform {
     private static final int GUARD_BYTES = 16;
     /** Widest encoding of the guard-field setup prepended to {@code <clinit>} (2 calls + PUTSTATIC). */
     private static final int GUARD_INIT_BYTES = 16;
+    /**
+     * Conservative constant-pool entries the guard adds: the guard field (Utf8/Fieldref/NameAndType),
+     * the {@code Runtime}/{@code getRuntime}/{@code availableProcessors} references, and the
+     * {@code RuntimeException} constructor reference. Fixed per class, so a class whose pool is already
+     * near the 65535-entry limit cannot be guarded at all.
+     */
+    private static final int GUARD_POOL_OVERHEAD = 32;
 
     private final ClassLoader hierarchy;
     private final int intensity;
@@ -100,9 +107,18 @@ public final class ControlFlowTransform {
 
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
-        new ClassReader(classBytes).accept(cn, ClassReader.SKIP_FRAMES);
+        ClassReader reader = new ClassReader(classBytes);
+        reader.accept(cn, ClassReader.SKIP_FRAMES);
 
         if ((cn.access & Opcodes.ACC_INTERFACE) != 0) {
+            return classBytes;
+        }
+        // The guard adds a field and references (Runtime, RuntimeException, the guard field) at a fixed
+        // constant-pool cost. If the class's pool is already so full it cannot fit that overhead, the
+        // class cannot be guarded without ClassTooLargeException. Skip it and report the methods that
+        // stay plain rather than aborting the entire hardened build.
+        if (reader.getItemCount() + GUARD_POOL_OVERHEAD > MethodSize.SAFE_POOL_ITEMS) {
+            oversizedMethods += countGuardable(cn);
             return classBytes;
         }
         // Pick a guard field name that collides with no existing member, so a class that happens to

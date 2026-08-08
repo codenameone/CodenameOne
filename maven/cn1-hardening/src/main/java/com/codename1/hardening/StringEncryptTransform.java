@@ -83,14 +83,18 @@ public final class StringEncryptTransform {
     private static final int CLINIT_CALL_BYTES = 5;
     /** Widest encoding of the per-access decoder INVOKESTATIC inserted after an LDC. */
     private static final int DECODER_CALL_BYTES = 5;
-    /** Target ceiling for the constant-pool item count (the hard JVM limit is 65535), with margin. */
-    private static final int SAFE_POOL_ITEMS = 60000;
     /**
      * Conservative constant-pool entries each hoisted literal adds -- a Utf8 for the field name, a
      * NameAndType, a Fieldref, and the ciphertext Utf8 + String -- so the total can be bounded before
      * hoisting rather than discovering the overflow only when ASM writes the class.
      */
     private static final int POOL_ITEMS_PER_HOIST = 6;
+    /**
+     * Conservative constant-pool entries encrypting one {@code static final String} adds -- the field's
+     * {@code Fieldref} and {@code NameAndType} for the new {@code PUTSTATIC} (the ciphertext replaces the
+     * stripped plaintext, so it is roughly net-zero). Budgeted with the hoisting growth against the pool.
+     */
+    private static final int POOL_ITEMS_PER_STATIC = 4;
     /**
      * Conservative constant-pool entries the synthetic decoder itself adds (its name/descriptor, the
      * {@code Methodref} the encrypt sites share, and the {@code String.toCharArray}/{@code intern}
@@ -123,6 +127,12 @@ public final class StringEncryptTransform {
     private int annotationLiteralCount;
     /** The input class's constant-pool item count, so hoisting can stay under the 65535-entry limit. */
     private int poolBaseItems;
+    /**
+     * Constant-pool items still available before the 65535-entry limit, after reserving the decoder's
+     * fixed overhead. Both channels (hoisted method literals and static-final constants) draw from it,
+     * so their combined growth is budgeted rather than each ignoring the other.
+     */
+    private int poolItemsRemaining;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null, null);
@@ -278,8 +288,9 @@ public final class StringEncryptTransform {
         ClassNode cn = new ClassNode();
         ClassReader reader = new ClassReader(classBytes);
         reader.accept(cn, ClassReader.SKIP_FRAMES);
-        // The input's current constant-pool item count; hoisting must not grow the pool past 65535.
+        // The input's current constant-pool item count; encryption must not grow the pool past 65535.
         poolBaseItems = reader.getItemCount();
+        poolItemsRemaining = MethodSize.SAFE_POOL_ITEMS - poolBaseItems - DECODER_POOL_OVERHEAD;
 
         boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0;
         // The decoder is a concrete static method, and (for interface constants) it is invoked from
@@ -332,7 +343,7 @@ public final class StringEncryptTransform {
         // the values it would have selected as jar-wide exclusions, so those values are left plaintext in
         // every OTHER class too -- otherwise a value encrypted+interned elsewhere would compare != to the
         // plaintext copy here on ParparVM.
-        if (poolBaseItems + DECODER_POOL_OVERHEAD > SAFE_POOL_ITEMS) {
+        if (poolItemsRemaining < 0) {
             collectSelectedValues(cn, newlyExcluded);
             return classBytes;
         }
@@ -768,7 +779,7 @@ public final class StringEncryptTransform {
         // encryption for the whole class: it adds no per-value field, so it does not grow the pool, and
         // -- crucially -- it keeps EVERY occurrence encrypted and interned rather than leaving some
         // plaintext, so a value hoisted in one class still compares == to its per-access copy here.
-        int budget = (SAFE_POOL_ITEMS - poolBaseItems - DECODER_POOL_OVERHEAD) / POOL_ITEMS_PER_HOIST;
+        int budget = poolItemsRemaining / POOL_ITEMS_PER_HOIST;
         if (budget < 0) {
             budget = 0;
         }
@@ -844,6 +855,9 @@ public final class StringEncryptTransform {
                     field, "Ljava/lang/String;", null, null));
             encryptedCount++;
         }
+        // Charge the hoisted fields against the shared pool budget so the static-final channel that runs
+        // next sees the reduced headroom.
+        poolItemsRemaining -= valueToField.size() * POOL_ITEMS_PER_HOIST;
         // hoistMethodLiterals runs only for a non-interface (interfaces decode per access), so the
         // helper split, if it triggers, emits ordinary private static helpers.
         prependToClinit(cn, init, false);
@@ -855,6 +869,15 @@ public final class StringEncryptTransform {
         if (cn.fields == null) {
             return false;
         }
+        // Encrypting one static-final grows the pool (a PUTSTATIC Fieldref + NameAndType), so a class
+        // with thousands of them could exceed the 65535-entry limit. Cap it at the shared pool budget
+        // (already reduced by any hoisting above); constants past the budget keep their plaintext. That
+        // is safe -- a static-final's ConstantValue is dead once javac inlines every read (those inlined
+        // LDCs are encrypted by the method channel), so it is never compared by ==.
+        int budget = poolItemsRemaining / POOL_ITEMS_PER_STATIC;
+        if (budget < 0) {
+            budget = 0;
+        }
         // Build the initializer and remember which fields to strip WITHOUT mutating yet, so a class
         // whose <clinit> cannot accommodate the init keeps its constants (plaintext, reported) rather
         // than being left with fields whose ConstantValue was stripped but never re-initialized.
@@ -863,6 +886,11 @@ public final class StringEncryptTransform {
         for (FieldNode fn : cn.fields) {
             boolean isStatic = (fn.access & Opcodes.ACC_STATIC) != 0;
             if (isStatic && fn.value instanceof String && shouldEncrypt((String) fn.value)) {
+                if (toStrip.size() >= budget) {
+                    // Pool budget exhausted: leave this constant plaintext (dead value, reported).
+                    clinitFullLiteralCount++;
+                    continue;
+                }
                 String plain = (String) fn.value;
                 // shouldEncrypt already rejected any value whose ciphertext could overflow the
                 // constant pool (class-independent bound), so the encode result fits.
@@ -887,6 +915,7 @@ public final class StringEncryptTransform {
             fn.value = null;
             encryptedCount++;
         }
+        poolItemsRemaining -= toStrip.size() * POOL_ITEMS_PER_STATIC;
         prependToClinit(cn, init, isInterface);
         return true;
     }

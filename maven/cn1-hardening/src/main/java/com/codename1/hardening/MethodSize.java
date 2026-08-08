@@ -40,6 +40,12 @@ final class MethodSize {
     /** The hard JVM limit on a method's bytecode array. */
     static final int LIMIT = 65535;
     /**
+     * The constant-pool item count a transform must stay under. The hard JVM limit is 65535 entries;
+     * this sits below it by a margin that absorbs the per-item estimates a transform makes before it
+     * knows the exact pool growth. Shared by the string and control-flow transforms.
+     */
+    static final int SAFE_POOL_ITEMS = 60000;
+    /**
      * The size a transform must stay under. Below {@link #LIMIT} by a margin that absorbs both the
      * upper-bound estimate's slack and the fact that the real limit is on the emitted bytes, which
      * COMPUTE_MAXS/FRAMES can shift slightly.
