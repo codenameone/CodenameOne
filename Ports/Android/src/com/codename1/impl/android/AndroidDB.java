@@ -219,6 +219,10 @@ public class AndroidDB extends Database {
         try {
             if (isLegacyBehavior()) {
                 db.execSQL(sql);
+                // Tracked here too. The legacy hint restores what this port used to run, not what
+                // it used to know: an execute("BEGIN") opens a real transaction either way, and a
+                // key change allowed over it copies uncommitted rows into the replacement.
+                noteFirstStatementTransactionControl(sql);
                 return;
             }
             // execSQL rejects anything after the first statement, so split and run each: the

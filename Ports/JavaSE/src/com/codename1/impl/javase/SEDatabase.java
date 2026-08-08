@@ -103,8 +103,13 @@ public class SEDatabase extends Database {
      * <p>The caller is expected to hold the claim for that key already, from
      * {@link #reserveConnection(String)}, taken before the connection was opened. This constructor
      * does not take it, and closing the database gives it back.
+     *
+     * <p>Package private for that reason: the reservation it depends on is not reachable from
+     * outside, so an external caller could not satisfy the precondition and would end up with a
+     * connection missing from the registry -- invisible to another connection's key change, and
+     * decrementing that connection's entry when it closed.
      */
-    public SEDatabase(java.sql.Connection conn, String databaseName, String openKey)
+    SEDatabase(java.sql.Connection conn, String databaseName, String openKey)
             throws IOException {
         init(conn, databaseName, openKey);
     }
@@ -385,6 +390,8 @@ public class SEDatabase extends Database {
             try {
                 ps = conn.prepareStatement(sql);
                 ps.execute();
+                // See AndroidDB: the hint restores what ran, not what was known about it.
+                noteFirstStatementTransactionControl(sql);
             } catch (SQLException ex) {
                 throw new IOException(ex.getMessage(), ex);
             } finally {

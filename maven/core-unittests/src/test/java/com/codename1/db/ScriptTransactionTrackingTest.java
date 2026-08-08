@@ -90,6 +90,10 @@ class ScriptTransactionTrackingTest {
             noteScriptTransactionControl(sql);
         }
 
+        void ranFirstStatementOnly(String sql) {
+            noteFirstStatementTransactionControl(sql);
+        }
+
         void failedPartway(String sql) {
             // The same call the ports make from their finally block. A failed script has already
             // run everything before the statement that failed, so its control statements are read
@@ -370,6 +374,26 @@ class ScriptTransactionTrackingTest {
         } finally {
             Database.setLegacyBehavior(false);
         }
+    }
+
+    @Test
+    void theLegacyPathTracksTheStatementItActuallyRan() {
+        // Under the legacy hint a script runs as far as its first statement and the rest is
+        // discarded. Reading the whole string would credit a COMMIT that never executed and report
+        // no transaction over one that is open -- which is what lets a key change run across it.
+        db.ranFirstStatementOnly("BEGIN");
+        assertTrue(db.isInTransaction(), "the BEGIN it ran opened a transaction");
+
+        db.ran("ROLLBACK");
+        db.ranFirstStatementOnly("BEGIN; COMMIT");
+        assertTrue(db.isInTransaction(), "only the BEGIN ran, so the transaction is still open");
+
+        db.ranFirstStatementOnly("COMMIT");
+        assertFalse(db.isInTransaction());
+
+        db.ranFirstStatementOnly("");
+        db.ranFirstStatementOnly(null);
+        assertFalse(db.isInTransaction(), "nothing to read, nothing to change");
     }
 
     @Test

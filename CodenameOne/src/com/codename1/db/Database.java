@@ -706,6 +706,26 @@ public abstract class Database {
         }
     }
 
+    /// Records the transaction control in the first statement of a script, and only that one.
+    ///
+    /// For the legacy hint, where a script runs as far as its first statement and the rest is
+    /// discarded. Reading the whole string there would credit statements that never ran: a
+    /// `BEGIN; COMMIT` would be read as opening and closing, when only the `BEGIN` was executed
+    /// and the transaction is still open -- the direction that lets a key change run over it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the script that was handed to the engine
+    protected void noteFirstStatementTransactionControl(String sql) {
+        if (sql == null) {
+            return;
+        }
+        String[] statements = SQLStatementSplitter.split(sql);
+        if (statements.length > 0) {
+            noteScriptTransactionControl(statements[0]);
+        }
+    }
+
     /// Reads a SAVEPOINT or RELEASE, which start and end a transaction when they are the outer one.
     ///
     /// A savepoint inside a transaction is a mark within it and changes nothing here. A savepoint
