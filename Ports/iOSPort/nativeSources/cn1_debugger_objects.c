@@ -204,7 +204,22 @@ JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
 /* --------------------------------------------------------------------- */
 
 #define CN1_ISSUED_INITIAL_CAP 4096u   /* power of two; open addressing */
-static uintptr_t* g_issued = NULL;
+
+/*
+ * Each entry records which suspended thread the reference was obtained for, so
+ * that resuming one thread can drop its ids without touching those of a thread
+ * that is still stopped. Owner 0 means "not tied to a suspension" — the
+ * java.lang.Thread objects the thread list hands over — and those survive
+ * until every thread is running again.
+ *
+ * Both halves of that matter. Clearing globally on a per-thread resume made a
+ * still-parked thread's locals report unavailable mid-inspection; clearing
+ * nothing while any thread stayed parked left the resumed thread's ids
+ * accepted after its objects could be collected, which is the worse of the
+ * two.
+ */
+static uintptr_t* g_issuedKeys = NULL;
+static int64_t* g_issuedOwners = NULL;
 static unsigned g_issuedCap = 0;
 static unsigned g_issuedCount = 0;
 static pthread_mutex_t g_issuedMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -216,42 +231,49 @@ static unsigned issued_slot(uintptr_t key, unsigned cap) {
     return (unsigned)(h & (cap - 1));
 }
 
-/* Insert into a table known to have room. Returns 1 if newly added. */
-static int issued_put(uintptr_t* table, unsigned cap, uintptr_t key) {
+/* Insert into tables known to have room. Returns 1 if newly added. */
+static int issued_put(uintptr_t* keys, int64_t* owners, unsigned cap,
+                      uintptr_t key, int64_t owner) {
     unsigned i = issued_slot(key, cap);
     for (unsigned n = 0; n < cap; n++) {
         unsigned at = (i + n) & (cap - 1);
-        if (table[at] == key) return 0;
-        if (table[at] == 0) { table[at] = key; return 1; }
+        if (keys[at] == key) return 0;
+        if (keys[at] == 0) { keys[at] = key; owners[at] = owner; return 1; }
     }
     return 0;
 }
 
 /* Grows past a 3/4 load factor. Returns 0 only if the allocation fails. */
 static int issued_reserve(void) {
-    if (g_issued != NULL && (g_issuedCount + 1) * 4 < g_issuedCap * 3) {
+    if (g_issuedKeys != NULL && (g_issuedCount + 1) * 4 < g_issuedCap * 3) {
         return 1;
     }
     unsigned newCap = g_issuedCap ? g_issuedCap * 2 : CN1_ISSUED_INITIAL_CAP;
-    uintptr_t* grown = (uintptr_t*)calloc(newCap, sizeof(uintptr_t));
-    if (!grown) return 0;
+    uintptr_t* keys = (uintptr_t*)calloc(newCap, sizeof(uintptr_t));
+    int64_t* owners = (int64_t*)calloc(newCap, sizeof(int64_t));
+    if (!keys || !owners) { free(keys); free(owners); return 0; }
     for (unsigned i = 0; i < g_issuedCap; i++) {
-        if (g_issued[i] != 0) issued_put(grown, newCap, g_issued[i]);
+        if (g_issuedKeys[i] != 0) {
+            issued_put(keys, owners, newCap, g_issuedKeys[i], g_issuedOwners[i]);
+        }
     }
-    free(g_issued);
-    g_issued = grown;
+    free(g_issuedKeys);
+    free(g_issuedOwners);
+    g_issuedKeys = keys;
+    g_issuedOwners = owners;
     g_issuedCap = newCap;
     return 1;
 }
 
-int cn1_debugger_note_issued(JAVA_OBJECT obj) {
+int cn1_debugger_note_issued_for(JAVA_OBJECT obj, int64_t owner) {
     if (obj == JAVA_NULL) return 1;   /* null needs no record */
     uintptr_t key = (uintptr_t)obj;
     int ok;
     pthread_mutex_lock(&g_issuedMutex);
     ok = issued_reserve();
     if (ok) {
-        g_issuedCount += (unsigned)issued_put(g_issued, g_issuedCap, key);
+        g_issuedCount += (unsigned)issued_put(g_issuedKeys, g_issuedOwners,
+                                              g_issuedCap, key, owner);
     }
     pthread_mutex_unlock(&g_issuedMutex);
     /* The table grows, so this only fails when the allocation does. A caller
@@ -261,29 +283,81 @@ int cn1_debugger_note_issued(JAVA_OBJECT obj) {
     return ok;
 }
 
+int cn1_debugger_note_issued(JAVA_OBJECT obj) {
+    return cn1_debugger_note_issued_for(obj, 0);
+}
+
+/* Locates an entry, returning its index or -1. Caller holds the mutex. */
+static int issued_find(uintptr_t key) {
+    if (g_issuedKeys == NULL) return -1;
+    unsigned i = issued_slot(key, g_issuedCap);
+    for (unsigned n = 0; n < g_issuedCap; n++) {
+        unsigned at = (i + n) & (g_issuedCap - 1);
+        if (g_issuedKeys[at] == key) return (int)at;
+        if (g_issuedKeys[at] == 0) return -1;
+    }
+    return -1;
+}
+
 int cn1_debugger_was_issued(JAVA_OBJECT obj) {
     if (obj == JAVA_NULL) return 0;
-    uintptr_t key = (uintptr_t)obj;
-    int found = 0;
     pthread_mutex_lock(&g_issuedMutex);
-    if (g_issued != NULL) {
-        unsigned i = issued_slot(key, g_issuedCap);
-        for (unsigned n = 0; n < g_issuedCap; n++) {
-            unsigned at = (i + n) & (g_issuedCap - 1);
-            if (g_issued[at] == key) { found = 1; break; }
-            if (g_issued[at] == 0) break;
-        }
-    }
+    int at = issued_find((uintptr_t)obj);
     pthread_mutex_unlock(&g_issuedMutex);
-    return found;
+    return at >= 0;
+}
+
+int64_t cn1_debugger_owner_of(JAVA_OBJECT obj) {
+    if (obj == JAVA_NULL) return 0;
+    pthread_mutex_lock(&g_issuedMutex);
+    int at = issued_find((uintptr_t)obj);
+    int64_t owner = at >= 0 ? g_issuedOwners[at] : 0;
+    pthread_mutex_unlock(&g_issuedMutex);
+    return owner;
 }
 
 void cn1_debugger_forget_issued(void) {
     pthread_mutex_lock(&g_issuedMutex);
-    if (g_issued != NULL) {
-        memset(g_issued, 0, g_issuedCap * sizeof(uintptr_t));
+    if (g_issuedKeys != NULL) {
+        memset(g_issuedKeys, 0, g_issuedCap * sizeof(uintptr_t));
+        memset(g_issuedOwners, 0, g_issuedCap * sizeof(int64_t));
     }
     g_issuedCount = 0;
+    pthread_mutex_unlock(&g_issuedMutex);
+}
+
+void cn1_debugger_forget_issued_for(int64_t owner) {
+    if (owner == 0) return;
+    pthread_mutex_lock(&g_issuedMutex);
+    if (g_issuedKeys != NULL) {
+        /* Rebuilt rather than tombstoned: deletion from a linear probe would
+         * otherwise cut the chains that later lookups walk. */
+        unsigned cap = g_issuedCap;
+        uintptr_t* keys = (uintptr_t*)calloc(cap, sizeof(uintptr_t));
+        int64_t* owners = (int64_t*)calloc(cap, sizeof(int64_t));
+        if (keys && owners) {
+            unsigned kept = 0;
+            for (unsigned i = 0; i < cap; i++) {
+                if (g_issuedKeys[i] != 0 && g_issuedOwners[i] != owner) {
+                    kept += (unsigned)issued_put(keys, owners, cap,
+                                                 g_issuedKeys[i], g_issuedOwners[i]);
+                }
+            }
+            free(g_issuedKeys);
+            free(g_issuedOwners);
+            g_issuedKeys = keys;
+            g_issuedOwners = owners;
+            g_issuedCount = kept;
+        } else {
+            /* Out of memory: drop everything rather than keep ids we can no
+             * longer prove belong to a still-parked thread. */
+            free(keys);
+            free(owners);
+            memset(g_issuedKeys, 0, cap * sizeof(uintptr_t));
+            memset(g_issuedOwners, 0, cap * sizeof(int64_t));
+            g_issuedCount = 0;
+        }
+    }
     pthread_mutex_unlock(&g_issuedMutex);
 }
 

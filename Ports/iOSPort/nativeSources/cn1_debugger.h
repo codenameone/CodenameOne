@@ -124,6 +124,20 @@ extern int cn1_debugger_note_issued(JAVA_OBJECT obj);
 extern int cn1_debugger_was_issued(JAVA_OBJECT obj);
 extern void cn1_debugger_forget_issued(void);
 
+/**
+ * Records a reference against the suspended thread it was obtained for, reads
+ * back that owner, and drops one thread's records on its resume.
+ *
+ * Ownership is what lets a per-thread resume invalidate only its own ids. A
+ * global clear would cut the ground from under a thread that is still stopped
+ * and being inspected; clearing nothing would leave the resumed thread's ids
+ * accepted after its objects can be collected. Owner 0 means the reference is
+ * not tied to a suspension and survives until every thread runs again.
+ */
+extern int cn1_debugger_note_issued_for(JAVA_OBJECT obj, int64_t owner);
+extern int64_t cn1_debugger_owner_of(JAVA_OBJECT obj);
+extern void cn1_debugger_forget_issued_for(int64_t owner);
+
 /** Resolves an objectID that arrived from the IDE, or NULL to refuse it. */
 extern struct clazz* cn1_debugger_class_of_wire_id(JAVA_OBJECT obj);
 

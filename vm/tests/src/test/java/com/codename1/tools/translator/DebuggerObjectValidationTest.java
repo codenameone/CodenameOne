@@ -183,6 +183,34 @@ class DebuggerObjectValidationTest {
         assertEquals("all-resolvable", probe("ISSUE_MANY_RESOLVE"));
     }
 
+    /**
+     * Resuming one thread invalidates its ids and only its ids.
+     *
+     * <p>Both directions are failures. Clearing globally cut the ground from
+     * under a thread that was still stopped and being inspected, so its
+     * locals started reporting unavailable; clearing nothing left the resumed
+     * thread's ids accepted after its objects could be collected, which is a
+     * read of reclaimed storage rather than a display glitch.</p>
+     */
+    @Test
+    void aPerThreadResumeDropsOnlyThatThreadsIds() throws Exception {
+        assertEquals("gone", probe("OWNER_RESUMED_IS_DROPPED"));
+        assertEquals("kept", probe("OWNER_PARKED_IS_KEPT"));
+    }
+
+    /** A reference reached through an object inherits that object's owner. */
+    @Test
+    void referencesReachedThroughAnObjectInheritItsOwner() throws Exception {
+        assertEquals("gone", probe("OWNER_INHERITED_IS_DROPPED"));
+    }
+
+    /** Ids tied to no suspension survive a per-thread resume, but not a full one. */
+    @Test
+    void unownedIdsSurviveAPerThreadResumeOnly() throws Exception {
+        assertEquals("kept", probe("OWNER_UNOWNED_SURVIVES_THREAD_RESUME"));
+        assertEquals("gone", probe("OWNER_UNOWNED_DROPPED_BY_FULL_RESUME"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -200,7 +228,10 @@ class DebuggerObjectValidationTest {
                 "NULL", "NO_CLASS_WORD", "TAGGED_INT", "TAGGED_INT_CLASS",
                 "TAGGED_INT_VALUE", "WIRE_ID_ISSUED", "WIRE_ID_AFTER_RESUME",
                 "WIRE_ID_NEVER_ISSUED", "WIRE_ID_TAGGED", "ISSUE_MANY",
-                "ISSUE_MANY_RESOLVE");
+                "ISSUE_MANY_RESOLVE", "OWNER_RESUMED_IS_DROPPED",
+                "OWNER_PARKED_IS_KEPT", "OWNER_INHERITED_IS_DROPPED",
+                "OWNER_UNOWNED_SURVIVES_THREAD_RESUME",
+                "OWNER_UNOWNED_DROPPED_BY_FULL_RESUME");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -274,6 +305,29 @@ class DebuggerObjectValidationTest {
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0xDEADBEEFDEAD0000ULL;\n" +
+            "    } else if (strncmp(which, \"OWNER_\", 6) == 0) {\n" +
+            "        /* Two parked threads, 7 and 9, each with a reference. */\n" +
+            "        JAVA_OBJECT ofSeven = (JAVA_OBJECT)(uintptr_t)0x8000;\n" +
+            "        JAVA_OBJECT ofNine  = (JAVA_OBJECT)(uintptr_t)0x9000;\n" +
+            "        JAVA_OBJECT reached = (JAVA_OBJECT)(uintptr_t)0xA000;\n" +
+            "        JAVA_OBJECT unowned = (JAVA_OBJECT)(uintptr_t)0xB000;\n" +
+            "        cn1_debugger_note_issued_for(ofSeven, 7);\n" +
+            "        cn1_debugger_note_issued_for(ofNine, 9);\n" +
+            "        cn1_debugger_note_issued_for(reached, cn1_debugger_owner_of(ofSeven));\n" +
+            "        cn1_debugger_note_issued_for(unowned, 0);\n" +
+            "        if (strcmp(which, \"OWNER_UNOWNED_DROPPED_BY_FULL_RESUME\") == 0) {\n" +
+            "            cn1_debugger_forget_issued();\n" +
+            "            printf(\"%s\\n\", cn1_debugger_was_issued(unowned) ? \"kept\" : \"gone\");\n" +
+            "            return 0;\n" +
+            "        }\n" +
+            "        cn1_debugger_forget_issued_for(7);   /* thread 7 resumes */\n" +
+            "        JAVA_OBJECT probe = NULL;\n" +
+            "        if (strcmp(which, \"OWNER_RESUMED_IS_DROPPED\") == 0) probe = ofSeven;\n" +
+            "        else if (strcmp(which, \"OWNER_PARKED_IS_KEPT\") == 0) probe = ofNine;\n" +
+            "        else if (strcmp(which, \"OWNER_INHERITED_IS_DROPPED\") == 0) probe = reached;\n" +
+            "        else probe = unowned;\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(probe) ? \"kept\" : \"gone\");\n" +
+            "        return 0;\n" +
             "    } else if (strcmp(which, \"ISSUE_MANY\") == 0) {\n" +
             "        /* Past the initial 4096 capacity, as a big array would. */\n" +
             "        for (int i = 1; i <= 9000; i++) {\n" +
