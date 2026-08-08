@@ -353,6 +353,56 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void perAccessEncryptionIsCappedByConstantPoolBudget() throws Exception {
+        // The per-access channel is NOT pool-neutral when a value's plaintext is retained elsewhere: the
+        // ciphertext Utf8+String is a NET addition. Here every literal is ALSO kept plaintext in a class
+        // annotation (annotation values are never encrypted), so encrypting all of an interface's method
+        // copies would push the pool past 65535 and make ClassWriter.toByteArray() throw
+        // ClassTooLargeException. The transform must budget the ciphertext growth per distinct value and
+        // leave the overflow values plaintext (recorded for a jar-wide exclusion) instead.
+        int perMethod = 300;
+        int methods = 60;
+        int total = perMethod * methods; // 18000 distinct literals -- past what the 60000-item budget allows
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        // An interface, so every method literal goes through per access (never hoisted to <clinit>).
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_ABSTRACT | org.objectweb.asm.Opcodes.ACC_INTERFACE,
+                "app/ManyLiterals", null, "java/lang/Object", null);
+        // Retain every value as plaintext in a class-level annotation array; no encryption channel reaches
+        // annotation values, so each stays referenced and the method-copy ciphertext is a net pool add.
+        org.objectweb.asm.AnnotationVisitor av = w.visitAnnotation("Lapp/Keep;", false);
+        org.objectweb.asm.AnnotationVisitor arr = av.visitArray("value");
+        for (int i = 0; i < total; i++) {
+            arr.visit(null, "interface per-access literal value number " + i);
+        }
+        arr.visitEnd();
+        av.visitEnd();
+        int n = 0;
+        for (int mth = 0; mth < methods; mth++) {
+            org.objectweb.asm.MethodVisitor mv = w.visitMethod(
+                    org.objectweb.asm.Opcodes.ACC_PUBLIC, "m" + mth, "()V", null, null);
+            mv.visitCode();
+            for (int k = 0; k < perMethod; k++, n++) {
+                mv.visitLdcInsn("interface per-access literal value number " + n);
+                mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+            }
+            mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+            mv.visitMaxs(1, 0);
+            mv.visitEnd();
+        }
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        byte[] out = t.transform(w.toByteArray());
+        // The class assembles and verifies -- crucially, no ClassTooLargeException from a pool overflow.
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertTrue("some literals are encrypted within the pool budget", t.getEncryptedCount() > 0);
+        assertFalse("the pool-budget guard must leave the overflow values for a jar-wide exclusion",
+                t.getNewlyExcluded().isEmpty());
+    }
+
+    @Test
     public void staticFinalConstantWithFullClinitStaysPlaintextAndReports() throws Exception {
         // A static-final ConstantValue can only be moved into <clinit>; when <clinit> is already full it
         // cannot, so the field keeps its plaintext. That is safe (javac inlined every read as an LDC,

@@ -93,6 +93,9 @@ public final class MappingFile {
 
     // obfuscated class binary name -> mapping
     private final Map<String, ClassMapping> byObfuscated = new HashMap<String, ClassMapping>();
+    // Same ClassMapping objects keyed by their ORIGINAL (deobfuscated) FQCN, so an inlined method's
+    // declaring class -- named by its original name on the member line -- can recover its sourceFile.
+    private final Map<String, ClassMapping> byOriginal = new HashMap<String, ClassMapping>();
 
     public static MappingFile parse(String text) throws IOException {
         return parse(new StringReader(text));
@@ -160,6 +163,9 @@ public final class MappingFile {
         String obf = line.substring(arrow + 4, line.length() - 1).trim();
         ClassMapping cm = new ClassMapping(original);
         byObfuscated.put(obf, cm);
+        // Also index by original FQCN so an inlined method's declaring class (recorded by its ORIGINAL
+        // name on the member line) can recover its own sourceFile metadata for the inline frame.
+        byOriginal.put(original, cm);
         return cm;
     }
 
@@ -304,7 +310,17 @@ public final class MappingFile {
     /** Builds a frame for one method record, honoring an inlinee's own declaring class/source file. */
     private Frame frameFor(MethodMapping m, String enclosingClass, String enclosingFile, int observed) {
         String cls = m.declaringClass != null ? m.declaringClass : enclosingClass;
-        String file = m.declaringClass != null ? simpleSourceFile(m.declaringClass) : enclosingFile;
+        String file;
+        if (m.declaringClass != null) {
+            // An inlined method comes from another class (Helper.kt, a package-private class in a
+            // differently named file). Prefer that class's own recorded sourceFile metadata when the
+            // mapping has it, so the inline frame points at Helper.kt rather than a fabricated
+            // Helper.java; fall back to the synthesized <DeclaringClass>.java only when it has none.
+            ClassMapping dc = byOriginal.get(m.declaringClass);
+            file = synthesizedSourceFile(m.declaringClass, dc != null ? dc.sourceFile : null);
+        } else {
+            file = enclosingFile;
+        }
         return new Frame(cls, m.originalName, file, m.mapLine(observed));
     }
 

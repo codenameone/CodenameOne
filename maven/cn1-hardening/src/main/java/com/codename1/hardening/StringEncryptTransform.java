@@ -96,6 +96,15 @@ public final class StringEncryptTransform {
      */
     private static final int POOL_ITEMS_PER_STATIC = 4;
     /**
+     * Conservative constant-pool entries one per-access ciphertext adds -- a Utf8 for the ciphertext
+     * plus its {@code String_info}. The per-access channel is NOT pool-neutral: when the plaintext value
+     * is retained elsewhere (an unstripped static-final {@code ConstantValue}, an annotation value, or
+     * another class in the jar), the original pair stays referenced, so the ciphertext pair is a net
+     * addition. Budgeted per distinct value against the pool so a class dense with retained plaintext
+     * cannot silently overflow the 65535-entry limit in {@code ClassWriter.toByteArray()}.
+     */
+    private static final int POOL_ITEMS_PER_ACCESS = 2;
+    /**
      * Conservative constant-pool entries the synthetic decoder itself adds (its name/descriptor, the
      * {@code Methodref} the encrypt sites share, and the {@code String.toCharArray}/{@code intern}
      * references). Reserved from the pool budget, and gated: a class whose pool cannot fit even this
@@ -395,18 +404,22 @@ public final class StringEncryptTransform {
                                                boolean isInterface) {
         boolean changed = false;
         if (cn.methods != null) {
+            // Distinct values already charged against the pool budget in this pass. ASM folds equal
+            // ciphertext strings to one constant, so a value re-encountered in another method adds no
+            // further pool entry and must not be charged twice.
+            java.util.Set<String> pooledThisPass = new java.util.HashSet<String>();
             for (MethodNode mn : cn.methods) {
                 if (mn.instructions == null || decoderName.equals(mn.name)) {
                     continue;
                 }
-                changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName);
+                changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName, pooledThisPass);
             }
         }
         return changed;
     }
 
     private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base, boolean isInterface,
-                                          String decoderName) {
+                                          String decoderName, java.util.Set<String> pooledThisPass) {
         boolean changed = false;
         // Each rewrite inserts an INVOKESTATIC, growing the method. A method already near the limit
         // cannot take unbounded rewrites, so track the running size and stop (leaving the remaining
@@ -418,14 +431,28 @@ public final class StringEncryptTransform {
             if (insn instanceof LdcInsnNode) {
                 LdcInsnNode ldc = (LdcInsnNode) insn;
                 if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
+                    String plain = (String) ldc.cst;
                     if (currentBytes + DECODER_CALL_BYTES > MethodSize.SAFE_LIMIT) {
                         // This method cannot grow to hold the decode call. Record the value as a jar-wide
                         // exclusion so the engine leaves it plaintext in every class -- encrypting it
                         // elsewhere would break a valid literal == against this plaintext copy.
                         methodFullLiteralCount++;
-                        newlyExcluded.add((String) ldc.cst);
+                        newlyExcluded.add(plain);
+                    } else if (!pooledThisPass.contains(plain)
+                            && poolItemsRemaining < POOL_ITEMS_PER_ACCESS) {
+                        // The ciphertext for a not-yet-charged value would push the class constant pool
+                        // past the 65535-entry limit (per-access is not pool-neutral when the plaintext is
+                        // retained elsewhere). Leaving some occurrences encrypted and others plaintext
+                        // would break a valid literal ==, so exclude the value jar-wide (plaintext in
+                        // every class) and let the engine's second pass re-run with it excluded, rather
+                        // than let ClassWriter.toByteArray() throw ClassTooLargeException.
+                        newlyExcluded.add(plain);
                     } else {
-                        String plain = (String) ldc.cst;
+                        // Charge the pool budget the first time a distinct value is encrypted this pass;
+                        // repeats of the same value reuse the folded ciphertext constant for free.
+                        if (pooledThisPass.add(plain)) {
+                            poolItemsRemaining -= POOL_ITEMS_PER_ACCESS;
+                        }
                         // shouldEncrypt already rejected any value whose ciphertext could overflow the
                         // constant pool, using a class-independent bound, so the encode result fits.
                         ldc.cst = encode(plain, base);
@@ -776,9 +803,11 @@ public final class StringEncryptTransform {
         // field name Utf8, a NameAndType, a Fieldref, the ciphertext Utf8 + String), so a class with
         // tens of thousands of distinct literals could exceed the JVM's 65535-entry limit and make ASM
         // throw ClassTooLargeException. When hoisting them all would overflow, fall back to per-access
-        // encryption for the whole class: it adds no per-value field, so it does not grow the pool, and
-        // -- crucially -- it keeps EVERY occurrence encrypted and interned rather than leaving some
-        // plaintext, so a value hoisted in one class still compares == to its per-access copy here.
+        // encryption for the whole class: it adds no per-value field, so it grows the pool far less (just
+        // the ciphertext Utf8 + String per distinct value, itself budgeted against poolItemsRemaining in
+        // encryptMethodLiterals), and -- crucially -- it keeps every affordable occurrence encrypted and
+        // interned rather than leaving some plaintext, so a value hoisted in one class still compares ==
+        // to its per-access copy here.
         int budget = poolItemsRemaining / POOL_ITEMS_PER_HOIST;
         if (budget < 0) {
             budget = 0;

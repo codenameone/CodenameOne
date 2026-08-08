@@ -171,6 +171,39 @@ public class MappingFileTest {
     }
 
     @Test
+    public void inlinedMethodFromKotlinClassUsesItsOwnSourceFile() throws Exception {
+        // The inlinee is Helper.doIt from a Kotlin class whose declaration records sourceFile Helper.kt.
+        // The inline frame must report Helper.kt, not a fabricated Helper.java.
+        MappingFile mf = MappingFile.parse(
+                "com.example.Outer -> x:\n"
+                + "    1:1:void outerMethod():30:30 -> a\n"
+                + "com.example.Helper -> y:\n"
+                + "    # {\"id\":\"sourceFile\",\"fileName\":\"Helper.kt\"}\n"
+                + "    void doIt() -> b\n"
+                // Back in Outer: an inlined call to Helper.doIt at obf line 1 of method a.
+                + "com.example.Outer -> x:\n"
+                + "    1:1:void com.example.Helper.doIt():12:12 -> a\n"
+                + "    1:1:void outerMethod():30:30 -> a\n");
+        java.util.List<Frame> frames = mf.retraceAll(new Frame("x", "a", "x.java", 1));
+        assertEquals(2, frames.size());
+        assertEquals("com.example.Helper", frames.get(0).getClassName());
+        assertEquals("doIt", frames.get(0).getMethodName());
+        assertEquals("Helper.kt", frames.get(0).getFileName());
+        assertEquals("com.example.Outer", frames.get(1).getClassName());
+    }
+
+    @Test
+    public void inlinedMethodWithoutMetadataStillSynthesizesJava() throws Exception {
+        // A declaring class with no recorded sourceFile metadata falls back to the synthesized name.
+        MappingFile mf = MappingFile.parse(
+                "com.example.Outer -> x:\n"
+                + "    1:1:void com.example.Callee.run():12:12 -> a\n"
+                + "    1:1:void outerMethod():30:30 -> a\n");
+        assertEquals("Callee.java",
+                mf.retraceAll(new Frame("x", "a", "x.java", 1)).get(0).getFileName());
+    }
+
+    @Test
     public void keepsRealReportedSourceFileButNotObfuscatedPlaceholder() throws Exception {
         MappingFile mf = MappingFile.parse(
                 "com.example.Screen -> a:\n"
