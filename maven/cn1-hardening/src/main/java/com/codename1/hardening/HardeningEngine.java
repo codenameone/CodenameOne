@@ -187,6 +187,7 @@ public final class HardeningEngine {
         int oversizedLiterals = 0;
         int condyLiterals = 0;
         int clinitFullLiterals = 0;
+        int methodFullLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -212,6 +213,7 @@ public final class HardeningEngine {
                 oversizedLiterals += t.getOversizedLiteralCount();
                 condyLiterals += t.getCondyLiteralCount();
                 clinitFullLiterals += t.getClinitFullLiteralCount();
+                methodFullLiterals += t.getMethodFullLiteralCount();
             }
         }
 
@@ -333,6 +335,11 @@ public final class HardeningEngine {
             result.getWarnings().add(clinitFullLiterals + " string literal(s) were left in plaintext "
                     + "because the class's static initializer is already near the 65535-byte method "
                     + "limit and could not hold the decode step");
+        }
+        if (stringsApplied && methodFullLiterals > 0) {
+            result.getWarnings().add(methodFullLiterals + " string literal(s) were left in plaintext "
+                    + "because their enclosing method is already near the 65535-byte limit and the "
+                    + "per-access decode call would overflow it");
         }
         if (controlFlowApplied && oversizedGuardMethods > 0) {
             result.getWarnings().add(oversizedGuardMethods + " method(s) were left with plain control "

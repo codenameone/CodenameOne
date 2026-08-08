@@ -81,6 +81,10 @@ public final class MappingFile {
         final String originalName;
         // obfuscated member name -> candidate original methods (multiple when line ranges differ)
         final Map<String, List<MethodMapping>> methods = new HashMap<String, List<MethodMapping>>();
+        // R8's recorded source file (e.g. Screen.kt) from a "# {"id":"sourceFile",...}" comment; null
+        // when the mapping carries no such metadata. Lets a hardened build -- which strips SourceFile
+        // from the binary, so the device reports no filename -- still name the real source file.
+        String sourceFile;
 
         ClassMapping(String originalName) {
             this.originalName = originalName;
@@ -107,10 +111,44 @@ public final class MappingFile {
                 // Class line: "original -> obfuscated:"
                 current = mf.parseClassLine(line);
             } else if (current != null) {
-                mf.parseMemberLine(current, line.trim());
+                String trimmed = line.trim();
+                // R8 records per-class metadata as an INDENTED comment, e.g.
+                // # {"id":"sourceFile","fileName":"Screen.kt"}. It is not a member line (no " -> "),
+                // so capture the source file here rather than dropping it in parseMemberLine.
+                if (trimmed.startsWith("#")) {
+                    String sf = parseSourceFileMetadata(trimmed);
+                    if (sf != null) {
+                        current.sourceFile = sf;
+                    }
+                } else {
+                    mf.parseMemberLine(current, trimmed);
+                }
             }
         }
         return mf;
+    }
+
+    /**
+     * Extracts the {@code fileName} from an R8 {@code sourceFile} metadata comment such as
+     * {@code # {"id":"sourceFile","fileName":"Screen.kt"}}, or {@code null} when the comment is not
+     * one. Deliberately a small indexOf scan rather than a JSON dependency (this module is zero-dep).
+     */
+    private static String parseSourceFileMetadata(String comment) {
+        if (comment.indexOf("\"id\":\"sourceFile\"") < 0) {
+            return null;
+        }
+        String key = "\"fileName\":\"";
+        int at = comment.indexOf(key);
+        if (at < 0) {
+            return null;
+        }
+        int start = at + key.length();
+        int end = comment.indexOf('"', start);
+        if (end < 0) {
+            return null;
+        }
+        String name = comment.substring(start, end).trim();
+        return name.length() == 0 ? null : name;
     }
 
     private ClassMapping parseClassLine(String line) {
@@ -219,7 +257,7 @@ public final class MappingFile {
         // obfuscated class, or a ParparVM synthesized <obfClass>.java), it carries no information, so
         // synthesize <OriginalClass>.java from the retraced class instead.
         String file = preferredSourceFile(obfuscated.getFileName(), obfuscated.getClassName(),
-                originalClass);
+                originalClass, cm.sourceFile);
         // ParparVM records a constructor / static initializer under the runtime sentinel names
         // __INIT__ / __CLINIT__ (BytecodeMethod), but a ProGuard mapping keys them as <init>/<clinit>.
         // Normalize before the lookup, or the frame misses its method record and keeps the sentinel
@@ -272,13 +310,15 @@ public final class MappingFile {
 
     /**
      * The source file to report for the enclosing class. Keeps a real reported name (Screen.kt,
-     * Main.java) but synthesizes {@code <OriginalClass>.java} when the reported name is empty or is
-     * just the obfuscated class name with an extension (a renamed/synthesized placeholder that would
-     * otherwise leak an obfuscated name into the retraced stack).
+     * Main.java); otherwise -- when the reported name is empty or is just the obfuscated class name with
+     * an extension (a renamed/synthesized placeholder) -- prefers R8's recorded {@code sourceFile}
+     * metadata when the mapping has it (so a hardened build that stripped SourceFile still names
+     * Screen.kt), and only falls back to synthesizing {@code <OriginalClass>.java} when it does not.
      */
-    private static String preferredSourceFile(String reported, String obfClassName, String originalClass) {
+    private static String preferredSourceFile(String reported, String obfClassName, String originalClass,
+            String mappedSourceFile) {
         if (reported == null || reported.length() == 0) {
-            return simpleSourceFile(originalClass);
+            return synthesizedSourceFile(originalClass, mappedSourceFile);
         }
         int dot = reported.lastIndexOf('.');
         String reportedBase = dot > 0 ? reported.substring(0, dot) : reported;
@@ -292,9 +332,17 @@ public final class MappingFile {
             obfSimple = obfSimple.substring(0, dollar);
         }
         if (reportedBase.equals(obfSimple)) {
-            return simpleSourceFile(originalClass);
+            return synthesizedSourceFile(originalClass, mappedSourceFile);
         }
         return reported;
+    }
+
+    /** R8's recorded source file when the mapping has it, else a synthesized {@code <Class>.java}. */
+    private static String synthesizedSourceFile(String originalClass, String mappedSourceFile) {
+        if (mappedSourceFile != null && mappedSourceFile.length() > 0) {
+            return mappedSourceFile;
+        }
+        return simpleSourceFile(originalClass);
     }
 
     private static String simpleSourceFile(String fqcn) {

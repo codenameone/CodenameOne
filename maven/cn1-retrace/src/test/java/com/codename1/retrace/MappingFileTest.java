@@ -58,6 +58,36 @@ public class MappingFileTest {
             + "    70:72:void <clinit>() -> <clinit>\n";
 
     @Test
+    public void usesR8SourceFileMetadataWhenSourceFileStripped() throws Exception {
+        // A hardened Android build strips SourceFile, so the device reports no real filename; R8's
+        // sourceFile metadata comment carries the true name (Screen.kt) and must be used instead of a
+        // synthesized Screen.java.
+        String mapping =
+                "com.example.Screen -> a.b:\n"
+                + "    # {\"id\":\"sourceFile\",\"fileName\":\"Screen.kt\"}\n"
+                + "    142:145:void onClick() -> a\n";
+        MappingFile mf = MappingFile.parse(mapping);
+        // Reported file is the obfuscated class placeholder (b.java) -- a stripped-SourceFile symptom.
+        Frame placeholder = mf.retrace(new Frame("a.b", "a", "b.java", 143));
+        assertEquals("com.example.Screen", placeholder.getClassName());
+        assertEquals("onClick", placeholder.getMethodName());
+        assertEquals("Screen.kt", placeholder.getFileName());
+        // Empty reported file (the other stripped-SourceFile symptom) resolves the same way.
+        Frame empty = mf.retrace(new Frame("a.b", "a", "", 143));
+        assertEquals("Screen.kt", empty.getFileName());
+    }
+
+    @Test
+    public void synthesizesSourceFileWhenMappingHasNoMetadata() throws Exception {
+        // Without sourceFile metadata, a stripped-SourceFile frame still synthesizes <Class>.java.
+        String mapping =
+                "com.example.Screen -> a.b:\n"
+                + "    142:145:void onClick() -> a\n";
+        Frame out = MappingFile.parse(mapping).retrace(new Frame("a.b", "a", "b.java", 143));
+        assertEquals("Screen.java", out.getFileName());
+    }
+
+    @Test
     public void normalizesParparVmConstructorSentinel() throws Exception {
         // ParparVM records a constructor frame under the runtime sentinel __INIT__; the mapping keys it
         // as <init>. Without normalization the lookup misses and the frame keeps __INIT__.

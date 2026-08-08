@@ -368,6 +368,52 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void interfaceMethodTooLargeSkipsAndReportsLiterals() throws Exception {
+        // The interface path decodes per access (an INVOKESTATIC after each LDC). A method already near
+        // the limit cannot take those, so its literals are left plaintext and reported; a normal method
+        // in the same interface is still encrypted -- the build must not abort.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_INTERFACE | org.objectweb.asm.Opcodes.ACC_ABSTRACT,
+                "app/BigIface", null, "java/lang/Object", null);
+        // A static method already ~60 KB, then a few encryptable literals it cannot fit a decode call for.
+        org.objectweb.asm.MethodVisitor big = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "big", "()V", null, null);
+        big.visitCode();
+        for (int i = 0; i < 30100; i++) {
+            big.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
+            big.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        for (int i = 0; i < 5; i++) {
+            big.visitLdcInsn("a big-interface secret literal number " + i);
+            big.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        big.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        big.visitMaxs(1, 0);
+        big.visitEnd();
+        // A normal static method whose literal must still be encrypted.
+        org.objectweb.asm.MethodVisitor small = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "small", "()Ljava/lang/String;", null, null);
+        small.visitCode();
+        small.visitLdcInsn("a small interface secret literal");
+        small.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        small.visitMaxs(1, 0);
+        small.visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 3);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("the near-limit method's literals are reported", 5, t.getMethodFullLiteralCount());
+        assertTrue("the normal method's literal is still encrypted", t.getEncryptedCount() >= 1);
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertTrue("the un-encryptable literal stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, "a big-interface secret literal number 0"));
+        assertFalse("the small literal is encrypted away",
+                StringEncryptTransform.containsStringLiteral(out, "a small interface secret literal"));
+    }
+
+    @Test
     public void oversizedInitializerIsSplitAcrossHelpers() throws Exception {
         // A generated class with enough distinct literals that a single <clinit> would exceed the
         // 65535-byte method limit. Hoisting must split the initializer across helper methods so the

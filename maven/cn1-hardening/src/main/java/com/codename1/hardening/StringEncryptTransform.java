@@ -80,6 +80,8 @@ public final class StringEncryptTransform {
     private static final int MAX_CLINIT_CHUNK_BYTES = 48000;
     /** Widest encoding of one INVOKESTATIC helper call prepended to <clinit>. */
     private static final int CLINIT_CALL_BYTES = 5;
+    /** Widest encoding of the per-access decoder INVOKESTATIC inserted after an LDC. */
+    private static final int DECODER_CALL_BYTES = 5;
 
     private final boolean encryptAllStrings;
     private final int seed;
@@ -91,6 +93,7 @@ public final class StringEncryptTransform {
     private int oversizedLiteralCount;
     private int condyLiteralCount;
     private int clinitFullLiteralCount;
+    private int methodFullLiteralCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -197,6 +200,16 @@ public final class StringEncryptTransform {
         return clinitFullLiteralCount;
     }
 
+    /**
+     * The number of literals left plaintext because encrypting them per access would have pushed the
+     * enclosing method past the 65,535-byte limit. Only the interface path decodes per access (a class's
+     * literals are hoisted to {@code <clinit>}, which does not grow the method body), so this is rare;
+     * reported rather than aborting the build on a valid input class.
+     */
+    public int getMethodFullLiteralCount() {
+        return methodFullLiteralCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
@@ -289,23 +302,32 @@ public final class StringEncryptTransform {
     private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base, boolean isInterface,
                                           String decoderName) {
         boolean changed = false;
+        // Each rewrite inserts an INVOKESTATIC, growing the method. A method already near the limit
+        // cannot take unbounded rewrites, so track the running size and stop (leaving the remaining
+        // literals plaintext, reported) before the method would overflow, rather than aborting the build.
+        int currentBytes = MethodSize.estimateBytes(mn.instructions);
         AbstractInsnNode insn = mn.instructions.getFirst();
         while (insn != null) {
             AbstractInsnNode next = insn.getNext();
             if (insn instanceof LdcInsnNode) {
                 LdcInsnNode ldc = (LdcInsnNode) insn;
                 if (ldc.cst instanceof String && shouldEncryptLiteral((String) ldc.cst)) {
-                    String plain = (String) ldc.cst;
-                    // shouldEncrypt already rejected any value whose ciphertext could overflow the
-                    // constant pool, using a class-independent bound, so the encode result fits.
-                    ldc.cst = encode(plain, base);
-                    // The itf flag must be true when the decoder lives in an interface, or the JVM
-                    // writes a Methodref instead of an InterfaceMethodref and throws
-                    // IncompatibleClassChangeError at run time.
-                    mn.instructions.insert(ldc, new MethodInsnNode(
-                            Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
-                    encryptedCount++;
-                    changed = true;
+                    if (currentBytes + DECODER_CALL_BYTES > MethodSize.SAFE_LIMIT) {
+                        methodFullLiteralCount++;
+                    } else {
+                        String plain = (String) ldc.cst;
+                        // shouldEncrypt already rejected any value whose ciphertext could overflow the
+                        // constant pool, using a class-independent bound, so the encode result fits.
+                        ldc.cst = encode(plain, base);
+                        // The itf flag must be true when the decoder lives in an interface, or the JVM
+                        // writes a Methodref instead of an InterfaceMethodref and throws
+                        // IncompatibleClassChangeError at run time.
+                        mn.instructions.insert(ldc, new MethodInsnNode(
+                                Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
+                        currentBytes += DECODER_CALL_BYTES;
+                        encryptedCount++;
+                        changed = true;
+                    }
                 }
             }
             insn = next;
