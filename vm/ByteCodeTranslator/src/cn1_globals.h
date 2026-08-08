@@ -1355,6 +1355,18 @@ typedef struct CN1BibopPage {
                                           //  idempotent across parallel markers)
     int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
                                           //  full walk (GC-thread only)
+    JAVA_BOOLEAN gcMajorSpliced;          // pulled from a PARTIAL pool by the major sweep, so
+                                          //  its slots are a one-off deep-sweep sample rather
+                                          //  than the steady-state retirement sample the
+                                          //  adaptive trigger is calibrated on (see
+                                          //  cn1BibopAdaptAfterSweep). Transient: set at the
+                                          //  splice, cleared as the sweep reaches the page
+    JAVA_BOOLEAN gcPageReleased;          // the slot region has been handed back to the OS
+                                          //  (madvise) and must be re-acquired before use.
+                                          //  Only ever set on a page that is unreachable
+                                          //  from every pool, then published with the page
+                                          //  onto bibopReleasedPool under bibopMutex, so
+                                          //  no lock-free reader can observe it in flight
 #ifdef CN1_GRACE_AUDIT
     int gcAuditSnapshot;                  // QA builds only: bumpIndex at mark start.
                                           //  Relaxed __atomic access everywhere -- the
