@@ -99,6 +99,26 @@ public final class JarDemuxer {
                         // the .SF the JVM no longer verifies, which is correct for a rewritten jar.
                         continue;
                     } else {
+                        // Every non-class entry -- resources, native bundles, AND any .java/.kt/.swift/
+                        // .m/.h/.cs source a CN1Lib bundles -- is carried byte-for-byte. Carrying a
+                        // .java/.kt source unchanged while the engine renames classes is SAFE and cannot
+                        // produce a "cannot find symbol" against the renamed jar, because no builder ever
+                        // javac-compiles an unzip'd source against an engine-renamed classpath:
+                        //   - Android: the engine does NOT rename (AndroidGradleBuilder.hardeningRename-
+                        //     Supported()==false -> renameEnabled=false). R8 is the sole renamer and runs
+                        //     AFTER javac has compiled the app classes together with any bundled native
+                        //     sources, so R8 renames the whole set consistently -- imports still resolve.
+                        //   - iOS/mac/watch/tv: unzip routes these sources into the RESOURCE tree
+                        //     (IPhoneBuilder passes resDir as unzip's sourceDir); the only javac compiles
+                        //     the generated stub dir, never the carried sources. Native impls are Obj-C.
+                        //   - win/linux: javac compiles only the ParparVM translator-GENERATED .java,
+                        //     emitted from already-renamed bytecode, so it is internally consistent.
+                        //   - javascript: javac targets the JS port's own sources against staged classes;
+                        //     bundled app native sources are .js, and string encryption is off on JS.
+                        //   - javase/desktop: runs the bytecode directly and recompiles no sources.
+                        // So there is no rename-vs-source mismatch to guard; a source-text keep scanner
+                        // would be dead code. Revisit only if a builder starts compiling unzip's sourceDir
+                        // against an engine-renamed classpath.
                         nonClass.put(name, data);
                     }
                 }
