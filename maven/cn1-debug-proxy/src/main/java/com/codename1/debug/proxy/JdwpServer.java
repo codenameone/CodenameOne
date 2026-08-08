@@ -128,7 +128,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     // threads that had already hit a breakpoint.
     private final Map<Long, ThreadInfo> deviceThreads = new ConcurrentHashMap<>();
     // Resolved java.lang.Thread names, cached because naming a thread costs a
-    // field read plus a string read on the device.
+    // field read plus a string read on the device. Cleared on every
+    // authoritative thread list so a rename is picked up.
     private final Map<Long, String> threadNames = new ConcurrentHashMap<>();
     // ClassPrepare requests the IDE has registered, by request id. IntelliJ and
     // NetBeans defer any breakpoint they could not resolve to one of these, so
@@ -160,6 +161,16 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         /** ClassExclude patterns. */
         final List<String> excludes;
         /**
+         * Count: report only the Nth match and then disable the request, or 0
+         * for no limit.
+         *
+         * The spec suppresses the first N-1 times the filter is satisfied and
+         * deletes the request once it reports. Skipping the modifier meant a
+         * counted request fired for every match instead of one, and stayed
+         * armed afterwards.
+         */
+        int countRemaining;
+        /**
          * SourceNameMatch patterns, compared against a class's source file.
          *
          * Every one must match: JDWP modifiers are conjunctive, and the
@@ -185,13 +196,15 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
         ClassPrepareRequest(int requestId, int suspendPolicy,
                             List<String> includes, List<String> excludes,
-                            List<String> sourceNames, int onlyClassId) {
+                            List<String> sourceNames, int onlyClassId,
+                            int countRemaining) {
             this.requestId = requestId;
             this.suspendPolicy = suspendPolicy;
             this.includes = includes;
             this.excludes = excludes;
             this.sourceNames = sourceNames;
             this.onlyClassId = onlyClassId;
+            this.countRemaining = countRemaining;
         }
 
         /**
@@ -1197,6 +1210,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 List<String> classExcludes = new ArrayList<>();
                 List<String> sourceNameMatches = new ArrayList<>();
                 int onlyClassId = -1;
+                int eventCount = 0;
                 for (int i = 0; i < modCount && !badModifier; i++) {
                     if (off >= p.length) { badModifier = true; break; }
                     int modKind = p[off] & 0xff; off += 1;
@@ -1213,6 +1227,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     switch (modKind) {
                         case 1: { // Count
                             if (off + 4 > p.length) { badModifier = true; break; }
+                            // Retained: an unlimited request where the client
+                            // asked for one event is the same class of bug as
+                            // the dropped class filters above.
+                            eventCount = readInt(p, off);
                             off += 4; break;
                         }
                         case 2: { // ConditionalExpression (deprecated) — exprID
@@ -1333,7 +1351,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 } else if (eventKind == EK_CLASS_PREPARE) {
                     ClassPrepareRequest cpr = new ClassPrepareRequest(
                             rid, suspendPolicy, classIncludes, classExcludes,
-                            sourceNameMatches, onlyClassId);
+                            sourceNameMatches, onlyClassId, eventCount);
                     classPrepareRequests.put(rid, cpr);
                     // The reply has to reach the IDE before the events do, so
                     // the already-loaded classes are replayed after it below.
@@ -1415,9 +1433,17 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private void replayClassPrepare(ClassPrepareRequest cpr) {
         if (symbols == null) return;
         int fired = 0;
+        boolean exhausted = false;
         for (SymbolTable.ClassInfo c : symbols.allClasses()) {
             String dotted = c.jvmName.replace('/', '.');
             if (!cpr.accepts(c.classId, dotted, c.sourceFile, symbols)) continue;
+            if (cpr.countRemaining > 0) {
+                // The spec reports only the Nth satisfaction and then deletes
+                // the request; the first N-1 are swallowed.
+                cpr.countRemaining--;
+                if (cpr.countRemaining > 0) continue;
+                exhausted = true;
+            }
             try {
                 Buf b = new Buf();
                 b.writeByte(SP_NONE);
@@ -1435,6 +1461,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 System.err.println("[jdwp] failed to send CLASS_PREPARE: " + e.getMessage());
                 return;
             }
+            if (exhausted) break;
+        }
+        if (exhausted) {
+            classPrepareRequests.remove(cpr.requestId);
         }
         System.out.println("[jdwp] CLASS_PREPARE rid=" + cpr.requestId
                 + " matched " + fired + " class(es)"
@@ -1974,7 +2004,12 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             boolean stillSuspended = suspended[i] || (was != null && was.suspended);
             deviceThreads.put(threadIds[i], new ThreadInfo(stillSuspended, threadObjects[i]));
         }
-        threadNames.keySet().retainAll(deviceThreads.keySet());
+        // Names are dropped wholesale, not just for threads that died. A live
+        // thread can be renamed -- pools do it per task -- and a name cached
+        // from the first query would otherwise label it wrongly for the rest
+        // of its life. Re-resolved on the next query after each refresh, which
+        // costs a field read and a string read per thread the IDE asks about.
+        threadNames.clear();
         // The device's list is authoritative whenever it arrives, so a thread
         // missing from it has died. Pruning here keeps the event-derived set
         // bounded and stops a dead worker reappearing through the fallback in

@@ -258,6 +258,51 @@ public class JdwpClassPrepareTest {
         }
     }
 
+    /**
+     * A Count modifier reports only the Nth match, then the request is gone.
+     *
+     * <p>The spec swallows the first N-1 satisfactions and deletes the request
+     * once it reports. Skipping the modifier meant a client asking for one
+     * event got one per matching class, and the request stayed armed.</p>
+     */
+    @Test
+    public void aCountModifierReportsOnlyTheNthMatch() throws Exception {
+        try (Fixture f = new Fixture()) {
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[] { "com.example.*" },
+                            new String[0], -1L, new String[0], 2));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertEquals("exactly one event, for the second match",
+                    1, f.preparedSignatures(rid).size());
+        }
+    }
+
+    /** A count of one reports the first match and no more. */
+    @Test
+    public void aCountOfOneReportsTheFirstMatchOnly() throws Exception {
+        try (Fixture f = new Fixture()) {
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[] { "com.example.*" },
+                            new String[0], -1L, new String[0], 1));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertEquals(1, f.preparedSignatures(rid).size());
+        }
+    }
+
+    /** Without one, every match still fires. */
+    @Test
+    public void withoutACountEveryMatchFires() throws Exception {
+        try (Fixture f = new Fixture()) {
+            int rid = f.registerClassPrepare(new String[] { "com.example.*" }, new String[0]);
+
+            assertEquals(4, f.preparedSignatures(rid).size());
+        }
+    }
+
     // ---- fixture -----------------------------------------------------------
 
     private static final class Fixture implements AutoCloseable {
