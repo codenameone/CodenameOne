@@ -188,6 +188,7 @@ public final class HardeningEngine {
         int condyLiterals = 0;
         int clinitFullLiterals = 0;
         int methodFullLiterals = 0;
+        int annotationLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -214,6 +215,7 @@ public final class HardeningEngine {
                 condyLiterals += t.getCondyLiteralCount();
                 clinitFullLiterals += t.getClinitFullLiteralCount();
                 methodFullLiterals += t.getMethodFullLiteralCount();
+                annotationLiterals += t.getAnnotationLiteralCount();
             }
         }
 
@@ -340,6 +342,14 @@ public final class HardeningEngine {
             result.getWarnings().add(methodFullLiterals + " string literal(s) were left in plaintext "
                     + "because their enclosing method is already near the 65535-byte limit and the "
                     + "per-access decode call would overflow it");
+        }
+        if (stringsApplied && annotationLiterals > 0) {
+            // Annotation element values live in the annotation metadata, not an LDC or a ConstantValue,
+            // so no encryption channel reaches them. CN1 has no reflection to read them back, so this is
+            // a disclosure note; don't put a secret in an annotation and expect it hidden.
+            result.getWarnings().add(annotationLiterals + " string(s) in annotation values/defaults were "
+                    + "not encrypted (they live in annotation metadata, not code); do not place a secret "
+                    + "in an annotation");
         }
         if (controlFlowApplied && oversizedGuardMethods > 0) {
             result.getWarnings().add(oversizedGuardMethods + " method(s) were left with plain control "

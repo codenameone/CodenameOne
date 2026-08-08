@@ -368,6 +368,52 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void annotationStringsAreCountedAsExcluded() throws Exception {
+        // Strings in annotation element values/arrays live in the annotation metadata, not an LDC or a
+        // ConstantValue, so no channel encrypts them. They must be counted (and stay plaintext); an enum
+        // reference is not a string literal and must NOT be counted.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Annotated", null, "java/lang/Object", null);
+        org.objectweb.asm.AnnotationVisitor av = w.visitAnnotation("Lapp/Anno;", true);
+        av.visit("secret", "a class annotation secret value");
+        org.objectweb.asm.AnnotationVisitor arr = av.visitArray("list");
+        arr.visit(null, "an array annotation value");
+        arr.visitEnd();
+        av.visitEnum("kind", "Lapp/Kind;", "FOO"); // enum reference -- not a string literal
+        av.visitEnd();
+        org.objectweb.asm.FieldVisitor fv = w.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE,
+                "f", "I", null, null);
+        org.objectweb.asm.AnnotationVisitor fav = fv.visitAnnotation("Lapp/Anno;", true);
+        fav.visit("fieldSecret", "a field annotation secret value");
+        fav.visitEnd();
+        fv.visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 9);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("the three distinct annotation strings are counted, the enum ref is not",
+                3, t.getAnnotationLiteralCount());
+        // The annotation string survives verbatim in the constant pool (no channel encrypts it).
+        assertTrue("annotation strings stay plaintext (no channel reaches them)",
+                containsRawBytes(out, "a class annotation secret value"));
+    }
+
+    private static boolean containsRawBytes(byte[] haystack, String needle) throws Exception {
+        byte[] n = needle.getBytes("UTF-8");
+        outer:
+        for (int i = 0; i + n.length <= haystack.length; i++) {
+            for (int j = 0; j < n.length; j++) {
+                if (haystack[i + j] != n[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @Test
     public void interfaceMethodTooLargeSkipsAndReportsLiterals() throws Exception {
         // The interface path decodes per access (an INVOKESTATIC after each LDC). A method already near
         // the limit cannot take those, so its literals are left plaintext and reported; a normal method

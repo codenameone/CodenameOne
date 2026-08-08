@@ -30,6 +30,7 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -94,6 +95,7 @@ public final class StringEncryptTransform {
     private int condyLiteralCount;
     private int clinitFullLiteralCount;
     private int methodFullLiteralCount;
+    private int annotationLiteralCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -210,6 +212,18 @@ public final class StringEncryptTransform {
         return methodFullLiteralCount;
     }
 
+    /**
+     * The number of distinct string values the current mode would encrypt that are stored in annotation
+     * element values or annotation defaults. javac keeps those in the annotation metadata, not as an
+     * {@code LDC} or a field {@code ConstantValue}, so no encryption channel reaches them; they stay
+     * readable. Counted and reported so an {@code strings:all} build is not believed to have encrypted
+     * every string. (Codename One has no runtime reflection to read an annotation value back, so this is
+     * a disclosure note, not a correctness risk.)
+     */
+    public int getAnnotationLiteralCount() {
+        return annotationLiteralCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
@@ -251,6 +265,7 @@ public final class StringEncryptTransform {
         // silently shipped.
         concatLiteralCount += countConcatLiterals(cn);
         condyLiteralCount += countCondyLiterals(cn);
+        annotationLiteralCount += countAnnotationStrings(cn);
         // Count the distinct literals that would be encrypted but are too large to (their ciphertext
         // could overflow the constant pool), so the engine can report the exclusion rather than let an
         // strings:all build claim it encrypted everything.
@@ -432,6 +447,79 @@ public final class StringEncryptTransform {
             }
         }
         return false;
+    }
+
+    /**
+     * Counts the distinct string values the current mode would encrypt that live in annotation element
+     * values or defaults (see {@link #getAnnotationLiteralCount()}). Walks class, field, method and
+     * parameter annotations plus method annotation defaults, recursing into nested annotations and array
+     * values; skips enum references ({@code String[]}) and {@code Type}, which are not string literals.
+     */
+    private int countAnnotationStrings(ClassNode cn) {
+        java.util.Set<String> found = new java.util.HashSet<String>();
+        collectAnnotations(cn.visibleAnnotations, found);
+        collectAnnotations(cn.invisibleAnnotations, found);
+        if (cn.fields != null) {
+            for (FieldNode f : cn.fields) {
+                collectAnnotations(f.visibleAnnotations, found);
+                collectAnnotations(f.invisibleAnnotations, found);
+            }
+        }
+        if (cn.methods != null) {
+            for (MethodNode m : cn.methods) {
+                collectAnnotations(m.visibleAnnotations, found);
+                collectAnnotations(m.invisibleAnnotations, found);
+                collectParameterAnnotations(m.visibleParameterAnnotations, found);
+                collectParameterAnnotations(m.invisibleParameterAnnotations, found);
+                collectAnnotationValue(m.annotationDefault, found);
+            }
+        }
+        return found.size();
+    }
+
+    private void collectAnnotations(java.util.List<AnnotationNode> list, java.util.Set<String> out) {
+        if (list == null) {
+            return;
+        }
+        for (AnnotationNode an : list) {
+            collectAnnotationNode(an, out);
+        }
+    }
+
+    private void collectParameterAnnotations(java.util.List<AnnotationNode>[] params,
+                                             java.util.Set<String> out) {
+        if (params == null) {
+            return;
+        }
+        for (java.util.List<AnnotationNode> list : params) {
+            collectAnnotations(list, out);
+        }
+    }
+
+    private void collectAnnotationNode(AnnotationNode an, java.util.Set<String> out) {
+        if (an == null || an.values == null) {
+            return;
+        }
+        // values is a flat [name, value, name, value, ...] list; only the values can hold strings.
+        for (int i = 1; i < an.values.size(); i += 2) {
+            collectAnnotationValue(an.values.get(i), out);
+        }
+    }
+
+    private void collectAnnotationValue(Object value, java.util.Set<String> out) {
+        if (value instanceof String) {
+            if (modeSelectsLiteral((String) value)) {
+                out.add((String) value);
+            }
+        } else if (value instanceof AnnotationNode) {
+            collectAnnotationNode((AnnotationNode) value, out);
+        } else if (value instanceof java.util.List) {
+            for (Object e : (java.util.List<?>) value) {
+                collectAnnotationValue(e, out);
+            }
+        }
+        // A String[] is an enum reference {descriptor, constant} and a Type is a class literal -- neither
+        // is a user string literal, so both are left uncounted.
     }
 
     /**
