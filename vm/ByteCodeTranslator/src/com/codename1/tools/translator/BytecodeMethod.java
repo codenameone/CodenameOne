@@ -1402,7 +1402,13 @@ public class BytecodeMethod implements SignatureSet {
             if (a.getIndex() != b.getIndex()) {
                 return a.getIndex() - b.getIndex();
             }
-            return a.getQualifier() - b.getQualifier();
+            if (a.getQualifier() != b.getQualifier()) {
+                return a.getQualifier() - b.getQualifier();
+            }
+            // Two declarations can share both: disjoint blocks reusing a slot
+            // for the same type. Declaration order breaks the tie, so the
+            // emitted table does not depend on hash order.
+            return a.getSequence() - b.getSequence();
         }
     };
 
@@ -2347,11 +2353,19 @@ public class BytecodeMethod implements SignatureSet {
         localVariables.add(lv);
     }
 
-    /** Drops the store-synthesised placeholder a real declaration supersedes. */
+    /**
+     * Drops the store-synthesised placeholder a real declaration supersedes.
+     *
+     * Matched on storage rather than with equals, which now also compares
+     * scope — a placeholder has none, so it would never equal the declaration
+     * that replaces it.
+     */
     private void replaceSyntheticLocalVariable(LocalVariable replacement) {
         for (Iterator<LocalVariable> it = localVariables.iterator(); it.hasNext();) {
             LocalVariable existing = it.next();
-            if (existing.getScopeStart() == null && existing.equals(replacement)) {
+            if (existing.getScopeStart() == null
+                    && existing.getIndex() == replacement.getIndex()
+                    && existing.getQualifier() == replacement.getQualifier()) {
                 it.remove();
                 return;
             }

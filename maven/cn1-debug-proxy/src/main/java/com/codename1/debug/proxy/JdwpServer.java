@@ -158,12 +158,24 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         final List<String> includes;
         /** ClassExclude patterns. */
         final List<String> excludes;
+        /**
+         * ClassOnly: the single class the request is restricted to, or -1.
+         *
+         * A client may pin a request to one type by reference id rather than
+         * by name pattern. Dropping it left the request with no patterns at
+         * all, which reads as "every class" — so a request for one type
+         * replayed the entire symbol table at the IDE.
+         */
+        final int onlyClassId;
+
         ClassPrepareRequest(int requestId, int suspendPolicy,
-                            List<String> includes, List<String> excludes) {
+                            List<String> includes, List<String> excludes,
+                            int onlyClassId) {
             this.requestId = requestId;
             this.suspendPolicy = suspendPolicy;
             this.includes = includes;
             this.excludes = excludes;
+            this.onlyClassId = onlyClassId;
         }
 
         /**
@@ -177,7 +189,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             return pattern.equals(className);
         }
 
-        boolean accepts(String className) {
+        boolean accepts(int classId, String className) {
+            if (onlyClassId >= 0 && classId != onlyClassId) return false;
             for (String ex : excludes) {
                 if (matches(ex, className)) return false;
             }
@@ -1143,6 +1156,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 boolean badModifier = false;
                 List<String> classIncludes = new ArrayList<>();
                 List<String> classExcludes = new ArrayList<>();
+                int onlyClassId = -1;
                 for (int i = 0; i < modCount && !badModifier; i++) {
                     if (off >= p.length) { badModifier = true; break; }
                     int modKind = p[off] & 0xff; off += 1;
@@ -1171,6 +1185,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                         }
                         case 4: { // ClassOnly (refTypeID)
                             if (off + 8 > p.length) { badModifier = true; break; }
+                            // Retained: for a ClassPrepare request this is the
+                            // whole restriction, and dropping it turns a
+                            // one-class request into an all-classes one.
+                            onlyClassId = fromJdwpRef(readLong(p, off));
                             off += 8; break;
                         }
                         case 5: case 6: { // ClassMatch, ClassExclude (string)
@@ -1270,7 +1288,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     }
                 } else if (eventKind == EK_CLASS_PREPARE) {
                     ClassPrepareRequest cpr = new ClassPrepareRequest(
-                            rid, suspendPolicy, classIncludes, classExcludes);
+                            rid, suspendPolicy, classIncludes, classExcludes, onlyClassId);
                     classPrepareRequests.put(rid, cpr);
                     // The reply has to reach the IDE before the events do, so
                     // the already-loaded classes are replayed after it below.
@@ -1354,7 +1372,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         int fired = 0;
         for (SymbolTable.ClassInfo c : symbols.allClasses()) {
             String dotted = c.jvmName.replace('/', '.');
-            if (!cpr.accepts(dotted)) continue;
+            if (!cpr.accepts(c.classId, dotted)) continue;
             try {
                 Buf b = new Buf();
                 b.writeByte(SP_NONE);
@@ -1375,7 +1393,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         }
         System.out.println("[jdwp] CLASS_PREPARE rid=" + cpr.requestId
                 + " matched " + fired + " class(es)"
-                + (cpr.includes.isEmpty() ? "" : " for " + cpr.includes));
+                + (cpr.includes.isEmpty() ? "" : " for " + cpr.includes)
+                + (cpr.onlyClassId >= 0 ? " restricted to classId " + cpr.onlyClassId : ""));
     }
 
     private void handleObject(int id, int cmd, byte[] p) throws IOException {

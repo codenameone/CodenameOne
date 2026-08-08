@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -355,6 +356,48 @@ class OnDeviceDebugFrameTableTest {
         assertTrue(anyScoped, "the fixture should produce at least one scoped local");
     }
 
+    /**
+     * Two locals of the same type sharing a slot each keep their own row.
+     *
+     * <p>The set that holds locals keyed them by slot and storage qualifier,
+     * so consecutive blocks each declaring an {@code int} collapsed to one
+     * entry. That was survivable while every local was reported live for the
+     * whole method — they share one storage location anyway — but once a local
+     * is filtered to its own scope it is not: in the second block the debugger
+     * would have had no row to show, so the variable would simply be absent
+     * from the IDE rather than merely misnamed.</p>
+     */
+    @Test
+    void twoLocalsOfTheSameTypeSharingASlotEachKeepTheirOwnRow() throws Exception {
+        FrameTable table = frameTableOf(translateHost(), "handler");
+
+        List<Row> slotFive = new ArrayList<>();
+        for (Row r : table.rows) {
+            if (r.slot == 5) slotFive.add(r);
+        }
+        assertEquals(2, slotFive.size(),
+                "both declarations for slot 5 should be described, was:\n" + table);
+
+        Row live = null;
+        for (Row r : slotFive) {
+            if (r.liveAt(INT_SCOPE_LINE)) {
+                assertNull(live, "only one may be live at a line, was:\n" + table);
+                live = r;
+            }
+        }
+        assertNotNull(live, "one of them must be live in the first block, was:\n" + table);
+
+        Row liveLater = null;
+        for (Row r : slotFive) {
+            if (r.liveAt(REF_SCOPE_LINE)) {
+                assertNull(liveLater, "only one may be live at a line, was:\n" + table);
+                liveLater = r;
+            }
+        }
+        assertNotNull(liveLater, "and the other in the second block, was:\n" + table);
+        assertTrue(live != liveLater, "they must be different rows, was:\n" + table);
+    }
+
     // ---- parsing the generated C ------------------------------------------
 
     private static final class Row {
@@ -565,6 +608,8 @@ class OnDeviceDebugFrameTableTest {
         handler.visitLabel(start);
         handler.visitLineNumber(INT_SCOPE_LINE, start);
         handler.visitInsn(Opcodes.ICONST_1);
+        handler.visitVarInsn(Opcodes.ISTORE, 5);        // int first — slot 5
+        handler.visitInsn(Opcodes.ICONST_1);
         handler.visitVarInsn(Opcodes.ISTORE, 2);        // int count
         handler.visitVarInsn(Opcodes.ILOAD, 2);
         handler.visitVarInsn(Opcodes.ISTORE, 3);        // int copy
@@ -574,6 +619,8 @@ class OnDeviceDebugFrameTableTest {
         handler.visitVarInsn(Opcodes.ASTORE, 2);        // String label — same slot
         handler.visitVarInsn(Opcodes.ALOAD, 2);
         handler.visitVarInsn(Opcodes.ASTORE, 4);        // Object held
+        handler.visitInsn(Opcodes.ICONST_2);
+        handler.visitVarInsn(Opcodes.ISTORE, 5);        // int second — slot 5 again
         Label lastStatement = new Label();
         handler.visitLabel(lastStatement);
         handler.visitLineNumber(METHOD_END_LINE, lastStatement);
@@ -587,7 +634,10 @@ class OnDeviceDebugFrameTableTest {
         handler.visitLocalVariable("copy", "I", null, start, end, 3);
         handler.visitLocalVariable("label", "Ljava/lang/String;", null, midpoint, end, 2);
         handler.visitLocalVariable("held", "Ljava/lang/Object;", null, midpoint, end, 4);
-        handler.visitMaxs(2, 5);
+        // Two ints of the same type sharing slot 5 in disjoint blocks.
+        handler.visitLocalVariable("first", "I", null, start, midpoint, 5);
+        handler.visitLocalVariable("second", "I", null, midpoint, end, 5);
+        handler.visitMaxs(2, 6);
         handler.visitEnd();
 
         MethodVisitor ping = cw.visitMethod(

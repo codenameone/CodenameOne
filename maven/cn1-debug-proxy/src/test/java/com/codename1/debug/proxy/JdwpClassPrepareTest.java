@@ -158,6 +158,43 @@ public class JdwpClassPrepareTest {
         }
     }
 
+    /**
+     * A request pinned to one type by ClassOnly fires only for that type.
+     *
+     * <p>The modifier was parsed for its width and discarded, so a request
+     * carrying it and no name pattern was left with nothing to match on —
+     * which reads as "every class". A client asking about one type got a
+     * prepare event for the whole symbol table.</p>
+     */
+    @Test
+    public void aClassOnlyRestrictionIsHonoured() throws Exception {
+        try (Fixture f = new Fixture()) {
+            // classId 1 (Main$1) arrives as JDWP reference id 2.
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[0], new String[0], 2L));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertEquals(Collections.singletonList("Lcom/example/Main$1;"),
+                    f.preparedSignatures(rid));
+        }
+    }
+
+    /** ClassOnly and a pattern together intersect rather than either winning. */
+    @Test
+    public void aClassOnlyRestrictionCombinesWithAPattern() throws Exception {
+        try (Fixture f = new Fixture()) {
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[] { "java.*" },
+                            new String[0], 2L));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertTrue("a pattern that excludes the pinned class yields nothing",
+                    f.preparedSignatures(rid).isEmpty());
+        }
+    }
+
     // ---- fixture -----------------------------------------------------------
 
     private static final class Fixture implements AutoCloseable {

@@ -191,12 +191,22 @@ final class JdwpTestClient implements AutoCloseable {
 
     /** EventRequest.Set for a ClassPrepare with the given include/exclude patterns. */
     static byte[] classPrepareRequest(int suspendPolicy, String[] includes, String[] excludes) {
+        return classPrepareRequest(suspendPolicy, includes, excludes, -1);
+    }
+
+    /** {@code onlyClassJdwpId} of -1 omits the ClassOnly modifier. */
+    static byte[] classPrepareRequest(int suspendPolicy, String[] includes,
+                                      String[] excludes, long onlyClassJdwpId) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream b = new DataOutputStream(bytes);
         try {
             b.writeByte(EK_CLASS_PREPARE);
             b.writeByte(suspendPolicy);
-            b.writeInt(includes.length + excludes.length);
+            b.writeInt(includes.length + excludes.length + (onlyClassJdwpId >= 0 ? 1 : 0));
+            if (onlyClassJdwpId >= 0) {
+                b.writeByte(4);   // ClassOnly
+                b.writeLong(onlyClassJdwpId);
+            }
             for (String pattern : includes) {
                 b.writeByte(MOD_CLASS_MATCH);
                 writeString(b, pattern);
