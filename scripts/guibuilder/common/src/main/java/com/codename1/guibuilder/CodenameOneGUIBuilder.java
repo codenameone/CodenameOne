@@ -707,8 +707,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param what a short description of what is about to happen, for the prompt
      * @return true when the caller may proceed
      */
-    private boolean confirmDiscardEditorBuffer(String what) {
+    private boolean confirmDiscardEditorBuffer(String what, String opening) {
+        // Reopening the pane already on screen is not a discard -- it reloads the same file, and
+        // prompting there made openCss() bail out while activeCodeEditor still referenced the
+        // previous editor, so typing went into a detached one and live restyling stopped.
         if (reopeningEditor || !editorBufferIsDirty()) return true;
+        if (opening != null && opening.equals(editorBufferKind)) return true;
         if (com.codename1.ui.Dialog.show("Unsaved changes",
                 "The open editor has changes you have not saved. " + what + " discards them.",
                 "Discard", "Keep editing")) {
@@ -3169,7 +3173,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             fields.add(booleanProperty("Infinite progress", "infinite", false));
         }
         if ("Tabs".equals(type)) {
-            fields.add(propertyField("Selected tab index", "selectedIndex", "0"));
+            // Bounded by the tabs that exist: the preview clamps an out-of-range value to the last
+            // tab while appendGeneratedTabState() refuses to emit one at all, so the saved form
+            // opened on the first tab and did not match the canvas.
+            int tabCount = Math.max(1, GuiDocument.componentsIn(element).size());
+            fields.add(numericPropertyField("Selected tab index", "selectedIndex", "0", 0, tabCount - 1));
             fields.add(pickerProperty("Tab placement", "tabPlacement",
                     new String[]{"top", "bottom", "left", "right"}, "top"));
         }
@@ -3318,7 +3326,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             fields.add(fieldLabel("Order in parent"));
             fields.add(order);
         }
-        if (GuiDocument.acceptsChildren(element)) {
+        // Tabs and Accordion build their own composite layout in both the preview and the
+        // generated source, so the stored layout is never applied; offering the picker only let the
+        // user dirty and save the document with no effect anywhere.
+        String childType = value(element, "type", "Container");
+        if (GuiDocument.acceptsChildren(element)
+                && !"Tabs".equals(childType) && !"Accordion".equals(childType)) {
             Picker layout = stringPicker(new String[]{"BoxLayout", "BorderLayout", "FlowLayout", "GridLayout", "TableLayout", "LayeredLayout"}, document.attribute("layout", "BoxLayout"));
             layout.addActionListener(e -> changeLayout(element, layout));
             fields.add(fieldLabel("Container layout"));
@@ -4311,7 +4324,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void refreshProject() {
-        if (!confirmDiscardEditorBuffer("Reloading the project")) return;
+        if (!confirmDiscardEditorBuffer("Reloading the project", null)) return;
         guiFiles = ProjectIO.findGuiFiles(binding.guiDir());
         refreshForms();
         if (document == null) return;
@@ -4341,7 +4354,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void openCss() {
         if (binding == null || binding.cssFile() == null) return;
-        if (!confirmDiscardEditorBuffer("Opening the stylesheet")) return;
+        if (!confirmDiscardEditorBuffer("Opening the stylesheet", "css")) return;
         try {
             refreshEditor();
             String css = ProjectIO.read(binding.cssFile());
@@ -4409,7 +4422,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void openBindingModel() {
         if (document == null || binding == null || binding.sourceDir() == null) return;
-        if (!confirmDiscardEditorBuffer("Opening the binding model")) return;
+        if (!confirmDiscardEditorBuffer("Opening the binding model", "model")) return;
         String formPath = companionSourcePath();
         String modelPath = formPath.substring(0, formPath.length() - 5) + "Model.java";
         try {
@@ -4450,7 +4463,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void openSourceEditor(String handler) {
         if (document == null || binding == null || binding.sourceDir() == null) return;
-        if (!confirmDiscardEditorBuffer("Opening the companion source")) return;
+        if (!confirmDiscardEditorBuffer("Opening the companion source", "source")) return;
         String sourcePath = companionSourcePath();
         try {
             // Rebuild the canvas first: opening an editor over an already open one would nest
