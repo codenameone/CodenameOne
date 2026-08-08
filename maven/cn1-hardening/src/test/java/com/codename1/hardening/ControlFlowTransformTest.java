@@ -148,6 +148,45 @@ public class ControlFlowTransformTest {
         assertEquals(5, c.getMethod("add", int.class, int.class).invoke(null, 2, 3));
     }
 
+    @Test
+    public void classWithNearFullClinitIsSkippedNotOverflowed() throws Exception {
+        // The guard reads a field initialized in <clinit>. When <clinit> is already near the limit the
+        // setup cannot be added, so guarding would leave the field 0 and every guard would throw. The
+        // whole class must be skipped (reported), not corrupted or aborted with MethodTooLargeException.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/FullClinitGuard", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor clinit = w.visitMethod(org.objectweb.asm.Opcodes.ACC_STATIC,
+                "<clinit>", "()V", null, null);
+        clinit.visitCode();
+        for (int i = 0; i < 31500; i++) { // ~63 KB
+            clinit.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
+            clinit.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        clinit.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        clinit.visitMaxs(1, 0);
+        clinit.visitEnd();
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "add", "(II)I", null, null);
+        m.visitCode();
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 0);
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 1);
+        m.visitInsn(org.objectweb.asm.Opcodes.IADD);
+        m.visitInsn(org.objectweb.asm.Opcodes.IRETURN);
+        m.visitMaxs(2, 2);
+        m.visitEnd();
+        w.visitEnd();
+
+        ControlFlowTransform t = new ControlFlowTransform();
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("no method can be guarded when <clinit> cannot hold the setup", 0, t.getGuardedMethods());
+        assertTrue("the skipped guardable method is reported", t.getOversizedMethods() >= 1);
+        CheckClassAdapter.verify(new ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.FullClinitGuard", out);
+        assertEquals(5, c.getMethod("add", int.class, int.class).invoke(null, 2, 3));
+    }
+
     // Renames the class internal name so the intense variant can load beside the plain one.
     private static byte[] rename(byte[] bytes, String from, String to) {
         org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader(bytes);

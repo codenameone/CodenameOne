@@ -132,39 +132,82 @@ public class PiiScrubber {
     /// form (which every V8/Chrome JavaScript frame also uses), and the
     /// Firefox/Safari `fn@url:line:column` form.
     ///
-    /// Both forms require an actual frame location, not just the leading token: a
+    /// A frame requires the full grammar, not just the leading token and some digits: a
     /// message can wrap onto a line that begins with `at ` (`printStackTrace` puts
-    /// `at account 123456 failed` on its own line) or that merely mentions a file,
-    /// and its id must still be scrubbed. So the `at ` form must carry a
-    /// parenthesized location (`(File.java:42)`, `(url:line:col)`, `(Native Method)`)
-    /// or a bare trailing `:<line>` (ParparVM), and the `@` form must carry an `@`
-    /// and a terminal `:<line>:<column>`.
+    /// `at account 123456 failed:789` on its own line) and its id must still be scrubbed.
+    /// The `at ` form must be a single whitespace-free identity (`<class>.<method>`, a JS
+    /// function ref, or a URL) followed by a real location -- a parenthesized
+    /// `(File.java:42)`/`(url:line:col)`/`(Native Method)`/`(Unknown Source)`, or a bare
+    /// trailing `:<line>` (ParparVM). The `@` form must carry an `@` and a terminal
+    /// `:<line>:<column>`.
     private static boolean isFrameLine(String line) {
         String t = line.trim();
         if (t.startsWith("at ")) {
-            return hasParenLocation(t) || endsWithColonNumber(t);
+            return atFrame(t.substring(3).trim());
         }
         return t.indexOf('@') >= 0 && endsWithLineColumn(t);
     }
 
-    /// True when `t` ends with a genuine parenthesized frame location, not just any parentheses:
-    /// `(File.java:42)` / `(url:line:col)` (content ending in `:<digits>`), or the JVM literals
-    /// `(Native Method)` / `(Unknown Source)`. A message wrapped onto an `at ...` line with an
-    /// incidental parenthetical (`at account 123456 failed (retry)`) does not match, so its digits
-    /// stay subject to scrubbing.
-    private static boolean hasParenLocation(String t) {
-        if (!t.endsWith(")")) {
+    /// The body of an `at ...` line: a whitespace-free identity plus a real location. A message
+    /// continuation such as `account 123456 failed:789` or `account 123456 failed (token:789)` has
+    /// spaces in its identity, so it is not a frame and its digits stay subject to scrubbing.
+    private static boolean atFrame(String rest) {
+        if (rest.length() == 0) {
             return false;
         }
-        int open = t.lastIndexOf('(');
-        if (open < 0) {
+        if (rest.endsWith(")")) {
+            int open = rest.lastIndexOf('(');
+            if (open < 0) {
+                return false;
+            }
+            String inside = rest.substring(open + 1, rest.length() - 1);
+            boolean location = "Native Method".equals(inside) || "Unknown Source".equals(inside)
+                    || endsWithColonNumber(inside);
+            return location && isFrameIdentity(rest.substring(0, open).trim());
+        }
+        int start = trailingLocationStart(rest);
+        return start > 0 && isFrameIdentity(rest.substring(0, start));
+    }
+
+    /// A frame's identity is a single token: non-empty and free of whitespace. A free-form message
+    /// continuation (`account 123456 failed`) has spaces, so it is rejected.
+    private static boolean isFrameIdentity(String id) {
+        if (id.length() == 0) {
             return false;
         }
-        String inside = t.substring(open + 1, t.length() - 1);
-        if ("Native Method".equals(inside) || "Unknown Source".equals(inside)) {
-            return true;
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c == ' ' || c == '\t') {
+                return false;
+            }
         }
-        return endsWithColonNumber(inside);
+        return true;
+    }
+
+    /// Index at which a trailing `:<line>` (optionally `:<line>:<column>`) location begins, or -1
+    /// when the string does not end in one. A single trailing `)` is allowed.
+    private static int trailingLocationStart(String t) {
+        int i = t.length() - 1;
+        if (i >= 0 && t.charAt(i) == ')') {
+            i--;
+        }
+        int start = -1;
+        boolean matched = true;
+        while (matched) {
+            int j = i;
+            int digits = 0;
+            while (j >= 0 && t.charAt(j) >= '0' && t.charAt(j) <= '9') {
+                j--;
+                digits++;
+            }
+            if (digits > 0 && j >= 0 && t.charAt(j) == ':') {
+                start = j;
+                i = j - 1;
+            } else {
+                matched = false;
+            }
+        }
+        return start;
     }
 
     /// True when `t` ends with a `:<digits>` run (a trailing `)` allowed): the

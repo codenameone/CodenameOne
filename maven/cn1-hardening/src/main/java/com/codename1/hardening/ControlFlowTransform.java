@@ -59,6 +59,8 @@ public final class ControlFlowTransform {
 
     /** Widest encoding of one entry guard (GETSTATIC, IFGT, NEW, DUP, INVOKESPECIAL, ATHROW). */
     private static final int GUARD_BYTES = 16;
+    /** Widest encoding of the guard-field setup prepended to {@code <clinit>} (2 calls + PUTSTATIC). */
+    private static final int GUARD_INIT_BYTES = 16;
 
     private final ClassLoader hierarchy;
     private final int intensity;
@@ -109,6 +111,15 @@ public final class ControlFlowTransform {
         // assumption that the collision means it was already transformed.
         String guardField = resolveGuardField(cn);
 
+        // The guards read a field initialized in <clinit>; if <clinit> is already near the method limit
+        // the setup cannot be added, and an uninitialized field is 0 -- which makes every guard take its
+        // dead (throwing) arm. So the whole class cannot be guarded then: skip it (reporting the methods
+        // that stay plain) rather than corrupt behaviour or abort the build with MethodTooLargeException.
+        if (MethodSize.estimateBytes(findClinit(cn)) + GUARD_INIT_BYTES > MethodSize.SAFE_LIMIT) {
+            oversizedMethods += countGuardable(cn);
+            return classBytes;
+        }
+
         boolean changed = false;
         if (cn.methods != null) {
             for (MethodNode mn : cn.methods) {
@@ -139,6 +150,29 @@ public final class ControlFlowTransform {
         ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
         return cw.toByteArray();
+    }
+
+    private static MethodNode findClinit(ClassNode cn) {
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                if ("<clinit>".equals(mn.name) && "()V".equals(mn.desc)) {
+                    return mn;
+                }
+            }
+        }
+        return null;
+    }
+
+    private int countGuardable(ClassNode cn) {
+        int n = 0;
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                if (isGuardable(mn)) {
+                    n++;
+                }
+            }
+        }
+        return n;
     }
 
     private boolean isGuardable(MethodNode mn) {
