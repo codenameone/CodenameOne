@@ -205,6 +205,61 @@ public final class StringEncryptTransform {
         }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
     }
 
+    /**
+     * Collects every string a class contributes to ParparVM's constant pool as an interned-free literal
+     * -- {@code LDC} operands and {@code static final String} {@code ConstantValue}s. Used to gather the
+     * literals of the UNHARDENED library jars: on a ParparVM-C target a compile-time literal is a
+     * constant-pool object that is never interned, while an encrypted app copy is {@code intern()}ed, so
+     * a value encrypted in the app but left plaintext in a library class would compare {@code !=} against
+     * the library copy even though the two equal literals were reference-equal before hardening. The
+     * engine excludes these from encryption so that identity is preserved across the library boundary.
+     */
+    public static void collectAllLiterals(byte[] classBytes, final java.util.Set<String> out) {
+        new ClassReader(classBytes).accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.FieldVisitor visitField(int access, String name, String desc,
+                                                             String sig, Object value) {
+                if (value instanceof String) {
+                    out.add((String) value);
+                }
+                return null;
+            }
+
+            @Override
+            public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc,
+                                                               String sig, String[] exceptions) {
+                return new org.objectweb.asm.MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitLdcInsn(Object cst) {
+                        if (cst instanceof String) {
+                            out.add((String) cst);
+                        }
+                    }
+                };
+            }
+        }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+    }
+
+    /**
+     * Values that appear as plaintext literals in the UNHARDENED library jars. On a ParparVM-C target
+     * encrypting an app copy of one of these would break a valid literal {@code ==} against the library's
+     * (never interned) constant-pool copy, so they are excluded from encryption. Null when there is no
+     * such constraint (a real-JVM/Android target, where every compile-time literal is interned anyway).
+     */
+    private java.util.Set<String> libraryLiterals;
+    /** Distinct values this transform left plaintext because a library class also holds them as a literal. */
+    private final java.util.Set<String> libraryExcludedValues = new java.util.HashSet<String>();
+
+    /** Sets the unhardened-library literal set whose values must stay plaintext to preserve identity. */
+    void setLibraryLiterals(java.util.Set<String> values) {
+        this.libraryLiterals = values;
+    }
+
+    /** The distinct values left plaintext because an unhardened library class also holds them as a literal. */
+    java.util.Set<String> getLibraryExcludedValues() {
+        return libraryExcludedValues;
+    }
+
     public int getEncryptedCount() {
         return encryptedCount;
     }
@@ -1197,6 +1252,12 @@ public final class StringEncryptTransform {
             return false;
         }
         if (jarExcluded != null && jarExcluded.contains(s)) {
+            return false;
+        }
+        if (libraryLiterals != null && libraryLiterals.contains(s)) {
+            // Left plaintext so the app copy stays the same (never-interned) constant-pool object the
+            // unhardened library class uses, preserving a valid literal == across the boundary on ParparVM.
+            libraryExcludedValues.add(s);
             return false;
         }
         if (encryptAllStrings) {

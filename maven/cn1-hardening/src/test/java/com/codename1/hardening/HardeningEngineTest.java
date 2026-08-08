@@ -100,6 +100,89 @@ public class HardeningEngineTest {
         return cw.toByteArray();
     }
 
+    /** A class whose {@code run()} method loads each given string literal (and discards it). */
+    private static byte[] classWithLiterals(String internal, String... literals) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor mv = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "run", "()V", null, null);
+        mv.visitCode();
+        for (String s : literals) {
+            mv.visitLdcInsn(s);
+            mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        mv.visitMaxs(1, 0);
+        mv.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    private File writeJar(String name, String internal, byte[] classBytes) throws Exception {
+        File jar = tmp.newFile(name);
+        FileOutputStream fo = new FileOutputStream(jar);
+        ZipOutputStream zos = new ZipOutputStream(fo);
+        zos.putNextEntry(new ZipEntry(internal + ".class"));
+        zos.write(classBytes);
+        zos.closeEntry();
+        zos.finish();
+        fo.close();
+        return jar;
+    }
+
+    private HardeningResult hardenAppWithLibrary(String platform, String appInternal, String[] appLiterals,
+            String libInternal, String[] libLiterals, String suffix) throws Exception {
+        File appJar = writeJar("app-" + suffix + ".jar", appInternal, classWithLiterals(appInternal, appLiterals));
+        File libJar = writeJar("lib-" + suffix + ".jar", libInternal, classWithLiterals(libInternal, libLiterals));
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "aggressive");
+        hints.put("harden.strings", "all");
+        hints.put("harden.rename", "false");     // isolate string encryption -- no ProGuard dependency
+        hints.put("harden.controlFlow", "false");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(appJar).outputJar(tmp.newFile("out-" + suffix + ".jar"))
+                .mappingFile(tmp.newFile("map-" + suffix + ".txt"))
+                .reportFile(tmp.newFile("report-" + suffix + ".json"))
+                .workDir(tmp.newFolder("work-" + suffix))
+                .config(HardeningConfig.from(hints, platform, true))
+                .mainClass(appInternal.replace('/', '.'));
+        req.addLibraryJar(libJar);
+        return HardeningEngine.harden(req);
+    }
+
+    @Test
+    public void librarySharedLiteralsStayPlaintextOnParparVM() throws Exception {
+        // On a ParparVM-C target a compile-time literal is a never-interned constant-pool object while an
+        // encrypted app copy is intern()ed, so a value that ALSO appears as a literal in an unhardened
+        // library class must be left plaintext or a valid literal == against the library copy (which held
+        // before hardening) would break. A value unique to the app is still encrypted.
+        String shared = "value shared between the app and an unhardened library class";
+        String appOnly = "a secret value that appears only in the application";
+        HardeningResult r = hardenAppWithLibrary("ios", "app/App", new String[]{shared, appOnly},
+                "lib/Lib", new String[]{shared}, "ios");
+        assertTrue(r.isHardened());
+        byte[] app = readAll(r.getHardenedJar()).get("app/App.class");
+        assertTrue("a library-shared literal stays plaintext to preserve == on ParparVM",
+                StringEncryptTransform.containsStringLiteral(app, shared));
+        assertFalse("an app-only literal is still encrypted",
+                StringEncryptTransform.containsStringLiteral(app, appOnly));
+    }
+
+    @Test
+    public void librarySharedLiteralsAreEncryptedOnRealJvm() throws Exception {
+        // On a real-JVM target every compile-time literal is interned to the same pool intern() uses, so
+        // there is no cross-boundary identity hazard: the library scan is skipped and the shared value IS
+        // encrypted (full coverage, no needless plaintext).
+        String shared = "value shared between the app and an unhardened library class";
+        HardeningResult r = hardenAppWithLibrary("javase", "app/App", new String[]{shared},
+                "lib/Lib", new String[]{shared}, "jvm");
+        assertTrue(r.isHardened());
+        byte[] app = readAll(r.getHardenedJar()).get("app/App.class");
+        assertFalse("on a real JVM the shared literal is encrypted (no cross-boundary hazard)",
+                StringEncryptTransform.containsStringLiteral(app, shared));
+    }
+
     private HardeningResult harden(HardeningProfile profile, String platform, boolean renameSupported)
             throws Exception {
         File in = buildInputJar();

@@ -189,6 +189,7 @@ public final class HardeningEngine {
         int clinitFullLiterals = 0;
         int annotationLiterals = 0;
         int jarExcludedLiterals = 0;
+        int libraryExcludedLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -201,6 +202,23 @@ public final class HardeningEngine {
                     StringEncryptTransform.collectConstantValues(cls, constantValues);
                 }
             }
+            // On a ParparVM-C target a compile-time literal is a never-interned constant-pool object,
+            // while an encrypted app copy is intern()ed, so encrypting an app value that ALSO appears as
+            // a literal in an UNHARDENED library class (core, java-runtime, dependencies -- never in
+            // 'renamed') would break a valid literal == against the library copy that held before
+            // hardening. Collect those library literals and exclude them from encryption. On a real-JVM
+            // or Android target every compile-time literal is interned to the same pool intern() uses, so
+            // the constraint does not apply and the scan is skipped (full coverage).
+            java.util.Set<String> libraryLiterals = null;
+            if (translatesThroughParparVMC(cfg.getPlatform()) && req.getLibraryJars() != null) {
+                libraryLiterals = new java.util.HashSet<String>();
+                for (File lib : req.getLibraryJars()) {
+                    collectJarLiterals(lib, libraryLiterals);
+                }
+            }
+            final java.util.Set<String> libLiterals =
+                    libraryLiterals != null && !libraryLiterals.isEmpty() ? libraryLiterals : null;
+            java.util.Set<String> libraryExcluded = new java.util.HashSet<String>();
             // Pass 1 (from a snapshot of the input bytes): transform every class, tally the counts, and
             // collect the values any class could NOT encrypt (a method too full for the decode call, or a
             // class whose pool cannot fit the decoder). A value encrypted+interned in one class but left
@@ -211,8 +229,10 @@ public final class HardeningEngine {
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
                 StringEncryptTransform t = new StringEncryptTransform(
                         cfg.isEncryptAllStrings(), seed, hierarchy, constantValues, null);
+                t.setLibraryLiterals(libLiterals);
                 e.setValue(t.transform(e.getValue()));
                 jarExcluded.addAll(t.getNewlyExcluded());
+                libraryExcluded.addAll(t.getLibraryExcludedValues());
                 encryptedStrings += t.getEncryptedCount();
                 concatLiterals += t.getConcatLiteralCount();
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
@@ -233,10 +253,13 @@ public final class HardeningEngine {
                 condyLiterals = 0;
                 clinitFullLiterals = 0;
                 annotationLiterals = 0;
+                libraryExcluded.clear();
                 for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
                     StringEncryptTransform t = new StringEncryptTransform(
                             cfg.isEncryptAllStrings(), seed, hierarchy, constantValues, jarExcluded);
+                    t.setLibraryLiterals(libLiterals);
                     e.setValue(t.transform(original.get(e.getKey())));
+                    libraryExcluded.addAll(t.getLibraryExcludedValues());
                     encryptedStrings += t.getEncryptedCount();
                     concatLiterals += t.getConcatLiteralCount();
                     legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
@@ -247,6 +270,7 @@ public final class HardeningEngine {
                 }
             }
             jarExcludedLiterals = jarExcluded.size();
+            libraryExcludedLiterals = libraryExcluded.size();
         }
 
         int guardedMethods = 0;
@@ -377,6 +401,14 @@ public final class HardeningEngine {
                     + "plaintext in every class because at least one class could not encrypt them (a "
                     + "method or constant pool near the JVM limit); those literals stay readable");
         }
+        if (stringsApplied && libraryExcludedLiterals > 0) {
+            // Values that also appear as a literal in an unhardened library class are left plaintext so a
+            // literal == against the library's (never interned) constant-pool copy still holds on ParparVM.
+            result.getWarnings().add(libraryExcludedLiterals + " distinct string value(s) were left in "
+                    + "plaintext because an unhardened framework/dependency class also holds them as a "
+                    + "literal (encrypting only the app copy would break a valid reference-equality check "
+                    + "against the library copy on the ParparVM native targets); those literals stay readable");
+        }
         if (stringsApplied && annotationLiterals > 0) {
             // Annotation element values live in the annotation metadata, not an LDC or a ConstantValue,
             // so no encryption channel reaches them. CN1 has no reflection to read them back, so this is
@@ -452,6 +484,48 @@ public final class HardeningEngine {
     static boolean translatesThroughParparVMC(String platform) {
         return "ios".equals(platform) || "mac".equals(platform) || "watch".equals(platform)
                 || "tv".equals(platform) || "win".equals(platform) || "linux".equals(platform);
+    }
+
+    /**
+     * Collects every string literal ({@code LDC} operand or {@code static final String}
+     * {@code ConstantValue}) in every class of {@code jar} into {@code out}. Used to gather the
+     * literals of the unhardened library jars so an app value shared with a framework/dependency class
+     * is not encrypted (which would break a literal {@code ==} against the un-interned library copy on
+     * ParparVM). A jar that cannot be read is skipped -- a library the engine cannot scan simply
+     * contributes no exclusions rather than aborting the build.
+     */
+    private static void collectJarLiterals(File jar, java.util.Set<String> out) {
+        if (jar == null || !jar.isFile()) {
+            return;
+        }
+        try {
+            java.io.FileInputStream fi = new java.io.FileInputStream(jar);
+            try {
+                java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(fi);
+                java.util.zip.ZipEntry entry;
+                byte[] buf = new byte[8192];
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
+                        continue;
+                    }
+                    java.io.ByteArrayOutputStream bout = new java.io.ByteArrayOutputStream();
+                    int r;
+                    while ((r = zis.read(buf)) >= 0) {
+                        bout.write(buf, 0, r);
+                    }
+                    try {
+                        StringEncryptTransform.collectAllLiterals(bout.toByteArray(), out);
+                    } catch (RuntimeException ignored) {
+                        // A class ASM cannot parse (a newer format than this ASM, a malformed entry)
+                        // contributes no exclusions; it must not fail the scan of the rest of the jar.
+                    }
+                }
+            } finally {
+                fi.close();
+            }
+        } catch (IOException ex) {
+            // An unreadable library jar simply contributes no exclusions.
+        }
     }
 
     /**

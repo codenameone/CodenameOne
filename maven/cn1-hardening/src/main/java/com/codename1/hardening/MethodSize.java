@@ -91,7 +91,12 @@ final class MethodSize {
             case AbstractInsnNode.INVOKE_DYNAMIC_INSN:
                 return 5;
             case AbstractInsnNode.JUMP_INSN:
-                return 5;
+                // GOTO/JSR have a 5-byte wide form (GOTO_W/JSR_W). A conditional branch (IF*) has NO wide
+                // form, so when its target is out of the +-32KB range ASM widens it to an inverted 3-byte
+                // conditional over a 5-byte GOTO_W == 8 bytes. Charge the widest form of each so the
+                // upper-bound estimate never undercounts a method dense with long-range conditionals.
+                return n.getOpcode() == org.objectweb.asm.Opcodes.GOTO
+                        || n.getOpcode() == org.objectweb.asm.Opcodes.JSR ? 5 : 8;
             case AbstractInsnNode.LDC_INSN:
                 return 3;
             case AbstractInsnNode.IINC_INSN:
