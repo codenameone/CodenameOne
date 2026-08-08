@@ -398,6 +398,31 @@ class OnDeviceDebugFrameTableTest {
         assertTrue(live != liveLater, "they must be different rows, was:\n" + table);
     }
 
+    /**
+     * A scope that opens and closes on one line is bounded to that line.
+     *
+     * <p>Both labels resolve to the same source line, which is not the same
+     * thing as a scope running to the end of the method. Treating it as
+     * open-ended left the local visible for every later line and able to
+     * collide with a declaration reusing its slot.</p>
+     */
+    @Test
+    void aScopeThatOpensAndClosesOnOneLineCoversOnlyThatLine() throws Exception {
+        FrameTable table = frameTableOf(translateHost(), "handler");
+        Row oneLiner = rowFor(table, 6, 'I');
+
+        assertEquals(INT_SCOPE_LINE, oneLiner.startLine,
+                "it opens on the line it is declared, was:\n" + table);
+        assertEquals(INT_SCOPE_LINE + 1, oneLiner.endLine,
+                "and closes right after it rather than running on, was:\n" + table);
+        assertTrue(oneLiner.liveAt(INT_SCOPE_LINE),
+                "it must be visible on its own line, was:\n" + table);
+        assertFalse(oneLiner.liveAt(REF_SCOPE_LINE),
+                "and gone by the next block, was:\n" + table);
+        assertFalse(oneLiner.liveAt(METHOD_END_LINE),
+                "and certainly by the end of the method, was:\n" + table);
+    }
+
     // ---- parsing the generated C ------------------------------------------
 
     private static final class Row {
@@ -607,6 +632,13 @@ class OnDeviceDebugFrameTableTest {
         handler.visitCode();
         handler.visitLabel(start);
         handler.visitLineNumber(INT_SCOPE_LINE, start);
+        handler.visitInsn(Opcodes.ICONST_3);
+        handler.visitVarInsn(Opcodes.ISTORE, 6);        // int oneLiner, opens...
+        Label oneLinerEnd = new Label();
+        handler.visitLabel(oneLinerEnd);
+        // A second statement on the same source line, so the closing label
+        // resolves to the line the scope opened on rather than the next one.
+        handler.visitLineNumber(INT_SCOPE_LINE, oneLinerEnd);
         handler.visitInsn(Opcodes.ICONST_1);
         handler.visitVarInsn(Opcodes.ISTORE, 5);        // int first — slot 5
         handler.visitInsn(Opcodes.ICONST_1);
@@ -637,7 +669,8 @@ class OnDeviceDebugFrameTableTest {
         // Two ints of the same type sharing slot 5 in disjoint blocks.
         handler.visitLocalVariable("first", "I", null, start, midpoint, 5);
         handler.visitLocalVariable("second", "I", null, midpoint, end, 5);
-        handler.visitMaxs(2, 6);
+        handler.visitLocalVariable("oneLiner", "I", null, start, oneLinerEnd, 6);
+        handler.visitMaxs(2, 7);
         handler.visitEnd();
 
         MethodVisitor ping = cw.visitMethod(

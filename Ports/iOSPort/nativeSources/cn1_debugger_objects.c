@@ -204,22 +204,35 @@ JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
 /* --------------------------------------------------------------------- */
 
 #define CN1_ISSUED_INITIAL_CAP 4096u   /* power of two; open addressing */
+#define CN1_ISSUED_MAX_OWNERS 4
 
 /*
- * Each entry records which suspended thread the reference was obtained for, so
- * that resuming one thread can drop its ids without touching those of a thread
- * that is still stopped. Owner 0 means "not tied to a suspension" — the
- * java.lang.Thread objects the thread list hands over — and those survive
- * until every thread is running again.
+ * One entry per reference the debugger has handed to the proxy, carrying the
+ * set of suspended threads it was obtained for.
  *
- * Both halves of that matter. Clearing globally on a per-thread resume made a
- * still-parked thread's locals report unavailable mid-inspection; clearing
- * nothing while any thread stayed parked left the resumed thread's ids
- * accepted after its objects could be collected, which is the worse of the
- * two.
+ * A set rather than a single owner because two stopped threads can expose the
+ * same reference -- a shared singleton in both their locals, say. Keeping only
+ * the first meant resuming that thread dropped the id while the other was
+ * still parked and inspecting through it.
+ *
+ * Owner 0 means "not tied to a suspension" -- the java.lang.Thread objects the
+ * thread list hands over -- and those survive until every thread runs again.
  */
-static uintptr_t* g_issuedKeys = NULL;
-static int64_t* g_issuedOwners = NULL;
+struct issued_entry {
+    uintptr_t key;
+    int64_t owners[CN1_ISSUED_MAX_OWNERS];
+    unsigned char ownerCount;
+    /*
+     * Set when more owners appeared than there are slots. Such an entry is
+     * dropped as soon as any owner resumes, because we can no longer prove
+     * another still holds it: reporting a reference as unavailable is a
+     * display problem, accepting one whose object may have been reclaimed is
+     * a read of freed memory.
+     */
+    unsigned char ownerOverflow;
+};
+
+static struct issued_entry* g_issued = NULL;
 static unsigned g_issuedCap = 0;
 static unsigned g_issuedCount = 0;
 static pthread_mutex_t g_issuedMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -231,49 +244,75 @@ static unsigned issued_slot(uintptr_t key, unsigned cap) {
     return (unsigned)(h & (cap - 1));
 }
 
-/* Insert into tables known to have room. Returns 1 if newly added. */
-static int issued_put(uintptr_t* keys, int64_t* owners, unsigned cap,
-                      uintptr_t key, int64_t owner) {
+/* Adds an owner to an entry, ignoring duplicates. */
+static void entry_add_owner(struct issued_entry* e, int64_t owner) {
+    if (owner == 0) return;   /* unowned: nothing to record */
+    for (unsigned i = 0; i < e->ownerCount; i++) {
+        if (e->owners[i] == owner) return;
+    }
+    if (e->ownerCount < CN1_ISSUED_MAX_OWNERS) {
+        e->owners[e->ownerCount++] = owner;
+    } else {
+        e->ownerOverflow = 1;
+    }
+}
+
+/* Finds or creates the entry for key in a table known to have room. */
+static struct issued_entry* issued_put(struct issued_entry* table, unsigned cap,
+                                       uintptr_t key, int* created) {
     unsigned i = issued_slot(key, cap);
     for (unsigned n = 0; n < cap; n++) {
         unsigned at = (i + n) & (cap - 1);
-        if (keys[at] == key) return 0;
-        if (keys[at] == 0) { keys[at] = key; owners[at] = owner; return 1; }
+        if (table[at].key == key) { *created = 0; return &table[at]; }
+        if (table[at].key == 0) {
+            memset(&table[at], 0, sizeof(table[at]));
+            table[at].key = key;
+            *created = 1;
+            return &table[at];
+        }
     }
-    return 0;
+    *created = 0;
+    return NULL;
 }
 
 /* Grows past a 3/4 load factor. Returns 0 only if the allocation fails. */
 static int issued_reserve(void) {
-    if (g_issuedKeys != NULL && (g_issuedCount + 1) * 4 < g_issuedCap * 3) {
+    if (g_issued != NULL && (g_issuedCount + 1) * 4 < g_issuedCap * 3) {
         return 1;
     }
     unsigned newCap = g_issuedCap ? g_issuedCap * 2 : CN1_ISSUED_INITIAL_CAP;
-    uintptr_t* keys = (uintptr_t*)calloc(newCap, sizeof(uintptr_t));
-    int64_t* owners = (int64_t*)calloc(newCap, sizeof(int64_t));
-    if (!keys || !owners) { free(keys); free(owners); return 0; }
+    struct issued_entry* grown =
+        (struct issued_entry*)calloc(newCap, sizeof(struct issued_entry));
+    if (!grown) return 0;
     for (unsigned i = 0; i < g_issuedCap; i++) {
-        if (g_issuedKeys[i] != 0) {
-            issued_put(keys, owners, newCap, g_issuedKeys[i], g_issuedOwners[i]);
+        if (g_issued[i].key != 0) {
+            int created = 0;
+            struct issued_entry* moved =
+                issued_put(grown, newCap, g_issued[i].key, &created);
+            if (moved) *moved = g_issued[i];
         }
     }
-    free(g_issuedKeys);
-    free(g_issuedOwners);
-    g_issuedKeys = keys;
-    g_issuedOwners = owners;
+    free(g_issued);
+    g_issued = grown;
     g_issuedCap = newCap;
     return 1;
 }
 
 int cn1_debugger_note_issued_for(JAVA_OBJECT obj, int64_t owner) {
     if (obj == JAVA_NULL) return 1;   /* null needs no record */
-    uintptr_t key = (uintptr_t)obj;
     int ok;
     pthread_mutex_lock(&g_issuedMutex);
     ok = issued_reserve();
     if (ok) {
-        g_issuedCount += (unsigned)issued_put(g_issuedKeys, g_issuedOwners,
-                                              g_issuedCap, key, owner);
+        int created = 0;
+        struct issued_entry* e =
+            issued_put(g_issued, g_issuedCap, (uintptr_t)obj, &created);
+        if (e) {
+            entry_add_owner(e, owner);
+            g_issuedCount += (unsigned)created;
+        } else {
+            ok = 0;
+        }
     }
     pthread_mutex_unlock(&g_issuedMutex);
     /* The table grows, so this only fails when the allocation does. A caller
@@ -287,74 +326,84 @@ int cn1_debugger_note_issued(JAVA_OBJECT obj) {
     return cn1_debugger_note_issued_for(obj, 0);
 }
 
-/* Locates an entry, returning its index or -1. Caller holds the mutex. */
-static int issued_find(uintptr_t key) {
-    if (g_issuedKeys == NULL) return -1;
+/* Locates an entry, or NULL. Caller holds the mutex. */
+static struct issued_entry* issued_find(uintptr_t key) {
+    if (g_issued == NULL) return NULL;
     unsigned i = issued_slot(key, g_issuedCap);
     for (unsigned n = 0; n < g_issuedCap; n++) {
         unsigned at = (i + n) & (g_issuedCap - 1);
-        if (g_issuedKeys[at] == key) return (int)at;
-        if (g_issuedKeys[at] == 0) return -1;
+        if (g_issued[at].key == key) return &g_issued[at];
+        if (g_issued[at].key == 0) return NULL;
     }
-    return -1;
+    return NULL;
 }
 
 int cn1_debugger_was_issued(JAVA_OBJECT obj) {
     if (obj == JAVA_NULL) return 0;
     pthread_mutex_lock(&g_issuedMutex);
-    int at = issued_find((uintptr_t)obj);
+    int found = issued_find((uintptr_t)obj) != NULL;
     pthread_mutex_unlock(&g_issuedMutex);
-    return at >= 0;
+    return found;
 }
 
 int64_t cn1_debugger_owner_of(JAVA_OBJECT obj) {
     if (obj == JAVA_NULL) return 0;
     pthread_mutex_lock(&g_issuedMutex);
-    int at = issued_find((uintptr_t)obj);
-    int64_t owner = at >= 0 ? g_issuedOwners[at] : 0;
+    struct issued_entry* e = issued_find((uintptr_t)obj);
+    int64_t owner = (e != NULL && e->ownerCount > 0) ? e->owners[0] : 0;
     pthread_mutex_unlock(&g_issuedMutex);
     return owner;
 }
 
 void cn1_debugger_forget_issued(void) {
     pthread_mutex_lock(&g_issuedMutex);
-    if (g_issuedKeys != NULL) {
-        memset(g_issuedKeys, 0, g_issuedCap * sizeof(uintptr_t));
-        memset(g_issuedOwners, 0, g_issuedCap * sizeof(int64_t));
+    if (g_issued != NULL) {
+        memset(g_issued, 0, g_issuedCap * sizeof(struct issued_entry));
     }
     g_issuedCount = 0;
     pthread_mutex_unlock(&g_issuedMutex);
 }
 
+/* Whether an entry survives the given owner resuming. */
+static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
+    if (e->ownerCount == 0) return 1;      /* unowned: only a full clear drops it */
+    if (e->ownerOverflow) return 0;        /* cannot prove another owner remains */
+    unsigned remaining = 0;
+    for (unsigned i = 0; i < e->ownerCount; i++) {
+        if (e->owners[i] != owner) {
+            e->owners[remaining++] = e->owners[i];
+        }
+    }
+    e->ownerCount = (unsigned char)remaining;
+    return remaining > 0;                  /* another suspension still holds it */
+}
+
 void cn1_debugger_forget_issued_for(int64_t owner) {
     if (owner == 0) return;
     pthread_mutex_lock(&g_issuedMutex);
-    if (g_issuedKeys != NULL) {
+    if (g_issued != NULL) {
         /* Rebuilt rather than tombstoned: deletion from a linear probe would
          * otherwise cut the chains that later lookups walk. */
         unsigned cap = g_issuedCap;
-        uintptr_t* keys = (uintptr_t*)calloc(cap, sizeof(uintptr_t));
-        int64_t* owners = (int64_t*)calloc(cap, sizeof(int64_t));
-        if (keys && owners) {
-            unsigned kept = 0;
+        struct issued_entry* kept =
+            (struct issued_entry*)calloc(cap, sizeof(struct issued_entry));
+        if (kept) {
+            unsigned keptCount = 0;
             for (unsigned i = 0; i < cap; i++) {
-                if (g_issuedKeys[i] != 0 && g_issuedOwners[i] != owner) {
-                    kept += (unsigned)issued_put(keys, owners, cap,
-                                                 g_issuedKeys[i], g_issuedOwners[i]);
-                }
+                if (g_issued[i].key == 0) continue;
+                if (!entry_survives_resume(&g_issued[i], owner)) continue;
+                int created = 0;
+                struct issued_entry* moved =
+                    issued_put(kept, cap, g_issued[i].key, &created);
+                if (moved) { *moved = g_issued[i]; keptCount += (unsigned)created; }
             }
-            free(g_issuedKeys);
-            free(g_issuedOwners);
-            g_issuedKeys = keys;
-            g_issuedOwners = owners;
-            g_issuedCount = kept;
+            free(g_issued);
+            g_issued = kept;
+            g_issuedCount = keptCount;
         } else {
             /* Out of memory: drop everything rather than keep ids we can no
              * longer prove belong to a still-parked thread. */
-            free(keys);
-            free(owners);
-            memset(g_issuedKeys, 0, cap * sizeof(uintptr_t));
-            memset(g_issuedOwners, 0, cap * sizeof(int64_t));
+            memset(g_issued, 0, cap * sizeof(struct issued_entry));
             g_issuedCount = 0;
         }
     }

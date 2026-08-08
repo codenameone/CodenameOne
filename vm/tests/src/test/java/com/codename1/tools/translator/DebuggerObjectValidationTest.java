@@ -211,6 +211,21 @@ class DebuggerObjectValidationTest {
         assertEquals("gone", probe("OWNER_UNOWNED_DROPPED_BY_FULL_RESUME"));
     }
 
+    /**
+     * A reference two parked threads both expose survives one of them
+     * resuming.
+     *
+     * <p>Storing a single owner per reference meant the second thread to
+     * expose a shared object — a singleton in both their locals, say — had its
+     * claim discarded, so resuming the first dropped the id while the second
+     * was still parked and inspecting through it.</p>
+     */
+    @Test
+    void aReferenceSharedByTwoThreadsOutlivesTheFirstResume() throws Exception {
+        assertEquals("kept", probe("SHARED_SURVIVES_FIRST_RESUME"));
+        assertEquals("gone", probe("SHARED_DROPPED_BY_LAST_RESUME"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -231,7 +246,8 @@ class DebuggerObjectValidationTest {
                 "ISSUE_MANY_RESOLVE", "OWNER_RESUMED_IS_DROPPED",
                 "OWNER_PARKED_IS_KEPT", "OWNER_INHERITED_IS_DROPPED",
                 "OWNER_UNOWNED_SURVIVES_THREAD_RESUME",
-                "OWNER_UNOWNED_DROPPED_BY_FULL_RESUME");
+                "OWNER_UNOWNED_DROPPED_BY_FULL_RESUME",
+                "SHARED_SURVIVES_FIRST_RESUME", "SHARED_DROPPED_BY_LAST_RESUME");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -305,6 +321,17 @@ class DebuggerObjectValidationTest {
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0xDEADBEEFDEAD0000ULL;\n" +
+            "    } else if (strncmp(which, \"SHARED_\", 7) == 0) {\n" +
+            "        /* One reference exposed by both parked threads. */\n" +
+            "        JAVA_OBJECT shared = (JAVA_OBJECT)(uintptr_t)0xC000;\n" +
+            "        cn1_debugger_note_issued_for(shared, 7);\n" +
+            "        cn1_debugger_note_issued_for(shared, 9);\n" +
+            "        cn1_debugger_forget_issued_for(7);\n" +
+            "        if (strcmp(which, \"SHARED_DROPPED_BY_LAST_RESUME\") == 0) {\n" +
+            "            cn1_debugger_forget_issued_for(9);\n" +
+            "        }\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(shared) ? \"kept\" : \"gone\");\n" +
+            "        return 0;\n" +
             "    } else if (strncmp(which, \"OWNER_\", 6) == 0) {\n" +
             "        /* Two parked threads, 7 and 9, each with a reference. */\n" +
             "        JAVA_OBJECT ofSeven = (JAVA_OBJECT)(uintptr_t)0x8000;\n" +

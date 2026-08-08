@@ -1510,12 +1510,17 @@ public class BytecodeMethod implements SignatureSet {
                 || startLine == END_OF_METHOD) {
             return ALWAYS_LIVE;
         }
-        // Open-ended when the scope runs to the end of the method, and when its
-        // end resolves at or before its start — the latter happens where the
-        // whole scope sits on one line, and an empty range would hide the local
-        // everywhere rather than nowhere.
-        if (endLine == END_OF_METHOD || endLine <= startLine) {
+        // Open-ended only when the scope really does run to the end of the
+        // method. A scope whose end resolves at or before its start is one
+        // that opens and closes on a single line; giving that an open end
+        // would leave the local visible for the rest of the method and let it
+        // collide with a later declaration reusing its slot. It gets the one
+        // line it occupies instead — an empty range would hide it everywhere.
+        if (endLine == END_OF_METHOD) {
             return new int[] { startLine, 0 };
+        }
+        if (endLine <= startLine) {
+            return new int[] { startLine, startLine + 1 };
         }
         return new int[] { startLine, endLine };
     }
