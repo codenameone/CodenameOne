@@ -186,6 +186,7 @@ public final class HardeningEngine {
         int legacyInterfaceConstants = 0;
         int oversizedLiterals = 0;
         int condyLiterals = 0;
+        int clinitFullLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -210,10 +211,12 @@ public final class HardeningEngine {
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
                 oversizedLiterals += t.getOversizedLiteralCount();
                 condyLiterals += t.getCondyLiteralCount();
+                clinitFullLiterals += t.getClinitFullLiteralCount();
             }
         }
 
         int guardedMethods = 0;
+        int oversizedGuardMethods = 0;
         boolean controlFlowApplied = cfg.isControlFlow() && controlFlowSafeFor(cfg.getPlatform());
         if (controlFlowApplied) {
             for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
@@ -222,6 +225,7 @@ public final class HardeningEngine {
                 if (out != e.getValue()) {
                     e.setValue(out);
                 }
+                oversizedGuardMethods += t.getOversizedMethods();
                 guardedMethods += t.getGuardedMethods();
             }
         }
@@ -324,6 +328,16 @@ public final class HardeningEngine {
             result.getWarnings().add(oversizedLiterals + " string literal(s) were too large to encrypt "
                     + "(their ciphertext would overflow the 65535-byte constant pool) and remain in "
                     + "plaintext; move a large embedded secret/blob out of a string constant to hide it");
+        }
+        if (stringsApplied && clinitFullLiterals > 0) {
+            result.getWarnings().add(clinitFullLiterals + " string literal(s) were left in plaintext "
+                    + "because the class's static initializer is already near the 65535-byte method "
+                    + "limit and could not hold the decode step");
+        }
+        if (controlFlowApplied && oversizedGuardMethods > 0) {
+            result.getWarnings().add(oversizedGuardMethods + " method(s) were left with plain control "
+                    + "flow because they are already near the 65535-byte method limit and adding the "
+                    + "guard would overflow them");
         }
         if (req.getReportFile() != null) {
             writeReport(req.getReportFile(), cfg, result);

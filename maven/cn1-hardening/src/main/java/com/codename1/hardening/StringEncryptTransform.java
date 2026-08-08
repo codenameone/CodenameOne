@@ -73,12 +73,13 @@ public final class StringEncryptTransform {
     /** Synthesized <clinit> initializer-chunk helpers, kept clear of any real member. */
     private static final String INIT_HELPER_PREFIX = "zqCI$";
     /**
-     * Cut a generated <clinit> into helper methods once its initializer grows past this many
-     * instructions, so a class with thousands of hoisted/encrypted constants never exceeds the
-     * JVM's 65535-byte method limit. Each init unit is LDC -> INVOKESTATIC -> PUTSTATIC (~9
-     * bytes), so this bound keeps every method well under the limit.
+     * Cut a generated <clinit> into helper methods once a chunk grows past this many ENCODED bytes, so
+     * a class with thousands of hoisted/encrypted constants never exceeds the JVM's 65535-byte method
+     * limit. Kept well under MethodSize.SAFE_LIMIT so each helper fits.
      */
-    private static final int MAX_CLINIT_INSNS = 4000;
+    private static final int MAX_CLINIT_CHUNK_BYTES = 48000;
+    /** Widest encoding of one INVOKESTATIC helper call prepended to <clinit>. */
+    private static final int CLINIT_CALL_BYTES = 5;
 
     private final boolean encryptAllStrings;
     private final int seed;
@@ -89,6 +90,7 @@ public final class StringEncryptTransform {
     private int legacyInterfaceConstantCount;
     private int oversizedLiteralCount;
     private int condyLiteralCount;
+    private int clinitFullLiteralCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -183,6 +185,16 @@ public final class StringEncryptTransform {
      */
     public int getCondyLiteralCount() {
         return condyLiteralCount;
+    }
+
+    /**
+     * The number of literals left plaintext because the class's {@code <clinit>} is already so close to
+     * the 65,535-byte method limit that even the split path's helper calls would not fit. Extremely
+     * rare (a class whose static initializer is itself near the limit), but reported rather than
+     * aborting the build so a valid input class is never rejected.
+     */
+    public int getClinitFullLiteralCount() {
+        return clinitFullLiteralCount;
     }
 
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
@@ -494,11 +506,24 @@ public final class StringEncryptTransform {
         if (valueToField.isEmpty()) {
             return false;
         }
-        // 2. Replace each LDC of a hoisted value with a GETSTATIC of its field, in the ORIGINAL method
-        //    bodies. This happens BEFORE the initializer is inserted, so the initializer's own
-        //    ciphertext LDCs are never rescanned -- otherwise a ciphertext that happens to equal
-        //    another hoisted plaintext (the XOR encoding is involutive) would be rewritten into a read
-        //    of a not-yet-assigned field and pass null to the decoder.
+        // 2. Build the initializer BEFORE mutating anything, so a class whose <clinit> cannot
+        //    accommodate it is left untouched (its literals stay plaintext, reported) rather than
+        //    half-transformed with fields that are declared but never initialized.
+        InsnList init = new InsnList();
+        for (java.util.Map.Entry<String, String> e : valueToField.entrySet()) {
+            init.add(new LdcInsnNode(encode(e.getKey(), base)));
+            init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, false));
+            init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
+        }
+        if (!clinitCanAccept(cn, init)) {
+            clinitFullLiteralCount += valueToField.size();
+            return false;
+        }
+        // 3. Commit. Replace each LDC of a hoisted value with a GETSTATIC of its field in the ORIGINAL
+        //    method bodies; the standalone init is inserted into <clinit> only afterwards, so its own
+        //    ciphertext LDCs are never rescanned -- otherwise a ciphertext that happens to equal another
+        //    hoisted plaintext (the XOR encoding is involutive) would be rewritten into a read of a
+        //    not-yet-assigned field and pass null to the decoder.
         for (MethodNode mn : cn.methods) {
             if (mn.instructions == null || decoderName.equals(mn.name)) {
                 continue;
@@ -516,18 +541,14 @@ public final class StringEncryptTransform {
                 insn = next;
             }
         }
-        // 3. Add a field per value and decode it once in <clinit>, prepended so it runs before the
-        //    original body (a hoisted value used within <clinit> reads the already-initialized field).
+        // Add a field per value; the init decodes each once in <clinit>, prepended so it runs before
+        // the original body (a hoisted value used within <clinit> reads the already-initialized field).
         if (cn.fields == null) {
             cn.fields = new java.util.ArrayList<FieldNode>();
         }
-        InsnList init = new InsnList();
-        for (java.util.Map.Entry<String, String> e : valueToField.entrySet()) {
+        for (String field : valueToField.values()) {
             cn.fields.add(new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
-                    e.getValue(), "Ljava/lang/String;", null, null));
-            init.add(new LdcInsnNode(encode(e.getKey(), base)));
-            init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, false));
-            init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
+                    field, "Ljava/lang/String;", null, null));
             encryptedCount++;
         }
         // hoistMethodLiterals runs only for a non-interface (interfaces decode per access), so the
@@ -541,30 +562,40 @@ public final class StringEncryptTransform {
         if (cn.fields == null) {
             return false;
         }
+        // Build the initializer and remember which fields to strip WITHOUT mutating yet, so a class
+        // whose <clinit> cannot accommodate the init keeps its constants (plaintext, reported) rather
+        // than being left with fields whose ConstantValue was stripped but never re-initialized.
         InsnList init = new InsnList();
-        boolean changed = false;
+        java.util.List<FieldNode> toStrip = new java.util.ArrayList<FieldNode>();
         for (FieldNode fn : cn.fields) {
             boolean isStatic = (fn.access & Opcodes.ACC_STATIC) != 0;
             if (isStatic && fn.value instanceof String && shouldEncrypt((String) fn.value)) {
                 String plain = (String) fn.value;
                 // shouldEncrypt already rejected any value whose ciphertext could overflow the
                 // constant pool (class-independent bound), so the encode result fits.
-                // Strip the ConstantValue so the plaintext leaves the class file entirely
-                // (this is the slot ParparVM would otherwise dump into the C constant pool).
-                fn.value = null;
                 init.add(new LdcInsnNode(encode(plain, base)));
                 // itf=true when the decoder lives in an interface, else the JVM emits a Methodref
                 // instead of an InterfaceMethodref and throws IncompatibleClassChangeError.
                 init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, isInterface));
                 init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, fn.name, fn.desc));
-                encryptedCount++;
-                changed = true;
+                toStrip.add(fn);
             }
         }
-        if (changed) {
-            prependToClinit(cn, init, isInterface);
+        if (toStrip.isEmpty()) {
+            return false;
         }
-        return changed;
+        if (!clinitCanAccept(cn, init)) {
+            clinitFullLiteralCount += toStrip.size();
+            return false;
+        }
+        // Commit: strip each ConstantValue so the plaintext leaves the class file entirely (the slot
+        // ParparVM would otherwise dump into the C constant pool), and decode it once in <clinit>.
+        for (FieldNode fn : toStrip) {
+            fn.value = null;
+            encryptedCount++;
+        }
+        prependToClinit(cn, init, isInterface);
+        return true;
     }
 
     /**
@@ -600,12 +631,13 @@ public final class StringEncryptTransform {
         // synthetic helper methods and have <clinit> call them in order. Each init unit ends with
         // PUTSTATIC (stack empty), so cutting after a PUTSTATIC keeps every chunk verifiable.
         //
-        // Measure the COMBINED size -- the class may already carry a large <clinit>, so even a small
-        // new initializer inserted directly could push the existing method over the limit. When the
-        // total is under the bound, insert directly; otherwise split so <clinit> only gains a few calls.
-        MethodNode existingClinit = findClinit(cn);
-        int existingSize = existingClinit == null ? 0 : existingClinit.instructions.size();
-        if (existingSize + init.size() <= MAX_CLINIT_INSNS) {
+        // Measure the COMBINED ENCODED bytes -- the class may already carry a large <clinit>, so even a
+        // small new initializer inserted directly could push the existing method over the limit, and a
+        // node count cannot prove the direct-insert path fits. When the total is under the bound, insert
+        // directly; otherwise split so <clinit> only gains a few calls. Callers pre-check clinitCanAccept
+        // before mutating, so the split is only reached when the calls themselves fit.
+        int existingBytes = MethodSize.estimateBytes(findClinit(cn));
+        if (existingBytes + MethodSize.estimateBytes(init) <= MethodSize.SAFE_LIMIT) {
             insertIntoClinit(cn, init);
             return;
         }
@@ -619,13 +651,15 @@ public final class StringEncryptTransform {
                 | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC;
         InsnList calls = new InsnList();
         InsnList chunk = new InsnList();
+        int chunkBytes = 0;
         int helperCounter = 0;
         AbstractInsnNode insn = init.getFirst();
         while (insn != null) {
             AbstractInsnNode next = insn.getNext();
             init.remove(insn);
+            chunkBytes += MethodSize.estimateBytes(insn);
             chunk.add(insn);
-            boolean atBoundary = insn.getOpcode() == Opcodes.PUTSTATIC && chunk.size() >= MAX_CLINIT_INSNS;
+            boolean atBoundary = insn.getOpcode() == Opcodes.PUTSTATIC && chunkBytes >= MAX_CLINIT_CHUNK_BYTES;
             if (atBoundary || next == null) {
                 String hname;
                 do {
@@ -642,10 +676,32 @@ public final class StringEncryptTransform {
                 // of an InterfaceMethodref and throws IncompatibleClassChangeError at run time.
                 calls.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, hname, "()V", isInterface));
                 chunk = new InsnList();
+                chunkBytes = 0;
             }
             insn = next;
         }
         insertIntoClinit(cn, calls);
+    }
+
+    /**
+     * Whether {@code prependToClinit} can add {@code init} without pushing {@code <clinit>} past the
+     * method limit. A direct insert must fit under {@link MethodSize#SAFE_LIMIT}; otherwise the split
+     * moves {@code init} into helper methods and {@code <clinit>} only gains one call per chunk, so the
+     * check is whether the existing initializer plus those calls fits. Returns false only in the extreme
+     * case that even the calls do not fit -- then the caller leaves the literals plaintext rather than
+     * mutating a class it cannot finish.
+     */
+    private boolean clinitCanAccept(ClassNode cn, InsnList init) {
+        int existingBytes = MethodSize.estimateBytes(findClinit(cn));
+        int initBytes = MethodSize.estimateBytes(init);
+        if (existingBytes + initBytes <= MethodSize.SAFE_LIMIT) {
+            return true;
+        }
+        int chunks = (initBytes + MAX_CLINIT_CHUNK_BYTES - 1) / MAX_CLINIT_CHUNK_BYTES;
+        if (chunks < 1) {
+            chunks = 1;
+        }
+        return existingBytes + chunks * CLINIT_CALL_BYTES <= MethodSize.SAFE_LIMIT;
     }
 
     /** The class's existing {@code <clinit>}, or {@code null} if it has none. */

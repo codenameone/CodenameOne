@@ -57,9 +57,13 @@ public final class ControlFlowTransform {
     static final String GUARD_FIELD = "zq$cf";
     static final String GUARD_DESC = "I";
 
+    /** Widest encoding of one entry guard (GETSTATIC, IFGT, NEW, DUP, INVOKESPECIAL, ATHROW). */
+    private static final int GUARD_BYTES = 16;
+
     private final ClassLoader hierarchy;
     private final int intensity;
     private int guardedMethods;
+    private int oversizedMethods;
 
     public ControlFlowTransform() {
         this(null, 1);
@@ -83,6 +87,15 @@ public final class ControlFlowTransform {
         return guardedMethods;
     }
 
+    /**
+     * Methods left unguarded because they are already so close to the 65,535-byte method limit that
+     * prepending the guard(s) would overflow them. Skipped rather than aborting the build; reported so
+     * a paranoid build knows a large generated method kept its plain control flow.
+     */
+    public int getOversizedMethods() {
+        return oversizedMethods;
+    }
+
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
         new ClassReader(classBytes).accept(cn, ClassReader.SKIP_FRAMES);
@@ -100,6 +113,13 @@ public final class ControlFlowTransform {
         if (cn.methods != null) {
             for (MethodNode mn : cn.methods) {
                 if (!isGuardable(mn)) {
+                    continue;
+                }
+                // A generated method can already be near the 65,535-byte limit; prepending guards would
+                // overflow it and make ASM abort the whole build. Skip (and report) such a method rather
+                // than fail on a valid input class.
+                if (MethodSize.estimateBytes(mn) + GUARD_BYTES * intensity > MethodSize.SAFE_LIMIT) {
+                    oversizedMethods++;
                     continue;
                 }
                 for (int i = 0; i < intensity; i++) {

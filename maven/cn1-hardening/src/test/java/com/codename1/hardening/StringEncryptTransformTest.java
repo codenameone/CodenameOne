@@ -270,52 +270,78 @@ public class StringEncryptTransformTest {
                 StringEncryptTransform.containsStringLiteral(out, "an encryptable small secret value"));
     }
 
-    @Test
-    public void existingLargeClinitIsSplitWhenCombinedWithNewInit() throws Exception {
-        // A class that already carries a large <clinit> must not have a new initializer inserted
-        // directly (which could push the combined method over the 65535-byte limit): the split
-        // decision accounts for the existing initializer, so even one small hoisted literal triggers a
-        // helper split when the class's <clinit> is already large.
+    /** Builds a class whose existing <clinit> is padByteApprox bytes of harmless ICONST_0/POP filler. */
+    private static org.objectweb.asm.ClassWriter classWithBigClinit(String owner, int padPairs) {
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
         w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
-                "app/BigExistingClinit", null, "java/lang/Object", null);
-        // An existing <clinit> with more instructions than the split threshold, but each a harmless
-        // stack-neutral ICONST_0/POP pair.
+                owner, null, "java/lang/Object", null);
         org.objectweb.asm.MethodVisitor clinit = w.visitMethod(org.objectweb.asm.Opcodes.ACC_STATIC,
                 "<clinit>", "()V", null, null);
         clinit.visitCode();
-        for (int i = 0; i < 5000; i++) {
+        for (int i = 0; i < padPairs; i++) {
             clinit.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
             clinit.visitInsn(org.objectweb.asm.Opcodes.POP);
         }
         clinit.visitInsn(org.objectweb.asm.Opcodes.RETURN);
         clinit.visitMaxs(1, 0);
         clinit.visitEnd();
-        // One encryptable literal, whose hoisted initializer would otherwise be inserted directly.
-        addStringGetter(w, "probe", "a small hoisted secret literal value");
-        w.visitEnd();
+        return w;
+    }
 
-        StringEncryptTransform t = new StringEncryptTransform(true, 13);
-        byte[] out = t.transform(w.toByteArray());
-        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
-                new java.io.PrintWriter(new java.io.StringWriter()));
-
-        final boolean[] sawHelper = {false};
+    private static boolean hasHelper(byte[] out) {
+        final boolean[] saw = {false};
         new org.objectweb.asm.ClassReader(out).accept(new org.objectweb.asm.ClassVisitor(
                 org.objectweb.asm.Opcodes.ASM9) {
             @Override
             public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc,
                     String sig, String[] exceptions) {
                 if (name.startsWith("zqCI$")) {
-                    sawHelper[0] = true;
+                    saw[0] = true;
                 }
                 return null;
             }
         }, org.objectweb.asm.ClassReader.SKIP_CODE);
-        assertTrue("a large existing <clinit> must push the new init into a helper", sawHelper[0]);
+        return saw[0];
+    }
 
+    @Test
+    public void existingLargeClinitIsSplitWhenCombinedWithNewInit() throws Exception {
+        // A small new initializer that would fit on its own is still split into a helper when the class
+        // already carries a <clinit> near the 65535-byte limit -- the split decision measures the
+        // COMBINED encoded size, not just the new init. ~59.6 KB of existing <clinit> + a handful of
+        // literals exceeds the safe bound, so the new init must move into a helper.
+        org.objectweb.asm.ClassWriter w = classWithBigClinit("app/BigExistingClinit", 29800);
+        for (int i = 0; i < 40; i++) {
+            addStringGetter(w, "probe" + i, "a hoisted secret literal value number " + i);
+        }
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 13);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertTrue("a large existing <clinit> must push the new init into a helper", hasHelper(out));
+        assertEquals(40, t.getEncryptedCount());
         Class<?> c = new ByteLoader().define("app.BigExistingClinit", out);
-        assertEquals("a small hoisted secret literal value", c.getMethod("probe").invoke(null));
+        assertEquals("a hoisted secret literal value number 0", c.getMethod("probe0").invoke(null));
+    }
+
+    @Test
+    public void clinitTooFullLeavesLiteralPlaintextAndReports() throws Exception {
+        // The existing <clinit> is so close to the limit that not even a helper CALL would fit, so the
+        // literal cannot be hoisted: it is left plaintext and counted, rather than aborting the build.
+        org.objectweb.asm.ClassWriter w = classWithBigClinit("app/FullClinit", 31500); // ~63 KB
+        addStringGetter(w, "probe", "a literal that cannot be hoisted here");
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 5);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertEquals("the un-hoistable literal is reported", 1, t.getClinitFullLiteralCount());
+        assertEquals("nothing was encrypted for this class", 0, t.getEncryptedCount());
+        assertTrue("the literal stays plaintext rather than the build aborting",
+                StringEncryptTransform.containsStringLiteral(out, "a literal that cannot be hoisted here"));
     }
 
     @Test

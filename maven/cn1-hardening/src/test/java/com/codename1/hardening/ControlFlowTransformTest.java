@@ -107,6 +107,47 @@ public class ControlFlowTransformTest {
         assertEquals(5, c.getMethod("add", int.class, int.class).invoke(null, 2, 3));
     }
 
+    @Test
+    public void oversizedMethodIsSkippedNotOverflowed() throws Exception {
+        // A method already near the 65535-byte limit cannot take a guard without overflowing. It must
+        // be skipped (and reported), while a normal sibling method is still guarded -- the build must
+        // not abort on a valid input class.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/BigMethod", null, "java/lang/Object", null);
+        // ~62 KB of harmless ICONST_0/POP filler: too large to accept a guard.
+        org.objectweb.asm.MethodVisitor big = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "big", "()V", null, null);
+        big.visitCode();
+        for (int i = 0; i < 31000; i++) {
+            big.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
+            big.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        big.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        big.visitMaxs(1, 0);
+        big.visitEnd();
+        // A normal method that can and must still be guarded.
+        org.objectweb.asm.MethodVisitor add = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "add", "(II)I", null, null);
+        add.visitCode();
+        add.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 0);
+        add.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 1);
+        add.visitInsn(org.objectweb.asm.Opcodes.IADD);
+        add.visitInsn(org.objectweb.asm.Opcodes.IRETURN);
+        add.visitMaxs(2, 2);
+        add.visitEnd();
+        w.visitEnd();
+
+        ControlFlowTransform t = new ControlFlowTransform();
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("the near-limit method must be skipped", 1, t.getOversizedMethods());
+        assertTrue("the normal method must still be guarded", t.getGuardedMethods() >= 1);
+        CheckClassAdapter.verify(new ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.BigMethod", out);
+        assertEquals(5, c.getMethod("add", int.class, int.class).invoke(null, 2, 3));
+    }
+
     // Renames the class internal name so the intense variant can load beside the plain one.
     private static byte[] rename(byte[] bytes, String from, String to) {
         org.objectweb.asm.ClassReader cr = new org.objectweb.asm.ClassReader(bytes);
