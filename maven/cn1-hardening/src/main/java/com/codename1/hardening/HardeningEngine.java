@@ -183,6 +183,7 @@ public final class HardeningEngine {
         int seed = deriveSeed(cfg, req.getBuildKey());
         int encryptedStrings = 0;
         int concatLiterals = 0;
+        int legacyInterfaceConstants = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -204,6 +205,7 @@ public final class HardeningEngine {
                 }
                 encryptedStrings += t.getEncryptedCount();
                 concatLiterals += t.getConcatLiteralCount();
+                legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
             }
         }
 
@@ -295,6 +297,14 @@ public final class HardeningEngine {
             result.getWarnings().add(concatLiterals + " string-concatenation literal group(s) compiled "
                     + "to invokedynamic (JDK 9+ javac) were not encrypted; compile with "
                     + "-XDstringConcat=inline or an older -target to encrypt concatenation literals");
+        }
+        if (stringsApplied && legacyInterfaceConstants > 0) {
+            // A pre-Java-8 interface cannot host a <clinit>/decoder, so its own static-final String
+            // constants stay plaintext in that class file. Reads elsewhere were inlined and are
+            // encrypted; report the declaring-interface leak rather than ship it unremarked.
+            result.getWarnings().add(legacyInterfaceConstants + " static-final String constant(s) on "
+                    + "pre-Java-8 interface(s) were not encrypted (such interfaces cannot host the "
+                    + "decoder); recompile the interface at -target 8+ to encrypt its constant pool");
         }
         if (req.getReportFile() != null) {
             writeReport(req.getReportFile(), cfg, result);

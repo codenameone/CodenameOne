@@ -244,6 +244,87 @@ public class StringEncryptTransformTest {
         assertEquals(b, c.getMethod("b").invoke(null));
     }
 
+    @Test
+    public void preJava8InterfaceConstantIsCountedAsExcluded() throws Exception {
+        // A Java 7 interface cannot host a <clinit>/decoder, so its own static-final String constant
+        // stays plaintext. The transform must not silently ship it: it leaves it and counts it so the
+        // engine can warn.
+        String secret = "legacy interface constant secret value";
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_7, org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_INTERFACE | org.objectweb.asm.Opcodes.ACC_ABSTRACT,
+                "app/LegacyIface", null, "java/lang/Object", null);
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "SECRET", "Ljava/lang/String;", null, secret)
+                .visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 55);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("nothing can be encrypted on a pre-Java-8 interface", 0, t.getEncryptedCount());
+        assertEquals("its constant must be counted as an exclusion", 1, t.getLegacyInterfaceConstantCount());
+        assertTrue("the constant is left as-is (reported, not silently dropped)",
+                StringEncryptTransform.containsStringLiteral(out, secret));
+    }
+
+    @Test
+    public void oversizedInitializerIsSplitAcrossHelpers() throws Exception {
+        // A generated class with enough distinct literals that a single <clinit> would exceed the
+        // 65535-byte method limit. Hoisting must split the initializer across helper methods so the
+        // class still assembles, verifies and runs -- rather than throwing MethodTooLargeException.
+        // 8000 fields * ~9 bytes/init-unit ~= 72 KB, comfortably past the limit without the split.
+        int count = 8000;
+        String probeValue = "big_clinit_secret_literal_number_0";
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/BigClinit", null, "java/lang/Object", null);
+        // Spread the literals across small, individually-valid methods (each pops what it loads).
+        int perMethod = 200;
+        for (int start = 0; start < count; start += perMethod) {
+            org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                    | org.objectweb.asm.Opcodes.ACC_STATIC, "m" + start, "()V", null, null);
+            m.visitCode();
+            for (int i = start; i < start + perMethod && i < count; i++) {
+                m.visitLdcInsn("big_clinit_secret_literal_number_" + i);
+                m.visitInsn(org.objectweb.asm.Opcodes.POP);
+            }
+            m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+            m.visitMaxs(1, 0);
+            m.visitEnd();
+        }
+        // A probe that returns literal 0 so we can confirm a hoisted value decodes correctly.
+        addStringGetter(w, "probe", probeValue);
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 4242);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("every distinct literal is hoisted once", count, t.getEncryptedCount());
+
+        // The output must verify (no MethodTooLargeException was thrown building it, and no method is
+        // too large or malformed).
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+
+        // The split actually happened: at least one synthetic initializer helper exists.
+        final boolean[] sawHelper = {false};
+        new org.objectweb.asm.ClassReader(out).accept(new org.objectweb.asm.ClassVisitor(
+                org.objectweb.asm.Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc,
+                    String sig, String[] exceptions) {
+                if (name.startsWith("zqCI$")) {
+                    sawHelper[0] = true;
+                }
+                return null;
+            }
+        }, org.objectweb.asm.ClassReader.SKIP_CODE);
+        assertTrue("the oversized initializer must be split into helper methods", sawHelper[0]);
+
+        assertFalse(StringEncryptTransform.containsStringLiteral(out, probeValue));
+        Class<?> c = new ByteLoader().define("app.BigClinit", out);
+        assertEquals(probeValue, c.getMethod("probe").invoke(null));
+    }
+
     private static void addStringGetter(org.objectweb.asm.ClassWriter w, String name, String value) {
         org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
                 | org.objectweb.asm.Opcodes.ACC_STATIC, name, "()Ljava/lang/String;", null, null);

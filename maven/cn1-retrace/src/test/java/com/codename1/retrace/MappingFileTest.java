@@ -52,6 +52,29 @@ public class MappingFileTest {
         assertEquals("MyForm.java", out.getFileName());
     }
 
+    private static final String INIT_MAPPING =
+            "com.example.MyForm -> zqaaaa:\n"
+            + "    50:55:void <init>() -> <init>\n"
+            + "    70:72:void <clinit>() -> <clinit>\n";
+
+    @Test
+    public void normalizesParparVmConstructorSentinel() throws Exception {
+        // ParparVM records a constructor frame under the runtime sentinel __INIT__; the mapping keys it
+        // as <init>. Without normalization the lookup misses and the frame keeps __INIT__.
+        MappingFile mf = MappingFile.parse(INIT_MAPPING);
+        Frame out = mf.retrace(new Frame("zqaaaa", "__INIT__", "zqaaaa.java", 52));
+        assertEquals("com.example.MyForm", out.getClassName());
+        assertEquals("<init>", out.getMethodName());
+    }
+
+    @Test
+    public void normalizesParparVmStaticInitializerSentinel() throws Exception {
+        MappingFile mf = MappingFile.parse(INIT_MAPPING);
+        Frame out = mf.retrace(new Frame("zqaaaa", "__CLINIT__", "zqaaaa.java", 71));
+        assertEquals("com.example.MyForm", out.getClassName());
+        assertEquals("<clinit>", out.getMethodName());
+    }
+
     @Test
     public void retracesMethodByLineRange() throws Exception {
         MappingFile mf = MappingFile.parse(MAPPING);

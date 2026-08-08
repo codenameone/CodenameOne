@@ -220,7 +220,12 @@ public final class MappingFile {
         // synthesize <OriginalClass>.java from the retraced class instead.
         String file = preferredSourceFile(obfuscated.getFileName(), obfuscated.getClassName(),
                 originalClass);
-        List<MethodMapping> candidates = cm.methods.get(obfuscated.getMethodName());
+        // ParparVM records a constructor / static initializer under the runtime sentinel names
+        // __INIT__ / __CLINIT__ (BytecodeMethod), but a ProGuard mapping keys them as <init>/<clinit>.
+        // Normalize before the lookup, or the frame misses its method record and keeps the sentinel
+        // name with no line mapping.
+        String methodName = normalizeInitializer(obfuscated.getMethodName());
+        List<MethodMapping> candidates = cm.methods.get(methodName);
         List<Frame> out = new ArrayList<Frame>();
         if (candidates != null && !candidates.isEmpty()) {
             for (MethodMapping m : candidates) {
@@ -238,9 +243,24 @@ public final class MappingFile {
                 }
             }
         } else {
-            out.add(new Frame(originalClass, obfuscated.getMethodName(), file, observed));
+            out.add(new Frame(originalClass, methodName, file, observed));
         }
         return out;
+    }
+
+    /**
+     * Maps ParparVM's runtime initializer sentinels to the JVM names a ProGuard mapping uses, so a
+     * crash inside a constructor or static initializer resolves its method record. Any other name is
+     * returned unchanged.
+     */
+    private static String normalizeInitializer(String methodName) {
+        if ("__INIT__".equals(methodName)) {
+            return "<init>";
+        }
+        if ("__CLINIT__".equals(methodName)) {
+            return "<clinit>";
+        }
+        return methodName;
     }
 
     /** Builds a frame for one method record, honoring an inlinee's own declaring class/source file. */

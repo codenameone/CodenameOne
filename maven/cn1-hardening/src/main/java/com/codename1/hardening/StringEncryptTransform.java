@@ -69,12 +69,23 @@ public final class StringEncryptTransform {
     private static final char TAG_ARG = '\u0001';
     private static final char TAG_CONST = '\u0002';
 
+    /** Synthesized <clinit> initializer-chunk helpers, kept clear of any real member. */
+    private static final String INIT_HELPER_PREFIX = "zqCI$";
+    /**
+     * Cut a generated <clinit> into helper methods once its initializer grows past this many
+     * instructions, so a class with thousands of hoisted/encrypted constants never exceeds the
+     * JVM's 65535-byte method limit. Each init unit is LDC -> INVOKESTATIC -> PUTSTATIC (~9
+     * bytes), so this bound keeps every method well under the limit.
+     */
+    private static final int MAX_CLINIT_INSNS = 4000;
+
     private final boolean encryptAllStrings;
     private final int seed;
     private final ClassLoader hierarchy;
     private final java.util.Set<String> constantValues;
     private int encryptedCount;
     private int concatLiteralCount;
+    private int legacyInterfaceConstantCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -137,6 +148,18 @@ public final class StringEncryptTransform {
         return concatLiteralCount;
     }
 
+    /**
+     * The number of {@code static final String} constants on pre-Java-8 interfaces that this transform
+     * left in plaintext. Such an interface cannot host a {@code <clinit>} or the decoder (both need
+     * class-file version 52), so its own {@code ConstantValue} attribute cannot be moved to a decode
+     * call. Every <em>read</em> of the constant elsewhere was inlined by javac to an {@code LDC} and is
+     * encrypted there, so the value is hidden at each use; only the declaring interface's constant pool
+     * still carries it. Counted and reported rather than shipped silently.
+     */
+    public int getLegacyInterfaceConstantCount() {
+        return legacyInterfaceConstantCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
@@ -149,6 +172,18 @@ public final class StringEncryptTransform {
         // interface has no default/static method bodies to hold LDC literals anyway, so skip it whole
         // rather than emit a class that fails verification.
         if (isInterface && (cn.version & 0xFFFF) < Opcodes.V1_8) {
+            // A pre-Java-8 interface cannot host a <clinit>/decoder, so its own static-final String
+            // ConstantValue attributes cannot be moved to a decode call and stay plaintext. Count the
+            // ones we would otherwise have encrypted so the engine reports the exclusion instead of
+            // silently shipping them; javac already inlined (and this pass encrypts) every read site.
+            if (cn.fields != null) {
+                for (FieldNode f : cn.fields) {
+                    if ((f.access & Opcodes.ACC_STATIC) != 0 && (f.access & Opcodes.ACC_FINAL) != 0
+                            && f.value instanceof String && shouldEncryptLiteral((String) f.value)) {
+                        legacyInterfaceConstantCount++;
+                    }
+                }
+            }
             return classBytes;
         }
 
@@ -377,7 +412,9 @@ public final class StringEncryptTransform {
             init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
             encryptedCount++;
         }
-        prependToClinit(cn, init);
+        // hoistMethodLiterals runs only for a non-interface (interfaces decode per access), so the
+        // helper split, if it triggers, emits ordinary private static helpers.
+        prependToClinit(cn, init, false);
         return true;
     }
 
@@ -407,7 +444,7 @@ public final class StringEncryptTransform {
             }
         }
         if (changed) {
-            prependToClinit(cn, init);
+            prependToClinit(cn, init, isInterface);
         }
         return changed;
     }
@@ -438,7 +475,56 @@ public final class StringEncryptTransform {
         return bytes <= 65535;
     }
 
-    private void prependToClinit(ClassNode cn, InsnList init) {
+    private void prependToClinit(ClassNode cn, InsnList init, boolean isInterface) {
+        // A generated class can hoist/encrypt thousands of constants; emitting every init unit into a
+        // single <clinit> can blow past the 65535-byte method limit (ASM throws MethodTooLargeException
+        // even though every input method was valid). When the initializer is large, split it across
+        // synthetic helper methods and have <clinit> call them in order. Each init unit ends with
+        // PUTSTATIC (stack empty), so cutting after a PUTSTATIC keeps every chunk verifiable.
+        if (init.size() <= MAX_CLINIT_INSNS) {
+            insertIntoClinit(cn, init);
+            return;
+        }
+        java.util.Set<String> taken = new java.util.HashSet<String>();
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                taken.add(mn.name);
+            }
+        }
+        int access = (isInterface ? Opcodes.ACC_PUBLIC : Opcodes.ACC_PRIVATE)
+                | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC;
+        InsnList calls = new InsnList();
+        InsnList chunk = new InsnList();
+        int helperCounter = 0;
+        AbstractInsnNode insn = init.getFirst();
+        while (insn != null) {
+            AbstractInsnNode next = insn.getNext();
+            init.remove(insn);
+            chunk.add(insn);
+            boolean atBoundary = insn.getOpcode() == Opcodes.PUTSTATIC && chunk.size() >= MAX_CLINIT_INSNS;
+            if (atBoundary || next == null) {
+                String hname;
+                do {
+                    hname = INIT_HELPER_PREFIX + helperCounter;
+                    helperCounter++;
+                } while (taken.contains(hname));
+                taken.add(hname);
+                MethodNode helper = new MethodNode(Opcodes.ASM9, access, hname, "()V", null, null);
+                helper.instructions = new InsnList();
+                helper.instructions.add(chunk);
+                helper.instructions.add(new InsnNode(Opcodes.RETURN));
+                cn.methods.add(helper);
+                // itf=true when the helper lives in an interface, or the JVM emits a Methodref instead
+                // of an InterfaceMethodref and throws IncompatibleClassChangeError at run time.
+                calls.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, hname, "()V", isInterface));
+                chunk = new InsnList();
+            }
+            insn = next;
+        }
+        insertIntoClinit(cn, calls);
+    }
+
+    private void insertIntoClinit(ClassNode cn, InsnList init) {
         MethodNode clinit = null;
         if (cn.methods != null) {
             for (MethodNode mn : cn.methods) {
