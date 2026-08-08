@@ -54,7 +54,8 @@ public class JdwpClassPrepareTest {
             "version\t1\n"
           + "class\t0\tcom_example_Main\tMain.java\t-1\tcom/example/Main\n"
           + "class\t1\tcom_example_Main_1\tMain.java\t-1\tcom/example/Main$1\n"
-          + "class\t2\tjava_lang_String\tString.java\t-1\tjava/lang/String\n";
+          + "class\t2\tjava_lang_String\tString.java\t-1\tjava/lang/String\n"
+          + "class\t3\tcom_example_Other\tOther.java\t-1\tcom/example/Other\n";
 
     @Test
     public void aMatchingPatternFiresForEveryClassItCovers() throws Exception {
@@ -62,7 +63,8 @@ public class JdwpClassPrepareTest {
             int rid = f.registerClassPrepare(new String[] { "com.example.*" }, new String[0]);
 
             List<String> prepared = f.preparedSignatures(rid);
-            assertEquals(Arrays.asList("Lcom/example/Main$1;", "Lcom/example/Main;"), prepared);
+            assertEquals(Arrays.asList("Lcom/example/Main$1;", "Lcom/example/Main;",
+                            "Lcom/example/Other;"), prepared);
         }
     }
 
@@ -87,7 +89,8 @@ public class JdwpClassPrepareTest {
         try (Fixture f = new Fixture()) {
             int rid = f.registerClassPrepare(new String[0], new String[] { "java.*" });
 
-            assertEquals(Arrays.asList("Lcom/example/Main$1;", "Lcom/example/Main;"),
+            assertEquals(Arrays.asList("Lcom/example/Main$1;", "Lcom/example/Main;",
+                            "Lcom/example/Other;"),
                     f.preparedSignatures(rid));
         }
     }
@@ -192,6 +195,27 @@ public class JdwpClassPrepareTest {
 
             assertTrue("a pattern that excludes the pinned class yields nothing",
                     f.preparedSignatures(rid).isEmpty());
+        }
+    }
+
+    /**
+     * A request restricted to one source file fires only for that file.
+     *
+     * <p>The modifier was parsed for its width and discarded, so a request
+     * carrying it replayed for every class the name patterns allowed —
+     * including classes from unrelated files.</p>
+     */
+    @Test
+    public void aSourceNameRestrictionIsHonoured() throws Exception {
+        try (Fixture f = new Fixture()) {
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[] { "com.example.*" },
+                            new String[0], -1L, new String[] { "Other.java" }));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertEquals(Collections.singletonList("Lcom/example/Other;"),
+                    f.preparedSignatures(rid));
         }
     }
 

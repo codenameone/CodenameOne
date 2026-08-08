@@ -160,6 +160,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         /** ClassExclude patterns. */
         final List<String> excludes;
         /**
+         * SourceNameMatch patterns, compared against a class's source file.
+         *
+         * Every one must match: JDWP modifiers are conjunctive, and the
+         * conservative direction here is fewer events rather than more.
+         * Dropped, the request replayed for classes from unrelated files.
+         */
+        final List<String> sourceNames;
+        /**
          * ClassOnly: the single class the request is restricted to, or -1.
          *
          * A client may pin a request to one type by reference id rather than
@@ -171,11 +179,12 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
         ClassPrepareRequest(int requestId, int suspendPolicy,
                             List<String> includes, List<String> excludes,
-                            int onlyClassId) {
+                            List<String> sourceNames, int onlyClassId) {
             this.requestId = requestId;
             this.suspendPolicy = suspendPolicy;
             this.includes = includes;
             this.excludes = excludes;
+            this.sourceNames = sourceNames;
             this.onlyClassId = onlyClassId;
         }
 
@@ -190,8 +199,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             return pattern.equals(className);
         }
 
-        boolean accepts(int classId, String className) {
+        boolean accepts(int classId, String className, String sourceFile) {
             if (onlyClassId >= 0 && classId != onlyClassId) return false;
+            for (String sourceName : sourceNames) {
+                if (sourceFile == null || !matches(sourceName, sourceFile)) return false;
+            }
             for (String ex : excludes) {
                 if (matches(ex, className)) return false;
             }
@@ -1157,6 +1169,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 boolean badModifier = false;
                 List<String> classIncludes = new ArrayList<>();
                 List<String> classExcludes = new ArrayList<>();
+                List<String> sourceNameMatches = new ArrayList<>();
                 int onlyClassId = -1;
                 for (int i = 0; i < modCount && !badModifier; i++) {
                     if (off >= p.length) { badModifier = true; break; }
@@ -1239,6 +1252,10 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                             if (off + 4 > p.length) { badModifier = true; break; }
                             int slen = readInt(p, off);
                             if (slen < 0 || off + 4 + slen > p.length) { badModifier = true; break; }
+                            // Retained for the same reason as ClassOnly: a
+                            // ClassPrepare request restricted to one source
+                            // file replayed for every file without it.
+                            sourceNameMatches.add(readString(p, off));
                             off += 4 + slen;
                             break;
                         }
@@ -1289,7 +1306,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     }
                 } else if (eventKind == EK_CLASS_PREPARE) {
                     ClassPrepareRequest cpr = new ClassPrepareRequest(
-                            rid, suspendPolicy, classIncludes, classExcludes, onlyClassId);
+                            rid, suspendPolicy, classIncludes, classExcludes,
+                            sourceNameMatches, onlyClassId);
                     classPrepareRequests.put(rid, cpr);
                     // The reply has to reach the IDE before the events do, so
                     // the already-loaded classes are replayed after it below.
@@ -1373,7 +1391,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         int fired = 0;
         for (SymbolTable.ClassInfo c : symbols.allClasses()) {
             String dotted = c.jvmName.replace('/', '.');
-            if (!cpr.accepts(c.classId, dotted)) continue;
+            if (!cpr.accepts(c.classId, dotted, c.sourceFile)) continue;
             try {
                 Buf b = new Buf();
                 b.writeByte(SP_NONE);
@@ -1395,7 +1413,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         System.out.println("[jdwp] CLASS_PREPARE rid=" + cpr.requestId
                 + " matched " + fired + " class(es)"
                 + (cpr.includes.isEmpty() ? "" : " for " + cpr.includes)
-                + (cpr.onlyClassId >= 0 ? " restricted to classId " + cpr.onlyClassId : ""));
+                + (cpr.onlyClassId >= 0 ? " restricted to classId " + cpr.onlyClassId : "")
+                + (cpr.sourceNames.isEmpty() ? "" : " in " + cpr.sourceNames));
     }
 
     private void handleObject(int id, int cmd, byte[] p) throws IOException {

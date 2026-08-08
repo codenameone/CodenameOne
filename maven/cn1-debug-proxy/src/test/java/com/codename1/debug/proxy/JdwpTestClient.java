@@ -197,15 +197,28 @@ final class JdwpTestClient implements AutoCloseable {
     /** {@code onlyClassJdwpId} of -1 omits the ClassOnly modifier. */
     static byte[] classPrepareRequest(int suspendPolicy, String[] includes,
                                       String[] excludes, long onlyClassJdwpId) {
+        return classPrepareRequest(suspendPolicy, includes, excludes,
+                onlyClassJdwpId, new String[0]);
+    }
+
+    /** Adds SourceNameMatch modifiers for each entry in {@code sourceNames}. */
+    static byte[] classPrepareRequest(int suspendPolicy, String[] includes,
+                                      String[] excludes, long onlyClassJdwpId,
+                                      String[] sourceNames) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream b = new DataOutputStream(bytes);
         try {
             b.writeByte(EK_CLASS_PREPARE);
             b.writeByte(suspendPolicy);
-            b.writeInt(includes.length + excludes.length + (onlyClassJdwpId >= 0 ? 1 : 0));
+            b.writeInt(includes.length + excludes.length + sourceNames.length
+                    + (onlyClassJdwpId >= 0 ? 1 : 0));
             if (onlyClassJdwpId >= 0) {
                 b.writeByte(4);   // ClassOnly
                 b.writeLong(onlyClassJdwpId);
+            }
+            for (String sourceName : sourceNames) {
+                b.writeByte(12);  // SourceNameMatch
+                writeString(b, sourceName);
             }
             for (String pattern : includes) {
                 b.writeByte(MOD_CLASS_MATCH);
