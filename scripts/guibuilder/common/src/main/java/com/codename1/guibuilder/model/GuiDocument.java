@@ -244,6 +244,22 @@ public final class GuiDocument {
         return componentsIn(parent).size() >= BORDER_LAYOUT_REGIONS;
     }
 
+    /**
+     * The text the preview shows for a freshly added component, so the document carries it too.
+     *
+     * @param type the component type
+     * @return the default text, or null for a type that has none
+     */
+    private static String defaultTextFor(String type) {
+        if ("Button".equals(type)) return "Button";
+        if ("Label".equals(type)) return "Label";
+        if ("SpanLabel".equals(type)) return "Wrapped label text";
+        if ("TextArea".equals(type)) return "Text area";
+        if ("CheckBox".equals(type)) return "Check box";
+        if ("RadioButton".equals(type)) return "Radio button";
+        return null;
+    }
+
     /** North, South, East, West and Center: everything a BorderLayout can hold. */
     private static final int BORDER_LAYOUT_REGIONS = 5;
 
@@ -261,6 +277,11 @@ public final class GuiDocument {
         Element child = new Element("component");
         child.setAttribute("type", type);
         child.setAttribute("name", uniqueName(type));
+        // The preview substitutes a visible default for a missing text attribute while the
+        // generator emits an empty string, so a control added and saved without being edited went
+        // from labelled on the canvas to blank at runtime. Store what the canvas shows.
+        String defaultText = defaultTextFor(type);
+        if (defaultText != null) child.setAttribute("text", defaultText);
         if (acceptsChildren(child)) child.setAttribute("layout", "LayeredLayout");
         parent.addChild(child);
         assignFreeTableCell(parent, child);
