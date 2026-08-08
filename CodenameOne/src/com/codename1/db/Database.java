@@ -756,10 +756,30 @@ public abstract class Database {
     }
 
     /// Whether a ROLLBACK names a savepoint, which unwinds to it rather than ending anything.
+    ///
+    /// Reads the next keyword rather than searching for the text " TO": SQL separates words with
+    /// any whitespace or a comment, so `ROLLBACK\nTO checkpoint` and `ROLLBACK /* here */ TO x`
+    /// are the same statement to the engine. Missing one of those would clear the flag while
+    /// SQLite stayed inside the transaction -- the caller's own commit would then be rejected as
+    /// having nothing to commit, and a key change would be allowed underneath it.
     private static boolean hasToSavepoint(String statement) {
-        String rest = statement.toUpperCase();
-        int to = rest.indexOf(" TO");
-        return to >= 0;
+        return "TO".equals(keywordAfterFirst(statement));
+    }
+
+    /// The second keyword of a statement, upper cased, or an empty string.
+    private static String keywordAfterFirst(String statement) {
+        int start = skipLeadingTrivia(statement, 0);
+        int length = statement.length();
+        int end = start;
+        while (end < length && isKeywordChar(statement.charAt(end))) {
+            end++;
+        }
+        int secondStart = skipLeadingTrivia(statement, end);
+        int secondEnd = secondStart;
+        while (secondEnd < length && isKeywordChar(statement.charAt(secondEnd))) {
+            secondEnd++;
+        }
+        return statement.substring(secondStart, secondEnd).toUpperCase();
     }
 
     /// Rejects a key change while a transaction is open.

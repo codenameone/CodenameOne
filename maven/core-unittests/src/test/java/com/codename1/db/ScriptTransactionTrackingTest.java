@@ -140,6 +140,26 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void aSavepointRollbackIsRecognisedAcrossAnyWhitespace() {
+        // SQL separates words with any whitespace or a comment, so these are all the same
+        // statement to the engine. Reading only " TO" would clear the flag on all but the first
+        // while SQLite stayed inside the transaction.
+        String[] sameStatement = {
+            "ROLLBACK TO checkpoint",
+            "ROLLBACK\nTO checkpoint",
+            "ROLLBACK\tTO checkpoint",
+            "ROLLBACK /* here */ TO checkpoint",
+            "ROLLBACK -- here\nTO checkpoint",
+        };
+        for (String statement : sameStatement) {
+            db.ran("BEGIN");
+            db.ran(statement);
+            assertTrue(db.isInTransaction(), "still inside the transaction after: " + statement);
+            db.ran("ROLLBACK");
+        }
+    }
+
+    @Test
     void aTriggerBodyIsNotTransactionControl() {
         // CREATE TRIGGER ... BEGIN ... END is one statement, and its BEGIN is not a transaction.
         db.ran("CREATE TRIGGER t AFTER INSERT ON x BEGIN UPDATE y SET a = 1; END");

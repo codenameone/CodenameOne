@@ -10976,6 +10976,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // Before anything opens: a plaintext open of a database mid-conversion would create an
         // empty one over the top of the real data, which nothing afterwards could undo.
         recoverInterruptedDatabaseMigration(resolveNativeDatabasePath(databaseName));
+        // And refused outright while a conversion is running, rather than opened onto the file it
+        // is about to replace. Checked here, where the decision to open is made, so a conversion
+        // that has already counted the connections cannot be joined by a new one.
+        refuseIfDatabaseIsBeingConverted(resolveNativeDatabasePath(databaseName));
         SQLiteDatabase db;
         if (databaseName.startsWith("file://")) {
             db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
@@ -10990,6 +10994,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (config == null || !config.isEncrypted()) {
             return openOrCreateDB(databaseName);
         }
+        // Refused while a conversion owns the file, for the reason given in openOrCreateDB.
+        refuseIfDatabaseIsBeingConverted(resolveNativeDatabasePath(databaseName));
         // The SQLCipher-backed package is deleted at build time for apps that never touch
         // DatabaseConfig, so it has to be reached reflectively - the same arrangement the
         // ARCore-backed AR implementation uses.
@@ -11211,6 +11217,62 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Database files a conversion currently owns exclusively.
+    private static final java.util.Set<String> MIGRATING_DATABASES =
+            new java.util.HashSet<String>();
+
+    /// Claims a database for a conversion, or refuses.
+    ///
+    /// Counting the connections and then converting are one decision, not two. Between a count
+    /// read on its own and the rename that ends the conversion, another thread can open the
+    /// database, and that connection then holds the file the rename replaces: its writes are
+    /// accepted and disappear when the backup goes. So the count is read and the claim taken
+    /// under the same lock the opens take, and an open that arrives afterwards is refused for as
+    /// long as the conversion runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the database file
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database is open elsewhere, or already being converted
+    public static synchronized void beginDatabaseMigration(String path) throws IOException {
+        if (MIGRATING_DATABASES.contains(path)) {
+            throw new IOException("The database " + path + " is already being converted.");
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        if (count != null && count.intValue() > 1) {
+            throw new IOException("The database " + path + " is open more than once, and "
+                    + "converting it replaces the file underneath every connection to it. Close "
+                    + "the other connections first; writes made through them during the "
+                    + "conversion would be accepted and then lost.");
+        }
+        MIGRATING_DATABASES.add(path);
+    }
+
+    /// Releases a database claimed by `#beginDatabaseMigration(String)`.
+    public static synchronized void endDatabaseMigration(String path) {
+        MIGRATING_DATABASES.remove(path);
+    }
+
+    /// Refuses to open a database a conversion currently owns.
+    ///
+    /// Checked where the decision to open is made rather than in a connection's constructor, so
+    /// that a conversion which has already taken its claim cannot be joined by a new connection
+    /// onto the file it is about to replace.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a conversion currently owns the file
+    public static synchronized void refuseIfDatabaseIsBeingConverted(String path)
+            throws IOException {
+        if (path != null && MIGRATING_DATABASES.contains(path)) {
+            throw new IOException("The database " + path + " is being converted and cannot be "
+                    + "opened until that finishes.");
+        }
+    }
+
     /// How many connections are open on a database file, encrypted or not.
     public static synchronized int openDatabaseConnections(String path) {
         Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
@@ -11417,6 +11479,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!isDatabaseEncryptionSupported()) {
             return openOrCreateDB(databaseName);
         }
+        // Refused while a conversion owns the file, for the reason given in openOrCreateDB.
+        refuseIfDatabaseIsBeingConverted(resolveNativeDatabasePath(databaseName));
         Object opened;
         try {
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");

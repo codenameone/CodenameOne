@@ -319,18 +319,28 @@ class AndroidCipherDB extends Database {
 
     private void migrateThroughExport(String targetKey) throws IOException {
         String path = db.getPath();
-        if (AndroidImplementation.openDatabaseConnections(path) > 1) {
-            // Refused rather than raced. The swap renames a new file over this one, and Android
-            // lets that succeed while another connection still holds the old file open -- that
-            // connection keeps writing to a file that is no longer the database, is told each
-            // write succeeded, and then loses the lot when the backup is deleted. Its WAL is the
-            // same story. There is no way to migrate underneath it, so the caller is told.
+        // Claimed rather than merely counted. The swap renames a new file over this one, and
+        // Android lets that succeed while another connection still holds the old file open --
+        // that connection keeps writing to a file that is no longer the database, is told each
+        // write succeeded, and loses the lot when the backup is deleted. Its WAL is the same
+        // story. Reading a count and then converting leaves room for a connection to arrive in
+        // between, so the count and the claim are taken together under one lock and every open
+        // that arrives afterwards is refused until this returns.
+        try {
+            AndroidImplementation.beginDatabaseMigration(path);
+        } catch (IOException openElsewhere) {
             throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
-                    "The database " + path + " is open more than once, and converting it replaces "
-                    + "the file underneath every connection to it. Close the other connections "
-                    + "first; writes made through them during the conversion would be accepted "
-                    + "and then lost.");
+                    openElsewhere.getMessage(), openElsewhere);
         }
+        try {
+            migrateThroughExportExclusively(targetKey, path);
+        } finally {
+            AndroidImplementation.endDatabaseMigration(path);
+        }
+    }
+
+    /** The conversion itself, with this database claimed for the duration. */
+    private void migrateThroughExportExclusively(String targetKey, String path) throws IOException {
         String name = new File(path).getName();
         File dir = AndroidImplementation.databaseMigrationDir(path);
         if (dir == null) {
