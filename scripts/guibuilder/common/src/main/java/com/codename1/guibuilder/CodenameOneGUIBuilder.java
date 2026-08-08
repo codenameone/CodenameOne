@@ -1954,6 +1954,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int column = plan.tableCell[1];
         Integer vacatedRow = parseInteger(dragged.getAttribute("tableRow"));
         Integer vacatedColumn = parseInteger(dragged.getAttribute("tableColumn"));
+        // Validate BEFORE touching the document. endTransaction() commits whatever happened rather
+        // than rolling back, and a false return does not refresh the canvas, so a check placed
+        // after the reparent or the occupant's reassignment would leave a visibly rejected drop
+        // recorded in the saved form. Anything added here that can refuse the drop belongs above
+        // the first setAttribute, not below it.
+        if (!draggedSpanFits(plan.parent, dragged, plan.occupied, row, column)) {
+            setStatus("That cell cannot hold this component's span");
+            return false;
+        }
         if (oldParent != plan.parent) {
             document.select(dragged);
             if (!document.moveSelectedToParent(plan.parent, componentChildren(plan.parent).size())) return false;
@@ -1965,13 +1974,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     : firstFreeTableCell(plan.parent, dragged, plan.occupied);
             document.setAttribute("tableRow", String.valueOf(destination[0]));
             document.setAttribute("tableColumn", String.valueOf(destination[1]));
-        }
-        // The anchor being free is not enough when the dragged component spans: its whole
-        // rectangle has to fit and be clear. normalizeTableCells() only repairs duplicate anchors,
-        // so an intersecting span survived it and overlapped in the preview and generated form.
-        if (!draggedSpanFits(plan.parent, dragged, plan.occupied, row, column)) {
-            setStatus("That cell cannot hold this component's span");
-            return false;
         }
         document.select(dragged);
         document.setAttribute("layoutConstraint", null);
@@ -2000,6 +2002,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (rowSpan == 1 && columnSpan == 1) return true;
         int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
         if (column + columnSpan > columns) return false;
+        // Rows as well as columns: normalizeTableCells() grows the table from anchor cells only, so
+        // a rectangle hanging off the bottom row is never repaired and reaches TableLayout intact.
+        int rows = Math.max(1, integer(value(parent, "tableLayoutRows", "2"), 2));
+        if (row + rowSpan > rows) return false;
         for (Element child : componentChildren(parent)) {
             if (child == dragged || child == displaced) continue;
             Integer childRow = parseInteger(child.getAttribute("tableRow"));
@@ -3299,21 +3305,28 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 "The existing model was generated for the previous strategy and will not bind"
                 + " correctly. Regenerate it when you save? Your own changes to that file are"
                 + " replaced.", "Regenerate on save", "Keep mine")) {
-            regenerateModelOnSave = false;
+            regenerateModelFor = null;
             setStatus("Kept the existing model; it may not bind under the new strategy");
             return;
         }
         // Deferred to Save, so the model and the companion change together. Writing it here left
         // the on-disk pair mismatched until the form happened to be saved -- and permanently so if
         // the picker change was undone or the form closed without saving.
-        regenerateModelOnSave = true;
+        regenerateModelFor = document;
         setStatus("The binding model will be regenerated when you save");
     }
 
-    /** Rewrites the model alongside the companion, when a strategy change asked for it. */
-    private void regenerateModelIfRequested(String sourcePath) {
-        if (!regenerateModelOnSave) return;
-        regenerateModelOnSave = false;
+    /**
+     * Rewrites the model alongside the companion, when this document's strategy change asked for
+     * it.
+     *
+     * @param sourcePath the companion source path
+     * @return false only when the rewrite was requested and could not be written; the caller must
+     *     fail the save then, or the companion would describe a strategy the model on disk does not
+     */
+    private boolean regenerateModelIfRequested(String sourcePath) {
+        if (regenerateModelFor != document) return true; //NOPMD CompareObjectsWithEquals
+        regenerateModelFor = null;
         String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
         try {
             String regenerated = generatedModelSource();
@@ -3330,13 +3343,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 reopenActiveEditor();
             }
             setStatus("Regenerated the binding model for the new strategy");
+            return true;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Model regeneration failed: " + ex.getMessage());
+            // Put the request back: the strategy is still unreconciled, so the next save retries.
+            regenerateModelFor = document;
+            return false;
         }
     }
 
-    /** Set when a strategy change agreed to rewrite the model, cleared once that has happened. */
-    private boolean regenerateModelOnSave;
+    /**
+     * The document whose strategy change agreed to rewrite its model, or null when none has.
+     *
+     * <p>Held as the document rather than a boolean: switching forms and discarding used to leave a
+     * bare flag set, and the next save of any other form consumed it and overwrote that form's
+     * model with generated content.
+     */
+    private GuiDocument regenerateModelFor;
 
     private Component toolbarCommandsEditor() {
         Container commands = new Container(BoxLayout.y());
@@ -4364,7 +4387,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // to "properties". Creating the model only when the Code pane is saved left an ordinary
             // Save producing source that referenced a class which did not exist.
             if (ensureBindingModel(sourcePath) == MODEL_FAILED) return false;
-            regenerateModelIfRequested(sourcePath);
+            if (!regenerateModelIfRequested(sourcePath)) return false;
             // Only now: marking the document clean after the .gui write but before the companion
             // one meant a failed companion write left isModified() false, so the next form switch
             // went ahead without retrying and the runtime source stayed stale.
