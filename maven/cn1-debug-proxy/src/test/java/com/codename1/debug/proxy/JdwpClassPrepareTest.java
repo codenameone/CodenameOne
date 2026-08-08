@@ -55,7 +55,9 @@ public class JdwpClassPrepareTest {
           + "class\t0\tcom_example_Main\tMain.java\t-1\tcom/example/Main\n"
           + "class\t1\tcom_example_Main_1\tMain.java\t-1\tcom/example/Main$1\n"
           + "class\t2\tjava_lang_String\tString.java\t-1\tjava/lang/String\n"
-          + "class\t3\tcom_example_Other\tOther.java\t-1\tcom/example/Other\n";
+          + "class\t3\tcom_example_Other\tOther.java\t-1\tcom/example/Other\n"
+          // Derived extends Main, so ClassOnly on Main must reach it.
+          + "class\t4\tcom_example_Derived\tDerived.java\t0\tcom/example/Derived\n";
 
     @Test
     public void aMatchingPatternFiresForEveryClassItCovers() throws Exception {
@@ -63,8 +65,8 @@ public class JdwpClassPrepareTest {
             int rid = f.registerClassPrepare(new String[] { "com.example.*" }, new String[0]);
 
             List<String> prepared = f.preparedSignatures(rid);
-            assertEquals(Arrays.asList("Lcom/example/Main$1;", "Lcom/example/Main;",
-                            "Lcom/example/Other;"), prepared);
+            assertEquals(Arrays.asList("Lcom/example/Derived;", "Lcom/example/Main$1;",
+                            "Lcom/example/Main;", "Lcom/example/Other;"), prepared);
         }
     }
 
@@ -89,8 +91,8 @@ public class JdwpClassPrepareTest {
         try (Fixture f = new Fixture()) {
             int rid = f.registerClassPrepare(new String[0], new String[] { "java.*" });
 
-            assertEquals(Arrays.asList("Lcom/example/Main$1;", "Lcom/example/Main;",
-                            "Lcom/example/Other;"),
+            assertEquals(Arrays.asList("Lcom/example/Derived;", "Lcom/example/Main$1;",
+                            "Lcom/example/Main;", "Lcom/example/Other;"),
                     f.preparedSignatures(rid));
         }
     }
@@ -158,6 +160,43 @@ public class JdwpClassPrepareTest {
             assertEquals(0, reply.errorCode);
             assertTrue("a breakpoint request should get a non-zero id",
                     reply.stream().readInt() > 0);
+        }
+    }
+
+    /**
+     * ClassOnly on a base type reaches its subclasses.
+     *
+     * <p>For class prepare the spec restricts to the given type <em>and its
+     * subtypes</em>. Comparing ids for identity meant a client watching
+     * preparation beneath a base class never saw the subclasses, which is the
+     * reason to pin a base rather than a leaf in the first place.</p>
+     */
+    @Test
+    public void aClassOnlyRestrictionReachesSubtypes() throws Exception {
+        try (Fixture f = new Fixture()) {
+            // classId 0 (Main) arrives as JDWP reference id 1; Derived extends it.
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[0], new String[0], 1L));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertEquals(Arrays.asList("Lcom/example/Derived;", "Lcom/example/Main;"),
+                    f.preparedSignatures(rid));
+        }
+    }
+
+    /** A leaf type still matches only itself. */
+    @Test
+    public void aClassOnlyRestrictionOnALeafMatchesOnlyIt() throws Exception {
+        try (Fixture f = new Fixture()) {
+            // classId 3 (Other) arrives as reference id 4; nothing extends it.
+            JdwpTestClient.Reply reply = f.client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[0], new String[0], 4L));
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+
+            assertEquals(Collections.singletonList("Lcom/example/Other;"),
+                    f.preparedSignatures(rid));
         }
     }
 

@@ -305,6 +305,21 @@ class DebuggerObjectValidationTest {
         assertEquals("kept", probe("THREAD_LIST_REFRESH_KEEPS_OWNED"));
     }
 
+    /**
+     * A resumed thread stops owning an entry even when the thread list also
+     * claims it.
+     *
+     * <p>Deciding survival before removing the owner left the resumed thread
+     * in the owner set, so the next thread-list refresh kept the entry alive
+     * on the strength of an owner that had long since resumed — and once that
+     * thread died, the object and everything it reached stayed rooted for the
+     * session.</p>
+     */
+    @Test
+    void aResumedOwnerIsRemovedEvenFromAnEntryTheThreadListClaims() throws Exception {
+        assertEquals("gone", probe("STALE_OWNER_IS_REMOVED"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -330,7 +345,8 @@ class DebuggerObjectValidationTest {
                 "ROOTS_MARK_ISSUED", "ROOTS_MARK_AFTER_GROWTH",
                 "ROOTS_RELEASED_NOT_MARKED", "ROOTS_TAGGED_NOT_MARKED",
                 "DERIVED_INHERITS_ALL_OWNERS", "UNOWNED_CLAIM_SURVIVES",
-                "THREAD_LIST_REFRESH_RELEASES", "THREAD_LIST_REFRESH_KEEPS_OWNED");
+                "THREAD_LIST_REFRESH_RELEASES", "THREAD_LIST_REFRESH_KEEPS_OWNED",
+                "STALE_OWNER_IS_REMOVED");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -429,6 +445,17 @@ class DebuggerObjectValidationTest {
             "        cn1MarkedRootCount = 0;\n" +
             "        cn1_debugger_mark_issued_roots(NULL);\n" +
             "        printf(\"%s\\n\", cn1MarkRootTargetSeen ? \"marked\" : \"not-marked\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"STALE_OWNER_IS_REMOVED\") == 0) {\n" +
+            "        /* Claimed by a suspension and by the thread list; the\n" +
+            "         * thread resumes, then a later refresh drops the list\n" +
+            "         * claim. Nothing holds it after that. */\n" +
+            "        JAVA_OBJECT both = (JAVA_OBJECT)(uintptr_t)0x12000;\n" +
+            "        cn1_debugger_note_issued_for(both, 7);\n" +
+            "        cn1_debugger_note_issued(both);\n" +
+            "        cn1_debugger_forget_issued_for(7);        /* thread resumes */\n" +
+            "        cn1_debugger_forget_thread_list_claims(); /* later refresh */\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(both) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strncmp(which, \"THREAD_LIST_REFRESH_\", 20) == 0) {\n" +
             "        /* A thread object the list advertised, and one a stopped\n" +

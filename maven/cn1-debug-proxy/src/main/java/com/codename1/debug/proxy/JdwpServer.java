@@ -168,12 +168,18 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
          */
         final List<String> sourceNames;
         /**
-         * ClassOnly: the single class the request is restricted to, or -1.
+         * ClassOnly: the type the request is restricted to, or -1.
          *
          * A client may pin a request to one type by reference id rather than
          * by name pattern. Dropping it left the request with no patterns at
          * all, which reads as "every class" — so a request for one type
          * replayed the entire symbol table at the IDE.
+         *
+         * For class prepare the spec restricts to that type <em>and its
+         * subtypes</em>, so this is matched up the superclass chain rather
+         * than by identity: a client watching preparation beneath a base
+         * class expects the subclasses, which is the whole point of pinning
+         * a base rather than a leaf.
          */
         final int onlyClassId;
 
@@ -199,8 +205,28 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             return pattern.equals(className);
         }
 
-        boolean accepts(int classId, String className, String sourceFile) {
-            if (onlyClassId >= 0 && classId != onlyClassId) return false;
+        /**
+         * Whether {@code classId} is the pinned type or descends from it.
+         *
+         * Walks superclasses only — the symbol table records a superclass per
+         * class but not its interfaces, so a request pinned to an interface
+         * matches the interface itself and not its implementors. The bound on
+         * the walk guards against a malformed table rather than a real cycle.
+         */
+        private boolean isSelfOrSubtypeOf(int classId, SymbolTable symbols) {
+            int at = classId;
+            for (int hops = 0; at >= 0 && hops < 512; hops++) {
+                if (at == onlyClassId) return true;
+                SymbolTable.ClassInfo c = symbols == null ? null : symbols.classById(at);
+                if (c == null) return false;
+                at = c.superId;
+            }
+            return false;
+        }
+
+        boolean accepts(int classId, String className, String sourceFile,
+                        SymbolTable symbols) {
+            if (onlyClassId >= 0 && !isSelfOrSubtypeOf(classId, symbols)) return false;
             for (String sourceName : sourceNames) {
                 if (sourceFile == null || !matches(sourceName, sourceFile)) return false;
             }
@@ -1391,7 +1417,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         int fired = 0;
         for (SymbolTable.ClassInfo c : symbols.allClasses()) {
             String dotted = c.jvmName.replace('/', '.');
-            if (!cpr.accepts(c.classId, dotted, c.sourceFile)) continue;
+            if (!cpr.accepts(c.classId, dotted, c.sourceFile, symbols)) continue;
             try {
                 Buf b = new Buf();
                 b.writeByte(SP_NONE);

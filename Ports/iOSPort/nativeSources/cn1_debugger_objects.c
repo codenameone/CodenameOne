@@ -415,11 +415,17 @@ void cn1_debugger_forget_issued(void) {
     pthread_mutex_unlock(&g_issuedMutex);
 }
 
-/* Whether an entry survives the given owner resuming. */
+/*
+ * Whether an entry survives the given owner resuming.
+ *
+ * The owner is removed first, unconditionally. Returning early for an entry
+ * the thread list also claims used to leave the resumed thread in the owner
+ * set, and a later refresh then kept the entry alive on the strength of that
+ * stale owner -- so once the thread died, the object and everything it reached
+ * stayed rooted for the rest of the session. Survival and owner removal are
+ * separate questions.
+ */
 static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
-    if (e->unowned) return 1;              /* only a full clear drops it */
-    if (e->ownerCount == 0) return 1;
-    if (e->ownerOverflow) return 0;        /* cannot prove another owner remains */
     unsigned remaining = 0;
     for (unsigned i = 0; i < e->ownerCount; i++) {
         if (e->owners[i] != owner) {
@@ -427,6 +433,9 @@ static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
         }
     }
     e->ownerCount = (unsigned char)remaining;
+
+    if (e->unowned) return 1;              /* the thread list still claims it */
+    if (e->ownerOverflow) return 0;        /* cannot prove another owner remains */
     return remaining > 0;                  /* another suspension still holds it */
 }
 
