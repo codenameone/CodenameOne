@@ -292,10 +292,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                 CN1WearableBridge.forgetAfterLocalRemoval(appPath, beforeTombstone);
                 continue;
             }
-            if (!started) {
-                ensureAppRunning();
-                started = true;
-            }
+            // The app is started at the DISPATCH sites below, not here.
+            //
+            // Every pre-filter added ahead of this line only narrowed the problem: an unreadable
+            // asset still downloading, a transfer another pass already claimed, and this device's
+            // own echoed publication all reach this point and then deliver nothing. On a device
+            // that permits the background activity start, each of those brought the receiver's UI
+            // forward for an event no listener ever sees. Starting where the callback is actually
+            // handed over is the version of this that cannot be outflanked by the next case.
             if (transferItem) {
                 // A file transfer arrives as a DataMap carrying an Asset rather than an inline
                 // payload. Turn it back into the WearableMessage the receiver expects; this callback
@@ -322,6 +326,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                     // Confirmed from inside the delivery: dispatched is not delivered, and a
                     // claim persisted for a file the app never received suppresses the redelivery
                     // that would have replaced it.
+                    if (!started) {
+                        ensureAppRunning();
+                        started = true;
+                    }
                     final android.net.Uri claimed = uri;
                     final long claimedSeq = transferSeq;
                     final android.content.Context svc = this;
@@ -395,6 +403,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                         // replica leaves the same item winning, and re-announcing a value the app
                         // already holds is a spurious change -- listeners re-render, and anything
                         // that treats a change as an event would act on it twice.
+                        if (!started) {
+                            ensureAppRunning();
+                            started = true;
+                        }
                         CN1WearableBridge.deliverIfStampUnchanged(appPath, beforeQuery,
                                 remaining.sequence, remaining.node, remaining.payload);
                     } else {
@@ -480,6 +492,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                             CN1WearableBridge.recordLocalEcho(appPath, winner.sequence,
                                     winner.node, winner.payload);
                         } else {
+                            if (!started) {
+                                ensureAppRunning();
+                                started = true;
+                            }
                             CN1WearableBridge.deliverIfOutranks(appPath, winner.sequence,
                                     winner.node, winner.payload);
                         }
@@ -519,6 +535,10 @@ public class CN1WearableListenerService extends WearableListenerService {
                 CN1WearableBridge.recordLocalEcho(appPath, CN1WearableBridge.sequenceOf(value),
                         uri.getHost(), CN1WearableBridge.payloadOf(value));
             } else {
+                if (!started) {
+                    ensureAppRunning();
+                    started = true;
+                }
                 CN1WearableBridge.deliverIfOutranks(appPath, CN1WearableBridge.sequenceOf(value),
                         uri.getHost(), CN1WearableBridge.payloadOf(value));
             }

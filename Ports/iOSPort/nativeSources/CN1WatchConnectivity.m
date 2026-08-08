@@ -245,10 +245,25 @@ static void cn1WearableRetryUnstashed(void) {
             continue;
         }
         NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
-        if ([blob writeToFile:full atomically:YES]) {
-            [lock lock];
+        if (![blob writeToFile:full atomically:YES]) {
+            continue;
+        }
+        // Re-checked AFTER the write, under the lock, because the EDT can confirm this very token
+        // while the write is in progress. Confirmation removes a file that does not exist yet and
+        // clears the claim; the write then lands behind it, leaving an unclaimed inbox file that
+        // the next activation delivers a second time -- a one-shot transfer resurrected after the
+        // app already had it.
+        //
+        // The window cannot be closed by ordering alone, so it is detected instead: if the entry
+        // is gone, the confirmation won and the file this pass just created is removed.
+        [lock lock];
+        BOOL stillPending = cn1WearableUnstashed()[name] != nil;
+        if (stillPending) {
             [cn1WearableUnstashed() removeObjectForKey:name];
-            [lock unlock];
+        }
+        [lock unlock];
+        if (!stillPending) {
+            [[NSFileManager defaultManager] removeItemAtPath:full error:NULL];
         }
     }
 }
