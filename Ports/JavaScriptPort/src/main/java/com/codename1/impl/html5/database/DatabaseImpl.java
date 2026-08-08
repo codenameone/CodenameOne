@@ -184,11 +184,15 @@ public class DatabaseImpl extends Database {
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
         requireSoleConnectionForKeyChange(databaseName);
-        String key = null;
-        if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(databaseName);
+        try {
+            String key = null;
+            if (config != null && config.isEncrypted()) {
+                key = config.resolveKeyMaterial(databaseName);
+            }
+            checkNative(SQLiteNative.rekey(peer, key));
+        } finally {
+            releaseKeyChangeClaim(databaseName);
         }
-        checkNative(SQLiteNative.rekey(peer, key));
     }
 
     @Override

@@ -51,20 +51,35 @@ public class SEDatabase extends Database {
      */
     private String databaseName;
 
+    /** The resolved file this connection holds, as the open-database registry knows it. */
+    private final String openKey;
+
     /**
      * Cursors created from this connection. Closing the database has to invalidate them, because
      * their statements belong to the connection and are gone once it closes.
      */
     private final List<SECursor> openCursors = new ArrayList<SECursor>();
 
-    public SEDatabase(java.sql.Connection conn) {
-        this(conn, null);
+    public SEDatabase(java.sql.Connection conn) throws IOException {
+        this(conn, null, null);
     }
 
-    public SEDatabase(java.sql.Connection conn, String databaseName) {
+    public SEDatabase(java.sql.Connection conn, String databaseName) throws IOException {
+        this(conn, databaseName, databaseName);
+    }
+
+    /**
+     * @param openKey identifies the file on disk rather than the name it was asked for. The two
+     * differ here: a name is resolved against the storage directory unless it looks like a path,
+     * so "app.db", the absolute path it resolves to, and "/tmp/./app.db" can all name one file.
+     * Registering the name would let two of those spellings rekey the file under each other.
+     */
+    public SEDatabase(java.sql.Connection conn, String databaseName, String openKey)
+            throws IOException {
         this.databaseName = databaseName;
+        this.openKey = openKey;
         this.conn = conn;
-        registerOpenDatabase(databaseName);
+        registerOpenDatabase(openKey);
         try {
             conn.setAutoCommit(true);
         } catch (SQLException err) {
@@ -194,6 +209,10 @@ public class SEDatabase extends Database {
         try {
             conn.commit();
             conn.setAutoCommit(true);
+            // The mode belongs to the transaction that just ended, not to the connection. Leaving
+            // an IMMEDIATE from execute("BEGIN IMMEDIATE") set would make the next plain
+            // beginTransaction() take a write lock nobody asked for.
+            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             markTransactionEnded();
         } catch (SQLException ex) {
             // JDBC leaves the transaction open when the commit fails, so discard it here rather
@@ -208,6 +227,7 @@ public class SEDatabase extends Database {
             } catch (SQLException ignored) {
                 // Same.
             }
+            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             throw abandonFailedCommit(ex);
         }
     }
@@ -223,8 +243,10 @@ public class SEDatabase extends Database {
                 // statement silently joins a new implicit transaction.
                 conn.setAutoCommit(true);
             }
+            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             markTransactionEnded();
         } catch (SQLException ex) {
+            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             throw new IOException(ex.getMessage(), ex);
         }
     }
@@ -242,7 +264,7 @@ public class SEDatabase extends Database {
         if (conn == null) {
             return;
         }
-        releaseOpenDatabase(databaseName);
+        releaseOpenDatabase(openKey);
         java.sql.Connection closing = conn;
         conn = null;
         if (inTransaction) {
@@ -495,7 +517,7 @@ public class SEDatabase extends Database {
         checkNoTransactionForKeyChange();
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
-        requireSoleConnectionForKeyChange(databaseName);
+        requireSoleConnectionForKeyChange(openKey);
         Statement s = null;
         try {
             s = conn.createStatement();
@@ -513,6 +535,7 @@ public class SEDatabase extends Database {
             throw new IOException(ex.getMessage(), ex);
         } finally {
             cleanup(s);
+            releaseKeyChangeClaim(openKey);
         }
     }
 

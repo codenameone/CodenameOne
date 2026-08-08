@@ -57,7 +57,7 @@ class DatabaseImpl extends Database {
     /** The file this connection is open on, for the shared registry a key change consults. */
     private final String openKey;
 
-    public DatabaseImpl(String databaseName, String path) {
+    public DatabaseImpl(String databaseName, String path) throws IOException {
         this.databaseName = databaseName;
         this.openKey = path;
         peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
@@ -191,11 +191,15 @@ class DatabaseImpl extends Database {
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
         requireSoleConnectionForKeyChange(openKey);
-        String key = null;
-        if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(databaseName);
+        try {
+            String key = null;
+            if (config != null && config.isEncrypted()) {
+                key = config.resolveKeyMaterial(databaseName);
+            }
+            IOSImplementation.nativeInstance.sqlDbRekey(peer, key);
+        } finally {
+            releaseKeyChangeClaim(openKey);
         }
-        IOSImplementation.nativeInstance.sqlDbRekey(peer, key);
     }
 
     private void executeScript(String sql) throws IOException {

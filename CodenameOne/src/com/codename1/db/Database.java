@@ -823,6 +823,13 @@ public abstract class Database {
     /// so the ports refuse instead.
     private static final java.util.Hashtable OPEN_DATABASES = new java.util.Hashtable();
 
+    /// Files whose key is being changed right now.
+    ///
+    /// Counting open connections answers "is anybody else here" only at the instant it is asked.
+    /// A rewrite takes longer than that, so the answer has to be held for its whole length or a
+    /// connection opened a moment later still ends up reading a file that changed underneath it.
+    private static final java.util.Hashtable REKEYING_DATABASES = new java.util.Hashtable();
+
     /// Records that a connection to a database file has been opened.
     ///
     /// Ports call this once they have a connection, and `#releaseOpenDatabase(String)` when they
@@ -832,9 +839,18 @@ public abstract class Database {
     /// #### Parameters
     ///
     /// - `key`: identifies the file, canonically enough that two spellings of one path agree
-    protected static synchronized void registerOpenDatabase(String key) {
+    protected static synchronized void registerOpenDatabase(String key) throws IOException {
         if (key == null) {
             return;
+        }
+        if (REKEYING_DATABASES.containsKey(key)) {
+            // A key change is a file rewrite, and it is not over when the claim is taken -- it is
+            // over when the last page is written. Letting an open through in the middle hands back
+            // a connection keyed to whichever half of the file it happened to read.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + key + " is having its key changed. Opening it now would key"
+                    + " the connection to a file that is being rewritten under it. Retry once the"
+                    + " key change returns.");
         }
         Integer count = (Integer) OPEN_DATABASES.get(key);
         OPEN_DATABASES.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
@@ -875,12 +891,34 @@ public abstract class Database {
     /// - `IOException`: if another connection has the same file open
     protected static synchronized void requireSoleConnectionForKeyChange(String key)
             throws IOException {
-        Integer count = key == null ? null : (Integer) OPEN_DATABASES.get(key);
+        if (key == null) {
+            return;
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
         if (count != null && count.intValue() > 1) {
             throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
                     "The database " + key + " is open more than once, and changing its key rewrites"
                     + " it under the new one for this connection only. Close the others first;"
                     + " reads through them would fail once they reached a rewritten page.");
+        }
+        if (REKEYING_DATABASES.put(key, key) != null) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + key + " is already having its key changed. Two rewrites of"
+                    + " one file interleave into a database that opens under neither key.");
+        }
+    }
+
+    /// Ends the exclusive claim `#requireSoleConnectionForKeyChange(String)` took.
+    ///
+    /// Ports call this from a `finally` around the rewrite, so a key change that throws does not
+    /// leave the file barred from opening for the rest of the process.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key the claim was taken under
+    protected static synchronized void releaseKeyChangeClaim(String key) {
+        if (key != null) {
+            REKEYING_DATABASES.remove(key);
         }
     }
 

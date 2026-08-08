@@ -362,6 +362,11 @@ jobs:
         # anything noticing until an Android app build forty minutes later. Runs after the port
         # is compiled, which is what it type-checks against.
         run: scripts/ci/check-android-cipher-package-compiles.sh
+      - name: Compile the bundled SQLite WebAssembly module
+        if: ${{ matrix.java-version == 8 }}
+        # A module no engine accepts does not fail anything on its own: the JavaScript port just
+        # reports the database as unavailable and its tests skip.
+        run: scripts/ci/check-js-sqlite-wasm.sh
       - name: Run SpotBugs for ByteCodeTranslator
         if: ${{ matrix.java-version == 8 }}
         run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify

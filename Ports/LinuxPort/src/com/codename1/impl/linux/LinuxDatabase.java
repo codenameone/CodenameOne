@@ -176,11 +176,15 @@ class LinuxDatabase extends Database {
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
         requireSoleConnectionForKeyChange(openKey);
-        String key = null;
-        if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(databaseName);
+        try {
+            String key = null;
+            if (config != null && config.isEncrypted()) {
+                key = config.resolveKeyMaterial(databaseName);
+            }
+            LinuxNative.sqlDbRekey(peer, key);
+        } finally {
+            releaseKeyChangeClaim(openKey);
         }
-        LinuxNative.sqlDbRekey(peer, key);
     }
 
     @Override
