@@ -27,7 +27,7 @@ import java.util.Properties;
  * the cloud build server. The user pairs this with {@code mvn
  * cn1:ios-on-device-debugging} (which launches the desktop proxy) and then
  * attaches jdb / IntelliJ / VS Code over JDWP — see
- * {@code docs/developer-guide/On-Device-Debugging.adoc}.
+ * {@code docs/developer-guide/On-Device-Debugging.asciidoc}.
  *
  * Forces {@code codename1.arg.ios.onDeviceDebug=true} so the listener
  * thread is linked into the binary and the Info.plist gets the proxy
