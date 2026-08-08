@@ -2164,7 +2164,9 @@ public class IPhoneBuilder extends Executor {
                         registerNativeImplementationsAndCreateStubs(
                                 new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
                                 stubSource, classesDir),
-                        iosMode, svgRegistryInstall);
+                        iosMode, svgRegistryInstall, healthBindingsInstall,
+                        routeDispatcherInstallSource(sourceZip, "        "),
+                        annotationFrameworksInstallSource(sourceZip, "        "));
             }
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source", ex);
@@ -3710,7 +3712,10 @@ public class IPhoneBuilder extends Executor {
                             WatchNativeBuilder.translationRoot(request.getMainClass()));
                     log("[watchNative] Translating the watch slice from "
                             + watchNativeBuilder.getWatchMain());
-                    if (!exec(userDir, env, 420000, watchCmd.toArray(new String[0]))) {
+                    // The same 600s the phone pass above gets, and for the same reason: the watch
+                    // root can reach a graph of comparable size, so a lower cap here would kill an
+                    // otherwise valid companion build on its SECOND translation only.
+                    if (!exec(userDir, env, 600000, watchCmd.toArray(new String[0]))) {
                         return false;
                     }
                 }
@@ -4071,6 +4076,13 @@ public class IPhoneBuilder extends Executor {
                             + "  targets_to_fix.each do |main_target|\n"
                             + "    project_root = File.dirname(project_file)\n"
                             + "    swift_paths = Dir.glob(File.join(project_root, main_class_name + '-src', '**', '*.swift'))\n"
+                            // The staged WATCH translation lives under <Main>-src/watch-src and is
+                            // compiled by the watch target, from the file list stageWatchTranslation
+                            // returns. This glob would otherwise hand the watch slice's Swift to the
+                            // PHONE target -- a second copy of a class the phone already has, from a
+                            // translation describing a different program.
+                            + "    swift_paths = swift_paths.reject{|p| p.include?('/"
+                            + WatchNativeBuilder.WATCH_SRC_DIR + "/')}\n"
                             + "    swift_paths.each do |swift_path|\n"
                             + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
                             + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
@@ -4089,7 +4101,8 @@ public class IPhoneBuilder extends Executor {
                             + "    swift_refs = xcproj.files.select do |f|\n"
                             + "      file_name = f.path || f.name || f.display_name\n"
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
-                            + SURFACES_EXTENSION_NAME + "/')\n"
+                            + SURFACES_EXTENSION_NAME + "/') && !file_name.include?('/"
+                            + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
                             + "    swift_refs.each do |ref|\n"
                             + "      unless main_target.source_build_phase.files_references.include?(ref)\n"

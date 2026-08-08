@@ -156,24 +156,101 @@ static NSString *cn1WearableInboxDir(void) {
 }
 
 /// Writes the encoded transfer to the inbox and returns its file name, or nil.
-static NSString *cn1WearableStashInbox(NSString *path, NSData *wrapped) {
-    if (wrapped == nil) {
-        return nil;
-    }
-    NSString *name = [[NSUUID UUID] UUIDString];
-    NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
+/// Entries whose durable write failed -- storage full, or unavailable behind data protection --
+/// keyed by the same token the durable copy would have used.
+///
+/// A failed stash used to return nil, which dropped the transfer to an UNTRACKED delivery: no
+/// token, so no confirmation, no relinquish and no replay. WatchConnectivity deletes its temporary
+/// file the moment the delegate returns, so the only remaining copy was an in-process runnable, and
+/// a process death or a queue eviction with no listener registered lost a one-shot transfer the
+/// sender had already been told arrived.
+///
+/// Keeping the payload here preserves the token, so the transfer stays tracked and the ordinary
+/// confirm/relinquish protocol still applies. The write is retried on every activation drain, so a
+/// device that frees space gets the durable copy without the payload ever having been dropped.
+/// Durability across a process death is not recoverable when the disk write itself fails -- this
+/// narrows the window rather than closing it.
+/// Defined below, next to the in-flight set it guards; the unstashed map shares that lock because
+/// the two are always updated for the same entry.
+static NSLock *cn1WearableInFlightLock(void);
+
+static NSMutableDictionary *cn1WearableUnstashed(void) {
+    static NSMutableDictionary *entries;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        entries = [[NSMutableDictionary alloc] init];
+    });
+    return entries;
+}
+
+/// Bounded, because an unstashable payload is held in memory: past this many the oldest goes, which
+/// is the same trade the pending-delivery cap makes for the same reason.
+static const NSUInteger kCn1WearableMaxUnstashed = 16;
+
+static NSData *cn1WearableEncodeInboxEntry(NSString *path, NSData *wrapped) {
     NSMutableDictionary *entry = [NSMutableDictionary dictionary];
     entry[@"p"] = path == nil ? @"" : path;
     entry[@"b"] = wrapped;
     if (![NSKeyedArchiver respondsToSelector:@selector(archivedDataWithRootObject:requiringSecureCoding:error:)]) {
         return nil;
     }
-    NSData *blob = [NSKeyedArchiver archivedDataWithRootObject:entry
-                                        requiringSecureCoding:NO error:NULL];
-    if (blob == nil || ![blob writeToFile:full atomically:YES]) {
+    return [NSKeyedArchiver archivedDataWithRootObject:entry requiringSecureCoding:NO error:NULL];
+}
+
+static NSString *cn1WearableStashInbox(NSString *path, NSData *wrapped) {
+    if (wrapped == nil) {
         return nil;
     }
+    NSString *name = [[NSUUID UUID] UUIDString];
+    NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
+    NSData *blob = cn1WearableEncodeInboxEntry(path, wrapped);
+    if (blob != nil && [blob writeToFile:full atomically:YES]) {
+        return name;
+    }
+    // No durable copy. The token is issued anyway and the payload held in memory, so the delivery
+    // stays tracked and the write can be retried; see cn1WearableUnstashed.
+    NSLock *lock = cn1WearableInFlightLock();
+    [lock lock];
+    NSMutableDictionary *pending = cn1WearableUnstashed();
+    if (pending.count >= kCn1WearableMaxUnstashed) {
+        NSString *oldest = pending.allKeys.firstObject;
+        if (oldest != nil) {
+            [pending removeObjectForKey:oldest];
+        }
+    }
+    pending[name] = @{@"p": path == nil ? @"" : path, @"b": wrapped};
+    [lock unlock];
     return name;
+}
+
+/// Retries the durable write for anything cn1WearableStashInbox could not persist.
+///
+/// Run from the activation drain: a device that has freed space, or come out from behind data
+/// protection, gets the durable copy from here without the payload having been dropped or
+/// redelivered. The entry is already in flight, so the drain's own pass skips the file it finds.
+static void cn1WearableRetryUnstashed(void) {
+    NSLock *lock = cn1WearableInFlightLock();
+    [lock lock];
+    NSArray *tokens = cn1WearableUnstashed().allKeys;
+    [lock unlock];
+    for (NSString *name in tokens) {
+        [lock lock];
+        NSDictionary *entry = cn1WearableUnstashed()[name];
+        [lock unlock];
+        if (entry == nil) {
+            continue;
+        }
+        NSData *blob = cn1WearableEncodeInboxEntry(entry[@"p"], entry[@"b"]);
+        if (blob == nil) {
+            continue;
+        }
+        NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
+        if ([blob writeToFile:full atomically:YES]) {
+            [lock lock];
+            [cn1WearableUnstashed() removeObjectForKey:name];
+            [lock unlock];
+        }
+    }
 }
 
 /// Inbox entries this process has already handed to the runtime and is still waiting to have
@@ -311,6 +388,9 @@ static void cn1WearableClearInFlight(NSString *name) {
 /// Called on session activation: reaching that point means this process is alive and the CN1
 /// runtime is up, so anything still parked was written by a run that did not get that far.
 static void cn1WearableDrainInbox(void) {
+    // Anything a previous stash could not persist gets its durable copy first, if storage now
+    // allows it. Those entries are already in flight, so the pass below leaves them alone.
+    cn1WearableRetryUnstashed();
     NSString *dir = cn1WearableInboxDir();
     NSArray<NSString *> *names = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:dir
                                                                                      error:NULL];
@@ -435,6 +515,12 @@ void cn1_wearable_confirmInbox(const char *inboxToken) {
     NSString *full = [cn1WearableInboxDir() stringByAppendingPathComponent:name];
     NSFileManager *files = [NSFileManager defaultManager];
     [files removeItemAtPath:full error:NULL];
+    // An entry whose durable write never succeeded is held in memory under this same token; the
+    // app has it now, so it stops being retried.
+    NSLock *unstashedLock = cn1WearableInFlightLock();
+    [unstashedLock lock];
+    [cn1WearableUnstashed() removeObjectForKey:name];
+    [unstashedLock unlock];
     // The claim is released only once the file is actually GONE. A delete can be refused -- data
     // protection while the device is locked, a transient filesystem error -- and clearing the
     // in-flight marker anyway left a consumed one-shot transfer looking new to the next inbox
@@ -1503,6 +1589,9 @@ static NSData *cn1WearableWrapFile(NSString *name, NSData *contents) {
     // point exists only in WearableConnection's in-process queue or an un-run callSerially. A
     // process death in between loses a one-shot file that the sender has already been told arrived,
     // and nothing redelivers it -- the sender's copy is gone too.
+    // A token is issued even when the durable write fails -- the payload is then held in memory and
+    // the write retried on the next activation -- so the transfer stays TRACKED either way and
+    // never silently degrades to a fire-and-forget delivery. See cn1WearableUnstashed.
     NSData *wrapped = cn1WearableWrapFile(file.fileURL.lastPathComponent, body);
     NSString *stashed = cn1WearableStashInbox(path, wrapped);
     // Marked before the hand-off, so a reactivation that drains the inbox mid-flight skips it.

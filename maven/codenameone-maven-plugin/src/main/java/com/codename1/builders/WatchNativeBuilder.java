@@ -296,7 +296,9 @@ class WatchNativeBuilder {
     /// providers and the ad padding are all phone concerns; pulling them in here would defeat the
     /// point of rooting the translation somewhere else.
     void writeWatchStubSource(BuildRequest request, File stubSource, String buildVersion,
-            String nativeRegistration, String iosMode, String svgRegistryInstall)
+            String nativeRegistration, String iosMode, String svgRegistryInstall,
+            String healthBindingsInstall, String routeDispatcherInstall,
+            String annotationFrameworksInstall)
             throws IOException {
         String stubClass = translationRoot(request.getMainClass()) + "Stub";
         String body = "package " + request.getPackageName() + ";\n\n"
@@ -322,14 +324,18 @@ class WatchNativeBuilder {
                 + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                 + "        if(!initialized) {\n"
                 + "            initialized = true;\n"
-                // The SAME registry install the phone stub emits.
+                // The SAME registry installs the phone stub emits.
                 //
-                // It is a static reference, and that is the whole point: the generated SVG classes
-                // are reached only reflectively, so this call is what keeps them in the reachable
-                // graph. Leaving it out of the watch stub let the watch translation shake out all
-                // of them -- correct tree-shaking, wrong result -- and SVG and Lottie fell back to
-                // a placeholder render on the watch while working on the phone.
+                // They are static references, and that is the whole point: every one of these
+                // registries is reached only reflectively, so these calls are what keep the
+                // generated classes in the reachable graph. Emitting only some of them let the
+                // watch translation shake out the rest -- correct tree-shaking, wrong result. The
+                // SVG omission was visible (SVG and Lottie fell back to a placeholder render on the
+                // watch while working on the phone); generated routes, annotation-backed
+                // mappers/DAOs/clients and the health bindings fail the same way, silently, on a
+                // watch app that happens to use them.
                 + svgRegistryInstall
+                + healthBindingsInstall
                 + "            i.init(this);\n"
                 + "        }\n"
                 + "        i.start();\n"
@@ -345,6 +351,12 @@ class WatchNativeBuilder {
                 + "        " + stubClass + " stub = new " + stubClass + "();\n"
                 + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
                 + "        com.codename1.impl.ios.IOSImplementation.setIosMode(\"" + iosMode + "\");\n"
+                // Same position as the phone stub's: before Display.init, after the implementation
+                // is known. The generated route dispatcher and the annotation frameworks are found
+                // reflectively too, so without these the second translation drops their bootstrap
+                // classes and navigation on the watch resolves nothing.
+                + routeDispatcherInstall
+                + annotationFrameworksInstall
                 + "        Display.init(stub);\n"
                 + "    }\n"
                 + "}\n";
@@ -388,7 +400,15 @@ class WatchNativeBuilder {
             if (!f.isFile()) {
                 continue;
             }
-            boolean source = name.endsWith(".m") || name.endsWith(".c");
+            // .swift belongs here too. A NativeInterface implemented in Swift is emitted by the
+            // second translator pass like any other source, and skipping it left the watch target
+            // with no implementation for a native call the watch code makes -- while the phone's
+            // Swift phase fixup, which globs <Main>-src/**/*.swift, would have swept the watch
+            // copy into the PHONE target instead. It is excluded from that glob for the same
+            // reason (see IPhoneBuilder's swift fixup).
+            boolean source = name.endsWith(".m") || name.endsWith(".c")
+                    || name.endsWith(".swift") || name.endsWith(".mm")
+                    || name.endsWith(".cpp") || name.endsWith(".cc");
             if (!source && !name.endsWith(".h")) {
                 // Only the code. The watch bundle's plist, resources and project file are written
                 // by this builder against the PHONE project -- taking the second translation's

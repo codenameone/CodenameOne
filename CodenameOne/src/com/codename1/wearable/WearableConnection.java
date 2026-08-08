@@ -633,8 +633,23 @@ public final class WearableConnection {
                     deliverTagged(path, this, true);
                     return;
                 }
+                // Isolated per listener, as the tracked delivery is, and for a sharper reason: a
+                // removal has nothing to fall back on. The item is gone, so no later enumeration
+                // finds it and no re-read recovers it -- a listener skipped because an EARLIER one
+                // threw stays permanently wrong about a path nothing will mention again.
+                RuntimeException failure = null;
                 for (WearableDataListener l : copy) {
-                    l.dataRemoved(path);
+                    try {
+                        l.dataRemoved(path);
+                    } catch (RuntimeException listenerFailed) {
+                        if (failure == null) {
+                            failure = listenerFailed;
+                        }
+                    }
+                }
+                // Reported, not swallowed -- but only once every listener has been offered it.
+                if (failure != null) {
+                    throw failure;
                 }
             }
         }, true);
