@@ -390,7 +390,28 @@ def add_reason(entry: dict, reason: str) -> None:
         reasons.append(reason)
 
 
-def parse_logs(paths: list[Path], states: dict[str, dict]) -> bool:
+def log_marker_test(manifest: dict, states: dict[str, dict], name: str) -> str | None:
+    """The contract test a CN1SS log marker belongs to, or None for a test this
+    port does not register.
+
+    A marker names its test class most of the time, but a screenshot test reports
+    a skip under its SCREENSHOT OUTPUT name -- ``test=VideoIODecodedFrames`` for
+    VideoIODecodedFramesScreenshotTest, ``test=GoogleWebMap`` for
+    GoogleWebMapScreenshotTest. Matching only the class name dropped every one of
+    those skips on the floor, and the surrounding "suite starting" / "suite
+    finished" pair then scored the test as a PASS: a skipped map test, a skipped
+    VideoIO decode and a skipped watch dialog all rendered green. Resolve through
+    the same screenshot mapping parse_comparisons uses.
+    """
+    if name in states:
+        return name
+    owner = screenshot_test(manifest, name)
+    if owner in states:
+        return owner
+    return None
+
+
+def parse_logs(manifest: dict, paths: list[Path], states: dict[str, dict]) -> bool:
     suite_finished = False
     for path in paths:
         if not path.is_file():
@@ -399,19 +420,31 @@ def parse_logs(paths: list[Path], states: dict[str, dict]) -> bool:
             if "CN1SS:SUITE:FINISHED" in line:
                 suite_finished = True
             match = START_RE.search(line)
-            if match and match.group(1) in states:
-                states[match.group(1)]["started"] = True
+            test = log_marker_test(manifest, states, match.group(1)) if match else None
+            if test:
+                states[test]["started"] = True
             match = FINISH_RE.search(line)
-            if match and match.group(1) in states:
-                states[match.group(1)]["finished"] = True
+            test = log_marker_test(manifest, states, match.group(1)) if match else None
+            if test:
+                states[test]["finished"] = True
             match = SKIP_RE.search(line)
-            if match and match.group(1) in states:
-                entry = states[match.group(1)]
+            if match:
+                test = log_marker_test(manifest, states, match.group(1))
+                if test is None:
+                    # Silence here is what let a skip render as a pass, so an
+                    # unattributable skip is a contract defect rather than a line
+                    # to ignore: either the test is missing from the manifest or
+                    # the marker names something no screenshot mapping covers.
+                    raise ContractError(
+                        f"Skip marker for {match.group(1)} in {path} is not mapped to a test"
+                    )
+                entry = states[test]
                 entry["skipped"] = True
                 add_reason(entry, match.group(2) or "reported-skip")
             match = ERROR_RE.search(line)
-            if match and match.group(1) in states:
-                entry = states[match.group(1)]
+            test = log_marker_test(manifest, states, match.group(1)) if match else None
+            if test:
+                entry = states[test]
                 entry["failed"] = True
                 add_reason(entry, (match.group(2) or "").strip() or "suite-error")
     return suite_finished
@@ -520,7 +553,7 @@ def normalize(
         }
         for test in mapped
     }
-    suite_finished = parse_logs(logs, states)
+    suite_finished = parse_logs(manifest, logs, states)
     performance = parse_performance(
         logs,
         manifest.get("performance_benchmarks", []),

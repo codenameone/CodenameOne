@@ -58,8 +58,18 @@ static __typeof__(gst_structure_get_fraction)*     p_gst_structure_get_fraction;
 static __typeof__(gst_buffer_map)*                 p_gst_buffer_map;
 static __typeof__(gst_buffer_unmap)*               p_gst_buffer_unmap;
 static __typeof__(gst_buffer_new_allocate)*        p_gst_buffer_new_allocate;
+static __typeof__(gst_element_factory_find)*       p_gst_element_factory_find;
+static __typeof__(gst_element_factory_list_get_elements)* p_gst_element_factory_list_get_elements;
+static __typeof__(gst_element_factory_list_filter)* p_gst_element_factory_list_filter;
+static __typeof__(gst_plugin_feature_list_free)*   p_gst_plugin_feature_list_free;
+static __typeof__(gst_caps_from_string)*           p_gst_caps_from_string;
+/* gst_caps_unref is a static inline over gst_mini_object_unref, so the real
+   symbol to resolve is the latter -- nothing in this file is linked against
+   GStreamer. */
+static __typeof__(gst_mini_object_unref)*          p_gst_mini_object_unref;
 /* app: libgstapp-1.0.so.0 */
 static __typeof__(gst_app_sink_try_pull_sample)*   p_gst_app_sink_try_pull_sample;
+static __typeof__(gst_app_sink_try_pull_preroll)*  p_gst_app_sink_try_pull_preroll;
 static __typeof__(gst_app_src_push_buffer)*        p_gst_app_src_push_buffer;
 static __typeof__(gst_app_src_end_of_stream)*      p_gst_app_src_end_of_stream;
 
@@ -99,15 +109,67 @@ static int cn1LoadGstVideo(void) {
     CN1_GST_SYM(core, p_gst_buffer_map, "gst_buffer_map");
     CN1_GST_SYM(core, p_gst_buffer_unmap, "gst_buffer_unmap");
     CN1_GST_SYM(core, p_gst_buffer_new_allocate, "gst_buffer_new_allocate");
+    CN1_GST_SYM(core, p_gst_element_factory_find, "gst_element_factory_find");
+    CN1_GST_SYM(core, p_gst_element_factory_list_get_elements, "gst_element_factory_list_get_elements");
+    CN1_GST_SYM(core, p_gst_element_factory_list_filter, "gst_element_factory_list_filter");
+    CN1_GST_SYM(core, p_gst_plugin_feature_list_free, "gst_plugin_feature_list_free");
+    CN1_GST_SYM(core, p_gst_caps_from_string, "gst_caps_from_string");
+    CN1_GST_SYM(core, p_gst_mini_object_unref, "gst_mini_object_unref");
     CN1_GST_SYM(app, p_gst_app_sink_try_pull_sample, "gst_app_sink_try_pull_sample");
     CN1_GST_SYM(app, p_gst_app_src_push_buffer, "gst_app_src_push_buffer");
     CN1_GST_SYM(app, p_gst_app_src_end_of_stream, "gst_app_src_end_of_stream");
 #undef CN1_GST_SYM
+    /* Optional: present since GStreamer 1.10. Reading a PAUSED pipeline needs it,
+       but a host old enough to lack it should lose frame-accurate seeking, not the
+       whole media backend, so it is resolved without failing the load. */
+    *(void**)(&p_gst_app_sink_try_pull_preroll) = dlsym(app, "gst_app_sink_try_pull_preroll");
     if (ok) {
         p_gst_init(0, 0);
     }
     cn1_gstv_state = ok ? 1 : -1;
     return ok;
+}
+
+/*
+ * gst_parse_launch() with the default flags does NOT return NULL for every bad
+ * description: for a missing element it hands back a PARTIALLY CONSTRUCTED
+ * pipeline and reports the gap through the GError (only GST_PARSE_FLAG_FATAL_ERRORS
+ * makes that case NULL). Ignoring the error therefore looked like success -- on a
+ * host with only gstreamer plugins-base and plugins-good, "no element x264enc" built
+ * a writer whose appsrc was connected to nothing, every pushed frame vanished, and
+ * the failure surfaced 30 seconds later as "Failed to finalize video file". Treat a
+ * reported error as a build failure and give back nothing.
+ */
+static GstElement* cn1ParsePipeline(const char* desc) {
+    GError* err = NULL;
+    GstElement* pipe = p_gst_parse_launch(desc, &err);
+    if (err) {
+        if (pipe) {
+            p_gst_element_set_state(pipe, GST_STATE_NULL);
+            p_gst_object_unref(pipe);
+        }
+        g_error_free(err);
+        return NULL;
+    }
+    return pipe;
+}
+
+/*
+ * An appsink only queues buffers while the pipeline is PLAYING. In PAUSED -- which
+ * is where frame-accurate seeking has to happen, since a FLUSH|ACCURATE seek is
+ * answered by a new preroll -- the decoded frame is held as the PREROLL buffer, and
+ * gst_app_sink_try_pull_sample() never sees it. Pulling the sample was therefore
+ * empty on every read: the reader reported 0x0, no frames, and no audio track.
+ */
+static GstSample* cn1PullFrame(GstElement* sink, GstClockTime timeout) {
+    GstSample* sample = NULL;
+    if (p_gst_app_sink_try_pull_preroll) {
+        sample = p_gst_app_sink_try_pull_preroll((GstAppSink*) sink, timeout);
+    }
+    if (!sample) {
+        sample = p_gst_app_sink_try_pull_sample((GstAppSink*) sink, timeout);
+    }
+    return sample;
 }
 
 static void cn1StripFile(const char* in, char* out, size_t n) {
@@ -137,7 +199,7 @@ static void cn1ReaderProbe(CN1VideoReader* r) {
     GstState st = GST_STATE_NULL;
     p_gst_element_set_state(r->pipeline, GST_STATE_PAUSED);
     p_gst_element_get_state(r->pipeline, &st, NULL, 5 * GST_SECOND);
-    GstSample* sample = p_gst_app_sink_try_pull_sample((GstAppSink*) r->vsink, 3 * GST_SECOND);
+    GstSample* sample = cn1PullFrame(r->vsink, 3 * GST_SECOND);
     if (sample) {
         GstCaps* caps = p_gst_sample_get_caps(sample);
         if (caps) {
@@ -164,15 +226,14 @@ static void cn1ReaderProbeAudio(CN1VideoReader* r) {
     snprintf(desc, sizeof(desc),
             "filesrc location=\"%s\" ! decodebin ! audioconvert ! audioresample ! "
             "audio/x-raw,format=S16LE ! appsink name=a sync=false", r->path);
-    GError* err = NULL;
-    GstElement* pipe = p_gst_parse_launch(desc, &err);
+    GstElement* pipe = cn1ParsePipeline(desc);
     if (!pipe) { return; }
     GstElement* sink = p_gst_bin_get_by_name(GST_BIN(pipe), "a");
     GstState st = GST_STATE_NULL;
     p_gst_element_set_state(pipe, GST_STATE_PAUSED);
     p_gst_element_get_state(pipe, &st, NULL, 3 * GST_SECOND);
     if (sink) {
-        GstSample* sample = p_gst_app_sink_try_pull_sample((GstAppSink*) sink, 2 * GST_SECOND);
+        GstSample* sample = cn1PullFrame(sink, 2 * GST_SECOND);
         if (sample) {
             GstCaps* caps = p_gst_sample_get_caps(sample);
             if (caps) {
@@ -194,7 +255,7 @@ static JAVA_OBJECT cn1ReaderFrameAt(CODENAME_ONE_THREAD_STATE, CN1VideoReader* r
     p_gst_element_seek_simple(r->pipeline, GST_FORMAT_TIME,
             (GstSeekFlags) (GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_ACCURATE),
             (gint64) ms * GST_MSECOND);
-    GstSample* sample = p_gst_app_sink_try_pull_sample((GstAppSink*) r->vsink, 3 * GST_SECOND);
+    GstSample* sample = cn1PullFrame(r->vsink, 3 * GST_SECOND);
     if (!sample) { return JAVA_NULL; }
     JAVA_OBJECT result = JAVA_NULL;
     GstBuffer* buf = p_gst_sample_get_buffer(sample);
@@ -222,8 +283,7 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
             "filesrc location=\"%s\" ! decodebin ! audioconvert ! audioresample ! "
             "audio/x-raw,format=S16LE,channels=%d,rate=%d ! appsink name=a sync=false",
             r->path, ch, rate);
-    GError* err = NULL;
-    GstElement* pipe = p_gst_parse_launch(desc, &err);
+    GstElement* pipe = cn1ParsePipeline(desc);
     if (!pipe) { return JAVA_NULL; }
     GstElement* sink = p_gst_bin_get_by_name(GST_BIN(pipe), "a");
     p_gst_element_set_state(pipe, GST_STATE_PLAYING);
@@ -295,6 +355,42 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_videoBackendAvailable___R_bool
     return cn1LoadGstVideo() ? JAVA_TRUE : JAVA_FALSE;
 }
 
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_videoFactoryAvailable___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT nameObj) {
+    if (!cn1LoadGstVideo() || nameObj == JAVA_NULL) { return JAVA_FALSE; }
+    GstElementFactory* factory = p_gst_element_factory_find(stringToUTF8(threadStateData, nameObj));
+    if (!factory) { return JAVA_FALSE; }
+    p_gst_object_unref(factory);
+    return JAVA_TRUE;
+}
+
+/*
+ * True when SOME decoder in the registry accepts these caps on its sink pad.
+ *
+ * Decoding runs through decodebin, which auto-plugs whatever the host has, so
+ * the question is a capability question and not a question about particular
+ * plugin names. Asking by name meant a hardware-only install answered "no
+ * H.264" while decodebin would have decoded it perfectly well: the VA plugin
+ * spells its decoder vah264dec, stateless V4L2 spells it v4l2slh264dec, and AAC
+ * arrives as avdec_aac_fixed or fdkaacdec depending on the build. Any list of
+ * names is a list of the installs someone happened to think of. Filter the
+ * registry by caps instead, which is the same question decodebin itself asks.
+ */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_videoDecoderAvailable___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT capsObj) {
+    if (!cn1LoadGstVideo() || capsObj == JAVA_NULL) { return JAVA_FALSE; }
+    GstCaps* caps = p_gst_caps_from_string(stringToUTF8(threadStateData, capsObj));
+    if (!caps) { return JAVA_FALSE; }
+    /* GST_RANK_MARGINAL rather than NONE: decodebin will autoplug anything at
+       marginal or above, and NONE would count decoders it never selects. */
+    GList* decoders = p_gst_element_factory_list_get_elements(
+            GST_ELEMENT_FACTORY_TYPE_DECODER, GST_RANK_MARGINAL);
+    GList* matching = p_gst_element_factory_list_filter(decoders, caps, GST_PAD_SINK, FALSE);
+    int found = (matching != NULL);
+    if (matching) { p_gst_plugin_feature_list_free(matching); }
+    if (decoders) { p_gst_plugin_feature_list_free(decoders); }
+    p_gst_mini_object_unref((GstMiniObject*) caps);
+    return found ? JAVA_TRUE : JAVA_FALSE;
+}
+
 JAVA_LONG com_codename1_impl_linux_LinuxNative_videoReaderOpen___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT pathObj) {
     if (!cn1LoadGstVideo()) { return 0; }
     char path[2048];
@@ -303,8 +399,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_videoReaderOpen___java_lang_Strin
     snprintf(desc, sizeof(desc),
             "filesrc location=\"%s\" ! decodebin ! videoconvert ! "
             "video/x-raw,format=RGBA ! appsink name=v sync=false max-buffers=2", path);
-    GError* err = NULL;
-    GstElement* pipe = p_gst_parse_launch(desc, &err);
+    GstElement* pipe = cn1ParsePipeline(desc);
     if (!pipe) { return 0; }
     CN1VideoReader* r = (CN1VideoReader*) calloc(1, sizeof(CN1VideoReader));
     r->pipeline = pipe;
@@ -366,8 +461,7 @@ JAVA_LONG com_codename1_impl_linux_LinuxNative_videoWriterOpen___java_lang_Strin
                 "audioconvert ! avenc_aac bitrate=%d ! aacparse ! mux.",
                 sampleRate, channels, audioBitRate);
     }
-    GError* err = NULL;
-    GstElement* pipe = p_gst_parse_launch(desc, &err);
+    GstElement* pipe = cn1ParsePipeline(desc);
     if (!pipe) { return 0; }
     CN1VideoWriter* w = (CN1VideoWriter*) calloc(1, sizeof(CN1VideoWriter));
     w->pipeline = pipe;
