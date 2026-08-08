@@ -281,11 +281,6 @@ in the IDE editor when stepping into framework code.
   compiled without debug info. Such a local also has no declaring
   scope, so the debugger lists it for the whole method rather than
   only where it's live.
-* *Two locals of the same type sharing a slot* are reported as one.
-  Where disjoint blocks reuse a JVM slot for, say, two different
-  `int` variables, the debugger keeps the later declaration's name
-  and scope for both. Reuse across *different* types — the common
-  case, and the one that used to matter — is fully distinguished.
 * *Static field reads* are unsupported. Instance field reads are
   fully wired; static-field support requires an additional per-class
   static table that hasn't been emitted yet.
