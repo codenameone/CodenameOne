@@ -1234,8 +1234,17 @@ public class CN1WearableBridge implements WearableBridge {
         }
         persistedClock = value;
         try {
+            // commit(), not apply(). This floor is the promise that no future publication of ours
+            // will draw a sequence at or below one we have already SEEN from a peer. apply() writes
+            // in the background, so a process death between observing an ahead-of-wall-clock peer
+            // sequence and the flush restored the older floor on restart -- the next publication
+            // then drew a sequence below the peer item that is still published, deliverIfOutranks
+            // ranked it stale, and the value was dropped with no callback and no error.
+            //
+            // Runs off the main thread (the Data Layer workers), and only when the floor actually
+            // moves, which is rare: the blocking write is bounded and not on any UI path.
             c.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
-                    .edit().putLong(CLOCK_KEY, value).apply();
+                    .edit().putLong(CLOCK_KEY, value).commit();
         } catch (Throwable unavailable) {
             // Best effort: the in-memory floor still holds for this process.
         }
@@ -3884,7 +3893,14 @@ public class CN1WearableBridge implements WearableBridge {
                     c.getSharedPreferences(CLAIM_PREFS, Context.MODE_PRIVATE);
             android.content.SharedPreferences.Editor edit = prefs.edit();
             edit.putString(key, stamp);
-            edit.apply();
+            // commit(), not apply(). This record is what stops a one-shot transfer being delivered
+            // twice, and it has to be on disk BEFORE anything observable says the payload was
+            // taken: the acknowledgement published to the sender, and the deletion that follows it.
+            // With apply() a process death in that window left no claim while the sender's DataItem
+            // was still published, so the next startup replay handed the app the same file again.
+            //
+            // Called from the confirmation path on a Data Layer worker, never the main thread.
+            edit.commit();
             // NO inline prune. Writing one claim says nothing about whether OTHER items are still
             // published, and the sender retries a failed deletion indefinitely -- so age-pruning
             // here could drop a live transfer's claim while recording an unrelated one, and the
