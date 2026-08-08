@@ -45,6 +45,11 @@ public final class LinuxNative {
     /* ------------------------------------------------------------- VideoIO */
     /** True when the GStreamer runtime backing VideoIO is available (libgstreamer-1.0 loadable). */
     public static native boolean videoBackendAvailable();
+    /// True when the host's GStreamer registry contains this element factory. The codec
+    /// lists this port reports have to describe what the installed plugins can actually
+    /// do: a distribution that ships only plugins-base and plugins-good has no x264enc,
+    /// and claiming H.264 anyway sent callers down a pipeline that cannot be built.
+    public static native boolean videoFactoryAvailable(String factoryName);
     // Reader (filesrc ! decodebin ! videoconvert ! appsink). The peer owns the pipeline.
     public static native long videoReaderOpen(String path);
     public static native int videoReaderWidth(long peer);

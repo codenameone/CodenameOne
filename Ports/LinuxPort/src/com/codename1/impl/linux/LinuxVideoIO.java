@@ -49,12 +49,51 @@ class LinuxVideoIO extends VideoIO {
         return codecs(false);
     }
 
+    /// Decoding runs through `decodebin`, which auto-plugs whatever decoder the host
+    /// has, so a codec is decodable when any one of its known GStreamer decoders is
+    /// installed. Encoding has no such freedom: the writer builds a fixed pipeline,
+    /// so an encoder is offered only when the exact factory that pipeline names is
+    /// present.
+    private static final String[] H264_DECODERS = {"avdec_h264", "openh264dec", "vaapih264dec", "nvh264dec", "v4l2h264dec"};
+    private static final String[] HEVC_DECODERS = {"avdec_h265", "vaapih265dec", "nvh265dec", "v4l2h265dec"};
+    private static final String[] AAC_DECODERS = {"avdec_aac", "faad"};
+
+    private static boolean anyFactory(String[] names) {
+        for (int i = 0; i < names.length; i++) {
+            if (LinuxNative.videoFactoryAvailable(names[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The codecs this host can really handle. Reporting H.264, HEVC and AAC
+    /// unconditionally described the pipelines this port *would like* to build rather
+    /// than the plugins that are installed: a distribution carrying only
+    /// gstreamer plugins-base and plugins-good has no x264enc, x265enc or avenc_aac,
+    /// so callers picked an encoder that could not exist and the failure only showed
+    /// up as a broken write much later.
     private VideoCodec[] codecs(boolean encoder) {
         List<VideoCodec> out = new ArrayList<VideoCodec>();
         String[] mp4 = new String[]{CONTAINER_MP4};
-        out.add(new VideoCodec(CODEC_H264, "H.264 (GStreamer)", "video/avc", true, encoder, !encoder, false, -1, -1, mp4));
-        out.add(new VideoCodec(CODEC_HEVC, "HEVC (GStreamer)", "video/hevc", true, encoder, !encoder, false, -1, -1, mp4));
-        out.add(new VideoCodec(CODEC_AAC, "AAC (GStreamer)", "audio/mp4a-latm", false, encoder, !encoder, false, -1, -1, mp4));
+        if (!LinuxNative.videoBackendAvailable()) {
+            return new VideoCodec[0];
+        }
+        // Every encoder pipeline muxes into MP4 through a parser, so a missing muxer
+        // or parser disqualifies the codec just as surely as a missing encoder.
+        boolean mux = LinuxNative.videoFactoryAvailable("mp4mux");
+        if (encoder ? (mux && LinuxNative.videoFactoryAvailable("x264enc") && LinuxNative.videoFactoryAvailable("h264parse"))
+                : anyFactory(H264_DECODERS)) {
+            out.add(new VideoCodec(CODEC_H264, "H.264 (GStreamer)", "video/avc", true, encoder, !encoder, false, -1, -1, mp4));
+        }
+        if (encoder ? (mux && LinuxNative.videoFactoryAvailable("x265enc") && LinuxNative.videoFactoryAvailable("h265parse"))
+                : anyFactory(HEVC_DECODERS)) {
+            out.add(new VideoCodec(CODEC_HEVC, "HEVC (GStreamer)", "video/hevc", true, encoder, !encoder, false, -1, -1, mp4));
+        }
+        if (encoder ? (mux && LinuxNative.videoFactoryAvailable("avenc_aac") && LinuxNative.videoFactoryAvailable("aacparse"))
+                : anyFactory(AAC_DECODERS)) {
+            out.add(new VideoCodec(CODEC_AAC, "AAC (GStreamer)", "audio/mp4a-latm", false, encoder, !encoder, false, -1, -1, mp4));
+        }
         return out.toArray(new VideoCodec[out.size()]);
     }
 

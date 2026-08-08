@@ -140,6 +140,12 @@ jobs:
       # (browser), libsecret (secure storage), libnotify (notifications), GeoClue
       # (location), libepoxy + EGL/GLES + the Mesa software driver (the offscreen
       # 3D backend). Plus CMake/Ninja, Xvfb and a font for Pango to lay out.
+      #
+      # The GStreamer plugin set matters as much as the library: base + good carry
+      # appsrc/appsink, videoconvert and mp4mux but NO codec. VideoIO's encoder is
+      # x264enc/x265enc (plugins-ugly) parsed by h264parse/h265parse (plugins-bad)
+      # with avenc_aac for audio and avdec_* for playback (libav), so without those
+      # three packages the port has no encoder and no H.264 decoder at all.
       - name: Install the GTK build stack + toolchain
         run: |
           set -e
@@ -151,6 +157,7 @@ jobs:
             libfontconfig1-dev libfreetype-dev \
             libcurl4-openssl-dev libssl-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
             libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
             libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri
 
@@ -346,6 +353,7 @@ jobs:
                 gtk+3.0-dev cairo-dev pango-dev gdk-pixbuf-dev glib-dev fontconfig-dev freetype-dev \
                 curl-dev openssl-dev libepoxy-dev mesa-dev mesa-gles mesa-egl mesa-gbm mesa-dri-gallium \
                 webkit2gtk-4.1-dev gstreamer-dev gst-plugins-base-dev \
+                gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav \
                 libsecret-dev libnotify-dev geoclue-dev xvfb ttf-dejavu
               # JDK 8 runs the translator/maven; JDK 17 is needed to compile the
               # launcher against the Java-17 suite classes (CompilerHelper discovers
@@ -393,7 +401,9 @@ jobs:
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write, because this job publishes the normalized report to the
+      # port-status-data branch itself (see the publish step below).
+      contents: write
       pull-requests: write
       issues: write
     env:
@@ -524,3 +534,36 @@ jobs:
           path: artifacts/linux-port/port-status-linux-*.json
           if-no-files-found: warn
           retention-days: 14
+
+      # Publish from here rather than waiting for port-status-publish.yml.
+      # That workflow reacts to a workflow_run "completed" event, and GitHub has
+      # never delivered one for this workflow: the ios, android, javascript and
+      # ParparVM-Windows producers each get a publish run seconds after they
+      # finish, this one gets none, and ports/linux-x64.json and
+      # ports/linux-arm64.json had never existed on the data branch at all. The
+      # public table therefore served the checked-in fallback for both Linux
+      # columns until it aged out. The report is already on disk in this job, so
+      # publish it directly and depend on no event.
+      #
+      # if: always() for the same reason the job itself runs on failure -- a
+      # report recording real failures is the one the table most needs.
+      - name: Publish the Linux reports to the data branch
+        if: >-
+          always() && github.ref == 'refs/heads/master' &&
+          (github.event_name == 'push' || github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PORT_STATUS_PUBLISH: '1'
+        run: |
+          set -euo pipefail
+          published=0
+          for report in artifacts/linux-port/port-status-linux-*.json; do
+            [ -f "$report" ] || continue
+            ./scripts/hellocodenameone/conformance/publish_port_status.sh "$report"
+            published=$((published + 1))
+          done
+          if [ "$published" -eq 0 ]; then
+            echo "No normalized Linux report to publish." >&2
+            exit 1
+          fi
