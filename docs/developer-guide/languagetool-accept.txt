@@ -644,4 +644,5 @@ unhardened
 unretraceable
 [Dd]eobfuscation
 [Mm]inif(y|ies|ied|ier|ication)
+[Uu]nminif(y|ies|ied|ier|ication)
 [Rr]etrace(d|s|able)?

@@ -110,13 +110,13 @@ final class CrashReportPayload {
         this.nativeLog = trim(nativeLog, MAX_NATIVE_LOG_LEN);
         this.nativeStack = trim(nativeStack, MAX_NATIVE_STACK_LEN);
         this.rawStack = trim(rawStack, MAX_RAW_STACK_LEN);
-        this.traceFormat = deriveTraceFormat(this.frames, this.rawStack);
         Display d = Display.getInstance();
+        this.platform = d.getPlatformName();
+        this.traceFormat = deriveTraceFormat(this.frames, this.rawStack, this.platform);
         this.buildKey = d.getProperty("build_key", "");
         this.packageName = d.getProperty("package_name", "");
         this.appName = d.getProperty("AppName", "");
         this.appVersion = d.getProperty("AppVersion", "");
-        this.platform = d.getPlatformName();
         this.osVersion = d.getProperty("OSVer", "");
         this.mappingId = d.getProperty("cn1.mappingId", "");
         this.hardenLevel = d.getProperty("cn1.hardenLevel", "");
@@ -125,20 +125,24 @@ final class CrashReportPayload {
         this.clientTs = System.currentTimeMillis();
     }
 
-    /// Derives the trace format from what we actually have. Structured
-    /// frames win; otherwise a raw stack whose first frame line begins
-    /// `"    at "` is the ParparVM text format, and anything else with a
-    /// body is a JavaScript engine stack. Never a guess -- the server
-    /// relies on this to pick a parser.
-    private static String deriveTraceFormat(List<Frame> frames, String rawStack) {
+    /// Derives the trace format from what we actually have, so the server picks the right parser --
+    /// never a guess. Structured frames win. Otherwise: the JavaScript port's raw stack is a JS engine
+    /// stack; a ParparVM C target's is the "    at <fqcn>.<method>:<line>" text; a JVM target
+    /// (Android/desktop) reaching here has an ordinary JVM printStackTrace (e.g. a stackless throwable
+    /// whose only frames are in its cause) that the JS parser must NOT touch. The old heuristic looked
+    /// only for the 4-space ParparVM shape and labeled everything else -- including the tab-indented
+    /// JVM trace -- as JavaScript; derive from the platform so that never happens.
+    static String deriveTraceFormat(List<Frame> frames, String rawStack, String platform) {
         if (frames != null && !frames.isEmpty()) {
             return TRACE_STRUCTURED;
         }
         if (rawStack == null || rawStack.length() == 0) {
             return TRACE_NONE;
         }
-        // A ParparVM frame line is exactly "    at <fqcn>.<method>:<line>"; a V8/JS
-        // frame carries a '(' or a URL. Look at the first "    at " line.
+        if (isJavaScriptPlatform(platform)) {
+            return TRACE_JS;
+        }
+        // A ParparVM frame line is exactly "    at <fqcn>.<method>:<line>" -- no '(', URL or '@'.
         int at = rawStack.indexOf("    at ");
         if (at >= 0) {
             int lineEnd = rawStack.indexOf('\n', at);
@@ -147,7 +151,19 @@ final class CrashReportPayload {
                 return TRACE_PARPARVM;
             }
         }
-        return TRACE_JS;
+        // Not JavaScript and not the ParparVM text shape: an ordinary JVM printStackTrace body. There
+        // is no JVM raw parser, so report NONE and let the server keep the text verbatim rather than
+        // misparsing it as a JavaScript stack.
+        return TRACE_NONE;
+    }
+
+    /// The JavaScript port's platform name; its raw stack is a JS engine {@code Error().stack}.
+    private static boolean isJavaScriptPlatform(String platform) {
+        if (platform == null) {
+            return false;
+        }
+        String p = platform.toLowerCase();
+        return p.indexOf("html") >= 0 || p.indexOf("javascript") >= 0 || p.equals("js");
     }
 
     static final class Frame {
