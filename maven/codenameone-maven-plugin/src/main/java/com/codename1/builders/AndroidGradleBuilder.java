@@ -352,6 +352,28 @@ public class AndroidGradleBuilder extends Executor {
         return renameRequested && !"true".equals(enableProguardArg);
     }
 
+    /**
+     * True when this build will produce a signed release variant -- the only variant whose Gradle
+     * buildType carries {@code minifyEnabled}, and therefore the only one R8 actually renames. A
+     * debug-only build ({@code android.release=false} with a debug variant) or a build with no signing
+     * certificate runs only {@code assembleDebug}, so R8 never renames even with
+     * {@code android.enableProguard=true}. Mirrors the release/debug task selection.
+     */
+    static boolean androidReleaseVariantBuilt(BuildRequest request) {
+        if (request.getCertificate() == null) {
+            return false;
+        }
+        boolean release = "true".equals(request.getArg("android.release", "true"));
+        boolean debug = release
+                ? "true".equals(request.getArg("android.debug", "false"))
+                : "true".equals(request.getArg("android.debug", "true"));
+        if (!release && !debug) {
+            // Neither explicitly selected: the builder falls back to building both, including release.
+            return true;
+        }
+        return release;
+    }
+
     static boolean usesHuaweiPush(int detectedPushVersion, String messagingService,
             boolean hasHuaweiConfiguration) {
         return detectedPushVersion == 3
@@ -860,16 +882,26 @@ public class AndroidGradleBuilder extends Executor {
                 && hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
                 && hardenLevel.trim().length() > 0
                 && hardenBoolArg(request, "harden.rename", true);
-        // R8 minification is emitted only when android.enableProguard is exactly "true" (see the
-        // minifyEnabled gate below), so any other value -- off, 0, False, no -- leaves R8 off. Gate on
-        // that same predicate, not just the literal "false", or a rename profile would be stamped
-        // rename:r8/hardened and ship without renaming.
+        // R8 actually renames only for a signed RELEASE variant built with minification: minifyEnabled
+        // lives in the release buildType and is emitted only when android.enableProguard is exactly
+        // "true", and a debug-only build (or one with no signing certificate) runs only assembleDebug.
+        // So a rename hardening profile must be rejected unless R8 will really run, not just when
+        // enableProguard is the literal "false" -- otherwise the APK ships stamped rename:r8/hardened
+        // without ever being renamed.
         String enableProguard = request.getArg("android.enableProguard", "true");
-        if (r8RenameRequiredButDisabled(hardenRenames, enableProguard)) {
+        if (r8RenameRequiredButDisabled(hardenRenames, enableProguard)
+                || (hardenRenames && !androidReleaseVariantBuilt(request))) {
+            String reason = !"true".equals(enableProguard)
+                    ? "android.enableProguard=" + enableProguard + " disables R8 (it renames only when "
+                            + "android.enableProguard=true)"
+                    : "this build produces no signed release variant (android.release="
+                            + request.getArg("android.release", "true") + ", android.debug="
+                            + request.getArg("android.debug", "false") + ", certificate "
+                            + (request.getCertificate() == null ? "absent" : "present")
+                            + "), and R8 minification applies only to the release build";
             throw new BuildException("harden.level=" + hardenLevel + " requires Android's R8/ProGuard "
-                    + "renaming, but android.enableProguard=" + enableProguard + " disables it (R8 runs "
-                    + "only when android.enableProguard=true). Enable R8, set harden.rename=false, or "
-                    + "set harden.level=off.");
+                    + "renaming, but " + reason + ". Build a signed release variant with R8 enabled, set "
+                    + "harden.rename=false, or set harden.level=off.");
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set

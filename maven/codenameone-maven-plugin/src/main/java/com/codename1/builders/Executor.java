@@ -2349,6 +2349,15 @@ public abstract class Executor {
     }
 
     /**
+     * Extra fully-qualified class names to keep from renaming, beyond the main class, for a slice whose
+     * runtime resolves a class by its ORIGINAL name in generated native code (which the input-jar
+     * scanner cannot discover). Empty by default; the iOS builder adds the watch lifecycle entry.
+     */
+    protected java.util.List<String> extraKeepClasses(BuildRequest request) {
+        return java.util.Collections.emptyList();
+    }
+
+    /**
      * Java source that stamps the hardening runtime properties ({@code cn1.mappingId},
      * {@code cn1.hardened}, {@code cn1.hardenLevel}) into {@code Display}, so every port's stub can
      * emit them the same way. These back {@code Hardening.isHardened()} and the crash report's
@@ -2580,6 +2589,23 @@ public abstract class Executor {
         // (the stubs combine it with getPackageName()), so passing it bare would keep a default-package
         // class and let ProGuard rename the real application class out from under the generated stub.
         p.setProperty("cn1.mainClass", fullyQualifiedMainClass(request));
+        // Keep any class a slice resolves by its original name in generated native code (e.g. the
+        // watch lifecycle entry embedded in cn1_watch_runtime_start), which the input-jar scanner
+        // cannot see. Appended as ProGuard -keep rules to harden.keep, the caller-keep channel.
+        java.util.List<String> extraKeeps = extraKeepClasses(request);
+        if (extraKeeps != null && !extraKeeps.isEmpty()) {
+            StringBuilder kb = new StringBuilder(p.getProperty("harden.keep", ""));
+            for (String cls : extraKeeps) {
+                if (cls == null || cls.trim().length() == 0) {
+                    continue;
+                }
+                if (kb.length() > 0) {
+                    kb.append('\n');
+                }
+                kb.append("-keep class ").append(cls.trim()).append(" { *; }");
+            }
+            p.setProperty("harden.keep", kb.toString());
+        }
         p.setProperty("cn1.renameSupported", Boolean.toString(hardeningRenameSupported()));
         // Local plugin builds are ungated: the engine is open source and a developer must be able
         // to reproduce a cloud failure locally. The cloud daemon sets this from the account tier.

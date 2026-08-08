@@ -53,6 +53,35 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void renameHardeningNeedsAReleaseVariantNotJustEnableProguard() {
+        // R8 minifyEnabled lives in the release buildType, so a debug-only build never renames even
+        // with the default android.enableProguard=true.
+        BuildRequest debugOnly = new BuildRequest();
+        debugOnly.setCertificate(new byte[] {1, 2, 3});
+        debugOnly.putArgument("android.release", "false");
+        debugOnly.putArgument("android.debug", "true");
+        assertFalse(AndroidGradleBuilder.androidReleaseVariantBuilt(debugOnly),
+                "android.release=false + debug builds only assembleDebug");
+
+        // A default (release) build with a certificate does produce a release variant.
+        BuildRequest release = new BuildRequest();
+        release.setCertificate(new byte[] {1, 2, 3});
+        assertTrue(AndroidGradleBuilder.androidReleaseVariantBuilt(release));
+
+        // Neither explicitly selected falls back to building both (release included).
+        BuildRequest both = new BuildRequest();
+        both.setCertificate(new byte[] {1, 2, 3});
+        both.putArgument("android.release", "false");
+        both.putArgument("android.debug", "false");
+        assertTrue(AndroidGradleBuilder.androidReleaseVariantBuilt(both));
+
+        // No signing certificate means only assembleDebug runs, so no release variant.
+        BuildRequest noCert = new BuildRequest();
+        noCert.putArgument("android.release", "true");
+        assertFalse(AndroidGradleBuilder.androidReleaseVariantBuilt(noCert));
+    }
+
+    @Test
     void typedPushAutoDetectsBothAndroidProviderConfigurations() {
         assertTrue(AndroidGradleBuilder.usesFcmPush(3, "auto", true));
         assertFalse(AndroidGradleBuilder.usesFcmPush(3, "auto", false));

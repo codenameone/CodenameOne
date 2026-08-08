@@ -488,6 +488,46 @@ public class IPhoneBuilder extends Executor {
         return "ios";
     }
 
+    /**
+     * The watch lifecycle entry class is resolved by its ORIGINAL fully-qualified name at run time --
+     * {@code CN1WatchBootstrap} embeds it in {@code cn1_watch_runtime_start("<watchMain>")} -- and that
+     * request-only string is not a reference the input-jar scanner can discover. When the watch ships a
+     * distinct entry class, keep it so the rename doesn't leave the watch runtime looking up a name that
+     * no longer exists. (A shared entry is the phone main class, already kept as {@code cn1.mainClass};
+     * the tvOS target boots through the translated main-class symbol, not a by-name lookup.)
+     */
+    @Override
+    protected java.util.List<String> extraKeepClasses(BuildRequest request) {
+        return watchEntryKeepClasses(request);
+    }
+
+    /** True when this build ships a watchOS slice (watchNative.enabled or a watchMain entry point). */
+    static boolean watchTargetEnabled(BuildRequest request) {
+        return "true".equals(request.getArg("watchNative.enabled", "false"))
+                || request.getArg("watchMain",
+                        request.getArg("watchNative.mainClass", "")).trim().length() > 0;
+    }
+
+    /** The distinct watch entry class to keep (fully qualified), or empty when it shares the main class. */
+    static java.util.List<String> watchEntryKeepClasses(BuildRequest request) {
+        if (!watchTargetEnabled(request)) {
+            return java.util.Collections.emptyList();
+        }
+        String watchMain = request.getArg("watchMain",
+                request.getArg("watchNative.mainClass", "")).trim();
+        String main = request.getMainClass() == null ? "" : request.getMainClass().trim();
+        if (watchMain.length() == 0 || watchMain.equals(main)) {
+            return java.util.Collections.emptyList();
+        }
+        if (watchMain.indexOf('.') < 0) {
+            String pkg = request.getPackageName();
+            if (pkg != null && pkg.trim().length() > 0) {
+                watchMain = pkg.trim() + "." + watchMain;
+            }
+        }
+        return java.util.Collections.singletonList(watchMain);
+    }
+
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         // Builder instances are normally single-use, but keep scan-derived
