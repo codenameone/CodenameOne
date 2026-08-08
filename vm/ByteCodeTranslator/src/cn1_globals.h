@@ -1361,6 +1361,13 @@ typedef struct CN1BibopPage {
                                           //  adaptive trigger is calibrated on (see
                                           //  cn1BibopAdaptAfterSweep). Transient: set at the
                                           //  splice, cleared as the sweep reaches the page
+    JAVA_BOOLEAN gcPageReusableAdvice;    // the release used MADV_FREE_REUSABLE (Darwin), so
+                                          //  the slot region is marked reusable and MUST be
+                                          //  restored with MADV_FREE_REUSE before anything is
+                                          //  allocated into it. FALSE when the release used an
+                                          //  advice with no pairing (MADV_FREE, MADV_DONTNEED),
+                                          //  which is what makes an EXPECTED reuse rejection
+                                          //  distinguishable from a genuine failure to restore
     JAVA_BOOLEAN gcPageReleased;          // the slot region has been handed back to the OS
                                           //  (madvise) and must be re-acquired before use.
                                           //  Only ever set on a page that is unreachable

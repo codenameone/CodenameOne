@@ -2341,6 +2341,7 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     // adaptive-trigger statistics. Reformatting a recycled page also lands here,
     // where both are already false, so the writes are idempotent.
     p->gcPageReleased = JAVA_FALSE;
+    p->gcPageReusableAdvice = JAVA_FALSE;
     p->gcMajorSpliced = JAVA_FALSE;
 #ifdef CN1_GC_VERIFY
     // QA: a recycled page still holds the DEAD previous occupants' headers, so a
@@ -2546,6 +2547,10 @@ static int cn1PageReleaseTraceOn(void) {
 // the pages charged to the process, so a nonzero value here means the release
 // ran but bought nothing.
 static int cn1PageReleaseReusableErrno = 0;
+// Last errno from a rejected MADV_FREE_REUSE on a page that WAS marked reusable.
+// Distinct from the release errno above: this one means a page could not be
+// taken back out of the reusable state and was therefore not handed out.
+static int cn1PageReuseFailErrno = 0;
 
 // Empty pages whose slot region has been given back to the OS. Kept OFF
 // bibopFreePool so the acquire path always prefers a warm page and only pays the
@@ -2618,9 +2623,11 @@ static JAVA_BOOLEAN cn1BibopReleasePageMemory(CN1BibopPage* p) {
     // is no accounting to restore), so one released flag covers both.
     if(madvise(addr, len, MADV_FREE_REUSABLE) == 0) {
         ok = JAVA_TRUE;
+        p->gcPageReusableAdvice = JAVA_TRUE;   // must be restored before reuse
     } else {
         cn1PageReleaseReusableErrno = errno;
         ok = (madvise(addr, len, MADV_FREE) == 0) ? JAVA_TRUE : JAVA_FALSE;
+        p->gcPageReusableAdvice = JAVA_FALSE;  // no pairing to restore
     }
 #elif defined(MADV_DONTNEED)
     // Linux: drops the pages and re-faults them as zero, which is exactly the
@@ -2639,23 +2646,41 @@ static JAVA_BOOLEAN cn1BibopReleasePageMemory(CN1BibopPage* p) {
 #endif
 }
 
-// Take a released page back into service. On Darwin the REUSE call is what
-// restores the footprint accounting MADV_FREE_REUSABLE removed; skipping it
-// would leave the process under-reporting memory it is genuinely using again.
-static void cn1BibopReusePageMemory(CN1BibopPage* p) {
+// Take a released page back into service. Returns whether the page is safe to
+// allocate into.
+//
+// On Darwin a page released with MADV_FREE_REUSABLE is still classified by the
+// kernel as reusable storage. MADV_FREE_REUSE is what takes it back out of that
+// state and restores the footprint accounting, so if it FAILS the page must not
+// be handed to the allocator: the kernel would be free to treat storage that is
+// about to hold live objects as discardable, and the process would under-report
+// memory it is genuinely using. A page released with an advice that has no
+// pairing (MADV_FREE, or Linux MADV_DONTNEED) has nothing to restore and is
+// always safe -- which is exactly why the advice kind is recorded per page, so
+// an expected rejection there is not mistaken for a real failure here.
+static JAVA_BOOLEAN cn1BibopReusePageMemory(CN1BibopPage* p) {
 #if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32)
     size_t off = cn1BibopReleaseOffset();
     if(off == 0) {
-        return;
+        p->gcPageReleased = JAVA_FALSE;
+        return JAVA_TRUE;
     }
 #if defined(__APPLE__)
-    madvise((char*)p + off, (size_t)CN1_BIBOP_PAGE_SIZE - off, MADV_FREE_REUSE);
+    if(p->gcPageReusableAdvice) {
+        if(madvise((char*)p + off, (size_t)CN1_BIBOP_PAGE_SIZE - off,
+                   MADV_FREE_REUSE) != 0) {
+            cn1PageReuseFailErrno = errno;
+            return JAVA_FALSE;                 // leave it released; caller retries later
+        }
+        p->gcPageReusableAdvice = JAVA_FALSE;
+    }
 #endif
 #if defined(CN1_GC_INSTRUMENT)
     atomic_fetch_add_explicit(&cn1BibopPagesReacquired, 1, memory_order_relaxed);
 #endif
 #endif
     p->gcPageReleased = JAVA_FALSE;
+    return JAVA_TRUE;
 }
 
 // Release the surplus of bibopFreePool. Called at the end of a sweep, on the GC
@@ -2735,9 +2760,9 @@ static void cn1BibopTrimFreePool(void) {
     }
     if(cn1PageReleaseTraceOn()) {
         fprintf(stderr, "[PAGE-RELEASE] kept=%d taken=%d released=%d rejected=%d "
-                "headerBytes=%zu reusableErrno=%d\n",
+                "headerBytes=%zu releaseErrno=%d reuseFailErrno=%d\n",
                 kept, taken, releasedNow, rejected, cn1BibopReleaseOffset(),
-                cn1PageReleaseReusableErrno);
+                cn1PageReleaseReusableErrno, cn1PageReuseFailErrno);
     }
     pthread_mutex_lock(&bibopMutex);
     if(relTail != 0) {
@@ -2978,8 +3003,18 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
         // region (and under CN1_GC_VERIFY writes every slot).
         np = bibopReleasedPool;
         bibopReleasedPool = np->nextPool;
-        cn1BibopReusePageMemory(np);
-        cn1BibopFormatPage(np, ci);
+        if(cn1BibopReusePageMemory(np)) {
+            cn1BibopFormatPage(np, ci);
+        } else {
+            // Could not restore it; putting a page the kernel still considers
+            // reusable into service risks losing whatever is written into it.
+            // Return it to the pool and fall through to a fresh page -- one
+            // failed syscall, no spin, and self-healing if the cause is
+            // transient.
+            np->nextPool = bibopReleasedPool;
+            bibopReleasedPool = np;
+            np = 0;
+        }
     }
     pthread_mutex_unlock(&bibopMutex);
     if(np == 0) {
