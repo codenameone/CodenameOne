@@ -327,21 +327,43 @@ public class StringEncryptTransformTest {
     }
 
     @Test
-    public void clinitTooFullLeavesLiteralPlaintextAndReports() throws Exception {
-        // The existing <clinit> is so close to the limit that not even a helper CALL would fit, so the
-        // literal cannot be hoisted: it is left plaintext and counted, rather than aborting the build.
-        org.objectweb.asm.ClassWriter w = classWithBigClinit("app/FullClinit", 31500); // ~63 KB
-        addStringGetter(w, "probe", "a literal that cannot be hoisted here");
+    public void staticFinalConstantWithFullClinitStaysPlaintextAndReports() throws Exception {
+        // A static-final ConstantValue can only be moved into <clinit>; when <clinit> is already full it
+        // cannot, so the field keeps its plaintext. That is safe (javac inlined every read as an LDC,
+        // which IS encrypted, so the field value is dead), and reported via getClinitFullLiteralCount.
+        org.objectweb.asm.ClassWriter w = classWithBigClinit("app/FullClinitStatic", 31500); // ~63 KB
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "SECRET", "Ljava/lang/String;", null,
+                "a static-final constant with a full clinit").visitEnd();
         w.visitEnd();
 
         StringEncryptTransform t = new StringEncryptTransform(true, 5);
         byte[] out = t.transform(w.toByteArray());
         CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
                 new java.io.PrintWriter(new java.io.StringWriter()));
-        assertEquals("the un-hoistable literal is reported", 1, t.getClinitFullLiteralCount());
-        assertEquals("nothing was encrypted for this class", 0, t.getEncryptedCount());
-        assertTrue("the literal stays plaintext rather than the build aborting",
-                StringEncryptTransform.containsStringLiteral(out, "a literal that cannot be hoisted here"));
+        assertEquals("the un-encryptable static-final is reported", 1, t.getClinitFullLiteralCount());
+        assertTrue("its constant stays plaintext rather than the build aborting",
+                StringEncryptTransform.containsStringLiteral(out, "a static-final constant with a full clinit"));
+    }
+
+    @Test
+    public void clinitTooFullFallsBackToPerAccessEncryption() throws Exception {
+        // The existing <clinit> is so close to the limit that not even a helper CALL would fit, so the
+        // literal cannot be HOISTED. Rather than leaving it plaintext (which would break a cross-class
+        // == against an encrypted copy elsewhere), it is encrypted PER ACCESS -- no <clinit> growth.
+        org.objectweb.asm.ClassWriter w = classWithBigClinit("app/FullClinit", 31500); // ~63 KB
+        addStringGetter(w, "probe", "a literal encrypted per access here");
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 5);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertTrue("the literal is encrypted per access, not left plaintext", t.getEncryptedCount() >= 1);
+        assertFalse("its plaintext must be gone",
+                StringEncryptTransform.containsStringLiteral(out, "a literal encrypted per access here"));
+        Class<?> c = new ByteLoader().define("app.FullClinit", out);
+        assertEquals("a literal encrypted per access here", c.getMethod("probe").invoke(null));
     }
 
     @Test
@@ -460,10 +482,12 @@ public class StringEncryptTransformTest {
     }
 
     @Test
-    public void hoistingIsCappedByConstantPoolBudget() throws Exception {
+    public void poolHeavyClassEncryptsPerAccessInsteadOfOverflowingOrLeavingPlaintext() throws Exception {
         // A class with far more distinct literals than the constant pool can hold once each is hoisted
-        // (a field + its reference constants) would overflow the 65535-entry pool. The transform must
-        // cap hoisting and leave the rest plaintext (reported) rather than throw ClassTooLargeException.
+        // (a field + its reference constants) would overflow the 65535-entry pool. Rather than
+        // ClassTooLargeException -- or leaving some plaintext (which breaks cross-class ==) -- the class
+        // falls back to per-access encryption: no per-value field, so no pool growth, and every
+        // occurrence is encrypted and interned. A probe reuses one value so a decode is checked.
         int count = 12000;
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
         w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
@@ -481,17 +505,21 @@ public class StringEncryptTransformTest {
             m.visitMaxs(1, 0);
             m.visitEnd();
         }
+        addStringGetter(w, "probe", "pool_heavy_secret_literal_number_0");
         w.visitEnd();
 
         StringEncryptTransform t = new StringEncryptTransform(true, 71);
         byte[] out = t.transform(w.toByteArray());
-        assertTrue("hoisting must be capped, leaving some literals plaintext",
-                t.getPoolFullLiteralCount() > 0);
-        // Every distinct literal is either encrypted or reported as pool-excluded; nothing is lost.
-        assertEquals(count, t.getEncryptedCount() + t.getPoolFullLiteralCount());
-        // The class assembles and verifies -- no ClassTooLargeException.
+        // Per-access encrypts every OCCURRENCE (count filler + the probe reuse), where hoisting would
+        // encrypt each distinct value once; count+1 therefore proves the per-access fallback ran.
+        assertEquals(count + 1, t.getEncryptedCount());
+        assertFalse("no literal is left plaintext",
+                StringEncryptTransform.containsStringLiteral(out, "pool_heavy_secret_literal_number_5"));
+        // The class assembles and verifies -- no ClassTooLargeException -- and a value decodes.
         CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
                 new java.io.PrintWriter(new java.io.StringWriter()));
+        Class<?> c = new ByteLoader().define("app.PoolHeavy", out);
+        assertEquals("pool_heavy_secret_literal_number_0", c.getMethod("probe").invoke(null));
     }
 
     @Test

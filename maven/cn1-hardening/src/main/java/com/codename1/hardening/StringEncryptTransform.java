@@ -104,7 +104,6 @@ public final class StringEncryptTransform {
     private int clinitFullLiteralCount;
     private int methodFullLiteralCount;
     private int annotationLiteralCount;
-    private int poolFullLiteralCount;
     /** The input class's constant-pool item count, so hoisting can stay under the 65535-entry limit. */
     private int poolBaseItems;
 
@@ -235,15 +234,6 @@ public final class StringEncryptTransform {
         return annotationLiteralCount;
     }
 
-    /**
-     * The number of literals left unhoisted (plaintext) because hoisting them all -- each adds a
-     * synthetic field and its field-reference constants -- would push the class past the JVM's
-     * 65,535-entry constant-pool limit (which makes ASM throw {@code ClassTooLargeException}). Rare (a
-     * generated class with ~13k+ distinct selected literals); reported rather than aborting the build.
-     */
-    public int getPoolFullLiteralCount() {
-        return poolFullLiteralCount;
-    }
 
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
@@ -310,12 +300,7 @@ public final class StringEncryptTransform {
         // access; interface method bodies are rare and not hot loops.
         if (cn.methods != null) {
             if (isInterface) {
-                for (MethodNode mn : cn.methods) {
-                    if (mn.instructions == null || decoderName.equals(mn.name)) {
-                        continue;
-                    }
-                    changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName);
-                }
+                changed |= encryptAllMethodsPerAccess(cn, base, decoderName, true);
             } else {
                 changed |= hoistMethodLiterals(cn, base, decoderName);
             }
@@ -336,6 +321,28 @@ public final class StringEncryptTransform {
         ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
         return cw.toByteArray();
+    }
+
+    /**
+     * Encrypts every method-body literal in {@code cn} PER ACCESS (an {@code LDC} ciphertext + a decoder
+     * {@code INVOKESTATIC}), rather than hoisting distinct values to fields. Used for interfaces (whose
+     * fields are public) and as the fallback when hoisting a class would overflow the constant pool or
+     * its {@code <clinit>} is already full: per-access adds no per-value field, so it does not grow the
+     * pool, and it keeps EVERY occurrence of a value encrypted and interned -- preserving a valid
+     * cross-class literal {@code ==} on ParparVM instead of leaving some copies plaintext.
+     */
+    private boolean encryptAllMethodsPerAccess(ClassNode cn, int base, String decoderName,
+                                               boolean isInterface) {
+        boolean changed = false;
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                if (mn.instructions == null || decoderName.equals(mn.name)) {
+                    continue;
+                }
+                changed |= encryptMethodLiterals(cn, mn, base, isInterface, decoderName);
+            }
+        }
+        return changed;
     }
 
     private boolean encryptMethodLiterals(ClassNode cn, MethodNode mn, int base, boolean isInterface,
@@ -651,44 +658,35 @@ public final class StringEncryptTransform {
                 }
             }
         }
+        if (valueToField.isEmpty()) {
+            return false;
+        }
         // Bound hoisting by constant-pool growth: each hoisted literal adds several pool entries (its
         // field name Utf8, a NameAndType, a Fieldref, the ciphertext Utf8 + String), so a class with
         // tens of thousands of distinct literals could exceed the JVM's 65535-entry limit and make ASM
-        // throw ClassTooLargeException. Cap the number hoisted at what the pool budget allows and leave
-        // the rest plaintext, reported. First-seen order is kept (LinkedHashMap), so the cut is stable.
+        // throw ClassTooLargeException. When hoisting them all would overflow, fall back to per-access
+        // encryption for the whole class: it adds no per-value field, so it does not grow the pool, and
+        // -- crucially -- it keeps EVERY occurrence encrypted and interned rather than leaving some
+        // plaintext, so a value hoisted in one class still compares == to its per-access copy here.
         int budget = (SAFE_POOL_ITEMS - poolBaseItems) / POOL_ITEMS_PER_HOIST;
         if (budget < 0) {
             budget = 0;
         }
         if (valueToField.size() > budget) {
-            java.util.Iterator<java.util.Map.Entry<String, String>> it =
-                    valueToField.entrySet().iterator();
-            int kept = 0;
-            while (it.hasNext()) {
-                it.next();
-                if (kept < budget) {
-                    kept++;
-                } else {
-                    it.remove();
-                    poolFullLiteralCount++;
-                }
-            }
+            return encryptAllMethodsPerAccess(cn, base, decoderName, false);
         }
-        if (valueToField.isEmpty()) {
-            return false;
-        }
-        // 2. Build the initializer BEFORE mutating anything, so a class whose <clinit> cannot
-        //    accommodate it is left untouched (its literals stay plaintext, reported) rather than
-        //    half-transformed with fields that are declared but never initialized.
+        // 2. Build the initializer BEFORE mutating anything.
         InsnList init = new InsnList();
         for (java.util.Map.Entry<String, String> e : valueToField.entrySet()) {
             init.add(new LdcInsnNode(encode(e.getKey(), base)));
             init.add(new MethodInsnNode(Opcodes.INVOKESTATIC, cn.name, decoderName, DECODER_DESC, false));
             init.add(new FieldInsnNode(Opcodes.PUTSTATIC, cn.name, e.getValue(), "Ljava/lang/String;"));
         }
+        // If the class's <clinit> is already so full it cannot hold the decode init, fall back to
+        // per-access here too (no <clinit> growth), for the same reason: keep every occurrence encrypted
+        // and interned rather than leaving these method-body literals plaintext.
         if (!clinitCanAccept(cn, init)) {
-            clinitFullLiteralCount += valueToField.size();
-            return false;
+            return encryptAllMethodsPerAccess(cn, base, decoderName, false);
         }
         // 3. Commit. Replace each LDC of a hoisted value with a GETSTATIC of its field in the ORIGINAL
         //    method bodies; the standalone init is inserted into <clinit> only afterwards, so its own

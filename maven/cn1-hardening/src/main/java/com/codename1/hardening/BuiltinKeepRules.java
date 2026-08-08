@@ -78,6 +78,7 @@ public final class BuiltinKeepRules {
         r.add("-keep class * implements com.codename1.location.GeofenceListener { *; }");
         r.add("-keep class * implements com.codename1.location.LocationListener { *; }");
         r.add("-keep class * implements com.codename1.background.BackgroundFetch { *; }");
+        r.add("-keep class * implements com.codename1.background.BackgroundWorker { *; }");
         // JNI/native method names must not move.
         r.add("-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }");
         // enum values()/valueOf(String) resolve constants by name, so they are kept -- this is

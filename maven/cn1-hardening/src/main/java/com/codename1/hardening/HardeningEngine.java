@@ -189,7 +189,6 @@ public final class HardeningEngine {
         int clinitFullLiterals = 0;
         int methodFullLiterals = 0;
         int annotationLiterals = 0;
-        int poolFullLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -217,7 +216,6 @@ public final class HardeningEngine {
                 clinitFullLiterals += t.getClinitFullLiteralCount();
                 methodFullLiterals += t.getMethodFullLiteralCount();
                 annotationLiterals += t.getAnnotationLiteralCount();
-                poolFullLiterals += t.getPoolFullLiteralCount();
             }
         }
 
@@ -344,11 +342,6 @@ public final class HardeningEngine {
             result.getWarnings().add(methodFullLiterals + " string literal(s) were left in plaintext "
                     + "because their enclosing method is already near the 65535-byte limit and the "
                     + "per-access decode call would overflow it");
-        }
-        if (stringsApplied && poolFullLiterals > 0) {
-            result.getWarnings().add(poolFullLiterals + " string literal(s) were left in plaintext "
-                    + "because hoisting them would push the class past the 65535-entry constant-pool "
-                    + "limit; split the generated class or reduce its distinct literals");
         }
         if (stringsApplied && annotationLiterals > 0) {
             // Annotation element values live in the annotation metadata, not an LDC or a ConstantValue,
