@@ -353,6 +353,28 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     /**
+     * True when a rename-delivering hardening profile is active for THIS build, so the R8 renaming the
+     * profile promises must be enforced. Gated first on the VERIFIED {@code cn1.hardened} output (set only
+     * after a successful, entitled engine run, exactly as {@link #hardeningR8Keep(BuildRequest)}): a build
+     * that took the {@code harden.allowUnhardenedLocalBuild} escape hatch has {@code cn1.harden.forceOff}
+     * set, so {@code hardenSourceJar} returned the original jar stamped {@code cn1.hardened=false} and
+     * nothing was renamed to enforce -- enforcing R8 there would defeat the documented escape hatch. The
+     * tri-state opt-outs ({@code androidHardeningEnabled}, {@code renameRequested}) are resolved by the
+     * caller with the engine's {@code boolTri} rules.
+     */
+    static boolean androidRenameHardeningActive(BuildRequest request, boolean androidHardeningEnabled,
+            boolean renameRequested) {
+        if (!"true".equals(request.getArg("cn1.hardened", "false"))) {
+            return false;
+        }
+        String hardenLevel = request.getArg("harden.level", "off");
+        return androidHardeningEnabled
+                && hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
+                && hardenLevel.trim().length() > 0
+                && renameRequested;
+    }
+
+    /**
      * True when this build will produce a signed release variant -- the only variant whose Gradle
      * buildType carries {@code minifyEnabled}, and therefore the only one R8 actually renames. A
      * debug-only build ({@code android.release=false} with a debug variant) or a build with no signing
@@ -878,10 +900,8 @@ public class AndroidGradleBuilder extends Executor {
         // (false/0/off/no all mean off), so harden.rename=off and harden.rename=0 behave identically
         // to harden.rename=false here rather than being misread as "renaming still requested".
         boolean androidHardeningEnabled = hardenBoolArg(request, "harden.and.enabled", true);
-        boolean hardenRenames = androidHardeningEnabled
-                && hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
-                && hardenLevel.trim().length() > 0
-                && hardenBoolArg(request, "harden.rename", true);
+        boolean hardenRenames = androidRenameHardeningActive(request, androidHardeningEnabled,
+                hardenBoolArg(request, "harden.rename", true));
         // R8 actually renames only for a signed RELEASE variant built with minification: minifyEnabled
         // lives in the release buildType and is emitted only when android.enableProguard is exactly
         // "true", and a debug-only build (or one with no signing certificate) runs only assembleDebug.
