@@ -162,6 +162,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
         }
 
+        applyHardeningPreflight();
+
         try {
             createAntProject();
         } catch (IOException ex) {
@@ -171,6 +173,253 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             getLog().error("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage());
             throw new MojoExecutionException("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * App-hardening pre-flight (Check 1). Validates {@code harden.level} and refuses targets that
+     * cannot be hardened before a build is spent. Runs for every target: for cloud targets it fails
+     * fast client-side before submission; for local/source targets it stops (or, with the escape
+     * hatch, forces hardening off) because a locally built binary never reaches the server and its
+     * mapping would be orphaned from the crash-symbolication service.
+     */
+    private void applyHardeningPreflight() throws MojoFailureException {
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream fis = new FileInputStream(settingsFile)) {
+                settings.load(fis);
+            } catch (IOException ex) {
+                getLog().debug("Could not read codenameone_settings.properties for hardening pre-flight", ex);
+            }
+        }
+        applyHardeningPreflight(settings);
+    }
+
+    /**
+     * Runs the hardening pre-flight against a given set of effective settings. Called first with the
+     * project's own {@code codenameone_settings.properties} (fail-fast before the merged jar is built),
+     * and again after {@code createAntProject} merges the CN1Lib-contributed
+     * {@code codenameone_library_appended/required.properties} -- a library can turn hardening on via
+     * {@code codename1.arg.harden.level}, which the early call cannot see, and without this second pass
+     * such a build would slip past the local-build refusal / force-off and produce a locally hardened
+     * artifact whose mapping is never uploaded.
+     */
+    private void applyHardeningPreflight(Properties settings) throws MojoFailureException {
+        String level = settings.getProperty("codename1.arg.harden.level", "off");
+        // A per-platform opt-out (harden.<platform>.enabled=false) means hardening won't run for
+        // this target, so the pre-flight must not reject it -- treat the level as off. The native-Mac
+        // targets ride the iOS pipeline with platform=ios, so derive their opt-out key from the
+        // build target instead (matching IPhoneBuilder, which reports "mac" for them).
+        String hardenPlatform = hardenPlatformForBuildTarget(buildTarget);
+        if (hardenPlatform == null) {
+            hardenPlatform = normalizeHardenPlatform(platform);
+        }
+        if (hardenPlatform != null && isHardenFalse(
+                settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true"))) {
+            level = "off";
+        }
+        // Even at a non-off level, a build that has overridden every individual transform off
+        // (e.g. harden.rename=false, harden.strings=off, harden.controlFlow=false) requests nothing:
+        // the engine treats that as SKIPPED_NOT_REQUESTED, which is equivalent to off. Resolve the
+        // overrides to the effective transform set so such a build is not rejected on a local/source
+        // or on-device-debug target for a "hardening" it isn't actually asking for. An unknown level
+        // is NOT reduced here -- it must reach the preflight so the invalid-level check rejects it.
+        if (hardeningReducesToOff(settings, level)) {
+            level = "off";
+        }
+        boolean allowLocal = "true".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.harden.allowUnhardenedLocalBuild", "false").trim());
+        boolean onDeviceDebug = "true".equalsIgnoreCase(
+                settings.getProperty("codename1.arg.android.onDeviceDebug", "false").trim())
+                || (buildTarget != null && buildTarget.contains("on-device-debug"));
+
+        HardeningPreflight.Result r = HardeningPreflight.check(level, buildTarget, allowLocal, onDeviceDebug);
+        if (r.isFailed()) {
+            throw new MojoFailureException(r.getMessage());
+        }
+        if (r.isForceOff()) {
+            getLog().warn(r.getMessage());
+            System.setProperty("cn1.harden.forceOff", "true");
+        } else {
+            System.clearProperty("cn1.harden.forceOff");
+        }
+        // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
+        // jars (so an application method that overrides a framework method is not renamed apart from
+        // its superclass). Only needed when hardening will actually run.
+        if (!"off".equalsIgnoreCase(level.trim()) && !r.isForceOff()) {
+            try {
+                List<String> cp = project.getCompileClasspathElements();
+                StringBuilder sb = new StringBuilder();
+                for (String element : cp) {
+                    File f = new File(element);
+                    if (f.isFile() && element.endsWith(".jar")) {
+                        if (sb.length() > 0) {
+                            sb.append(File.pathSeparator);
+                        }
+                        sb.append(f.getAbsolutePath());
+                    }
+                }
+                System.setProperty("cn1.hardening.libraryJars", sb.toString());
+            } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
+                getLog().debug("Could not resolve compile classpath for hardening library jars", ex);
+            }
+        } else {
+            System.clearProperty("cn1.hardening.libraryJars");
+        }
+    }
+
+    /**
+     * The {@code harden.<platform>.enabled} opt-out key implied by the build target, for targets
+     * whose {@code codename1.platform} does not name their real hardening platform. The native-Mac
+     * targets (mac-source / mac-os-x-native) run with platform=ios but harden as "mac", so their
+     * opt-out is {@code harden.mac.enabled}. Returns {@code null} when the target carries no such
+     * override and the platform value should be used.
+     */
+    private static String hardenPlatformForBuildTarget(String buildTarget) {
+        if (BUILD_TARGET_MAC_NATIVE_PROJECT.equals(buildTarget)
+                || BUILD_TARGET_MAC_NATIVE.equals(buildTarget)) {
+            return "mac";
+        }
+        return null;
+    }
+
+    /**
+     * True when a {@code harden.*} boolean setting reads as disabled, using the same tri-state rules
+     * as the engine's {@code HardeningConfig.boolTri}: {@code false}, {@code 0} and {@code off} all
+     * mean off. Recognizing only the literal {@code false} here would preflight-reject a
+     * local/source build that {@code harden.<platform>.enabled=off} had actually turned off.
+     */
+    private static boolean isHardenFalse(String value) {
+        if (value == null) {
+            return false;
+        }
+        String t = value.trim().toLowerCase();
+        return "false".equals(t) || "0".equals(t) || "off".equals(t);
+    }
+
+    /**
+     * True when, at this level, at least one hardening transform is still requested once the
+     * individual {@code harden.*} overrides are applied -- mirroring the engine's
+     * {@code HardeningConfig}/{@code willApplyAnyTransform} "is anything requested" decision (the
+     * platform-safety refinement is the server's, and only ever narrows this). A level whose every
+     * transform is overridden off requests nothing and is equivalent to {@code off}, so the preflight
+     * must not reject it.
+     */
+    /**
+     * True when a <em>valid</em> non-off level requests no transform once the {@code harden.*}
+     * overrides are applied, so it is equivalent to {@code off} and must not be rejected. An unknown
+     * or misspelled level (rank 0) returns {@code false} so it is left untouched and reaches
+     * {@link HardeningPreflight#check} -- which rejects it fast, client-side, rather than letting a
+     * cloud build be submitted for the forked engine to reject later.
+     */
+    static boolean hardeningReducesToOff(Properties settings, String level) {
+        return hardenLevelRank(level) >= 1 && !hardeningRequestsAnyTransform(settings, level);
+    }
+
+    static boolean hardeningRequestsAnyTransform(Properties settings, String level) {
+        int rank = hardenLevelRank(level);
+        if (rank <= 0) {
+            return false;
+        }
+        // rank is 1..3 here (standard/aggressive/paranoid), so the standard-level defaults -- renaming
+        // and constant-string encryption -- are on unless explicitly overridden off. Control-flow is a
+        // default only from aggressive up.
+        boolean atLeastAggressive = rank >= 2;
+        boolean rename = hardenBoolTri(
+                settings.getProperty("codename1.arg.harden.rename"), true);
+        boolean stringsOn = hardenStringsRequested(
+                settings.getProperty("codename1.arg.harden.strings"), true);
+        boolean controlFlow = hardenBoolTri(
+                settings.getProperty("codename1.arg.harden.controlFlow"), atLeastAggressive);
+        return rename || stringsOn || controlFlow;
+    }
+
+    /** off/empty/unknown = 0, standard = 1, aggressive = 2, paranoid = 3. */
+    private static int hardenLevelRank(String level) {
+        if (level == null) {
+            return 0;
+        }
+        String v = level.trim().toLowerCase();
+        if ("standard".equals(v)) {
+            return 1;
+        }
+        if ("aggressive".equals(v)) {
+            return 2;
+        }
+        if ("paranoid".equals(v)) {
+            return 3;
+        }
+        return 0;
+    }
+
+    /** Tri-state boolean matching the engine's {@code HardeningConfig.boolTri}. */
+    private static boolean hardenBoolTri(String value, boolean def) {
+        if (value == null) {
+            return def;
+        }
+        String t = value.trim().toLowerCase();
+        if (t.isEmpty()) {
+            return def;
+        }
+        if ("true".equals(t) || "1".equals(t) || "2".equals(t) || "3".equals(t) || "on".equals(t)) {
+            return true;
+        }
+        if ("false".equals(t) || "0".equals(t) || "off".equals(t)) {
+            return false;
+        }
+        return def;
+    }
+
+    /**
+     * Whether string encryption is requested, matching {@code HardeningConfig}'s {@code harden.strings}
+     * parsing: {@code off} disables; {@code constants}/{@code all} enable; anything else (including an
+     * unset value) falls back to the level default, which the CLI validates up front.
+     */
+    private static boolean hardenStringsRequested(String strings, boolean def) {
+        if (strings == null) {
+            return def;
+        }
+        String v = strings.trim().toLowerCase();
+        if (v.isEmpty()) {
+            return def;
+        }
+        if ("off".equals(v)) {
+            return false;
+        }
+        if ("constants".equals(v) || "all".equals(v)) {
+            return true;
+        }
+        return def;
+    }
+
+    /** Maps {@code codename1.platform} to the {@code harden.<platform>.enabled} opt-out key. */
+    private static String normalizeHardenPlatform(String platform) {
+        if (platform == null) {
+            return null;
+        }
+        String p = platform.trim().toLowerCase();
+        if (p.startsWith("android")) {
+            return "and";
+        }
+        if (p.startsWith("ios")) {
+            return "ios";
+        }
+        if (p.contains("javascript")) {
+            return "javascript";
+        }
+        if (p.contains("win")) {
+            return "win";
+        }
+        if (p.contains("mac")) {
+            return "mac";
+        }
+        if (p.contains("linux")) {
+            return "linux";
+        }
+        if (p.contains("javase") || p.contains("desktop")) {
+            return "javase";
+        }
+        return null;
     }
 
     /**
@@ -882,6 +1131,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         }
 
+        // Re-run the hardening pre-flight against the MERGED effective settings: a CN1Lib can supply
+        // codename1.arg.harden.level (or a per-platform opt-out) via the appended/required properties
+        // just merged above, which the early pre-flight -- run before this jar existed -- could not see.
+        // Without this, a library that turns hardening on would slip a local/source build past the
+        // local-build refusal / force-off and produce a locally hardened artifact whose mapping is never
+        // uploaded (so its crashes could never be retraced).
+        applyHardeningPreflight(cn1SettingsProps);
+
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
@@ -1323,7 +1580,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         try {
             getLog().info("Starting android project builder...");
-            boolean result = e.build(distJar, request);
+            boolean result = e.runBuild(distJar, request);
             getLog().info("Android project builder completed with result "+result);
             if (!result) {
                 getLog().error("Received false return value from build()");
@@ -1527,7 +1784,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
 
         try {
-            boolean result = e.build(distJar, request);
+            boolean result = e.runBuild(distJar, request);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1658,7 +1915,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setIncludeSource(true);
 
         try {
-            boolean result = e.build(distJar, r);
+            boolean result = e.runBuild(distJar, r);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1669,6 +1926,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (e.getWindowsExecutable() != null) {
                 getLog().info("Built native Windows executable: " + e.getWindowsExecutable().getAbsolutePath());
             }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new MojoExecutionException(hardeningEx.getMessage(), hardeningEx);
         } catch (org.apache.tools.ant.BuildException ex) {
             String builderLog = e.getErrorMessage();
             if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1739,7 +1998,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setIncludeSource(true);
 
         try {
-            boolean result = e.build(distJar, r);
+            boolean result = e.runBuild(distJar, r);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1750,6 +2009,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             if (e.getLinuxExecutable() != null) {
                 getLog().info("Built native Linux executable: " + e.getLinuxExecutable().getAbsolutePath());
             }
+        } catch (com.codename1.builders.BuildException hardeningEx) {
+            throw new MojoExecutionException(hardeningEx.getMessage(), hardeningEx);
         } catch (org.apache.tools.ant.BuildException ex) {
             String builderLog = e.getErrorMessage();
             if (builderLog != null && builderLog.trim().length() > 0) {
@@ -1832,7 +2093,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setIncludeSource(true);
 
         try {
-            boolean result = e.build(distJar, r);
+            boolean result = e.runBuild(distJar, r);
             if (!result) {
                 String builderLog = e.getErrorMessage();
                 if (builderLog != null && builderLog.trim().length() > 0) {

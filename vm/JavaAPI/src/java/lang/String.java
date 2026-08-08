@@ -606,12 +606,18 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * All literal strings and string-valued constant expressions are interned. String literals are defined in Section 3.10.5 of the Java Language Specification
      */
     public java.lang.String intern() {
-        int off = str.indexOf(this);
-        if(off > -1) {
-            return str.get(off);
+        // Synchronized on the shared pool: intern() must be atomic so two threads canonicalizing
+        // equal strings concurrently return the same object (and never corrupt the pool by adding
+        // during another thread's traversal). The JDK contract requires s.intern()==t.intern()
+        // whenever s.equals(t).
+        synchronized(str) {
+            int off = str.indexOf(this);
+            if(off > -1) {
+                return str.get(off);
+            }
+            str.add(this);
+            return this;
         }
-        str.add(this);
-        return this;
     }
 
     /**

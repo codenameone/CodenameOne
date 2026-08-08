@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.impl.javase;
 
 import javax.swing.*;
@@ -164,14 +186,34 @@ public class BuildHintEditor {
                         model.type = BuildHintValueType.Checkbox;
                     } else if ("select".equalsIgnoreCase(propertyValue)) {
                         model.type = BuildHintValueType.Select;
-                        String valuesString = System.getProperty("codename1.arg.{{ "+model.name+" }}.values");
+                        // Resolve the sibling ".values" property using the *exact* brace content of
+                        // the ".type" property we're processing. model.name has already been stripped
+                        // of its group prefix (a grouped hint registered as {{#group#name}} leaves
+                        // model.name == "name"), and the registration side uses no spaces inside the
+                        // braces, so the old "{{ "+model.name+" }}" lookup missed every grouped Select
+                        // and every space-sensitive key. Deriving the key from propName keeps the two
+                        // in lockstep regardless of grouping or spacing. Fall back to the historical
+                        // spaced form for any cn1lib that registered its values key that way.
+                        String valuesKey = propName.substring(0, propName.indexOf("}}.")+3) + "values";
+                        String valuesString = System.getProperty(valuesKey);
+                        if (valuesString == null) {
+                            valuesString = System.getProperty("codename1.arg.{{ "+model.name+" }}.values");
+                        }
                         if (valuesString != null) {
-                            String separator = ""+valuesString.charAt(valuesString.length()-1);
+                            // The historical format is delimiter-TERMINATED: the last character is the
+                            // separator (so any delimiter could be used, e.g. "a;b;c;"). Grouped
+                            // registrations, and BuildHintSchemaDefaults, instead use a plain
+                            // comma-separated list with no trailing delimiter ("modern,legacy,custom",
+                            // "false,true"). Treating the last char as the delimiter there would split
+                            // "custom" on 'm'. So: only use the last char as the delimiter when it is a
+                            // punctuation (non-word) character; otherwise split on comma.
+                            char last = valuesString.charAt(valuesString.length() - 1);
+                            String separator = Character.isLetterOrDigit(last) ? "," : ("" + last);
                             ArrayList<String> values = new ArrayList<String>();
                             values.add("");
-                            for (String value : valuesString.split(separator)) {
+                            for (String value : valuesString.split(java.util.regex.Pattern.quote(separator))) {
                                 if (!value.trim().isEmpty()) {
-                                    values.add(value);
+                                    values.add(value.trim());
                                 }
                             }
 

@@ -90,6 +90,11 @@ public class JavaScriptBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform(BuildRequest request) {
+        return "javascript";
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         debug("Request Args: ");
         debug("-----------------");
@@ -132,7 +137,7 @@ public class JavaScriptBuilder extends Executor {
             List<File> generatedImpls = generateNativeInterfaceImpls(buildDir, nativeInterfaces);
 
             String translatorAppName = sanitizeIdentifier(request.getMainClass()) + "JavaScriptMain";
-            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses, nativeInterfaces);
+            File launcherJava = writeLauncher(buildDir, translatorAppName, request.getPackageName(), request.getMainClass(), stageClasses, nativeInterfaces, request);
             compileLauncher(launcherJava, generatedImpls, stageClasses, portClassesStaged);
 
             File parparvmCompilerJar = extractParparVMCompiler();
@@ -387,7 +392,7 @@ public class JavaScriptBuilder extends Executor {
     }
 
     private File writeLauncher(File workDir, String launcherName, String packageName, String mainClass, File stageClasses,
-                               List<Class<?>> nativeInterfaces) throws IOException {
+                               List<Class<?>> nativeInterfaces, BuildRequest request) throws IOException {
         // If the build-time SVG transcoder generated com.codename1.generated.svg.SVGRegistry
         // for this app, register the transcoded SVGs at startup -- the JS-port analogue of
         // JavaSEPort.init's reflective installGlobal(). A DIRECT call (not reflection) is
@@ -399,6 +404,7 @@ public class JavaScriptBuilder extends Executor {
         PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8));
         try {
             pw.println("import com.codename1.impl.html5.ParparVMBootstrap;");
+            pw.println("import com.codename1.ui.Display;");
             pw.println("import " + packageName + "." + mainClass + ";");
             pw.println();
             pw.println("public final class " + launcherName + " {");
@@ -416,7 +422,17 @@ public class JavaScriptBuilder extends Executor {
                             + ifaceName + ".class, " + ifaceName + "Impl.class);");
                 }
             }
-            pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
+            // Stamp the hardening metadata after Display.init but BEFORE the lifecycle's init/start,
+            // so Hardening.isHardened() and any crash raised during startup already carry the mapping
+            // id / level (parity with iOS and Android). bootstrap(lifecycle, afterInit) invokes the
+            // runnable at exactly that point; a post-bootstrap stamp would miss startup because
+            // bootstrap runs init/start inline. hardeningRuntimeProperties emits
+            // Display.getInstance().setProperty(...) lines.
+            pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
+            pw.println("            public void run() {");
+            pw.print(hardeningRuntimeProperties(request));
+            pw.println("            }");
+            pw.println("        });");
             pw.println("    }");
             pw.println("}");
         } finally {

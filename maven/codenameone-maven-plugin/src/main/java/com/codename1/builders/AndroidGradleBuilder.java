@@ -340,6 +340,40 @@ public class AndroidGradleBuilder extends Executor {
                         && hasFirebaseConfiguration);
     }
 
+    /**
+     * True when a rename-delivering hardening profile is requested but Android R8 -- the only renamer
+     * on Android -- is not enabled to deliver it. R8 minification is emitted only when
+     * {@code android.enableProguard} is exactly {@code "true"} (the {@code minifyEnabled} gate), so any
+     * other value ({@code off}, {@code 0}, {@code False}, {@code no}, ...) leaves the rename unfulfilled;
+     * the check must mirror that predicate, not just reject the literal {@code "false"}, or a rename
+     * profile would be stamped {@code rename:r8}/hardened and ship without renaming.
+     */
+    static boolean r8RenameRequiredButDisabled(boolean renameRequested, String enableProguardArg) {
+        return renameRequested && !"true".equals(enableProguardArg);
+    }
+
+    /**
+     * True when this build will produce a signed release variant -- the only variant whose Gradle
+     * buildType carries {@code minifyEnabled}, and therefore the only one R8 actually renames. A
+     * debug-only build ({@code android.release=false} with a debug variant) or a build with no signing
+     * certificate runs only {@code assembleDebug}, so R8 never renames even with
+     * {@code android.enableProguard=true}. Mirrors the release/debug task selection.
+     */
+    static boolean androidReleaseVariantBuilt(BuildRequest request) {
+        if (request.getCertificate() == null) {
+            return false;
+        }
+        boolean release = "true".equals(request.getArg("android.release", "true"));
+        boolean debug = release
+                ? "true".equals(request.getArg("android.debug", "false"))
+                : "true".equals(request.getArg("android.debug", "true"));
+        if (!release && !debug) {
+            // Neither explicitly selected: the builder falls back to building both, including release.
+            return true;
+        }
+        return release;
+    }
+
     static boolean usesHuaweiPush(int detectedPushVersion, String messagingService,
             boolean hasHuaweiConfiguration) {
         return detectedPushVersion == 3
@@ -754,6 +788,55 @@ public class AndroidGradleBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform(BuildRequest request) {
+        return "and";
+    }
+
+    /**
+     * R8 keep rules contributed by app hardening, appended to the generated {@code proguard.cfg}.
+     * On Android the engine does not rename, so the user's {@code harden.keep} rules and the
+     * name-bound property-object rule (renaming a {@code PropertyBusinessObject}'s members silently
+     * changes JSON/DB schema) must be handed to R8 here. Empty when hardening is off.
+     */
+    private String hardeningR8Keep(BuildRequest request) {
+        // Gate on the VERIFIED cn1.hardened output (set only after a successful, entitled engine run),
+        // not harden.level: an Android opt-out (harden.and.enabled=off/0/false, or a level whose
+        // transforms are all disabled) makes the engine decline, and these keep rules must not then
+        // change which names R8 obfuscates.
+        if (!"true".equals(request.getArg("cn1.hardened", "false"))) {
+            return "";
+        }
+        // Prefer the full keep set the engine derived from the input jar: the native-interface peers
+        // it found, plus the user's harden.keep. Those the automatic R8 analysis can't see, so without
+        // them R8 would rename a name-resolved class and the hardened release wouldn't resolve it.
+        String engineKeep = getLastHardeningR8Keep();
+        if (engineKeep != null && engineKeep.trim().length() > 0) {
+            return engineKeep.endsWith("\n") ? engineKeep : engineKeep + "\n";
+        }
+        // Fallback when the engine emitted no keep file (e.g. build() invoked without runBuild): the
+        // user's harden.keep. PropertyBusinessObject needs no keep -- its JSON/DB keys come from the
+        // string passed to its Property, not the field name, so renaming the field is safe.
+        StringBuilder sb = new StringBuilder();
+        String keep = request.getArg("harden.keep", "");
+        if (keep != null && keep.trim().length() > 0) {
+            // Newlines only: a ';' is legal inside a ProGuard rule body.
+            for (String rule : keep.split("\\r?\\n")) {
+                if (rule.trim().length() > 0) {
+                    sb.append(rule.trim()).append('\n');
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    @Override
+    protected boolean hardeningRenameSupported() {
+        // R8 remains the sole renamer on Android; the engine only encrypts strings here and
+        // exports its keep rules to the generated proguard.cfg.
+        return false;
+    }
+
+    @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
@@ -786,6 +869,39 @@ public class AndroidGradleBuilder extends Executor {
             request.putArgument("android.enableProguard", "false");
             request.putArgument("android.release", "false");
             request.putArgument("android.debug", "true");
+        }
+        // On Android renaming is delivered by R8 (the engine does not rename here), so a hardening
+        // level that promises renaming cannot be honored with R8 turned off. Fail rather than ship a
+        // build stamped "hardened" that was never renamed. (harden.rename=false opts out explicitly.)
+        String hardenLevel = request.getArg("harden.level", "off");
+        // Parse the opt-outs with the same tri-state rules the engine's HardeningConfig.boolTri uses
+        // (false/0/off/no all mean off), so harden.rename=off and harden.rename=0 behave identically
+        // to harden.rename=false here rather than being misread as "renaming still requested".
+        boolean androidHardeningEnabled = hardenBoolArg(request, "harden.and.enabled", true);
+        boolean hardenRenames = androidHardeningEnabled
+                && hardenLevel != null && !"off".equalsIgnoreCase(hardenLevel.trim())
+                && hardenLevel.trim().length() > 0
+                && hardenBoolArg(request, "harden.rename", true);
+        // R8 actually renames only for a signed RELEASE variant built with minification: minifyEnabled
+        // lives in the release buildType and is emitted only when android.enableProguard is exactly
+        // "true", and a debug-only build (or one with no signing certificate) runs only assembleDebug.
+        // So a rename hardening profile must be rejected unless R8 will really run, not just when
+        // enableProguard is the literal "false" -- otherwise the APK ships stamped rename:r8/hardened
+        // without ever being renamed.
+        String enableProguard = request.getArg("android.enableProguard", "true");
+        if (r8RenameRequiredButDisabled(hardenRenames, enableProguard)
+                || (hardenRenames && !androidReleaseVariantBuilt(request))) {
+            String reason = !"true".equals(enableProguard)
+                    ? "android.enableProguard=" + enableProguard + " disables R8 (it renames only when "
+                            + "android.enableProguard=true)"
+                    : "this build produces no signed release variant (android.release="
+                            + request.getArg("android.release", "true") + ", android.debug="
+                            + request.getArg("android.debug", "false") + ", certificate "
+                            + (request.getCertificate() == null ? "absent" : "present")
+                            + "), and R8 minification applies only to the release build";
+            throw new BuildException("harden.level=" + hardenLevel + " requires Android's R8/ProGuard "
+                    + "renaming, but " + reason + ". Build a signed release variant with R8 enabled, set "
+                    + "harden.rename=false, or set harden.level=off.");
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
@@ -4730,7 +4846,10 @@ public class AndroidGradleBuilder extends Executor {
                     + "\n\n"
                     + "public class " + request.getMainClass() + "Stub extends " + request.getArg("android.customActivity", "CodenameOneActivity") + "{\n";
             stubSourceCode += decodeFunction();
-            stubSourceCode += "    public static final String BUILD_KEY = \"LOCAL_BUILD\";\n"
+            stubSourceCode += "    public static final String BUILD_KEY = \"" + buildKeyEncoded(request) + "\";\n"
+                    + "    public static final String CN1_MAPPING_ID = \"" + resolveMappingId(request) + "\";\n"
+                    + "    public static final String CN1_HARDENED = \"" + request.getArg("cn1.hardened", "false") + "\";\n"
+                    + "    public static final String CN1_HARDEN_LEVEL = \"" + request.getArg("cn1.hardenLevel", "off") + "\";\n"
                     + "    public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\";\n"
                     + "    public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\";\n"
                     + "    public static final String LICENSE_KEY = \"" + xorEncode(licenseKey) + "\";\n"
@@ -4791,6 +4910,9 @@ public class AndroidGradleBuilder extends Executor {
                     + gcmSenderId
                     + nativeThemeStubProps
                     + "        Display.getInstance().setProperty(\"build_key\", d(BUILD_KEY));\n"
+                    + "        Display.getInstance().setProperty(\"cn1.mappingId\", CN1_MAPPING_ID);\n"
+                    + "        Display.getInstance().setProperty(\"cn1.hardened\", CN1_HARDENED);\n"
+                    + "        Display.getInstance().setProperty(\"cn1.hardenLevel\", CN1_HARDEN_LEVEL);\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                     + "        Display.getInstance().setProperty(\"built_by_user\", d(BUILT_BY_USER));\n"
                     + useBackgroundPermissionSnippet
@@ -5106,7 +5228,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "     public static final String C2DM_MESSAGE_EXTRA = \"message\";\n"
                     + "     public static final String C2DM_MESSAGE_IMAGE = \"image\";\n"
                     + "     public static final String C2DM_MESSAGE_CATEGORY = \"category\";\n"
-                    + "     public static final String BUILD_KEY = \"LOCAL_BUILD\"\n;"
+                    + "     public static final String BUILD_KEY = \"" + buildKeyEncoded(request) + "\"\n;"
                     + "     public static final String PACKAGE_NAME = \"" + request.getPackageName() + "\"\n;"
                     + "     public static final String BUILT_BY_USER = \"" + xorEncode(request.getUserName()) + "\"\n;"
                     + "	private static String KEY = \"c2dmPref\";\n"
@@ -5426,6 +5548,16 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         String keepOverride = request.getArg("android.proguardKeepOverride", "Exceptions, InnerClasses, Signature, Deprecated, SourceFile, LineNumberTable, *Annotation*, EnclosingMethod");
+        // On a build the engine actually hardened, strip SourceFile from R8's kept attributes for
+        // DexGuard parity (the retrace reconstructs the file name from the retraced class;
+        // LineNumberTable is kept so lines still retrace). Gate on the VERIFIED cn1.hardened output
+        // (set only after a successful, entitled engine run), so an opt-out build (harden.and.enabled
+        // =off/0, or a level whose transforms are all disabled -> engine declines) keeps its
+        // metadata. Only when the developer didn't supply their own attribute list.
+        if ("true".equals(request.getArg("cn1.hardened", "false"))
+                && request.getArg("android.proguardKeepOverride", null) == null) {
+            keepOverride = keepOverride.replace("SourceFile, ", "").replace(", SourceFile", "").replace("SourceFile,", "");
+        }
 
         String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
                 "-keep class com.google.firebase.** { *; }\n\n";
@@ -5507,6 +5639,11 @@ public class AndroidGradleBuilder extends Executor {
                         : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
+                // App-hardening keep rules for R8. On Android the engine does not rename (R8 is the
+                // sole renamer), so the user's harden.keep and the name-bound property-object rule
+                // must reach R8 here or a dynamically-resolved class can still be renamed and fail
+                // only in the hardened release.
+                + hardeningR8Keep(request)
                 + (usesHealthStore
                         ? HealthManifestFragments.proguardKeepRules(
                                 new java.util.ArrayList<String>(

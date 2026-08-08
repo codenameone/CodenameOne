@@ -13,7 +13,7 @@ For most intents and purposes this will be enough, unless you're specifically co
 The restrictions laid on apps are here to make them extra secure and on top of that Codename One lays a few big advantages in security:
 
 - Codename One code is compiled (unlike for example, PhoneGap/Cordova)
-- Codename One obfuscates by default which makes the binaries harder to reverse engineer
+- Android release builds are obfuscated by default with R8, which makes the binaries harder to reverse engineer. On the other ports the shipped code is compiled or translated (the iOS/native ports go through ParparVM to C) rather than renamed. Enterprise accounts can turn on cross-platform hardening -- name obfuscation, string encryption and more -- for every port; see the App Hardening chapter
 - Codename One compiles the UI to native code too which means typical reverse engineering code will have a harder time following
 - Codename One disables debug flags so a hacker won't be able to debug your production app on the device
 
