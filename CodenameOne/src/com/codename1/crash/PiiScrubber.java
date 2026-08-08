@@ -132,18 +132,37 @@ public class PiiScrubber {
     /// form (which every V8/Chrome JavaScript frame also uses), and the
     /// Firefox/Safari `fn@url:line:column` form.
     ///
-    /// The `at ` prefix is a strong frame signal. For the `@` form the prefix
-    /// is absent, so a bare substring test such as `.js:` would also match a
-    /// free-form message that merely mentions a file (`account 123456 failed in
-    /// app.js: retry`) and let its id through. So the non-`at` case requires an
-    /// `@` *and* an actual terminal `:<line>:<column>` location, which a message
-    /// does not carry.
+    /// Both forms require an actual frame location, not just the leading token: a
+    /// message can wrap onto a line that begins with `at ` (`printStackTrace` puts
+    /// `at account 123456 failed` on its own line) or that merely mentions a file,
+    /// and its id must still be scrubbed. So the `at ` form must carry a
+    /// parenthesized location (`(File.java:42)`, `(url:line:col)`, `(Native Method)`)
+    /// or a bare trailing `:<line>` (ParparVM), and the `@` form must carry an `@`
+    /// and a terminal `:<line>:<column>`.
     private static boolean isFrameLine(String line) {
         String t = line.trim();
         if (t.startsWith("at ")) {
-            return true;
+            return (t.endsWith(")") && t.indexOf('(') >= 0) || endsWithColonNumber(t);
         }
         return t.indexOf('@') >= 0 && endsWithLineColumn(t);
+    }
+
+    /// True when `t` ends with a `:<digits>` run (a trailing `)` allowed): the
+    /// ParparVM frame coordinate `at <fqcn>.<method>:<line>`, and also the tail of a
+    /// `:<line>:<column>`. A message ending in text or a space-separated number does
+    /// not match, so its digits stay subject to scrubbing.
+    private static boolean endsWithColonNumber(String t) {
+        int end = t.length();
+        if (end > 0 && t.charAt(end - 1) == ')') {
+            end--;
+        }
+        int i = end - 1;
+        int digits = 0;
+        while (i >= 0 && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
+            i--;
+            digits++;
+        }
+        return digits > 0 && i >= 0 && t.charAt(i) == ':';
     }
 
     /// True when `t` ends with a `:<line>:<column>` location: two colon-separated

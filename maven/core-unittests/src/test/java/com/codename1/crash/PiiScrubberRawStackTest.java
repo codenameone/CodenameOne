@@ -77,6 +77,19 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void messageLineStartingWithAtIsNotAFrame() {
+        // printStackTrace can wrap a message onto a line that begins with "at " but carries no frame
+        // location; its long id must still be scrubbed. A real JVM frame below keeps its line number.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account 123456 failed to load\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+    }
+
+    @Test
     void customScrubMessageOverrideReachesRawStack() {
         // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
         // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by

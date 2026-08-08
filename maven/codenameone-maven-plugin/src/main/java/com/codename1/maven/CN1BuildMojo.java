@@ -209,8 +209,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // (e.g. harden.rename=false, harden.strings=off, harden.controlFlow=false) requests nothing:
         // the engine treats that as SKIPPED_NOT_REQUESTED, which is equivalent to off. Resolve the
         // overrides to the effective transform set so such a build is not rejected on a local/source
-        // or on-device-debug target for a "hardening" it isn't actually asking for.
-        if (!"off".equalsIgnoreCase(level.trim()) && !hardeningRequestsAnyTransform(settings, level)) {
+        // or on-device-debug target for a "hardening" it isn't actually asking for. An unknown level
+        // is NOT reduced here -- it must reach the preflight so the invalid-level check rejects it.
+        if (hardeningReducesToOff(settings, level)) {
             level = "off";
         }
         boolean allowLocal = "true".equalsIgnoreCase(
@@ -291,6 +292,17 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * transform is overridden off requests nothing and is equivalent to {@code off}, so the preflight
      * must not reject it.
      */
+    /**
+     * True when a <em>valid</em> non-off level requests no transform once the {@code harden.*}
+     * overrides are applied, so it is equivalent to {@code off} and must not be rejected. An unknown
+     * or misspelled level (rank 0) returns {@code false} so it is left untouched and reaches
+     * {@link HardeningPreflight#check} -- which rejects it fast, client-side, rather than letting a
+     * cloud build be submitted for the forked engine to reject later.
+     */
+    static boolean hardeningReducesToOff(Properties settings, String level) {
+        return hardenLevelRank(level) >= 1 && !hardeningRequestsAnyTransform(settings, level);
+    }
+
     static boolean hardeningRequestsAnyTransform(Properties settings, String level) {
         int rank = hardenLevelRank(level);
         if (rank <= 0) {

@@ -118,4 +118,30 @@ public class HardeningPreflightTest {
         // off requests nothing regardless of overrides.
         assertFalse(CN1BuildMojo.hardeningRequestsAnyTransform(new java.util.Properties(), "off"));
     }
+
+    @Test
+    public void invalidLevelIsNotReducedToOff() {
+        // A misspelled level must NOT be silently rewritten to off by the no-transform reduction: it
+        // has to reach HardeningPreflight.check() so the client-side invalid-level validation fires.
+        java.util.Properties allOff = new java.util.Properties();
+        allOff.setProperty("codename1.arg.harden.rename", "false");
+        allOff.setProperty("codename1.arg.harden.strings", "off");
+        allOff.setProperty("codename1.arg.harden.controlFlow", "false");
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(allOff, "stanadrd"));
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(new java.util.Properties(), "stanadrd"));
+        // The invalid level still fails the preflight, unchanged.
+        assertTrue(HardeningPreflight.check("stanadrd", "ios-device", false, false).isFailed());
+    }
+
+    @Test
+    public void validLevelWithEveryTransformOffReducesToOff() {
+        java.util.Properties allOff = new java.util.Properties();
+        allOff.setProperty("codename1.arg.harden.rename", "false");
+        allOff.setProperty("codename1.arg.harden.strings", "off");
+        allOff.setProperty("codename1.arg.harden.controlFlow", "false");
+        assertTrue(CN1BuildMojo.hardeningReducesToOff(allOff, "standard"));
+        // A real request or plain off is not "reduced" (off has nothing to reduce).
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(new java.util.Properties(), "standard"));
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(allOff, "off"));
+    }
 }
