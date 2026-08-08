@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="CN1 Android On-Device Debug" type="MavenRunConfiguration" folderName="On-Device Debug">
+  <configuration default="false" name="CN1 iOS On-Device Debug Build" type="MavenRunConfiguration" folderName="On-Device Debug">
     <MavenSettings>
       <option name="myGeneralSettings" />
       <option name="myRunnerSettings" />
@@ -10,7 +10,7 @@
           </option>
           <option name="goals">
             <list>
-              <option value="cn1:android-on-device-debugging" />
+              <option value="cn1:buildIosOnDeviceDebug" />
             </list>
           </option>
           <option name="pomFileName" value="pom.xml" />

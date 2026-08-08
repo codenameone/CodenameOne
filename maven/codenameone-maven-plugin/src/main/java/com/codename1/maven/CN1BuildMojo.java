@@ -833,6 +833,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         try (FileInputStream fis = new FileInputStream(codenameOneSettingsCopy)) {
             cn1SettingsProps.load(fis);
         }
+        // The build request is assembled from this copy, not from the mojo's
+        // own properties, so the command-line overlay has to be applied here
+        // too -- otherwise a hint passed with -D is read by the mojo and still
+        // absent from what the builder actually sees.
+        overlayCommandLineBuildHints(cn1SettingsProps);
         if (serverMustProvideKotlinVersion != null) {
             cn1SettingsProps.setProperty("codename1.arg.requireKotlinStdlib", serverMustProvideKotlinVersion);
         }

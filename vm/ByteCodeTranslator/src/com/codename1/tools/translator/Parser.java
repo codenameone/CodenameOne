@@ -330,14 +330,24 @@ public class Parser extends ClassVisitor {
                     for (Integer line : lines) {
                         w.write("line\t" + m.getMethodOffset() + "\t" + line + "\n");
                     }
-                    // Local variables: emitted as "always-live" scope until a
-                    // follow-up resolves ASM labels to source lines properly.
-                    // jdb tolerates this — uninitialised slots just show 0.
-                    for (com.codename1.tools.translator.bytecodes.LocalVariable lv : m.getLocalVariables()) {
+                    // Local variables, each with the source-line range it is in
+                    // scope for so the IDE only asks for slots that are live.
+                    // 0/0 means "always live" — a local with no scope in the
+                    // class file, or one the translator synthesised from a
+                    // store opcode. Taken in the same deterministic order the
+                    // device's own side-table uses.
+                    java.util.List<com.codename1.tools.translator.bytecodes.LocalVariable> vars =
+                            m.debugVarEntries();
+                    java.util.List<int[]> scopes = m.debugVarScopes(vars);
+                    for (int vi = 0; vi < vars.size(); vi++) {
+                        com.codename1.tools.translator.bytecodes.LocalVariable lv = vars.get(vi);
+                        int[] scope = scopes.get(vi);
                         w.write("var\t" + m.getMethodOffset()
                                 + "\t" + lv.getIndex()
                                 + "\t" + lv.getOrigName()
-                                + "\t" + lv.getDesc() + "\n");
+                                + "\t" + lv.getDesc()
+                                + "\t" + scope[0]
+                                + "\t" + scope[1] + "\n");
                     }
                 }
             }
