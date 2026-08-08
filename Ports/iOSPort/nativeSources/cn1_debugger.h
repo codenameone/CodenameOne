@@ -112,6 +112,22 @@ extern int cn1_debugger_is_tagged_int(JAVA_OBJECT obj);
 extern JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj);
 
 /**
+ * Records a reference as handed to the proxy, tests whether one was, and
+ * forgets the whole set on resume.
+ *
+ * A registered class word survives reclamation, so it proves shape but not
+ * liveness. Requiring that a wire objectID be one this debugger issued since
+ * the last resume refuses a stale id from an earlier suspension instead of
+ * dereferencing it.
+ */
+extern void cn1_debugger_note_issued(JAVA_OBJECT obj);
+extern int cn1_debugger_was_issued(JAVA_OBJECT obj);
+extern void cn1_debugger_forget_issued(void);
+
+/** Resolves an objectID that arrived from the IDE, or NULL to refuse it. */
+extern struct clazz* cn1_debugger_class_of_wire_id(JAVA_OBJECT obj);
+
+/**
  * Whether a local described by one side-table row is in scope at a source
  * line. Locals out of scope are left out of the reply rather than reported
  * with the contents of storage that belongs to another scope.

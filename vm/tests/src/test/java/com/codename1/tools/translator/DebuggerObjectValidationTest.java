@@ -133,6 +133,37 @@ class DebuggerObjectValidationTest {
         assertEquals("-7", probe("TAGGED_INT_NEGATIVE"));
     }
 
+    /**
+     * An objectID the IDE holds across a resume is refused, not read.
+     *
+     * <p>A registered class word proves shape, not liveness: full-page BiBOP
+     * reclamation resets the page cursor without clearing class words, and a
+     * legacy object reaches {@code free()} with its header intact. So a
+     * reclaimed allocation still passes the class check. Requiring that a wire
+     * id be one the debugger issued since the last resume refuses the stale
+     * one instead of reading through it.</p>
+     */
+    @Test
+    void aWireIdFromAnEarlierSuspensionIsRefused() throws Exception {
+        assertEquals("accepted", probe("WIRE_ID_ISSUED"));
+        assertEquals("rejected", probe("WIRE_ID_AFTER_RESUME"));
+    }
+
+    /** An id never handed out at all is refused, however well-formed. */
+    @Test
+    void aWireIdTheDebuggerNeverIssuedIsRefused() throws Exception {
+        assertEquals("rejected", probe("WIRE_ID_NEVER_ISSUED"));
+    }
+
+    /**
+     * Tagged ints are exempt: they carry their value in the reference, so
+     * there is no allocation that could have been reclaimed.
+     */
+    @Test
+    void aTaggedIntNeedsNoIssueRecord() throws Exception {
+        assertEquals("accepted", probe("WIRE_ID_TAGGED"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -148,7 +179,8 @@ class DebuggerObjectValidationTest {
         List<String> cases = Arrays.asList("REGISTERED", "ARRAY", "IMPOSTOR",
                 "INT_AS_REFERENCE", "WILD_POINTER", "MISALIGNED", "NULL_PAGE",
                 "NULL", "NO_CLASS_WORD", "TAGGED_INT", "TAGGED_INT_CLASS",
-                "TAGGED_INT_VALUE");
+                "TAGGED_INT_VALUE", "WIRE_ID_ISSUED", "WIRE_ID_AFTER_RESUME",
+                "WIRE_ID_NEVER_ISSUED", "WIRE_ID_TAGGED");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -222,6 +254,28 @@ class DebuggerObjectValidationTest {
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0xDEADBEEFDEAD0000ULL;\n" +
+            "    } else if (strcmp(which, \"WIRE_ID_ISSUED\") == 0) {\n" +
+            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        cn1_debugger_note_issued(&object);\n" +
+            "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
+            "                ? \"accepted\" : \"rejected\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"WIRE_ID_AFTER_RESUME\") == 0) {\n" +
+            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        cn1_debugger_note_issued(&object);\n" +
+            "        cn1_debugger_forget_issued();   /* the app ran on */\n" +
+            "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
+            "                ? \"accepted\" : \"rejected\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"WIRE_ID_NEVER_ISSUED\") == 0) {\n" +
+            "        object.__codenameOneParentClsReference = &registeredClass;\n" +
+            "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(&object)\n" +
+            "                ? \"accepted\" : \"rejected\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"WIRE_ID_TAGGED\") == 0) {\n" +
+            "        printf(\"%s\\n\", cn1_debugger_class_of_wire_id(CN1_TAG_INT(42))\n" +
+            "                ? \"accepted\" : \"rejected\");\n" +
+            "        return 0;\n" +
             "    } else if (strcmp(which, \"TAGGED_INT\") == 0) {\n" +
             "        candidate = CN1_TAG_INT(42);\n" +
             "    } else if (strcmp(which, \"TAGGED_INT_CLASS\") == 0) {\n" +

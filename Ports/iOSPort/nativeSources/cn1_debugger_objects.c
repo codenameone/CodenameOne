@@ -179,6 +179,101 @@ JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
 #endif
 }
 
+
+/* --------------------------------------------------------------------- */
+/* Object ids the debugger has handed out during the current suspension.  */
+/*                                                                        */
+/* A registered class word proves a pointer LOOKS like an object of a     */
+/* known class. It does not prove the allocation is still live: full-page */
+/* BiBOP reclamation resets the page cursor without clearing class words, */
+/* and a legacy object goes to free() with its header intact. An IDE that */
+/* holds an objectID across a resume and asks about it after a collection */
+/* would therefore pass validation and be read anyway.                    */
+/*                                                                        */
+/* Every reference handed to the proxy is recorded here, and the set is   */
+/* cleared whenever a thread resumes. A wire id that is not in it is one  */
+/* the debugger did not issue this time round, so it is refused rather    */
+/* than dereferenced.                                                     */
+/*                                                                        */
+/* This bounds the reported window; it is not a liveness proof. Objects   */
+/* the IDE is shown come from live frames, fields and arrays and so are   */
+/* reachable, but the concurrent collector can still run while a thread   */
+/* is parked. Closing that completely means rooting debugger-issued ids   */
+/* until the IDE disposes them, which is a change to the collector rather */
+/* than to this file.                                                     */
+/* --------------------------------------------------------------------- */
+
+#define CN1_ISSUED_CAP 4096u   /* power of two; open addressing, linear probe */
+static uintptr_t g_issued[CN1_ISSUED_CAP];
+static unsigned g_issuedCount = 0;
+static pthread_mutex_t g_issuedMutex = PTHREAD_MUTEX_INITIALIZER;
+
+static unsigned issued_slot(uintptr_t key) {
+    /* Pointers are aligned, so the low bits carry no entropy. */
+    uintptr_t h = key >> 3;
+    h ^= h >> 13;
+    return (unsigned)(h & (CN1_ISSUED_CAP - 1));
+}
+
+void cn1_debugger_note_issued(JAVA_OBJECT obj) {
+    if (obj == JAVA_NULL) return;
+    uintptr_t key = (uintptr_t)obj;
+    pthread_mutex_lock(&g_issuedMutex);
+    /* Full table: stop recording rather than spin. Ids beyond the cap are
+     * refused on the way back in, which errs toward "unavailable" instead of
+     * toward a stale read. */
+    if (g_issuedCount < CN1_ISSUED_CAP - 1) {
+        unsigned i = issued_slot(key);
+        for (unsigned n = 0; n < CN1_ISSUED_CAP; n++) {
+            unsigned at = (i + n) & (CN1_ISSUED_CAP - 1);
+            if (g_issued[at] == key) break;
+            if (g_issued[at] == 0) {
+                g_issued[at] = key;
+                g_issuedCount++;
+                break;
+            }
+        }
+    }
+    pthread_mutex_unlock(&g_issuedMutex);
+}
+
+int cn1_debugger_was_issued(JAVA_OBJECT obj) {
+    if (obj == JAVA_NULL) return 0;
+    uintptr_t key = (uintptr_t)obj;
+    int found = 0;
+    pthread_mutex_lock(&g_issuedMutex);
+    unsigned i = issued_slot(key);
+    for (unsigned n = 0; n < CN1_ISSUED_CAP; n++) {
+        unsigned at = (i + n) & (CN1_ISSUED_CAP - 1);
+        if (g_issued[at] == key) { found = 1; break; }
+        if (g_issued[at] == 0) break;
+    }
+    pthread_mutex_unlock(&g_issuedMutex);
+    return found;
+}
+
+void cn1_debugger_forget_issued(void) {
+    pthread_mutex_lock(&g_issuedMutex);
+    memset(g_issued, 0, sizeof(g_issued));
+    g_issuedCount = 0;
+    pthread_mutex_unlock(&g_issuedMutex);
+}
+
+/**
+ * Resolves an objectID that arrived from the IDE.
+ *
+ * Stricter than cn1_debugger_class_of, which answers "is this shaped like a
+ * live object" for a value the runtime just read itself. A wire id has also to
+ * be one this debugger issued since the last resume.
+ */
+struct clazz* cn1_debugger_class_of_wire_id(JAVA_OBJECT obj) {
+    if (obj == JAVA_NULL) return NULL;
+    /* A tagged int is a value; there is no allocation to outlive anything. */
+    if (CN1_IS_TAGGED(obj)) return cn1_debugger_class_of(obj);
+    if (!cn1_debugger_was_issued(obj)) return NULL;
+    return cn1_debugger_class_of(obj);
+}
+
 /**
  * Whether a local is in scope at a given source line.
  *

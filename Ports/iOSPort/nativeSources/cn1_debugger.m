@@ -133,6 +133,14 @@ static pthread_mutex_t g_writeMutex = PTHREAD_MUTEX_INITIALIZER;
 // as a permanent synthetic entry with no java.lang.Thread behind it — and it
 // only appears once the IDE resolves a thread name, i.e. as a side effect of
 // the very feature this change added.
+//
+// Captured lazily, at the one place the listener actually needs a Java
+// context, rather than eagerly at thread start: getThreadLocalData()
+// initialises threadIdKey, threadKeyCounter and the allThreads array without
+// synchronisation, so calling it from this thread during app startup could
+// race the main thread's first call and produce competing TLS keys or
+// duplicate thread ids. By the time a CMD_GET_STRING arrives, a proxy and an
+// IDE are both attached and the VM has long since initialised.
 static struct ThreadLocalData* g_listenerTsd = NULL;
 
 // Wait-for-attach state. cn1_debugger_run_when_ready stashes the VM-callback
@@ -628,6 +636,9 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
  * preserveStep=1 to leave stepKind alone, or 0 to also reset to -1.
  */
 static void resumeThreadById(int64_t threadId, int preserveStep) {
+    // Ids issued during this stop are not valid past it: the app runs on and
+    // the collector is free to reclaim what the IDE was looking at.
+    cn1_debugger_forget_issued();
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
     if (!preserveStep) {
@@ -639,6 +650,7 @@ static void resumeThreadById(int64_t threadId, int preserveStep) {
 }
 
 static void resumeAll(int preserveStep) {
+    cn1_debugger_forget_issued();
     for (int i = 0; i < SUS_TABLE_SIZE; i++) {
         pthread_mutex_lock(&g_sus[i].mu);
         if (g_sus[i].suspended) {
@@ -654,6 +666,7 @@ static void resumeAll(int preserveStep) {
 
 /* Sets the step state on a thread and wakes it if currently suspended. */
 static void setStepAndResume(int64_t threadId, int stepKind) {
+    cn1_debugger_forget_issued();
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
     s->stepKind = stepKind;
@@ -830,7 +843,11 @@ static void handleGetThreads(void) {
             if (suspended) flags |= 0x01;
             if (t->threadActive) flags |= 0x02;
             JAVA_OBJECT threadObj = t->currentThreadObject;
-            if (!cn1_debugger_is_valid_object(threadObj)) threadObj = JAVA_NULL;
+            if (cn1_debugger_is_valid_object(threadObj)) {
+                cn1_debugger_note_issued(threadObj);
+            } else {
+                threadObj = JAVA_NULL;
+            }
             writeBE64(p, (uint64_t)tid); p += 8;
             *p++ = flags;
             writeBE64(p, (uint64_t)(uintptr_t)threadObj); p += 8;
@@ -928,6 +945,7 @@ static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
                         break;
                     }
                     value = (uint64_t)(uintptr_t)obj;
+                    cn1_debugger_note_issued(obj);
                     // Tag java.lang.String references with JDWP type 's'
                     // so the IDE can read their contents via
                     // StringReference.Value instead of invoking toString().
@@ -1032,7 +1050,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             int classId = -1;
             uint8_t isArray = 0;
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            struct clazz* cls = cn1_debugger_class_of(obj);
+            struct clazz* cls = cn1_debugger_class_of_wire_id(obj);
             if (cls != NULL) {
                 classId = cls->classId;
                 isArray = cls->isArray ? 1 : 0;
@@ -1060,8 +1078,12 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             @try {
                 // toNSString walks the String's char[]; a reference that is
                 // not really a String would send it off into arbitrary memory.
-                if (cn1_debugger_class_of(obj) == &class__java_lang_String) {
-                    ns = toNSString(getThreadLocalData(), obj);
+                if (cn1_debugger_class_of_wire_id(obj) == &class__java_lang_String) {
+                    struct ThreadLocalData* listenerTsd = getThreadLocalData();
+                    // This call is what registers the listener in allThreads;
+                    // remember it here so the enumeration can leave it out.
+                    g_listenerTsd = listenerTsd;
+                    ns = toNSString(listenerTsd, obj);
                 }
             } @catch (NSException* e) {
                 ns = nil;
@@ -1092,7 +1114,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 return 0;
             }
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            struct clazz* objCls = cn1_debugger_class_of(obj);
+            struct clazz* objCls = cn1_debugger_class_of_wire_id(obj);
             int classId = objCls != NULL ? objCls->classId : -1;
             // An unverifiable reference yields no fields rather than a read
             // at obj+offset, which is where a bogus objectID used to fault.
@@ -1129,8 +1151,13 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                     field_read_into(obj, fe, &tc, &val);
                     // A reference field can legitimately hold a value the GC
                     // has since reclaimed; don't pass one on as an objectID.
-                    if (tc == 'L' && !cn1_debugger_is_valid_object((JAVA_OBJECT)(uintptr_t)val)) {
-                        val = 0;
+                    if (tc == 'L') {
+                        JAVA_OBJECT ref = (JAVA_OBJECT)(uintptr_t)val;
+                        if (cn1_debugger_is_valid_object(ref)) {
+                            cn1_debugger_note_issued(ref);
+                        } else {
+                            val = 0;
+                        }
                     }
                 } else {
                     tc = 'L'; val = 0;
@@ -1165,7 +1192,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             // The thunk dispatches through this receiver's vtable, so an
             // unverifiable one would jump through a fabricated function
             // pointer. Refuse the call instead.
-            if (thisObj != JAVA_NULL && !cn1_debugger_is_valid_object(thisObj)) {
+            if (thisObj != JAVA_NULL && cn1_debugger_class_of_wire_id(thisObj) == NULL) {
                 uint8_t badThis[9] = {'V',0,0,0,0,0,0,0,0};
                 sendEvent(EVT_INVOKE_RESULT, badThis, 9);
                 return 0;
@@ -1203,7 +1230,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                         // dereference this. An unverifiable argument becomes
                         // null, which the callee can at least handle.
                         JAVA_OBJECT arg = (JAVA_OBJECT)(uintptr_t)v;
-                        argv[i].o = cn1_debugger_is_valid_object(arg) ? arg : JAVA_NULL;
+                        argv[i].o = cn1_debugger_class_of_wire_id(arg) != NULL ? arg : JAVA_NULL;
                         break;
                     }
                 }
@@ -1255,6 +1282,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 case 'D':
                     memcpy(&bits, &r.value.d, 8); break;
                 case 'L': case '[': case 'X':
+                    cn1_debugger_note_issued(r.value.o);
                     bits = (uint64_t)(uintptr_t)r.value.o; break;
                 case 'V': default:
                     bits = 0; break;
@@ -1275,7 +1303,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             int length = 0;
-            struct clazz* arrCls = cn1_debugger_class_of(obj);
+            struct clazz* arrCls = cn1_debugger_class_of_wire_id(obj);
             if (arrCls != NULL && !cn1_debugger_is_tagged_int(obj) && arrCls->isArray) {
                 length = ((JAVA_ARRAY)obj)->length;
             }
@@ -1303,7 +1331,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             // Everything below indexes arr->data, so the reference has to be
             // a verified array before any of it runs.
-            struct clazz* objArrCls = cn1_debugger_class_of(obj);
+            struct clazz* objArrCls = cn1_debugger_class_of_wire_id(obj);
             if (objArrCls == NULL || cn1_debugger_is_tagged_int(obj) || !objArrCls->isArray) {
                 uint8_t err[5] = {'L', 0,0,0,0};
                 sendEvent(EVT_ARRAY_VALUES, err, 5);
@@ -1400,7 +1428,11 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                         // anything else would come straight back to us as an
                         // objectID the IDE expects us to dereference.
                         JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
-                        if (!cn1_debugger_is_valid_object(v)) v = JAVA_NULL;
+                        if (cn1_debugger_is_valid_object(v)) {
+                            cn1_debugger_note_issued(v);
+                        } else {
+                            v = JAVA_NULL;
+                        }
                         writeBE64(p, (uint64_t)(uintptr_t)v);
                         p += 8; break;
                     }
@@ -1494,9 +1526,6 @@ static int cn1_debugger_is_attach_ready(void) {
 
 static void* listenerThreadMain(void* arg) {
     @autoreleasepool {
-        // Register up front and remember it, rather than discovering it later
-        // when a command handler happens to need a Java context.
-        g_listenerTsd = getThreadLocalData();
         NSDictionary* info = [[NSBundle mainBundle] infoDictionary];
         NSString* host = info[@"CN1ProxyHost"];
         NSNumber* portN = info[@"CN1ProxyPort"];
