@@ -330,6 +330,32 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void reportSerializesWarnings() throws Exception {
+        // On the ParparVM native ports control-flow obfuscation is skipped as unsafe, which records a
+        // warning. String encryption still applies on iOS, so the build is hardened and a report is
+        // written (no ProGuard/rename needed). The warning must appear in the JSON report, not only in
+        // the forked-process log, or a consumer reading the report is told less than the truth.
+        File in = buildInputJar();
+        File out = tmp.newFile("app-hardened-warn.jar");
+        File mapping = tmp.newFile("mapping-warn.txt");
+        File report = tmp.newFile("report-warn.json");
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "aggressive");
+        HardeningConfig cfg = HardeningConfig.from(hints, "ios", false);
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(in).outputJar(out).mappingFile(mapping).reportFile(report)
+                .workDir(tmp.newFolder("work-warn")).config(cfg)
+                .mainClass("com.codename1.hardening.fixture.Secrets").buildKey("TESTKEY");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertTrue("string encryption should harden the iOS build", r.isHardened());
+        assertFalse("the skipped control-flow pass should record a warning", r.getWarnings().isEmpty());
+        String json = new String(Files.readAllBytes(report.toPath()), Charset.forName("UTF-8"));
+        assertTrue("report must contain a warnings array: " + json, json.indexOf("\"warnings\"") >= 0);
+        assertTrue("report must serialize the warning text: " + json,
+                json.indexOf("control-flow obfuscation is not applied") >= 0);
+    }
+
+    @Test
     public void scannerKeepsNativeInterfacePeers() throws Exception {
         // Phase 1: find the native interface. Phase 2: keep ITS generated Impl/Stub peer -- narrow,
         // not the old blanket **Impl / **Stub.

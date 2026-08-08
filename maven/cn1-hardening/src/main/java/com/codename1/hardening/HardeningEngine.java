@@ -465,6 +465,19 @@ public final class HardeningEngine {
             }
             sb.append('"').append(json(t.get(i))).append('"');
         }
+        sb.append("],\n");
+        // Serialize the warnings too: a warning records a known limitation (e.g. plaintext left in a
+        // JDK 9+ concat recipe, or a transform skipped as unsafe for the platform). A consumer reading
+        // the report -- not the forked-process log -- would otherwise see "transforms":["strings:all"]
+        // with no hint that some plaintext was excluded, which the doc promises the report surfaces.
+        sb.append("  \"warnings\": [");
+        List<String> w = r.getWarnings();
+        for (int i = 0; i < w.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append('"').append(json(w.get(i))).append('"');
+        }
         sb.append("]\n");
         sb.append("}\n");
         writeText(reportFile, sb.toString());

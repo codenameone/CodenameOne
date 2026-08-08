@@ -32,9 +32,14 @@ public enum HardeningProfile {
     OFF,
     /** Class/method/field renaming plus encryption of constant strings. */
     STANDARD,
-    /** Adds encryption of all strings and control-flow obfuscation. */
+    /** Adds encryption of all strings and control-flow obfuscation (opaque predicates). */
     AGGRESSIVE,
-    /** Adds opaque predicates and reflective-name hiding on top of aggressive. */
+    /**
+     * Raises control-flow obfuscation intensity on top of aggressive: two opaque-predicate
+     * guards per eligible method instead of one ({@link HardeningConfig#getControlFlowIntensity()}).
+     * It adds no new kind of transform -- in particular there is no reflective-name hiding, since
+     * Codename One has no runtime reflection for such names to feed.
+     */
     PARANOID;
 
     /** Parses a level name case-insensitively; returns {@code null} for an unknown value. */
