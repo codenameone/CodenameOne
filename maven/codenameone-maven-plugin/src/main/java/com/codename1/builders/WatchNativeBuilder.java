@@ -776,19 +776,59 @@ class WatchNativeBuilder {
             if (close < 0) {
                 return -1;
             }
-            int cdata = inject.indexOf("<![CDATA[", i);
-            if (cdata < 0 || cdata > close) {
+            int cdata = inject.indexOf(CDATA_OPEN, i);
+            int comment = inject.indexOf(COMMENT_OPEN, i);
+            // Whichever construct starts first, if either starts before the candidate end tag.
+            // A </string> written inside a comment is no more an end tag than one inside CDATA.
+            boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
+            int skipFrom = cdataFirst ? cdata : comment;
+            if (skipFrom < 0 || skipFrom > close) {
                 return close;
             }
-            int end = inject.indexOf("]]>", cdata + CDATA_OPEN.length());
+            String opener = cdataFirst ? CDATA_OPEN : COMMENT_OPEN;
+            String closer = cdataFirst ? CDATA_CLOSE : COMMENT_CLOSE;
+            int end = inject.indexOf(closer, skipFrom + opener.length());
             if (end < 0) {
-                // Unterminated CDATA. Nothing after it can be located reliably, so the key is
-                // treated as absent rather than guessed at.
+                // Unterminated. Nothing after it can be located reliably, so the key is treated as
+                // absent rather than guessed at.
                 return -1;
             }
-            i = end + CDATA_CLOSE.length();
+            i = end + closer.length();
         }
         return -1;
+    }
+
+    private static final String COMMENT_OPEN = "<!--";
+
+    private static final String COMMENT_CLOSE = "-->";
+
+    /// Removes XML comments from text outside any CDATA section.
+    ///
+    /// A comment is markup, not content: the parser reading the phone's plist drops it, so keeping
+    /// it here escaped "<!-- note -->" into the watch's visible string. Inside CDATA the same
+    /// characters are data and are left exactly as written.
+    private static String stripComments(String value) {
+        if (value == null || value.indexOf(COMMENT_OPEN) < 0) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        int i = 0;
+        while (i < value.length()) {
+            int open = value.indexOf(COMMENT_OPEN, i);
+            if (open < 0) {
+                out.append(value.substring(i));
+                break;
+            }
+            out.append(value, i, open);
+            int close = value.indexOf(COMMENT_CLOSE, open + COMMENT_OPEN.length());
+            if (close < 0) {
+                // Unterminated: everything after it is inside the comment, so nothing more is
+                // content.
+                break;
+            }
+            i = close + COMMENT_CLOSE.length();
+        }
+        return out.toString();
     }
 
     private static final String CDATA_OPEN = "<![CDATA[";
@@ -811,17 +851,17 @@ class WatchNativeBuilder {
             return null;
         }
         if (raw.indexOf(CDATA_OPEN) < 0) {
-            return decodeXmlEntities(raw.trim());
+            return decodeXmlEntities(stripComments(raw).trim());
         }
         StringBuilder out = new StringBuilder(raw.length());
         int i = 0;
         while (i < raw.length()) {
             int cdata = raw.indexOf(CDATA_OPEN, i);
             if (cdata < 0) {
-                out.append(decodeXmlEntities(raw.substring(i)));
+                out.append(decodeXmlEntities(stripComments(raw.substring(i))));
                 break;
             }
-            out.append(decodeXmlEntities(raw.substring(i, cdata)));
+            out.append(decodeXmlEntities(stripComments(raw.substring(i, cdata))));
             int body = cdata + CDATA_OPEN.length();
             int end = raw.indexOf(CDATA_CLOSE, body);
             if (end < 0) {

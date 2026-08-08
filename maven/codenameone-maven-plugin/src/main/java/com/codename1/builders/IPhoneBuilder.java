@@ -325,13 +325,20 @@ public class IPhoneBuilder extends Executor {
         if (!watchNativeBuilder.needsOwnTranslation()) {
             return;
         }
+        // Rooted at the LIFECYCLE classes, not the generated stubs, and run before either stub is
+        // written.
+        //
+        // A stub is not evidence about the app: it installs the registries the app might need, and
+        // the health bindings among them reference HealthStore and every listener the app-wide scan
+        // found. Walking from the stubs therefore made both roots reach health code no matter which
+        // lifecycle actually used it, which is this whole attribution answering its own question.
+        // The lifecycle class is the honest root -- it is the code the developer wrote.
         String pkg = request.getPackageName() == null ? "" : request.getPackageName().replace('.', '/');
         String prefix = pkg.length() == 0 ? "" : pkg + "/";
-        java.util.List<File> phoneRoots = java.util.Arrays.asList(phoneStubDir, classesDir);
-        java.util.List<File> watchRoots = java.util.Arrays.asList(watchStubDir, classesDir);
-        phoneRootReachesHealth = reachesHealth(phoneRoots, prefix + request.getMainClass() + "Stub");
-        watchRootReachesHealth = reachesHealth(watchRoots,
-                prefix + WatchNativeBuilder.translationRoot(request.getMainClass()) + "Stub");
+        java.util.List<File> roots = java.util.Arrays.asList(classesDir);
+        phoneRootReachesHealth = reachesHealth(roots, prefix + request.getMainClass());
+        watchRootReachesHealth = reachesHealth(roots,
+                watchNativeBuilder.getWatchMain().replace('.', '/'));
         log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
                 + ", watch=" + watchRootReachesHealth);
     }
@@ -2132,6 +2139,11 @@ public class IPhoneBuilder extends Executor {
         // its installGlobal() call into the Stub right before the first
         // init(Object) so theme.getImage("foo.svg") returns the transcoded
         // SVG immediately. Skipped silently for apps that have no SVGs.
+        // Before the stubs are written, because what goes INTO each stub depends on the answer:
+        // installing the health bindings in a stub whose lifecycle never touches health would both
+        // entitle that target and make it reach health code, which is the question being asked.
+        resolveHealthUsagePerRoot(request, classesDir);
+
         String healthBindingsInstall = "";
         String healthInstallStatement = HealthListenerBindings
                 .installStatement(healthScan.resolve());
@@ -2139,6 +2151,13 @@ public class IPhoneBuilder extends Executor {
             healthBindingsInstall = "            "
                     + healthInstallStatement;
         }
+        // Per target, because the registry is a hard reference to HealthStore and to every listener
+        // the app-wide scan found. Installing it in a stub whose lifecycle never touches health
+        // pulls HealthKit into that slice and entitles it -- release signing then fails against an
+        // App ID without the capability. A target that does not reach health has no listeners to
+        // register either, so withholding it costs that slice nothing.
+        String phoneHealthBindingsInstall = phoneRootReachesHealth ? healthBindingsInstall : "";
+        String watchHealthBindingsInstall = watchRootReachesHealth ? healthBindingsInstall : "";
 
         String svgRegistryInstall = "";
         File svgRegistryClassFile = new File(classesDir,
@@ -2311,7 +2330,7 @@ public class IPhoneBuilder extends Executor {
                     + "            initialized = true;\n"
                     + firebaseRegisterInstall
                     + svgRegistryInstall
-                    + healthBindingsInstall
+                    + phoneHealthBindingsInstall
                     + "            i.init(this);\n"
                     + createStartInvocation(request, "i")
                     + "        } else {\n"
@@ -2367,7 +2386,7 @@ public class IPhoneBuilder extends Executor {
                         registerNativeImplementationsAndCreateStubs(
                                 new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
                                 stubSource, classesDir),
-                        iosMode, svgRegistryInstall, healthBindingsInstall,
+                        iosMode, svgRegistryInstall, watchHealthBindingsInstall,
                         routeDispatcherInstallSource(sourceZip, "        "),
                         annotationFrameworksInstallSource(sourceZip, "        "));
             }
@@ -2651,11 +2670,6 @@ public class IPhoneBuilder extends Executor {
             try {
                 phoneStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, false);
                 watchStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, true);
-                // Now that each root has a stub of its own, ask which of them actually reaches the
-                // health API. Must happen here: the entitlement decision runs long before the
-                // translator, whose trees would answer the same question, because the capability it
-                // injects has to be in the request by the time the Info.plist is generated.
-                resolveHealthUsagePerRoot(request, classesDir);
             } catch (IOException ex) {
                 throw new BuildException("Failed to separate the phone and watch entry points", ex);
             }

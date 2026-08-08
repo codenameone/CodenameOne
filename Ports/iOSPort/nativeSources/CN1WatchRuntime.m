@@ -40,6 +40,7 @@
 #include "java_lang_NullPointerException.h"
 #include "java_lang_RuntimeException.h"
 #include <pthread.h>
+#include <unistd.h>
 #include <signal.h>
 
 // Mirror CodenameOne_GLAppDelegate's installSignalHandlers (that file is the
@@ -149,6 +150,12 @@ void cn1_watch_runtime_paint(void) {
 static int cn1WatchPendingPhases[CN1_WATCH_MAX_PENDING_PHASES];
 static int cn1WatchPendingPhaseCount = 0;
 
+/// Guards the queue. It used to be touched only from the main thread -- transitions and the paint
+/// pump both run there -- but the drain below waits for readiness off that thread.
+static pthread_mutex_t cn1WatchPhaseLock = PTHREAD_MUTEX_INITIALIZER;
+
+static BOOL cn1WatchDrainThreadRunning = NO;
+
 /// Records a phase for later delivery, collapsing a repeat of the one already at the tail.
 ///
 /// watchOS can send the same transition twice; delivering it twice would hand the stub a second
@@ -200,17 +207,20 @@ static void cn1WatchDeliverPhase(int phase) {
 /// transition is waiting, so a foreground arriving next has to flush the backlog itself before
 /// recording anything of its own.
 static void cn1WatchReplayPendingPhase(void) {
-    if (cn1WatchPendingPhaseCount == 0 || !cn1WatchJavaReady()) {
+    if (!cn1WatchJavaReady()) {
         return;
     }
     int pending[CN1_WATCH_MAX_PENDING_PHASES];
-    int count = cn1WatchPendingPhaseCount;
+    int count;
+    pthread_mutex_lock(&cn1WatchPhaseLock);
+    count = cn1WatchPendingPhaseCount;
     for (int i = 0; i < count; i++) {
         pending[i] = cn1WatchPendingPhases[i];
     }
-    // Cleared BEFORE delivering: a delivery runs translated code, and re-entering this from it must
-    // not replay what is already on its way.
+    // Cleared BEFORE delivering, and under the lock: a delivery runs translated code, and neither
+    // a re-entrant call nor the drain thread must replay what is already on its way.
     cn1WatchPendingPhaseCount = 0;
+    pthread_mutex_unlock(&cn1WatchPhaseLock);
     for (int i = 0; i < count; i++) {
         cn1WatchDeliverPhase(pending[i]);
     }
@@ -221,10 +231,70 @@ static void cn1WatchReplayPendingPhase(void) {
 /// A transition is never delivered ahead of an earlier one that is still waiting -- that is what
 /// turned a background/foreground pair across the readiness boundary into a foreground the stub
 /// could not balance.
+/// Waits for the Java side to come up and then drains the queue.
+///
+/// The pump cannot be the only drain. applicationWillResignActive stops it, so a phase queued
+/// while the watch is in the background sits there while the VM finishes initialising -- the stub's
+/// run() calls start() and nothing delivers the stop() that should follow it, for the whole
+/// suspension. Waiting on the readiness transition itself is the trigger that does not depend on
+/// something else happening first.
+///
+/// A detached thread rather than a timer, because timers are scheduled on a run loop the watch is
+/// no longer servicing. It exits as soon as the queue drains or the wait is hopeless.
+static void *cn1WatchPhaseDrainThread(void *arg) {
+    (void)arg;
+    // 30s at 50ms. Display.init is milliseconds away in practice; the bound exists so a VM that
+    // never comes up does not leave a thread spinning for the life of the process.
+    for (int i = 0; i < 600; i++) {
+        pthread_mutex_lock(&cn1WatchPhaseLock);
+        BOOL done = cn1WatchPendingPhaseCount == 0;
+        pthread_mutex_unlock(&cn1WatchPhaseLock);
+        if (done) {
+            break;
+        }
+        if (cn1WatchJavaReady()) {
+            cn1WatchReplayPendingPhase();
+            break;
+        }
+        usleep(50 * 1000);
+    }
+    pthread_mutex_lock(&cn1WatchPhaseLock);
+    cn1WatchDrainThreadRunning = NO;
+    pthread_mutex_unlock(&cn1WatchPhaseLock);
+    return NULL;
+}
+
+/// Arms the drain thread, at most one at a time.
+static void cn1WatchArmPhaseDrain(void) {
+    pthread_mutex_lock(&cn1WatchPhaseLock);
+    BOOL alreadyRunning = cn1WatchDrainThreadRunning;
+    cn1WatchDrainThreadRunning = YES;
+    pthread_mutex_unlock(&cn1WatchPhaseLock);
+    if (alreadyRunning) {
+        return;
+    }
+    pthread_t drain;
+    if (pthread_create(&drain, NULL, cn1WatchPhaseDrainThread, NULL) == 0) {
+        pthread_detach(drain);
+    } else {
+        pthread_mutex_lock(&cn1WatchPhaseLock);
+        cn1WatchDrainThreadRunning = NO;
+        pthread_mutex_unlock(&cn1WatchPhaseLock);
+    }
+}
+
 static void cn1WatchHandlePhase(int phase) {
     cn1WatchReplayPendingPhase();
-    if (!cn1WatchJavaReady() || cn1WatchPendingPhaseCount > 0) {
+    pthread_mutex_lock(&cn1WatchPhaseLock);
+    BOOL queued = !cn1WatchJavaReady() || cn1WatchPendingPhaseCount > 0;
+    if (queued) {
         cn1WatchQueuePhase(phase);
+    }
+    pthread_mutex_unlock(&cn1WatchPhaseLock);
+    if (queued) {
+        // Do not wait for the next paint or the next transition: neither is guaranteed to come
+        // while the watch is suspended, which is exactly when this queue is non-empty.
+        cn1WatchArmPhaseDrain();
         return;
     }
     cn1WatchDeliverPhase(phase);
