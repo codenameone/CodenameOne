@@ -69,6 +69,15 @@ public final class BuiltinKeepRules {
         // itself here; the specific <Interface>Impl / <Interface>Stub are found by scanning the input
         // (InputJarKeepScanner) and kept individually, rather than the over-broad **Impl / **Stub.
         r.add("-keep class * implements com.codename1.system.NativeInterface { *; }");
+        // Background callbacks the OS restarts by the app's PERSISTED class name resolve the listener
+        // via Class.forName + newInstance after a process restart (GeofenceManager persists it to
+        // Storage; background location and background fetch register a class the platform reconstructs).
+        // These are genuine reflective, name-bound seams -- unlike CN1's string-keyed property
+        // persistence -- so the class name must stay stable across an app update, or the default
+        // per-build mapping renames it and the background callback silently stops. Keep the implementors.
+        r.add("-keep class * implements com.codename1.location.GeofenceListener { *; }");
+        r.add("-keep class * implements com.codename1.location.LocationListener { *; }");
+        r.add("-keep class * implements com.codename1.background.BackgroundFetch { *; }");
         // JNI/native method names must not move.
         r.add("-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }");
         // enum values()/valueOf(String) resolve constants by name, so they are kept -- this is

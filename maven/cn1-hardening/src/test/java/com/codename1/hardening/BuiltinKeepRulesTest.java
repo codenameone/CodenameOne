@@ -79,4 +79,21 @@ public class BuiltinKeepRulesTest {
             assertFalse("SourceFile stripped for " + p, sourceKept);
         }
     }
+
+    @Test
+    public void keepsNameBoundBackgroundCallbacks() {
+        // Background callbacks the OS restarts by their persisted class name (Geofence, background
+        // location, background fetch) resolve the app's listener via Class.forName + newInstance, so
+        // renaming one silently stops the callback. Their implementors must be kept.
+        List<String> rules = BuiltinKeepRules.rules("com.example.MyApp");
+        assertTrue(rules.contains(
+                "-keep class * implements com.codename1.location.GeofenceListener { *; }"));
+        assertTrue(rules.contains(
+                "-keep class * implements com.codename1.location.LocationListener { *; }"));
+        assertTrue(rules.contains(
+                "-keep class * implements com.codename1.background.BackgroundFetch { *; }"));
+        // The same rules are exported to R8 on Android (where R8 does the renaming).
+        assertTrue(BuiltinKeepRules.forR8("com.example.MyApp").contains(
+                "-keep class * implements com.codename1.location.GeofenceListener { *; }"));
+    }
 }

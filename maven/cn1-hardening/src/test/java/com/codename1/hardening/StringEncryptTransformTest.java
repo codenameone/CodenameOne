@@ -460,12 +460,48 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void hoistingIsCappedByConstantPoolBudget() throws Exception {
+        // A class with far more distinct literals than the constant pool can hold once each is hoisted
+        // (a field + its reference constants) would overflow the 65535-entry pool. The transform must
+        // cap hoisting and leave the rest plaintext (reported) rather than throw ClassTooLargeException.
+        int count = 12000;
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/PoolHeavy", null, "java/lang/Object", null);
+        int perMethod = 200;
+        for (int start = 0; start < count; start += perMethod) {
+            org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                    | org.objectweb.asm.Opcodes.ACC_STATIC, "m" + start, "()V", null, null);
+            m.visitCode();
+            for (int i = start; i < start + perMethod && i < count; i++) {
+                m.visitLdcInsn("pool_heavy_secret_literal_number_" + i);
+                m.visitInsn(org.objectweb.asm.Opcodes.POP);
+            }
+            m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+            m.visitMaxs(1, 0);
+            m.visitEnd();
+        }
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 71);
+        byte[] out = t.transform(w.toByteArray());
+        assertTrue("hoisting must be capped, leaving some literals plaintext",
+                t.getPoolFullLiteralCount() > 0);
+        // Every distinct literal is either encrypted or reported as pool-excluded; nothing is lost.
+        assertEquals(count, t.getEncryptedCount() + t.getPoolFullLiteralCount());
+        // The class assembles and verifies -- no ClassTooLargeException.
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+    }
+
+    @Test
     public void oversizedInitializerIsSplitAcrossHelpers() throws Exception {
         // A generated class with enough distinct literals that a single <clinit> would exceed the
         // 65535-byte method limit. Hoisting must split the initializer across helper methods so the
         // class still assembles, verifies and runs -- rather than throwing MethodTooLargeException.
-        // 8000 fields * ~9 bytes/init-unit ~= 72 KB, comfortably past the limit without the split.
-        int count = 8000;
+        // 6000 fields * ~11 bytes/init-unit ~= 66 KB, past the method limit but well under the
+        // constant-pool budget (so this exercises the method-size split, not the pool cap).
+        int count = 6000;
         String probeValue = "big_clinit_secret_literal_number_0";
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
         w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,

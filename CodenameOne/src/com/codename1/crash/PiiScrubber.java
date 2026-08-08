@@ -104,8 +104,10 @@ public class PiiScrubber {
     /// A free-form (non-frame) line is routed through {@link #scrubMessage(String)}
     /// -- the overridable method -- so an app that redacts app-specific tokens there
     /// redacts them in `rawStack` too, not only in the separately-scrubbed message.
-    /// A frame line instead gets only the built-in email pass: the virtual scrubber
-    /// masks long digit runs, which would destroy a frame's line/column coordinate.
+    /// A frame line is scrubbed too, but only up to its terminal `:line:column`
+    /// coordinate: the coordinate is preserved for symbolication while the function
+    /// identity and any URL/query before it (which can carry user data, e.g.
+    /// `app.js?account=123456`) still get message scrubbing.
     public String scrubRawStack(String rawStack) {
         if (rawStack == null) {
             return null;
@@ -117,7 +119,7 @@ public class PiiScrubber {
             int nl = rawStack.indexOf('\n', i);
             int lineEnd = nl < 0 ? len : nl;
             String line = rawStack.substring(i, lineEnd);
-            out.append(isFrameLine(line) ? scrubEmails(line) : scrubMessage(line));
+            out.append(isFrameLine(line) ? scrubFrameLine(line) : scrubMessage(line));
             if (nl < 0) {
                 break;
             }
@@ -125,6 +127,19 @@ public class PiiScrubber {
             i = nl + 1;
         }
         return out.toString();
+    }
+
+    /// Scrubs a recognized frame line while preserving its terminal `:line[:column]` coordinate.
+    /// Everything before the coordinate -- the function identity and any URL/query -- goes through
+    /// {@link #scrubMessage(String)}, so a URL query like `?account=123456` is masked; the coordinate
+    /// tail is appended verbatim so symbolication still works. A frame with no numeric coordinate
+    /// (`(Native Method)`) has nothing to protect and no PII to speak of, so it gets only the email pass.
+    private String scrubFrameLine(String line) {
+        int loc = trailingLocationStart(line);
+        if (loc <= 0) {
+            return scrubEmails(line);
+        }
+        return scrubMessage(line.substring(0, loc)) + line.substring(loc);
     }
 
     /// True for a stack-trace line whose numeric tokens are source coordinates,

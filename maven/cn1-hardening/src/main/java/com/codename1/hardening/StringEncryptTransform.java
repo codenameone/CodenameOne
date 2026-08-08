@@ -83,6 +83,14 @@ public final class StringEncryptTransform {
     private static final int CLINIT_CALL_BYTES = 5;
     /** Widest encoding of the per-access decoder INVOKESTATIC inserted after an LDC. */
     private static final int DECODER_CALL_BYTES = 5;
+    /** Target ceiling for the constant-pool item count (the hard JVM limit is 65535), with margin. */
+    private static final int SAFE_POOL_ITEMS = 60000;
+    /**
+     * Conservative constant-pool entries each hoisted literal adds -- a Utf8 for the field name, a
+     * NameAndType, a Fieldref, and the ciphertext Utf8 + String -- so the total can be bounded before
+     * hoisting rather than discovering the overflow only when ASM writes the class.
+     */
+    private static final int POOL_ITEMS_PER_HOIST = 6;
 
     private final boolean encryptAllStrings;
     private final int seed;
@@ -96,6 +104,9 @@ public final class StringEncryptTransform {
     private int clinitFullLiteralCount;
     private int methodFullLiteralCount;
     private int annotationLiteralCount;
+    private int poolFullLiteralCount;
+    /** The input class's constant-pool item count, so hoisting can stay under the 65535-entry limit. */
+    private int poolBaseItems;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -224,10 +235,23 @@ public final class StringEncryptTransform {
         return annotationLiteralCount;
     }
 
+    /**
+     * The number of literals left unhoisted (plaintext) because hoisting them all -- each adds a
+     * synthetic field and its field-reference constants -- would push the class past the JVM's
+     * 65,535-entry constant-pool limit (which makes ASM throw {@code ClassTooLargeException}). Rare (a
+     * generated class with ~13k+ distinct selected literals); reported rather than aborting the build.
+     */
+    public int getPoolFullLiteralCount() {
+        return poolFullLiteralCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
-        new ClassReader(classBytes).accept(cn, ClassReader.SKIP_FRAMES);
+        ClassReader reader = new ClassReader(classBytes);
+        reader.accept(cn, ClassReader.SKIP_FRAMES);
+        // The input's current constant-pool item count; hoisting must not grow the pool past 65535.
+        poolBaseItems = reader.getItemCount();
 
         boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0;
         // The decoder is a concrete static method, and (for interface constants) it is invoked from
@@ -624,6 +648,29 @@ public final class StringEncryptTransform {
                         taken.add(fname);
                         valueToField.put(v, fname);
                     }
+                }
+            }
+        }
+        // Bound hoisting by constant-pool growth: each hoisted literal adds several pool entries (its
+        // field name Utf8, a NameAndType, a Fieldref, the ciphertext Utf8 + String), so a class with
+        // tens of thousands of distinct literals could exceed the JVM's 65535-entry limit and make ASM
+        // throw ClassTooLargeException. Cap the number hoisted at what the pool budget allows and leave
+        // the rest plaintext, reported. First-seen order is kept (LinkedHashMap), so the cut is stable.
+        int budget = (SAFE_POOL_ITEMS - poolBaseItems) / POOL_ITEMS_PER_HOIST;
+        if (budget < 0) {
+            budget = 0;
+        }
+        if (valueToField.size() > budget) {
+            java.util.Iterator<java.util.Map.Entry<String, String>> it =
+                    valueToField.entrySet().iterator();
+            int kept = 0;
+            while (it.hasNext()) {
+                it.next();
+                if (kept < budget) {
+                    kept++;
+                } else {
+                    it.remove();
+                    poolFullLiteralCount++;
                 }
             }
         }

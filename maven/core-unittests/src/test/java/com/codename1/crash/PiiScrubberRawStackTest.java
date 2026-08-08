@@ -141,6 +141,18 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void frameUrlQueryDataIsScrubbedButCoordinateSurvives() {
+        // A JS frame URL can carry user data in its query; the terminal line:column coordinate must
+        // survive for symbolication, but the identity/URL/query before it still gets scrubbed.
+        String stack = "TypeError: boom\n"
+                + "    at f (https://host/app.js?account=123456:1:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account=[num]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf(":1:42)") >= 0, scrubbed);
+    }
+
+    @Test
     void customScrubMessageOverrideReachesRawStack() {
         // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
         // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by
