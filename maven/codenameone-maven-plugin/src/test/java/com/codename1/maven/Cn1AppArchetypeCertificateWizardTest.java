@@ -28,6 +28,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Cn1AppArchetypeCertificateWizardTest {
@@ -62,6 +63,64 @@ class Cn1AppArchetypeCertificateWizardTest {
         assertContains(".idea/runConfigurations/CN1_JavaScript_Local_Build.xml", "value=\"local-javascript\"");
         assertContains(".vscode/settings.json", "Local > JavaScript Build");
         assertContains(".vscode/settings.json", "-Dcodename1.buildTarget=local-javascript");
+    }
+
+    /**
+     * A generated project must offer both halves of iOS on-device debugging
+     * from the IDE: the build that turns the debug listener on, and the proxy
+     * the IDE attaches through.
+     *
+     * NetBeans had neither, so the two goals had to be typed by hand and the
+     * build one silently did nothing unless the developer had already edited
+     * codenameone_settings.properties (issue #5333). IntelliJ shipped the
+     * proxy and the attach config but not the build.
+     */
+    @Test
+    void iosOnDeviceDebugBindingsAreIncludedInPackagedProjectTemplates() throws Exception {
+        // The build goal forces the onDeviceDebug hint on for one build.
+        assertContains("tools/netbeans/nbactions.xml", "CUSTOM-Build for iOS On-Device Debug");
+        assertContains("tools/netbeans/nbactions.xml", "<goal>cn1:buildIosOnDeviceDebug</goal>");
+        assertContains(".idea/runConfigurations/CN1_iOS_OnDeviceDebug.xml",
+                "cn1:buildIosOnDeviceDebug");
+
+        // The proxy bridges the device's wire protocol to JDWP.
+        assertContains("tools/netbeans/nbactions.xml", "CUSTOM-Start iOS Debug Proxy");
+        assertContains("tools/netbeans/nbactions.xml", "<goal>cn1:ios-on-device-debugging</goal>");
+        assertContains(".idea/runConfigurations/CN1_Debug_Proxy.xml",
+                "cn1:ios-on-device-debugging");
+    }
+
+    /**
+     * Generated run configurations must use the goal prefix the plugin
+     * actually registers.
+     *
+     * The descriptor sets {@code <goalPrefix>cn1</goalPrefix>}, so a
+     * configuration written against the artifact-derived {@code codenameone}
+     * prefix cannot resolve the plugin and the action fails to start. The
+     * NetBeans actions and the certificate-wizard configuration were already
+     * on {@code cn1}; the on-device-debug ones were not.
+     */
+    @Test
+    void generatedRunConfigurationsUseTheRegisteredGoalPrefix() throws Exception {
+        String descriptor = pluginDescriptor();
+        assertTrue(descriptor.contains("<goalPrefix>cn1</goalPrefix>"),
+                "this test pins the prefix the plugin registers; update it if that changes");
+
+        File dir = new File("../cn1app-archetype/src/main/resources/archetype-resources/.idea/runConfigurations");
+        File[] configs = dir.listFiles();
+        assertTrue(configs != null && configs.length > 0, "expected run configurations at " + dir);
+        for (File config : configs) {
+            String body = new String(Files.readAllBytes(config.toPath()), StandardCharsets.UTF_8);
+            assertFalse(body.contains("codenameone:"),
+                    config.getName() + " uses the unregistered 'codenameone' prefix,"
+                            + " so the action cannot resolve the plugin");
+        }
+    }
+
+    private static String pluginDescriptor() throws Exception {
+        File pom = new File("pom.xml");
+        assertTrue(pom.isFile(), "expected the plugin pom at " + pom.getAbsolutePath());
+        return new String(Files.readAllBytes(pom.toPath()), StandardCharsets.UTF_8);
     }
 
     private static void assertContains(String path, String expected) throws Exception {

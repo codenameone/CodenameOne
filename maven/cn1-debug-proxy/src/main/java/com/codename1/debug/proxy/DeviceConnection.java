@@ -58,11 +58,24 @@ public final class DeviceConnection implements AutoCloseable {
         void onHello(int version);
         void onBreakpointHit(long threadId, int methodId, int line);
         void onStepComplete(long threadId, int methodId, int line);
+        /**
+         * The device's live thread list, in reply to {@link #getThreads()}.
+         * {@code suspended} marks threads the debugger has parked, and
+         * {@code threadObjects} carries each {@code java.lang.Thread} instance
+         * (0 when the thread has not published one) so the proxy can read its
+         * name through the ordinary object/field commands.
+         */
+        void onThreads(long[] threadIds, boolean[] suspended, long[] threadObjects);
         void onStack(long threadId, int[] methodIds, int[] lines);
         void onLocals(int[] slots, byte[] typeCodes, long[] values);
         void onVmDeath();
         void onStringValue(String value);
-        void onObjectClass(int classId, boolean isArray);
+        /**
+         * @param dimensions array depth when {@code isArray}; {@code classId}
+         *                   then names the scalar component, since an array's
+         *                   own class is synthetic and has no symbol entry.
+         */
+        void onObjectClass(int classId, boolean isArray, int dimensions);
         void onObjectFields(byte[] typeCodes, long[] values);
         void onInvokeResult(byte type, long value);
         void onArrayLength(int length);
@@ -171,10 +184,28 @@ public final class DeviceConnection implements AutoCloseable {
                 listener.onStepComplete(tid, mid, line);
                 return;
             }
+            case WireProtocol.EVT_THREAD_LIST: {
+                // count(4) then per thread: threadId(8) flags(1) threadObject(8).
+                if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
+                int n = readInt(p, 0);
+                if (!frameHolds(n, 17, 4, p.length)) { listener.onUnknownEvent(code, p); return; }
+                long[] ids = new long[n];
+                boolean[] suspended = new boolean[n];
+                long[] objects = new long[n];
+                int off = 4;
+                for (int i = 0; i < n; i++) {
+                    ids[i] = readLong(p, off); off += 8;
+                    suspended[i] = (p[off] & 0x01) != 0; off += 1;
+                    objects[i] = readLong(p, off); off += 8;
+                }
+                listener.onThreads(ids, suspended, objects);
+                return;
+            }
             case WireProtocol.EVT_STACK: {
                 if (p.length < 12) { listener.onUnknownEvent(code, p); return; }
                 long tid = readLong(p, 0);
                 int n = readInt(p, 8);
+                if (!frameHolds(n, 8, 12, p.length)) { listener.onUnknownEvent(code, p); return; }
                 int[] mids = new int[n];
                 int[] lines = new int[n];
                 for (int i = 0; i < n; i++) {
@@ -187,6 +218,7 @@ public final class DeviceConnection implements AutoCloseable {
             case WireProtocol.EVT_LOCALS: {
                 if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
                 int n = readInt(p, 0);
+                if (!frameHolds(n, 13, 4, p.length)) { listener.onUnknownEvent(code, p); return; }
                 int[] slots = new int[n];
                 byte[] types = new byte[n];
                 long[] values = new long[n];
@@ -211,12 +243,17 @@ public final class DeviceConnection implements AutoCloseable {
                 int cid = p.length >= 4 ? readInt(p, 0) : -1;
                 // 5th byte is isArray flag; older devices omit it.
                 boolean isArr = p.length >= 5 && p[4] != 0;
-                listener.onObjectClass(cid, isArr);
+                // 6th byte is the array depth; devices before it sent none,
+                // and a depth of 1 is what those could only have meant.
+                int dims = p.length >= 6 ? (p[5] & 0xff) : (isArr ? 1 : 0);
+                if (isArr && dims == 0) dims = 1;
+                listener.onObjectClass(cid, isArr, dims);
                 return;
             }
             case WireProtocol.EVT_OBJECT_FIELDS: {
                 if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
                 int n = readInt(p, 0);
+                if (!frameHolds(n, 9, 4, p.length)) { listener.onUnknownEvent(code, p); return; }
                 byte[] types = new byte[n];
                 long[] values = new long[n];
                 int off = 4;
@@ -366,6 +403,11 @@ public final class DeviceConnection implements AutoCloseable {
         sendCommand(WireProtocol.CMD_STEP, p);
     }
 
+    /** Asks the device to enumerate its live Java threads. */
+    public void getThreads() throws IOException {
+        sendCommand(WireProtocol.CMD_GET_THREADS, null);
+    }
+
     public void getStack(long threadId) throws IOException {
         byte[] p = new byte[8];
         writeLong(p, 0, threadId);
@@ -448,6 +490,23 @@ public final class DeviceConnection implements AutoCloseable {
             try { if (socket != null) socket.close(); } catch (IOException ignore) {}
             try { if (server != null) server.close(); } catch (IOException ignore) {}
         }
+    }
+
+    /**
+     * Whether a frame really carries {@code count} entries of
+     * {@code bytesPerEntry} after a {@code headerBytes} header.
+     *
+     * <p>Divides rather than multiplying: the frame's count is whatever
+     * arrived on the socket, and {@code count * bytesPerEntry} overflows to a
+     * negative number for a large enough one, which turns the obvious
+     * {@code header + count * size > length} guard into a pass. Everything
+     * after it then allocates arrays of that count, so a four-byte payload
+     * claiming a hundred million entries takes the proxy down with an
+     * OutOfMemoryError instead of being reported as an unreadable frame.</p>
+     */
+    private static boolean frameHolds(int count, int bytesPerEntry, int headerBytes, int length) {
+        if (count < 0 || length < headerBytes) return false;
+        return count <= (length - headerBytes) / bytesPerEntry;
     }
 
     private static int readInt(byte[] b, int off) {

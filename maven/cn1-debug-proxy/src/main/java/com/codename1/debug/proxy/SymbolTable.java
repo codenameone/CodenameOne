@@ -95,11 +95,35 @@ public final class SymbolTable {
         public final int slot;
         public final String name;
         public final String descriptor;
+        /**
+         * Source lines this local is in scope for, end exclusive. {@code 0}
+         * for {@code startLine} means "always live" (no scope in the class
+         * file, or a local the translator synthesised from a store opcode);
+         * {@code 0} for {@code endLine} means "to the end of the method".
+         */
+        public final int startLine;
+        public final int endLine;
 
-        LocalVarInfo(int slot, String name, String descriptor) {
+        LocalVarInfo(int slot, String name, String descriptor, int startLine, int endLine) {
             this.slot = slot;
             this.name = name;
             this.descriptor = descriptor;
+            this.startLine = startLine;
+            this.endLine = endLine;
+        }
+
+        /** JDWP wants a code index and a length; ParparVM's index is the line. */
+        public long jdwpCodeIndex() {
+            return Math.max(startLine, 0);
+        }
+
+        public int jdwpLength() {
+            if (startLine <= 0 || endLine <= startLine) {
+                // Always-live, or live to the end of the method: an
+                // open-ended length keeps the IDE from hiding the local.
+                return Integer.MAX_VALUE;
+            }
+            return endLine - startLine;
         }
     }
 
@@ -160,6 +184,15 @@ public final class SymbolTable {
      * gzip-inflated by the caller). The proxy no longer reads a local sidecar
      * file — the table travels over the wire via CMD_GET_SYMBOLS.
      */
+    /** A malformed numeric column degrades that field, not the whole table. */
+    private static int parseIntOrZero(String s) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     public static SymbolTable load(InputStream in) throws IOException {
         SymbolTable t = new SymbolTable();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
@@ -215,8 +248,15 @@ public final class SymbolTable {
                         if (parts.length < 5) continue;
                         int mid = Integer.parseInt(parts[1]);
                         int slot = Integer.parseInt(parts[2]);
+                        // Columns 6 and 7 are the scope's line range. Tables
+                        // written before scopes were tracked stop at column 5;
+                        // those locals stay always-live.
+                        int startLine = parts.length >= 6 ? parseIntOrZero(parts[5]) : 0;
+                        int endLine = parts.length >= 7 ? parseIntOrZero(parts[6]) : 0;
                         MethodInfo m = t.methodsById.get(mid);
-                        if (m != null) m.locals.add(new LocalVarInfo(slot, parts[3], parts[4]));
+                        if (m != null) {
+                            m.locals.add(new LocalVarInfo(slot, parts[3], parts[4], startLine, endLine));
+                        }
                         break;
                     }
                     case "field": {
