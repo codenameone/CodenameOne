@@ -2323,6 +2323,16 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
+    // Page-release state. Both MUST be initialized here: a page from
+    // cn1BibopRawPage is indeterminate memory, and cn1BibopTrimFreePool READS
+    // gcPageReleased before anything has written it. A stale nonzero value would
+    // make the trim skip the madvise, mark the page released anyway and file it
+    // under bibopReleasedPool -- the release silently doing nothing for that page
+    // -- while a stale gcMajorSpliced would drop an ordinary page out of the
+    // adaptive-trigger statistics. Reformatting a recycled page also lands here,
+    // where both are already false, so the writes are idempotent.
+    p->gcPageReleased = JAVA_FALSE;
+    p->gcMajorSpliced = JAVA_FALSE;
 #ifdef CN1_GC_VERIFY
     // QA: a recycled page still holds the DEAD previous occupants' headers, so a
     // reference that dangles into it would resolve to a plausible-looking object
@@ -2692,6 +2702,13 @@ static CN1BibopPage* cn1BibopNewPage(int ci) {
         return 0;
     }
     CN1BibopPage* p = (CN1BibopPage*)mem;
+    // cn1BibopRawPage hands back indeterminate memory (an arena carved from
+    // posix_memalign, which malloc may have recycled from its own free list), so
+    // every header field is garbage until written. cn1BibopFormatPage sets the
+    // ones it knows about; zeroing first means a field added later cannot be
+    // silently read before its first assignment, which is the defect this guards
+    // against. Once per NEW page only -- the pool hit path never reaches here.
+    memset(p, 0, sizeof(CN1BibopPage));
     cn1BibopFormatPage(p, ci);
     // Publish into the append-only registry: set nextAll (release) BEFORE the
     // head CAS so a concurrent rescan that reads the new head (acquire) sees a

@@ -247,18 +247,6 @@ class BibopPageFloorIntegrationTest {
                     m.containsKey("HELD") ? m.get("HELD") : -1,
                     m.containsKey("RELEASED") ? m.get("RELEASED") : -1));
         }
-        long releaseLines = 0;
-        for (String line : vmOutput.split("\\R")) {
-            if (line.startsWith("[PAGE-RELEASE]")) {
-                releaseLines++;
-            }
-        }
-        report.append("sweeps that released pages: ").append(releaseLines).append('\n');
-        for (String line : vmOutput.split("\\R")) {
-            if (line.startsWith("[PAGE-RELEASE]")) {
-                report.append("  ").append(line).append('\n');
-            }
-        }
         System.err.println("[BibopPageFloorIntegrationTest] texture set " + TEXTURE_SET_KB
                 + "KB, phys_footprint\n" + report);
 
@@ -395,11 +383,13 @@ class BibopPageFloorIntegrationTest {
     private String runVm(Path executable, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(executable.toAbsolutePath().toString());
         builder.directory(workingDir.toFile());
-        builder.environment().put("CN1_GC_LOG_CYCLES", "1");
-        // Surfaces how many pages each sweep handed back, so a failure says whether
-        // the release path never ran or ran and did not move the footprint.
-        builder.environment().put("CN1_LOG_PAGE_RELEASE", "1");
-        builder.redirectErrorStream(true);
+        // Do NOT merge stderr into stdout. The VM's env-gated tracers write to
+        // stderr, and a merged write can land in the middle of a marker line --
+        // observed as a phase silently missing from the table because its marker
+        // had a tracer line spliced through it. The footprint columns are the
+        // evidence here; set CN1_LOG_PAGE_RELEASE=1 by hand when you want the
+        // per-sweep page counts alongside them.
+        builder.redirectError(ProcessBuilder.Redirect.INHERIT);
         Process process = builder.start();
         String output;
         try (BufferedReader reader = new BufferedReader(

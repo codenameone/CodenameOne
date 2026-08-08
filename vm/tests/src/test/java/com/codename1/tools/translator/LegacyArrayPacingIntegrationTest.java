@@ -332,8 +332,12 @@ class LegacyArrayPacingIntegrationTest {
     private String runVm(Path executable, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(executable.toAbsolutePath().toString());
         builder.directory(workingDir.toFile());
-        builder.environment().put("CN1_GC_LOG_CYCLES", "1");
-        builder.redirectErrorStream(true);
+        // Do NOT merge stderr into stdout. The VM's env-gated tracers write to
+        // stderr, and a merged write can land in the middle of a marker line --
+        // observed as a phase silently missing from the table because its
+        // ARM_PEAK line had a [GC-CYCLE] spliced through it. Nothing here parses
+        // stderr, so let it through to the surefire log instead.
+        builder.redirectError(ProcessBuilder.Redirect.INHERIT);
         Process process = builder.start();
         String output;
         try (BufferedReader reader = new BufferedReader(
