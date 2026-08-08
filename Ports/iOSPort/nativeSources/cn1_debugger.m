@@ -635,10 +635,27 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
  * step kind) survives a subsequent CMD_RESUME from jdb. Caller passes
  * preserveStep=1 to leave stepKind alone, or 0 to also reset to -1.
  */
-static void resumeThreadById(int64_t threadId, int preserveStep) {
-    // Ids issued during this stop are not valid past it: the app runs on and
-    // the collector is free to reclaim what the IDE was looking at.
+/**
+ * Drops the issued-id set once nothing is parked any more.
+ *
+ * Ids do not survive the app running on -- the collector is free to reclaim
+ * what the IDE was looking at. But the IDE can resume or step one thread while
+ * another stays stopped, and that other thread's locals, fields and arrays are
+ * still being inspected; clearing globally on a per-thread resume made them
+ * start reporting unavailable. So the set is kept while any thread remains
+ * suspended and dropped when the last one wakes.
+ */
+static void forgetIssuedIfNothingParked(void) {
+    for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+        pthread_mutex_lock(&g_sus[i].mu);
+        int stillParked = g_sus[i].suspended;
+        pthread_mutex_unlock(&g_sus[i].mu);
+        if (stillParked) return;
+    }
     cn1_debugger_forget_issued();
+}
+
+static void resumeThreadById(int64_t threadId, int preserveStep) {
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
     if (!preserveStep) {
@@ -647,6 +664,7 @@ static void resumeThreadById(int64_t threadId, int preserveStep) {
     s->suspended = 0;
     pthread_cond_signal(&s->cv);
     pthread_mutex_unlock(&s->mu);
+    forgetIssuedIfNothingParked();
 }
 
 static void resumeAll(int preserveStep) {
@@ -666,7 +684,6 @@ static void resumeAll(int preserveStep) {
 
 /* Sets the step state on a thread and wakes it if currently suspended. */
 static void setStepAndResume(int64_t threadId, int stepKind) {
-    cn1_debugger_forget_issued();
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
     s->stepKind = stepKind;
@@ -675,6 +692,7 @@ static void setStepAndResume(int64_t threadId, int stepKind) {
         pthread_cond_signal(&s->cv);
     }
     pthread_mutex_unlock(&s->mu);
+    forgetIssuedIfNothingParked();
 }
 
 /* --------------------------------------------------------------------- */
@@ -843,9 +861,8 @@ static void handleGetThreads(void) {
             if (suspended) flags |= 0x01;
             if (t->threadActive) flags |= 0x02;
             JAVA_OBJECT threadObj = t->currentThreadObject;
-            if (cn1_debugger_is_valid_object(threadObj)) {
-                cn1_debugger_note_issued(threadObj);
-            } else {
+            if (!cn1_debugger_is_valid_object(threadObj)
+                    || !cn1_debugger_note_issued(threadObj)) {
                 threadObj = JAVA_NULL;
             }
             writeBE64(p, (uint64_t)tid); p += 8;
@@ -944,8 +961,14 @@ static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
                         value = 0;
                         break;
                     }
+                    if (!cn1_debugger_note_issued(obj)) {
+                        // Unrecordable, so every later request for it would be
+                        // refused; a reference the IDE can see but cannot
+                        // expand is worse than one it never saw.
+                        value = 0;
+                        break;
+                    }
                     value = (uint64_t)(uintptr_t)obj;
-                    cn1_debugger_note_issued(obj);
                     // Tag java.lang.String references with JDWP type 's'
                     // so the IDE can read their contents via
                     // StringReference.Value instead of invoking toString().
@@ -1153,9 +1176,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                     // has since reclaimed; don't pass one on as an objectID.
                     if (tc == 'L') {
                         JAVA_OBJECT ref = (JAVA_OBJECT)(uintptr_t)val;
-                        if (cn1_debugger_is_valid_object(ref)) {
-                            cn1_debugger_note_issued(ref);
-                        } else {
+                        if (!cn1_debugger_is_valid_object(ref)
+                                || !cn1_debugger_note_issued(ref)) {
                             val = 0;
                         }
                     }
@@ -1282,8 +1304,9 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 case 'D':
                     memcpy(&bits, &r.value.d, 8); break;
                 case 'L': case '[': case 'X':
-                    cn1_debugger_note_issued(r.value.o);
-                    bits = (uint64_t)(uintptr_t)r.value.o; break;
+                    bits = cn1_debugger_note_issued(r.value.o)
+                            ? (uint64_t)(uintptr_t)r.value.o : 0;
+                    break;
                 case 'V': default:
                     bits = 0; break;
             }
@@ -1428,9 +1451,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                         // anything else would come straight back to us as an
                         // objectID the IDE expects us to dereference.
                         JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
-                        if (cn1_debugger_is_valid_object(v)) {
-                            cn1_debugger_note_issued(v);
-                        } else {
+                        if (!cn1_debugger_is_valid_object(v)
+                                || !cn1_debugger_note_issued(v)) {
                             v = JAVA_NULL;
                         }
                         writeBE64(p, (uint64_t)(uintptr_t)v);

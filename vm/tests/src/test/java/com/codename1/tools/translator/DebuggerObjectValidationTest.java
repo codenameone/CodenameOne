@@ -164,6 +164,25 @@ class DebuggerObjectValidationTest {
         assertEquals("accepted", probe("WIRE_ID_TAGGED"));
     }
 
+    /**
+     * The issued-id table grows rather than silently dropping records.
+     *
+     * <p>A fixed table stopped recording once full, but callers still sent
+     * those references to the IDE — so past the cap every displayed reference
+     * became one the IDE could see and never expand. Inspecting a large object
+     * array reaches that in a single suspension.</p>
+     */
+    @Test
+    void theIssuedTableGrowsBeyondItsInitialCapacity() throws Exception {
+        assertEquals("all-recorded", probe("ISSUE_MANY"));
+    }
+
+    /** And every one of them still resolves afterwards. */
+    @Test
+    void everyIssuedIdRemainsResolvableAfterGrowth() throws Exception {
+        assertEquals("all-resolvable", probe("ISSUE_MANY_RESOLVE"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -180,7 +199,8 @@ class DebuggerObjectValidationTest {
                 "INT_AS_REFERENCE", "WILD_POINTER", "MISALIGNED", "NULL_PAGE",
                 "NULL", "NO_CLASS_WORD", "TAGGED_INT", "TAGGED_INT_CLASS",
                 "TAGGED_INT_VALUE", "WIRE_ID_ISSUED", "WIRE_ID_AFTER_RESUME",
-                "WIRE_ID_NEVER_ISSUED", "WIRE_ID_TAGGED");
+                "WIRE_ID_NEVER_ISSUED", "WIRE_ID_TAGGED", "ISSUE_MANY",
+                "ISSUE_MANY_RESOLVE");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -254,6 +274,28 @@ class DebuggerObjectValidationTest {
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0xDEADBEEFDEAD0000ULL;\n" +
+            "    } else if (strcmp(which, \"ISSUE_MANY\") == 0) {\n" +
+            "        /* Past the initial 4096 capacity, as a big array would. */\n" +
+            "        for (int i = 1; i <= 9000; i++) {\n" +
+            "            if (!cn1_debugger_note_issued((JAVA_OBJECT)(uintptr_t)(i * 8))) {\n" +
+            "                printf(\"dropped-at-%d\\n\", i);\n" +
+            "                return 0;\n" +
+            "            }\n" +
+            "        }\n" +
+            "        printf(\"all-recorded\\n\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"ISSUE_MANY_RESOLVE\") == 0) {\n" +
+            "        for (int i = 1; i <= 9000; i++) {\n" +
+            "            cn1_debugger_note_issued((JAVA_OBJECT)(uintptr_t)(i * 8));\n" +
+            "        }\n" +
+            "        for (int i = 1; i <= 9000; i++) {\n" +
+            "            if (!cn1_debugger_was_issued((JAVA_OBJECT)(uintptr_t)(i * 8))) {\n" +
+            "                printf(\"lost-%d\\n\", i);\n" +
+            "                return 0;\n" +
+            "            }\n" +
+            "        }\n" +
+            "        printf(\"all-resolvable\\n\");\n" +
+            "        return 0;\n" +
             "    } else if (strcmp(which, \"WIRE_ID_ISSUED\") == 0) {\n" +
             "        object.__codenameOneParentClsReference = &registeredClass;\n" +
             "        cn1_debugger_note_issued(&object);\n" +

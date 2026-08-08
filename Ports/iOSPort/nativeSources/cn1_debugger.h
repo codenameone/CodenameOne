@@ -120,7 +120,7 @@ extern JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj);
  * the last resume refuses a stale id from an earlier suspension instead of
  * dereferencing it.
  */
-extern void cn1_debugger_note_issued(JAVA_OBJECT obj);
+extern int cn1_debugger_note_issued(JAVA_OBJECT obj);
 extern int cn1_debugger_was_issued(JAVA_OBJECT obj);
 extern void cn1_debugger_forget_issued(void);
 

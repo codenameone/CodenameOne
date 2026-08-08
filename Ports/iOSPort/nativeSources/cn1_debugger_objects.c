@@ -203,38 +203,62 @@ JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
 /* than to this file.                                                     */
 /* --------------------------------------------------------------------- */
 
-#define CN1_ISSUED_CAP 4096u   /* power of two; open addressing, linear probe */
-static uintptr_t g_issued[CN1_ISSUED_CAP];
+#define CN1_ISSUED_INITIAL_CAP 4096u   /* power of two; open addressing */
+static uintptr_t* g_issued = NULL;
+static unsigned g_issuedCap = 0;
 static unsigned g_issuedCount = 0;
 static pthread_mutex_t g_issuedMutex = PTHREAD_MUTEX_INITIALIZER;
 
-static unsigned issued_slot(uintptr_t key) {
+static unsigned issued_slot(uintptr_t key, unsigned cap) {
     /* Pointers are aligned, so the low bits carry no entropy. */
     uintptr_t h = key >> 3;
     h ^= h >> 13;
-    return (unsigned)(h & (CN1_ISSUED_CAP - 1));
+    return (unsigned)(h & (cap - 1));
 }
 
-void cn1_debugger_note_issued(JAVA_OBJECT obj) {
-    if (obj == JAVA_NULL) return;
+/* Insert into a table known to have room. Returns 1 if newly added. */
+static int issued_put(uintptr_t* table, unsigned cap, uintptr_t key) {
+    unsigned i = issued_slot(key, cap);
+    for (unsigned n = 0; n < cap; n++) {
+        unsigned at = (i + n) & (cap - 1);
+        if (table[at] == key) return 0;
+        if (table[at] == 0) { table[at] = key; return 1; }
+    }
+    return 0;
+}
+
+/* Grows past a 3/4 load factor. Returns 0 only if the allocation fails. */
+static int issued_reserve(void) {
+    if (g_issued != NULL && (g_issuedCount + 1) * 4 < g_issuedCap * 3) {
+        return 1;
+    }
+    unsigned newCap = g_issuedCap ? g_issuedCap * 2 : CN1_ISSUED_INITIAL_CAP;
+    uintptr_t* grown = (uintptr_t*)calloc(newCap, sizeof(uintptr_t));
+    if (!grown) return 0;
+    for (unsigned i = 0; i < g_issuedCap; i++) {
+        if (g_issued[i] != 0) issued_put(grown, newCap, g_issued[i]);
+    }
+    free(g_issued);
+    g_issued = grown;
+    g_issuedCap = newCap;
+    return 1;
+}
+
+int cn1_debugger_note_issued(JAVA_OBJECT obj) {
+    if (obj == JAVA_NULL) return 1;   /* null needs no record */
     uintptr_t key = (uintptr_t)obj;
+    int ok;
     pthread_mutex_lock(&g_issuedMutex);
-    /* Full table: stop recording rather than spin. Ids beyond the cap are
-     * refused on the way back in, which errs toward "unavailable" instead of
-     * toward a stale read. */
-    if (g_issuedCount < CN1_ISSUED_CAP - 1) {
-        unsigned i = issued_slot(key);
-        for (unsigned n = 0; n < CN1_ISSUED_CAP; n++) {
-            unsigned at = (i + n) & (CN1_ISSUED_CAP - 1);
-            if (g_issued[at] == key) break;
-            if (g_issued[at] == 0) {
-                g_issued[at] = key;
-                g_issuedCount++;
-                break;
-            }
-        }
+    ok = issued_reserve();
+    if (ok) {
+        g_issuedCount += (unsigned)issued_put(g_issued, g_issuedCap, key);
     }
     pthread_mutex_unlock(&g_issuedMutex);
+    /* The table grows, so this only fails when the allocation does. A caller
+     * that cannot record a reference must report null rather than hand over an
+     * id that every later request would refuse -- a reference the IDE can see
+     * but cannot expand is worse than one it never saw. */
+    return ok;
 }
 
 int cn1_debugger_was_issued(JAVA_OBJECT obj) {
@@ -242,11 +266,13 @@ int cn1_debugger_was_issued(JAVA_OBJECT obj) {
     uintptr_t key = (uintptr_t)obj;
     int found = 0;
     pthread_mutex_lock(&g_issuedMutex);
-    unsigned i = issued_slot(key);
-    for (unsigned n = 0; n < CN1_ISSUED_CAP; n++) {
-        unsigned at = (i + n) & (CN1_ISSUED_CAP - 1);
-        if (g_issued[at] == key) { found = 1; break; }
-        if (g_issued[at] == 0) break;
+    if (g_issued != NULL) {
+        unsigned i = issued_slot(key, g_issuedCap);
+        for (unsigned n = 0; n < g_issuedCap; n++) {
+            unsigned at = (i + n) & (g_issuedCap - 1);
+            if (g_issued[at] == key) { found = 1; break; }
+            if (g_issued[at] == 0) break;
+        }
     }
     pthread_mutex_unlock(&g_issuedMutex);
     return found;
@@ -254,7 +280,9 @@ int cn1_debugger_was_issued(JAVA_OBJECT obj) {
 
 void cn1_debugger_forget_issued(void) {
     pthread_mutex_lock(&g_issuedMutex);
-    memset(g_issued, 0, sizeof(g_issued));
+    if (g_issued != NULL) {
+        memset(g_issued, 0, g_issuedCap * sizeof(uintptr_t));
+    }
     g_issuedCount = 0;
     pthread_mutex_unlock(&g_issuedMutex);
 }
