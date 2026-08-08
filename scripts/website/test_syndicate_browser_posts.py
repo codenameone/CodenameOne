@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from unittest.mock import MagicMock, patch
 
 from syndicate_blog_posts import State
 from syndicate_browser_posts import (
@@ -48,6 +49,25 @@ class HashnodeCompletionTest(unittest.TestCase):
                 subheading_set=True,
                 tags_set=True,
                 canonical_set=True,
+            )
+
+    def test_public_article_verification_accepts_matching_canonical(self) -> None:
+        response = MagicMock()
+        response.status = 200
+        response.read.return_value = (
+            b'<link rel="canonical" href="https://www.codenameone.com/blog/example/">'
+        )
+        response.__enter__.return_value = response
+
+        with patch(
+            "syndicate_browser_posts.urllib.request.urlopen",
+            return_value=response,
+        ):
+            self.assertTrue(
+                HashnodeAdapter._wait_for_public_article(
+                    "https://debugagent.com/example",
+                    "https://www.codenameone.com/blog/example/",
+                )
             )
 
     def test_explicit_recovery_accepts_only_failed_drafts(self) -> None:
