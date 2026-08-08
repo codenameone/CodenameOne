@@ -537,18 +537,16 @@ static void ensureSusInit(void) {
 static pthread_mutex_t g_susTableMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*
- * Whether a slot holds nothing worth keeping, so it can be handed to another
- * thread. Everything here is at its initial value: no suspension, no frame,
- * no pending step, no queued invocation. Checked under the slot's own lock.
+ * The calling thread's own slot, remembered across calls.
+ *
+ * cn1_debugger_check asks for it at every source line of every method, which
+ * makes this the hottest path the debugger adds to a running app -- taking a
+ * process-wide lock and scanning the table there would cost more than the
+ * check it guards. A claimed slot never changes hands, so once a thread has
+ * found its own the answer cannot go stale.
  */
-static int susSlotIsIdle(struct sus_state* s) {
-    int idle;
-    pthread_mutex_lock(&s->mu);
-    idle = !s->suspended && s->tsd == NULL && s->stepKind == -1
-            && s->invokeThunk == NULL;
-    pthread_mutex_unlock(&s->mu);
-    return idle;
-}
+static __thread struct sus_state* t_ownSlot = NULL;
+static __thread int64_t t_ownSlotThread = 0;
 
 /**
  * The suspension slot for a thread, claiming one on first use.
@@ -557,11 +555,12 @@ static int susSlotIsIdle(struct sus_state* s) {
  * and the table is not, so two live threads can hash together. The claim makes
  * the slot that thread's own until it is reclaimed.
  *
- * A table with no free slot reclaims one that is idle -- a slot in its initial
- * state carries nothing, so the thread that owned it loses nothing by being
- * moved, and claims a fresh slot the next time it asks. Failing that, the
- * hashed slot is returned unclaimed: degraded exactly as before, but never
- * NULL, because every caller dereferences the result.
+ * Slots are never taken back. That bounds how many threads can hold one at a
+ * time, and a table with none left falls back to the hashed slot unclaimed --
+ * degraded exactly as it was before any of this, but never NULL, because every
+ * caller dereferences the result. Reclaiming instead would mean a slot could
+ * change owner underneath the thread that holds it, which is the very thing
+ * being fixed, and would cost the lock-free fast path above.
  */
 static struct sus_state* susForThread(int64_t threadId) {
     ensureSusInit();
@@ -576,12 +575,6 @@ static struct sus_state* susForThread(int64_t threadId) {
         }
         if (freeSlot == NULL && s->owner == 0) freeSlot = s;
     }
-    if (freeSlot == NULL) {
-        for (int i = 0; i < SUS_TABLE_SIZE; i++) {
-            struct sus_state* s = &g_sus[(start + (unsigned)i) & (SUS_TABLE_SIZE - 1)];
-            if (susSlotIsIdle(s)) { freeSlot = s; break; }
-        }
-    }
     if (freeSlot != NULL) {
         freeSlot->owner = threadId;
         pthread_mutex_unlock(&g_susTableMutex);
@@ -589,6 +582,19 @@ static struct sus_state* susForThread(int64_t threadId) {
     }
     pthread_mutex_unlock(&g_susTableMutex);
     return &g_sus[start];
+}
+
+/*
+ * The slot for the thread that is asking, through the per-thread cache. Only
+ * for a caller running *on* that thread: the listener asks about other threads
+ * and must not cache their slots as its own.
+ */
+static struct sus_state* susForCurrentThread(int64_t threadId) {
+    if (t_ownSlot != NULL && t_ownSlotThread == threadId) return t_ownSlot;
+    struct sus_state* s = susForThread(threadId);
+    t_ownSlot = s;
+    t_ownSlotThread = threadId;
+    return s;
 }
 
 /* --------------------------------------------------------------------- */
@@ -831,7 +837,7 @@ void cn1_debugger_check(struct ThreadLocalData* tsd, int line) {
 
     // Stepping has priority over breakpoints so a step that lands on a
     // breakpoint reports once (as STEP_COMPLETE).
-    struct sus_state* s = susForThread(threadId);
+    struct sus_state* s = susForCurrentThread(threadId);
     int sk = s->stepKind;
     if (sk >= 0) {
         int depth = tsd->callStackOffset;
