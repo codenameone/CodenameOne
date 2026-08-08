@@ -16714,7 +16714,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (config != null && config.isEncrypted()) {
                 probeKey(conn);
             }
-            SEDatabase result = new SEDatabase(conn, databaseName);
+            // The resolved file, not the name: a name is resolved against the storage directory
+            // unless it looks like a path, so two names can be one file and the registry a key
+            // change consults has to see them as one.
+            SEDatabase result = new SEDatabase(conn, databaseName, canonicalDatabaseKey(file));
             conn = null;
             return result;
         } catch (SQLException ex) {
@@ -16801,6 +16804,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 + "Do not treat a simulator run as evidence that real user data is protected. ****");
     }
 
+
+    /**
+     * The registry key for a database file: its canonical path where the filesystem can give one,
+     * and its absolute path otherwise. Canonical resolves "." segments and symlinks, which is what
+     * makes "/tmp/app.db" and "/tmp/./app.db" one entry rather than two.
+     */
+    private static String canonicalDatabaseKey(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException err) {
+            // A file that cannot be canonicalized has not been created yet or sits behind a
+            // permission wall. The absolute path still identifies it more precisely than the name.
+            return f.getAbsolutePath();
+        }
+    }
 
     private File getDatabaseFile(String databaseName) {
         File f = new File(getStorageDir() + File.separator+ "database" + File.separator + databaseName);
