@@ -12,7 +12,21 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCAL_REPO="${CN1_LOCAL_REPO:-/tmp/cn1-local-repo}"
 JDK8="${JAVA8_HOME:-$(/usr/libexec/java_home -v 1.8)}"
 JDK21="${JAVA21_HOME:-$(/usr/libexec/java_home -v 21)}"
-CORE_JAR="$LOCAL_REPO/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar"
+# Read from the reactor rather than hard coded: maven/update-version.sh moves the project off
+# 8.0-SNAPSHOT at every release, after which a pinned path made the first unzip fail under set -e
+# and took the packaging, launch and process checks with it.
+pom_version() {
+  sed -n 's|^[[:space:]]*<version>\(.*\)</version>.*|\1|p' "$1" | head -1
+}
+CN1_VERSION="$(pom_version "$REPO_ROOT/maven/pom.xml")"
+# The editor is versioned by its own reactor, which need not move in step with the framework.
+GUIBUILDER_VERSION="$(pom_version "$REPO_ROOT/scripts/guibuilder/pom.xml")"
+if [ -z "$CN1_VERSION" ] || [ -z "$GUIBUILDER_VERSION" ]; then
+  echo "Could not read the project version from maven/pom.xml or scripts/guibuilder/pom.xml" >&2
+  exit 1
+fi
+GUIBUILDER_JAR="javase/target/codenameone-guibuilder-${GUIBUILDER_VERSION}.jar"
+CORE_JAR="$LOCAL_REPO/com/codenameone/codenameone-core/${CN1_VERSION}/codenameone-core-${CN1_VERSION}.jar"
 
 run_tests=1
 launch=1
@@ -60,8 +74,8 @@ for module in core factory css-compiler; do
   for jar in "$REPO_ROOT/maven/$module/target/"*.jar; do
     [ -e "$jar" ] || continue
     case "$jar" in *-sources.jar|*-javadoc.jar) continue;; esac
-    artifact="$(basename "$jar" | sed 's/-8\.0-SNAPSHOT\.jar$//')"
-    dest="$LOCAL_REPO/com/codenameone/$artifact/8.0-SNAPSHOT/$(basename "$jar")"
+    artifact="$(basename "$jar" | sed "s/-${CN1_VERSION}\.jar\$//")"
+    dest="$LOCAL_REPO/com/codenameone/$artifact/${CN1_VERSION}/$(basename "$jar")"
     [ -e "$dest" ] && cp -f "$jar" "$dest"
   done
 done
@@ -83,7 +97,7 @@ JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
 for jar in "$REPO_ROOT/maven/javase/target/"*.jar; do
   [ -e "$jar" ] || continue
   case "$jar" in *-sources.jar|*-javadoc.jar|*jar-with-dependencies.jar) continue;; esac
-  dest="$LOCAL_REPO/com/codenameone/codenameone-javase/8.0-SNAPSHOT/$(basename "$jar")"
+  dest="$LOCAL_REPO/com/codenameone/codenameone-javase/${CN1_VERSION}/$(basename "$jar")"
   [ -e "$dest" ] && cp -f "$jar" "$dest"
 done
 
@@ -107,7 +121,7 @@ JAVA_HOME="$JDK8" PATH="$JDK8/bin:$PATH" \
     -Dcodename1.platform=javase -Dmaven.test.skip=true
 
 if [ "$launch" = "0" ]; then
-  echo "Built: scripts/guibuilder/javase/target/codenameone-guibuilder-8.0-SNAPSHOT.jar"
+  echo "Built: scripts/guibuilder/$GUIBUILDER_JAR"
   exit 0
 fi
 
@@ -120,7 +134,7 @@ cssFile=$PWD/demo-project/src/main/css/theme.css
 initialForm=com.example.NestedLayoutsForm
 EOF
 
-pkill -f "codenameone-guibuilder-8.0-SNAPSHOT.jar" 2>/dev/null || true
+pkill -f "codenameone-guibuilder-${GUIBUILDER_VERSION}.jar" 2>/dev/null || true
 sleep 1
 echo "==> launching"
 nohup "$JDK21/bin/java" \
@@ -131,9 +145,9 @@ nohup "$JDK21/bin/java" \
   --add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED \
   --add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED \
   ${CN1_EXTRA_ARGS:-} \
-  -jar javase/target/codenameone-guibuilder-8.0-SNAPSHOT.jar > /tmp/guibuilder.log 2>&1 &
+  -jar "$GUIBUILDER_JAR" > /tmp/guibuilder.log 2>&1 &
 sleep 12
-if pgrep -f "codenameone-guibuilder-8.0-SNAPSHOT.jar" > /dev/null; then
+if pgrep -f "codenameone-guibuilder-${GUIBUILDER_VERSION}.jar" > /dev/null; then
   echo "GUI Builder running; log at /tmp/guibuilder.log"
 else
   echo "GUI Builder failed to start:" >&2
