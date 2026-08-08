@@ -111,7 +111,13 @@ void cn1_watch_runtime_start(const char *watchMainClass) {
     }
 }
 
+/// Defined below, next to the phase-forwarding it belongs to.
+static void cn1WatchReplayPendingPhase(void);
+
 void cn1_watch_runtime_paint(void) {
+    // Before the frame: a phase that arrived during launch is delivered as soon as the Java side
+    // exists, rather than waiting for the next real transition that may never come.
+    cn1WatchReplayPendingPhase();
     [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
 }
 
@@ -126,22 +132,63 @@ void cn1_watch_runtime_paint(void) {
 //
 // Guarded on the runtime being up: watchOS can send a transition before the VM thread has
 // initialised the constant pool, and calling into a translated method then would fault.
-void cn1_watch_runtime_didEnterBackground(void) {
-    if (!cn1WatchRuntimeStarted) {
+/// The phase seen before the Java side could take it: 0 none, 1 background, 2 foreground.
+///
+/// Only the LAST one is kept, deliberately. If the watch is backgrounded and foregrounded again
+/// before the VM is up, the app was never told about either and the only thing it needs to learn is
+/// where it ended up.
+static int cn1WatchPendingPhase = 0;
+
+/// Whether the Java lifecycle is installed, which is a different question from whether the runtime
+/// was started.
+///
+/// cn1_watch_runtime_start sets its flag and then hands off to a THREAD that has yet to reach
+/// Display.init, so the flag is true for a window in which IOSImplementation.instance is still
+/// null. Forwarding a phase into that window dereferences null inside translated code, on a thread
+/// with no Java frame to unwind to. The view controller is created during Display.init by the
+/// implementation itself, so its existence is evidence the implementation exists.
+static BOOL cn1WatchJavaReady(void) {
+    return cn1WatchRuntimeStarted && [CodenameOne_GLViewController instance] != nil;
+}
+
+static void cn1WatchDeliverPhase(int phase) {
+    if (phase == 1) {
+        com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
+                CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    } else if (phase == 2) {
+        com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
+                CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    }
+}
+
+/// Hands over a phase the app could not be told about yet. Called from the paint pump, which is the
+/// one thing that runs regularly and only does work once the Java side is up.
+static void cn1WatchReplayPendingPhase(void) {
+    if (cn1WatchPendingPhase == 0 || !cn1WatchJavaReady()) {
         return;
     }
+    int phase = cn1WatchPendingPhase;
+    cn1WatchPendingPhase = 0;
+    cn1WatchDeliverPhase(phase);
+}
+
+void cn1_watch_runtime_didEnterBackground(void) {
+    // Native bookkeeping is unconditional -- it is this file's own state, not the VM's.
     isAppSuspended = YES;
-    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
-            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    if (!cn1WatchJavaReady()) {
+        cn1WatchPendingPhase = 1;
+        return;
+    }
+    cn1WatchDeliverPhase(1);
 }
 
 void cn1_watch_runtime_willEnterForeground(void) {
-    if (!cn1WatchRuntimeStarted) {
+    isAppSuspended = NO;
+    if (!cn1WatchJavaReady()) {
+        cn1WatchPendingPhase = 2;
         return;
     }
-    isAppSuspended = NO;
-    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
-            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    cn1WatchDeliverPhase(2);
 }
 
 void cn1_watch_runtime_pointerPressed(int x, int y) {

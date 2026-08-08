@@ -1246,6 +1246,42 @@ public class CN1WearableBridge implements WearableBridge {
 
     /// Called by the listener service before it handles anything, so a process that never starts an
     /// activity can still restore and persist the logical clock.
+    /// Brings the app process up because a callback is about to be handed to WearableConnection.
+    ///
+    /// Lives here rather than only in the listener service because dispatch does not: a resolved
+    /// removal and a retried asset are both announced from this class, outside every launch site
+    /// the service owns. Queueing a callback into a process with no listener is only half a
+    /// delivery -- nothing drains the queue, and a service process that dies before the user opens
+    /// the app loses it, with a deleted DataItem absent from startup replay and a transfer bounded
+    /// by the sender's retention.
+    ///
+    /// A no-op once the app is up, which is the common case: the checks below are a field read and
+    /// a package-manager lookup.
+    static void ensureAppRunning() {
+        Context c = serviceContext;
+        if (c == null) {
+            CN1WearableBridge b = current;
+            c = b == null ? null : b.context;
+        }
+        if (c == null) {
+            return;
+        }
+        try {
+            if (com.codename1.ui.Display.isInitialized()) {
+                return;
+            }
+            android.content.Intent launch = c.getPackageManager()
+                    .getLaunchIntentForPackage(c.getApplicationInfo().packageName);
+            if (launch != null) {
+                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(launch);
+            }
+        } catch (Throwable notPermitted) {
+            // Background activity starts are restricted on newer Android. The delivery stays in the
+            // in-memory queue and is replayed if the app opens while this process is still alive.
+        }
+    }
+
     static void noteServiceContext(Context context) {
         if (context == null || serviceContext != null) {
             return;
@@ -1963,6 +1999,7 @@ public class CN1WearableBridge implements WearableBridge {
                                 // Already delivered, in this process or a previous one.
                                 continue;
                             }
+                            ensureAppRunning();
                             WearableConnection.deliverDataChangedTracked(
                                     t.logicalPath, t.payload, new Runnable() {
                                         public void run() {
@@ -2387,6 +2424,11 @@ public class CN1WearableBridge implements WearableBridge {
                                     // redelivery that would have replaced it.
                                     final Uri claimed = uri;
                                     final long claimedSeq = tseq;
+                                    // The first sighting deliberately did NOT start the app -- the
+                                    // asset was unreadable and nothing was deliverable yet. This
+                                    // retry is the point at which it becomes deliverable, so it is
+                                    // the point that owes the launch.
+                                    ensureAppRunning();
                                     WearableConnection.deliverDataChangedTracked(
                                             t.logicalPath, t.payload, new Runnable() {
                                                 public void run() {
@@ -2724,6 +2766,11 @@ public class CN1WearableBridge implements WearableBridge {
             // the weakest possible value and any real republication outranks it -- which is the
             // same reason dropping the stamp was safe.
             markRemovalAnnounced(path);
+            // A removal is dispatched from here, not from the service, so the launch belongs here
+            // too: the deleted DataItem is gone from startup replay, so a queued removal that no
+            // listener ever drains leaves the app's persisted state holding a value the peer
+            // deleted, with nothing left to correct it.
+            ensureAppRunning();
             WearableConnection.deliverDataRemoved(path);
             return true;
         }

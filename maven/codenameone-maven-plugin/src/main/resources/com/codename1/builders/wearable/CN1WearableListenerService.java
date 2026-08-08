@@ -72,26 +72,11 @@ public class CN1WearableListenerService extends WearableListenerService {
      * the queue is never drained. Launching is a no-op when the app is already running.
      */
     private void ensureAppRunning() {
-        try {
-            if (com.codename1.ui.Display.isInitialized()) {
-                return;
-            }
-            android.content.Intent launch = getPackageManager()
-                    .getLaunchIntentForPackage(getApplicationInfo().packageName);
-            if (launch != null) {
-                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-                startActivity(launch);
-            }
-        } catch (Throwable notPermitted) {
-            // Background activity starts are restricted on newer Android. The delivery stays in the
-            // in-memory queue and is replayed if the app opens while this process is still alive.
-            //
-            // That is a convenience, not a durability guarantee, and the two transports differ on
-            // purpose: replicated data and file transfers are durable in the Data Layer itself -- the
-            // item stays published and the next connection re-delivers it -- whereas a live message
-            // is best-effort by contract and needs both apps awake, which is what isReachable() and
-            // the sender's reply timeout exist to tell it.
-        }
+        // One implementation, in the bridge: dispatch happens there too -- a resolved removal and a
+        // retried asset are both announced from CN1WearableBridge, outside every launch site this
+        // service owns -- and two copies of this would drift apart the moment one of them learned
+        // something the other did not.
+        CN1WearableBridge.ensureAppRunning();
     }
 
     @Override
@@ -111,7 +96,10 @@ public class CN1WearableListenerService extends WearableListenerService {
         if (path == null || !isFromAKnownNode(event.getSourceNodeId())) {
             return;
         }
-        ensureAppRunning();
+        // Classified BEFORE the app is started, for the same reason the data path is. A recognised
+        // node can still send something this process cannot act on -- a reply whose requester died,
+        // a malformed request path, a path from a different build -- and launching first brought
+        // the UI forward for a message that is discarded a few lines later.
         if (path.startsWith(CN1WearableBridge.replyPath())) {
             // An answer to a request we sent. The token rides in the path.
             String token = path.substring(CN1WearableBridge.replyPath().length());
@@ -120,6 +108,14 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // A real answer arrived, so the deadline that would have failed this request is no
                 // longer needed; leaving it scheduled holds a task per request for the full timeout.
                 CN1WearableBridge.cancelReplyTimeout(replyToken);
+                // Only when the request is still outstanding. A reply that arrives after the
+                // requesting process was killed has no handler to reach -- deliverReply drops it --
+                // so waking the app for one shows the user a window they did not ask for and
+                // nothing else. A live request means a handler is waiting in THIS process, which
+                // also means the app is already up, so this is a no-op in the normal case.
+                if (WearableConnection.hasPendingReply(replyToken)) {
+                    ensureAppRunning();
+                }
                 WearableConnection.deliverReply(replyToken, event.getData(), null);
             } catch (NumberFormatException malformed) {
                 // Not ours, or a peer running a different build.
@@ -140,6 +136,9 @@ public class CN1WearableListenerService extends WearableListenerService {
                 // keyed to the node that asked; two watches can otherwise pick the same number.
                 int localToken = CN1WearableBridge.rememberRequestOrigin(
                         peerToken, event.getSourceNodeId());
+                // The path parsed and a peer is waiting for an answer, so this one is worth a
+                // launch: without the app up nothing will ever answer it.
+                ensureAppRunning();
                 // Past the delimiter, not onto it: the encoded application path escapes its own
                 // slashes, so this one belongs to the wire format and is not part of the app's path.
                 WearableConnection.deliverMessage(
@@ -151,6 +150,7 @@ public class CN1WearableListenerService extends WearableListenerService {
             return;
         }
         if (path.startsWith(CN1WearableBridge.messagePath() + "/")) {
+            ensureAppRunning();
             WearableConnection.deliverMessage(
                     CN1WearableBridge.decode(
                             path.substring(CN1WearableBridge.messagePath().length() + 1)),

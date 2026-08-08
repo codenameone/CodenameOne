@@ -550,6 +550,26 @@ public final class WearableConnection {
     /// - `replyToken`: the token returned with the original request
     /// - `payload`: the encoded reply payload, or null when the request failed
     /// - `error`: a description of the failure, or null on success
+    /// Framework/port entry point: whether a request is still waiting on this token.
+    ///
+    /// A port uses this to decide whether an inbound reply is worth waking the application for. A
+    /// reply whose requester is gone -- the process was killed while the peer was answering -- has
+    /// nowhere to be delivered, and on Android starting the app for it brings the UI forward only
+    /// for [#deliverReply] to drop the payload on the next line.
+    ///
+    /// #### Parameters
+    ///
+    /// - `replyToken`: the token the reply arrived under
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a request registered under that token is still outstanding.
+    public static boolean hasPendingReply(int replyToken) {
+        synchronized (pendingReplies) {
+            return pendingReplies.containsKey(Integer.valueOf(replyToken));
+        }
+    }
+
     public static void deliverReply(int replyToken, final byte[] payload, final String error) {
         final PendingReply pending;
         synchronized (pendingReplies) {
