@@ -638,73 +638,78 @@ public abstract class Database {
         return b.toString();
     }
 
-    /// Records a transaction that a script opened or closed.
+    /// Records what a script did to the transaction state.
     ///
-    /// `#execute(java.lang.String)` hands SQL straight to the engine, so `execute("BEGIN")` opens a
-    /// real transaction that `#beginTransaction()` never saw. Left untracked, the two ways of
+    /// `#execute(java.lang.String)` hands SQL straight to the engine, so `execute("BEGIN")` opens
+    /// a real transaction that `#beginTransaction()` never saw. Left untracked, the two ways of
     /// saying the same thing disagree: a key change would be allowed inside a transaction opened
     /// this way, and `beginTransaction(); execute("COMMIT")` would leave the flag set over a
     /// transaction that has already ended, so the next `commitTransaction()` addresses one that is
     /// not there.
     ///
-    /// Ports call this after a successful `#execute(java.lang.String)`, with the script they ran.
-    /// Only statements the engine itself would treat as transaction control count, and a `BEGIN`
-    /// opening a trigger body is not one of them -- the splitter keeps a trigger together, so its
-    /// body is never a statement here.
+    /// Ports call this after `#execute(java.lang.String)`, and after a parameterized call, with
+    /// the SQL they ran. A `BEGIN` opening a trigger body is not transaction control -- the
+    /// splitter keeps a trigger together, so its body is never a statement here -- and SAVEPOINT
+    /// is not tracked at all, because it nests and this API's transactions do not.
     ///
-    /// SAVEPOINT is deliberately not tracked. It nests, this API's transactions do not, and a
-    /// savepoint inside a transaction is the caller's business.
+    /// A script that failed partway had already run everything before the statement that failed,
+    /// and the engine does not undo it. The control statements are read in order either way: they
+    /// are the least likely statement to be the one that failed, since `BEGIN` and `COMMIT`
+    /// reference nothing that can be missing. So `BEGIN; INSERT INTO missing_table VALUES(1)` is
+    /// left open, which it is, and `BEGIN; COMMIT; INSERT INTO missing_table VALUES(1)` is left
+    /// closed, which it also is -- where treating any `BEGIN` as still open would hold the flag
+    /// over a committed transaction and block every key change until the connection was closed.
+    ///
+    /// The one case left wrong is a script whose own `BEGIN` failed, reported as open when nothing
+    /// is. That is the recoverable direction -- `#rollbackTransaction()` clears it -- and the one
+    /// that refuses a key change rather than allowing one underneath a live transaction.
     ///
     /// #### Parameters
     ///
-    /// - `sql`: the script that was just run
+    /// - `sql`: the SQL that was run, whether or not it finished
     protected void noteScriptTransactionControl(String sql) {
-        noteScriptTransactionControl(sql, true);
-    }
-
-    /// Records a transaction that a script opened or closed, when the script may not have finished.
-    ///
-    /// A script that fails partway has already run everything before the statement that failed,
-    /// and the engine does not undo it: `BEGIN; INSERT INTO missing_table VALUES(1)` opens a real
-    /// transaction and then throws, and nothing here can see how far it got.
-    ///
-    /// So a failed script that contains a `BEGIN` is treated as having opened one. That is the
-    /// safe half of the uncertainty: it refuses a key change, which would otherwise replace the
-    /// database underneath an open transaction and install uncommitted rows, and it still lets a
-    /// rollback through, which is what the caller needs in order to recover. Assuming the other
-    /// way round buys nothing and loses data.
-    ///
-    /// #### Parameters
-    ///
-    /// - `sql`: the script that was run
-    ///
-    /// - `completed`: false if it failed partway
-    protected void noteScriptTransactionControl(String sql, boolean completed) {
         if (sql == null) {
             return;
         }
-        if (!completed) {
-            for (String statement : SQLStatementSplitter.split(sql)) {
-                if ("BEGIN".equals(leadingKeyword(statement))) {
-                    inTransaction = true;
-                    return;
-                }
-            }
-            return;
-        }
         for (String statement : SQLStatementSplitter.split(sql)) {
-            String keyword = leadingKeyword(statement);
+            String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
                 inTransaction = true;
-            } else if ("COMMIT".equals(keyword) || "END".equals(keyword)
-                    || "ROLLBACK".equals(keyword)) {
-                // ROLLBACK TO <savepoint> does not end the transaction, and neither does
-                // RELEASE; only a bare ROLLBACK does.
-                if (!"ROLLBACK".equals(keyword) || !hasToSavepoint(statement)) {
-                    inTransaction = false;
-                }
+            } else if (keyword != null) {
+                inTransaction = false;
             }
         }
+    }
+
+    /// The transaction-control keyword a statement starts with, or null if it is not one.
+    ///
+    /// Shared so that a port which has to act on transaction control -- the simulator routes it
+    /// through JDBC, because there the transaction is the connection's autocommit flag rather than
+    /// something the driver reads back out of the SQL -- classifies it exactly as the tracking
+    /// here does. Two copies of this drifted apart once already.
+    ///
+    /// Only a bare `ROLLBACK` counts: `ROLLBACK TO <savepoint>` unwinds within the transaction
+    /// rather than ending it, as SAVEPOINT and RELEASE do.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a single statement
+    ///
+    /// #### Returns
+    ///
+    /// `BEGIN`, `COMMIT`, `END`, `ROLLBACK`, or null
+    protected static String transactionControlKeyword(String statement) {
+        if (statement == null) {
+            return null;
+        }
+        String keyword = leadingKeyword(statement);
+        if ("BEGIN".equals(keyword) || "COMMIT".equals(keyword) || "END".equals(keyword)) {
+            return keyword;
+        }
+        if ("ROLLBACK".equals(keyword) && !hasToSavepoint(statement)) {
+            return "ROLLBACK";
+        }
+        return null;
     }
 
     /// The first word of a statement, upper cased, or an empty string.

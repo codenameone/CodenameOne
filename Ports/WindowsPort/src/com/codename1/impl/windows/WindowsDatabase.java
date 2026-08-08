@@ -179,12 +179,12 @@ class WindowsDatabase extends Database {
         checkOpen();
         // The engine runs the whole script, so a failure partway leaves everything before the
         // failing statement done and nothing here able to see how far it got.
-        boolean completed = false;
         try {
             WindowsNative.sqlDbExecScript(peer, sql);
-            completed = true;
         } finally {
-            noteScriptTransactionControl(sql, completed);
+            // In a finally: a script that failed partway had already run everything before the
+            // statement that failed, and the engine does not undo it.
+            noteScriptTransactionControl(sql);
         }
     }
 

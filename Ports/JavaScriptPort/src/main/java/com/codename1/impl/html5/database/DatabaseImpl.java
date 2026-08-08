@@ -190,12 +190,12 @@ public class DatabaseImpl extends Database {
     public void execute(String sql) throws IOException {
         checkOpen();
         // The engine runs the whole script; see the iOS port for why the failure path matters.
-        boolean completed = false;
         try {
             checkNative(SQLiteNative.execScript(peer, sql));
-            completed = true;
         } finally {
-            noteScriptTransactionControl(sql, completed);
+            // In a finally: a script that failed partway had already run everything before the
+            // statement that failed, and the engine does not undo it.
+            noteScriptTransactionControl(sql);
         }
     }
 

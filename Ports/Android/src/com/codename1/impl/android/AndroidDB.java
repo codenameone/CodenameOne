@@ -51,14 +51,18 @@ public class AndroidDB extends Database {
     /** The path this connection is open on, for the shared registry a conversion consults. */
     private final String openPath;
 
-    public AndroidDB(SQLiteDatabase db) {
+    /**
+     * @param db the open connection
+     * @param openPath the file it is open on, whose connection slot the caller already took
+     */
+    public AndroidDB(SQLiteDatabase db, String openPath) {
         this.db = db;
-        // Registered even though this implementation never converts anything: the conversion that
-        // consults the registry is usually being asked for by an application that has one of
-        // these open, and a conversion that cannot see it replaces the file underneath it.
-        this.openPath = db == null ? null : db.getPath();
-        AndroidImplementation.databaseConnectionOpened(this.openPath);
+        // The slot is taken by the implementation before the engine opens anything, so that a
+        // conversion reading the count during the open has to see this connection. Registering
+        // here instead would leave a gap the conversion could start inside.
+        this.openPath = openPath;
     }
+
 
     private void checkOpen() throws IOException {
         if (db == null) {

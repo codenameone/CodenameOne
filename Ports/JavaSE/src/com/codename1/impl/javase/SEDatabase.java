@@ -100,7 +100,7 @@ public class SEDatabase extends Database {
     ///
     /// true if it was transaction control and has been carried out
     private boolean runAsTransactionControl(String sql) throws IOException {
-        if (transactionKeyword(sql) == null) {
+        if (transactionControlKeyword(sql) == null) {
             return false;
         }
         try {
@@ -125,7 +125,7 @@ public class SEDatabase extends Database {
     ///
     /// true if it was transaction control and has been carried out
     private boolean executeTransactionControl(String statement) throws SQLException {
-        String keyword = transactionKeyword(statement);
+        String keyword = transactionControlKeyword(statement);
         if ("BEGIN".equals(keyword)) {
             conn.setAutoCommit(false);
             return true;
@@ -141,29 +141,6 @@ public class SEDatabase extends Database {
             return true;
         }
         return false;
-    }
-
-    /// The transaction keyword a statement starts with, or null.
-    ///
-    /// Only a bare ROLLBACK counts; `ROLLBACK TO <savepoint>` unwinds within the transaction and
-    /// belongs to the driver, as SAVEPOINT and RELEASE do. `BEGIN` here is never a trigger body:
-    /// the splitter keeps a CREATE TRIGGER together, so its BEGIN is not a statement.
-    private static String transactionKeyword(String statement) {
-        String trimmed = statement == null ? "" : statement.trim();
-        String upper = trimmed.toUpperCase();
-        if (upper.startsWith("BEGIN") && !upper.startsWith("BEGINS")) {
-            return "BEGIN";
-        }
-        if (upper.startsWith("COMMIT")) {
-            return "COMMIT";
-        }
-        if (upper.equals("END") || upper.startsWith("END ") || upper.startsWith("END;")) {
-            return "END";
-        }
-        if (upper.startsWith("ROLLBACK") && upper.indexOf(" TO") < 0) {
-            return "ROLLBACK";
-        }
-        return null;
     }
 
     @Override

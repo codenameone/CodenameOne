@@ -81,8 +81,10 @@ class AndroidCipherDB extends Database {
         this.db = db;
         this.databaseName = databaseName;
         this.currentKey = key == null ? "" : key;
+        // The slot was taken by AndroidImplementation before this connection was opened, so that
+        // a conversion reading the count during the open has to see it. Registering here would
+        // leave a gap the conversion could start inside.
         this.openPath = db.getPath();
-        AndroidImplementation.databaseConnectionOpened(this.openPath);
     }
 
     private void checkOpen() throws IOException {

@@ -196,12 +196,12 @@ class DatabaseImpl extends Database {
         checkOpen();
         // sqlite3_exec runs a whole script, which is the portable contract -- and which means a
         // failure partway leaves everything before the failing statement done.
-        boolean completed = false;
         try {
             executeScript(sql);
-            completed = true;
         } finally {
-            noteScriptTransactionControl(sql, completed);
+            // In a finally: a script that failed partway had already run everything before the
+            // statement that failed, and the engine does not undo it.
+            noteScriptTransactionControl(sql);
         }
     }
 

@@ -10976,17 +10976,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // Before anything opens: a plaintext open of a database mid-conversion would create an
         // empty one over the top of the real data, which nothing afterwards could undo.
         recoverInterruptedDatabaseMigration(resolveNativeDatabasePath(databaseName));
-        // And refused outright while a conversion is running, rather than opened onto the file it
-        // is about to replace. Checked here, where the decision to open is made, so a conversion
-        // that has already counted the connections cannot be joined by a new one.
-        refuseIfDatabaseIsBeingConverted(resolveNativeDatabasePath(databaseName));
+        // The slot is taken before the engine opens anything, not after: a conversion that reads
+        // the count while this open is in progress has to see this connection, or it will start
+        // replacing the file this is about to hand back.
+        String nativePath = resolveNativeDatabasePath(databaseName);
+        reserveDatabaseConnection(nativePath);
         SQLiteDatabase db;
-        if (databaseName.startsWith("file://")) {
-            db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
-        } else {
-            db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+        try {
+            if (databaseName.startsWith("file://")) {
+                db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
+            } else {
+                db = getContext().openOrCreateDatabase(databaseName, getContext().MODE_PRIVATE, null);
+            }
+        } catch (RuntimeException didNotOpen) {
+            databaseConnectionClosed(nativePath);
+            throw didNotOpen;
         }
-        return new AndroidDB(db);
+        return new AndroidDB(db, nativePath);
     }
 
     @Override
@@ -10994,8 +11000,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (config == null || !config.isEncrypted()) {
             return openOrCreateDB(databaseName);
         }
-        // Refused while a conversion owns the file, for the reason given in openOrCreateDB.
-        refuseIfDatabaseIsBeingConverted(resolveNativeDatabasePath(databaseName));
+        // The slot is taken before the engine opens anything, for the reason given in
+        // openOrCreateDB. AndroidCipherFactory hands back a connection that already holds it.
+        String nativePath = resolveNativeDatabasePath(databaseName);
+        reserveDatabaseConnection(nativePath);
         // The SQLCipher-backed package is deleted at build time for apps that never touch
         // DatabaseConfig, so it has to be reached reflectively - the same arrangement the
         // ARCore-backed AR implementation uses.
@@ -11010,16 +11018,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     resolveNativeDatabasePath(databaseName), databaseName,
                     config.resolveKeyMaterial(databaseName));
         } catch (java.lang.reflect.InvocationTargetException err) {
+            releaseUnusedDatabaseConnection(nativePath);
             Throwable cause = err.getCause();
             if (cause instanceof IOException) {
                 throw (IOException) cause;
             }
             throw new IOException(cause == null ? err.toString() : cause.getMessage(), cause);
         } catch (IOException err) {
+            releaseUnusedDatabaseConnection(nativePath);
             throw err;
         } catch (ClassNotFoundException notBundled) {
             // The only benign reason to land here: the build pruned the package because the
             // application never referenced DatabaseConfig.
+            releaseUnusedDatabaseConnection(nativePath);
             throw new com.codename1.db.DatabaseEncryptionException(
                     com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
                     "This build does not include encrypted database support", notBundled);
@@ -11029,15 +11040,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // NOT_SUPPORTED would hide it: every caller would be told encryption is unavailable
             // on a device that ships the engine. This is the failure mode a compiler would have
             // caught if the seam were not reflective, so it has to be loud.
+            releaseUnusedDatabaseConnection(nativePath);
             throw new IOException("The encrypted database implementation is present but does not "
                     + "expose the expected entry point. This build is inconsistent: "
                     + broken.getMessage(), broken);
         } catch (Throwable err) {
+            releaseUnusedDatabaseConnection(nativePath);
             throw new com.codename1.db.DatabaseEncryptionException(
                     com.codename1.db.DatabaseEncryptionException.NOT_SUPPORTED,
                     "This build does not include encrypted database support", err);
         }
         if (!(opened instanceof Database)) {
+            releaseUnusedDatabaseConnection(nativePath);
             throw new IOException("The encrypted database implementation returned "
                     + (opened == null ? "nothing" : opened.getClass().getName())
                     + " rather than a Database. This build is inconsistent.");
@@ -11256,21 +11270,33 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         MIGRATING_DATABASES.remove(path);
     }
 
-    /// Refuses to open a database a conversion currently owns.
+    /// Gives back a slot taken by `#reserveDatabaseConnection(String)` when no connection was
+    /// handed to the caller after all.
+    public static void releaseUnusedDatabaseConnection(String path) {
+        databaseConnectionClosed(path);
+    }
+
+    /// Takes a connection slot on a database, or refuses because a conversion owns it.
     ///
-    /// Checked where the decision to open is made rather than in a connection's constructor, so
-    /// that a conversion which has already taken its claim cannot be joined by a new connection
-    /// onto the file it is about to replace.
+    /// The check and the count are one step. Checking that no conversion is running and then
+    /// registering afterwards leaves a gap: the engine's open sits between them, and a conversion
+    /// that reads the count during it sees only its own connection, takes its claim, and starts
+    /// replacing the file the open is about to return a connection to. Taking the slot inside the
+    /// same lock as the check closes that -- a conversion either sees the slot and refuses, or
+    /// holds the claim and the open refuses.
+    ///
+    /// The caller releases the slot with `#databaseConnectionClosed(String)` if the open itself
+    /// then fails, and the connection releases it on close.
     ///
     /// #### Throws
     ///
     /// - `IOException`: if a conversion currently owns the file
-    public static synchronized void refuseIfDatabaseIsBeingConverted(String path)
-            throws IOException {
+    public static synchronized void reserveDatabaseConnection(String path) throws IOException {
         if (path != null && MIGRATING_DATABASES.contains(path)) {
             throw new IOException("The database " + path + " is being converted and cannot be "
                     + "opened until that finishes.");
         }
+        databaseConnectionOpened(path);
     }
 
     /// How many connections are open on a database file, encrypted or not.
@@ -11479,8 +11505,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!isDatabaseEncryptionSupported()) {
             return openOrCreateDB(databaseName);
         }
-        // Refused while a conversion owns the file, for the reason given in openOrCreateDB.
-        refuseIfDatabaseIsBeingConverted(resolveNativeDatabasePath(databaseName));
+        // The slot is taken before the engine opens anything, for the reason given in
+        // openOrCreateDB. AndroidCipherFactory hands back a connection that already holds it.
+        String nativePath = resolveNativeDatabasePath(databaseName);
+        reserveDatabaseConnection(nativePath);
         Object opened;
         try {
             Class c = Class.forName("com.codename1.impl.android.cipher.AndroidCipherFactory");
@@ -11497,13 +11525,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (NoSuchMethodException broken) {
             // Same reasoning as openOrCreateDB: falling back to the plaintext engine here would
             // silently turn a re-key into a no-op on a build that does ship the cipher.
+            releaseUnusedDatabaseConnection(nativePath);
             throw new IOException("The encrypted database implementation is present but does not "
                     + "expose the expected entry point. This build is inconsistent: "
                     + broken.getMessage(), broken);
         } catch (Throwable err) {
+            releaseUnusedDatabaseConnection(nativePath);
             return openOrCreateDB(databaseName);
         }
         if (!(opened instanceof Database)) {
+            releaseUnusedDatabaseConnection(nativePath);
             throw new IOException("The encrypted database implementation returned "
                     + (opened == null ? "nothing" : opened.getClass().getName())
                     + " rather than a Database. This build is inconsistent.");

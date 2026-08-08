@@ -89,7 +89,10 @@ class ScriptTransactionTrackingTest {
         }
 
         void failedPartway(String sql) {
-            noteScriptTransactionControl(sql, false);
+            // The same call the ports make from their finally block. A failed script has already
+            // run everything before the statement that failed, so its control statements are read
+            // exactly as a completed script's are.
+            noteScriptTransactionControl(sql);
         }
     }
 
@@ -167,13 +170,21 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
-    void aScriptThatFailedPartwayIsAssumedToHaveOpenedItsTransaction() {
+    void aScriptThatFailedPartwayLeavesItsTransactionOpen() {
         // "BEGIN; INSERT INTO missing_table VALUES(1)" opens a real transaction and then throws.
-        // Nothing here can see how far it got, and assuming it closed is the half of that
-        // uncertainty that lets a conversion replace the database underneath an open transaction.
+        // The BEGIN ran, so the transaction is open, and a conversion must not replace the
+        // database underneath it.
         db.failedPartway("BEGIN; INSERT INTO missing_table VALUES(1)");
-        assertTrue(db.isInTransaction(),
-                "a failed script that contains a BEGIN may have left one open");
+        assertTrue(db.isInTransaction(), "the BEGIN ran, so the transaction is open");
+    }
+
+    @Test
+    void aScriptThatFailedAfterCommittingIsNotStillInATransaction() {
+        // "BEGIN; COMMIT; INSERT INTO missing_table VALUES(1)" committed before it failed, so the
+        // engine is back in autocommit. Reading any BEGIN as still open would hold the flag over a
+        // committed transaction and block every key change until the connection was closed.
+        db.failedPartway("BEGIN; COMMIT; INSERT INTO missing_table VALUES(1)");
+        assertFalse(db.isInTransaction(), "the COMMIT ran too");
     }
 
     @Test
