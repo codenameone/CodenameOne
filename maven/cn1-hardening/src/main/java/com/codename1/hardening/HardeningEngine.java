@@ -405,6 +405,13 @@ public final class HardeningEngine {
      */
     /** True when at least one transform will actually run for this config and platform. */
     static boolean willApplyAnyTransform(HardeningConfig cfg) {
+        // An off profile skips everything: harden() returns SKIPPED for OFF (before any transform),
+        // even when a stale individual override such as harden.rename=true is still present. Match
+        // that here so a non-entitled build that explicitly set harden.level=off is skipped rather
+        // than rejected as not-entitled just because an override was left behind.
+        if (cfg.getProfile() == HardeningProfile.OFF) {
+            return false;
+        }
         // A per-platform opt-out means nothing runs for this target -- so a non-entitled build with
         // harden.<platform>.enabled=false is skipped, not rejected as not-entitled.
         if (!cfg.isPlatformEnabled()) {

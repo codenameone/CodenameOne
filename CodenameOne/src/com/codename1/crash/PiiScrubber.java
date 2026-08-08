@@ -164,7 +164,33 @@ public class PiiScrubber {
         if (t.startsWith("at ")) {
             return atFrame(t.substring(3).trim());
         }
-        return t.indexOf('@') >= 0 && endsWithLineColumn(t);
+        return atSignFrame(t);
+    }
+
+    /// The body of a Firefox/Safari `fn@source:line:column` frame: a whitespace-free function
+    /// identity (empty for an anonymous frame), an `@`, and a URL/file source before the trailing
+    /// `:<line>:<column>`. The source must actually look like a URL or file -- contain a `/`
+    /// (`scheme://host/path`) or a `.` (`file.ext`). Without that check a wrapped message such as
+    /// `send status@host:1:123456` matches merely by containing an `@` and ending in two numeric
+    /// groups, and its six-digit tail would be preserved verbatim as a fake column instead of being
+    /// scrubbed. A bare source word like `host` fails the shape test, so the message stays scrubbed.
+    private static boolean atSignFrame(String t) {
+        int at = t.indexOf('@');
+        if (at < 0 || !endsWithLineColumn(t)) {
+            return false;
+        }
+        // A wrapped message almost always has a space before the '@' (`send status@...`); a real frame's
+        // function ref is a single token. An empty identity is allowed (an anonymous `@url:1:2` frame).
+        String ident = t.substring(0, at);
+        if (ident.length() > 0 && !isFrameIdentity(ident)) {
+            return false;
+        }
+        int loc = trailingLocationStart(t);
+        if (loc <= at + 1) {
+            return false;
+        }
+        String source = t.substring(at + 1, loc);
+        return source.indexOf('/') >= 0 || source.indexOf('.') >= 0;
     }
 
     /// The body of an `at ...` line: a whitespace-free identity plus a real location. A message

@@ -219,6 +219,29 @@ public class HardeningEngineTest {
     }
 
     @Test
+    public void offLevelWithStaleOverrideAppliesNoTransform() throws Exception {
+        // harden.level=off with a leftover harden.rename=true must not count as an applied transform,
+        // so a non-entitled build that turned hardening off is skipped (harden() returns SKIPPED for
+        // OFF) rather than rejected as not-entitled by the CLI's entitlement gate.
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "off");
+        hints.put("harden.rename", "true");
+        HardeningConfig cfg = HardeningConfig.from(hints, "ios", true);
+        assertFalse("off must apply no transform even with a stale override",
+                HardeningEngine.willApplyAnyTransform(cfg));
+        File in = buildInputJar();
+        File out = tmp.newFile("off-override-hardened.jar");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(in).outputJar(out).mappingFile(tmp.newFile("off-override-map.txt"))
+                .workDir(tmp.newFolder("off-override-work"))
+                .config(cfg)
+                .mainClass("com.codename1.hardening.fixture.Secrets");
+        HardeningResult r = HardeningEngine.harden(req);
+        assertFalse(r.isHardened());
+        assertEquals(HardeningResult.Outcome.SKIPPED_NOT_REQUESTED, r.getOutcome());
+    }
+
+    @Test
     public void androidRenameOnlyIsHardenedViaR8() throws Exception {
         // Android (renameSupported=false), standard with strings off: the engine renames nothing,
         // but R8 will, so the build must be marked hardened rather than skipped.

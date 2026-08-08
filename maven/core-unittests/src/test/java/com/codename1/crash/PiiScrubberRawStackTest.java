@@ -213,4 +213,18 @@ class PiiScrubberRawStackTest {
         assertTrue(scrubbed.indexOf("tes***@example.com") >= 0, scrubbed);
         assertTrue(scrubbed.indexOf("Bar.java:42") >= 0, scrubbed);
     }
+
+    @Test
+    void atSignMessageWithoutUrlSourceIsScrubbed() {
+        // A wrapped message that merely contains an '@' and ends in two numeric groups
+        // (status@host:1:123456) is NOT a Firefox/Safari frame: its source `host` is neither a URL nor
+        // a file, so the six-digit tail must be scrubbed rather than preserved as a fake column. A real
+        // Firefox frame (fn@http://host/app.js:10:5) whose source IS a URL keeps its coordinate.
+        String stack = "java.lang.RuntimeException: verifying\n"
+                + "status@host:1:123456\n"
+                + "renderApp@http://host/app.js:10:5\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:10:5") >= 0, scrubbed);
+    }
 }
