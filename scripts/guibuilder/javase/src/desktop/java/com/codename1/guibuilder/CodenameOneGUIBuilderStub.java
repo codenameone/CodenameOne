@@ -42,12 +42,10 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JTextPane;
-import javax.swing.JComponent;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.text.JTextComponent;
-import javax.swing.undo.UndoManager;
 
 public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener {
     static final String APP_DISPLAY_NAME = "Codename One GUI Builder";
@@ -481,14 +479,14 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
     private static void installMenus() {
         JMenuBar bar = new JMenuBar();
         JMenu file = new JMenu("File");
-        file.add(item("Save Form", KeyEvent.VK_S, true, CodenameOneGUIBuilder::saveActiveDocument));
-        file.add(item("Reload Project Forms", KeyEvent.VK_R, true, CodenameOneGUIBuilder::refreshActiveProject));
+        file.add(item("Save Form", KeyEvent.VK_S, true, onCn1Edt(CodenameOneGUIBuilder::saveActiveDocument)));
+        file.add(item("Reload Project Forms", KeyEvent.VK_R, true, onCn1Edt(CodenameOneGUIBuilder::refreshActiveProject)));
         file.addSeparator();
-        file.add(item("Close GUI Builder", KeyEvent.VK_W, true, () -> Display.getInstance().exitApplication()));
+        file.add(item("Close GUI Builder", KeyEvent.VK_W, true, onCn1Edt(CodenameOneGUIBuilderStub::exitWithConfirmation)));
 
         JMenu edit = new JMenu("Edit");
-        edit.add(item("Undo", KeyEvent.VK_Z, true, CodenameOneGUIBuilderStub::undoFocusedEditorOrForm));
-        JMenuItem redo = item("Redo", 0, false, CodenameOneGUIBuilderStub::redoFocusedEditorOrForm);
+        edit.add(item("Undo", KeyEvent.VK_Z, true, onCn1Edt(CodenameOneGUIBuilderStub::undoFocusedEditorOrForm)));
+        JMenuItem redo = item("Redo", 0, false, onCn1Edt(CodenameOneGUIBuilderStub::redoFocusedEditorOrForm));
         redo.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Z,
                 menuShortcutMask() | KeyEvent.SHIFT_DOWN_MASK));
         edit.add(redo);
@@ -500,15 +498,15 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         // Bare Backspace, so it competes with typing: guard it, or deleting a character in the code
         // editor deletes the selected component from the design instead.
         edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false,
-                () -> { if (!isCodeEditorFocused()) CodenameOneGUIBuilder.deleteActiveSelection(); }));
+                onCn1Edt(() -> { if (!isCodeEditorFocused()) CodenameOneGUIBuilder.deleteActiveSelection(); })));
 
         JMenu view = new JMenu("View");
         JCheckBoxMenuItem dark = new JCheckBoxMenuItem("Dark Mode", CodenameOneGUIBuilder.isActiveDarkMode());
         dark.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_D, menuShortcutMask()));
-        dark.addActionListener(e -> CodenameOneGUIBuilder.toggleActiveDarkMode());
+        dark.addActionListener(e -> com.codename1.ui.CN.callSerially(CodenameOneGUIBuilder::toggleActiveDarkMode));
         view.add(dark);
         view.addSeparator();
-        view.add(item("Refresh Canvas", KeyEvent.VK_0, true, CodenameOneGUIBuilder::refreshActiveProject));
+        view.add(item("Refresh Canvas", KeyEvent.VK_0, true, onCn1Edt(CodenameOneGUIBuilder::refreshActiveProject)));
 
         JMenu forms = new JMenu("Forms");
         String[] names = CodenameOneGUIBuilder.activeFormNames();
@@ -517,15 +515,15 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
             String name = names[i];
             String simple = name.substring(name.lastIndexOf('.') + 1);
             JMenuItem form = item(simple, i < 9 ? KeyEvent.VK_1 + i : 0, i < 9,
-                    () -> CodenameOneGUIBuilder.openActiveForm(formIndex));
+                    onCn1Edt(() -> CodenameOneGUIBuilder.openActiveForm(formIndex)));
             form.setToolTipText(name);
             forms.add(form);
         }
 
         JMenu code = new JMenu("Editors");
-        code.add(item("Edit Companion Java Source", KeyEvent.VK_J, true, CodenameOneGUIBuilder::openActiveSource));
-        code.add(item("Edit Binding Model", KeyEvent.VK_K, true, CodenameOneGUIBuilder::openActiveModel));
-        code.add(item("Edit theme.css with Live Preview", KeyEvent.VK_T, true, CodenameOneGUIBuilder::openActiveCss));
+        code.add(item("Edit Companion Java Source", KeyEvent.VK_J, true, onCn1Edt(CodenameOneGUIBuilder::openActiveSource)));
+        code.add(item("Edit Binding Model", KeyEvent.VK_K, true, onCn1Edt(CodenameOneGUIBuilder::openActiveModel)));
+        code.add(item("Edit theme.css with Live Preview", KeyEvent.VK_T, true, onCn1Edt(CodenameOneGUIBuilder::openActiveCss)));
         bar.add(file);
         bar.add(edit);
         bar.add(view);
@@ -584,25 +582,47 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         }
     }
 
-    private static UndoManager focusedEditorUndoManager() {
-        java.awt.Component focus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-        if (!(focus instanceof JComponent)) return null;
-        Object value = ((JComponent) focus).getClientProperty("cn1.codeEditorUndoManager");
-        return value instanceof UndoManager ? (UndoManager) value : null;
+    /**
+     * Routes undo or redo to a focused Codename One editor, exactly as the clipboard bridge routes
+     * cut and copy.
+     *
+     * <p>The Swing focus owner stays on the canvas while a pure {@code EditorView} has the Codename
+     * One focus, and nothing installs the {@code cn1.codeEditorUndoManager} client property that
+     * was queried here, so the accelerator always reached the fallback: Cmd/Ctrl+Z rebuilt the
+     * canvas by undoing the GUI document while the source, CSS or model edit it was aimed at stayed
+     * exactly as it was.
+     *
+     * @param redo true to redo, false to undo
+     * @return true when a focused editor handled it
+     */
+    private static boolean undoFocusedCodeEditor(final boolean redo) {
+        com.codename1.ui.Form form = com.codename1.ui.CN.getCurrentForm();
+        com.codename1.ui.Component focused = form == null ? null : form.getFocused();
+        if (!(focused instanceof com.codename1.ui.editor.EditorView)) return false;
+        final com.codename1.ui.editor.EditorView view = (com.codename1.ui.editor.EditorView) focused;
+        if (view.getComponentForm() == null) return false;
+        com.codename1.ui.CN.callSerially(new Runnable() {
+            @Override public void run() {
+                if (redo) view.performRedo(); else view.performUndo();
+            }
+        });
+        return true;
     }
 
     private static void undoFocusedEditorOrForm() {
-        UndoManager manager = focusedEditorUndoManager();
-        if (manager != null) {
-            if (manager.canUndo()) manager.undo();
-        } else CodenameOneGUIBuilder.undoActiveEdit();
+        if (undoFocusedCodeEditor(false)) return;
+        CodenameOneGUIBuilder.undoActiveEdit();
+    }
+
+    /** Exits only once the editor has confirmed there is nothing unsaved to lose. */
+    private static void exitWithConfirmation() {
+        if (!CodenameOneGUIBuilder.confirmActiveExit()) return;
+        Display.getInstance().exitApplication();
     }
 
     private static void redoFocusedEditorOrForm() {
-        UndoManager manager = focusedEditorUndoManager();
-        if (manager != null) {
-            if (manager.canRedo()) manager.redo();
-        } else CodenameOneGUIBuilder.redoActiveEdit();
+        if (undoFocusedCodeEditor(true)) return;
+        CodenameOneGUIBuilder.redoActiveEdit();
     }
 
     private static void editFocusedTextOrForm(String operation) {
@@ -647,6 +667,24 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         return true;
     }
 
+    /**
+     * Wraps an action that mutates Codename One state so it runs on the Codename One EDT. Swing
+     * delivers menu actions on the AWT event thread, and the pointer bridge and test timers already
+     * hop across; the menu commands did not, so ordinary menu use raced painting and input.
+     *
+     * <p>Deliberately not applied to the clipboard items: those first inspect the AWT focus owner
+     * and may drive a Swing {@code JTextComponent}, which has to stay on the AWT thread. They hand
+     * off to the Codename One EDT themselves once they know a Codename One editor is focused.
+     *
+     * @param action the Codename One work to run
+     * @return a runnable safe to hand to Swing
+     */
+    private static Runnable onCn1Edt(final Runnable action) {
+        return new Runnable() {
+            @Override public void run() { com.codename1.ui.CN.callSerially(action); }
+        };
+    }
+
     private static JMenuItem item(String label, int key, boolean menuShortcut, Runnable action) {
         JMenuItem item = new JMenuItem(label);
         if (key > 0) {
@@ -676,7 +714,11 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         timer.start();
     }
 
-    @Override public void windowClosing(WindowEvent e) { Display.getInstance().exitApplication(); }
+    @Override public void windowClosing(WindowEvent e) {
+        // exitApplication() terminates the JVM without any save or lifecycle callback, so both this
+        // and the Cmd/Ctrl+W item have to ask first or ordinary closure discards the work.
+        com.codename1.ui.CN.callSerially(CodenameOneGUIBuilderStub::exitWithConfirmation);
+    }
     @Override public void windowOpened(WindowEvent e) { }
     @Override public void windowClosed(WindowEvent e) { }
     @Override public void windowIconified(WindowEvent e) { }

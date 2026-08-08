@@ -1794,6 +1794,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String oldLayeredInsets = dragged.getAttribute("layeredInsets");
         String oldConstraint = oldParent == null || !"BorderLayout".equals(value(oldParent, "layout", "BoxLayout"))
                 ? null : GuiDocument.effectiveBorderConstraint(oldParent, dragged);
+        // The cell the dragged component is about to leave, so a displaced sibling can take it.
+        String vacatedRow = dragged.getAttribute("tableRow");
+        String vacatedColumn = dragged.getAttribute("tableColumn");
         if (plan.occupied != null && oldParent == plan.parent) {
             document.select(plan.occupied);
             document.setAttribute("layoutConstraint", oldConstraint);
@@ -1811,6 +1814,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             } else if ("LayeredLayout".equals(oldLayout)) {
                 document.setAttribute("layoutConstraint", null);
                 document.setAttribute("layeredInsets", oldLayeredInsets);
+            } else if ("TableLayout".equals(oldLayout)) {
+                // Without a cell the displaced component falls back to one derived from sibling
+                // order, which collides with an existing child whenever the table's XML order and
+                // its explicit coordinates disagree -- two components in one cell, in the preview
+                // and in the generated source. It takes the cell the dragged component vacated.
+                document.setAttribute("layoutConstraint", null);
+                document.setAttribute("layeredInsets", null);
+                if (vacatedRow != null && vacatedColumn != null) {
+                    document.setAttribute("tableRow", vacatedRow);
+                    document.setAttribute("tableColumn", vacatedColumn);
+                } else {
+                    int[] free = firstFreeTableCell(oldParent, dragged, plan.occupied);
+                    document.setAttribute("tableRow", String.valueOf(free[0]));
+                    document.setAttribute("tableColumn", String.valueOf(free[1]));
+                }
             } else {
                 document.setAttribute("layoutConstraint", null);
                 document.setAttribute("layeredInsets", null);
@@ -3129,13 +3147,59 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         Picker picker = stringPicker(new String[]{"None", "PropertyBusinessObject", "@Bindable POJO"}, selected);
         picker.addActionListener(e -> {
             String choice = picker.getSelectedString();
+            String previous = value(document.root(), "bindingStrategy", "properties");
+            String chosen = "None".equals(choice) ? "none"
+                    : "@Bindable POJO".equals(choice) ? "bindable" : "properties";
+            if (chosen.equals(previous)) return;
             document.select(document.root());
-            document.setAttribute("bindingStrategy", "None".equals(choice) ? "none"
-                    : "@Bindable POJO".equals(choice) ? "bindable" : "properties");
+            document.setAttribute("bindingStrategy", chosen);
+            syncBindingModel(chosen);
             setStatus("Binding strategy: " + choice + " • Java preview regenerated on open");
         });
         field.add(picker);
         return field;
+    }
+
+    /**
+     * Keeps the binding model in step with a changed strategy.
+     *
+     * <p>The generated companion binds through {@code UiBinding} for a PropertyBusinessObject and
+     * through {@code Binders.bind()} for a {@code @Bindable} POJO. A model left over from the other
+     * strategy still compiles under the generic binder but throws {@code IllegalStateException} at
+     * construction because no binder was generated for it, and in the opposite direction it fails
+     * to compile. The model is the developer's own file, so it is regenerated only on request
+     * rather than silently overwritten.
+     *
+     * @param strategy the strategy just selected
+     */
+    private void syncBindingModel(String strategy) {
+        if (binding == null || binding.sourceDir() == null || document == null) return;
+        String sourcePath = companionSourcePath();
+        String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
+        if ("none".equals(strategy)) {
+            if (ProjectIO.exists(modelPath)) {
+                setStatus("Binding disabled; " + modelPath.substring(modelPath.lastIndexOf('/') + 1)
+                        + " is no longer referenced and can be deleted");
+            }
+            return;
+        }
+        if (!ProjectIO.exists(modelPath)) {
+            ensureBindingModel(sourcePath);
+            return;
+        }
+        if (!com.codename1.ui.Dialog.show("Regenerate the binding model?",
+                "The existing model was generated for the previous strategy and will not bind"
+                + " correctly. Regenerate it? Your own changes to that file are replaced.",
+                "Regenerate", "Keep mine")) {
+            setStatus("Kept the existing model; it may not bind under the new strategy");
+            return;
+        }
+        try {
+            ProjectIO.write(modelPath, generatedModelSource());
+            setStatus("Regenerated the binding model for the new strategy");
+        } catch (IOException ex) {
+            ToastBar.showErrorMessage("Model regeneration failed: " + ex.getMessage());
+        }
     }
 
     private Component toolbarCommandsEditor() {
@@ -5562,6 +5626,39 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     public static void pasteActiveSelection() { if (active != null) active.paste(); }
     public static void deleteActiveSelection() { if (active != null) active.deleteSelection(); }
     public static void undoActiveEdit() { if (active != null) active.undo(); }
+
+    /**
+     * Asks about unsaved work on behalf of the desktop shell, which exits the JVM outright and so
+     * gets no later chance to save.
+     *
+     * @return true when it is safe to close
+     */
+    public static boolean confirmActiveExit() {
+        if (active == null) return true;
+        return active.confirmExit();
+    }
+
+    private boolean confirmExit() {
+        boolean editorDirty = editorBufferIsDirty();
+        boolean documentDirty = document != null && document.isModified();
+        if (!editorDirty && !documentDirty) return true;
+        String what = documentDirty && editorDirty ? "The form and the open editor have"
+                : documentDirty ? "The form has" : "The open editor has";
+        if (com.codename1.ui.Dialog.show("Unsaved changes",
+                what + " changes you have not saved. Save before closing?", "Save", "Discard")) {
+            if (documentDirty && !save()) {
+                setStatus("Not closing: the save failed");
+                return false;
+            }
+            if (editorDirty) {
+                // The editor buffer is only reachable through its own Save action, so closing with
+                // it unsaved would discard it however this exit was reached.
+                setStatus("Save the open editor before closing");
+                return false;
+            }
+        }
+        return true;
+    }
     public static void redoActiveEdit() { if (active != null) active.redo(); }
     public static void toggleActiveDarkMode() { if (active != null) active.toggleDarkMode(); }
     public static boolean isActiveDarkMode() { return active != null && active.darkMode; }
