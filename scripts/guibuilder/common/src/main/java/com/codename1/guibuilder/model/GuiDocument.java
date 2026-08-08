@@ -285,15 +285,24 @@ public final class GuiDocument {
             if (sibling == child) continue;
             markOccupied(taken, parent, sibling);
         }
+        // The child brings its own span when it is a paste, so the whole rectangle it would cover
+        // has to be free and inside the table -- checking only the anchor let a two-column
+        // component land beside an occupied cell and overlap on the next rebuild.
+        int childRowSpan = Math.max(1, parseInt(child.getAttribute("tableVerticalSpan"), 1));
+        int childColumnSpan = Math.max(1, parseInt(child.getAttribute("tableHorizontalSpan"), 1));
         for (int cursor = 0; ; cursor++) {
             int row = cursor / columns;
             int column = cursor % columns;
-            if (taken.contains(row + ":" + column)) continue;
+            if (column + childColumnSpan > columns) continue;
+            if (spanOverlaps(taken, row, column, childRowSpan, childColumnSpan)) continue;
             setNormalizedAttribute(child, "tableRow", String.valueOf(row));
             setNormalizedAttribute(child, "tableColumn", String.valueOf(column));
             int declaredRows = parseInt(parent.getAttribute("tableLayoutRows"), 2);
-            if (declaredRows < row + 1) {
-                setNormalizedAttribute(parent, "tableLayoutRows", String.valueOf(row + 1));
+            // Grown by the child's full height: a spanning child placed on the last row needs every
+            // row it covers to exist, or the constraint reaches past the declared table again.
+            int needed = row + childRowSpan;
+            if (declaredRows < needed) {
+                setNormalizedAttribute(parent, "tableLayoutRows", String.valueOf(needed));
             }
             return;
         }
@@ -304,6 +313,23 @@ public final class GuiDocument {
      * greater than one occupies a rectangle; treating it as a single cell handed the next component
      * a slot underneath it, and TableLayout then placed two children in the same space.
      */
+    /**
+     * @param taken the cells already claimed
+     * @param row the candidate anchor row
+     * @param column the candidate anchor column
+     * @param rowSpan how many rows the child covers
+     * @param columnSpan how many columns the child covers
+     * @return true when any cell of that rectangle is already claimed
+     */
+    private static boolean spanOverlaps(Set<String> taken, int row, int column, int rowSpan, int columnSpan) {
+        for (int r = row; r < row + rowSpan; r++) {
+            for (int c = column; c < column + columnSpan; c++) {
+                if (taken.contains(r + ":" + c)) return true;
+            }
+        }
+        return false;
+    }
+
     private static void markOccupied(Set<String> taken, Element parent, Element sibling) {
         int row = effectiveTableRow(parent, sibling);
         int column = effectiveTableColumn(parent, sibling);
