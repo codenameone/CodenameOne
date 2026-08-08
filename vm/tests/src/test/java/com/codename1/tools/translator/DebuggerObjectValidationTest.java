@@ -306,6 +306,36 @@ class DebuggerObjectValidationTest {
     }
 
     /**
+     * Nor anything reached through a Thread object the refresh re-advertises.
+     *
+     * <p>A refresh re-issues only the top-level {@code Thread} objects, so a
+     * field the IDE had expanded off one carries no claim of its own. Clearing
+     * the old claims before recording the new ones dropped every such id, and
+     * the object stayed reachable from a live thread the whole time -- every
+     * later string, field or array request naming it was refused for no reason
+     * the developer could see.</p>
+     */
+    @Test
+    void aRefreshKeepsWhatHangsOffAThreadItStillAdvertises() throws Exception {
+        assertEquals("kept", probe("REFRESH_DESCENDANT_KEPT"));
+    }
+
+    /** Reached transitively: a field of a field is no less reachable. */
+    @Test
+    void aRefreshKeepsDescendantsSeveralHopsDown() throws Exception {
+        assertEquals("kept", probe("REFRESH_DESCENDANT_DEEP"));
+    }
+
+    /**
+     * Once the thread itself stops being advertised, what hung off it goes
+     * too -- otherwise the fix would just be a leak by another name.
+     */
+    @Test
+    void aRefreshReleasesDescendantsOfAThreadThatIsGone() throws Exception {
+        assertEquals("gone", probe("REFRESH_DESCENDANT_THREAD_GONE"));
+    }
+
+    /**
      * A resumed thread stops owning an entry even when the thread list also
      * claims it.
      *
@@ -454,7 +484,8 @@ class DebuggerObjectValidationTest {
             "        cn1_debugger_note_issued_for(both, 7);\n" +
             "        cn1_debugger_note_issued(both);\n" +
             "        cn1_debugger_forget_issued_for(7);        /* thread resumes */\n" +
-            "        cn1_debugger_forget_thread_list_claims(); /* later refresh */\n" +
+            "        cn1_debugger_begin_thread_list();         /* later refresh */\n" +
+            "        cn1_debugger_end_thread_list();\n" +
             "        printf(\"%s\\n\", cn1_debugger_was_issued(both) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strncmp(which, \"THREAD_LIST_REFRESH_\", 20) == 0) {\n" +
@@ -465,9 +496,30 @@ class DebuggerObjectValidationTest {
             "        cn1_debugger_note_issued(dead);\n" +
             "        cn1_debugger_note_issued_for(alsoOwned, 7);\n" +
             "        cn1_debugger_note_issued(alsoOwned);\n" +
-            "        cn1_debugger_forget_thread_list_claims();\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        cn1_debugger_end_thread_list();\n" +
             "        JAVA_OBJECT probe =\n" +
             "            strcmp(which, \"THREAD_LIST_REFRESH_KEEPS_OWNED\") == 0 ? alsoOwned : dead;\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(probe) ? \"kept\" : \"gone\");\n" +
+            "        return 0;\n" +
+            "    } else if (strncmp(which, \"REFRESH_DESCENDANT_\", 19) == 0) {\n" +
+            "        /* The IDE expands a field of a live Thread object, then the\n" +
+            "         * thread list refreshes and re-advertises that same Thread. */\n" +
+            "        JAVA_OBJECT threadObj = (JAVA_OBJECT)(uintptr_t)0x13000;\n" +
+            "        JAVA_OBJECT child = (JAVA_OBJECT)(uintptr_t)0x13008;\n" +
+            "        JAVA_OBJECT grandchild = (JAVA_OBJECT)(uintptr_t)0x13010;\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        cn1_debugger_note_issued(threadObj);\n" +
+            "        cn1_debugger_end_thread_list();\n" +
+            "        cn1_debugger_note_issued_inheriting(child, threadObj);\n" +
+            "        cn1_debugger_note_issued_inheriting(grandchild, child);\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        if (strcmp(which, \"REFRESH_DESCENDANT_THREAD_GONE\") != 0) {\n" +
+            "            cn1_debugger_note_issued(threadObj);   /* still alive */\n" +
+            "        }\n" +
+            "        cn1_debugger_end_thread_list();\n" +
+            "        JAVA_OBJECT probe =\n" +
+            "            strcmp(which, \"REFRESH_DESCENDANT_DEEP\") == 0 ? grandchild : child;\n" +
             "        printf(\"%s\\n\", cn1_debugger_was_issued(probe) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"DERIVED_INHERITS_ALL_OWNERS\") == 0) {\n" +

@@ -88,32 +88,48 @@ public class JdwpLineTableTest {
     }
 
     /**
-     * A method with no lines answers ABSENT_INFORMATION rather than an empty
-     * table. The empty table is the crash: the debugger takes it as
-     * authoritative and every location in the method becomes unresolvable.
+     * A method with no lines still gets a usable table: one entry at code
+     * index 0 whose line number is "unknown".
+     *
+     * <p>The two answers that look right both end the session. An empty table
+     * is taken as authoritative and no location in the method resolves;
+     * ABSENT_INFORMATION is what the spec reserves for this, but jdb has no
+     * case for that error on this path and raises {@code InternalException}
+     * just the same. A one-entry table is the only shape that lets the frame
+     * print and the rest of the stack survive.</p>
      */
     @Test
-    public void aMethodWithoutLinesReportsAbsentInformationRatherThanAnEmptyTable() throws Exception {
+    public void aMethodWithoutLinesStillGetsATableTheDebuggerCanResolve() throws Exception {
         int port = JdwpTestClient.freePort();
         JdwpServer server = new JdwpServer(port);
         try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
             primeSymbols(server);
 
             JdwpTestClient.Reply reply = lineTable(client, 1);
-            assertEquals("ABSENT_INFORMATION", 101, reply.errorCode);
-            assertEquals("an error reply carries no table", 0, reply.body.length);
+            assertEquals(0, reply.errorCode);
+
+            DataInputStream body = reply.stream();
+            assertEquals(0L, body.readLong());
+            assertEquals(0L, body.readLong());
+            assertEquals("never an empty table", 1, body.readInt());
+            assertEquals("covers the index frames report", 0L, body.readLong());
+            assertEquals("line unknown", -1, body.readInt());
         }
     }
 
     /** A method the symbol table never described answers the same way. */
     @Test
-    public void anUnknownMethodReportsAbsentInformation() throws Exception {
+    public void anUnknownMethodGetsTheSameUnknownLineTable() throws Exception {
         int port = JdwpTestClient.freePort();
         JdwpServer server = new JdwpServer(port);
         try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
             primeSymbols(server);
 
-            assertEquals(101, lineTable(client, 9999).errorCode);
+            JdwpTestClient.Reply reply = lineTable(client, 9999);
+            assertEquals(0, reply.errorCode);
+            DataInputStream body = reply.stream();
+            body.readLong(); body.readLong();
+            assertEquals(1, body.readInt());
         }
     }
 
@@ -154,13 +170,14 @@ public class JdwpLineTableTest {
     }
 
     /**
-     * For a method with no table at all there is nothing to be consistent
-     * with, so the device's line passes through; LineTable reports the absence
-     * and the debugger stops consulting the index.
+     * A frame in a method with no lines is reported at code index 0, the one
+     * index that method's table describes. Passing the device's line through
+     * would name an index its table does not cover, which is the same
+     * unresolvable location by another route.
      */
     @Test
-    public void aFrameInAMethodWithoutATablePassesItsLineThrough() throws Exception {
-        assertEquals(42L, frameCodeIndexFor(1, 42));
+    public void aFrameInAMethodWithoutLinesIsReportedAtTheIndexItsTableCovers() throws Exception {
+        assertEquals(0L, frameCodeIndexFor(1, 42));
     }
 
     /**
@@ -180,12 +197,10 @@ public class JdwpLineTableTest {
 
             for (Frame frame : frames(client)) {
                 JdwpTestClient.Reply table = lineTable(client, (int) frame.methodId - 1);
-                if (table.errorCode == 101) {
-                    continue;  // admits it has no lines; index is never consulted
-                }
                 assertEquals(0, table.errorCode);
-                assertTrue("frame at " + frame.codeIndex + " should be in its method's table",
-                        linesOf(table).contains(frame.codeIndex));
+                assertTrue("frame at code index " + frame.codeIndex
+                                + " should be covered by its own method's table",
+                        indicesOf(table).contains(frame.codeIndex));
             }
         }
     }
@@ -245,17 +260,18 @@ public class JdwpLineTableTest {
         return frames;
     }
 
-    private List<Long> linesOf(JdwpTestClient.Reply table) throws Exception {
+    /** The code indices a line table describes. */
+    private List<Long> indicesOf(JdwpTestClient.Reply table) throws Exception {
         DataInputStream body = table.stream();
         body.readLong();  // start
         body.readLong();  // end
         int count = body.readInt();
-        List<Long> lines = new ArrayList<>();
+        List<Long> indices = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            lines.add(body.readLong());
-            body.readInt();
+            indices.add(body.readLong());
+            body.readInt();  // line number
         }
-        return lines;
+        return indices;
     }
 
     private void primeSymbols(JdwpServer server) throws Exception {

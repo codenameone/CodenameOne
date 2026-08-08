@@ -146,10 +146,17 @@ extern int cn1_debugger_note_issued_inheriting(JAVA_OBJECT obj, JAVA_OBJECT pare
 extern void cn1_debugger_forget_issued_for(int64_t owner);
 
 /**
- * Drops the thread list's claim on the objects it previously advertised, so
- * each refresh supersedes the last and dead threads stop being rooted.
+ * Opens a thread-list generation. Call before recording a refresh's threads;
+ * pair with cn1_debugger_end_thread_list once every one has been noted.
  */
-extern void cn1_debugger_forget_thread_list_claims(void);
+extern void cn1_debugger_begin_thread_list(void);
+
+/**
+ * Closes the generation, dropping objects that neither a suspension nor the
+ * list just built claims, and that hang off nothing which survives. Each
+ * refresh supersedes the last, so dead threads stop being rooted.
+ */
+extern void cn1_debugger_end_thread_list(void);
 
 /** Resolves an objectID that arrived from the IDE, or NULL to refuse it. */
 extern struct clazz* cn1_debugger_class_of_wire_id(JAVA_OBJECT obj);

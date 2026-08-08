@@ -229,12 +229,24 @@ struct issued_entry {
      * and later by the thread list. Dropping the entry when that thread
      * resumes would then reject an id the live thread list still advertises.
      *
-     * Reconciled on every thread-list refresh rather than only on a full
-     * resume -- see cn1_debugger_forget_thread_list_claims. An IDE polling
-     * AllThreads on a running app would otherwise pin every Thread object it
-     * ever saw, and their retained graphs with them, for the session.
+     * Stamped with the thread-list generation that claimed it rather than a
+     * plain flag, so a refresh can tell "claimed by the list that is current"
+     * from "claimed by a list that has been superseded" without clearing the
+     * claims it is about to re-add. An IDE polling AllThreads on a running app
+     * would otherwise pin every Thread object it ever saw, and their retained
+     * graphs with them, for the session.
      */
-    unsigned char unowned;
+    unsigned int listGen;
+    /*
+     * The reference this one was reached through, if any -- the Thread object
+     * whose field the IDE expanded, say. A descendant carries no owner of its
+     * own and no claim of its own, so without this link a thread-list refresh
+     * would drop it even though the object it hangs off is still live and
+     * still claimed, and every later request naming it would be rejected.
+     */
+    uintptr_t parent;
+    /* Scratch for the reachability sweep in end_thread_list. */
+    unsigned char survives;
     /*
      * Set when more owners appeared than there are slots. Such an entry is
      * dropped as soon as any owner resumes, because we can no longer prove
@@ -244,6 +256,13 @@ struct issued_entry {
      */
     unsigned char ownerOverflow;
 };
+
+/*
+ * Thread-list generation. Bumped when the device starts building a thread
+ * list; an entry stamped with the current value is claimed by the list the
+ * IDE is holding now.
+ */
+static unsigned int g_listGen = 1;
 
 static struct issued_entry* g_issued = NULL;
 static unsigned g_issuedCap = 0;
@@ -261,7 +280,7 @@ static struct issued_entry* issued_find(uintptr_t key);
 
 /* Adds an owner to an entry, ignoring duplicates. */
 static void entry_add_owner(struct issued_entry* e, int64_t owner) {
-    if (owner == 0) { e->unowned = 1; return; }
+    if (owner == 0) { e->listGen = g_listGen; return; }
     for (unsigned i = 0; i < e->ownerCount; i++) {
         if (e->owners[i] == owner) return;
     }
@@ -366,7 +385,8 @@ int cn1_debugger_note_issued_inheriting(JAVA_OBJECT obj, JAVA_OBJECT parent) {
                 for (unsigned i = 0; i < from->ownerCount; i++) {
                     entry_add_owner(e, from->owners[i]);
                 }
-                if (from->unowned) e->unowned = 1;
+                if (from->listGen > e->listGen) e->listGen = from->listGen;
+                e->parent = (uintptr_t)parent;
                 if (from->ownerOverflow) e->ownerOverflow = 1;
             }
         } else {
@@ -434,34 +454,75 @@ static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
     }
     e->ownerCount = (unsigned char)remaining;
 
-    if (e->unowned) return 1;              /* the thread list still claims it */
+    if (e->listGen == g_listGen) return 1; /* the thread list still claims it */
     if (e->ownerOverflow) return 0;        /* cannot prove another owner remains */
     return remaining > 0;                  /* another suspension still holds it */
 }
 
 /**
- * Drops the thread list's claim on everything it previously advertised.
+ * Opens a new thread-list generation.
  *
- * Called before each refresh records the current set, so an entry a live
- * snapshot no longer mentions loses its claim. Entries a suspension still owns
- * survive, having lost only this claim; entries left with none are removed,
- * which releases the GC roots holding dead Thread objects and whatever they
- * reach.
+ * Called before a refresh records the current set. Claims are not cleared
+ * here: the refresh is about to re-advertise most of the same Thread objects,
+ * and clearing first meant everything reached *through* one -- a field the IDE
+ * had expanded -- lost its claim with no way to get it back, since only the
+ * top-level Thread objects are re-issued. Stamping a new generation instead
+ * lets end_thread_list tell what the current list still claims from what only
+ * an older one did.
  */
-void cn1_debugger_forget_thread_list_claims(void) {
+void cn1_debugger_begin_thread_list(void) {
+    pthread_mutex_lock(&g_issuedMutex);
+    g_listGen++;
+    if (g_listGen == 0) g_listGen = 1;   /* 0 means "never claimed" */
+    pthread_mutex_unlock(&g_issuedMutex);
+}
+
+/**
+ * Closes the generation opened by begin_thread_list and drops what nothing
+ * claims any more.
+ *
+ * An entry survives if a suspension owns it, if the list just built claims it,
+ * or if it hangs off something that survives -- reached transitively, since a
+ * field of a field of a live Thread object is no less reachable for the extra
+ * hop. Everything else is released, which frees the GC roots holding dead
+ * Thread objects and the graphs they retain.
+ */
+void cn1_debugger_end_thread_list(void) {
     pthread_mutex_lock(&g_issuedMutex);
     if (g_issued != NULL) {
         unsigned cap = g_issuedCap;
+        for (unsigned i = 0; i < cap; i++) {
+            g_issued[i].survives = 0;
+        }
+        /* Entries that stand on their own, then whatever hangs off them.
+         * Iterated to a fixpoint because a chain is discovered one hop per
+         * pass and the table is in no particular order. */
+        for (unsigned i = 0; i < cap; i++) {
+            struct issued_entry* e = &g_issued[i];
+            if (e->key == 0) continue;
+            if (e->ownerCount > 0 || e->ownerOverflow || e->listGen == g_listGen) {
+                e->survives = 1;
+            }
+        }
+        int changed = 1;
+        while (changed) {
+            changed = 0;
+            for (unsigned i = 0; i < cap; i++) {
+                struct issued_entry* e = &g_issued[i];
+                if (e->key == 0 || e->survives || e->parent == 0) continue;
+                struct issued_entry* parent = issued_find(e->parent);
+                if (parent != NULL && parent->survives) {
+                    e->survives = 1;
+                    changed = 1;
+                }
+            }
+        }
         struct issued_entry* kept =
             (struct issued_entry*)calloc(cap, sizeof(struct issued_entry));
         if (kept) {
             unsigned keptCount = 0;
             for (unsigned i = 0; i < cap; i++) {
-                if (g_issued[i].key == 0) continue;
-                g_issued[i].unowned = 0;
-                if (g_issued[i].ownerCount == 0 && !g_issued[i].ownerOverflow) {
-                    continue;   /* nothing claims it any more */
-                }
+                if (g_issued[i].key == 0 || !g_issued[i].survives) continue;
                 int created = 0;
                 struct issued_entry* moved =
                     issued_put(kept, cap, g_issued[i].key, &created);

@@ -183,7 +183,7 @@ public final class DeviceConnection implements AutoCloseable {
                 // count(4) then per thread: threadId(8) flags(1) threadObject(8).
                 if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
                 int n = readInt(p, 0);
-                if (n < 0 || 4 + n * 17 > p.length) { listener.onUnknownEvent(code, p); return; }
+                if (!frameHolds(n, 17, 4, p.length)) { listener.onUnknownEvent(code, p); return; }
                 long[] ids = new long[n];
                 boolean[] suspended = new boolean[n];
                 long[] objects = new long[n];
@@ -200,6 +200,7 @@ public final class DeviceConnection implements AutoCloseable {
                 if (p.length < 12) { listener.onUnknownEvent(code, p); return; }
                 long tid = readLong(p, 0);
                 int n = readInt(p, 8);
+                if (!frameHolds(n, 8, 12, p.length)) { listener.onUnknownEvent(code, p); return; }
                 int[] mids = new int[n];
                 int[] lines = new int[n];
                 for (int i = 0; i < n; i++) {
@@ -212,6 +213,7 @@ public final class DeviceConnection implements AutoCloseable {
             case WireProtocol.EVT_LOCALS: {
                 if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
                 int n = readInt(p, 0);
+                if (!frameHolds(n, 13, 4, p.length)) { listener.onUnknownEvent(code, p); return; }
                 int[] slots = new int[n];
                 byte[] types = new byte[n];
                 long[] values = new long[n];
@@ -242,6 +244,7 @@ public final class DeviceConnection implements AutoCloseable {
             case WireProtocol.EVT_OBJECT_FIELDS: {
                 if (p.length < 4) { listener.onUnknownEvent(code, p); return; }
                 int n = readInt(p, 0);
+                if (!frameHolds(n, 9, 4, p.length)) { listener.onUnknownEvent(code, p); return; }
                 byte[] types = new byte[n];
                 long[] values = new long[n];
                 int off = 4;
@@ -478,6 +481,23 @@ public final class DeviceConnection implements AutoCloseable {
             try { if (socket != null) socket.close(); } catch (IOException ignore) {}
             try { if (server != null) server.close(); } catch (IOException ignore) {}
         }
+    }
+
+    /**
+     * Whether a frame really carries {@code count} entries of
+     * {@code bytesPerEntry} after a {@code headerBytes} header.
+     *
+     * <p>Divides rather than multiplying: the frame's count is whatever
+     * arrived on the socket, and {@code count * bytesPerEntry} overflows to a
+     * negative number for a large enough one, which turns the obvious
+     * {@code header + count * size > length} guard into a pass. Everything
+     * after it then allocates arrays of that count, so a four-byte payload
+     * claiming a hundred million entries takes the proxy down with an
+     * OutOfMemoryError instead of being reported as an unreadable frame.</p>
+     */
+    private static boolean frameHolds(int count, int bytesPerEntry, int headerBytes, int length) {
+        if (count < 0 || length < headerBytes) return false;
+        return count <= (length - headerBytes) / bytesPerEntry;
     }
 
     private static int readInt(byte[] b, int off) {

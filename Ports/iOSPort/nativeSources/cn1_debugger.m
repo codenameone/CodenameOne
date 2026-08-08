@@ -496,19 +496,30 @@ struct sus_state {
 
 #define SUS_TABLE_SIZE 1024
 static struct sus_state g_sus[SUS_TABLE_SIZE];
-static _Atomic int g_susInit = 0;
+static pthread_once_t g_susOnce = PTHREAD_ONCE_INIT;
 
-static void ensureSusInit(void) {
-    int expected = 0;
-    if (atomic_compare_exchange_strong(&g_susInit, &expected, 1)) {
-        for (int i = 0; i < SUS_TABLE_SIZE; i++) {
-            pthread_mutex_init(&g_sus[i].mu, NULL);
-            pthread_cond_init(&g_sus[i].cv, NULL);
-            g_sus[i].suspended = 0;
-            g_sus[i].stepKind = -1;
-            g_sus[i].tsd = NULL;
-        }
+static void susInitOnce(void) {
+    for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+        pthread_mutex_init(&g_sus[i].mu, NULL);
+        pthread_cond_init(&g_sus[i].cv, NULL);
+        g_sus[i].suspended = 0;
+        g_sus[i].stepKind = -1;
+        g_sus[i].tsd = NULL;
     }
+}
+
+/*
+ * pthread_once rather than a compare-and-swap on a flag: the flag has to be
+ * published before the mutexes are initialised or two threads would both
+ * initialise them, and publishing it first lets the losing caller return
+ * while the winner is still running pthread_mutex_init. It then locks a slot
+ * that does not exist yet. The window is one loop wide and needs the IDE's
+ * first AllThreads to race a thread reaching its first breakpoint, which is
+ * exactly when a debugger session starts. pthread_once holds every other
+ * caller until the initialiser has finished.
+ */
+static void ensureSusInit(void) {
+    pthread_once(&g_susOnce, susInitOnce);
 }
 
 static struct sus_state* susForThread(int64_t threadId) {
@@ -606,7 +617,16 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
     // Mark thread inactive so the concurrent GC can mark/sweep freely.
     tsd->threadActive = JAVA_FALSE;
     while (s->suspended) {
-        pthread_cond_wait(&s->cv, &s->mu);
+        // Check for queued work *before* waiting, not after. The listener
+        // publishes an invocation and signals from its own thread, and
+        // markSuspendedBeforeEvent advertises this thread as ready to run one
+        // as soon as the stop event goes out -- which is before it gets here.
+        // A condition variable does not queue signals, so an invocation that
+        // arrived in that window had already been signalled by the time this
+        // thread reached the wait: the listener waits for a result nobody is
+        // running and the target waits for a signal that has been and gone.
+        // The session hangs with no way out.
+        //
         // The listener thread may have queued a debugger-invoked method
         // call for us to run. Servicing it on this thread keeps the call
         // inside a valid Java context (right tsd, right call stack) and
@@ -627,11 +647,26 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
             r.value.o = JAVA_NULL;
             thunk(tsd, thisObj, argsCopy, &r);
             pthread_mutex_lock(&s->mu);
+            // Root the result before going inactive, not after the listener
+            // picks it up. A thunk that returns or throws a freshly allocated
+            // object leaves the only reference to it right here in r, and the
+            // concurrent collector does not scan sus_state. Marking the thread
+            // inactive first opens a window in which that object can be
+            // collected, after which the ID handed to the IDE names reclaimed
+            // storage and the next field or class request reads it.
+            if ((r.type == 'L' || r.type == '[' || r.type == 'X') && r.value.o != JAVA_NULL) {
+                cn1_debugger_note_issued_for(r.value.o, (int64_t)tsd->threadId);
+            }
             tsd->threadActive = JAVA_FALSE;
             s->invokeResult = r;
             s->invokeReady = 1;
             pthread_cond_broadcast(&s->cv);
+            // Re-test the predicate rather than falling into a wait: a resume
+            // may have arrived while the thunk ran, and another invocation may
+            // already be queued behind this one.
+            continue;
         }
+        pthread_cond_wait(&s->cv, &s->mu);
     }
     // GC may have parked us; wait for it to finish before resuming.
     while (tsd->threadBlockedByGC) {
@@ -827,8 +862,11 @@ static void handleGetStack(int64_t threadId) {
 static void handleGetThreads(void) {
     // This snapshot supersedes the last, so the Thread objects it advertised
     // stop being rooted by it. Without this an IDE polling the thread list on
-    // a running app would pin every thread object it ever saw.
-    cn1_debugger_forget_thread_list_claims();
+    // a running app would pin every thread object it ever saw. Opened here and
+    // closed once every thread has been noted, rather than clearing up front:
+    // the refresh re-advertises only top-level Thread objects, so clearing
+    // first also dropped everything the IDE had reached through one.
+    cn1_debugger_begin_thread_list();
     lockCriticalSection();
     int count = 0;
     if (allThreads != NULL) {
@@ -841,6 +879,10 @@ static void handleGetThreads(void) {
     uint8_t* buf = (uint8_t*)malloc(sz);
     if (!buf) {
         unlockCriticalSection();
+        // Closed on this path too: the reply says there are no threads, so
+        // leaving the generation open would let the next refresh reconcile
+        // against a list that was never built.
+        cn1_debugger_end_thread_list();
         uint8_t empty[4] = {0,0,0,0};
         sendEvent(EVT_THREAD_LIST, empty, 4);
         return;
@@ -873,6 +915,11 @@ static void handleGetThreads(void) {
         }
     }
     unlockCriticalSection();
+    // Every thread in this refresh has now been noted, so anything the older
+    // generation claimed and this one does not -- and that nothing else holds
+    // -- can go. Outside the critical section: the claim table has its own
+    // lock and note_issued already takes it under this one.
+    cn1_debugger_end_thread_list();
     sendEvent(EVT_THREAD_LIST, buf, (uint32_t)sz);
     free(buf);
 }
