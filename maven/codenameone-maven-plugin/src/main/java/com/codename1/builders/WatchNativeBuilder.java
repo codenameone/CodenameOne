@@ -317,7 +317,8 @@ class WatchNativeBuilder {
                 + "    public static final String APPLICATION_NAME = \""
                 + request.getDisplayName() + "\";\n"
                 + "    private " + watchMain + " i = new " + watchMain + "();\n"
-                + "    private boolean initialized = false;\n\n"
+                + "    private boolean initialized = false;\n"
+                + "    private boolean stopped = false;\n\n"
                 + "    public void run() {\n"
                 + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
                 + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
@@ -340,8 +341,36 @@ class WatchNativeBuilder {
                 + "        }\n"
                 + "        i.start();\n"
                 + "    }\n\n"
+                // The same suspend/resume contract the phone stub implements, because it is the
+                // same lifecycle class on both. Without these a watch app was only ever started
+                // and terminated: leaving it stopped the paint pump but never called stop(), so
+                // timers and resources it releases there ran on through the suspension, and
+                // reopening it never called start() again, so refresh-on-foreground work that
+                // happens on the phone silently did not happen on the watch.
+                + "    public void applicationDidEnterBackground() {\n"
+                + "        if(!stopped) {\n"
+                + "            stopped = true;\n"
+                + "            Display.getInstance().callSerially(new Runnable() {\n"
+                + "                public void run() {\n"
+                + "                    i.stop();\n"
+                + "                }\n"
+                + "            });\n"
+                + "        }\n"
+                + "    }\n\n"
+                + "    public void applicationWillEnterForeground() {\n"
+                // Re-runs this Runnable rather than calling start() directly, so the resumed
+                // session goes through exactly the path the first launch did -- initialized is
+                // already true, so it is start() and nothing else.
+                + "        if(stopped) {\n"
+                + "            stopped = false;\n"
+                + "            Display.getInstance().callSerially(this);\n"
+                + "        }\n"
+                + "    }\n\n"
                 + "    public void applicationWillTerminate() {\n"
-                + "        i.stop();\n"
+                + "        if(!stopped) {\n"
+                + "            i.stop();\n"
+                + "            stopped = true;\n"
+                + "        }\n"
                 + "        i.destroy();\n"
                 + "    }\n\n"
                 + "    public static void main(String[] argv) {\n"
@@ -472,6 +501,13 @@ class WatchNativeBuilder {
           .append("final class CN1WatchAppDelegate: NSObject, WKApplicationDelegate {\n")
           .append("    func applicationDidBecomeActive() { CN1WatchHost.shared().applicationDidBecomeActive() }\n")
           .append("    func applicationWillResignActive() { CN1WatchHost.shared().applicationWillResignActive() }\n")
+          // The active/resign pair only starts and stops the paint pump. These two carry the CN1
+          // application lifecycle -- the stub's stop() and start() -- which a watch app was never
+          // given: leaving and reopening it left timers and resources running through the
+          // suspension and skipped whatever the lifecycle class does on foreground, all of which
+          // the same class receives on the phone.
+          .append("    func applicationDidEnterBackground() { CN1WatchHost.shared().applicationDidEnterBackground() }\n")
+          .append("    func applicationWillEnterForeground() { CN1WatchHost.shared().applicationWillEnterForeground() }\n")
           .append("}\n\n")
           .append("// Surface bridge: CN1WatchHost pushes rendered frames here (main thread);\n")
           .append("// SwiftUI observes `image` and redraws.\n")
@@ -553,7 +589,9 @@ class WatchNativeBuilder {
           .append("extern void cn1_watch_runtime_paint(void);\n")
           .append("extern void cn1_watch_runtime_pointerPressed(int x, int y);\n")
           .append("extern void cn1_watch_runtime_pointerDragged(int x, int y);\n")
-          .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n\n")
+          .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n")
+          .append("extern void cn1_watch_runtime_didEnterBackground(void);\n")
+          .append("extern void cn1_watch_runtime_willEnterForeground(void);\n\n")
           .append("// App-specific entry: register natives + set the main class, init\n")
           .append("// Display (starts the EDT) and block this thread inside initVM.\n")
           .append("extern void ").append(mainStub)
@@ -569,6 +607,8 @@ class WatchNativeBuilder {
           .append("void cn1_watch_pointerPressed(int x, int y) { cn1_watch_runtime_pointerPressed(x, y); }\n")
           .append("void cn1_watch_pointerDragged(int x, int y) { cn1_watch_runtime_pointerDragged(x, y); }\n")
           .append("void cn1_watch_pointerReleased(int x, int y) { cn1_watch_runtime_pointerReleased(x, y); }\n")
+          .append("void cn1_watch_didEnterBackground(void) { cn1_watch_runtime_didEnterBackground(); }\n")
+          .append("void cn1_watch_willEnterForeground(void) { cn1_watch_runtime_willEnterForeground(); }\n")
           .append("#endif\n");
         owner.createFile(new File(appSrcDir, "CN1WatchBootstrap.m"),
                 bs.toString().getBytes(StandardCharsets.UTF_8));

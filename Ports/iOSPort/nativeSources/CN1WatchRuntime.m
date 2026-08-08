@@ -49,6 +49,15 @@
 // (the EDT unwinds to its run loop) instead of taking the whole app down.
 extern void throwException(struct ThreadLocalData* threadStateData, JAVA_OBJECT exception);
 
+// The translated lifecycle entry points, the same two CodenameOne_GLAppDelegate calls on iOS.
+extern void com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
+        CN1_THREAD_STATE_SINGLE_ARG);
+extern void com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
+        CN1_THREAD_STATE_SINGLE_ARG);
+
+// Defined at the bottom of this file, where the rest of the watch-excluded iOS symbols live.
+extern BOOL isAppSuspended;
+
 static void cn1WatchSignalHandler(int sig) {
     if (sig == SIGSEGV || sig == SIGBUS) {
         throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));
@@ -104,6 +113,35 @@ void cn1_watch_runtime_start(const char *watchMainClass) {
 
 void cn1_watch_runtime_paint(void) {
     [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+}
+
+// The watch equivalents of CodenameOne_GLAppDelegate's cn1ApplicationDidEnterBackground /
+// cn1ApplicationWillEnterForeground, which are in a file the watch slice excludes.
+//
+// Stopping the paint pump is not the same thing as suspending the app: it only means no frames
+// are produced. Without these the generated stub never received a lifecycle callback, so the
+// application's stop() was never called on suspension and its start() was never called again on
+// resume -- timers and resources stayed live in the background, and refresh-on-foreground logic
+// that the same lifecycle class runs on the phone never ran on the watch.
+//
+// Guarded on the runtime being up: watchOS can send a transition before the VM thread has
+// initialised the constant pool, and calling into a translated method then would fault.
+void cn1_watch_runtime_didEnterBackground(void) {
+    if (!cn1WatchRuntimeStarted) {
+        return;
+    }
+    isAppSuspended = YES;
+    com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+void cn1_watch_runtime_willEnterForeground(void) {
+    if (!cn1WatchRuntimeStarted) {
+        return;
+    }
+    isAppSuspended = NO;
+    com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
+            CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 void cn1_watch_runtime_pointerPressed(int x, int y) {
