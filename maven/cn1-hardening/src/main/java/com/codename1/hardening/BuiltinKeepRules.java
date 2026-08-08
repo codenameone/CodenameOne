@@ -79,6 +79,11 @@ public final class BuiltinKeepRules {
         r.add("-keep class * implements com.codename1.location.LocationListener { *; }");
         r.add("-keep class * implements com.codename1.background.BackgroundFetch { *; }");
         r.add("-keep class * implements com.codename1.background.BackgroundWorker { *; }");
+        // A com.codename1.social.Login subclass persists its OAuth access/refresh tokens under keys
+        // derived from getClass().getName() (Login.getAccessToken/setAccessToken/validateToken). Renaming
+        // an app's Login subclass would change the key after an app update, so the stored session becomes
+        // unreadable and the user is silently logged out. Keep the subclasses so the name stays stable.
+        r.add("-keep class * extends com.codename1.social.Login { *; }");
         // JNI/native method names must not move.
         r.add("-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }");
         // enum values()/valueOf(String) resolve constants by name, so they are kept -- this is

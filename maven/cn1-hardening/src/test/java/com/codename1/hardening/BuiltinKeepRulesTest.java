@@ -94,6 +94,9 @@ public class BuiltinKeepRulesTest {
                 "-keep class * implements com.codename1.background.BackgroundFetch { *; }"));
         assertTrue(rules.contains(
                 "-keep class * implements com.codename1.background.BackgroundWorker { *; }"));
+        // A Login subclass persists OAuth tokens under getClass().getName(), so its name must stay stable.
+        assertTrue(rules.contains(
+                "-keep class * extends com.codename1.social.Login { *; }"));
         // The same rules are exported to R8 on Android (where R8 does the renaming).
         assertTrue(BuiltinKeepRules.forR8("com.example.MyApp").contains(
                 "-keep class * implements com.codename1.location.GeofenceListener { *; }"));

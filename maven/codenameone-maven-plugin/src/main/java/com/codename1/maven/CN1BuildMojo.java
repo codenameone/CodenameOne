@@ -192,6 +192,19 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 getLog().debug("Could not read codenameone_settings.properties for hardening pre-flight", ex);
             }
         }
+        applyHardeningPreflight(settings);
+    }
+
+    /**
+     * Runs the hardening pre-flight against a given set of effective settings. Called first with the
+     * project's own {@code codenameone_settings.properties} (fail-fast before the merged jar is built),
+     * and again after {@code createAntProject} merges the CN1Lib-contributed
+     * {@code codenameone_library_appended/required.properties} -- a library can turn hardening on via
+     * {@code codename1.arg.harden.level}, which the early call cannot see, and without this second pass
+     * such a build would slip past the local-build refusal / force-off and produce a locally hardened
+     * artifact whose mapping is never uploaded.
+     */
+    private void applyHardeningPreflight(Properties settings) throws MojoFailureException {
         String level = settings.getProperty("codename1.arg.harden.level", "off");
         // A per-platform opt-out (harden.<platform>.enabled=false) means hardening won't run for
         // this target, so the pre-flight must not reject it -- treat the level as off. The native-Mac
@@ -1112,6 +1125,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             }
 
         }
+
+        // Re-run the hardening pre-flight against the MERGED effective settings: a CN1Lib can supply
+        // codename1.arg.harden.level (or a per-platform opt-out) via the appended/required properties
+        // just merged above, which the early pre-flight -- run before this jar existed -- could not see.
+        // Without this, a library that turns hardening on would slip a local/source build past the
+        // local-build refusal / force-off and produce a locally hardened artifact whose mapping is never
+        // uploaded (so its crashes could never be retraced).
+        applyHardeningPreflight(cn1SettingsProps);
 
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
