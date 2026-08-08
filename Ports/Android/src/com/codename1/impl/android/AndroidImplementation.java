@@ -10973,16 +10973,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public Database openOrCreateDB(String databaseName) throws IOException {
-        // Before anything opens: a plaintext open of a database mid-conversion would create an
-        // empty one over the top of the real data, which nothing afterwards could undo.
-        recoverInterruptedDatabaseMigration(resolveNativeDatabasePath(databaseName));
-        // The slot is taken before the engine opens anything, not after: a conversion that reads
-        // the count while this open is in progress has to see this connection, or it will start
-        // replacing the file this is about to hand back.
+        // Reserved first, and recovery run inside the reservation. The slot has to be taken
+        // before the engine opens anything, or a conversion reading the count during the open
+        // starts replacing the file this is about to hand back -- and recovery has to be inside
+        // it too, because a conversion that has just installed its converted file leaves the live
+        // file and the backup both present, which recovery would otherwise read as a completed
+        // conversion and act on by deleting the backup.
         String nativePath = resolveNativeDatabasePath(databaseName);
         reserveDatabaseConnection(nativePath);
         SQLiteDatabase db;
         try {
+            // A plaintext open of a database mid-conversion would create an empty one over the
+            // top of the real data, which nothing afterwards could undo.
+            recoverInterruptedDatabaseMigration(nativePath);
             if (databaseName.startsWith("file://")) {
                 db = SQLiteDatabase.openOrCreateDatabase(FileSystemStorage.getInstance().toNativePath(databaseName), null);
             } else {
@@ -10991,6 +10994,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } catch (RuntimeException didNotOpen) {
             databaseConnectionClosed(nativePath);
             throw didNotOpen;
+        } catch (IOException didNotRecover) {
+            databaseConnectionClosed(nativePath);
+            throw didNotRecover;
         }
         return new AndroidDB(db, nativePath);
     }
@@ -11103,6 +11109,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// name, are what establish that a conversion wrote it.
     public static final String MIGRATION_MARKER = ".marker";
 
+    /// Fourth line of a marker whose installed file was never shown to open.
+    private static final String MIGRATION_UNVALIDATED = "unvalidated";
+
     /// First line of a marker written by this port.
     private static final String MIGRATION_MARKER_MAGIC = "codename1-database-migration-1";
 
@@ -11142,9 +11151,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             String backup = reader.readLine();
             String target = reader.readLine();
+            String state = reader.readLine();
             return new String[] {
                 backup == null || backup.length() == 0 ? null : backup,
                 target == null || target.length() == 0 ? null : target,
+                state == null || state.length() == 0 ? null : state,
             };
         } catch (IOException unreadable) {
             return null;
@@ -11176,6 +11187,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new File(databaseMigrationMarker(path).getParentFile(), entry[0]);
     }
 
+    /// Whether the marker says its installed file was never shown to open.
+    private static boolean isDatabaseMigrationUnvalidated(String path) {
+        String[] entry = readDatabaseMigrationMarker(path);
+        return entry != null && entry.length > 2 && MIGRATION_UNVALIDATED.equals(entry[2]);
+    }
+
     /// Reads the export a marker claims, or null when there is none.
     ///
     /// The export is a second complete copy of the data, and a plaintext one when the conversion
@@ -11205,8 +11222,31 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static final java.util.Map<String, Integer> OPEN_DATABASE_CONNECTIONS =
             new java.util.HashMap<String, Integer>();
 
+    /// The key a database file is tracked under.
+    ///
+    /// Canonical, because two spellings of one file must not be two entries: a connection opened
+    /// as `/data/app/db.sqlite` has to be visible to a conversion started as
+    /// `/data/app/./db.sqlite`, or the file is replaced underneath it and its later writes -- each
+    /// one reported as successful -- disappear with the old inode. `toNativePath` only strips the
+    /// `file://` prefix, so a custom path arrives however the caller spelled it.
+    ///
+    /// Falls back to the absolute path when the file system cannot answer, which still collapses
+    /// the relative spellings; a canonical path that cannot be resolved is not a reason to refuse
+    /// to open a database.
+    private static String databaseKey(String path) {
+        if (path == null) {
+            return null;
+        }
+        try {
+            return new File(path).getCanonicalPath();
+        } catch (IOException cannotResolve) {
+            return new File(path).getAbsolutePath();
+        }
+    }
+
     /// Records a connection opened on a database file.
-    public static synchronized void databaseConnectionOpened(String path) {
+    public static synchronized void databaseConnectionOpened(String rawPath) {
+        String path = databaseKey(rawPath);
         if (path == null) {
             return;
         }
@@ -11216,7 +11256,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// Records a connection closed on a database file.
-    public static synchronized void databaseConnectionClosed(String path) {
+    public static synchronized void databaseConnectionClosed(String rawPath) {
+        String path = databaseKey(rawPath);
         if (path == null) {
             return;
         }
@@ -11251,7 +11292,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// #### Throws
     ///
     /// - `IOException`: if the database is open elsewhere, or already being converted
-    public static synchronized void beginDatabaseMigration(String path) throws IOException {
+    public static synchronized void beginDatabaseMigration(String rawPath) throws IOException {
+        String path = databaseKey(rawPath);
         if (MIGRATING_DATABASES.contains(path)) {
             throw new IOException("The database " + path + " is already being converted.");
         }
@@ -11265,9 +11307,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         MIGRATING_DATABASES.add(path);
     }
 
+    /// Whether a conversion currently owns a database file.
+    public static synchronized boolean isDatabaseBeingConverted(String rawPath) {
+        return MIGRATING_DATABASES.contains(databaseKey(rawPath));
+    }
+
     /// Releases a database claimed by `#beginDatabaseMigration(String)`.
-    public static synchronized void endDatabaseMigration(String path) {
-        MIGRATING_DATABASES.remove(path);
+    public static synchronized void endDatabaseMigration(String rawPath) {
+        MIGRATING_DATABASES.remove(databaseKey(rawPath));
     }
 
     /// Gives back a slot taken by `#reserveDatabaseConnection(String)` when no connection was
@@ -11291,7 +11338,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// #### Throws
     ///
     /// - `IOException`: if a conversion currently owns the file
-    public static synchronized void reserveDatabaseConnection(String path) throws IOException {
+    public static synchronized void reserveDatabaseConnection(String rawPath) throws IOException {
+        String path = databaseKey(rawPath);
         if (path != null && MIGRATING_DATABASES.contains(path)) {
             throw new IOException("The database " + path + " is being converted and cannot be "
                     + "opened until that finishes.");
@@ -11300,8 +11348,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// How many connections are open on a database file, encrypted or not.
-    public static synchronized int openDatabaseConnections(String path) {
-        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+    public static synchronized int openDatabaseConnections(String rawPath) {
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(databaseKey(rawPath));
         return count == null ? 0 : count.intValue();
     }
 
@@ -11334,7 +11382,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// an application may point a database at this exact path - and writing over it would
     /// destroy that database. Anything already there that this port did not write means the
     /// conversion does not start.
+    /// Marks a conversion whose installed file was never shown to open.
+    ///
+    /// Recovery reads a live file and a backup both being present as a completed conversion and
+    /// removes the backup. That is right when the converted file opened, and catastrophic when it
+    /// did not and could not be taken back out either: the last readable copy would go. This
+    /// records the difference, and recovery puts the backup back instead.
+    public static void markDatabaseMigrationUnvalidated(String path, File backup)
+            throws IOException {
+        writeMarker(path, backup, null, true);
+    }
+
     public static void writeDatabaseMigrationMarker(String path, File backup, File target)
+            throws IOException {
+        writeMarker(path, backup, target, false);
+    }
+
+    private static void writeMarker(String path, File backup, File target, boolean unvalidated)
             throws IOException {
         File marker = databaseMigrationMarker(path);
         if (marker == null) {
@@ -11361,6 +11425,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             writer.write(backup == null ? "" : backup.getName());
             writer.write("\n");
             writer.write(target == null ? "" : target.getName());
+            writer.write("\n");
+            writer.write(unvalidated ? MIGRATION_UNVALIDATED : "");
             writer.write("\n");
         } finally {
             writer.close();
@@ -11429,6 +11495,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         + "data is intact in that file; the database was not opened rather than "
                         + "replacing it with an empty one.");
             }
+            marker.delete();
+            return;
+        }
+        if (isDatabaseMigrationUnvalidated(path)) {
+            // The converted file is in place but was never shown to open, and the conversion could
+            // not take it back out. Both files existing is not evidence of success here, so the
+            // backup goes back rather than away: deleting it would drop the last readable copy.
+            File displaced = new File(path + ".unvalidated");
+            if (!live.renameTo(displaced) || !backup.renameTo(live)) {
+                throw new IOException("The database " + path + " holds a converted file that was "
+                        + "never shown to open, and the original at " + backup + " could not be "
+                        + "put back. The data is in that file; it was left there rather than "
+                        + "removed.");
+            }
+            displaced.delete();
             marker.delete();
             return;
         }
@@ -11560,10 +11641,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void deleteDB(String databaseName) throws IOException {
+        String deletePath = resolveNativeDatabasePath(databaseName);
+        if (isDatabaseBeingConverted(deletePath)) {
+            // A conversion owns the file and its working copies. Deleting either underneath it
+            // would strand the data in whichever one the conversion has not installed yet.
+            throw new IOException("The database " + deletePath + " is being converted and cannot "
+                    + "be deleted until that finishes.");
+        }
         // The working files first. They survive deleting the live file, and the next open runs
         // recovery and puts the backup back - so a database the caller was told had been deleted
         // reappears, and after an interrupted encryption what reappears is the plaintext copy.
-        discardDatabaseMigrationArtifacts(resolveNativeDatabasePath(databaseName));
+        discardDatabaseMigrationArtifacts(deletePath);
         if (databaseName.startsWith("file://")) {
             deleteFile(databaseName);
             return;
@@ -11578,6 +11666,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // reporting "does not exist" there would refuse a retry of encrypt or decrypt - the one
         // operation that could put it right.
         String path = resolveNativeDatabasePath(databaseName);
+        if (isDatabaseBeingConverted(path)) {
+            // A conversion is mid-flight and owns both the live file and its working copies.
+            // Recovering underneath it would act on a half-installed state, so this answers from
+            // what the conversion has not yet consumed instead.
+            return hasRecoverableDatabaseBackup(path) || new File(path).exists();
+        }
         try {
             recoverInterruptedDatabaseMigration(path);
         } catch (IOException cannotRecover) {

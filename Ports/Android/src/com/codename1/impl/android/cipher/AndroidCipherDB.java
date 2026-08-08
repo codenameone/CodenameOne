@@ -503,13 +503,25 @@ class AndroidCipherDB extends Database {
                         + "original was put back and nothing was converted: "
                         + cannotOpenConverted.getMessage(), cannotOpenConverted);
             }
-            // The marker stays: the backup still holds the data and recovery has to find it. Do
-            // not reopen, for the reason given where the two renames fail.
+            // The converted file is installed and will not open, and it could not be taken back
+            // out to make room for the original. Both files exist, which recovery would otherwise
+            // read as a completed conversion and act on by deleting the backup -- the last
+            // readable copy. Recording that the installed file was never validated is what makes
+            // recovery put the backup back instead.
+            try {
+                AndroidImplementation.markDatabaseMigrationUnvalidated(path, backup);
+            } catch (IOException cannotRecord) {
+                throw new IOException("The converted database at " + path + " could not be opened, "
+                        + "the original could not be put back, and the state could not be recorded "
+                        + "either. The original is intact at " + backup + " -- do not delete it: "
+                        + cannotRecord.getMessage(), cannotOpenConverted);
+            }
+            // Do not reopen, for the reason given where the two renames fail.
             throw new IOException("The converted database at " + path + " could not be opened and "
                     + "the original could not be put back either. The original is intact at "
-                    + backup + " and the database was left closed rather than opening the one "
-                    + "that will not open: " + cannotOpenConverted.getMessage(),
-                    cannotOpenConverted);
+                    + backup + " and will be restored on the next open; the database was left "
+                    + "closed rather than opening the one that will not open: "
+                    + cannotOpenConverted.getMessage(), cannotOpenConverted);
         }
         currentKey = targetKey;
         // The backup is the database in its previous form. After an encrypt that means a
