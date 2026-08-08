@@ -268,11 +268,30 @@ final class JdwpTestClient implements AutoCloseable {
         return bytes.toByteArray();
     }
 
+    /*
+     * Thread IDs travel in their own namespace so that a debugger asking about
+     * one as an object cannot be answered with an unrelated tagged int -- see
+     * JdwpThreadIdNamespaceTest, which pins the property rather than repeating
+     * the arithmetic.
+     */
+    static final long THREAD_ID_TAG = 0x4000000000000000L;
+
+    /** A device thread ID as the IDE sees it. */
+    static long toJdwpThread(long deviceThreadId) {
+        return THREAD_ID_TAG | (deviceThreadId << 1);
+    }
+
+    /** The device thread ID behind an ID the IDE was given. */
+    static long fromJdwpThread(long jdwpId) {
+        return (jdwpId & ~THREAD_ID_TAG) >>> 1;
+    }
+
+    /** Payload naming a device thread, in the namespace the IDE uses. */
     static byte[] threadId(long tid) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream b = new DataOutputStream(bytes);
         try {
-            b.writeLong(tid);
+            b.writeLong(toJdwpThread(tid));
         } catch (IOException impossible) {
             throw new AssertionError(impossible);
         }

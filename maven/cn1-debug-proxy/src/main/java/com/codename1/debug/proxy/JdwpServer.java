@@ -148,7 +148,22 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     // suspend policy each asked for. The spec's automatic VM-death event
     // carries request id 0; a registered request expects its own id back, and
     // an IDE that gets neither waits for a session end that never arrives.
-    private final Map<Integer, Integer> vmDeathRequests = new ConcurrentHashMap<>();
+    private final Map<Integer, VmDeathRequest> vmDeathRequests = new ConcurrentHashMap<>();
+
+    /** A registered VM_DEATH request: its suspend policy and remaining count. */
+    private static final class VmDeathRequest {
+        final int suspendPolicy;
+        /** Deaths still to be skipped before this request reports one. */
+        final int countRemaining;
+        VmDeathRequest(int suspendPolicy, int countRemaining) {
+            this.suspendPolicy = suspendPolicy;
+            this.countRemaining = countRemaining;
+        }
+        /** Whether this request wants to hear about the death now happening. */
+        boolean firesOnThisDeath() {
+            return countRemaining <= 1;
+        }
+    }
 
     /** What the device reports about one thread. Keyed by id in deviceThreads. */
     private static final class ThreadInfo {
@@ -293,6 +308,33 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      */
     private static long toJdwpRef(int sidecarId)  { return sidecarId + 1L; }
     private static int  fromJdwpRef(long jdwpId)  { return (int)(jdwpId - 1L); }
+
+    /*
+     * Thread IDs live in their own JDWP namespace, because a debugger is
+     * entitled to ask about a thread ID as an object -- jdb does exactly that
+     * while drawing its thread panel -- and ParparVM's thread IDs are small
+     * integers that are not distinguishable from what else can arrive here.
+     *
+     * Heap references are aligned, so they are even. Tagged ints are not
+     * references at all: ParparVM encodes int v as (v << 1) | 1, so they are
+     * always odd and cover the small values thread IDs use -- Integer 0 is 1,
+     * the same as thread 1. Neither range is safe to share, so thread IDs are
+     * tagged into the top of the space and shifted even: above every pointer
+     * an iOS process can hold, and never odd, so no tagged int can equal one.
+     */
+    private static final long THREAD_ID_TAG = 0x4000000000000000L;
+
+    private static boolean isThreadId(long jdwpId) {
+        return (jdwpId & THREAD_ID_TAG) != 0;
+    }
+
+    private static long toJdwpThread(long deviceThreadId) {
+        return THREAD_ID_TAG | (deviceThreadId << 1);
+    }
+
+    private static long fromJdwpThread(long jdwpId) {
+        return (jdwpId & ~THREAD_ID_TAG) >>> 1;
+    }
 
     /**
      * JDWP method modifier bits. We track only static in the sidecar
@@ -715,7 +757,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 List<Long> ids = currentThreadIds();
                 Buf b = new Buf();
                 b.writeInt(ids.size());
-                for (long tid : ids) b.writeLong(tid);
+                for (long tid : ids) b.writeLong(toJdwpThread(tid));
                 writeReply(id, 0, b.bytes());
                 return;
             }
@@ -1066,7 +1108,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 // refType(8) thread(8) method(8) argCount(4) args[].
                 // Each arg: tag(1) + value(tag-sized). options(4).
                 /* refType */ long classRef = readLong(p, 0);
-                long threadRef = readLong(p, 8);
+                long threadRef = fromJdwpThread(readLong(p, 8));
                 long methodRef = readLong(p, 16);
                 int argCount = readInt(p, 24);
                 int devMid = fromJdwpRef(methodRef);
@@ -1193,7 +1235,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     }
 
     private void handleThread(int id, int cmd, byte[] p) throws IOException {
-        long tid = readLong(p, 0);
+        long tid = fromJdwpThread(readLong(p, 0));
         switch (cmd) {
             case 1: { // Name
                 Buf b = new Buf(); b.writeString(threadName(tid)); writeReply(id, 0, b.bytes()); return;
@@ -1269,7 +1311,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 List<Long> ids = currentThreadIds();
                 Buf b = new Buf();
                 b.writeInt(ids.size());
-                for (long t : ids) b.writeLong(t);
+                for (long t : ids) b.writeLong(toJdwpThread(t));
                 b.writeInt(0);
                 writeReply(id, 0, b.bytes()); return;
             }
@@ -1281,7 +1323,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     // -------- StackFrame ----------------------------------------------------
 
     private void handleStackFrame(int id, int cmd, byte[] p) throws IOException {
-        long tid = readLong(p, 0);
+        long tid = fromJdwpThread(readLong(p, 0));
         long frameId = readLong(p, 8);
         int frameIdx = (int)(frameId & 0xFFFFFFFFL);
         switch (cmd) {
@@ -1469,7 +1511,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                         }
                         case 10: { // Step: threadID(8) + size(4) + depth(4) = 16
                             if (off + 16 > p.length) { badModifier = true; break; }
-                            stepThread = readLong(p, off); off += 8;
+                            stepThread = fromJdwpThread(readLong(p, off)); off += 8;
                             /* size */ off += 4;
                             stepDepth = readInt(p, off); off += 4;
                             break;
@@ -1545,7 +1587,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     replayClassPrepare(cpr);
                     return;
                 } else if (eventKind == EK_VM_DEATH) {
-                    vmDeathRequests.put(rid, suspendPolicy);
+                    // Count is honoured here as everywhere else. A VM dies
+                    // once, so a request asking to be told on the second death
+                    // is asking never to be told -- reporting the first anyway
+                    // would have a debugger act on an event it declined.
+                    vmDeathRequests.put(rid, new VmDeathRequest(suspendPolicy, eventCount));
                 } else if (eventKind == EK_SINGLE_STEP && stepThread != 0) {
                     // depth: 0=INTO, 1=OVER, 2=OUT — same numeric values as
                     // the wire protocol's STEP_INTO/OVER/OUT, so no mapping.
@@ -1670,11 +1716,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      * is indistinguishable from a tagged int, which is why every
      * odd-numbered thread displayed as a java.lang.Integer.
      *
-     * Heap references are page-aligned addresses well above the thread-id
-     * range, so there is no ambiguity to resolve here.
+     * Only an ID carrying the thread tag is treated this way, so nothing that
+     * is genuinely a reference -- including a tagged int, which is odd and so
+     * can look exactly like a small thread ID -- is diverted here.
      */
     private long resolveObjectId(long objectId) {
-        ThreadInfo info = deviceThreads.get(objectId);
+        if (!isThreadId(objectId)) return objectId;
+        ThreadInfo info = deviceThreads.get(fromJdwpThread(objectId));
         if (info != null && info.threadObject != 0) {
             return info.threadObject;
         }
@@ -1739,7 +1787,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             case 6: { // InvokeMethod (instance)
                 // objId(8) thread(8) refType(8) method(8) argCount(4) args[] options(4)
                 long thisObj = objectId;
-                long threadRef = readLong(p, 8);
+                long threadRef = fromJdwpThread(readLong(p, 8));
                 /* refType */ readLong(p, 16);
                 long methodRef = readLong(p, 24);
                 int argCount = readInt(p, 32);
@@ -2155,7 +2203,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             b.writeInt(1);
             b.writeByte(EK_BREAKPOINT);
             b.writeInt(rid);
-            b.writeLong(threadId);
+            b.writeLong(toJdwpThread(threadId));
             b.writeByte(TYPE_TAG_CLASS);
             b.writeLong(toJdwpRef(classId));
             b.writeLong(toJdwpRef(methodId));
@@ -2186,7 +2234,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             b.writeInt(1);
             b.writeByte(EK_SINGLE_STEP);
             b.writeInt(rid == null ? 0 : rid);
-            b.writeLong(threadId);
+            b.writeLong(toJdwpThread(threadId));
             b.writeByte(TYPE_TAG_CLASS);
             b.writeLong(toJdwpRef(classId));
             b.writeLong(toJdwpRef(methodId));
@@ -2301,17 +2349,22 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             // its own id sees the session end. The composite's suspend policy
             // is the strongest any request asked for — matching a lower one
             // would leave a debugger that asked to suspend running on.
-            Map<Integer, Integer> registered = new LinkedHashMap<>(vmDeathRequests);
+            Map<Integer, VmDeathRequest> all = new LinkedHashMap<>(vmDeathRequests);
+            List<Integer> firing = new ArrayList<>();
             int suspendPolicy = SP_NONE;
-            for (int policy : registered.values()) {
-                if (policy > suspendPolicy) suspendPolicy = policy;
+            for (Map.Entry<Integer, VmDeathRequest> e : all.entrySet()) {
+                if (!e.getValue().firesOnThisDeath()) continue;
+                firing.add(e.getKey());
+                if (e.getValue().suspendPolicy > suspendPolicy) {
+                    suspendPolicy = e.getValue().suspendPolicy;
+                }
             }
             Buf b = new Buf();
             b.writeByte(suspendPolicy);
-            b.writeInt(1 + registered.size());
+            b.writeInt(1 + firing.size());
             b.writeByte(EK_VM_DEATH);
             b.writeInt(0);
-            for (int rid : registered.keySet()) {
+            for (int rid : firing) {
                 b.writeByte(EK_VM_DEATH);
                 b.writeInt(rid);
             }

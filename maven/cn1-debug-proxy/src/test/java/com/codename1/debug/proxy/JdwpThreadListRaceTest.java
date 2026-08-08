@@ -137,7 +137,7 @@ public class JdwpThreadListRaceTest {
             int count = body.readInt();
             List<Long> ids = new ArrayList<>();
             for (int i = 0; i < count; i++) {
-                ids.add(body.readLong());
+                ids.add(JdwpTestClient.fromJdwpThread(body.readLong()));
             }
             return ids;
         }

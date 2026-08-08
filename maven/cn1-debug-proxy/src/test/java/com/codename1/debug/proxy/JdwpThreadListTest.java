@@ -86,7 +86,7 @@ public class JdwpThreadListTest {
             List<Long> ids = new ArrayList<>();
             int count = body.readInt();
             for (int i = 0; i < count; i++) {
-                ids.add(body.readLong());
+                ids.add(JdwpTestClient.fromJdwpThread(body.readLong()));
             }
             assertEquals(Arrays.asList(3L, 4L, 5L), ids);
             assertEquals("a group with no child groups", 0, body.readInt());
@@ -324,7 +324,7 @@ public class JdwpThreadListTest {
         int count = body.readInt();
         List<Long> ids = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            ids.add(body.readLong());
+            ids.add(JdwpTestClient.fromJdwpThread(body.readLong()));
         }
         assertTrue("ids should be reported in a stable order", isSorted(ids));
         return ids;
