@@ -2261,6 +2261,15 @@ _Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
 _Atomic int bibopGcEpoch = 1;
 _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 static long bibopCycleAllocatedBytes = 0;
+// LEGACY bytes charged to the cycle that is starting -- the twin of
+// bibopCycleAllocatedBytes for allocations above CN1_BIBOP_MAX_OBJECT. The
+// exchange result used to be discarded, which made a large-array workload look
+// QUIET to the major-sweep test below however hard it was allocating (its bytes
+// never reach bibopBytesSinceGc). That is the one shape where splicing every
+// partial page into every sweep is worst: heavy legacy churn driving the cycles
+// while a large BiBOP survivor set supplies the pages to walk -- precisely the
+// issue-5425 workload. GC-thread only, published at cycle begin.
+static long legacyCycleAllocatedBytes = 0;
 static long bibopLastCycleOccupiedBytes = 0;
 static long bibopLastCycleLiveBytes = 0;
 static long bibopLastCycleReclaimedBytes = 0;
@@ -2388,7 +2397,8 @@ void cn1BibopBeginGcCycle(void) {
     // Same atomic-exchange idiom as the BiBOP reset above: a racing fetch_add
     // lands either before the swap (covered by the cycle that is starting) or
     // after it (charged to the next cycle) -- never dropped.
-    (void)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0, memory_order_acq_rel);
+    legacyCycleAllocatedBytes = (long)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0,
+                                                               memory_order_acq_rel);
     // Latch AFTER the counter: an allocator racing between the two exchanges
     // still sees the old latch and skips, so the fresh latch can never be
     // consumed by bytes just charged to the cycle that is starting.
@@ -3437,11 +3447,20 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // that never goes quiet. A cycle driven by allocation volume is none of
         // those and keeps the O(retired pages) fast path.
         bibopCyclesSinceMajorSweep++;
+        // "Quiet" has to mean quiet on BOTH allocation paths. A cycle driven by
+        // legacy volume allocates nothing through BiBOP, so testing
+        // bibopCycleAllocatedBytes alone would call it quiet and splice every
+        // partial page in every sweep -- the O(all pages) regression issue 5425
+        // fixed, reintroduced for exactly the workload that reported it.
+        JAVA_BOOLEAN quiet =
+                (bibopCycleAllocatedBytes + legacyCycleAllocatedBytes)
+                        < CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
         int major = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
-                || bibopCycleAllocatedBytes < CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES
+                || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
         if(major) {
             bibopCyclesSinceMajorSweep = 0;
+            int spliced = 0;
             pthread_mutex_lock(&bibopMutex);
             for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
                 CN1BibopPage* p = bibopPartialPool[ci];
@@ -3451,10 +3470,17 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                     p->nextPool = list;
                     list = p;
                     p = next;
+                    spliced++;
                 }
                 bibopPartialPool[ci] = 0;
             }
             pthread_mutex_unlock(&bibopMutex);
+            if(cn1PageReleaseTraceOn()) {
+                fprintf(stderr, "[MAJOR-SWEEP] cycle=%d spliced=%d bibopKb=%ld legacyKb=%ld\n",
+                        currentGcMarkValue, spliced,
+                        (long)(bibopCycleAllocatedBytes / 1024),
+                        (long)(legacyCycleAllocatedBytes / 1024));
+            }
         }
     }
 #endif
