@@ -404,6 +404,9 @@ jobs:
       # write, because this job publishes the normalized report to the
       # port-status-data branch itself (see the publish step below).
       contents: write
+      # write, to dispatch website-docs.yml -- the Port Status page is static,
+      # so a published report is invisible until Hugo rebuilds.
+      actions: write
       pull-requests: write
       issues: write
     env:
@@ -567,3 +570,13 @@ jobs:
             echo "No normalized Linux report to publish." >&2
             exit 1
           fi
+          # Publishing to the data branch is only half the job. The Port Status
+          # page is STATIC -- Hugo reads the reports at build time -- and
+          # website-docs.yml is triggered by pushes to master, not by the data
+          # branch, so a report published here would sit unseen until the next
+          # daily rebuild. That is the same stale window this whole change
+          # exists to close. port-status-publish.yml dispatches the rebuild for
+          # the producers it handles; do the same for the ones that publish
+          # themselves. In the same step as the publish, so it runs only when
+          # the publish actually succeeded.
+          gh workflow run website-docs.yml --ref master -f deploy_production=true
