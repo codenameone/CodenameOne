@@ -2018,19 +2018,37 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int rowSpan = Math.max(1, integer(dragged.getAttribute("tableVerticalSpan"), 1));
         int columnSpan = Math.max(1, integer(dragged.getAttribute("tableHorizontalSpan"), 1));
         if (rowSpan == 1 && columnSpan == 1) return true;
+        return rectangleFree(parent, dragged, displaced, row, column, rowSpan, columnSpan);
+    }
+
+    /**
+     * Whether a child could occupy the given rectangle: inside the declared table and clear of
+     * every other child's rectangle.
+     *
+     * @param parent the table
+     * @param child the child being placed
+     * @param displaced a child already being moved elsewhere, or null
+     * @param row the anchor row
+     * @param column the anchor column
+     * @param rowSpan rows covered
+     * @param columnSpan columns covered
+     * @return true when the rectangle is free
+     */
+    private boolean rectangleFree(Element parent, Element child, Element displaced,
+            int row, int column, int rowSpan, int columnSpan) {
         int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
         if (column + columnSpan > columns) return false;
         // Rows as well as columns: normalizeTableCells() grows the table from anchor cells only, so
         // a rectangle hanging off the bottom row is never repaired and reaches TableLayout intact.
         int rows = Math.max(1, integer(value(parent, "tableLayoutRows", "2"), 2));
         if (row + rowSpan > rows) return false;
-        for (Element child : componentChildren(parent)) {
-            if (child == dragged || child == displaced) continue;
-            Integer childRow = parseInteger(child.getAttribute("tableRow"));
-            Integer childColumn = parseInteger(child.getAttribute("tableColumn"));
+        for (Element sibling : componentChildren(parent)) {
+            if (sibling == child || sibling == displaced) continue;
+            Integer childRow = parseInteger(sibling.getAttribute("tableRow"));
+            Integer childColumn = parseInteger(sibling.getAttribute("tableColumn"));
             if (childRow == null || childColumn == null) continue;
-            int childRowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
-            int childColumnSpan = Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1));
+            int childRowSpan = Math.max(1, integer(sibling.getAttribute("tableVerticalSpan"), 1));
+            int childColumnSpan = Math.max(1, integer(sibling.getAttribute("tableHorizontalSpan"), 1));
             boolean rowsOverlap = row < childRow.intValue() + childRowSpan && childRow.intValue() < row + rowSpan;
             boolean columnsOverlap = column < childColumn.intValue() + childColumnSpan
                     && childColumn.intValue() < column + columnSpan;
@@ -3498,18 +3516,36 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             fields.add(actions);
             fields.add(propertyField("Advanced insets (top right bottom left)", "layeredInsets", "auto auto auto auto"));
         } else if ("TableLayout".equals(document.parentLayout(element))) {
+            // Capped at the cells left from the anchor, and additionally checked against the
+            // siblings: a coordinate inside the table can still name a cell another child holds,
+            // and TableLayout.addLayoutComponent() throws on the duplicate instead of laying it
+            // out, which leaves the form unrenderable.
+            final Element tableParent = document.parentOf(element);
+            final Element cell = element;
             fields.add(numericPropertyField("Table row", "tableRow", "0", 0,
-                    Math.max(0, tableRowLimit(document.parentOf(element)))));
+                    Math.max(0, tableRowLimit(tableParent)),
+                    row -> rectangleFree(tableParent, cell, null, row,
+                            integer(cell.getAttribute("tableColumn"), 0),
+                            Math.max(1, integer(cell.getAttribute("tableVerticalSpan"), 1)),
+                            Math.max(1, integer(cell.getAttribute("tableHorizontalSpan"), 1)))));
             fields.add(numericPropertyField("Table column", "tableColumn", "0", 0,
-                    Math.max(0, tableColumnLimit(document.parentOf(element)))));
-            // Capped at the cells left from the anchor. TableLayout keeps adding the last column's
-            // width for a span that runs past the edge, drawing the component outside the table,
-            // and the same out-of-range constraint is emitted into the generated source.
-            Element tableParent = document.parentOf(element);
+                    Math.max(0, tableColumnLimit(tableParent)),
+                    column -> rectangleFree(tableParent, cell, null,
+                            integer(cell.getAttribute("tableRow"), 0), column,
+                            Math.max(1, integer(cell.getAttribute("tableVerticalSpan"), 1)),
+                            Math.max(1, integer(cell.getAttribute("tableHorizontalSpan"), 1)))));
             fields.add(numericPropertyField("Horizontal span", "tableHorizontalSpan", "1", 1,
-                    Math.max(1, spanRoom(tableParent, element, "tableColumn", "tableLayoutColumns"))));
+                    Math.max(1, spanRoom(tableParent, element, "tableColumn", "tableLayoutColumns")),
+                    span -> rectangleFree(tableParent, cell, null,
+                            integer(cell.getAttribute("tableRow"), 0),
+                            integer(cell.getAttribute("tableColumn"), 0),
+                            Math.max(1, integer(cell.getAttribute("tableVerticalSpan"), 1)), span)));
             fields.add(numericPropertyField("Vertical span", "tableVerticalSpan", "1", 1,
-                    Math.max(1, spanRoom(tableParent, element, "tableRow", "tableLayoutRows"))));
+                    Math.max(1, spanRoom(tableParent, element, "tableRow", "tableLayoutRows")),
+                    span -> rectangleFree(tableParent, cell, null,
+                            integer(cell.getAttribute("tableRow"), 0),
+                            integer(cell.getAttribute("tableColumn"), 0),
+                            span, Math.max(1, integer(cell.getAttribute("tableHorizontalSpan"), 1)))));
             fields.add(numericPropertyField("Column width %", "tableWidth", "-1", -1, 100));
             fields.add(numericPropertyField("Row height %", "tableHeight", "-1", -1, 100));
         }
@@ -4021,6 +4057,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return extent;
     }
 
+    /** Rejects an in-range table coordinate or span that would collide with a sibling. */
+    private interface TablePlacementCheck {
+        boolean accepts(int value);
+    }
+
     private int tableRowLimit(Element parent) {
         if (parent == null) return 99;
         return Math.max(0, integer(parent.getAttribute("tableLayoutRows"), 2) - 1);
@@ -4039,6 +4080,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private Component numericPropertyField(String label, String attribute, String fallback, int minimum, int maximum) {
+        return numericPropertyField(label, attribute, fallback, minimum, maximum, null);
+    }
+
+    /**
+     * @param label the field label
+     * @param attribute the attribute it edits
+     * @param fallback the value shown when the attribute is absent
+     * @param minimum smallest accepted value
+     * @param maximum largest accepted value
+     * @param placement rejects a value that is in range but would collide with a sibling, or null
+     *     when only the range matters. Range alone was not enough for table cells and spans: a
+     *     coordinate inside the declared table can still name a cell another child already holds,
+     *     and TableLayout.addLayoutComponent() throws on the duplicate rather than laying it out.
+     * @return the field
+     */
+    private Component numericPropertyField(String label, String attribute, String fallback,
+            int minimum, int maximum, TablePlacementCheck placement) {
         Element target = document.selected();
         TextField field = new TextField(document.attribute(attribute, fallback));
         field.setUIID("BuilderField");
@@ -4051,6 +4109,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         };
         Runnable commit = () -> {
             Integer parsed = parseInteger(field.getText());
+            if (parsed != null && parsed >= minimum && parsed <= maximum
+                    && placement != null && !placement.accepts(parsed.intValue())) {
+                field.setText(document.attribute(attribute, fallback));
+                field.setUIID("BuilderField");
+                setStatus(label + " " + parsed + " overlaps another component in this table");
+                return;
+            }
             if (parsed == null || parsed < minimum || parsed > maximum) {
                 field.setText(document.attribute(attribute, fallback));
                 field.setUIID("BuilderField");
@@ -5352,13 +5417,41 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private String ensureHandler(String source, String handler) {
-        if (source.indexOf(handler + "(") >= 0) return source;
+        if (declaresActionHandler(source, handler)) return source;
         int close = source.indexOf("// </gui-builder-user-code>");
         if (close < 0) close = source.lastIndexOf('}');
         String method = "\n    private void " + handler + "(ActionEvent event) {\n"
                 + "        // Add event behavior here.\n"
                 + "    }\n";
         return close < 0 ? source + method : source.substring(0, close) + method + source.substring(close);
+    }
+
+    /**
+     * True when the source already declares {@code handler(ActionEvent)}.
+     *
+     * <p>Matching on {@code handler + "("} alone was wrong twice over: a handler named
+     * {@code buildUI} found the generated zero-argument {@code buildUI()} and skipped the overload
+     * the listener needs, and any comment or call containing the same text did the same. Only a
+     * declaration taking an ActionEvent counts.
+     *
+     * @param source the companion source
+     * @param handler the handler method name
+     * @return true when the stub is already there
+     */
+    private boolean declaresActionHandler(String source, String handler) {
+        int at = 0;
+        while (true) {
+            at = source.indexOf(handler + "(", at);
+            if (at < 0) return false;
+            int open = at + handler.length() + 1;
+            int close = source.indexOf(')', open);
+            if (close > open) {
+                String parameters = source.substring(open, close);
+                // A declaration, not a call: the parameter list names the ActionEvent type.
+                if (parameters.indexOf("ActionEvent") >= 0) return true;
+            }
+            at = open;
+        }
     }
 
     private String mergeGeneratedSource(String existing, String generated) {
@@ -5471,9 +5564,52 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return removeConstructors(body, className(existing)).trim();
     }
 
+    /**
+     * Index of the real {@code class } keyword, skipping comments.
+     *
+     * <p>A legacy companion's licence header or Javadoc routinely contains prose such as "this
+     * class is", and taking that as the declaration made migration derive the wrong class name and
+     * leave the old constructors in place beside the regenerated ones.
+     *
+     * @param source the companion source
+     * @return the index of the declaration, or 0 when none was found
+     */
     private int classDeclaration(String source) {
-        int index = source.indexOf("class ");
+        int index = stripComments(source).indexOf("class ");
         return index < 0 ? 0 : index;
+    }
+
+    /**
+     * Blanks comment bodies while preserving every offset, so an index found in the result points
+     * at the same character in the original.
+     *
+     * @param source the source to mask
+     * @return the source with comment content replaced by spaces
+     */
+    static String stripComments(String source) {
+        char[] out = source.toCharArray();
+        boolean block = false;
+        boolean line = false;
+        for (int i = 0; i < out.length; i++) {
+            if (line) {
+                if (out[i] == '\n') line = false; else out[i] = ' ';
+            } else if (block) {
+                boolean end = out[i] == '*' && i + 1 < out.length && out[i + 1] == '/';
+                if (out[i] != '\n') out[i] = ' ';
+                if (end) {
+                    out[i + 1] = ' ';
+                    i++;
+                    block = false;
+                }
+            } else if (out[i] == '/' && i + 1 < out.length && out[i + 1] == '/') {
+                out[i] = ' ';
+                line = true;
+            } else if (out[i] == '/' && i + 1 < out.length && out[i + 1] == '*') {
+                out[i] = ' ';
+                block = true;
+            }
+        }
+        return new String(out);
     }
 
     private String className(String source) {
