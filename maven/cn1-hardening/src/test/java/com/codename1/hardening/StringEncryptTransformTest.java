@@ -347,6 +347,10 @@ public class StringEncryptTransformTest {
         byte[] out = t.transform(w.toByteArray());
         assertTrue("some constants are encrypted within the pool budget", t.getEncryptedCount() > 0);
         assertTrue("the rest are left plaintext and reported", t.getClinitFullLiteralCount() > 0);
+        // The budget-skipped constants must be excluded jar-wide, so an equal LDC in another class is not
+        // encrypted+interned while these fields stay plaintext (a GETSTATIC == mismatch on ParparVM).
+        assertFalse("budget-skipped constants are recorded for jar-wide exclusion",
+                t.getNewlyExcluded().isEmpty());
         // The class assembles and verifies -- no ClassTooLargeException.
         CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
                 new java.io.PrintWriter(new java.io.StringWriter()));

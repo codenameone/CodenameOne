@@ -90,4 +90,18 @@ class HardeningBooleanArgTest {
         assertTrue(p.parse("maybe", true), "unrecognized -> default");
         assertFalse(p.parse("maybe", false), "unrecognized -> default (false)");
     }
+
+    @Test
+    void parparvmCTargetsAreRecognizedForRuntimeLiteralExclusion() {
+        // The parparvm-java-api.jar runtime-literal exclusion applies exactly to the ParparVM-to-C
+        // targets, where a compile-time literal is a constant-pool object that is never interned; the
+        // DEX/JVM/JS targets intern their compile-time literals so no exclusion is needed there.
+        Probe p = new Probe();
+        for (String t : new String[] {"ios", "mac", "watch", "tv", "win", "linux"}) {
+            assertTrue(p.isParparVMCPlatform(t), t + " translates to C via ParparVM");
+        }
+        for (String t : new String[] {"and", "android", "javase", "desktop", "javascript"}) {
+            assertFalse(p.isParparVMCPlatform(t), t + " interns its compile-time literals");
+        }
+    }
 }

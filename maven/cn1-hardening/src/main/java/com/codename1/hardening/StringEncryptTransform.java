@@ -1117,8 +1117,11 @@ public final class StringEncryptTransform {
                     continue;
                 }
                 if (toStrip.size() >= budget) {
-                    // Pool budget exhausted: leave this constant plaintext (dead value, reported).
+                    // Pool budget exhausted: leave this constant plaintext, and exclude it jar-wide so an
+                    // equal LDC elsewhere is not encrypted+interned -- a GETSTATIC read of this still-plain
+                    // field would otherwise compare != to that interned copy on ParparVM.
                     clinitFullLiteralCount++;
+                    newlyExcluded.add((String) fn.value);
                     continue;
                 }
                 String plain = (String) fn.value;
@@ -1136,7 +1139,13 @@ public final class StringEncryptTransform {
             return false;
         }
         if (!clinitCanAccept(cn, init)) {
+            // The <clinit> cannot hold the decode steps, so none of these constants can be encrypted here.
+            // Exclude them jar-wide so an equal LDC in another class is not encrypted+interned while these
+            // fields stay plaintext, which a GETSTATIC read would see as a broken == on ParparVM.
             clinitFullLiteralCount += toStrip.size();
+            for (FieldNode fn : toStrip) {
+                newlyExcluded.add((String) fn.value);
+            }
             return false;
         }
         // Commit: strip each ConstantValue so the plaintext leaves the class file entirely (the slot

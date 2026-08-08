@@ -2384,6 +2384,17 @@ public abstract class Executor {
      * dispatch at runtime). The caller supplies the compile/platform classpath in the
      * {@code cn1.hardening.libraryJars} request argument (path-separated); subclasses may add more.
      */
+    /**
+     * True for the ParparVM-to-C targets (iOS/mac/watch/tv/win/linux), whose app links against the
+     * {@code parparvm-java-api.jar} runtime. A compile-time literal there is a constant-pool object that
+     * ParparVM never interns, so an encrypted app copy of the same value would not be reference-equal to
+     * it; the runtime's literals are therefore excluded from encryption on these targets.
+     */
+    protected boolean isParparVMCPlatform(String platform) {
+        return "ios".equals(platform) || "mac".equals(platform) || "watch".equals(platform)
+                || "tv".equals(platform) || "win".equals(platform) || "linux".equals(platform);
+    }
+
     protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
         java.util.List<File> jars = new java.util.ArrayList<File>();
         // Always include the Codename One framework jar: every builder receives it, and it carries
@@ -2393,6 +2404,22 @@ public abstract class Executor {
         // and is absent when hardening runs through buildNoException, so it can't be relied on alone.
         if (codenameOneJar != null && codenameOneJar.exists()) {
             jars.add(codenameOneJar);
+        }
+        // On a ParparVM-C target the app also links against the ParparVM Java runtime
+        // (parparvm-java-api.jar -- java.lang.Boolean, java.lang.String, ...), which the builder stages
+        // later and never hardens. Its literals must reach the engine's library-literal exclusion scan,
+        // or an app value like "true" (encrypted then interned) would compare != to a runtime-returned
+        // copy such as Boolean.toString() -- a constant-pool literal ParparVM never interns -- breaking a
+        // reference comparison that held before hardening. It doubles as a -libraryjars entry for ProGuard.
+        if (isParparVMCPlatform(hardeningPlatform(request))) {
+            try {
+                File runtime = getResourceAsFile("/parparvm-java-api.jar", ".jar");
+                if (runtime != null && runtime.exists() && !jars.contains(runtime)) {
+                    jars.add(runtime);
+                }
+            } catch (IOException ex) {
+                // Best-effort: without the runtime jar the scan simply misses its literals (a rare == edge).
+            }
         }
         String raw = request.getArg("cn1.hardening.libraryJars", "");
         if (raw == null || raw.length() == 0) {
