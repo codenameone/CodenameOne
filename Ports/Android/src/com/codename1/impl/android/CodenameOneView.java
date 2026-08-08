@@ -794,22 +794,22 @@ public class CodenameOneView {
     /**
      * A point inside whatever the crown should scroll.
      *
-     * <p>Walks up from the focused component to the nearest vertically scrollable ancestor and
-     * returns its centre; without a focus, the content pane's centre. Any point inside the right
-     * container will do -- the wheel path only uses it to decide which component receives the
-     * scroll -- so the centre is chosen because it cannot land on a border or a child that happens
-     * to sit at the container's origin.</p>
+     * <p>Starts at the focused component itself -- a focused {@code TextArea} or {@code List} is
+     * frequently the scrollable thing, with nothing scrollable above it -- and walks up to the
+     * nearest vertically scrollable ancestor; without a focus, the content pane's centre. Any
+     * point inside the right container will do -- the wheel path only uses it to decide which
+     * component receives the scroll -- so the centre is chosen because it cannot land on a border
+     * or a child that happens to sit at the container's origin.</p>
      */
     private int[] rotaryTarget() {
         com.codename1.ui.Form f = this.implementation.getCurrentForm();
         com.codename1.ui.Component anchor = null;
         if (f != null) {
-            com.codename1.ui.Component focused = f.getFocused();
-            com.codename1.ui.Container c = focused == null ? null : focused.getParent();
+            com.codename1.ui.Component c = f.getFocused();
             while (c != null && !c.isScrollableY()) {
                 c = c.getParent();
             }
-            anchor = c != null ? (com.codename1.ui.Component) c : f.getContentPane();
+            anchor = c != null ? c : f.getContentPane();
         }
         if (anchor == null) {
             return new int[] {0, 0};
