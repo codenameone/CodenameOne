@@ -439,10 +439,24 @@ public final class StringEncryptTransform {
         return count;
     }
 
-    /** True when a constant-dynamic carries a String among its bootstrap arguments. */
+    /** True when a constant-dynamic carries a String among its bootstrap arguments, nested ones too. */
     private static boolean condyHasStringArgument(ConstantDynamic condy) {
+        return condyHasStringArgument(condy, 0);
+    }
+
+    private static boolean condyHasStringArgument(ConstantDynamic condy, int depth) {
+        // A constant-dynamic bootstrap argument can itself be a ConstantDynamic whose arguments hold the
+        // plaintext, so recurse. The depth guard is a backstop against a pathological/cyclic pool.
+        if (depth > 16) {
+            return false;
+        }
         for (int i = 0, n = condy.getBootstrapMethodArgumentCount(); i < n; i++) {
-            if (condy.getBootstrapMethodArgument(i) instanceof String) {
+            Object arg = condy.getBootstrapMethodArgument(i);
+            if (arg instanceof String) {
+                return true;
+            }
+            if (arg instanceof ConstantDynamic
+                    && condyHasStringArgument((ConstantDynamic) arg, depth + 1)) {
                 return true;
             }
         }

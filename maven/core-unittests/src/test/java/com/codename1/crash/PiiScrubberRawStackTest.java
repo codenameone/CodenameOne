@@ -121,6 +121,26 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void messageWithWhitespaceFreeIdentityIsNotAFrame() {
+        // A wrapped message with no spaces around its id ("at account123456failed:789") is not a frame:
+        // the bare colon-number form requires a dotted class.method or a URL, and a bare word/word+digits
+        // paren location ("(attempt:123456)") is not a real location either.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account123456failed:789\n"
+                + "at retry (attempt:654321)\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n"
+                + "    at com.foo.Bar.qux:998877\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account[num]failed:789") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("attempt:[num]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("654321") < 0, scrubbed);
+        // Real frames (dotted identity) keep their coordinates.
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.qux:998877") >= 0, scrubbed);
+    }
+
+    @Test
     void customScrubMessageOverrideReachesRawStack() {
         // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
         // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by

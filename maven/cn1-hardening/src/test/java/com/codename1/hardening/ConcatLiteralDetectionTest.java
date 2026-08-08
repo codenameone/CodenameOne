@@ -155,4 +155,28 @@ public class ConcatLiteralDetectionTest {
         t.transform(condyFixture());
         assertEquals(1, t.getCondyLiteralCount());
     }
+
+    @Test
+    public void countsStringNestedInsideAnotherConstantDynamicArgument() {
+        // The outer condy has no direct String argument; its plaintext hides inside a NESTED condy.
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "com/codename1/hardening/fixture/NestedCondy",
+                null, "java/lang/Object", null);
+        ConstantDynamic inner = new ConstantDynamic("inner", "Ljava/lang/String;",
+                CONDY_BSM, "nested-plaintext-value");
+        ConstantDynamic outer = new ConstantDynamic("outer", "Ljava/lang/String;",
+                CONDY_BSM, inner);
+        MethodVisitor m = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "m",
+                "()Ljava/lang/String;", null, null);
+        m.visitCode();
+        m.visitLdcInsn(outer);
+        m.visitInsn(Opcodes.ARETURN);
+        m.visitMaxs(1, 0);
+        m.visitEnd();
+        cw.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        t.transform(cw.toByteArray());
+        assertEquals(1, t.getCondyLiteralCount());
+    }
 }

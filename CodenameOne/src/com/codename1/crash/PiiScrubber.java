@@ -161,12 +161,36 @@ public class PiiScrubber {
                 return false;
             }
             String inside = rest.substring(open + 1, rest.length() - 1);
-            boolean location = "Native Method".equals(inside) || "Unknown Source".equals(inside)
-                    || endsWithColonNumber(inside);
-            return location && isFrameIdentity(rest.substring(0, open).trim());
+            // The parenthesized location is the discriminator here (JVM `(File.java:42)`, Chrome
+            // `(url:line:col)`, or the `(Native Method)`/`(Unknown Source)` literals), so a plain
+            // whitespace-free identity before it is enough -- a Chrome frame's identity can be a bare
+            // function name with no dot.
+            return isParenLocation(inside) && isFrameIdentity(rest.substring(0, open).trim());
         }
         int start = trailingLocationStart(rest);
-        return start > 0 && isFrameIdentity(rest.substring(0, start));
+        if (start <= 0) {
+            return false;
+        }
+        // The bare `IDENT:<line>` form is ParparVM (`com.foo.Bar.baz:42`) or a JS anonymous URL frame;
+        // its identity is always a dotted `<class>.<method>` or a URL. A message token such as
+        // `account123456failed` is neither, so its digits stay subject to scrubbing.
+        return isDottedOrUrlIdentity(rest.substring(0, start));
+    }
+
+    /// True when the content of an `at ...(<loc>)` is a real location: the `(Native Method)` /
+    /// `(Unknown Source)` literals, or a `file.ext:line` / `scheme://host/path:line:col` whose part
+    /// before the trailing `:<digits>` names a file (has an extension dot) or a URL (has a `/`). A
+    /// bare word like `attempt:123456` is not a location, so its digits stay subject to scrubbing.
+    private static boolean isParenLocation(String inside) {
+        if ("Native Method".equals(inside) || "Unknown Source".equals(inside)) {
+            return true;
+        }
+        if (!endsWithColonNumber(inside)) {
+            return false;
+        }
+        int loc = trailingLocationStart(inside);
+        String head = loc > 0 ? inside.substring(0, loc) : "";
+        return head.indexOf('.') >= 0 || head.indexOf('/') >= 0;
     }
 
     /// A frame's identity is a single token: non-empty and free of whitespace. A free-form message
@@ -182,6 +206,13 @@ public class PiiScrubber {
             }
         }
         return true;
+    }
+
+    /// A stricter identity for the bare `IDENT:<line>` form: a whitespace-free token that is a dotted
+    /// `<class>.<method>` or a URL (has a `/`). A single word like `account123456failed` is rejected,
+    /// so a wrapped message that happens to start with `at ` and end in a colon-number is still scrubbed.
+    private static boolean isDottedOrUrlIdentity(String id) {
+        return isFrameIdentity(id) && (id.indexOf('.') >= 0 || id.indexOf('/') >= 0);
     }
 
     /// Index at which a trailing `:<line>` (optionally `:<line>:<column>`) location begins, or -1
