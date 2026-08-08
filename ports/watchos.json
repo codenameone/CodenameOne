@@ -1,36 +1,36 @@
 {
-  "commit": "0e57ebe1cfbf770ee621f4c17e8d017e3c545196",
-  "generated_at": "2026-08-08T06:49:48Z",
+  "commit": "30fef6d5620d26fd89b296a2a84de43be11da44a",
+  "generated_at": "2026-08-08T11:47:18Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 356694000
+        "duration_ns": 399901000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 151569000
+        "duration_ns": 151636000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 182536000
+        "duration_ns": 282033000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 105144000
+        "duration_ns": 120131000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 413733000
+        "duration_ns": 442473000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 373281000
+        "duration_ns": 319046000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 714647000
+        "duration_ns": 697422000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,14 +44,14 @@
     "suite_checksum": 0
   },
   "port": "watchos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31236206724",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31252409393",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 169,
-    "skip": 2
+    "pass": 158,
+    "skip": 13
   },
   "tests": {
     "ARApiTest": {
@@ -131,11 +131,17 @@
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "pass"
+      "reasons": [
+        "phone-dialog-on-watch"
+      ],
+      "status": "skip"
     },
     "CenteredInteractionDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "pass"
+      "reasons": [
+        "phone-dialog-on-watch"
+      ],
+      "status": "skip"
     },
     "ChartBarScreenshotTest": {
       "feature": "charts",
@@ -359,7 +365,10 @@
     },
     "GoogleWebMapScreenshotTest": {
       "feature": "native-web-maps",
-      "status": "pass"
+      "reasons": [
+        "watch-form-factor"
+      ],
+      "status": "skip"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -483,7 +492,10 @@
     },
     "NativeMapFallbackScreenshotTest": {
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "watch-form-factor"
+      ],
+      "status": "skip"
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
@@ -515,7 +527,10 @@
     },
     "RealOsmVectorScreenshotTest": {
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "watch-form-factor"
+      ],
+      "status": "skip"
     },
     "RichTextAreaScreenshotTest": {
       "feature": "pure-text-editing",
@@ -627,11 +642,17 @@
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "surfaces-not-on-tv-or-watch"
+      ],
+      "status": "skip"
     },
     "SurfacesRemoteViewsScreenshotTest": {
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "android-only-remoteviews-lowering"
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -719,19 +740,31 @@
     },
     "VectorMapDarkStyleScreenshotTest": {
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "watch-form-factor"
+      ],
+      "status": "skip"
     },
     "VectorMapMarkersScreenshotTest": {
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "watch-form-factor"
+      ],
+      "status": "skip"
     },
     "VectorMapShapesScreenshotTest": {
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "watch-form-factor"
+      ],
+      "status": "skip"
     },
     "VideoIODecodedFramesScreenshotTest": {
       "feature": "video-decoding",
-      "status": "pass"
+      "reasons": [
+        "videoio-unavailable-on-ios"
+      ],
+      "status": "skip"
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
