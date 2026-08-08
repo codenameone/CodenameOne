@@ -244,6 +244,12 @@ class DatabaseImpl extends Database {
         } finally {
             // Read back from the engine rather than inferred from the script. sqlite3_exec stops
             // at the statement that failed, so a trailing COMMIT in the text may never have run.
+            // The names first: an outermost SAVEPOINT opens a transaction that only its own
+            // RELEASE ends, and the engine reports a boolean without saying which savepoint owns
+            // it. A later RELEASE arriving through a parameterized overload -- which has no engine
+            // read of its own -- would otherwise go unrecognized and leave this believing a
+            // transaction was still open forever.
+            noteScriptTransactionControl(sql);
             noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
         }
     }

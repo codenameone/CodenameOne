@@ -102,6 +102,14 @@ public abstract class Database {
     /// the first release from ending it.
     private int outermostSavepointDepth;
 
+    /// How many nested `beginTransaction()` calls are outstanding.
+    ///
+    /// One, except under the legacy hint on Android, where nesting is allowed because that is what
+    /// the port used to do. The engine ref-counts there, so the first commit ends only the inner
+    /// one: clearing the flag on it would report no transaction while the outer still holds
+    /// uncommitted rows, and a key change would be allowed over them.
+    private int transactionDepth;
+
     /// Checks if this platform supports custom database paths.  On platforms that
     /// support this, you can pass a file path to `#openOrCreate(java.lang.String)`, `#exists(java.lang.String)`,
     /// `#delete(java.lang.String)`, and `#getDatabasePath(java.lang.String)`.
@@ -686,12 +694,12 @@ public abstract class Database {
             String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
                 inTransaction = true;
+                transactionDepth = 1;
                 forgetSavepoints();
                 continue;
             }
             if (keyword != null) {
-                inTransaction = false;
-                forgetSavepoints();
+                endTransactionCompletely();
                 continue;
             }
             noteSavepointControl(statement);
@@ -719,6 +727,7 @@ public abstract class Database {
             String name = savepointName(statement, false);
             if (!inTransaction) {
                 inTransaction = true;
+                transactionDepth = 1;
                 outermostSavepoint = name;
                 outermostSavepointDepth = 1;
             } else if (outermostSavepoint != null && outermostSavepoint.equals(name)) {
@@ -733,8 +742,7 @@ public abstract class Database {
                 && outermostSavepoint.equals(savepointName(statement, true))) {
             outermostSavepointDepth--;
             if (outermostSavepointDepth <= 0) {
-                inTransaction = false;
-                forgetSavepoints();
+                endTransactionCompletely();
             }
         }
     }
@@ -800,7 +808,14 @@ public abstract class Database {
     ///
     /// - `open`: whether the engine reports a transaction in progress
     protected void noteEngineTransactionState(boolean open) {
-        inTransaction = open;
+        if (open) {
+            inTransaction = true;
+            if (transactionDepth < 1) {
+                transactionDepth = 1;
+            }
+            return;
+        }
+        endTransactionCompletely();
     }
 
     /// The transaction-control keyword a statement starts with, or null if it is not one.
@@ -1097,7 +1112,14 @@ public abstract class Database {
     protected static synchronized void requireSoleConnectionForKeyChange(String key)
             throws IOException {
         if (key == null) {
-            return;
+            // A connection that never said which file it holds cannot be checked against the ones
+            // that did, so there is no answer to give -- and the failure of a wrong answer here is
+            // a database rewritten under another connection. Refusing is the only safe reading of
+            // "I do not know". The simulator's connection-taking constructor is how this arises.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "This database was opened from a connection rather than by name, so there is no"
+                    + " way to tell whether anything else has the same file open. Open it with"
+                    + " Database.openOrCreate to change its key.");
         }
         Integer count = (Integer) OPEN_DATABASES.get(key);
         if (count != null && count.intValue() > 1) {
@@ -1162,7 +1184,13 @@ public abstract class Database {
             throw new IOException("A transaction is already in progress on this database. "
                     + "Transactions do not nest; commit or roll back the current one first.");
         }
+        if (inTransaction) {
+            // Legacy nesting: the engine ref-counts, so this begin has to be counted too.
+            transactionDepth++;
+            return;
+        }
         inTransaction = true;
+        transactionDepth = 1;
         forgetSavepoints();
     }
 
@@ -1187,14 +1215,28 @@ public abstract class Database {
     /// Records that a transaction has actually ended. Call only after the engine has committed or
     /// rolled back successfully.
     protected void markTransactionEnded() {
-        inTransaction = false;
-        forgetSavepoints();
+        if (transactionDepth > 1) {
+            // An inner end under the legacy hint. The engine is still holding the outer one.
+            transactionDepth--;
+            return;
+        }
+        endTransactionCompletely();
     }
 
     /// Drops what is remembered about savepoints, for a transaction that has ended by other means.
     private void forgetSavepoints() {
         outermostSavepoint = null;
         outermostSavepointDepth = 0;
+    }
+
+    /// Ends the transaction outright, however many begins are outstanding.
+    ///
+    /// For the paths where the engine itself has ended it -- a COMMIT in a script, an engine that
+    /// reports autocommit -- rather than one nested end.
+    private void endTransactionCompletely() {
+        inTransaction = false;
+        transactionDepth = 0;
+        forgetSavepoints();
     }
 
     /// Discards a transaction whose commit failed, and builds the exception to report it with.

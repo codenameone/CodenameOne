@@ -351,6 +351,41 @@ public final class DatabaseConformanceSuite {
                     "a parameterized call rejects a multi-statement script instead of dropping the tail");
         }
 
+        // ---- a long past the range a double can hold
+        //
+        // SQLite stores 64-bit integers and the API hands back a Java long, so the whole range has
+        // to survive the round trip. A port that carries the value through a JavaScript number, or
+        // through any other 53-bit-mantissa float, loses the low bits and returns a value that is
+        // close enough to look right in a test that only checks a small number. Two neighbours are
+        // used because rounding maps them to the same double: if that is what happens, one of the
+        // two comes back as the other.
+        db.execute("DELETE FROM conf_stmt");
+        long big = 9007199254740993L;
+        long biggerStill = 9223372036854775807L;
+        db.execute("INSERT INTO conf_stmt (id, i) VALUES (?, ?)",
+                new Object[] {Integer.valueOf(90), Long.valueOf(big)});
+        db.execute("INSERT INTO conf_stmt (id, i) VALUES (?, ?)",
+                new Object[] {Integer.valueOf(91), Long.valueOf(biggerStill)});
+        Cursor wide = null;
+        try {
+            wide = db.executeQuery("SELECT i FROM conf_stmt WHERE id = 90");
+            r.check(wide.next(), "the wide-integer row is there");
+            long readBack = wide.getRow().getLong(0);
+            r.check(readBack == big, "a long past 2^53 round trips exactly, got " + readBack);
+        } finally {
+            closeQuietly(wide);
+        }
+        wide = null;
+        try {
+            wide = db.executeQuery("SELECT i FROM conf_stmt WHERE id = 91");
+            r.check(wide.next(), "the Long.MAX_VALUE row is there");
+            long readBack = wide.getRow().getLong(0);
+            r.check(readBack == biggerStill,
+                    "Long.MAX_VALUE round trips exactly, got " + readBack);
+        } finally {
+            closeQuietly(wide);
+        }
+
         // ---- typed binding
         db.execute("DELETE FROM conf_stmt");
         // Under the legacy hint iOS stringifies every parameter, and a byte[] has no text form, so

@@ -102,7 +102,29 @@ public class SEDatabaseConformanceTest {
         Class.forName("org.sqlite.JDBC");
         dbFile = File.createTempFile("cn1-conformance", ".db");
         assertTrue(dbFile.delete());
-        db = new SEDatabase(openPlain(dbFile));
+        db = identified(openPlain(dbFile), dbFile);
+    }
+
+    /**
+     * A database that knows which file it holds, the way JavaSEPort opens one.
+     *
+     * The connection-taking constructor deliberately cannot say, and a key change through it is
+     * refused for that reason -- so a test that re-keys has to identify its file like the port
+     * does, taking the claim first and passing the same key on.
+     */
+    private static SEDatabase identified(java.sql.Connection conn, File file) throws Exception {
+        String openKey = file.getCanonicalPath();
+        SEDatabase.reserveConnection(openKey);
+        boolean kept = false;
+        try {
+            SEDatabase opened = new SEDatabase(conn, file.getName(), openKey);
+            kept = true;
+            return opened;
+        } finally {
+            if (!kept) {
+                SEDatabase.releaseConnection(openKey);
+            }
+        }
     }
 
     @AfterEach
@@ -301,7 +323,7 @@ public class SEDatabaseConformanceTest {
         assertTrue(dbFile.delete());
 
         String key = "correct horse battery staple";
-        SEDatabase enc = new SEDatabase(openEncrypted(dbFile, key));
+        SEDatabase enc = identified(openEncrypted(dbFile, key), dbFile);
         try {
             enc.execute("CREATE TABLE secret (v TEXT)");
             enc.execute("INSERT INTO secret (v) VALUES (?)", new String[] {"classified"});
@@ -312,7 +334,7 @@ public class SEDatabaseConformanceTest {
         assertFalse(startsWithPlaintextHeader(dbFile),
                 "the file must not begin with a plaintext SQLite header");
 
-        SEDatabase reopened = new SEDatabase(openEncrypted(dbFile, key));
+        SEDatabase reopened = identified(openEncrypted(dbFile, key), dbFile);
         try {
             Cursor cur = reopened.executeQuery("SELECT v FROM secret");
             assertTrue(cur.next());
@@ -341,7 +363,7 @@ public class SEDatabaseConformanceTest {
 
         assertFalse(startsWithPlaintextHeader(dbFile));
 
-        SEDatabase enc = new SEDatabase(openEncrypted(dbFile, "a secret"));
+        SEDatabase enc = identified(openEncrypted(dbFile, "a secret"), dbFile);
         try {
             Cursor cur = enc.executeQuery("SELECT v FROM t");
             assertTrue(cur.next());

@@ -339,6 +339,40 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void nestedLegacyTransactionsEndOneAtATime() throws IOException {
+        // Under the legacy hint Android allows nesting because it used to, and its engine
+        // ref-counts. Clearing the flag on the first commit would report no transaction while the
+        // outer one still held uncommitted rows, and a key change would be allowed over them.
+        Database.setLegacyBehavior(true);
+        try {
+            db.beginTransaction();
+            db.beginTransaction();
+            db.commitTransaction();
+            assertTrue(db.isInTransaction(), "the outer transaction is still open");
+            db.commitTransaction();
+            assertFalse(db.isInTransaction(), "now both have ended");
+        } finally {
+            Database.setLegacyBehavior(false);
+        }
+    }
+
+    @Test
+    void aScriptCommitEndsEveryNestedBegin() throws IOException {
+        // A COMMIT in a script ends the transaction outright, whatever the count says: the engine
+        // has ended it, so holding the flag would block every key change until the connection
+        // closed.
+        Database.setLegacyBehavior(true);
+        try {
+            db.beginTransaction();
+            db.beginTransaction();
+            db.ran("COMMIT");
+            assertFalse(db.isInTransaction(), "the engine ended it, count or no count");
+        } finally {
+            Database.setLegacyBehavior(false);
+        }
+    }
+
+    @Test
     void anOrdinaryScriptLeavesTheStateAlone() {
         db.ran("CREATE TABLE t (a INTEGER); INSERT INTO t VALUES (1)");
         assertFalse(db.isInTransaction());

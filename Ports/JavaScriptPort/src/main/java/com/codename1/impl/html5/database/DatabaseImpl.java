@@ -51,21 +51,28 @@ public class DatabaseImpl extends Database {
      */
     private final String databaseName;
 
+    /** The pool file this connection holds, as the open-database registry knows it. */
+    private final String openKey;
+
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
 
     public DatabaseImpl(String name, String key) throws IOException {
         this.databaseName = name;
+        // The storage pool puts "foo" and "/foo" in the same file, so the registry has to see them
+        // as one database: two entries for one file would let either connection pass the
+        // sole-connection check and rekey the file underneath the other.
+        this.openKey = name != null && name.startsWith("/") ? name : "/" + name;
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this database, and opening it before asking would leave the handle behind when the
         // refusal arrived.
-        registerOpenDatabase(databaseName);
+        registerOpenDatabase(openKey);
         boolean opened = false;
         try {
             peer = SQLiteNative.open(name, key);
             opened = openOrFail(name);
         } finally {
             if (!opened) {
-                releaseOpenDatabase(databaseName);
+                releaseOpenDatabase(openKey);
             }
         }
     }
@@ -195,7 +202,7 @@ public class DatabaseImpl extends Database {
             // Last, not first: until the engine has let the database go this connection still
             // holds it, and giving the claim back sooner lets another connection start rewriting
             // it underneath a rollback that has not finished.
-            releaseOpenDatabase(databaseName);
+            releaseOpenDatabase(openKey);
         }
     }
 
@@ -205,7 +212,7 @@ public class DatabaseImpl extends Database {
         checkNoTransactionForKeyChange();
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
-        requireSoleConnectionForKeyChange(databaseName);
+        requireSoleConnectionForKeyChange(openKey);
         try {
             String key = null;
             if (config != null && config.isEncrypted()) {
@@ -213,7 +220,7 @@ public class DatabaseImpl extends Database {
             }
             checkNative(SQLiteNative.rekey(peer, key));
         } finally {
-            releaseKeyChangeClaim(databaseName);
+            releaseKeyChangeClaim(openKey);
         }
     }
 
@@ -226,6 +233,12 @@ public class DatabaseImpl extends Database {
         } finally {
             // Read back from the engine rather than inferred from the script: it stops at the
             // statement that failed, so a trailing COMMIT in the text may never have run.
+            // The names first: an outermost SAVEPOINT opens a transaction that only its own
+            // RELEASE ends, and the engine reports a boolean without saying which savepoint owns
+            // it. A later RELEASE arriving through a parameterized overload -- which has no engine
+            // read of its own -- would otherwise go unrecognized and leave this believing a
+            // transaction was still open forever.
+            noteScriptTransactionControl(sql);
             noteEngineTransactionState(SQLiteNative.inTransaction(peer));
         }
     }

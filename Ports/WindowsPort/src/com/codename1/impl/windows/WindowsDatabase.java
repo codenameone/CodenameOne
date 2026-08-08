@@ -105,6 +105,13 @@ class WindowsDatabase extends Database {
     /// And the default filesystem is case insensitive, so "C:/Data/App.db" and "c:/data/app.db"
     /// are one file: registering them apart would have each connection believe it was the only
     /// one and let either rekey the file underneath the other.
+    ///
+    /// The folding is `String.toLowerCase`, which on this target is the translator's `towlower`
+    /// path and covers the simple BMP mappings rather than only ASCII. `towlower` reads the C
+    /// locale, though, so a build that never sets one folds ASCII alone -- two spellings of a
+    /// non-ASCII path that differ only in case would then be two entries. Named here because the
+    /// error is in the unsafe direction, and closing it needs the platform asked for the real
+    /// name, not a smarter fold.
     private static String windowsPathKey(String path) {
         if (path == null) {
             return null;
@@ -226,6 +233,12 @@ class WindowsDatabase extends Database {
         } finally {
             // Read back from the engine rather than inferred from the script. SQLite stops at the
             // statement that failed, so a trailing COMMIT in the text may never have run.
+            // The names first: an outermost SAVEPOINT opens a transaction that only its own
+            // RELEASE ends, and the engine reports a boolean without saying which savepoint owns
+            // it. A later RELEASE arriving through a parameterized overload -- which has no engine
+            // read of its own -- would otherwise go unrecognized and leave this believing a
+            // transaction was still open forever.
+            noteScriptTransactionControl(sql);
             noteEngineTransactionState(WindowsNative.sqlDbInTransaction(peer));
         }
     }

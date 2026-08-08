@@ -6847,15 +6847,25 @@ function cn1SqliteToBigInt(v) {
   return BigInt(Math.trunc(Number(v)));
 }
 
-/** Converts an engine integer back into whatever this runtime uses for a Java long. */
+/**
+ * Converts an engine integer into the runtime's Java long.
+ *
+ * A long is a hi/lo pair here, not a BigInt and not a number: handing back a BigInt sends it
+ * through the runtime's _Lc(), whose BigInt branch goes via Number and drops everything past 53
+ * bits. SQLite stores 64-bit integers and the API promises a Java long, so 9007199254740993 came
+ * back as ...992 -- close enough to look right and wrong by one.
+ */
 function cn1SqliteFromBigInt(v) {
   const big = typeof v === "bigint" ? v : BigInt(Math.trunc(Number(v)));
-  if (typeof jvm.longFromBigInt === "function") {
-    return jvm.longFromBigInt(big);
+  if (typeof _Llit === "function") {
+    // Two's complement both halves: asIntN keeps the sign of a negative value in the high word,
+    // and the low word is read back unsigned on the way in.
+    return _Llit(Number(BigInt.asIntN(32, big & 0xFFFFFFFFn)) | 0,
+      Number(BigInt.asIntN(32, big >> 32n)) | 0);
   }
-  // Exact-longs runtime: BigInt is the representation. Otherwise fall back to a Number, which is
-  // what that runtime already uses everywhere else.
-  return typeof 0n === "bigint" && jvm.exactLongs !== false ? big : Number(big);
+  // A runtime without the hi/lo helpers represents longs as numbers, which is the precision it
+  // has everywhere else too.
+  return Number(big);
 }
 
 function cn1SqliteDbPath(name) {
