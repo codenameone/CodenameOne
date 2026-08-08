@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChatView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">ChatView.java</span></div><h1>ChatView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ai.ChatMessage;
+import com.codename1.ai.MessagePart;
+import com.codename1.ai.Role;
+import com.codename1.ai.TextPart;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/// A scrollable, theme-aware chat surface.
+///
+/// `ChatView` is a **pure UI component** -- it has no knowledge of
+/// LLMs or any specific chat backend. It accepts [ChatMessage]
+/// instances (the same data envelope the AI client uses, but
+/// equally usable for peer-to-peer messaging) and renders them as
+/// styled bubbles. Routing the user's input to a backend and
+/// piping responses back into the view is the caller's job. For
+/// LLM use there's a ready-made binding -- see
+/// `com.codename1.ai.LlmChatBinding` -- but the same surface
+/// trivially supports a WhatsApp-style peer chat:
+///
+/// ```
+/// ChatView view = new ChatView();
+/// view.setOnSend(evt -&gt; {
+///     String text = view.getInput().getText();
+///     view.getInput().clear();
+///     view.addMessage(ChatMessage.user(text));          // outgoing
+///     chatService.send(text, peerReply -&gt; {
+///         // peer responses render as &quot;assistant&quot; bubbles
+///         view.addMessage(ChatMessage.assistant(peerReply));
+///     });
+/// });
+/// // System / &quot;X joined the chat&quot; notices use ChatMessage.system.
+/// ```
+///
+/// The `USER` / `ASSISTANT` / `SYSTEM` roles map naturally to
+/// self / peer / system-notice in a peer chat; rename via CSS
+/// (the bubble UIIDs are `ChatBubbleUser`, `ChatBubbleAssistant`,
+/// `ChatBubbleSystem`) if the visual treatment needs to differ.
+/// Apps that need a totally different message data type can
+/// subclass and override [#createBubble(ChatMessage)] to render
+/// however they like while still using `ChatMessage` as the
+/// transport.
+///
+/// #### Default UIIDs
+///
+/// `ChatView`, `ChatViewMessages`, `ChatBubbleUser`,
+/// `ChatBubbleAssistant`, `ChatBubbleSystem`, `ChatBubbleText`,
+/// `ChatTypingIndicator`, `ChatInput`, `ChatInputField`,
+/// `ChatSendButton`, `ChatAttachButton`, `ChatVoiceButton`.
+public class ChatView extends Container {
+    private final Container messages;
+    private final ChatInput input;
+    private final Label typing;
+<span class="fc" id="L87">    private final List&lt;ChatMessage&gt; history = new ArrayList&lt;ChatMessage&gt;();</span>
+<span class="fc" id="L88">    private final List&lt;ChatBubble&gt; bubbles = new ArrayList&lt;ChatBubble&gt;();</span>
+
+    public ChatView() {
+<span class="fc" id="L91">        super(new BorderLayout());</span>
+<span class="fc" id="L92">        setUIID(&quot;ChatView&quot;);</span>
+<span class="fc" id="L93">        messages = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L94">        messages.setUIID(&quot;ChatViewMessages&quot;);</span>
+<span class="fc" id="L95">        messages.setScrollableY(true);</span>
+<span class="fc" id="L96">        typing = new Label(&quot;...&quot;);</span>
+<span class="fc" id="L97">        typing.setUIID(&quot;ChatTypingIndicator&quot;);</span>
+<span class="fc" id="L98">        typing.setVisible(false);</span>
+<span class="fc" id="L99">        input = new ChatInput();</span>
+
+<span class="fc" id="L101">        Container bottom = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L102">        bottom.add(typing);</span>
+<span class="fc" id="L103">        bottom.add(input);</span>
+
+<span class="fc" id="L105">        add(BorderLayout.CENTER, messages);</span>
+<span class="fc" id="L106">        add(BorderLayout.SOUTH, bottom);</span>
+<span class="fc" id="L107">    }</span>
+
+    /// Renders `message` as a new [ChatBubble] at the bottom of the
+    /// list and scrolls into view. Safe to call from any thread.
+    ///
+    /// The bubble itself is laid out inside a single-row FlowLayout
+    /// container whose alignment is driven by the message role:
+    /// USER -&gt; right, ASSISTANT -&gt; left, SYSTEM -&gt; centre. That keeps
+    /// the bubble's *visible width* anchored to its text content
+    /// rather than stretching across the full chat surface, which is
+    /// what makes a chat bubble actually look like a bubble.
+    public ChatBubble addMessage(final ChatMessage message) {
+<span class="fc" id="L119">        final ChatBubble[] out = new ChatBubble[1];</span>
+<span class="fc" id="L120">        Runnable r = new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L123">                ChatBubble b = createBubble(message);</span>
+<span class="fc" id="L124">                Container row = new Container(new FlowLayout(alignmentFor(message.getRole())));</span>
+<span class="fc" id="L125">                row.setUIID(&quot;ChatBubbleRow&quot;);</span>
+<span class="fc" id="L126">                row.add(b);</span>
+<span class="fc" id="L127">                history.add(message);</span>
+<span class="fc" id="L128">                bubbles.add(b);</span>
+<span class="fc" id="L129">                messages.add(row);</span>
+<span class="fc" id="L130">                messages.revalidateLater();</span>
+<span class="fc" id="L131">                messages.scrollComponentToVisible(b);</span>
+<span class="fc" id="L132">                out[0] = b;</span>
+<span class="fc" id="L133">            }</span>
+        };
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L136">            r.run();</span>
+        } else {
+            // Wait for the EDT to insert so we can return the bubble
+            // synchronously to the caller.
+<span class="nc" id="L140">            Display.getInstance().callSeriallyAndWait(r);</span>
+        }
+<span class="fc" id="L142">        return out[0];</span>
+    }
+
+    /// Appends an empty assistant/peer bubble that subsequent
+    /// [ChatBubble#appendText] calls (or [#appendToLastMessage]) can
+    /// stream tokens into. Returns the bubble so the caller can
+    /// retain the reference -- the typical pattern is to capture it
+    /// before opening a streaming network call.
+    public ChatBubble beginAssistantStream() {
+<span class="fc" id="L151">        return addMessage(new ChatMessage(Role.ASSISTANT,</span>
+<span class="fc" id="L152">                Arrays.&lt;MessagePart&gt;asList(new TextPart(&quot;&quot;))));</span>
+    }
+
+    /// Append a streaming token delta to the most recently added
+    /// bubble. Safe to call off-EDT. No-op when there is no
+    /// bubble yet.
+    public void appendToLastMessage(String delta) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (bubbles.isEmpty()) {</span>
+<span class="fc" id="L160">            return;</span>
+        }
+<span class="fc" id="L162">        bubbles.get(bubbles.size() - 1).appendText(delta);</span>
+<span class="fc" id="L163">    }</span>
+
+    public void setTypingIndicatorVisible(final boolean v) {
+<span class="fc" id="L166">        Runnable r = new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L169">                typing.setVisible(v);</span>
+<span class="fc" id="L170">                typing.getParent().revalidateLater();</span>
+<span class="fc" id="L171">            }</span>
+        };
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L174">            r.run();</span>
+        } else {
+<span class="nc" id="L176">            Display.getInstance().callSerially(r);</span>
+        }
+<span class="fc" id="L178">    }</span>
+
+    public void setOnSend(ActionListener listener) {
+<span class="fc" id="L181">        input.setOnSend(listener);</span>
+<span class="fc" id="L182">    }</span>
+
+    public void setOnAttach(ActionListener listener) {
+<span class="fc" id="L185">        input.setOnAttach(listener);</span>
+<span class="fc" id="L186">    }</span>
+
+    public void setOnVoice(ActionListener listener) {
+<span class="fc" id="L189">        input.setOnVoice(listener);</span>
+<span class="fc" id="L190">    }</span>
+
+    public ChatInput getInput() {
+<span class="fc" id="L193">        return input;</span>
+    }
+
+    public List&lt;ChatMessage&gt; getHistory() {
+<span class="fc" id="L197">        return Collections.unmodifiableList(history);</span>
+    }
+
+    /// Override to swap in a custom bubble renderer (e.g. one that
+    /// understands markdown, shows avatars, or formats peer
+    /// messages differently from LLM responses). Default delegates
+    /// to [ChatBubble].
+    protected ChatBubble createBubble(ChatMessage message) {
+<span class="fc" id="L205">        return new ChatBubble(message);</span>
+    }
+
+    private static int alignmentFor(Role role) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (role == Role.USER) {</span>
+<span class="fc" id="L210">            return com.codename1.ui.Component.RIGHT;</span>
+        }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (role == Role.SYSTEM) {</span>
+<span class="fc" id="L213">            return com.codename1.ui.Component.CENTER;</span>
+        }
+<span class="fc" id="L215">        return com.codename1.ui.Component.LEFT;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

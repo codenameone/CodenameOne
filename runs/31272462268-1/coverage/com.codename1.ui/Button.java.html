@@ -1,0 +1,1247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Button.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Button.java</span></div><h1>Button.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.ComponentStateChangeEvent;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Collection;
+import java.util.Vector;
+
+
+/// Button is the base class for several UI widgets allowing clickability.
+/// It has 3 states: rollover, pressed and the default state. `Button`
+/// can also have an `com.codename1.ui.events.ActionListener` that react when the
+/// `Button` is clicked or handle actions via a
+/// `com.codename1.ui.Command`.
+///
+/// Button has the &quot;Button&quot; UIID by default.
+///
+/// Here is trivial usage of the `Button` API:
+///
+/// ```java
+/// Form hi = new Form(&quot;Button&quot;);
+/// Button b = new Button(&quot;My Button&quot;);
+/// hi.add(b);
+/// b.addActionListener((e) -&gt; Log.p(&quot;Clicked&quot;));
+/// ```
+///
+/// This code shows a common use case of making a button look like a hyperlink
+///
+/// ```java
+/// Form hi = new Form(&quot;Button&quot;);
+/// Button b = new Button(&quot;Link Button&quot;);
+/// b.getAllStyles().setBorder(Border.createEmpty());
+/// b.getAllStyles().setTextDecoration(Style.TEXT_DECORATION_UNDERLINE);
+/// hi.add(b);
+/// b.addActionListener((e) -&gt; Log.p(&quot;Clicked&quot;));
+/// ```
+///
+/// @author Chen Fishbein
+public class Button extends Label implements ReleasableComponent, ActionSource&lt;ActionEvent&gt;, SelectableIconHolder {
+    /// Indicates the rollover state of a button which is equivalent to focused for
+    /// most uses
+    public static final int STATE_ROLLOVER = 0;
+    /// Indicates the pressed state of a button
+    public static final int STATE_PRESSED = 1;
+    /// Indicates the default state of a button which is neither pressed nor focused
+    public static final int STATE_DEFAULT = 2;
+    /// Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+    private static boolean buttonRippleEffectDefault;
+    /// Indicates whether text on the button should be drawn capitalized by default to match the Android design
+    private static boolean capsTextDefault;
+<span class="fc" id="L84">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+    /// Indicates whether text on the button should be drawn capitalized by default to match the Android design
+    private Boolean capsText;
+    private EventDispatcher stateChangeListeners;
+<span class="fc" id="L88">    private int state = STATE_DEFAULT;</span>
+    private Image pressedIcon;
+    private Image rolloverIcon;
+    private Image rolloverPressedIcon;
+    private Image disabledIcon;
+    private Command cmd;
+    private boolean toggle;
+    private int releaseRadius;
+    private boolean autoRelease;
+    /// Duration in millis of the iOS-style release dim-out (0 disables it). Read
+    /// from the `buttonReleaseFadeDurationInt` theme constant so only themes that
+    /// opt in pay for it; see {@link #startReleaseFade()}.
+    private int releaseFadeDuration;
+    /// Motion driving the release fade alpha (255 -&gt; 0); non-null while fading.
+    private Motion releaseFadeMotion;
+    /// Snapshot of the pressed background, faded out over the settled background.
+    private Image releaseFadeImage;
+    /// A listener used to bind the state with another button.  When that button's state
+    /// changes, then this button state will also change.
+    ///
+    private ActionListener&lt;? extends ActionEvent&gt; bindListener;
+
+    /// Constructs a button with an empty string for its text.
+    public Button() {
+<span class="fc" id="L112">        this(&quot;&quot;);</span>
+<span class="fc" id="L113">    }</span>
+
+    /// Constructs a button with the specified text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: label appearing on the button
+    public Button(String text) {
+<span class="fc" id="L121">        this(text, null, &quot;Button&quot;);</span>
+<span class="fc" id="L122">    }</span>
+
+    /// Allows binding a command to a button for ease of use
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: @param cmd command whose text would be used for the button and would recive action events
+    /// from the button
+    public Button(Command cmd) {
+<span class="fc" id="L131">        this(cmd.getCommandName(), cmd.getIcon());</span>
+<span class="fc" id="L132">        addActionListener(cmd);</span>
+<span class="fc" id="L133">        this.cmd = cmd;</span>
+<span class="fc" id="L134">        setEnabled(cmd.isEnabled());</span>
+<span class="fc" id="L135">        updateCommand();</span>
+<span class="fc" id="L136">    }</span>
+
+    /// Constructs a button with the specified image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: appearing on the button
+    public Button(Image icon) {
+<span class="nc" id="L144">        this(&quot;&quot;, icon);</span>
+<span class="nc" id="L145">    }</span>
+
+    /// Constructs a button with the specified material image icon.
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: appearing on the button
+    public Button(char icon) {
+<span class="fc" id="L153">        this(&quot;&quot;);</span>
+<span class="fc" id="L154">        setMaterialIcon(icon);</span>
+<span class="fc" id="L155">    }</span>
+
+    /// Constructor a button with text, material image and uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: label appearing on the button
+    ///
+    /// - `icon`: image appearing on the button
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(String text, char icon, String id) {
+<span class="nc" id="L167">        this(text, null, id);</span>
+<span class="nc" id="L168">        setMaterialIcon(icon);</span>
+<span class="nc" id="L169">    }</span>
+
+    /// Constructor a button with text, material image and uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: label appearing on the button
+    ///
+    /// - `icon`: image appearing on the button
+    ///
+    /// - `iconSize`: image size in millimeters
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(String text, char icon, float iconSize, String id) {
+<span class="nc" id="L183">        this(text, null, id);</span>
+<span class="nc" id="L184">        setMaterialIcon(icon, iconSize);</span>
+<span class="nc" id="L185">    }</span>
+
+    /// Constructor a button with text, image and uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: label appearing on the button
+    ///
+    /// - `icon`: image appearing on the button
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(String text, Image icon, String id) {
+<span class="fc" id="L197">        super(text);</span>
+<span class="fc" id="L198">        setUIIDFinal(id);</span>
+<span class="fc" id="L199">        setFocusable(true);</span>
+<span class="fc" id="L200">        setIcon(icon);</span>
+<span class="fc" id="L201">        this.pressedIcon = icon;</span>
+<span class="fc" id="L202">        this.rolloverIcon = icon;</span>
+<span class="fc" id="L203">        releaseRadius = UIManager.getInstance().getThemeConstant(&quot;releaseRadiusInt&quot;, 0);</span>
+<span class="fc" id="L204">        releaseFadeDuration = UIManager.getInstance().getThemeConstant(&quot;buttonReleaseFadeDurationInt&quot;, 0);</span>
+<span class="fc" id="L205">        setRippleEffect(buttonRippleEffectDefault);</span>
+<span class="pc bpc" id="L206" title="3 of 4 branches missed.">        if (isCapsText() &amp;&amp; text != null) {</span>
+<span class="nc" id="L207">            putClientProperty(&quot;cn1$origText&quot;, text);</span>
+<span class="nc" id="L208">            super.setText(UIManager.getInstance().localize(text, text).toUpperCase());</span>
+        }
+<span class="fc" id="L210">        setCursor(HAND_CURSOR);</span>
+<span class="fc" id="L211">    }</span>
+
+    /// Constructor a button with text and image
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: label appearing on the button
+    ///
+    /// - `icon`: image appearing on the button
+    public Button(String text, Image icon) {
+<span class="fc" id="L221">        this(text, icon, &quot;Button&quot;);</span>
+<span class="fc" id="L222">    }</span>
+
+    /// Constructor a button with image and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: image appearing on the button
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(Image icon, String id) {
+<span class="nc" id="L232">        this(&quot;&quot;, icon, id);</span>
+<span class="nc" id="L233">    }</span>
+
+    /// Constructor a button with material image icon and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: image appearing on the button
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(char icon, String id) {
+<span class="nc" id="L243">        this(&quot;&quot;, id);</span>
+<span class="nc" id="L244">        setMaterialIcon(icon);</span>
+<span class="nc" id="L245">    }</span>
+
+    /// Constructor a button with material image icon and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: image appearing on the button
+    ///
+    /// - `iconSize`: the size of the icon in millimeters
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(char icon, float iconSize, String id) {
+<span class="nc" id="L257">        this(&quot;&quot;, id);</span>
+<span class="nc" id="L258">        setMaterialIcon(icon, iconSize);</span>
+<span class="nc" id="L259">    }</span>
+
+    /// Constructor a button with text and UIID
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: label appearing on the button
+    ///
+    /// - `id`: UIID unique identifier for button
+    public Button(String text, String id) {
+<span class="fc" id="L269">        this(text, null, id);</span>
+<span class="fc" id="L270">    }</span>
+
+    /// Indicates whether text on the button should be drawn capitalized by default to match the Android design.
+    /// This value can be set by the `capsButtonTextBool` theme constant
+    ///
+    /// #### Returns
+    ///
+    /// the capsTextDefault
+    public static boolean isCapsTextDefault() {
+<span class="fc" id="L279">        return capsTextDefault;</span>
+    }
+
+    /// Indicates whether text on the button should be drawn capitalized by default to match the Android design
+    /// This value can be set by the `capsButtonTextBool` theme constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `aCapsTextDefault`: the capsTextDefault to set
+    public static void setCapsTextDefault(boolean aCapsTextDefault) {
+<span class="fc" id="L289">        capsTextDefault = aCapsTextDefault;</span>
+<span class="fc" id="L290">    }</span>
+
+    /// Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+    ///
+    /// #### Returns
+    ///
+    /// the buttonRippleEffectDefault
+    public static boolean isButtonRippleEffectDefault() {
+<span class="fc" id="L298">        return buttonRippleEffectDefault;</span>
+    }
+
+    /// Default value for the button ripple effect, this can be set with the theme constant buttonRippleBool
+    ///
+    /// #### Parameters
+    ///
+    /// - `aButtonRippleEffectDefault`: the buttonRippleEffectDefault to set
+    public static void setButtonRippleEffectDefault(boolean aButtonRippleEffectDefault) {
+<span class="fc" id="L307">        buttonRippleEffectDefault = aButtonRippleEffectDefault;</span>
+<span class="fc" id="L308">    }</span>
+
+    private void updateCommand() {
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (cmd.getMaterialIcon() == 0) {</span>
+<span class="fc" id="L312">            setRolloverIcon(cmd.getRolloverIcon());</span>
+<span class="fc" id="L313">            setDisabledIcon(cmd.getDisabledIcon());</span>
+<span class="fc" id="L314">            setPressedIcon(cmd.getPressedIcon());</span>
+        } else {
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            if (cmd.getIconFont() != null) {</span>
+<span class="nc" id="L317">                setFontIcon(cmd.getIconFont(), cmd.getMaterialIcon(), cmd.getMaterialIconSize());</span>
+            } else {
+<span class="fc" id="L319">                setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());</span>
+            }
+        }
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (cmd.getIconGapMM() &gt; -1) {</span>
+<span class="nc" id="L323">            setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));</span>
+        }
+        // Compact circular toolbar commands cannot accommodate an icon and a
+        // useful text label at the same time.  Themes may opt title-bar commands
+        // into icon-only rendering while retaining the command name as the
+        // accessibility label.  Side-menu, dialog and ordinary command-backed
+        // buttons are deliberately unaffected.
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (cmd.getClientProperty(&quot;TitleCommand&quot;) != null</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">                &amp;&amp; getUIManager().isThemeConstant(&quot;hideToolbarCommandTextWithIconBool&quot;, false)</span>
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">                &amp;&amp; (cmd.getIcon() != null || cmd.getMaterialIcon() != 0)) {</span>
+<span class="fc" id="L333">            String commandName = cmd.getCommandName();</span>
+<span class="fc" id="L334">            String accessibilityText = getAccessibilityText();</span>
+<span class="pc bpc" id="L335" title="3 of 6 branches missed.">            if ((accessibilityText == null || accessibilityText.equals(getText()))</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">                    &amp;&amp; commandName != null &amp;&amp; commandName.length() &gt; 0) {</span>
+<span class="fc" id="L337">                setAccessibilityText(commandName);</span>
+            }
+<span class="fc" id="L339">            setText(&quot;&quot;);</span>
+        }
+<span class="fc" id="L341">    }</span>
+
+    private ActionListener&lt;? extends ActionEvent&gt; bindListener() {
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (bindListener == null) {</span>
+<span class="fc" id="L345">            bindListener = new ActionListener&lt;ActionEvent&gt;() {</span>
+                @Override
+                public void actionPerformed(ActionEvent e) {
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">                    if (e.getSource() instanceof Button) {</span>
+<span class="fc" id="L349">                        Button b = (Button) e.getSource();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                        if (state != b.getState()) {</span>
+<span class="fc" id="L351">                            setState(b.getState());</span>
+<span class="fc" id="L352">                            repaint();</span>
+                        }
+                    }
+<span class="fc" id="L355">                }</span>
+            };
+        }
+<span class="fc" id="L358">        return bindListener;</span>
+    }
+
+    /// Bind the state of this button to another button's state.  Once bound, when the other
+    /// button's state changes, this button will change its state to match.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: The button whose state to bind to.
+    ///
+    /// #### See also
+    ///
+    /// - #unbindStateFrom(com.codename1.ui.Button)
+    public void bindStateTo(Button button) {
+<span class="fc" id="L372">        button.addStateChangeListener((ActionListener&lt;ComponentStateChangeEvent&gt;) bindListener());</span>
+<span class="fc" id="L373">    }</span>
+
+    /// Unbinds the state of this button from another button.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: The button to unbind state from.
+    ///
+    /// #### See also
+    ///
+    /// - #bindStateTo(com.codename1.ui.Button)
+    public void unbindStateFrom(Button button) {
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if (bindListener != null) {</span>
+<span class="fc" id="L386">            button.removeStateChangeListener((ActionListener&lt;ComponentStateChangeEvent&gt;) bindListener);</span>
+        }
+<span class="fc" id="L388">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void resetFocusable() {
+<span class="fc" id="L393">        setFocusable(true);</span>
+<span class="fc" id="L394">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void focusGainedInternal() {
+<span class="fc" id="L399">        super.focusGainedInternal();</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        if (state != STATE_PRESSED) {</span>
+<span class="fc" id="L401">            state = STATE_ROLLOVER;</span>
+<span class="fc" id="L402">            fireStateChange();</span>
+        }
+<span class="fc" id="L404">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void focusLostInternal() {
+<span class="fc" id="L409">        super.focusLostInternal();</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (state != STATE_DEFAULT) {</span>
+<span class="fc" id="L411">            state = STATE_DEFAULT;</span>
+<span class="fc" id="L412">            fireStateChange();</span>
+        }
+
+<span class="fc" id="L415">    }</span>
+
+    /// Returns the button state
+    ///
+    /// #### Returns
+    ///
+    /// One of STATE_ROLLOVER, STATE_DEAFULT, STATE_PRESSED
+    public int getState() {
+<span class="fc" id="L423">        return state;</span>
+    }
+
+    void setState(int state) {
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (state != this.state) {</span>
+<span class="fc" id="L428">            this.state = state;</span>
+<span class="fc" id="L429">            fireStateChange();</span>
+        }
+<span class="fc" id="L431">    }</span>
+
+    /// Set the button in released and unfocused state
+    @Override
+    public void setReleased() {
+<span class="fc" id="L436">        setState(Button.STATE_DEFAULT);</span>
+<span class="fc" id="L437">        repaint();</span>
+<span class="fc" id="L438">    }</span>
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    ///
+    /// #### See also
+    ///
+    /// - #STATE_PRESSED
+    @Override
+    public Image getPressedIcon() {
+<span class="fc" id="L452">        return pressedIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressedIcon`: icon used
+    ///
+    /// #### See also
+    ///
+    /// - #STATE_PRESSED
+    @Override
+    public void setPressedIcon(Image pressedIcon) {
+<span class="fc" id="L467">        this.pressedIcon = pressedIcon;</span>
+<span class="fc" id="L468">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L469">        checkAnimation();</span>
+<span class="fc" id="L470">        repaint();</span>
+<span class="fc" id="L471">    }</span>
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state and is selected. This is ONLY applicable to toggle buttons
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    @Override
+    public Image getRolloverPressedIcon() {
+<span class="fc" id="L481">        return rolloverPressedIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state and is selected. This is ONLY applicable to toggle buttons
+    ///
+    /// #### Parameters
+    ///
+    /// - `rolloverPressedIcon`: icon used
+    @Override
+    public void setRolloverPressedIcon(Image rolloverPressedIcon) {
+<span class="fc" id="L492">        this.rolloverPressedIcon = rolloverPressedIcon;</span>
+<span class="fc" id="L493">    }</span>
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    @Override
+    public Image getDisabledIcon() {
+<span class="fc" id="L503">        return disabledIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Parameters
+    ///
+    /// - `disabledIcon`: icon used
+    @Override
+    public void setDisabledIcon(Image disabledIcon) {
+<span class="fc" id="L514">        this.disabledIcon = disabledIcon;</span>
+<span class="fc" id="L515">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L516">        checkAnimation();</span>
+<span class="fc" id="L517">        repaint();</span>
+<span class="fc" id="L518">    }</span>
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    ///
+    /// #### See also
+    ///
+    /// - #STATE_ROLLOVER
+    @Override
+    public Image getRolloverIcon() {
+<span class="fc" id="L532">        return rolloverIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Parameters
+    ///
+    /// - `rolloverIcon`: icon to use
+    ///
+    /// #### See also
+    ///
+    /// - #STATE_ROLLOVER
+    @Override
+    public void setRolloverIcon(Image rolloverIcon) {
+<span class="fc" id="L547">        this.rolloverIcon = rolloverIcon;</span>
+<span class="fc" id="L548">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L549">        checkAnimation();</span>
+<span class="fc" id="L550">        repaint();</span>
+<span class="fc" id="L551">    }</span>
+
+    @Override
+    void checkAnimation() {
+<span class="fc" id="L555">        super.checkAnimation();</span>
+<span class="pc bpc" id="L556" title="1 of 6 branches missed.">        if ((pressedIcon != null &amp;&amp; pressedIcon.isAnimation()) ||</span>
+<span class="pc bpc" id="L557" title="1 of 4 branches missed.">                (rolloverIcon != null &amp;&amp; rolloverIcon.isAnimation()) ||</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                (disabledIcon != null &amp;&amp; disabledIcon.isAnimation())) {</span>
+<span class="nc" id="L559">            Form parent = getComponentForm();</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            if (parent != null) {</span>
+                // animations are always running so the internal animation isn't
+                // good enough. We never want to stop this sort of animation
+<span class="nc" id="L563">                parent.registerAnimated(this);</span>
+            }
+        }
+<span class="fc" id="L566">    }</span>
+
+    /// Adds a listener to be notified when the button state changes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: Listener to be notified when state changes
+    ///
+    /// #### See also
+    ///
+    /// - #getState()
+    ///
+    /// - #setState(int)
+    ///
+    /// - #removeStateChangeListener(com.codename1.ui.events.ActionListener)
+    @Override
+    public void addStateChangeListener(ActionListener&lt;ComponentStateChangeEvent&gt; l) {
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">        if (stateChangeListeners == null) {</span>
+<span class="fc" id="L584">            stateChangeListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L586">        stateChangeListeners.addListener(l);</span>
+<span class="fc" id="L587">    }</span>
+
+    /// Removes state change listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: State change listener to remove.
+    ///
+    /// #### See also
+    ///
+    /// - #addStateChangeListener(com.codename1.ui.events.ActionListener)
+    ///
+    /// - #getState()
+    ///
+    /// - #setState(int)
+    @Override
+    public void removeStateChangeListener(ActionListener&lt;ComponentStateChangeEvent&gt; l) {
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">        if (stateChangeListeners != null) {</span>
+<span class="fc" id="L605">            stateChangeListeners.removeListener(l);</span>
+        }
+<span class="fc" id="L607">    }</span>
+
+    private void fireStateChange() {
+<span class="fc bfc" id="L610" title="All 4 branches covered.">        if (stateChangeListeners != null &amp;&amp; stateChangeListeners.hasListeners()) {</span>
+<span class="fc" id="L611">            stateChangeListeners.fireActionEvent(new ActionEvent(this));</span>
+        }
+<span class="fc" id="L613">    }</span>
+
+    /// Adds a listener to the button which will cause an event to dispatch on click
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
+    @Override
+    public void addActionListener(ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L622">        dispatcher.addListener(l);</span>
+<span class="fc" id="L623">    }</span>
+
+    /// Removes the given action listener from the button
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: implementation of the action listener interface
+    @Override
+    public void removeActionListener(ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L632">        dispatcher.removeListener(l);</span>
+<span class="fc" id="L633">    }</span>
+
+    /// Returns a vector containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
+    ///
+    /// #### Deprecated
+    ///
+    /// use getListeners instead
+    public Vector&lt;ActionListener&lt;ActionEvent&gt;&gt; getActionListeners() {
+<span class="fc" id="L645">        return dispatcher.getListenerVector();</span>
+    }
+
+    /// Returns a collection containing the action listeners for this button
+    ///
+    /// #### Returns
+    ///
+    /// the action listeners
+    public Collection&lt;ActionListener&lt;ActionEvent&gt;&gt; getListeners() {
+<span class="fc" id="L654">        return dispatcher.getListenerCollection();</span>
+    }
+
+    /// Returns the icon for the button based on its current state
+    ///
+    /// #### Returns
+    ///
+    /// the button icon based on its current state
+    @Override
+    public Image getIconFromState() {
+<span class="fc" id="L664">        Image icon = getMaskedIcon();</span>
+<span class="pc bpc" id="L665" title="1 of 4 branches missed.">        if (!isEnabled() &amp;&amp; getDisabledIcon() != null) {</span>
+<span class="nc" id="L666">            return getDisabledIcon();</span>
+        }
+<span class="fc bfc" id="L668" title="All 4 branches covered.">        if (isToggle() &amp;&amp; isSelected()) {</span>
+<span class="fc" id="L669">            icon = rolloverPressedIcon;</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">            if (icon == null) {</span>
+<span class="fc" id="L671">                icon = getPressedIcon();</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">                if (icon == null) {</span>
+<span class="fc" id="L673">                    icon = getMaskedIcon();</span>
+                }
+            }
+<span class="fc" id="L676">            return icon;</span>
+        }
+<span class="pc bpc" id="L678" title="1 of 4 branches missed.">        switch (getState()) {</span>
+            case Button.STATE_DEFAULT:
+<span class="fc" id="L680">                break;</span>
+            case Button.STATE_PRESSED:
+<span class="fc" id="L682">                icon = getPressedIcon();</span>
+<span class="pc bpc" id="L683" title="1 of 2 branches missed.">                if (icon == null) {</span>
+<span class="fc" id="L684">                    icon = getMaskedIcon();</span>
+                }
+                break;
+            case Button.STATE_ROLLOVER:
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">                if (Display.getInstance().shouldRenderSelection(this)) {</span>
+<span class="fc" id="L689">                    icon = getRolloverIcon();</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">                    if (icon == null) {</span>
+<span class="fc" id="L691">                        icon = getMaskedIcon();</span>
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+<span class="fc" id="L698">        return icon;</span>
+    }
+
+    /// Allows subclasses to override action event behavior for pointer coordinates.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x position of the click if applicable (can be 0 or -1 otherwise)
+    ///
+    /// - `y`: the y position of the click if applicable (can be 0 or -1 otherwise)
+    protected void fireActionEvent(int x, int y) {
+<span class="fc" id="L709">        super.fireActionEvent();</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        if (cmd != null) {</span>
+            // PopGuard hook: if this button's command is the form's back command
+            // and the form has a pop guard installed, consult the guard before
+            // we dispatch to listeners. Vetoing here suppresses the user's back
+            // action listener cleanly, which is the natural pop-scope behavior.
+<span class="fc" id="L715">            Form f0 = getComponentForm();</span>
+<span class="pc bpc" id="L716" title="1 of 4 branches missed.">            if (f0 != null &amp;&amp; cmd == f0.getBackCommand()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">                if (!f0.checkPopGuard(com.codename1.router.PopReason.BACK_COMMAND)) {</span>
+<span class="nc" id="L718">                    return;</span>
+                }
+            }
+<span class="fc" id="L721">            ActionEvent ev = new ActionEvent(cmd, this, x, y);</span>
+<span class="fc" id="L722">            dispatcher.fireActionEvent(ev);</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">            if (!ev.isConsumed()) {</span>
+<span class="fc" id="L724">                Form f = getComponentForm();</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">                if (f != null) {</span>
+<span class="fc" id="L726">                    f.actionCommandImplNoRecurseComponent(cmd, ev);</span>
+                }
+            }
+<span class="fc" id="L729">        } else {</span>
+<span class="fc" id="L730">            dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));</span>
+        }
+<span class="fc" id="L732">        Display d = Display.getInstance();</span>
+<span class="fc bfc" id="L733" title="All 2 branches covered.">        if (d.isBuiltinSoundsEnabled()) {</span>
+<span class="fc" id="L734">            d.playBuiltinSound(Display.SOUND_TYPE_BUTTON_PRESS);</span>
+        }
+<span class="fc" id="L736">    }</span>
+
+    /// Invoked to change the state of the button to the pressed state
+    public void pressed() {
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">        if (!Display.impl.isScrollWheeling()) {</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">            if (state != STATE_PRESSED) {</span>
+<span class="fc" id="L742">                state = STATE_PRESSED;</span>
+<span class="fc" id="L743">                fireStateChange();</span>
+            }
+<span class="fc" id="L745">            repaint();</span>
+        }
+<span class="fc" id="L747">    }</span>
+
+    /// Invoked to change the state of the button to the released state
+    public void released() {
+<span class="fc" id="L751">        released(-1, -1);</span>
+<span class="fc" id="L752">    }</span>
+
+    /// Invoked to change the state of the button to the released state
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x position if a touch event triggered this, -1 if this isn't relevant
+    ///
+    /// - `y`: the y position if a touch event triggered this, -1 if this isn't relevant
+    public void released(int x, int y) {
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">        if (!Display.impl.isScrollWheeling()) {</span>
+            // Capture the pressed look BEFORE the state flips so it can fade out
+            // over the settled background (iOS-style release dim-out).
+<span class="fc bfc" id="L765" title="All 4 branches covered.">            if (state == STATE_PRESSED &amp;&amp; releaseFadeDuration &gt; 0) {</span>
+<span class="fc" id="L766">                startReleaseFade();</span>
+            }
+<span class="fc bfc" id="L768" title="All 2 branches covered.">            if (state != STATE_ROLLOVER) {</span>
+<span class="fc" id="L769">                state = STATE_ROLLOVER;</span>
+<span class="fc" id="L770">                fireStateChange();</span>
+            }
+            //if (releaseRadius &gt; 0 || (Math.abs(x - pressedX) &lt; CN.convertToPixels(1) &amp;&amp; Math.abs(y-pressedY) &lt; CN.convertToPixels(1))) {
+<span class="fc" id="L773">            fireActionEvent(x, y);</span>
+            //}
+
+<span class="fc" id="L776">            repaint();</span>
+        }
+<span class="fc" id="L778">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="nc bnc" id="L783" title="All 2 branches missed.">        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {</span>
+<span class="nc" id="L784">            pressed();</span>
+        }
+<span class="nc" id="L786">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="fc bfc" id="L791" title="All 2 branches covered.">        if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {</span>
+<span class="fc" id="L792">            released();</span>
+        }
+<span class="fc" id="L794">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyRepeated(int keyCode) {
+<span class="nc" id="L799">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void fireClicked() {
+<span class="fc" id="L804">        pressed();</span>
+<span class="fc" id="L805">        released();</span>
+<span class="fc" id="L806">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected boolean isSelectableInteraction() {
+<span class="fc" id="L811">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+<span class="nc bnc" id="L817" title="All 2 branches missed.">        if (!Display.getInstance().isDesktop()) {</span>
+<span class="nc" id="L818">            requestFocus();</span>
+        }
+<span class="nc" id="L820">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHoverReleased(int[] x, int[] y) {
+<span class="nc bnc" id="L825" title="All 2 branches missed.">        if (!Display.getInstance().isDesktop()) {</span>
+<span class="nc" id="L826">            requestFocus();</span>
+        }
+<span class="nc" id="L828">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L833">        Component leadParent = LeadUtil.leadParentImpl(this);</span>
+<span class="fc" id="L834">        leadParent.clearDrag();</span>
+<span class="fc" id="L835">        leadParent.setDragActivated(false);</span>
+<span class="fc bfc" id="L836" title="All 4 branches covered.">        if (pointerPressedListeners != null &amp;&amp; pointerPressedListeners.hasListeners()) {</span>
+<span class="fc" id="L837">            pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));</span>
+        }
+<span class="fc" id="L839">        pressed();</span>
+<span class="fc" id="L840">        Form f = getComponentForm();</span>
+        // might happen when programmatically triggering press
+<span class="fc bfc" id="L842" title="All 2 branches covered.">        if (f != null) {</span>
+<span class="fc" id="L843">            f.addComponentAwaitingRelease(this);</span>
+        }
+<span class="fc" id="L845">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="pc bpc" id="L850" title="1 of 4 branches missed.">        if (pointerReleasedListeners != null &amp;&amp; pointerReleasedListeners.hasListeners()) {</span>
+<span class="fc" id="L851">            ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);</span>
+<span class="fc" id="L852">            pointerReleasedListeners.fireActionEvent(ev);</span>
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">            if (ev.isConsumed()) {</span>
+<span class="nc" id="L854">                return;</span>
+            }
+        }
+<span class="fc" id="L857">        Form f = getComponentForm();</span>
+        // might happen when programmatically triggering press
+<span class="fc bfc" id="L859" title="All 2 branches covered.">        if (f != null) {</span>
+<span class="fc" id="L860">            f.removeComponentAwaitingRelease(this);</span>
+        }
+
+        // button shouldn't fire an event when a pointer is dragged into it
+<span class="fc bfc" id="L864" title="All 2 branches covered.">        if (state == STATE_PRESSED) {</span>
+<span class="fc" id="L865">            released(x, y);</span>
+        }
+<span class="fc bfc" id="L867" title="All 2 branches covered.">        if (restoreDragPercentage &gt; -1) {</span>
+<span class="fc" id="L868">            Display.getInstance().setDragStartPercentage(restoreDragPercentage);</span>
+        }
+<span class="fc" id="L870">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void dragInitiated() {
+<span class="pc bpc" id="L875" title="1 of 2 branches missed.">        if (Display.getInstance().shouldRenderSelection(this)) {</span>
+<span class="pc bpc" id="L876" title="1 of 2 branches missed.">            if (state != STATE_ROLLOVER) {</span>
+<span class="fc" id="L877">                state = STATE_ROLLOVER;</span>
+<span class="fc" id="L878">                fireStateChange();</span>
+            }
+        } else {
+<span class="nc bnc" id="L881" title="All 2 branches missed.">            if (state != STATE_DEFAULT) {</span>
+<span class="nc" id="L882">                state = STATE_DEFAULT;</span>
+<span class="nc" id="L883">                fireStateChange();</span>
+            }
+        }
+<span class="fc" id="L886">        repaint();</span>
+<span class="fc" id="L887">    }</span>
+
+    @Override
+    void initComponentImpl() {
+<span class="fc" id="L891">        super.initComponentImpl();</span>
+<span class="fc bfc" id="L892" title="All 2 branches covered.">        if (pressedIcon != null) {</span>
+<span class="fc" id="L893">            pressedIcon.lock();</span>
+        }
+<span class="fc bfc" id="L895" title="All 2 branches covered.">        if (rolloverIcon != null) {</span>
+<span class="fc" id="L896">            rolloverIcon.lock();</span>
+        }
+<span class="fc bfc" id="L898" title="All 2 branches covered.">        if (rolloverPressedIcon != null) {</span>
+<span class="fc" id="L899">            rolloverPressedIcon.lock();</span>
+        }
+<span class="fc bfc" id="L901" title="All 2 branches covered.">        if (disabledIcon != null) {</span>
+<span class="fc" id="L902">            disabledIcon.lock();</span>
+        }
+<span class="fc" id="L904">    }</span>
+
+    @Override
+    void deinitializeImpl() {
+<span class="fc bfc" id="L908" title="All 2 branches covered.">        if (state == STATE_PRESSED) {</span>
+<span class="fc" id="L909">            setReleased();</span>
+        }
+<span class="fc" id="L911">        super.deinitializeImpl();</span>
+<span class="fc bfc" id="L912" title="All 2 branches covered.">        if (pressedIcon != null) {</span>
+<span class="fc" id="L913">            pressedIcon.unlock();</span>
+        }
+<span class="fc bfc" id="L915" title="All 2 branches covered.">        if (rolloverIcon != null) {</span>
+<span class="fc" id="L916">            rolloverIcon.unlock();</span>
+        }
+<span class="fc bfc" id="L918" title="All 2 branches covered.">        if (rolloverPressedIcon != null) {</span>
+<span class="fc" id="L919">            rolloverPressedIcon.unlock();</span>
+        }
+<span class="fc bfc" id="L921" title="All 2 branches covered.">        if (disabledIcon != null) {</span>
+<span class="fc" id="L922">            disabledIcon.unlock();</span>
+        }
+<span class="fc" id="L924">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L929">        return getUIManager().getLookAndFeel().getButtonPreferredSize(this);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected Border getBorder() {
+<span class="fc" id="L935">        return getStyle().getBorder();</span>
+    }
+
+    @Override
+    boolean isPressedStyle() {
+        // if a toggle button has focus we should draw the selected state not the pressed state
+        // however if shouldRenderSelection is false the selected state won't be painted so
+        // we should draw the pressed state
+<span class="fc bfc" id="L943" title="All 4 branches covered.">        if (toggle &amp;&amp; isSelected()) {</span>
+<span class="fc bfc" id="L944" title="All 2 branches covered.">            if (hasFocus()) {</span>
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">                return !Display.getInstance().shouldRenderSelection(this);</span>
+            }
+<span class="fc" id="L947">            return true;</span>
+        }
+<span class="fc bfc" id="L949" title="All 2 branches covered.">        return state == STATE_PRESSED;</span>
+    }
+
+    /// This method return the Button Command if exists
+    ///
+    /// #### Returns
+    ///
+    /// Command Object or null if a Command not exists
+    public Command getCommand() {
+<span class="fc" id="L958">        return cmd;</span>
+    }
+
+    /// Applies the given command to this button
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the command on the button
+    public void setCommand(Command cmd) {
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">        if (this.cmd != null) {</span>
+<span class="nc" id="L968">            removeActionListener(this.cmd);</span>
+        }
+<span class="fc" id="L970">        this.cmd = cmd;</span>
+<span class="pc bpc" id="L971" title="1 of 2 branches missed.">        if (cmd != null) {</span>
+<span class="fc" id="L972">            setText(cmd.getCommandName());</span>
+<span class="pc bpc" id="L973" title="1 of 2 branches missed.">            if (cmd.getIcon() == null) {</span>
+<span class="pc bpc" id="L974" title="1 of 2 branches missed.">                if (cmd.getMaterialIcon() != 0) {</span>
+<span class="nc bnc" id="L975" title="All 2 branches missed.">                    if (cmd.getIconFont() != null) {</span>
+<span class="nc" id="L976">                        setFontIcon(cmd.getIconFont(), cmd.getMaterialIcon(), cmd.getMaterialIconSize());</span>
+                    } else {
+<span class="nc" id="L978">                        setMaterialIcon(cmd.getMaterialIcon(), cmd.getMaterialIconSize());</span>
+                    }
+                }
+            } else {
+<span class="nc" id="L982">                setIcon(cmd.getIcon());</span>
+            }
+<span class="fc" id="L984">            setEnabled(cmd.isEnabled());</span>
+<span class="fc" id="L985">            updateCommand();</span>
+<span class="fc" id="L986">            addActionListener(cmd);</span>
+        }
+<span class="fc" id="L988">    }</span>
+
+    /// Returns true if the button is selected for toggle buttons,
+    ///
+    /// #### Returns
+    ///
+    /// true if the button is selected
+    public boolean isSelected() {
+<span class="nc" id="L996">        return false;</span>
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// #### Deprecated
+    ///
+    /// use the Style alignment instead
+    @Override
+    public void setAlignment(int align) {
+<span class="fc" id="L1006">        super.setAlignment(align);</span>
+<span class="fc" id="L1007">        getPressedStyle().setAlignment(align);</span>
+<span class="fc" id="L1008">    }</span>
+
+    /// Toggle button mode is only relevant for checkboxes/radio buttons. When pressed
+    /// a toggle button stays pressed and when pressed again it moves to releleased state.
+    ///
+    /// #### Returns
+    ///
+    /// the toggle
+    public boolean isToggle() {
+<span class="fc" id="L1017">        return toggle;</span>
+    }
+
+    /// Toggle button mode is only relevant for checkboxes/radio buttons. When pressed
+    /// a toggle button stays pressed and when pressed again it moves to releleased state.
+    /// Setting toggle implicitly changes the UIID to &quot;ToggleButton&quot;
+    ///
+    /// #### Parameters
+    ///
+    /// - `toggle`: the toggle to set
+    public void setToggle(boolean toggle) {
+<span class="pc bpc" id="L1028" title="1 of 2 branches missed.">        if (this.toggle == toggle) {</span>
+<span class="nc" id="L1029">            return;</span>
+        }
+<span class="fc" id="L1031">        this.toggle = toggle;</span>
+<span class="fc" id="L1032">        accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE | AccessibilityManager.CHANGE_STATE);</span>
+<span class="pc bpc" id="L1033" title="1 of 6 branches missed.">        if (toggle &amp;&amp; &quot;CheckBox&quot;.equals(getUIID()) || &quot;RadioButton&quot;.equals(getUIID())) {</span>
+<span class="fc" id="L1034">            setUIID(&quot;ToggleButton&quot;);</span>
+        }
+<span class="fc" id="L1036">    }</span>
+
+    /// Overriden to workaround issue with caps text and different UIID's
+    /// {@inheritDoc}
+    @Override
+    public void setUIID(String id) {
+<span class="fc" id="L1042">        super.setUIID(id);</span>
+<span class="fc" id="L1043">        String t = (String) getClientProperty(&quot;cn1$origText&quot;);</span>
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">        if (t != null) {</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">            if (isCapsText()) {</span>
+<span class="nc" id="L1046">                super.setText(UIManager.getInstance().localize(t, t).toUpperCase());</span>
+            } else {
+<span class="nc" id="L1048">                super.setText(UIManager.getInstance().localize(t, t));</span>
+<span class="nc" id="L1049">                putClientProperty(&quot;cn1$origText&quot;, null);</span>
+            }
+        }
+<span class="fc" id="L1052">    }</span>
+
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="fc" id="L1058">        boolean a = super.animate();</span>
+<span class="pc bpc" id="L1059" title="1 of 2 branches missed.">        if (releaseFadeMotion != null) {</span>
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">            if (releaseFadeMotion.isFinished()) {</span>
+<span class="nc" id="L1061">                releaseFadeMotion = null;</span>
+<span class="nc" id="L1062">                releaseFadeImage = null;</span>
+<span class="nc" id="L1063">                Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L1065">                    f.deregisterAnimated(this);</span>
+                }
+            }
+<span class="nc" id="L1068">            a = true;</span>
+        }
+<span class="pc bpc" id="L1070" title="3 of 4 branches missed.">        if (!isEnabled() &amp;&amp; disabledIcon != null) {</span>
+<span class="nc bnc" id="L1071" title="All 4 branches missed.">            a |= disabledIcon.isAnimation() &amp;&amp; disabledIcon.animate();</span>
+        } else {
+<span class="pc bpc" id="L1073" title="2 of 3 branches missed.">            switch (state) {</span>
+                case STATE_ROLLOVER:
+<span class="pc bpc" id="L1075" title="5 of 6 branches missed.">                    a |= rolloverIcon != null &amp;&amp; rolloverIcon.isAnimation() &amp;&amp; rolloverIcon.animate();</span>
+<span class="fc" id="L1076">                    break;</span>
+                case STATE_PRESSED:
+<span class="nc bnc" id="L1078" title="All 6 branches missed.">                    a |= pressedIcon != null &amp;&amp; pressedIcon.isAnimation() &amp;&amp; pressedIcon.animate();</span>
+<span class="nc" id="L1079">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc" id="L1084">        return a;</span>
+    }
+
+    /// Snapshots the current pressed background into an image and starts the fade
+    /// motion so {@link #paintReleaseFadeOverlay(Graphics)} can dissolve it back to
+    /// the settled background over `releaseFadeDuration` millis. Mirrors the iOS
+    /// button highlight that fades out on release rather than snapping off.
+    private void startReleaseFade() {
+<span class="fc" id="L1092">        int w = getWidth();</span>
+<span class="fc" id="L1093">        int h = getHeight();</span>
+<span class="pc bpc" id="L1094" title="2 of 4 branches missed.">        if (w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L1095">            return;</span>
+        }
+<span class="fc" id="L1097">        Style pressed = getPressedStyle();</span>
+<span class="fc" id="L1098">        Image img = Image.createImage(w, h, 0);</span>
+<span class="fc" id="L1099">        Graphics ig = img.getGraphics();</span>
+        // The border/painter draw at the component's absolute origin; shift the
+        // offscreen graphics so the capture lands at (0, 0) in the image.
+<span class="fc" id="L1102">        ig.translate(-getX(), -getY());</span>
+<span class="fc" id="L1103">        Border b = pressed.getBorder();</span>
+<span class="pc bpc" id="L1104" title="2 of 4 branches missed.">        if (b != null &amp;&amp; b.isBackgroundPainter()) {</span>
+<span class="nc" id="L1105">            b.paintBorderBackground(ig, this);</span>
+<span class="pc bpc" id="L1106" title="1 of 2 branches missed.">        } else if (pressed.getBgPainter() != null) {</span>
+<span class="fc" id="L1107">            pressed.getBgPainter().paint(ig, getBounds());</span>
+        }
+<span class="fc" id="L1109">        releaseFadeImage = img;</span>
+<span class="fc" id="L1110">        releaseFadeMotion = Motion.createEaseOutMotion(255, 0, releaseFadeDuration);</span>
+<span class="fc" id="L1111">        releaseFadeMotion.start();</span>
+<span class="fc" id="L1112">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L1114">            f.registerAnimated(this);</span>
+        }
+<span class="fc" id="L1116">    }</span>
+
+    /// Draws the fading pressed-background snapshot over the freshly painted
+    /// settled background, so a release dissolves the highlight instead of
+    /// dropping it in a single frame. {@inheritDoc}
+    @Override
+    void paintReleaseFadeOverlay(Graphics g) {
+<span class="pc bpc" id="L1123" title="3 of 4 branches missed.">        if (releaseFadeMotion != null &amp;&amp; releaseFadeImage != null) {</span>
+<span class="nc" id="L1124">            int oldAlpha = g.getAlpha();</span>
+<span class="nc" id="L1125">            g.setAlpha(releaseFadeMotion.getValue());</span>
+<span class="nc" id="L1126">            g.drawImage(releaseFadeImage, getX(), getY());</span>
+<span class="nc" id="L1127">            g.setAlpha(oldAlpha);</span>
+        }
+<span class="fc" id="L1129">    }</span>
+
+    /// Whether a release dim-out is currently animating; package-private probe
+    /// for tests (see ButtonReleaseFadeTest).
+    boolean isReleaseFadeActive() {
+<span class="fc bfc" id="L1134" title="All 2 branches covered.">        return releaseFadeMotion != null;</span>
+    }
+
+    /// Places the check box or radio button on the opposite side at the far end
+    ///
+    /// #### Returns
+    ///
+    /// the oppositeSide
+    public boolean isOppositeSide() {
+<span class="nc" id="L1143">        return false;</span>
+    }
+
+    /// Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
+    /// pointer release events and not to pointer press events
+    ///
+    /// #### Returns
+    ///
+    /// the releaseRadius
+    @Override
+    public int getReleaseRadius() {
+<span class="fc" id="L1154">        return releaseRadius;</span>
+    }
+
+    /// Indicates a radius in which a pointer release will still have effect. Notice that this only applies to
+    /// pointer release events and not to pointer press events
+    ///
+    /// #### Parameters
+    ///
+    /// - `releaseRadius`: the releaseRadius to set
+    @Override
+    public void setReleaseRadius(int releaseRadius) {
+<span class="nc" id="L1165">        this.releaseRadius = releaseRadius;</span>
+<span class="nc" id="L1166">    }</span>
+
+    /// Returns if this is an auto released Button.
+    /// Auto released Buttons will are been disarmed when a drag is happening
+    /// within the Button.
+    ///
+    /// #### Returns
+    ///
+    /// true if it's an auto released Button.
+    @Override
+    public boolean isAutoRelease() {
+<span class="fc" id="L1177">        return autoRelease;</span>
+    }
+
+    /// Sets the auto released mode of this button, by default it's not an auto
+    /// released Button
+    @Override
+    public void setAutoRelease(boolean autoRelease) {
+<span class="nc" id="L1184">        this.autoRelease = autoRelease;</span>
+<span class="nc" id="L1185">    }</span>
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc bfc" id="L1189" title="All 2 branches covered.">        if (isLegacyRenderer()) {</span>
+<span class="fc" id="L1190">            initAutoResize();</span>
+<span class="fc" id="L1191">            getUIManager().getLookAndFeel().drawButton(g, this);</span>
+<span class="fc" id="L1192">            return;</span>
+        }
+<span class="fc" id="L1194">        super.paintImpl(g);</span>
+<span class="fc" id="L1195">    }</span>
+
+    /// Indicates whether text on the button should be drawn capitalized by
+    /// default to match the Android design. By default only `Button` and
+    /// `RaisedButton` will be capped to keep compatibility. You can add
+    /// additional UIID's to the mix by using the theme constant
+    /// `capsButtonUiids` which can include a separated list of the
+    /// UIID's to capitalize
+    ///
+    /// #### Returns
+    ///
+    /// the capsText
+    public final boolean isCapsText() {
+<span class="pc bpc" id="L1208" title="1 of 2 branches missed.">        if (capsText == null) {</span>
+<span class="pc bpc" id="L1209" title="1 of 2 branches missed.">            if (capsTextDefault) {</span>
+<span class="nc" id="L1210">                String uiid = getUIID();</span>
+<span class="nc bnc" id="L1211" title="All 4 branches missed.">                return &quot;Button&quot;.equals(uiid) || &quot;RaisedButton&quot;.equals(uiid) ||</span>
+<span class="nc bnc" id="L1212" title="All 2 branches missed.">                        super.getUIManager().getThemeConstant(&quot;capsButtonUiids&quot;, &quot;&quot;).indexOf(uiid) &gt; -1;</span>
+            }
+<span class="fc" id="L1214">            return false;</span>
+        }
+<span class="nc" id="L1216">        return capsText;</span>
+    }
+
+    /// Indicates whether text on the button should be drawn capitalized by
+    /// default to match the Android design. By default only `Button` and
+    /// `RaisedButton` will be capped to keep compatibility. You can add
+    /// additional UIID's to the mix by using the theme constant
+    /// `capsButtonUiids` which can include a separated list of the
+    /// UIID's to capitalize
+    ///
+    /// #### Parameters
+    ///
+    /// - `capsText`: the capsText to set
+    public void setCapsText(boolean capsText) {
+<span class="nc" id="L1230">        this.capsText = capsText;</span>
+<span class="nc" id="L1231">    }</span>
+
+    /// Overriden to implement the caps mode `#setCapsText(boolean)`
+    /// {@inheritDoc}
+    @Override
+    public void setText(String t) {
+<span class="pc bpc" id="L1237" title="1 of 2 branches missed.">        if (isCapsText()) {</span>
+<span class="nc" id="L1238">            putClientProperty(&quot;cn1$origText&quot;, t);</span>
+<span class="nc bnc" id="L1239" title="All 2 branches missed.">            if (t != null) {</span>
+<span class="nc" id="L1240">                super.setText(getUIManager().localize(t, t).toUpperCase());</span>
+<span class="nc" id="L1241">                return;</span>
+            }
+        }
+<span class="fc" id="L1244">        super.setText(t);</span>
+<span class="fc" id="L1245">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

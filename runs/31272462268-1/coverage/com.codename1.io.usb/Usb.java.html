@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Usb.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.usb</a> &gt; <span class="el_source">Usb.java</span></div><h1>Usb.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ */
+package com.codename1.io.usb;
+
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// USB Host API.
+///
+/// Lets the device act as a USB host and talk to attached peripherals -- a
+/// barcode scanner, a serial-over-USB device, a microcontroller. This is
+/// **Android-only** in practice; iOS doesn't expose third-party USB host
+/// access and the simulator/JavaSE port stubs everything out.
+///
+/// #### Android specifics
+///
+/// The build pipeline adds the `android.hardware.usb.host` feature and a
+/// `&lt;uses-feature&gt;` declaration whenever `Usb` is referenced. To launch your
+/// app automatically when a device is plugged in, declare a
+/// `USB_DEVICE_ATTACHED` intent filter in `android.xintent_filter` using a
+/// `device_filter.xml` resource you ship in `native/android/res/xml/`. See
+/// `Developer Guide -&gt; Network Connectivity -&gt; USB`.
+public final class Usb {
+    private Usb() {
+    }
+
+    private static UsbPlatform platform() {
+<span class="nc" id="L38">        return Display.getInstance().getUsbPlatform();</span>
+    }
+
+    /// `true` if the current platform implements USB host access.
+    public static boolean isSupported() {
+<span class="nc" id="L43">        return platform().isSupported();</span>
+    }
+
+    /// All currently-attached USB devices.
+    public static UsbDevice[] listDevices() {
+<span class="nc" id="L48">        return platform().listDevices();</span>
+    }
+
+    /// Subscribes `listener` to attach / detach events. Returns immediately.
+    /// Calls on the EDT.
+    public static void addDeviceListener(UsbDeviceListener listener) {
+<span class="nc" id="L54">        platform().addDeviceListener(listener);</span>
+<span class="nc" id="L55">    }</span>
+
+    public static void removeDeviceListener(UsbDeviceListener listener) {
+<span class="nc" id="L58">        platform().removeDeviceListener(listener);</span>
+<span class="nc" id="L59">    }</span>
+
+    /// Requests permission from the user to talk to `device`. The result is
+    /// reported asynchronously via `UsbDeviceListener.onPermissionResult`.
+    public static void requestPermission(UsbDevice device) {
+<span class="nc" id="L64">        platform().requestPermission(device);</span>
+<span class="nc" id="L65">    }</span>
+
+    /// `true` if the user has granted access to `device`.
+    public static boolean hasPermission(UsbDevice device) {
+<span class="nc" id="L69">        return platform().hasPermission(device);</span>
+    }
+
+    /// Opens a bulk-transfer endpoint on the device. `endpointAddress` matches
+    /// the USB endpoint address from the device's descriptor. The caller must
+    /// have called `requestPermission` and received approval first.
+    public static InputStream openInputStream(UsbDevice device,
+                                              int endpointAddress)
+            throws IOException {
+<span class="nc" id="L78">        return platform().openInputStream(device, endpointAddress);</span>
+    }
+
+    public static OutputStream openOutputStream(UsbDevice device,
+                                                int endpointAddress)
+            throws IOException {
+<span class="nc" id="L84">        return platform().openOutputStream(device, endpointAddress);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

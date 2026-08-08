@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Vec3.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.common</a> &gt; <span class="el_source">Vec3.java</span></div><h1>Vec3.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.common;
+
+
+/// @author Daniel Murphy
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">public class Vec3 {</span>
+
+  public float x, y, z;
+
+<span class="fc" id="L32">  public Vec3() {</span>
+<span class="fc" id="L33">    x = y = z = 0f;</span>
+<span class="fc" id="L34">  }</span>
+
+<span class="fc" id="L36">  public Vec3(float argX, float argY, float argZ) {</span>
+<span class="fc" id="L37">    x = argX;</span>
+<span class="fc" id="L38">    y = argY;</span>
+<span class="fc" id="L39">    z = argZ;</span>
+<span class="fc" id="L40">  }</span>
+
+<span class="fc" id="L42">  public Vec3(Vec3 argCopy) {</span>
+<span class="fc" id="L43">    x = argCopy.x;</span>
+<span class="fc" id="L44">    y = argCopy.y;</span>
+<span class="fc" id="L45">    z = argCopy.z;</span>
+<span class="fc" id="L46">  }</span>
+
+  public Vec3 set(Vec3 argVec) {
+<span class="nc" id="L49">    x = argVec.x;</span>
+<span class="nc" id="L50">    y = argVec.y;</span>
+<span class="nc" id="L51">    z = argVec.z;</span>
+<span class="nc" id="L52">    return this;</span>
+  }
+
+  public Vec3 set(float argX, float argY, float argZ) {
+<span class="fc" id="L56">    x = argX;</span>
+<span class="fc" id="L57">    y = argY;</span>
+<span class="fc" id="L58">    z = argZ;</span>
+<span class="fc" id="L59">    return this;</span>
+  }
+
+  public Vec3 addLocal(Vec3 argVec) {
+<span class="fc" id="L63">    x += argVec.x;</span>
+<span class="fc" id="L64">    y += argVec.y;</span>
+<span class="fc" id="L65">    z += argVec.z;</span>
+<span class="fc" id="L66">    return this;</span>
+  }
+
+  public Vec3 add(Vec3 argVec) {
+<span class="fc" id="L70">    return new Vec3(x + argVec.x, y + argVec.y, z + argVec.z);</span>
+  }
+
+  public Vec3 subLocal(Vec3 argVec) {
+<span class="nc" id="L74">    x -= argVec.x;</span>
+<span class="nc" id="L75">    y -= argVec.y;</span>
+<span class="nc" id="L76">    z -= argVec.z;</span>
+<span class="nc" id="L77">    return this;</span>
+  }
+
+  public Vec3 sub(Vec3 argVec) {
+<span class="nc" id="L81">    return new Vec3(x - argVec.x, y - argVec.y, z - argVec.z);</span>
+  }
+
+  public Vec3 mulLocal(float argScalar) {
+<span class="fc" id="L85">    x *= argScalar;</span>
+<span class="fc" id="L86">    y *= argScalar;</span>
+<span class="fc" id="L87">    z *= argScalar;</span>
+<span class="fc" id="L88">    return this;</span>
+  }
+
+  public Vec3 mul(float argScalar) {
+<span class="nc" id="L92">    return new Vec3(x * argScalar, y * argScalar, z * argScalar);</span>
+  }
+
+  public Vec3 negate() {
+<span class="fc" id="L96">    return new Vec3(-x, -y, -z);</span>
+  }
+
+  public Vec3 negateLocal() {
+<span class="fc" id="L100">    x = -x;</span>
+<span class="fc" id="L101">    y = -y;</span>
+<span class="fc" id="L102">    z = -z;</span>
+<span class="fc" id="L103">    return this;</span>
+  }
+
+  public void setZero() {
+<span class="fc" id="L107">    x = 0;</span>
+<span class="fc" id="L108">    y = 0;</span>
+<span class="fc" id="L109">    z = 0;</span>
+<span class="fc" id="L110">  }</span>
+
+  public Vec3 clone() {
+<span class="fc" id="L113">    return new Vec3(this);</span>
+  }
+
+  public String toString() {
+<span class="nc" id="L117">    return &quot;(&quot; + x + &quot;,&quot; + y + &quot;,&quot; + z + &quot;)&quot;;</span>
+  }
+
+  public int hashCode() {
+<span class="nc" id="L121">    final int prime = 31;</span>
+<span class="nc" id="L122">    int result = 1;</span>
+<span class="nc" id="L123">    result = prime * result + Float.floatToIntBits(x);</span>
+<span class="nc" id="L124">    result = prime * result + Float.floatToIntBits(y);</span>
+<span class="nc" id="L125">    result = prime * result + Float.floatToIntBits(z);</span>
+<span class="nc" id="L126">    return result;</span>
+  }
+
+  public boolean equals(Object obj) {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">    if (this == obj) return true;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">    if (obj == null) return false;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">    if (getClass() != obj.getClass()) return false;</span>
+<span class="nc" id="L133">    Vec3 other = (Vec3) obj;</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">    if (Float.floatToIntBits(x) != Float.floatToIntBits(other.x)) return false;</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">    if (Float.floatToIntBits(y) != Float.floatToIntBits(other.y)) return false;</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">    if (Float.floatToIntBits(z) != Float.floatToIntBits(other.z)) return false;</span>
+<span class="nc" id="L137">    return true;</span>
+  }
+
+  public final static float dot(Vec3 a, Vec3 b) {
+<span class="fc" id="L141">    return a.x * b.x + a.y * b.y + a.z * b.z;</span>
+  }
+
+  public final static Vec3 cross(Vec3 a, Vec3 b) {
+<span class="fc" id="L145">    return new Vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);</span>
+  }
+
+  public final static void crossToOut(Vec3 a, Vec3 b, Vec3 out) {
+<span class="nc" id="L149">    final float tempy = a.z * b.x - a.x * b.z;</span>
+<span class="nc" id="L150">    final float tempz = a.x * b.y - a.y * b.x;</span>
+<span class="nc" id="L151">    out.x = a.y * b.z - a.z * b.y;</span>
+<span class="nc" id="L152">    out.y = tempy;</span>
+<span class="nc" id="L153">    out.z = tempz;</span>
+<span class="nc" id="L154">  }</span>
+  
+  public final static void crossToOutUnsafe(Vec3 a, Vec3 b, Vec3 out) {
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">    assert(out != b);</span>
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">    assert(out != a);</span>
+<span class="fc" id="L159">    out.x = a.y * b.z - a.z * b.y;</span>
+<span class="fc" id="L160">    out.y = a.z * b.x - a.x * b.z;</span>
+<span class="fc" id="L161">    out.z = a.x * b.y - a.y * b.x;</span>
+<span class="fc" id="L162">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

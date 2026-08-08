@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodePureEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">CodePureEditor.java</span></div><h1>CodePureEditor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.io.JSONParser;
+import com.codename1.ui.CodeCompletion;
+import com.codename1.ui.CodeDiagnostic;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/// The pure code editor backend. It maps the code editor command / query vocabulary onto a `CodeView`,
+/// parsing the diagnostics and completion payloads that arrive over the string command channel back into
+/// `CodeDiagnostic` / `CodeCompletion` objects.
+public class CodePureEditor extends PureEditor {
+    private CodeView codeView;
+
+    /// Creates a code editor backend.
+    public CodePureEditor(EditorHost host, String editorType) {
+<span class="fc" id="L42">        super(host, editorType);</span>
+<span class="fc" id="L43">        codeView = (CodeView) view();</span>
+<span class="fc" id="L44">    }</span>
+
+    @Override
+    protected EditorView createView(EditorHost host, boolean codeMode) {
+<span class="fc" id="L48">        return new CodeView(host);</span>
+    }
+
+    @Override
+    public void cmd(String name, String arg) {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (&quot;setLanguage&quot;.equals(name)) {</span>
+<span class="fc" id="L54">            codeView.setLanguage(arg);</span>
+<span class="fc" id="L55">            return;</span>
+        }
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (&quot;setTheme&quot;.equals(name)) {</span>
+<span class="nc" id="L58">            codeView.setTheme(arg);</span>
+<span class="nc" id="L59">            return;</span>
+        }
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (&quot;setLineNumbers&quot;.equals(name)) {</span>
+<span class="nc" id="L62">            codeView.setShowLineNumbers(&quot;1&quot;.equals(arg));</span>
+<span class="nc" id="L63">            return;</span>
+        }
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (&quot;setTabSize&quot;.equals(name)) {</span>
+<span class="nc" id="L66">            codeView.setTabSize(parseInt(arg, 4));</span>
+<span class="nc" id="L67">            return;</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (&quot;setCompletionEnabled&quot;.equals(name)) {</span>
+<span class="fc" id="L70">            codeView.setCompletionEnabled(&quot;1&quot;.equals(arg));</span>
+<span class="fc" id="L71">            return;</span>
+        }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (&quot;setDiagnostics&quot;.equals(name)) {</span>
+<span class="nc" id="L74">            codeView.setDiagnostics(parseDiagnostics(arg));</span>
+<span class="nc" id="L75">            return;</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (&quot;showCompletions&quot;.equals(name)) {</span>
+<span class="fc" id="L78">            handleShowCompletions(arg);</span>
+<span class="fc" id="L79">            return;</span>
+        }
+<span class="fc" id="L81">        super.cmd(name, arg);</span>
+<span class="fc" id="L82">    }</span>
+
+    private void handleShowCompletions(String arg) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (arg == null) {</span>
+<span class="nc" id="L86">            return;</span>
+        }
+<span class="fc" id="L88">        int colon = arg.indexOf(':');</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (colon &lt; 0) {</span>
+<span class="nc" id="L90">            return;</span>
+        }
+<span class="fc" id="L92">        int reqId = parseInt(arg.substring(0, colon), -1);</span>
+<span class="fc" id="L93">        List&lt;CodeCompletion&gt; items = parseCompletions(arg.substring(colon + 1));</span>
+<span class="fc" id="L94">        codeView.showCompletions(reqId, items);</span>
+<span class="fc" id="L95">    }</span>
+
+    private static List&lt;Object&gt; parseArray(String json) {
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        if (json == null || json.length() == 0) {</span>
+<span class="nc" id="L99">            return new ArrayList&lt;Object&gt;();</span>
+        }
+        try {
+<span class="fc" id="L102">            Map&lt;String, Object&gt; root = JSONParser.parseJSON(json);</span>
+<span class="fc" id="L103">            Object list = root.get(&quot;root&quot;);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (list instanceof List) {</span>
+<span class="fc" id="L105">                return (List&lt;Object&gt;) list;</span>
+            }
+<span class="nc" id="L107">        } catch (Throwable t) { // NOPMD - malformed input, intentionally ignored</span>
+            // malformed payload, treat as empty
+<span class="nc" id="L109">        }</span>
+<span class="nc" id="L110">        return new ArrayList&lt;Object&gt;();</span>
+    }
+
+    private List&lt;CodeDiagnostic&gt; parseDiagnostics(String json) {
+<span class="nc" id="L114">        List&lt;CodeDiagnostic&gt; out = new ArrayList&lt;CodeDiagnostic&gt;();</span>
+<span class="nc" id="L115">        List&lt;Object&gt; arr = parseArray(json);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        for (Object o : arr) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (!(o instanceof Map)) {</span>
+<span class="nc" id="L118">                continue;</span>
+            }
+<span class="nc" id="L120">            Map m = (Map) o;</span>
+<span class="nc" id="L121">            int line = intVal(m.get(&quot;l&quot;), 1);</span>
+<span class="nc" id="L122">            int col = intVal(m.get(&quot;c&quot;), 1);</span>
+<span class="nc" id="L123">            int el = intVal(m.get(&quot;el&quot;), line);</span>
+<span class="nc" id="L124">            int ec = intVal(m.get(&quot;ec&quot;), col + 1);</span>
+<span class="nc" id="L125">            String sev = strVal(m.get(&quot;s&quot;), CodeDiagnostic.ERROR);</span>
+<span class="nc" id="L126">            String msg = strVal(m.get(&quot;m&quot;), &quot;&quot;);</span>
+<span class="nc" id="L127">            out.add(new CodeDiagnostic(line, col, el, ec, msg).setSeverity(sev));</span>
+<span class="nc" id="L128">        }</span>
+<span class="nc" id="L129">        return out;</span>
+    }
+
+    private List&lt;CodeCompletion&gt; parseCompletions(String json) {
+<span class="fc" id="L133">        List&lt;CodeCompletion&gt; out = new ArrayList&lt;CodeCompletion&gt;();</span>
+<span class="fc" id="L134">        List&lt;Object&gt; arr = parseArray(json);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (Object o : arr) {</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (!(o instanceof Map)) {</span>
+<span class="nc" id="L137">                continue;</span>
+            }
+<span class="fc" id="L139">            Map m = (Map) o;</span>
+<span class="fc" id="L140">            String disp = strVal(m.get(&quot;d&quot;), &quot;&quot;);</span>
+<span class="fc" id="L141">            String ins = strVal(m.get(&quot;i&quot;), disp);</span>
+<span class="fc" id="L142">            CodeCompletion cc = new CodeCompletion(disp, ins);</span>
+<span class="fc" id="L143">            cc.setType(strVal(m.get(&quot;t&quot;), null));</span>
+<span class="fc" id="L144">            cc.setDetail(strVal(m.get(&quot;x&quot;), null));</span>
+<span class="fc" id="L145">            out.add(cc);</span>
+<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        return out;</span>
+    }
+
+    private static int intVal(Object o, int def) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (o instanceof Number) {</span>
+<span class="nc" id="L152">            return ((Number) o).intValue();</span>
+        }
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (o instanceof String) {</span>
+<span class="nc" id="L155">            return parseInt((String) o, def);</span>
+        }
+<span class="nc" id="L157">        return def;</span>
+    }
+
+    private static String strVal(Object o, String def) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+<span class="fc" id="L162">            return (String) o;</span>
+        }
+<span class="nc" id="L164">        return def;</span>
+    }
+
+    private static int parseInt(String s, int def) {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L169">            return def;</span>
+        }
+        try {
+<span class="fc" id="L172">            return Integer.parseInt(s.trim());</span>
+<span class="nc" id="L173">        } catch (NumberFormatException err) {</span>
+<span class="nc" id="L174">            return def;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

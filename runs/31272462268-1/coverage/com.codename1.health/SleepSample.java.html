@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SleepSample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">SleepSample.java</span></div><h1>SleepSample.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A sleep session, optionally broken into [SleepStageInterval] spans.
+///
+/// #### Stage detail is not guaranteed
+///
+/// A session recorded by a watch usually carries stages; one inferred by a
+/// phone usually does not, and neither did iOS before version 16. Check
+/// [#hasStageDetail()] and fall back to showing the total duration --
+/// drawing a hypnogram from a single &quot;asleep&quot; span produces an empty chart
+/// that looks like a bug.
+///
+/// ```java
+/// if (night.hasStageDetail()) {
+///     for (SleepStageInterval iv : night.getStages()) {
+///         drawBand(iv.getStage(), iv.getStartMillis(), iv.getEndMillis());
+///     }
+/// } else {
+///     showTotal(night.getDurationMillis());
+/// }
+/// ```
+///
+/// #### Neither phone reads sleep in this release
+///
+/// Sleep is available on the simulator, the desktop and the JavaScript
+/// port, and on none of the mobile ones: a sleep query is refused on iOS
+/// and Android alike, so no session of this shape ever comes back from a
+/// device. Build against it by all means -- but do not build a mobile
+/// screen around it yet.
+///
+/// The reason it is unfinished on iOS is worth knowing, because it shapes
+/// what finishing it will look like. HealthKit has no sleep-session
+/// object at all, only a run of overlapping category samples, so the port
+/// has to group them into sessions itself -- Apple's own convention is to
+/// split on a gap, which is what [SampleQuery#setSleepSessionGapMillis(long)]
+/// is there to tune. That grouping is a heuristic, which is why it
+/// belongs in the port rather than baked into the shared code.
+public final class SleepSample extends SessionSample {
+
+    private final List&lt;SleepStageInterval&gt; stages;
+
+    private SleepSample(long startMillis, long endMillis,
+            List&lt;SleepStageInterval&gt; stages) {
+<span class="fc" id="L70">        super(HealthDataType.SLEEP, startMillis, endMillis);</span>
+<span class="fc" id="L71">        this.stages = stages;</span>
+<span class="fc" id="L72">    }</span>
+
+    /// A session with no stage breakdown.
+    public static SleepSample create(long startMillis, long endMillis) {
+<span class="fc" id="L76">        return new SleepSample(startMillis, endMillis,</span>
+                new ArrayList&lt;SleepStageInterval&gt;());
+    }
+
+    /// A session with stage detail. The list is copied defensively.
+    public static SleepSample create(long startMillis, long endMillis,
+            List&lt;SleepStageInterval&gt; stages) {
+<span class="fc" id="L83">        List&lt;SleepStageInterval&gt; copy = new ArrayList&lt;SleepStageInterval&gt;();</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (stages != null) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (SleepStageInterval interval : stages) {</span>
+                // Skipping the null during validation and then copying the
+                // whole list anyway meant it was stored unvalidated, and
+                // every accessor that walks the stages -- hasStageDetail,
+                // the two duration roll-ups -- dereferenced it. Dropping it
+                // here instead matches addStage(null), which has always
+                // ignored one.
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (interval != null) {</span>
+<span class="fc" id="L93">                    requireInsideSession(interval, startMillis, endMillis);</span>
+                    // The interval itself, not just the list. Its platform
+                    // code is mutable, so retaining the caller's instance
+                    // left a handle onto a stored record.
+<span class="fc" id="L97">                    copy.add(new SleepStageInterval(interval));</span>
+                }
+<span class="fc" id="L99">            }</span>
+        }
+<span class="fc" id="L101">        return new SleepSample(startMillis, endMillis, copy);</span>
+    }
+
+    /// The stage breakdown, in the order the platform reported it. Empty
+    /// when no breakdown is available.
+    public List&lt;SleepStageInterval&gt; getStages() {
+<span class="fc" id="L107">        return Collections.unmodifiableList(stages);</span>
+    }
+
+    /// Appends a stage span. Used when building a session to write.
+    public void addStage(SleepStageInterval interval) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (interval != null) {</span>
+<span class="fc" id="L113">            requireInsideSession(interval, getStartMillis(), getEndMillis());</span>
+<span class="fc" id="L114">            stages.add(new SleepStageInterval(interval));</span>
+        }
+<span class="fc" id="L116">    }</span>
+
+    /// A stage outside the session it belongs to is not a stage of it.
+    ///
+    /// Unchecked, a session could report more time asleep than it lasted,
+    /// and carry stage data outside the very span the record is queried
+    /// by -- so a query that found the session would return detail from
+    /// outside its own range.
+    private static void requireInsideSession(SleepStageInterval interval,
+            long startMillis, long endMillis) {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (interval.getStartMillis() &lt; startMillis</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                || interval.getEndMillis() &gt; endMillis) {</span>
+<span class="nc" id="L128">            throw new IllegalArgumentException(&quot;sleep stage &quot;</span>
+<span class="nc" id="L129">                    + interval.getStartMillis() + &quot;..&quot;</span>
+<span class="nc" id="L130">                    + interval.getEndMillis()</span>
+                    + &quot; falls outside the session's span &quot; + startMillis
+                    + &quot;..&quot; + endMillis);
+        }
+<span class="fc" id="L134">    }</span>
+
+    /// `true` when this session carries a real stage breakdown -- that is,
+    /// at least one span classified as something more specific than
+    /// &quot;asleep&quot;, &quot;in bed&quot; or &quot;unknown&quot;.
+    ///
+    /// Returns `false` for an empty stage list and for a list containing
+    /// only [SleepStage#ASLEEP_UNSPECIFIED], [SleepStage#AWAKE_IN_BED] and
+    /// [SleepStage#UNKNOWN], because none of those tell you anything a
+    /// hypnogram could show.
+    /// How much stage detail this session carries.
+    ///
+    /// Three answers rather than the boolean [#hasStageDetail()], because
+    /// &quot;has stages&quot; collapses two cases an app has to draw differently: a
+    /// session that knows only asleep-versus-awake, and one carrying a real
+    /// hypnogram. Branch on this before building the UI rather than
+    /// discovering it from an empty chart.
+    ///
+    /// [#hasStageDetail()] is kept and is exactly
+    /// `getStageSupport() == SleepStageSupport.STAGED`.
+    public SleepStageSupport getStageSupport() {
+<span class="fc" id="L155">        boolean anyRecognised = false;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (SleepStageInterval iv : stages) {</span>
+<span class="fc" id="L157">            SleepStage s = iv.getStage();</span>
+<span class="pc bpc" id="L158" title="2 of 8 branches missed.">            if (s == SleepStage.LIGHT || s == SleepStage.CORE</span>
+                    || s == SleepStage.DEEP || s == SleepStage.REM) {
+<span class="fc" id="L160">                return SleepStageSupport.STAGED;</span>
+            }
+            // UNKNOWN is not a classification, so a session made only of
+            // unknown spans supports nothing -- the same mistake the asleep
+            // roll-up made by asking &quot;is this not awake?&quot; instead of naming
+            // the stages it counts, repeated here by falling through to
+            // ASLEEP_AWAKE. That tier promises a usable binary breakdown, so
+            // reporting it for a session that has none puts a caller in front
+            // of a chart with nothing to draw.
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            if (s != SleepStage.UNKNOWN) {</span>
+<span class="fc" id="L170">                anyRecognised = true;</span>
+            }
+<span class="fc" id="L172">        }</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        return anyRecognised ? SleepStageSupport.ASLEEP_AWAKE</span>
+                : SleepStageSupport.NONE;
+    }
+
+    public boolean hasStageDetail() {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        return getStageSupport() == SleepStageSupport.STAGED;</span>
+    }
+
+    /// The total time in `stage` -- the time actually covered by its
+    /// spans, so two overlapping spans of the same stage count the overlap
+    /// once.
+    public long getDurationMillis(SleepStage stage) {
+<span class="fc" id="L185">        List&lt;SleepStageInterval&gt; matching =</span>
+                new ArrayList&lt;SleepStageInterval&gt;();
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (SleepStageInterval iv : stages) {</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            if (iv.getStage() == stage) {</span>
+<span class="fc" id="L189">                matching.add(iv);</span>
+            }
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        return coveredMillis(matching);</span>
+    }
+
+    /// The total time spent asleep -- every span except [SleepStage#AWAKE],
+    /// [SleepStage#AWAKE_IN_BED] and [SleepStage#OUT_OF_BED].
+    ///
+    /// Falls back to the whole session duration when no stages are
+    /// present, which is the best available answer for a source that only
+    /// reported &quot;asleep from X to Y&quot;.
+    public long getAsleepDurationMillis() {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (stages.isEmpty()) {</span>
+<span class="nc" id="L203">            return getDurationMillis();</span>
+        }
+<span class="fc" id="L205">        List&lt;SleepStageInterval&gt; asleep =</span>
+                new ArrayList&lt;SleepStageInterval&gt;();
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (SleepStageInterval iv : stages) {</span>
+<span class="fc" id="L208">            SleepStage s = iv.getStage();</span>
+            // Named, not &quot;anything that is not awake&quot;. The negative form
+            // swept in UNKNOWN, which the enum defines as a span the source
+            // did not classify -- so a session carrying one ten-minute
+            // unclassified interval reported ten minutes of sleep, turning
+            // missing information into a measurement. A reading this API
+            // will not make up: an unclassified span counts towards neither
+            // side, and hasStageDetail() is what tells a caller the
+            // breakdown is unavailable.
+<span class="pc bpc" id="L217" title="2 of 10 branches missed.">            if (s == SleepStage.ASLEEP_UNSPECIFIED || s == SleepStage.LIGHT</span>
+                    || s == SleepStage.CORE || s == SleepStage.DEEP
+                    || s == SleepStage.REM) {
+<span class="fc" id="L220">                asleep.add(iv);</span>
+            }
+<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">        return coveredMillis(asleep);</span>
+    }
+
+    /// Time asleep in this session, as a [java.time.Duration].
+    ///
+    /// The millis form stays for the ports and the wire format; this is the
+    /// type the rest of the framework speaks.
+    public java.time.Duration getAsleepDuration() {
+<span class="nc" id="L231">        return java.time.Duration.ofMillis(getAsleepDurationMillis());</span>
+    }
+
+    /// Time actually covered by a set of spans, counting an overlap once.
+    ///
+    /// Summing the spans instead was wrong for the data both platforms
+    /// really produce: this class documents platform sleep categories as
+    /// overlapping, and a LIGHT span of `[0,10]` beside a DEEP span of
+    /// `[5,15]` summed to 20 in a session that lasted 15. A total time
+    /// asleep longer than the night it happened in is the kind of number
+    /// that gets drawn straight into a chart.
+    ///
+    /// Note this cannot be replaced by clamping to the session length --
+    /// that would hide the overlap while still reporting the wrong figure
+    /// for every night short enough not to hit the clamp.
+    private static long coveredMillis(List&lt;SleepStageInterval&gt; spans) {
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (spans.isEmpty()) {</span>
+<span class="fc" id="L248">            return 0;</span>
+        }
+<span class="fc" id="L250">        Collections.sort(spans, ByStart.INSTANCE);</span>
+<span class="fc" id="L251">        long covered = 0;</span>
+<span class="fc" id="L252">        long openFrom = spans.get(0).getStartMillis();</span>
+<span class="fc" id="L253">        long openTo = spans.get(0).getEndMillis();</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (int iter = 1; iter &lt; spans.size(); iter++) {</span>
+<span class="fc" id="L255">            SleepStageInterval iv = spans.get(iter);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            if (iv.getStartMillis() &gt; openTo) {</span>
+<span class="fc" id="L257">                covered += openTo - openFrom;</span>
+<span class="fc" id="L258">                openFrom = iv.getStartMillis();</span>
+<span class="fc" id="L259">                openTo = iv.getEndMillis();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">            } else if (iv.getEndMillis() &gt; openTo) {</span>
+<span class="fc" id="L261">                openTo = iv.getEndMillis();</span>
+            }
+        }
+<span class="fc" id="L264">        return covered + openTo - openFrom;</span>
+    }
+
+    /// Sorts spans by start so the merge above only has to look at the one
+    /// span it currently has open.
+    private static final class ByStart
+            implements java.util.Comparator&lt;SleepStageInterval&gt; {
+
+<span class="fc" id="L272">        static final ByStart INSTANCE = new ByStart();</span>
+
+        @Override
+        public int compare(SleepStageInterval a, SleepStageInterval b) {
+<span class="fc" id="L276">            long left = a.getStartMillis();</span>
+<span class="fc" id="L277">            long right = b.getStartMillis();</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (left == right) {</span>
+<span class="nc" id="L279">                return 0;</span>
+            }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            return left &lt; right ? -1 : 1;</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L287">        return &quot;SleepSample[&quot; + getStartMillis() + &quot;..&quot; + getEndMillis()</span>
+<span class="nc" id="L288">                + &quot; stages=&quot; + stages.size() + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

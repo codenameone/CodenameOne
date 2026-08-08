@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthSensorProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">HealthSensorProfile.java</span></div><h1>HealthSensorProfile.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.health.HealthDataType;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/// A standard Bluetooth SIG health sensor profile -- the service a device
+/// advertises and the measurements it produces.
+///
+/// These are the adopted profiles, so any conforming device works without
+/// per-vendor code: a heart-rate strap from any manufacturer speaks
+/// `0x180D`.
+public final class HealthSensorProfile {
+
+<span class="fc" id="L41">    private static final List&lt;HealthSensorProfile&gt; ALL =</span>
+            new ArrayList&lt;HealthSensorProfile&gt;();
+
+    private final String name;
+    private final BluetoothUuid serviceUuid;
+    private final BluetoothUuid measurementUuid;
+    private final List&lt;HealthDataType&gt; producedTypes;
+    private final boolean streaming;
+
+    private HealthSensorProfile(String name, int serviceShortUuid,
+            int measurementShortUuid, boolean streaming,
+<span class="fc" id="L52">            HealthDataType[] producedTypes) {</span>
+<span class="fc" id="L53">        this.name = name;</span>
+<span class="fc" id="L54">        this.serviceUuid = BluetoothUuid.fromShort(serviceShortUuid);</span>
+<span class="fc" id="L55">        this.measurementUuid = BluetoothUuid.fromShort(measurementShortUuid);</span>
+<span class="fc" id="L56">        this.streaming = streaming;</span>
+<span class="fc" id="L57">        this.producedTypes = Collections.unmodifiableList(</span>
+<span class="fc" id="L58">                new ArrayList&lt;HealthDataType&gt;(Arrays.asList(producedTypes)));</span>
+<span class="fc" id="L59">        ALL.add(this);</span>
+<span class="fc" id="L60">    }</span>
+
+    /// Heart Rate, service `0x180D`. Streams heart rate and, on most
+    /// straps, RR intervals for heart-rate variability.
+<span class="fc" id="L64">    public static final HealthSensorProfile HEART_RATE =</span>
+            new HealthSensorProfile(&quot;Heart Rate&quot;, 0x180D, 0x2A37, true,
+                    new HealthDataType[] { HealthDataType.HEART_RATE });
+
+    /// Cycling Power, service `0x1818`. Streams power and, when the meter
+    /// reports crank data, cadence.
+<span class="fc" id="L70">    public static final HealthSensorProfile CYCLING_POWER =</span>
+            new HealthSensorProfile(&quot;Cycling Power&quot;, 0x1818, 0x2A63, true,
+                    new HealthDataType[] { HealthDataType.POWER,
+                            HealthDataType.CYCLING_CADENCE });
+
+    /// Cycling Speed and Cadence, service `0x1816`. Streams derived speed
+    /// and cadence -- the raw characteristic carries cumulative counters,
+    /// which [SensorSession] differences for you.
+    /// Cycling Speed and Cadence, service `0x1816`.
+    ///
+    /// Only cadence is produced. Speed would need a wheel circumference
+    /// the profile does not carry, and guessing a tyre size scales every
+    /// distance the app derives -- so the wheel block is decoded and
+    /// discarded rather than published. Advertising SPEED here left apps
+    /// waiting forever for a sample that never came.
+<span class="fc" id="L85">    public static final HealthSensorProfile CYCLING_SPEED_CADENCE =</span>
+            new HealthSensorProfile(&quot;Cycling Speed and Cadence&quot;, 0x1816,
+                    0x2A5B, true,
+                    new HealthDataType[] {
+                            HealthDataType.CYCLING_CADENCE });
+
+    /// Running Speed and Cadence, service `0x1814`. Streams speed and step
+    /// cadence from a foot pod.
+<span class="fc" id="L93">    public static final HealthSensorProfile RUNNING_SPEED_CADENCE =</span>
+            new HealthSensorProfile(&quot;Running Speed and Cadence&quot;, 0x1814,
+                    0x2A53, true,
+                    new HealthDataType[] { HealthDataType.SPEED,
+                            HealthDataType.RUNNING_CADENCE });
+
+    /// Health Thermometer, service `0x1809`. Reports one measurement at a
+    /// time rather than streaming.
+<span class="fc" id="L101">    public static final HealthSensorProfile HEALTH_THERMOMETER =</span>
+            new HealthSensorProfile(&quot;Health Thermometer&quot;, 0x1809, 0x2A1C,
+                    false,
+                    new HealthDataType[] { HealthDataType.BODY_TEMPERATURE });
+
+    /// Weight Scale, service `0x181D`. Reports one measurement per
+    /// weighing.
+<span class="fc" id="L108">    public static final HealthSensorProfile WEIGHT_SCALE =</span>
+            new HealthSensorProfile(&quot;Weight Scale&quot;, 0x181D, 0x2A9D, false,
+                    new HealthDataType[] { HealthDataType.BODY_MASS });
+
+    /// Blood Pressure, service `0x1810`. Reports one measurement per
+    /// inflation cycle.
+<span class="fc" id="L114">    public static final HealthSensorProfile BLOOD_PRESSURE =</span>
+            new HealthSensorProfile(&quot;Blood Pressure&quot;, 0x1810, 0x2A35, false,
+                    new HealthDataType[] { HealthDataType.BLOOD_PRESSURE });
+
+    /// Glucose, service `0x1808`. Reports a measurement when the user
+    /// tests, and can replay stored records -- see
+    /// [SensorSession#requestStoredRecords(GlucoseRecordFilter)].
+<span class="fc" id="L121">    public static final HealthSensorProfile GLUCOSE =</span>
+            new HealthSensorProfile(&quot;Glucose&quot;, 0x1808, 0x2A18, false,
+                    new HealthDataType[] { HealthDataType.BLOOD_GLUCOSE });
+
+    /// The profile's human-readable name.
+    public String getName() {
+<span class="fc" id="L127">        return name;</span>
+    }
+
+    /// The GATT service UUID a conforming device advertises.
+    public BluetoothUuid getServiceUuid() {
+<span class="fc" id="L132">        return serviceUuid;</span>
+    }
+
+    /// The characteristic carrying this profile's measurements.
+    public BluetoothUuid getMeasurementUuid() {
+<span class="fc" id="L137">        return measurementUuid;</span>
+    }
+
+    /// The health data types a session with this profile can produce.
+    public List&lt;HealthDataType&gt; getProducedTypes() {
+<span class="fc" id="L142">        return producedTypes;</span>
+    }
+
+    /// `true` for profiles that notify continuously -- heart rate, power,
+    /// cadence. `false` for episodic ones that report a single reading per
+    /// measurement, such as a scale or a blood-pressure cuff.
+    ///
+    /// Worth branching on in UI: a streaming sensor should show a live
+    /// value, while an episodic one should show &quot;waiting for a
+    /// measurement&quot; until the user actually takes one.
+    public boolean isStreaming() {
+<span class="fc" id="L153">        return streaming;</span>
+    }
+
+    /// Every profile this framework understands.
+    public static List&lt;HealthSensorProfile&gt; values() {
+<span class="fc" id="L158">        return Collections.unmodifiableList(ALL);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L163">        return name;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

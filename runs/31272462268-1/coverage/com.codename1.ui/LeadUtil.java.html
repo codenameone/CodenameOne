@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LeadUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">LeadUtil.java</span></div><h1>LeadUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/// A package-private utility class for working with working with lead components.
+///
+/// @author Steve Hannah
+///
+<span class="nc" id="L29">abstract class LeadUtil {</span>
+
+    /// Gets the lead parent for a component, or the component itself if there is
+    /// no lead parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component whose lead parent we wish to retrieve.
+    ///
+    /// #### Returns
+    ///
+    /// @return The component's lead parent if one exists.  Will fall back to just return cmp
+    /// if no lead parent exists.
+    public static Component leadParentImpl(Component cmp) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (cmp == null) {</span>
+<span class="fc" id="L44">            return null;</span>
+        }
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (cmp.hasLead) {</span>
+            Component out;
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (cmp instanceof Container) {</span>
+<span class="fc" id="L49">                out = ((Container) cmp).getLeadParent();</span>
+            } else {
+<span class="fc" id="L51">                out = cmp.getParent().getLeadParent();</span>
+            }
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (out != null) {</span>
+<span class="fc" id="L54">                return out;</span>
+            }
+        }
+<span class="fc" id="L57">        return cmp;</span>
+    }
+
+    /// Gets the lead component for a component if one exists, or just passes through the
+    /// component provided in the argument.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: The component.
+    ///
+    /// #### Returns
+    ///
+    /// Either the lead component of the component, or the component itself.
+    public static Component leadComponentImpl(Component cmp) {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L72">            return null;</span>
+        }
+        // If a container is draggable or scrollable, then lead components make things too complicated
+        // as routing events to a lead component may cause scrolling or dragging to 
+        // work incorrectly.
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (cmp.hasLead) {</span>
+<span class="fc" id="L78">            Component out = cmp.getLeadComponent();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (out != null) {</span>
+<span class="fc" id="L80">                return out;</span>
+            }
+        }
+<span class="fc" id="L83">        return cmp;</span>
+    }
+
+    /// Dispatches a pointer pressed event to the lead component of cmp.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: A component whose lead component we will fire pointerPressed event on.
+    ///
+    /// - `x`: X-coord
+    ///
+    /// - `y`: Y-coord
+    public static void pointerPressed(Component cmp, int x, int y) {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L97">            return;</span>
+        }
+<span class="fc" id="L99">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L100">        lead.pointerPressed(x, y);</span>
+<span class="fc" id="L101">        Form f = cmp.getComponentForm();</span>
+<span class="fc" id="L102">        Component leadParent = leadParentImpl(cmp);</span>
+<span class="pc bpc" id="L103" title="3 of 8 branches missed.">        if (f != null &amp;&amp; !Display.impl.isScrollWheeling() &amp;&amp; leadParent.isFocusable() &amp;&amp; leadParent.isEnabled()) {</span>
+<span class="fc" id="L104">            f.setFocused(leadParent);</span>
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (cmp != lead) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L107">            leadParent.repaint();</span>
+        }
+
+<span class="fc" id="L110">    }</span>
+
+    /// Dispatches a pointer dragged event to the lead component of cmp.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: A component whose lead component we will fire pointerDragged event on.
+    ///
+    /// - `x`: X-coord
+    ///
+    /// - `y`: Y-coord
+    public static void pointerDragged(Component cmp, int x, int y) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L123">            return;</span>
+        }
+<span class="fc" id="L125">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L126">        lead.pointerDragged(x, y);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (cmp != lead) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L128">            leadParentImpl(cmp).repaint();</span>
+        }
+
+<span class="fc" id="L131">    }</span>
+
+    /// Dispatches a pointer dragged event to the lead component of cmp.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: A component whose lead component we will fire pointerDragged event on.
+    ///
+    /// - `x`: X-coords
+    ///
+    /// - `y`: Y-coords
+    public static void pointerDragged(Component cmp, int[] x, int[] y) {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L144">            return;</span>
+        }
+<span class="fc" id="L146">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L147">        lead.pointerDragged(x, y);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (cmp != lead) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L149">            leadParentImpl(cmp).repaint();</span>
+        }
+
+<span class="fc" id="L152">    }</span>
+
+    /// Dispatches a pointer released event to the lead component of cmp.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: A component whose lead component we will fire pointerReleased event on.
+    ///
+    /// - `x`: X-coord
+    ///
+    /// - `y`: Y-coord
+    public static void pointerReleased(Component cmp, int x, int y) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L165">            return;</span>
+        }
+<span class="fc" id="L167">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L168">        lead.pointerReleased(x, y);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (lead != cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L170">            leadParentImpl(cmp).repaint();</span>
+        }
+<span class="fc" id="L172">    }</span>
+
+    /// Dispatches a pointer pressed event to the lead component of cmp.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: A component whose lead component we will fire pointerPressed event on.
+    ///
+    /// - `x`: X-coord
+    ///
+    /// - `y`: Y-coord
+    public static void pointerHoverReleased(Component cmp, int[] x, int[] y) {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L185">            return;</span>
+        }
+<span class="fc" id="L187">        leadComponentImpl(cmp).pointerHoverReleased(x, y);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (leadParentImpl(cmp) != cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L189">            leadParentImpl(cmp).repaint();</span>
+        }
+<span class="fc" id="L191">    }</span>
+
+    public static void pointerHoverPressed(Component cmp, int[] x, int[] y) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L195">            return;</span>
+        }
+<span class="fc" id="L197">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L198">        lead.pointerHoverPressed(x, y);</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (lead != cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L200">            leadParentImpl(cmp).repaint();</span>
+        }
+<span class="fc" id="L202">    }</span>
+
+    public static void pointerHover(Component cmp, int[] x, int[] y) {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L206">            return;</span>
+        }
+<span class="fc" id="L208">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L209">        lead.pointerHover(x, y);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (lead != cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L211">            leadParentImpl(cmp).repaint();</span>
+        }
+<span class="fc" id="L213">    }</span>
+
+    public static void dragFinished(Component cmp, int x, int y) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L217">            return;</span>
+        }
+<span class="fc" id="L219">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L220">        lead.dragFinishedImpl(x, y);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (lead != cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L222">            leadParentImpl(cmp).repaint();</span>
+        }
+<span class="fc" id="L224">    }</span>
+
+    public static void longPointerPress(Component cmp, int x, int y) {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L228">            return;</span>
+        }
+<span class="fc" id="L230">        Component lead = leadComponentImpl(cmp);</span>
+<span class="fc" id="L231">        lead.longPointerPress(x, y);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (cmp != lead) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L233">            leadParentImpl(cmp).repaint();</span>
+        }
+<span class="fc" id="L235">    }</span>
+
+    public static void dragInitiated(Component cmp) {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L239">            return;</span>
+        }
+<span class="fc" id="L241">        Form f = cmp.getComponentForm();</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L243">            Component fc = f.getFocused();</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (fc != null) {</span>
+<span class="fc" id="L245">                fc.dragInitiated();</span>
+            }
+        }
+        //leadParentImpl(cmp).dragInitiated();
+<span class="fc" id="L249">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

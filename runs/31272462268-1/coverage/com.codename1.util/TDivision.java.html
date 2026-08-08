@@ -1,0 +1,990 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TDivision.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TDivision.java</span></div><h1>TDivision.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/// Static library that provides all operations related with division and modular
+/// arithmetic to `TBigInteger`. Some methods are provided in both mutable
+/// and immutable way. There are several variants provided listed below:
+///
+/// - **Division**
+///
+/// - `TBigInteger` division and remainder by `TBigInteger`.
+///
+/// - `TBigInteger` division and remainder by `int`.
+///
+/// - *gcd* between `TBigInteger` numbers.
+///
+/// - **Modular arithmetic **
+///
+/// - Modular exponentiation between `TBigInteger` numbers.
+///
+/// - Modular inverse of a `TBigInteger` numbers.
+final class TDivision {
+
+    private TDivision() {}
+
+    /// Divides the array 'a' by the array 'b' and gets the quotient and the
+    /// remainder. Implements the Knuth's division algorithm. See D. Knuth, The
+    /// Art of Computer Programming, vol. 2. Steps D1-D8 correspond the steps in
+    /// the algorithm description.
+    ///
+    /// #### Parameters
+    ///
+    /// - `quot`: the quotient
+    ///
+    /// - `quotLength`: the quotient's length
+    ///
+    /// - `a`: the dividend
+    ///
+    /// - `aLength`: the dividend's length
+    ///
+    /// - `b`: the divisor
+    ///
+    /// - `bLength`: the divisor's length
+    ///
+    /// #### Returns
+    ///
+    /// the remainder
+    static int[] divide(int[] quot, int quotLength, int[] a, int aLength, int[] b, int bLength) {
+
+<span class="nc" id="L65">        int[] normA = new int[aLength + 1]; // the normalized dividend</span>
+        // an extra byte is needed for correct shift
+<span class="nc" id="L67">        int[] normB = new int[bLength + 1]; // the normalized divisor;</span>
+<span class="nc" id="L68">        int normBLength = bLength;</span>
+        /*
+         * Step D1: normalize a and b and put the results to a1 and b1 the
+         * normalized divisor's first digit must be &gt;= 2^31
+         */
+<span class="nc" id="L73">        int divisorShift = TBigDecimal.numberOfLeadingZeros(b[bLength - 1]);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (divisorShift != 0) {</span>
+<span class="nc" id="L75">            TBitLevel.shiftLeft(normB, b, 0, divisorShift);</span>
+<span class="nc" id="L76">            TBitLevel.shiftLeft(normA, a, 0, divisorShift);</span>
+        } else {
+<span class="nc" id="L78">            System.arraycopy(a, 0, normA, 0, aLength);</span>
+<span class="nc" id="L79">            System.arraycopy(b, 0, normB, 0, bLength);</span>
+        }
+<span class="nc" id="L81">        int firstDivisorDigit = normB[normBLength - 1];</span>
+        // Step D2: set the quotient index
+<span class="nc" id="L83">        int i = quotLength - 1;</span>
+<span class="nc" id="L84">        int j = aLength;</span>
+
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        while (i &gt;= 0) {</span>
+            // Step D3: calculate a guess digit guessDigit
+<span class="nc" id="L88">            int guessDigit = 0;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (normA[j] == firstDivisorDigit) {</span>
+                // set guessDigit to the largest unsigned int value
+<span class="nc" id="L91">                guessDigit = -1;</span>
+            } else {
+<span class="nc" id="L93">                long product = (((normA[j] &amp; 0xffffffffL) &lt;&lt; 32) + (normA[j - 1] &amp; 0xffffffffL));</span>
+<span class="nc" id="L94">                long res = TDivision.divideLongByInt(product, firstDivisorDigit);</span>
+<span class="nc" id="L95">                guessDigit = (int) res; // the quotient of divideLongByInt</span>
+<span class="nc" id="L96">                int rem = (int) (res &gt;&gt; 32); // the remainder of</span>
+                // divideLongByInt
+                // decrease guessDigit by 1 while leftHand &gt; rightHand
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                if (guessDigit != 0) {</span>
+<span class="nc" id="L100">                    long leftHand = 0;</span>
+<span class="nc" id="L101">                    long rightHand = 0;</span>
+<span class="nc" id="L102">                    boolean rOverflowed = false;</span>
+<span class="nc" id="L103">                    guessDigit++; // to have the proper value in the loop</span>
+                    // below
+                    do {
+<span class="nc" id="L106">                        guessDigit--;</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                        if (rOverflowed) {</span>
+<span class="nc" id="L108">                            break;</span>
+                        }
+                        // leftHand always fits in an unsigned long
+<span class="nc" id="L111">                        leftHand = (guessDigit &amp; 0xffffffffL) * (normB[normBLength - 2] &amp; 0xffffffffL);</span>
+                        /*
+                         * rightHand can overflow; in this case the loop
+                         * condition will be true in the next step of the loop
+                         */
+<span class="nc" id="L116">                        rightHand = ((long) rem &lt;&lt; 32) + (normA[j - 2] &amp; 0xffffffffL);</span>
+<span class="nc" id="L117">                        long longR = (rem &amp; 0xffffffffL) + (firstDivisorDigit &amp; 0xffffffffL);</span>
+                        /*
+                         * checks that longR does not fit in an unsigned int;
+                         * this ensures that rightHand will overflow unsigned
+                         * long in the next step
+                         */
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                        if (TBigDecimal.numberOfLeadingZeros((int) (longR &gt;&gt;&gt; 32)) &lt; 32) {</span>
+<span class="nc" id="L124">                            rOverflowed = true;</span>
+                        } else {
+<span class="nc" id="L126">                            rem = (int) longR;</span>
+                        }
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                    } while (((leftHand ^ 0x8000000000000000L) &gt; (rightHand ^ 0x8000000000000000L)));</span>
+                }
+            }
+            // Step D4: multiply normB by guessDigit and subtract the production
+            // from normA.
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (guessDigit != 0) {</span>
+<span class="nc" id="L134">                int borrow = TDivision.multiplyAndSubtract(normA, j - normBLength, normB, normBLength, guessDigit);</span>
+                // Step D5: check the borrow
+<span class="nc bnc" id="L136" title="All 2 branches missed.">                if (borrow != 0) {</span>
+                    // Step D6: compensating addition
+<span class="nc" id="L138">                    guessDigit--;</span>
+<span class="nc" id="L139">                    long carry = 0;</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">                    for (int k = 0; k &lt; normBLength; k++) {</span>
+<span class="nc" id="L141">                        carry += (normA[j - normBLength + k] &amp; 0xffffffffL) + (normB[k] &amp; 0xffffffffL);</span>
+<span class="nc" id="L142">                        normA[j - normBLength + k] = (int) carry;</span>
+<span class="nc" id="L143">                        carry &gt;&gt;&gt;= 32;</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (quot != null) {</span>
+<span class="nc" id="L148">                quot[i] = guessDigit;</span>
+            }
+            // Step D7
+<span class="nc" id="L151">            j--;</span>
+<span class="nc" id="L152">            i--;</span>
+<span class="nc" id="L153">        }</span>
+        /*
+         * Step D8: we got the remainder in normA. Denormalize it id needed
+         */
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (divisorShift != 0) {</span>
+            // reuse normB
+<span class="nc" id="L159">            TBitLevel.shiftRight(normB, normBLength, normA, 0, divisorShift);</span>
+<span class="nc" id="L160">            return normB;</span>
+        }
+<span class="nc" id="L162">        System.arraycopy(normA, 0, normB, 0, bLength);</span>
+<span class="nc" id="L163">        return normA;</span>
+    }
+
+    /// Divides an array by an integer value. Implements the Knuth's division
+    /// algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dest`: the quotient
+    ///
+    /// - `src`: the dividend
+    ///
+    /// - `srcLength`: the length of the dividend
+    ///
+    /// - `divisor`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// remainder
+    static int divideArrayByInt(int[] dest, int[] src, final int srcLength, final int divisor) {
+
+<span class="fc" id="L184">        long rem = 0;</span>
+<span class="fc" id="L185">        long bLong = divisor &amp; 0xffffffffL;</span>
+
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (int i = srcLength - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L188">            long temp = (rem &lt;&lt; 32) | (src[i] &amp; 0xffffffffL);</span>
+            long quot;
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (temp &gt;= 0) {</span>
+<span class="fc" id="L191">                quot = (temp / bLong);</span>
+<span class="fc" id="L192">                rem = (temp % bLong);</span>
+            } else {
+                /*
+                 * make the dividend positive shifting it right by 1 bit then
+                 * get the quotient a remainder and correct them properly
+                 */
+<span class="nc" id="L198">                long aPos = temp &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L199">                long bPos = divisor &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L200">                quot = aPos / bPos;</span>
+<span class="nc" id="L201">                rem = aPos % bPos;</span>
+                // double the remainder and add 1 if a is odd
+<span class="nc" id="L203">                rem = (rem &lt;&lt; 1) + (temp &amp; 1);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">                if ((divisor &amp; 1) != 0) {</span>
+                    // the divisor is odd
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                    if (quot &lt;= rem) {</span>
+<span class="nc" id="L207">                        rem -= quot;</span>
+                    } else {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">                        if (quot - rem &lt;= bLong) {</span>
+<span class="nc" id="L210">                            rem += bLong - quot;</span>
+<span class="nc" id="L211">                            quot -= 1;</span>
+                        } else {
+<span class="nc" id="L213">                            rem += (bLong &lt;&lt; 1) - quot;</span>
+<span class="nc" id="L214">                            quot -= 2;</span>
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L219">            dest[i] = (int) (quot &amp; 0xffffffffL);</span>
+        }
+<span class="fc" id="L221">        return (int) rem;</span>
+    }
+
+    /// Divides an array by an integer value. Implements the Knuth's division
+    /// algorithm. See D. Knuth, The Art of Computer Programming, vol. 2.
+    ///
+    /// #### Parameters
+    ///
+    /// - `src`: the dividend
+    ///
+    /// - `srcLength`: the length of the dividend
+    ///
+    /// - `divisor`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// remainder
+    static int remainderArrayByInt(int[] src, final int srcLength, final int divisor) {
+
+<span class="fc" id="L240">        long result = 0;</span>
+
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (int i = srcLength - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L243">            long temp = (result &lt;&lt; 32) + (src[i] &amp; 0xffffffffL);</span>
+<span class="fc" id="L244">            long res = divideLongByInt(temp, divisor);</span>
+<span class="fc" id="L245">            result = (int) (res &gt;&gt; 32);</span>
+        }
+<span class="fc" id="L247">        return (int) result;</span>
+    }
+
+    /// Divides a `BigInteger` by a signed `int` and
+    /// returns the remainder.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dividend`: the BigInteger to be divided. Must be non-negative.
+    ///
+    /// - `divisor`: a signed int
+    ///
+    /// #### Returns
+    ///
+    /// divide % divisor
+    static int remainder(TBigInteger dividend, int divisor) {
+<span class="nc" id="L263">        return remainderArrayByInt(dividend.digits, dividend.numberLength, divisor);</span>
+    }
+
+    /// Divides an unsigned long a by an unsigned int b. It is supposed that the
+    /// most significant bit of b is set to 1, i.e. b &lt; 0
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the dividend
+    ///
+    /// - `b`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// @return the long value containing the unsigned integer remainder in the
+    /// left half and the unsigned integer quotient in the right half
+    static long divideLongByInt(long a, int b) {
+        long quot;
+        long rem;
+<span class="fc" id="L282">        long bLong = b &amp; 0xffffffffL;</span>
+
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (a &gt;= 0) {</span>
+<span class="fc" id="L285">            quot = (a / bLong);</span>
+<span class="fc" id="L286">            rem = (a % bLong);</span>
+        } else {
+            /*
+             * Make the dividend positive shifting it right by 1 bit then get
+             * the quotient a remainder and correct them properly
+             */
+<span class="nc" id="L292">            long aPos = a &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L293">            long bPos = b &gt;&gt;&gt; 1;</span>
+<span class="nc" id="L294">            quot = aPos / bPos;</span>
+<span class="nc" id="L295">            rem = aPos % bPos;</span>
+            // double the remainder and add 1 if a is odd
+<span class="nc" id="L297">            rem = (rem &lt;&lt; 1) + (a &amp; 1);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            if ((b &amp; 1) != 0) { // the divisor is odd</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                if (quot &lt;= rem) {</span>
+<span class="nc" id="L300">                    rem -= quot;</span>
+                } else {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">                    if (quot - rem &lt;= bLong) {</span>
+<span class="nc" id="L303">                        rem += bLong - quot;</span>
+<span class="nc" id="L304">                        quot -= 1;</span>
+                    } else {
+<span class="nc" id="L306">                        rem += (bLong &lt;&lt; 1) - quot;</span>
+<span class="nc" id="L307">                        quot -= 2;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L312">        return (rem &lt;&lt; 32) | (quot &amp; 0xffffffffL);</span>
+    }
+
+    /// Computes the quotient and the remainder after a division by an
+    /// `int` number.
+    ///
+    /// #### Returns
+    ///
+    /// an array of the form `[quotient, remainder]`.
+    static TBigInteger[] divideAndRemainderByInteger(TBigInteger val, int divisor, int divisorSign) {
+        // res[0] is a quotient and res[1] is a remainder:
+<span class="fc" id="L323">        int[] valDigits = val.digits;</span>
+<span class="fc" id="L324">        int valLen = val.numberLength;</span>
+<span class="fc" id="L325">        int valSign = val.sign;</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (valLen == 1) {</span>
+<span class="fc" id="L327">            long a = (valDigits[0] &amp; 0xffffffffL);</span>
+<span class="fc" id="L328">            long b = (divisor &amp; 0xffffffffL);</span>
+<span class="fc" id="L329">            long quo = a / b;</span>
+<span class="fc" id="L330">            long rem = a % b;</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (valSign != divisorSign) {</span>
+<span class="nc" id="L332">                quo = -quo;</span>
+            }
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">            if (valSign &lt; 0) {</span>
+<span class="nc" id="L335">                rem = -rem;</span>
+            }
+<span class="fc" id="L337">            return new TBigInteger[]{TBigInteger.valueOf(quo), TBigInteger.valueOf(rem)};</span>
+        }
+<span class="fc" id="L339">        int quotientLength = valLen;</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        int quotientSign = ((valSign == divisorSign) ? 1 : -1);</span>
+<span class="fc" id="L341">        int[] quotientDigits = new int[quotientLength];</span>
+        int[] remainderDigits;
+<span class="fc" id="L343">        remainderDigits = new int[]{TDivision.divideArrayByInt(quotientDigits, valDigits, valLen, divisor)};</span>
+<span class="fc" id="L344">        TBigInteger result0 = new TBigInteger(quotientSign, quotientLength, quotientDigits);</span>
+<span class="fc" id="L345">        TBigInteger result1 = new TBigInteger(valSign, 1, remainderDigits);</span>
+<span class="fc" id="L346">        result0.cutOffLeadingZeroes();</span>
+<span class="fc" id="L347">        result1.cutOffLeadingZeroes();</span>
+<span class="fc" id="L348">        return new TBigInteger[]{result0, result1};</span>
+    }
+
+    /// Multiplies an array by int and subtracts it from a subarray of another
+    /// array.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the array to subtract from
+    ///
+    /// - `start`: the start element of the subarray of a
+    ///
+    /// - `b`: the array to be multiplied and subtracted
+    ///
+    /// - `bLen`: the length of b
+    ///
+    /// - `c`: the multiplier of b
+    ///
+    /// #### Returns
+    ///
+    /// the carry element of subtraction
+    static int multiplyAndSubtract(int[] a, int start, int[] b, int bLen, int c) {
+<span class="nc" id="L370">        long carry0 = 0;</span>
+<span class="nc" id="L371">        long carry1 = 0;</span>
+
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        for (int i = 0; i &lt; bLen; i++) {</span>
+<span class="nc" id="L374">            carry0 = TMultiplication.unsignedMultAddAdd(b[i], c, (int) carry0, 0);</span>
+<span class="nc" id="L375">            carry1 = (a[start + i] &amp; 0xffffffffL) - (carry0 &amp; 0xffffffffL) + carry1;</span>
+<span class="nc" id="L376">            a[start + i] = (int) carry1;</span>
+<span class="nc" id="L377">            carry1 &gt;&gt;= 32; // -1 or 0</span>
+<span class="nc" id="L378">            carry0 &gt;&gt;&gt;= 32;</span>
+        }
+
+<span class="nc" id="L381">        carry1 = (a[start + bLen] &amp; 0xffffffffL) - carry0 + carry1;</span>
+<span class="nc" id="L382">        a[start + bLen] = (int) carry1;</span>
+<span class="nc" id="L383">        return (int) (carry1 &gt;&gt; 32); // -1 or 0</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `m`: @param m   a positive modulus Return the greatest common divisor of op1
+    /// and op2,
+    ///
+    /// - `op1`: must be greater than zero
+    ///
+    /// - `op2`: must be greater than zero
+    ///
+    /// #### Returns
+    ///
+    /// `GCD(op1, op2)`
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#gcd(TBigInteger)
+    static TBigInteger gcdBinary(TBigInteger op1, TBigInteger op2) {
+        // PRE: (op1 &gt; 0) and (op2 &gt; 0)
+
+        /*
+         * Divide both number the maximal possible times by 2 without rounding
+         * gcd(2*a, 2*b) = 2 * gcd(a,b)
+         */
+<span class="nc" id="L409">        int lsb1 = op1.getLowestSetBit();</span>
+<span class="nc" id="L410">        int lsb2 = op2.getLowestSetBit();</span>
+<span class="nc" id="L411">        int pow2Count = Math.min(lsb1, lsb2);</span>
+
+<span class="nc" id="L413">        TBitLevel.inplaceShiftRight(op1, lsb1);</span>
+<span class="nc" id="L414">        TBitLevel.inplaceShiftRight(op2, lsb2);</span>
+
+        TBigInteger swap;
+        // I want op2 &gt; op1
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (op1.compareTo(op2) == TBigInteger.GREATER) {</span>
+<span class="nc" id="L419">            swap = op1;</span>
+<span class="nc" id="L420">            op1 = op2;</span>
+<span class="nc" id="L421">            op2 = swap;</span>
+        }
+
+        do { // INV: op2 &gt;= op1 &amp;&amp; both are odd unless op1 = 0
+
+            // Optimization for small operands
+            // (op2.bitLength() &lt; 64) implies by INV (op1.bitLength() &lt; 64)
+<span class="nc bnc" id="L428" title="All 6 branches missed.">            if ((op2.numberLength == 1) || ((op2.numberLength == 2) &amp;&amp; (op2.digits[1] &gt; 0))) {</span>
+<span class="nc" id="L429">                op2 = TBigInteger.valueOf(TDivision.gcdBinary(op1.longValue(), op2.longValue()));</span>
+<span class="nc" id="L430">                break;</span>
+            }
+
+            // Implements one step of the Euclidean algorithm
+            // To reduce one operand if it's much smaller than the other one
+<span class="nc bnc" id="L435" title="All 2 branches missed.">            if (op2.numberLength &gt; op1.numberLength * 1.2) {</span>
+<span class="nc" id="L436">                op2 = op2.remainder(op1);</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                if (op2.signum() != 0) {</span>
+<span class="nc" id="L438">                    TBitLevel.inplaceShiftRight(op2, op2.getLowestSetBit());</span>
+                }
+            } else {
+
+                // Use Knuth's algorithm of successive subtract and shifting
+                do {
+<span class="nc" id="L444">                    TElementary.inplaceSubtract(op2, op1); // both are odd</span>
+<span class="nc" id="L445">                    TBitLevel.inplaceShiftRight(op2, op2.getLowestSetBit());</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                } while (op2.compareTo(op1) &gt;= TBigInteger.EQUALS);</span>
+            }
+            // now op1 &gt;= op2
+<span class="nc" id="L449">            swap = op2;</span>
+<span class="nc" id="L450">            op2 = op1;</span>
+<span class="nc" id="L451">            op1 = swap;</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        } while (op1.sign != 0);</span>
+<span class="nc" id="L453">        return op2.shiftLeft(pow2Count);</span>
+    }
+
+    /// Performs the same as `TBigInteger)`, but
+    /// with numbers of 63 bits, represented in positives values of `long`
+    /// type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `op1`: a positive number
+    ///
+    /// - `op2`: a positive number
+    ///
+    /// #### Returns
+    ///
+    /// `GCD(op1, op2)`
+    ///
+    /// #### See also
+    ///
+    /// - #gcdBinary(TBigInteger, TBigInteger)
+    static long gcdBinary(long op1, long op2) {
+        // PRE: (op1 &gt; 0) and (op2 &gt; 0)
+<span class="fc" id="L475">        int lsb1 = TBigDecimal.numberOfTrailingZeros(op1);</span>
+<span class="fc" id="L476">        int lsb2 = TBigDecimal.numberOfTrailingZeros(op2);</span>
+<span class="fc" id="L477">        int pow2Count = Math.min(lsb1, lsb2);</span>
+
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        if (lsb1 != 0) {</span>
+<span class="fc" id="L480">            op1 &gt;&gt;&gt;= lsb1;</span>
+        }
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">        if (lsb2 != 0) {</span>
+<span class="fc" id="L483">            op2 &gt;&gt;&gt;= lsb2;</span>
+        }
+        do {
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">            if (op1 &gt;= op2) {</span>
+<span class="fc" id="L487">                op1 -= op2;</span>
+<span class="fc" id="L488">                op1 &gt;&gt;&gt;= TBigDecimal.numberOfTrailingZeros(op1);</span>
+            } else {
+<span class="nc" id="L490">                op2 -= op1;</span>
+<span class="nc" id="L491">                op2 &gt;&gt;&gt;= TBigDecimal.numberOfTrailingZeros(op2);</span>
+            }
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        } while (op1 != 0);</span>
+<span class="fc" id="L494">        return (op2 &lt;&lt; pow2Count);</span>
+    }
+
+    /// Calculates a.modInverse(p) Based on: Savas, E; Koc, C &quot;The Montgomery
+    /// Modular Inverse - Revised&quot;
+    static TBigInteger modInverseMontgomery(TBigInteger a, TBigInteger p) {
+
+<span class="nc bnc" id="L501" title="All 2 branches missed.">        if (a.sign == 0) {</span>
+            // ZERO hasn't inverse
+<span class="nc" id="L503">            throw new ArithmeticException(&quot;BigInteger not invertible&quot;);</span>
+        }
+
+<span class="nc bnc" id="L506" title="All 2 branches missed.">        if (!p.testBit(0)) {</span>
+            // montgomery inverse require even modulo
+<span class="nc" id="L508">            return modInverseHars(a, p);</span>
+        }
+
+<span class="nc" id="L511">        int m = p.numberLength * 32;</span>
+        // PRE: a \in [1, p - 1]
+        TBigInteger u;
+        TBigInteger v;
+        TBigInteger r;
+        TBigInteger s;
+<span class="nc" id="L517">        u = p.copy(); // make copy to use inplace method</span>
+<span class="nc" id="L518">        v = a.copy();</span>
+<span class="nc" id="L519">        int max = Math.max(v.numberLength, u.numberLength);</span>
+<span class="nc" id="L520">        r = new TBigInteger(1, 1, new int[max + 1]);</span>
+<span class="nc" id="L521">        s = new TBigInteger(1, 1, new int[max + 1]);</span>
+<span class="nc" id="L522">        s.digits[0] = 1;</span>
+        // s == 1 &amp;&amp; v == 0
+
+<span class="nc" id="L525">        int k = 0;</span>
+
+<span class="nc" id="L527">        int lsbu = u.getLowestSetBit();</span>
+<span class="nc" id="L528">        int lsbv = v.getLowestSetBit();</span>
+        int toShift;
+
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        if (lsbu &gt; lsbv) {</span>
+<span class="nc" id="L532">            TBitLevel.inplaceShiftRight(u, lsbu);</span>
+<span class="nc" id="L533">            TBitLevel.inplaceShiftRight(v, lsbv);</span>
+<span class="nc" id="L534">            TBitLevel.inplaceShiftLeft(r, lsbv);</span>
+<span class="nc" id="L535">            k += lsbu - lsbv;</span>
+        } else {
+<span class="nc" id="L537">            TBitLevel.inplaceShiftRight(u, lsbu);</span>
+<span class="nc" id="L538">            TBitLevel.inplaceShiftRight(v, lsbv);</span>
+<span class="nc" id="L539">            TBitLevel.inplaceShiftLeft(s, lsbu);</span>
+<span class="nc" id="L540">            k += lsbv - lsbu;</span>
+        }
+
+<span class="nc" id="L543">        r.sign = 1;</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">        while (v.signum() &gt; 0) {</span>
+            // INV v &gt;= 0, u &gt;= 0, v odd, u odd (except last iteration when v is
+            // even (0))
+
+<span class="nc bnc" id="L548" title="All 2 branches missed.">            while (u.compareTo(v) &gt; TBigInteger.EQUALS) {</span>
+<span class="nc" id="L549">                TElementary.inplaceSubtract(u, v);</span>
+<span class="nc" id="L550">                toShift = u.getLowestSetBit();</span>
+<span class="nc" id="L551">                TBitLevel.inplaceShiftRight(u, toShift);</span>
+<span class="nc" id="L552">                TElementary.inplaceAdd(r, s);</span>
+<span class="nc" id="L553">                TBitLevel.inplaceShiftLeft(s, toShift);</span>
+<span class="nc" id="L554">                k += toShift;</span>
+            }
+
+<span class="nc bnc" id="L557" title="All 2 branches missed.">            while (u.compareTo(v) &lt;= TBigInteger.EQUALS) {</span>
+<span class="nc" id="L558">                TElementary.inplaceSubtract(v, u);</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">                if (v.signum() == 0) {</span>
+<span class="nc" id="L560">                    break;</span>
+                }
+<span class="nc" id="L562">                toShift = v.getLowestSetBit();</span>
+<span class="nc" id="L563">                TBitLevel.inplaceShiftRight(v, toShift);</span>
+<span class="nc" id="L564">                TElementary.inplaceAdd(s, r);</span>
+<span class="nc" id="L565">                TBitLevel.inplaceShiftLeft(r, toShift);</span>
+<span class="nc" id="L566">                k += toShift;</span>
+            }
+        }
+<span class="nc bnc" id="L569" title="All 2 branches missed.">        if (!u.isOne()) {</span>
+<span class="nc" id="L570">            throw new ArithmeticException(&quot;BigInteger not invertible.&quot;);</span>
+        }
+<span class="nc bnc" id="L572" title="All 2 branches missed.">        if (r.compareTo(p) &gt;= TBigInteger.EQUALS) {</span>
+<span class="nc" id="L573">            TElementary.inplaceSubtract(r, p);</span>
+        }
+
+<span class="nc" id="L576">        r = p.subtract(r);</span>
+
+        // Have pair: ((BigInteger)r, (Integer)k) where r == a^(-1) * 2^k mod
+        // (module)
+<span class="nc" id="L580">        int n1 = calcN(p);</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        if (k &gt; m) {</span>
+<span class="nc" id="L582">            r = monPro(r, TBigInteger.ONE, p, n1);</span>
+<span class="nc" id="L583">            k = k - m;</span>
+        }
+
+<span class="nc" id="L586">        r = monPro(r, TBigInteger.getPowerOfTwo(m - k), p, n1);</span>
+<span class="nc" id="L587">        return r;</span>
+    }
+
+    /// Calculate the first digit of the inverse
+    private static int calcN(TBigInteger a) {
+<span class="fc" id="L592">        long m0 = a.digits[0] &amp; 0xFFFFFFFFL;</span>
+<span class="fc" id="L593">        long n2 = 1L; // this is a'[0]</span>
+<span class="fc" id="L594">        long powerOfTwo = 2L;</span>
+        do {
+<span class="fc bfc" id="L596" title="All 2 branches covered.">            if (((m0 * n2) &amp; powerOfTwo) != 0) {</span>
+<span class="fc" id="L597">                n2 |= powerOfTwo;</span>
+            }
+<span class="fc" id="L599">            powerOfTwo &lt;&lt;= 1;</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">        } while (powerOfTwo &lt; 0x100000000L);</span>
+<span class="fc" id="L601">        n2 = -n2;</span>
+<span class="fc" id="L602">        return (int) (n2 &amp; 0xFFFFFFFFL);</span>
+    }
+
+    static TBigInteger squareAndMultiply(TBigInteger x2, TBigInteger a2, TBigInteger exponent, TBigInteger modulus,
+                                         int n2) {
+<span class="fc" id="L607">        TBigInteger res = x2;</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">        for (int i = exponent.bitLength() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L609">            res = monPro(res, res, modulus, n2);</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">            if (TBitLevel.testBit(exponent, i)) {</span>
+<span class="fc" id="L611">                res = monPro(res, a2, modulus, n2);</span>
+            }
+        }
+<span class="fc" id="L614">        return res;</span>
+    }
+
+    /// Implements the &quot;Shifting Euclidean modular inverse algorithm&quot;. &quot;Laszlo
+    /// Hars - Modular Inverse Algorithms Without Multiplications for
+    /// Cryptographic Applications&quot;
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a positive number
+    ///
+    /// - `m`: a positive modulus
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modInverse(TBigInteger)
+    static TBigInteger modInverseHars(TBigInteger a, TBigInteger m) {
+        // PRE: (a &gt; 0) and (m &gt; 0)
+        TBigInteger u;
+        TBigInteger v;
+        TBigInteger r;
+        TBigInteger s;
+        TBigInteger temp;
+        // u = MAX(a,m), v = MIN(a,m)
+<span class="nc bnc" id="L638" title="All 2 branches missed.">        if (a.compareTo(m) == TBigInteger.LESS) {</span>
+<span class="nc" id="L639">            u = m;</span>
+<span class="nc" id="L640">            v = a;</span>
+<span class="nc" id="L641">            r = TBigInteger.ZERO;</span>
+<span class="nc" id="L642">            s = TBigInteger.ONE;</span>
+        } else {
+<span class="nc" id="L644">            v = m;</span>
+<span class="nc" id="L645">            u = a;</span>
+<span class="nc" id="L646">            s = TBigInteger.ZERO;</span>
+<span class="nc" id="L647">            r = TBigInteger.ONE;</span>
+        }
+<span class="nc" id="L649">        int uLen = u.bitLength();</span>
+<span class="nc" id="L650">        int vLen = v.bitLength();</span>
+<span class="nc" id="L651">        int f = uLen - vLen;</span>
+
+<span class="nc bnc" id="L653" title="All 2 branches missed.">        while (vLen &gt; 1) {</span>
+<span class="nc bnc" id="L654" title="All 2 branches missed.">            if (u.sign == v.sign) {</span>
+<span class="nc" id="L655">                u = u.subtract(v.shiftLeft(f));</span>
+<span class="nc" id="L656">                r = r.subtract(s.shiftLeft(f));</span>
+            } else {
+<span class="nc" id="L658">                u = u.add(v.shiftLeft(f));</span>
+<span class="nc" id="L659">                r = r.add(s.shiftLeft(f));</span>
+            }
+<span class="nc" id="L661">            uLen = u.abs().bitLength();</span>
+<span class="nc" id="L662">            vLen = v.abs().bitLength();</span>
+<span class="nc" id="L663">            f = uLen - vLen;</span>
+<span class="nc bnc" id="L664" title="All 2 branches missed.">            if (f &lt; 0) {</span>
+                // SWAP(u,v)
+<span class="nc" id="L666">                temp = u;</span>
+<span class="nc" id="L667">                u = v;</span>
+<span class="nc" id="L668">                v = temp;</span>
+                // SWAP(r,s)
+<span class="nc" id="L670">                temp = r;</span>
+<span class="nc" id="L671">                r = s;</span>
+<span class="nc" id="L672">                s = temp;</span>
+
+<span class="nc" id="L674">                f = -f;</span>
+<span class="nc" id="L675">                vLen = uLen;</span>
+            }
+        }
+<span class="nc bnc" id="L678" title="All 2 branches missed.">        if (v.sign == 0) {</span>
+<span class="nc" id="L679">            return TBigInteger.ZERO;</span>
+        }
+<span class="nc bnc" id="L681" title="All 2 branches missed.">        if (v.sign &lt; 0) {</span>
+<span class="nc" id="L682">            s = s.negate();</span>
+        }
+<span class="nc bnc" id="L684" title="All 2 branches missed.">        if (s.compareTo(m) == TBigInteger.GREATER) {</span>
+<span class="nc" id="L685">            return s.subtract(m);</span>
+        }
+<span class="nc bnc" id="L687" title="All 2 branches missed.">        if (s.sign &lt; 0) {</span>
+<span class="nc" id="L688">            return s.add(m);</span>
+        }
+<span class="nc" id="L690">        return s; // a^(-1) mod m</span>
+    }
+
+    /*
+     * Implements the Montgomery modular exponentiation based in &lt;i&gt;The sliding
+     * windows algorithm and the MongomeryReduction&lt;/i&gt;.
+     *
+     * @ar.org.fitc.ref
+     * &quot;A. Menezes,P. van Oorschot, S. Vanstone - Handbook of Applied Cryptography&quot;
+     * ;
+     *
+     * @see #oddModPow(BigInteger, BigInteger, BigInteger)
+     */
+    static TBigInteger slidingWindow(TBigInteger x2, TBigInteger a2, TBigInteger exponent, TBigInteger modulus, int n2) {
+        // fill odd low pows of a2
+<span class="nc" id="L705">        TBigInteger[] pows = new TBigInteger[8];</span>
+<span class="nc" id="L706">        TBigInteger res = x2;</span>
+        int lowexp;
+        TBigInteger x3;
+        int acc3;
+<span class="nc" id="L710">        pows[0] = a2;</span>
+
+<span class="nc" id="L712">        x3 = monPro(a2, a2, modulus, n2);</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">        for (int i = 1; i &lt;= 7; i++) {</span>
+<span class="nc" id="L714">            pows[i] = monPro(pows[i - 1], x3, modulus, n2);</span>
+        }
+
+<span class="nc bnc" id="L717" title="All 2 branches missed.">        for (int i = exponent.bitLength() - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">            if (TBitLevel.testBit(exponent, i)) {</span>
+<span class="nc" id="L719">                lowexp = 1;</span>
+<span class="nc" id="L720">                acc3 = i;</span>
+
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                for (int j = Math.max(i - 3, 0); j &lt;= i - 1; j++) {</span>
+<span class="nc bnc" id="L723" title="All 2 branches missed.">                    if (TBitLevel.testBit(exponent, j)) {</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">                        if (j &lt; acc3) {</span>
+<span class="nc" id="L725">                            acc3 = j;</span>
+<span class="nc" id="L726">                            lowexp = (lowexp &lt;&lt; (i - j)) ^ 1;</span>
+                        } else {
+<span class="nc" id="L728">                            lowexp = lowexp ^ (1 &lt;&lt; (j - acc3));</span>
+                        }
+                    }
+                }
+
+<span class="nc bnc" id="L733" title="All 2 branches missed.">                for (int j = acc3; j &lt;= i; j++) {</span>
+<span class="nc" id="L734">                    res = monPro(res, res, modulus, n2);</span>
+                }
+<span class="nc" id="L736">                res = monPro(pows[(lowexp - 1) &gt;&gt; 1], res, modulus, n2);</span>
+<span class="nc" id="L737">                i = acc3;</span>
+            } else {
+<span class="nc" id="L739">                res = monPro(res, res, modulus, n2);</span>
+            }
+        }
+<span class="nc" id="L742">        return res;</span>
+    }
+
+    /// Performs modular exponentiation using the Montgomery Reduction. It
+    /// requires that all parameters be positive and the modulus be odd. &gt;
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modPow(TBigInteger, TBigInteger)
+    ///
+    /// - #monPro(TBigInteger, TBigInteger, TBigInteger, int)
+    ///
+    /// - @see #slidingWindow(TBigInteger, TBigInteger, TBigInteger, TBigInteger,
+    /// int)
+    ///
+    /// - @see #squareAndMultiply(TBigInteger, TBigInteger, TBigInteger,
+    /// TBigInteger, int)
+    static TBigInteger oddModPow(TBigInteger base, TBigInteger exponent, TBigInteger modulus) {
+        // PRE: (base &gt; 0), (exponent &gt; 0), (modulus &gt; 0) and (odd modulus)
+<span class="fc" id="L761">        int k = (modulus.numberLength &lt;&lt; 5); // r = 2^k</span>
+        // n-residue of base [base * r (mod modulus)]
+<span class="fc" id="L763">        TBigInteger a2 = base.shiftLeft(k).mod(modulus);</span>
+        // n-residue of base [1 * r (mod modulus)]
+<span class="fc" id="L765">        TBigInteger x2 = TBigInteger.getPowerOfTwo(k).mod(modulus);</span>
+        TBigInteger res;
+        // Compute (modulus[0]^(-1)) (mod 2^32) for odd modulus
+
+<span class="fc" id="L769">        int n2 = calcN(modulus);</span>
+<span class="pc bpc" id="L770" title="1 of 2 branches missed.">        if (modulus.numberLength == 1) {</span>
+<span class="fc" id="L771">            res = squareAndMultiply(x2, a2, exponent, modulus, n2);</span>
+        } else {
+<span class="nc" id="L773">            res = slidingWindow(x2, a2, exponent, modulus, n2);</span>
+        }
+
+<span class="fc" id="L776">        return monPro(res, TBigInteger.ONE, modulus, n2);</span>
+    }
+
+    /// Performs modular exponentiation using the Montgomery Reduction. It
+    /// requires that all parameters be positive and the modulus be even. Based
+    /// *The square and multiply algorithm and the Montgomery Reduction C. K.
+    /// Koc - Montgomery Reduction with Even Modulus*. The square and multiply
+    /// algorithm and the Montgomery Reduction.
+    ///
+    /// @ar.org.fitc.ref &quot;C. K. Koc - Montgomery Reduction with Even Modulus&quot;
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modPow(TBigInteger, TBigInteger)
+    static TBigInteger evenModPow(TBigInteger base, TBigInteger exponent, TBigInteger modulus) {
+        // PRE: (base &gt; 0), (exponent &gt; 0), (modulus &gt; 0) and (modulus even)
+        // STEP 1: Obtain the factorization 'modulus'= q * 2^j.
+<span class="nc" id="L793">        int j = modulus.getLowestSetBit();</span>
+<span class="nc" id="L794">        TBigInteger q = modulus.shiftRight(j);</span>
+
+        // STEP 2: Compute x1 := base^exponent (mod q).
+<span class="nc" id="L797">        TBigInteger x1 = oddModPow(base, exponent, q);</span>
+
+        // STEP 3: Compute x2 := base^exponent (mod 2^j).
+<span class="nc" id="L800">        TBigInteger x2 = pow2ModPow(base, exponent, j);</span>
+
+        // STEP 4: Compute q^(-1) (mod 2^j) and y := (x2-x1) * q^(-1) (mod 2^j)
+<span class="nc" id="L803">        TBigInteger qInv = modPow2Inverse(q, j);</span>
+<span class="nc" id="L804">        TBigInteger y = (x2.subtract(x1)).multiply(qInv);</span>
+<span class="nc" id="L805">        inplaceModPow2(y, j);</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">        if (y.sign &lt; 0) {</span>
+<span class="nc" id="L807">            y = y.add(TBigInteger.getPowerOfTwo(j));</span>
+        }
+        // STEP 5: Compute and return: x1 + q * y
+<span class="nc" id="L810">        return x1.add(q.multiply(y));</span>
+    }
+
+    /// It requires that all parameters be positive.
+    ///
+    /// #### Returns
+    ///
+    /// `baseexponent mod (2j)`.
+    ///
+    /// #### See also
+    ///
+    /// - TBigInteger#modPow(TBigInteger, TBigInteger)
+    static TBigInteger pow2ModPow(TBigInteger base, TBigInteger exponent, int j) {
+        // PRE: (base &gt; 0), (exponent &gt; 0) and (j &gt; 0)
+<span class="nc" id="L824">        TBigInteger res = TBigInteger.ONE;</span>
+<span class="nc" id="L825">        TBigInteger e = exponent.copy();</span>
+<span class="nc" id="L826">        TBigInteger baseMod2toN = base.copy();</span>
+        TBigInteger res2;
+        /*
+         * If 'base' is odd then it's coprime with 2^j and phi(2^j) = 2^(j-1);
+         * so we can reduce reduce the exponent (mod 2^(j-1)).
+         */
+<span class="nc bnc" id="L832" title="All 2 branches missed.">        if (base.testBit(0)) {</span>
+<span class="nc" id="L833">            inplaceModPow2(e, j - 1);</span>
+        }
+<span class="nc" id="L835">        inplaceModPow2(baseMod2toN, j);</span>
+
+<span class="nc bnc" id="L837" title="All 2 branches missed.">        for (int i = e.bitLength() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L838">            res2 = res.copy();</span>
+<span class="nc" id="L839">            inplaceModPow2(res2, j);</span>
+<span class="nc" id="L840">            res = res.multiply(res2);</span>
+<span class="nc bnc" id="L841" title="All 2 branches missed.">            if (TBitLevel.testBit(e, i)) {</span>
+<span class="nc" id="L842">                res = res.multiply(baseMod2toN);</span>
+<span class="nc" id="L843">                inplaceModPow2(res, j);</span>
+            }
+        }
+<span class="nc" id="L846">        inplaceModPow2(res, j);</span>
+<span class="nc" id="L847">        return res;</span>
+    }
+
+    private static void monReduction(int[] res, TBigInteger modulus, int n2) {
+
+        /* res + m*modulus_digits */
+<span class="fc" id="L853">        int[] modulusDigits = modulus.digits;</span>
+<span class="fc" id="L854">        int modulusLen = modulus.numberLength;</span>
+<span class="fc" id="L855">        long outerCarry = 0;</span>
+
+<span class="fc bfc" id="L857" title="All 2 branches covered.">        for (int i = 0; i &lt; modulusLen; i++) {</span>
+<span class="fc" id="L858">            long innnerCarry = 0;</span>
+<span class="fc" id="L859">            int m = (int) TMultiplication.unsignedMultAddAdd(res[i], n2, 0, 0);</span>
+<span class="fc bfc" id="L860" title="All 2 branches covered.">            for (int j = 0; j &lt; modulusLen; j++) {</span>
+<span class="fc" id="L861">                innnerCarry = TMultiplication.unsignedMultAddAdd(m, modulusDigits[j], res[i + j], (int) innnerCarry);</span>
+<span class="fc" id="L862">                res[i + j] = (int) innnerCarry;</span>
+<span class="fc" id="L863">                innnerCarry &gt;&gt;&gt;= 32;</span>
+            }
+
+<span class="fc" id="L866">            outerCarry += (res[i + modulusLen] &amp; 0xFFFFFFFFL) + innnerCarry;</span>
+<span class="fc" id="L867">            res[i + modulusLen] = (int) outerCarry;</span>
+<span class="fc" id="L868">            outerCarry &gt;&gt;&gt;= 32;</span>
+        }
+
+<span class="fc" id="L871">        res[modulusLen &lt;&lt; 1] = (int) outerCarry;</span>
+
+        /* res / r */
+<span class="fc bfc" id="L874" title="All 2 branches covered.">        for (int j = 0; j &lt; modulusLen + 1; j++) {</span>
+<span class="fc" id="L875">            res[j] = res[j + modulusLen];</span>
+        }
+<span class="fc" id="L877">    }</span>
+
+    /// Implements the Montgomery Product of two integers represented by
+    /// `int` arrays. The arrays are supposed in *little endian*
+    /// notation.
+    ///
+    /// @ar.org.fitc.ref &quot;C. K. Koc - Analyzing and Comparing Montgomery
+    /// Multiplication Algorithms&quot;
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: The first factor of the product.
+    ///
+    /// - `b`: The second factor of the product.
+    ///
+    /// - `modulus`: The modulus of the operations. Zmodulus.
+    ///
+    /// - `n2`: The digit modulus'[0].
+    ///
+    /// #### See also
+    ///
+    /// - #modPowOdd(TBigInteger, TBigInteger, TBigInteger)
+    static TBigInteger monPro(TBigInteger a, TBigInteger b, TBigInteger modulus, int n2) {
+<span class="fc" id="L900">        int modulusLen = modulus.numberLength;</span>
+<span class="fc" id="L901">        int[] res = new int[(modulusLen &lt;&lt; 1) + 1];</span>
+<span class="fc" id="L902">        TMultiplication.multArraysPAP(a.digits, Math.min(modulusLen, a.numberLength), b.digits,</span>
+<span class="fc" id="L903">                Math.min(modulusLen, b.numberLength), res);</span>
+<span class="fc" id="L904">        monReduction(res, modulus, n2);</span>
+<span class="fc" id="L905">        return finalSubtraction(res, modulus);</span>
+
+    }
+
+    /// Performs the final reduction of the Montgomery algorithm.
+    ///
+    /// #### See also
+    ///
+    /// - #monPro(TBigInteger, TBigInteger, TBigInteger, long)
+    ///
+    /// - #monSquare(TBigInteger, TBigInteger, long)
+    static TBigInteger finalSubtraction(int[] res, TBigInteger modulus) {
+
+        // skipping leading zeros
+<span class="fc" id="L919">        int modulusLen = modulus.numberLength;</span>
+<span class="pc bpc" id="L920" title="1 of 2 branches missed.">        boolean doSub = res[modulusLen] != 0;</span>
+<span class="pc bpc" id="L921" title="1 of 2 branches missed.">        if (!doSub) {</span>
+<span class="fc" id="L922">            int[] modulusDigits = modulus.digits;</span>
+<span class="fc" id="L923">            doSub = true;</span>
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            for (int i = modulusLen - 1; i &gt;= 0; i--) {</span>
+<span class="pc bpc" id="L925" title="1 of 2 branches missed.">                if (res[i] != modulusDigits[i]) {</span>
+<span class="pc bpc" id="L926" title="2 of 4 branches missed.">                    doSub = (res[i] != 0) &amp;&amp; ((res[i] &amp; 0xFFFFFFFFL) &gt; (modulusDigits[i] &amp; 0xFFFFFFFFL));</span>
+<span class="fc" id="L927">                    break;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L932">        TBigInteger result = new TBigInteger(1, modulusLen + 1, res);</span>
+
+        // if (res &gt;= modulusDigits) compute (res - modulusDigits)
+<span class="pc bpc" id="L935" title="1 of 2 branches missed.">        if (doSub) {</span>
+<span class="nc" id="L936">            TElementary.inplaceSubtract(result, modulus);</span>
+        }
+
+<span class="fc" id="L939">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L940">        return result;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `x`: an odd positive number.
+    ///
+    /// - `n`: the exponent by which 2 is raised.
+    ///
+    /// #### Returns
+    ///
+    /// `x-1 (mod 2n)`.
+    static TBigInteger modPow2Inverse(TBigInteger x, int n) {
+        // PRE: (x &gt; 0), (x is odd), and (n &gt; 0)
+<span class="nc" id="L954">        TBigInteger y = new TBigInteger(1, new int[1 &lt;&lt; n]);</span>
+<span class="nc" id="L955">        y.numberLength = 1;</span>
+<span class="nc" id="L956">        y.digits[0] = 1;</span>
+<span class="nc" id="L957">        y.sign = 1;</span>
+
+<span class="nc bnc" id="L959" title="All 2 branches missed.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L960" title="All 2 branches missed.">            if (TBitLevel.testBit(x.multiply(y), i)) {</span>
+                // Adding 2^i to y (setting the i-th bit)
+<span class="nc" id="L962">                y.digits[i &gt;&gt; 5] |= (1 &lt;&lt; (i &amp; 31));</span>
+            }
+        }
+<span class="nc" id="L965">        return y;</span>
+    }
+
+    /// Performs `x = x mod (2n)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: a positive number, it will store the result.
+    ///
+    /// - `n`: a positive exponent of `2`.
+    static void inplaceModPow2(TBigInteger x, int n) {
+        // PRE: (x &gt; 0) and (n &gt;= 0)
+<span class="nc" id="L977">        int fd = n &gt;&gt; 5;</span>
+        int leadingZeros;
+
+<span class="nc bnc" id="L980" title="All 4 branches missed.">        if ((x.numberLength &lt; fd) || (x.bitLength() &lt;= n)) {</span>
+<span class="nc" id="L981">            return;</span>
+        }
+<span class="nc" id="L983">        leadingZeros = 32 - (n &amp; 31);</span>
+<span class="nc" id="L984">        x.numberLength = fd + 1;</span>
+<span class="nc bnc" id="L985" title="All 2 branches missed.">        x.digits[fd] &amp;= (leadingZeros &lt; 32) ? (-1 &gt;&gt;&gt; leadingZeros) : 0;</span>
+<span class="nc" id="L986">        x.cutOffLeadingZeroes();</span>
+<span class="nc" id="L987">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

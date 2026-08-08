@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WidgetKind.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">WidgetKind.java</span></div><h1>WidgetKind.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Declares one kind of home-screen widget the app offers (an app may offer several). The kind id
+/// must match an entry in the `surfaces.json` file kept in the project's resources: widget kinds
+/// are compiled into the native app (the widget gallery entries, the iOS widget bundle and the
+/// Android receivers are all static), so the build needs them at build time while this runtime
+/// declaration drives publishing and validation. A mismatch logs a prominent warning.
+///
+/// Ids are restricted to `[a-z][a-z0-9_]*` because they are used to derive native type and
+/// resource names.
+public class WidgetKind {
+    private final String id;
+    private String displayName;
+    private String description;
+<span class="fc" id="L40">    private final List&lt;WidgetSize&gt; supportedSizes = new ArrayList&lt;WidgetSize&gt;();</span>
+
+    /// Creates a widget kind declaration.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the stable kind identifier, `[a-z][a-z0-9_]*`
+<span class="fc" id="L47">    public WidgetKind(String id) {</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (id == null || !isValidId(id)) {</span>
+<span class="fc" id="L49">            throw new IllegalArgumentException(&quot;Widget kind ids must match [a-z][a-z0-9_]* but got: &quot; + id);</span>
+        }
+<span class="fc" id="L51">        this.id = id;</span>
+<span class="fc" id="L52">    }</span>
+
+    private static boolean isValidId(String id) {
+<span class="fc" id="L55">        int n = id.length();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L57">            return false;</span>
+        }
+<span class="fc" id="L59">        char first = id.charAt(0);</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        if (first &lt; 'a' || first &gt; 'z') {</span>
+<span class="fc" id="L61">            return false;</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="fc" id="L64">            char c = id.charAt(i);</span>
+<span class="pc bpc" id="L65" title="3 of 10 branches missed.">            boolean ok = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '_';</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (!ok) {</span>
+<span class="nc" id="L67">                return false;</span>
+            }
+        }
+<span class="fc" id="L70">        return true;</span>
+    }
+
+    /// Sets the title shown in the platform widget gallery.
+    ///
+    /// #### Parameters
+    ///
+    /// - `displayName`: the gallery title
+    ///
+    /// #### Returns
+    ///
+    /// this kind, for chaining
+    public WidgetKind setDisplayName(String displayName) {
+<span class="fc" id="L83">        this.displayName = displayName;</span>
+<span class="fc" id="L84">        return this;</span>
+    }
+
+    /// Sets the description shown in the platform widget gallery.
+    ///
+    /// #### Parameters
+    ///
+    /// - `description`: the gallery description
+    ///
+    /// #### Returns
+    ///
+    /// this kind, for chaining
+    public WidgetKind setDescription(String description) {
+<span class="nc" id="L97">        this.description = description;</span>
+<span class="nc" id="L98">        return this;</span>
+    }
+
+    /// Adds a supported size family. When no size is added the kind defaults to `SMALL` and
+    /// `MEDIUM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: the size family to support
+    ///
+    /// #### Returns
+    ///
+    /// this kind, for chaining
+    public WidgetKind addSupportedSize(WidgetSize size) {
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        if (size != null &amp;&amp; !supportedSizes.contains(size)) {</span>
+<span class="fc" id="L113">            supportedSizes.add(size);</span>
+        }
+<span class="fc" id="L115">        return this;</span>
+    }
+
+    /// Returns the stable kind identifier.
+    public String getId() {
+<span class="fc" id="L120">        return id;</span>
+    }
+
+    /// Returns the gallery title, or null.
+    public String getDisplayName() {
+<span class="fc" id="L125">        return displayName;</span>
+    }
+
+    /// Returns the gallery description, or null.
+    public String getDescription() {
+<span class="fc" id="L130">        return description;</span>
+    }
+
+    /// Returns the supported size families; `SMALL` and `MEDIUM` when none were added explicitly.
+    public List&lt;WidgetSize&gt; getSupportedSizes() {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (supportedSizes.isEmpty()) {</span>
+<span class="fc" id="L136">            List&lt;WidgetSize&gt; def = new ArrayList&lt;WidgetSize&gt;(2);</span>
+<span class="fc" id="L137">            def.add(WidgetSize.SMALL);</span>
+<span class="fc" id="L138">            def.add(WidgetSize.MEDIUM);</span>
+<span class="fc" id="L139">            return def;</span>
+        }
+<span class="fc" id="L141">        return supportedSizes;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

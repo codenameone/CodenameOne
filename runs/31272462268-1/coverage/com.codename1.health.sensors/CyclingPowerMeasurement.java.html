@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CyclingPowerMeasurement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">CyclingPowerMeasurement.java</span></div><h1>CyclingPowerMeasurement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+/// A decoded Cycling Power Measurement, characteristic `0x2A63`.
+///
+/// #### Wire format
+///
+/// Unlike most SIG characteristics the flags field here is a **`uint16`**,
+/// not a single byte, because the profile defines sixteen optional fields.
+/// It is followed immediately by the instantaneous power.
+///
+/// #### Instantaneous power is signed
+///
+/// The power field is `sint16`, and negative values are real: a power
+/// meter reports negative watts when the rider is back-pedalling or the
+/// drivetrain is driving the cranks on a descent. Reading it as unsigned
+/// turns a brief -5 W into 65531 W, which then poisons every average and
+/// maximum for the whole ride.
+///
+/// This parser exposes the common fields -- instantaneous power,
+/// accumulated energy, pedal balance, crank revolutions. The remaining
+/// optional fields are skipped in order so that the fields after them
+/// still decode correctly.
+public final class CyclingPowerMeasurement {
+
+    private static final int FLAG_PEDAL_BALANCE = 0x0001;
+    /// Set when the balance is measured against the left pedal; clear
+    /// means the reference is unknown, which is a different reading.
+    private static final int FLAG_BALANCE_REFERENCE_LEFT = 0x0002;
+    // 0x0002 pedal-power-balance reference and 0x0008 accumulated-torque
+    // source are single-bit qualifiers on the two fields below rather than
+    // presence flags, so they shift nothing and are not read here.
+    private static final int FLAG_ACCUMULATED_TORQUE = 0x0004;
+    private static final int FLAG_WHEEL_REVOLUTIONS = 0x0010;
+    private static final int FLAG_CRANK_REVOLUTIONS = 0x0020;
+    private static final int FLAG_EXTREME_FORCE = 0x0040;
+    private static final int FLAG_EXTREME_TORQUE = 0x0080;
+    private static final int FLAG_EXTREME_ANGLES = 0x0100;
+    private static final int FLAG_TOP_DEAD_SPOT = 0x0200;
+    private static final int FLAG_BOTTOM_DEAD_SPOT = 0x0400;
+    private static final int FLAG_ACCUMULATED_ENERGY = 0x0800;
+
+    private final int instantaneousPowerWatts;
+    private final double pedalPowerBalancePercent;
+    private final boolean pedalPowerBalanceLeft;
+    private final long wheelRevolutions;
+    private final int lastWheelEventTime;
+    private final int crankRevolutions;
+    private final int lastCrankEventTime;
+    private final int accumulatedEnergyKilojoules;
+
+    private CyclingPowerMeasurement(int instantaneousPowerWatts,
+            double pedalPowerBalancePercent, boolean pedalPowerBalanceLeft,
+            long wheelRevolutions,
+            int lastWheelEventTime, int crankRevolutions,
+<span class="fc" id="L77">            int lastCrankEventTime, int accumulatedEnergyKilojoules) {</span>
+<span class="fc" id="L78">        this.instantaneousPowerWatts = instantaneousPowerWatts;</span>
+<span class="fc" id="L79">        this.pedalPowerBalancePercent = pedalPowerBalancePercent;</span>
+<span class="fc" id="L80">        this.pedalPowerBalanceLeft = pedalPowerBalanceLeft;</span>
+<span class="fc" id="L81">        this.wheelRevolutions = wheelRevolutions;</span>
+<span class="fc" id="L82">        this.lastWheelEventTime = lastWheelEventTime;</span>
+<span class="fc" id="L83">        this.crankRevolutions = crankRevolutions;</span>
+<span class="fc" id="L84">        this.lastCrankEventTime = lastCrankEventTime;</span>
+<span class="fc" id="L85">        this.accumulatedEnergyKilojoules = accumulatedEnergyKilojoules;</span>
+<span class="fc" id="L86">    }</span>
+
+    /// Decodes a `0x2A63` value. Returns `null` for a malformed or
+    /// truncated payload; never throws.
+    public static CyclingPowerMeasurement parse(byte[] value) {
+<span class="fc bfc" id="L91" title="All 4 branches covered.">        if (value == null || value.length &lt; 4) {</span>
+<span class="fc" id="L92">            return null;</span>
+        }
+<span class="fc" id="L94">        GattReader r = new GattReader(value);</span>
+<span class="fc" id="L95">        int flags = r.uint16();</span>
+<span class="fc" id="L96">        int power = r.sint16();</span>
+
+<span class="fc" id="L98">        double balance = Double.NaN;</span>
+<span class="fc" id="L99">        boolean balanceLeft = false;</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if ((flags &amp; FLAG_PEDAL_BALANCE) != 0) {</span>
+            // Transmitted in halves of a percent.
+<span class="fc" id="L102">            balance = r.uint8() * 0.5;</span>
+            // The reference qualifier travels with it. Dropping it made a
+            // left-referenced reading and an unknown-reference one
+            // indistinguishable, while the getter told callers to consult
+            // a bit they had no way to see.
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            balanceLeft = (flags &amp; FLAG_BALANCE_REFERENCE_LEFT) != 0;</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if ((flags &amp; FLAG_ACCUMULATED_TORQUE) != 0) {</span>
+<span class="fc" id="L110">            r.skip(2);</span>
+        }
+<span class="fc" id="L112">        long wheelRevs = -1;</span>
+<span class="fc" id="L113">        int wheelTime = -1;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_WHEEL_REVOLUTIONS) != 0) {</span>
+<span class="nc" id="L115">            wheelRevs = r.uint32();</span>
+<span class="nc" id="L116">            wheelTime = r.uint16();</span>
+        }
+<span class="fc" id="L118">        int crankRevs = -1;</span>
+<span class="fc" id="L119">        int crankTime = -1;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if ((flags &amp; FLAG_CRANK_REVOLUTIONS) != 0) {</span>
+<span class="fc" id="L121">            crankRevs = r.uint16();</span>
+<span class="fc" id="L122">            crankTime = r.uint16();</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_EXTREME_FORCE) != 0) {</span>
+<span class="nc" id="L125">            r.skip(4);</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_EXTREME_TORQUE) != 0) {</span>
+<span class="nc" id="L128">            r.skip(4);</span>
+        }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_EXTREME_ANGLES) != 0) {</span>
+<span class="nc" id="L131">            r.skip(3);</span>
+        }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_TOP_DEAD_SPOT) != 0) {</span>
+<span class="nc" id="L134">            r.skip(2);</span>
+        }
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_BOTTOM_DEAD_SPOT) != 0) {</span>
+<span class="nc" id="L137">            r.skip(2);</span>
+        }
+<span class="fc" id="L139">        int energy = -1;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if ((flags &amp; FLAG_ACCUMULATED_ENERGY) != 0) {</span>
+<span class="nc" id="L141">            energy = r.uint16();</span>
+        }
+
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (!r.isValid()) {</span>
+<span class="fc" id="L145">            return null;</span>
+        }
+<span class="fc" id="L147">        return new CyclingPowerMeasurement(power, balance, balanceLeft,</span>
+                wheelRevs, wheelTime, crankRevs, crankTime, energy);
+    }
+
+    /// Instantaneous power in watts. **May be negative** -- see the class
+    /// documentation.
+    public int getInstantaneousPowerWatts() {
+<span class="fc" id="L154">        return instantaneousPowerWatts;</span>
+    }
+
+    /// Whether [#getPedalPowerBalancePercent()] is measured against the
+    /// left pedal.
+    ///
+    /// `false` also means &quot;the meter did not say&quot;, which is not the same
+    /// as &quot;the right pedal&quot; -- check
+    /// [#getPedalPowerBalancePercent()] for `NaN` first to tell an absent
+    /// reading from an unqualified one.
+    public boolean isPedalPowerBalanceLeft() {
+<span class="nc" id="L165">        return pedalPowerBalanceLeft;</span>
+    }
+
+    /// The share of power contributed by one pedal, as a percentage, or
+    /// `Double.NaN` when absent. Which pedal it refers to is reported by
+    /// [#isPedalPowerBalanceLeft()]; most meters report the left.
+    public double getPedalPowerBalancePercent() {
+<span class="fc" id="L172">        return pedalPowerBalancePercent;</span>
+    }
+
+    /// Cumulative wheel revolutions since the meter powered on, or `-1`
+    /// when absent. Wraps at 2^32.
+    public long getWheelRevolutions() {
+<span class="nc" id="L178">        return wheelRevolutions;</span>
+    }
+
+    /// The wheel-event timestamp in 1/2048-second units, or `-1` when
+    /// absent. Wraps roughly every 32 seconds.
+    public int getLastWheelEventTime() {
+<span class="nc" id="L184">        return lastWheelEventTime;</span>
+    }
+
+    /// Cumulative crank revolutions, or `-1` when absent. Wraps at 2^16.
+    public int getCrankRevolutions() {
+<span class="fc" id="L189">        return crankRevolutions;</span>
+    }
+
+    /// The crank-event timestamp in 1/1024-second units, or `-1` when
+    /// absent. Wraps roughly every 64 seconds.
+    public int getLastCrankEventTime() {
+<span class="fc" id="L195">        return lastCrankEventTime;</span>
+    }
+
+    /// Total energy in kilojoules since the meter powered on, or `-1` when
+    /// absent.
+    public int getAccumulatedEnergyKilojoules() {
+<span class="nc" id="L201">        return accumulatedEnergyKilojoules;</span>
+    }
+
+    /// `true` when this notification carried crank data, from which
+    /// cadence can be derived.
+    public boolean hasCrankData() {
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        return crankRevolutions &gt;= 0;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L212">        return &quot;CyclingPowerMeasurement[&quot; + instantaneousPowerWatts + &quot; W]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

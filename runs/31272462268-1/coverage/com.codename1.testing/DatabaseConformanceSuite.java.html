@@ -1,0 +1,1624 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseConformanceSuite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.testing</a> &gt; <span class="el_source">DatabaseConformanceSuite.java</span></div><h1>DatabaseConformanceSuite.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.db.Cursor;
+import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
+import com.codename1.db.Row;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/// The portable acceptance test for `com.codename1.db`.
+///
+/// One set of assertions, run unchanged on every platform. A port is conformant when this suite
+/// passes against it; there is no separate, per-platform notion of correct behaviour. It lives in
+/// the framework rather than in a test project so that the device suite, the simulator unit tests
+/// and anyone writing a new port can all run the same checks.
+///
+/// Failures are reported through a `Reporter` rather than thrown, so a single run reports every
+/// violation instead of stopping at the first. That matters most when bringing up a new port,
+/// where the useful output is the whole list.
+///
+/// ```java
+/// DatabaseConformanceSuite.runAll(&quot;conformance.db&quot;,
+///         DatabaseConformanceSuite.MODE_STRICT, myReporter);
+/// ```
+///
+/// #### Modes
+///
+/// `#MODE_STRICT` asserts the contract documented in the `com.codename1.db` package. `#MODE_LEGACY`
+/// asserts that `Database#setLegacyBehavior(boolean)` really does restore what each platform used
+/// to do, which is what makes the compatibility promise testable rather than aspirational. Run the
+/// legacy mode only with the flag actually set.
+public final class DatabaseConformanceSuite {
+
+    /// Assert the portable contract.
+    public static final int MODE_STRICT = 0;
+
+    /// Assert that legacy compatibility mode restores the previous per-platform behaviour.
+    public static final int MODE_LEGACY = 1;
+
+    /// A port with no legacy behaviour of its own to restore.
+    public static final int PORT_OTHER = 0;
+
+    /// The simulator, whose `getPosition()` used to be 1-based.
+    public static final int PORT_SIMULATOR = 1;
+
+    /// The iOS port, which has the most legacy behaviour to restore.
+    public static final int PORT_IOS = 2;
+
+    /// The Android port.
+    public static final int PORT_ANDROID = 3;
+
+    /// Not overridden; the port is read from the running `Display`.
+    public static final int PORT_AUTODETECT = -1;
+
+    /// Set by `#setPortKind(int)`.
+    ///
+    /// The legacy expectations are per-port, because the behaviour being restored genuinely was.
+    /// Normally the port is read from `Display`, but a harness driving a `Database` directly --
+    /// the fast simulator gate on every PR, for instance -- has no `Display` up, so autodetection
+    /// reports `#PORT_OTHER` and the legacy groups would assert the portable contract instead of
+    /// that port's own previous behaviour. Such a harness declares what it is testing.
+<span class="nc" id="L88">    private static int portKindOverride = PORT_AUTODETECT;</span>
+
+    /// Declares which port the suite is being run against, for a harness with no `Display`.
+    ///
+    /// Pass `#PORT_AUTODETECT` to go back to reading it from `Display`, which is what an
+    /// on-device harness wants. This is global state, so a harness that sets it should reset it
+    /// afterwards.
+    ///
+    /// #### Parameters
+    ///
+    /// - `portKind`: one of the `PORT_` constants
+    public static void setPortKind(int portKind) {
+<span class="nc" id="L100">        portKindOverride = portKind;</span>
+<span class="nc" id="L101">    }</span>
+
+    /// Receives the outcome of each individual check.
+    public interface Reporter {
+
+        /// Records one assertion.
+        ///
+        /// #### Parameters
+        ///
+        /// - `condition`: true when the check passed
+        ///
+        /// - `message`: describes what was being checked, and is shown when it fails
+        void check(boolean condition, String message);
+
+        /// Records that a group of checks was not applicable here.
+        ///
+        /// #### Parameters
+        ///
+        /// - `reason`: why the checks were skipped
+        void skip(String reason);
+
+        /// Records a diagnostic note that is not itself a pass or a failure.
+        ///
+        /// #### Parameters
+        ///
+        /// - `message`: the observation
+        void info(String message);
+    }
+
+    private DatabaseConformanceSuite() {
+    }
+
+    /// Runs every group against a scratch database.
+    ///
+    /// The database is created and deleted by this method, so pass a name the application does not
+    /// otherwise use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: a scratch database name
+    ///
+    /// - `mode`: `#MODE_STRICT` or `#MODE_LEGACY`
+    ///
+    /// - `r`: receives the results
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the scratch database cannot be created at all
+    public static void runAll(String databaseName, int mode, Reporter r) throws IOException {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (!isDatabaseAvailable(r)) {</span>
+<span class="nc" id="L151">            return;</span>
+        }
+<span class="nc" id="L153">        runLifecycle(databaseName, mode, r);</span>
+
+<span class="nc" id="L155">        Database db = Database.openOrCreate(databaseName);</span>
+        try {
+<span class="nc" id="L157">            runStatements(db, mode, r);</span>
+<span class="nc" id="L158">            runCursor(db, mode, r);</span>
+<span class="nc" id="L159">            runTransactions(db, mode, r);</span>
+        } finally {
+<span class="nc" id="L161">            closeQuietly(db);</span>
+        }
+<span class="nc" id="L163">        runEncryption(databaseName + &quot;-enc&quot;, mode, r);</span>
+<span class="nc" id="L164">        deleteQuietly(databaseName);</span>
+<span class="nc" id="L165">    }</span>
+
+    /// Reports whether this platform provides a database at all.
+    ///
+    /// Ports without an implementation return null from `Database#openOrCreate(java.lang.String)`.
+    /// Callers use this to skip cleanly rather than fail.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: receives a skip message when there is no database
+    ///
+    /// #### Returns
+    ///
+    /// true when a database can be opened
+    public static boolean isDatabaseAvailable(Reporter r) {
+<span class="nc" id="L180">        Database probe = null;</span>
+        try {
+<span class="nc" id="L182">            probe = Database.openOrCreate(&quot;cn1-conformance-probe.db&quot;);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (probe == null) {</span>
+<span class="nc" id="L184">                r.skip(&quot;no-database-implementation-on-&quot; + Display.getInstance().getPlatformName());</span>
+<span class="nc" id="L185">                return false;</span>
+            }
+<span class="nc" id="L187">            return true;</span>
+<span class="nc" id="L188">        } catch (Throwable err) {</span>
+<span class="nc" id="L189">            r.skip(&quot;database-unavailable-on-&quot; + Display.getInstance().getPlatformName()</span>
+<span class="nc" id="L190">                    + &quot;: &quot; + err.getMessage());</span>
+<span class="nc" id="L191">            return false;</span>
+        } finally {
+<span class="nc" id="L193">            closeQuietly(probe);</span>
+<span class="nc" id="L194">            deleteQuietly(&quot;cn1-conformance-probe.db&quot;);</span>
+        }
+    }
+
+    // ------------------------------------------------------------------ lifecycle
+
+    /// Checks opening, existence, deletion, paths and use-after-close.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: a scratch database name
+    ///
+    /// - `mode`: `#MODE_STRICT` or `#MODE_LEGACY`
+    ///
+    /// - `r`: receives the results
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the scratch database cannot be created
+    public static void runLifecycle(String databaseName, int mode, Reporter r) throws IOException {
+<span class="nc" id="L214">        deleteQuietly(databaseName);</span>
+
+<span class="nc" id="L216">        Database db = Database.openOrCreate(databaseName);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        r.check(db != null, &quot;openOrCreate returns a database&quot;);</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (db == null) {</span>
+<span class="nc" id="L219">            return;</span>
+        }
+<span class="nc" id="L221">        noteDatabase(db);</span>
+<span class="nc" id="L222">        db.execute(&quot;CREATE TABLE IF NOT EXISTS lifecycle (id INTEGER PRIMARY KEY)&quot;);</span>
+<span class="nc" id="L223">        db.close();</span>
+
+<span class="nc" id="L225">        r.check(Database.exists(databaseName), &quot;exists() is true after the database is created&quot;);</span>
+
+<span class="nc" id="L227">        String path = Database.getDatabasePath(databaseName);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        r.check(path != null, &quot;getDatabasePath returns a path for an existing database&quot;);</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        if (path != null &amp;&amp; Database.isCustomPathSupported()) {</span>
+            // Only meaningful where databases live on a filesystem. A platform that reports no
+            // custom-path support is saying its databases are keyed by name inside a storage
+            // pool, and there the returned value is an opaque handle rather than something
+            // FileSystemStorage could open - the JavaScript port is the case in point.
+<span class="nc" id="L234">            r.check(FileSystemStorage.getInstance().exists(path),</span>
+                    &quot;the path from getDatabasePath resolves through FileSystemStorage&quot;);
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        } else if (path != null) {</span>
+<span class="nc" id="L237">            r.info(&quot;databases are not filesystem backed here, so the path is an opaque handle&quot;);</span>
+        }
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        r.check(!Database.isEncrypted(databaseName),</span>
+                &quot;isEncrypted is false for a plaintext database&quot;);
+
+        // close() is idempotent
+<span class="nc" id="L244">        Database again = Database.openOrCreate(databaseName);</span>
+<span class="nc" id="L245">        again.close();</span>
+<span class="nc" id="L246">        boolean secondCloseThrew = false;</span>
+        try {
+<span class="nc" id="L248">            again.close();</span>
+<span class="nc" id="L249">        } catch (IOException err) {</span>
+<span class="nc" id="L250">            secondCloseThrew = true;</span>
+<span class="nc" id="L251">        }</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        r.check(!secondCloseThrew, &quot;close() a second time is a no-op rather than an error&quot;);</span>
+
+        // use-after-close
+<span class="nc" id="L255">        boolean useAfterCloseThrew = false;</span>
+        try {
+<span class="nc" id="L257">            again.execute(&quot;SELECT 1&quot;);</span>
+<span class="nc" id="L258">        } catch (IOException err) {</span>
+<span class="nc" id="L259">            useAfterCloseThrew = true;</span>
+<span class="nc" id="L260">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L261">            useAfterCloseThrew = true;</span>
+<span class="nc" id="L262">            r.check(false, &quot;use-after-close throws IOException, not &quot; + err.getClass().getName());</span>
+<span class="nc" id="L263">        }</span>
+<span class="nc" id="L264">        r.check(useAfterCloseThrew, &quot;using a closed database throws&quot;);</span>
+
+        // custom paths agree with the advertised capability
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (!Database.isCustomPathSupported()) {</span>
+<span class="nc" id="L268">            boolean rejected = false;</span>
+            try {
+<span class="nc" id="L270">                Database.openOrCreate(&quot;some/path/db.sqlite&quot;);</span>
+<span class="nc" id="L271">            } catch (IllegalArgumentException err) {</span>
+<span class="nc" id="L272">                rejected = true;</span>
+<span class="nc" id="L273">            } catch (IOException err) {</span>
+<span class="nc" id="L274">                rejected = false;</span>
+<span class="nc" id="L275">            }</span>
+<span class="nc" id="L276">            r.check(rejected,</span>
+                    &quot;a path separator is rejected when custom paths are unsupported&quot;);
+<span class="nc" id="L278">        } else {</span>
+<span class="nc" id="L279">            r.info(&quot;custom database paths are supported here&quot;);</span>
+        }
+
+<span class="nc" id="L282">        Database.delete(databaseName);</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        r.check(!Database.exists(databaseName), &quot;exists() is false after delete()&quot;);</span>
+<span class="nc" id="L284">    }</span>
+
+    // ------------------------------------------------------------------ statements
+
+    /// Checks statement execution, parameter binding and error reporting.
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: an open database, left usable
+    ///
+    /// - `mode`: `#MODE_STRICT` or `#MODE_LEGACY`
+    ///
+    /// - `r`: receives the results
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the scratch table cannot be created
+    public static void runStatements(Database db, int mode, Reporter r) throws IOException {
+<span class="nc" id="L302">        noteDatabase(db);</span>
+<span class="nc" id="L303">        db.execute(&quot;DROP TABLE IF EXISTS conf_stmt&quot;);</span>
+<span class="nc" id="L304">        db.execute(&quot;CREATE TABLE conf_stmt (id INTEGER PRIMARY KEY, t TEXT, i INTEGER, &quot;</span>
+                + &quot;d REAL, b BLOB)&quot;);
+
+        // ---- multi-statement execute
+<span class="nc" id="L308">        db.execute(&quot;DROP TABLE IF EXISTS conf_m1&quot;);</span>
+<span class="nc" id="L309">        db.execute(&quot;DROP TABLE IF EXISTS conf_m2&quot;);</span>
+<span class="nc" id="L310">        boolean multiThrew = false;</span>
+        try {
+<span class="nc" id="L312">            db.execute(&quot;CREATE TABLE conf_m1 (a INTEGER); CREATE TABLE conf_m2 (a INTEGER)&quot;);</span>
+<span class="nc" id="L313">        } catch (IOException err) {</span>
+<span class="nc" id="L314">            multiThrew = true;</span>
+<span class="nc" id="L315">        }</span>
+<span class="nc" id="L316">        int created = countTables(db, &quot;conf_m1&quot;, &quot;conf_m2&quot;);</span>
+        // The compatibility hint restores what a port used to do, so it has something to restore
+        // only where the port shipped before this contract. Naming those ports rather than
+        // excluding iOS is the difference: Windows, Linux and the browser are new here, never ran
+        // a script any other way, and asserting the simulator's old truncation against them fails
+        // a port that is behaving correctly.
+<span class="nc bnc" id="L322" title="All 4 branches missed.">        if (mode == MODE_LEGACY &amp;&amp; portKind() == PORT_SIMULATOR) {</span>
+            // The simulator ran the first statement through a PreparedStatement and dropped the
+            // rest, without saying so.
+<span class="nc bnc" id="L325" title="All 4 branches missed.">            r.check(!multiThrew &amp;&amp; created == 1,</span>
+                    &quot;legacy: execute(String) runs only the first statement of a script, got &quot;
+                    + created + &quot; of 2&quot;);
+<span class="nc bnc" id="L328" title="All 4 branches missed.">        } else if (mode == MODE_LEGACY &amp;&amp; portKind() == PORT_ANDROID) {</span>
+            // Android handed the whole script to execSQL, which takes a single statement. Whether
+            // it refuses the tail by throwing or by ignoring it is the engine's business and not
+            // something the hint can promise, so what is asserted is the promise itself: the
+            // script does not run whole.
+<span class="nc bnc" id="L333" title="All 4 branches missed.">            r.check(multiThrew || created &lt; 2,</span>
+                    &quot;legacy: execute(String) does not run a whole script on Android, threw=&quot;
+                    + multiThrew + &quot; created=&quot; + created + &quot; of 2&quot;);
+        } else {
+<span class="nc bnc" id="L337" title="All 4 branches missed.">            r.check(!multiThrew &amp;&amp; created == 2,</span>
+                    &quot;execute(String) runs every statement of a script, got &quot; + created + &quot; of 2&quot;);
+        }
+
+        // ---- the parameterized forms take exactly one statement
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+<span class="nc" id="L343">            boolean rejected = false;</span>
+            try {
+<span class="nc" id="L345">                db.execute(&quot;INSERT INTO conf_stmt (t) VALUES (?); INSERT INTO conf_stmt (t) VALUES ('x')&quot;,</span>
+                        new String[] {&quot;a&quot;});
+<span class="nc" id="L347">            } catch (IOException err) {</span>
+<span class="nc" id="L348">                rejected = true;</span>
+<span class="nc" id="L349">            }</span>
+<span class="nc" id="L350">            r.check(rejected,</span>
+                    &quot;a parameterized call rejects a multi-statement script instead of dropping the tail&quot;);
+        }
+
+        // ---- a long past the range a double can hold
+        //
+        // SQLite stores 64-bit integers and the API hands back a Java long, so the whole range has
+        // to survive the round trip. A port that carries the value through a JavaScript number, or
+        // through any other 53-bit-mantissa float, loses the low bits and returns a value that is
+        // close enough to look right in a test that only checks a small number. Two neighbours are
+        // used because rounding maps them to the same double: if that is what happens, one of the
+        // two comes back as the other.
+<span class="nc" id="L362">        db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+<span class="nc" id="L363">        long big = 9007199254740993L;</span>
+<span class="nc" id="L364">        long biggerStill = 9223372036854775807L;</span>
+<span class="nc" id="L365">        db.execute(&quot;INSERT INTO conf_stmt (id, i) VALUES (?, ?)&quot;,</span>
+<span class="nc" id="L366">                new Object[] {Integer.valueOf(90), Long.valueOf(big)});</span>
+<span class="nc" id="L367">        db.execute(&quot;INSERT INTO conf_stmt (id, i) VALUES (?, ?)&quot;,</span>
+<span class="nc" id="L368">                new Object[] {Integer.valueOf(91), Long.valueOf(biggerStill)});</span>
+<span class="nc" id="L369">        Cursor wide = null;</span>
+        try {
+<span class="nc" id="L371">            wide = db.executeQuery(&quot;SELECT i FROM conf_stmt WHERE id = 90&quot;);</span>
+<span class="nc" id="L372">            r.check(wide.next(), &quot;the wide-integer row is there&quot;);</span>
+<span class="nc" id="L373">            long readBack = wide.getRow().getLong(0);</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            r.check(readBack == big, &quot;a long past 2^53 round trips exactly, got &quot; + readBack);</span>
+        } finally {
+<span class="nc" id="L376">            closeQuietly(wide);</span>
+        }
+<span class="nc" id="L378">        wide = null;</span>
+        try {
+<span class="nc" id="L380">            wide = db.executeQuery(&quot;SELECT i FROM conf_stmt WHERE id = 91&quot;);</span>
+<span class="nc" id="L381">            r.check(wide.next(), &quot;the Long.MAX_VALUE row is there&quot;);</span>
+<span class="nc" id="L382">            long readBack = wide.getRow().getLong(0);</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            r.check(readBack == biggerStill,</span>
+                    &quot;Long.MAX_VALUE round trips exactly, got &quot; + readBack);
+        } finally {
+<span class="nc" id="L386">            closeQuietly(wide);</span>
+        }
+
+        // ---- typed binding
+<span class="nc" id="L390">        db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+        // Under the legacy hint iOS stringifies every parameter, and a byte[] has no text form, so
+        // the blob column is left out of the insert there. That is the behaviour the hint restores,
+        // not a shortcoming: the check below still confirms the stringification itself.
+<span class="nc bnc" id="L394" title="All 4 branches missed.">        boolean stringifiesParameters = mode == MODE_LEGACY &amp;&amp; portKind() == PORT_IOS;</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        boolean blobWriteSupported = !stringifiesParameters;</span>
+<span class="nc" id="L396">        boolean typedRowInserted = true;</span>
+        try {
+<span class="nc bnc" id="L398" title="All 2 branches missed.">            if (stringifiesParameters) {</span>
+<span class="nc" id="L399">                db.execute(&quot;INSERT INTO conf_stmt (id, t, i, d) VALUES (?, ?, ?, ?)&quot;,</span>
+<span class="nc" id="L400">                        new Object[] {Integer.valueOf(1), &quot;text&quot;, Long.valueOf(42),</span>
+<span class="nc" id="L401">                            Double.valueOf(1.5)});</span>
+            } else {
+<span class="nc" id="L403">                db.execute(&quot;INSERT INTO conf_stmt (id, t, i, d, b) VALUES (?, ?, ?, ?, ?)&quot;,</span>
+<span class="nc" id="L404">                        new Object[] {Integer.valueOf(1), &quot;text&quot;, Long.valueOf(42),</span>
+<span class="nc" id="L405">                            Double.valueOf(1.5), new byte[] {1, 2, 3}});</span>
+            }
+<span class="nc" id="L407">        } catch (IOException err) {</span>
+<span class="nc" id="L408">            blobWriteSupported = false;</span>
+<span class="nc" id="L409">            typedRowInserted = false;</span>
+<span class="nc" id="L410">            r.check(false, &quot;execute() binds a parameter of each type: &quot; + err.getMessage());</span>
+<span class="nc" id="L411">        }</span>
+
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (typedRowInserted) {</span>
+            // typeof() over the parameter itself rather than over a stored column. A column
+            // carries an affinity, and SQLite converts an inserted value to it -- text &quot;42&quot; lands
+            // in an INTEGER column as an integer -- so reading the type back from the table says
+            // what the column is, not what was bound. This is the only form that distinguishes
+            // typed binding from stringified binding at all.
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            Cursor cur = stringifiesParameters</span>
+<span class="nc" id="L420">                    ? db.executeQuery(&quot;SELECT typeof(?), typeof(?), typeof(?)&quot;,</span>
+<span class="nc" id="L421">                            new Object[] {&quot;text&quot;, Long.valueOf(42), Double.valueOf(1.5)})</span>
+<span class="nc" id="L422">                    : db.executeQuery(&quot;SELECT typeof(?), typeof(?), typeof(?), typeof(?)&quot;,</span>
+<span class="nc" id="L423">                            new Object[] {&quot;text&quot;, Long.valueOf(42), Double.valueOf(1.5),</span>
+                                new byte[] {1, 2, 3}});
+            try {
+<span class="nc" id="L426">                r.check(cur.next(), &quot;typeof() over the bound parameters returns a row&quot;);</span>
+<span class="nc" id="L427">                Row row = cur.getRow();</span>
+<span class="nc" id="L428">                String tType = row.getString(0);</span>
+<span class="nc" id="L429">                String iType = row.getString(1);</span>
+<span class="nc" id="L430">                String dType = row.getString(2);</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                if (stringifiesParameters) {</span>
+<span class="nc" id="L432">                    r.check(&quot;text&quot;.equals(iType),</span>
+                            &quot;legacy: parameters are bound as text, typeof of a Long was &quot; + iType);
+<span class="nc" id="L434">                    r.check(&quot;text&quot;.equals(dType),</span>
+                            &quot;legacy: parameters are bound as text, typeof of a Double was &quot;
+                            + dType);
+                } else {
+<span class="nc" id="L438">                    String bType = row.getString(3);</span>
+<span class="nc" id="L439">                    r.check(&quot;text&quot;.equals(tType), &quot;a String binds as TEXT, got &quot; + tType);</span>
+<span class="nc" id="L440">                    r.check(&quot;integer&quot;.equals(iType), &quot;a Long binds as INTEGER, got &quot; + iType);</span>
+<span class="nc" id="L441">                    r.check(&quot;real&quot;.equals(dType), &quot;a Double binds as REAL, got &quot; + dType);</span>
+<span class="nc" id="L442">                    r.check(&quot;blob&quot;.equals(bType), &quot;a byte[] binds as BLOB, got &quot; + bType);</span>
+                }
+            } finally {
+<span class="nc" id="L445">                closeQuietly(cur);</span>
+            }
+
+            // ---- blob round trip, where one was written
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            if (blobWriteSupported) {</span>
+<span class="nc" id="L450">                Cursor blobCur = db.executeQuery(&quot;SELECT b FROM conf_stmt WHERE id = 1&quot;);</span>
+                try {
+<span class="nc" id="L452">                    blobCur.next();</span>
+<span class="nc" id="L453">                    byte[] read = blobCur.getRow().getBlob(0);</span>
+<span class="nc bnc" id="L454" title="All 10 branches missed.">                    boolean same = read != null &amp;&amp; read.length == 3</span>
+                            &amp;&amp; read[0] == 1 &amp;&amp; read[1] == 2 &amp;&amp; read[2] == 3;
+<span class="nc" id="L456">                    r.check(same, &quot;a blob round trips through getBlob&quot;);</span>
+                } finally {
+<span class="nc" id="L458">                    closeQuietly(blobCur);</span>
+                }
+<span class="nc" id="L460">            } else {</span>
+<span class="nc" id="L461">                r.info(&quot;legacy: no blob was written, since every parameter is stringified here&quot;);</span>
+            }
+        }
+
+        // ---- null handling
+<span class="nc" id="L466">        db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+<span class="nc" id="L467">        boolean nullStringArrayOk = true;</span>
+        try {
+<span class="nc" id="L469">            db.execute(&quot;INSERT INTO conf_stmt (id, t) VALUES (2, ?)&quot;, new String[] {null});</span>
+<span class="nc" id="L470">        } catch (IOException err) {</span>
+<span class="nc" id="L471">            nullStringArrayOk = false;</span>
+<span class="nc" id="L472">        }</span>
+<span class="nc" id="L473">        r.check(nullStringArrayOk, &quot;a null element in a String[] binds SQL NULL rather than failing&quot;);</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        if (nullStringArrayOk) {</span>
+<span class="nc" id="L475">            Cursor cur = db.executeQuery(&quot;SELECT t FROM conf_stmt WHERE id = 2&quot;);</span>
+            try {
+<span class="nc" id="L477">                cur.next();</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">                r.check(cur.getRow().getString(0) == null, &quot;a bound null reads back as null&quot;);</span>
+            } finally {
+<span class="nc" id="L480">                closeQuietly(cur);</span>
+            }
+        }
+
+        // ---- a null parameter array is the same as no parameters
+<span class="nc" id="L485">        boolean nullArrayOk = true;</span>
+        try {
+<span class="nc" id="L487">            db.execute(&quot;DELETE FROM conf_stmt&quot;, noParameterArray());</span>
+<span class="nc" id="L488">        } catch (Throwable err) {</span>
+<span class="nc" id="L489">            nullArrayOk = false;</span>
+<span class="nc" id="L490">        }</span>
+<span class="nc" id="L491">        r.check(nullArrayOk, &quot;execute(sql, (Object[]) null) behaves like the no-parameter form&quot;);</span>
+
+        // ---- malformed SQL is reported from executeQuery, not from the first next()
+<span class="nc bnc" id="L494" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+<span class="nc" id="L495">            boolean threwAtQuery = false;</span>
+<span class="nc" id="L496">            Cursor bad = null;</span>
+            try {
+<span class="nc" id="L498">                bad = db.executeQuery(&quot;SELECT nonexistent_column_xyz FROM conf_stmt&quot;);</span>
+<span class="nc" id="L499">            } catch (IOException err) {</span>
+<span class="nc" id="L500">                threwAtQuery = true;</span>
+            } finally {
+<span class="nc" id="L502">                closeQuietly(bad);</span>
+            }
+<span class="nc" id="L504">            r.check(threwAtQuery, &quot;executeQuery reports malformed SQL rather than deferring to next()&quot;);</span>
+        }
+
+        // ---- a named or numbered placeholder is still a parameter
+        // The API binds positionally, but SQLite lets a statement name its slots, and a port that
+        // counts only &quot;?&quot; markers sees no parameters at all in &quot;:a, :b&quot; and lets a call through
+        // with one argument -- leaving the second slot as SQL NULL, silently. The count SQLite
+        // reports is the largest index it assigned, so a repeated name counts once and &quot;?3&quot; alone
+        // counts three.
+<span class="nc bnc" id="L513" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+<span class="nc" id="L514">            db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+<span class="nc" id="L515">            boolean tooFewRejected = false;</span>
+            try {
+<span class="nc" id="L517">                db.execute(&quot;INSERT INTO conf_stmt (id, t) VALUES (:id, :t)&quot;,</span>
+<span class="nc" id="L518">                        new Object[] {Integer.valueOf(7)});</span>
+<span class="nc" id="L519">            } catch (IOException expected) {</span>
+<span class="nc" id="L520">                tooFewRejected = true;</span>
+<span class="nc" id="L521">            }</span>
+<span class="nc" id="L522">            r.check(tooFewRejected, &quot;a named placeholder counts as a parameter, so one argument &quot;</span>
+                    + &quot;for two of them is rejected rather than left as NULL&quot;);
+
+<span class="nc" id="L525">            boolean bothBound = false;</span>
+            try {
+<span class="nc" id="L527">                db.execute(&quot;INSERT INTO conf_stmt (id, t) VALUES (:id, :t)&quot;,</span>
+<span class="nc" id="L528">                        new Object[] {Integer.valueOf(7), &quot;named&quot;});</span>
+<span class="nc" id="L529">                bothBound = true;</span>
+<span class="nc" id="L530">            } catch (IOException err) {</span>
+<span class="nc" id="L531">                r.check(false, &quot;named placeholders bind positionally: &quot; + err.getMessage());</span>
+<span class="nc" id="L532">            }</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">            if (bothBound) {</span>
+<span class="nc" id="L534">                Cursor named = null;</span>
+                try {
+<span class="nc" id="L536">                    named = db.executeQuery(&quot;SELECT t FROM conf_stmt WHERE id = 7&quot;);</span>
+<span class="nc bnc" id="L537" title="All 4 branches missed.">                    r.check(named.next() &amp;&amp; &quot;named&quot;.equals(named.getRow().getString(0)),</span>
+                            &quot;both named placeholders received their argument&quot;);
+                } finally {
+<span class="nc" id="L540">                    closeQuietly(named);</span>
+                }
+            }
+<span class="nc" id="L543">            db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+        }
+
+        // ---- text survives a round trip byte for byte
+        // SQLite stores TEXT as UTF-8 and measures it in bytes, so a port that hands its engine a
+        // C string agrees with it on neither: anything outside ASCII comes back one character per
+        // byte, and a string holding a zero character is cut there. Both are invisible until
+        // someone stores a name or a pasted document, and both differ per port, which is exactly
+        // what this API is supposed to stop happening.
+<span class="nc" id="L552">        db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+<span class="nc" id="L553">        String[] texts = new String[] {</span>
+            &quot;plain ascii&quot;,
+            &quot;caf\u00e9 na\u00efve&quot;,          // Latin-1 range, two UTF-8 bytes each
+            &quot;\u4e2d\u6587\u30c6\u30b9\u30c8&quot;,     // three UTF-8 bytes each
+            &quot;\ud83d\ude00 emoji&quot;,           // a surrogate pair, four UTF-8 bytes
+            &quot;before\u0000after&quot;,            // a zero character, which SQLite stores
+        };
+<span class="nc bnc" id="L560" title="All 2 branches missed.">        for (int iter = 0; iter &lt; texts.length; iter++) {</span>
+<span class="nc" id="L561">            db.execute(&quot;INSERT INTO conf_stmt (id, t) VALUES (?, ?)&quot;,</span>
+<span class="nc" id="L562">                    new Object[] {Integer.valueOf(100 + iter), texts[iter]});</span>
+        }
+<span class="nc bnc" id="L564" title="All 2 branches missed.">        for (int iter = 0; iter &lt; texts.length; iter++) {</span>
+<span class="nc" id="L565">            Cursor cur = null;</span>
+<span class="nc" id="L566">            String back = null;</span>
+            try {
+<span class="nc" id="L568">                cur = db.executeQuery(&quot;SELECT t FROM conf_stmt WHERE id = ?&quot;,</span>
+<span class="nc" id="L569">                        new Object[] {Integer.valueOf(100 + iter)});</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">                if (cur.next()) {</span>
+<span class="nc" id="L571">                    back = cur.getRow().getString(0);</span>
+                }
+            } finally {
+<span class="nc" id="L574">                closeQuietly(cur);</span>
+            }
+<span class="nc" id="L576">            r.check(texts[iter].equals(back),</span>
+<span class="nc" id="L577">                    &quot;text round trips unchanged: &quot; + describeText(texts[iter])</span>
+<span class="nc" id="L578">                    + &quot; read back as &quot; + describeText(back));</span>
+        }
+<span class="nc" id="L580">        db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+
+        // ---- errors are IOException with a message
+<span class="nc" id="L583">        boolean properError = false;</span>
+        try {
+<span class="nc" id="L585">            db.execute(&quot;THIS IS NOT SQL&quot;);</span>
+<span class="nc" id="L586">        } catch (IOException err) {</span>
+<span class="nc bnc" id="L587" title="All 4 branches missed.">            properError = err.getMessage() != null &amp;&amp; err.getMessage().length() &gt; 0;</span>
+<span class="nc" id="L588">        } catch (RuntimeException err) {</span>
+<span class="nc" id="L589">            r.check(false, &quot;a SQL error raises IOException, not &quot; + err.getClass().getName());</span>
+<span class="nc" id="L590">        }</span>
+<span class="nc" id="L591">        r.check(properError, &quot;a SQL error raises IOException carrying a message&quot;);</span>
+
+        // ---- blob query parameters, both directions of the advertised capability
+<span class="nc bnc" id="L594" title="All 2 branches missed.">        if (blobWriteSupported) {</span>
+<span class="nc" id="L595">            db.execute(&quot;DELETE FROM conf_stmt&quot;);</span>
+<span class="nc" id="L596">            db.execute(&quot;INSERT INTO conf_stmt (id, b) VALUES (?, ?)&quot;,</span>
+<span class="nc" id="L597">                    new Object[] {Integer.valueOf(3), new byte[] {9, 8, 7}});</span>
+<span class="nc" id="L598">            boolean queried = false;</span>
+<span class="nc" id="L599">            boolean threw = false;</span>
+<span class="nc" id="L600">            Cursor cur = null;</span>
+            try {
+<span class="nc" id="L602">                cur = db.executeQuery(&quot;SELECT id FROM conf_stmt WHERE b = ?&quot;,</span>
+                        new Object[] {new byte[] {9, 8, 7}});
+<span class="nc" id="L604">                queried = cur.next();</span>
+<span class="nc" id="L605">            } catch (IOException err) {</span>
+<span class="nc" id="L606">                threw = true;</span>
+            } finally {
+<span class="nc" id="L608">                closeQuietly(cur);</span>
+            }
+<span class="nc" id="L610">            int advertised = blobQueryParametersSupported();</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">            if (advertised == CAPABILITY_YES) {</span>
+<span class="nc bnc" id="L612" title="All 4 branches missed.">                r.check(queried &amp;&amp; !threw,</span>
+                        &quot;isBlobQueryParameterSupported() is true, so a blob query parameter works&quot;);
+<span class="nc bnc" id="L614" title="All 2 branches missed.">            } else if (advertised == CAPABILITY_NO) {</span>
+<span class="nc" id="L615">                r.check(threw,</span>
+                        &quot;isBlobQueryParameterSupported() is false, so a blob query parameter &quot;
+                        + &quot;raises a clean IOException rather than silently misbehaving&quot;);
+            } else {
+                // The capability could not be read. The point of the check is to catch silent
+                // wrongness, so either a working query or a clean failure is acceptable; what is
+                // not acceptable is returning no row while claiming success.
+<span class="nc bnc" id="L622" title="All 4 branches missed.">                r.check(threw || queried,</span>
+                        &quot;a blob query parameter either works or fails cleanly, never silently &quot;
+                        + &quot;matching nothing&quot;);
+            }
+        }
+
+<span class="nc bnc" id="L628" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+            // ---- the argument list has to match the placeholders
+            //
+            // Supplying too few is the dangerous direction: an engine that binds what it is given
+            // and leaves the rest NULL runs a different statement than the caller wrote, silently
+            // and with no error. Too many is checked as well, since it means the same confusion.
+<span class="nc" id="L634">            db.execute(&quot;DROP TABLE IF EXISTS conf_args&quot;);</span>
+<span class="nc" id="L635">            db.execute(&quot;CREATE TABLE conf_args (a TEXT, b TEXT)&quot;);</span>
+
+<span class="nc" id="L637">            boolean tooFewThrew = false;</span>
+            try {
+<span class="nc" id="L639">                db.execute(&quot;INSERT INTO conf_args (a, b) VALUES (?, ?)&quot;, new String[] {&quot;only one&quot;});</span>
+<span class="nc" id="L640">            } catch (IOException expected) {</span>
+<span class="nc" id="L641">                tooFewThrew = true;</span>
+<span class="nc" id="L642">            }</span>
+<span class="nc" id="L643">            r.check(tooFewThrew, &quot;execute() with fewer arguments than placeholders throws rather &quot;</span>
+                    + &quot;than binding the missing ones as NULL&quot;);
+
+<span class="nc" id="L646">            boolean tooManyThrew = false;</span>
+            try {
+<span class="nc" id="L648">                db.execute(&quot;INSERT INTO conf_args (a, b) VALUES (?, ?)&quot;,</span>
+                        new String[] {&quot;one&quot;, &quot;two&quot;, &quot;three&quot;});
+<span class="nc" id="L650">            } catch (IOException expected) {</span>
+<span class="nc" id="L651">                tooManyThrew = true;</span>
+<span class="nc" id="L652">            }</span>
+<span class="nc" id="L653">            r.check(tooManyThrew, &quot;execute() with more arguments than placeholders throws&quot;);</span>
+
+<span class="nc" id="L655">            boolean queryTooFewThrew = false;</span>
+<span class="nc" id="L656">            Cursor argCursor = null;</span>
+            try {
+<span class="nc" id="L658">                argCursor = db.executeQuery(&quot;SELECT a FROM conf_args WHERE a = ? AND b = ?&quot;,</span>
+                        new String[] {&quot;only one&quot;});
+<span class="nc" id="L660">            } catch (IOException expected) {</span>
+<span class="nc" id="L661">                queryTooFewThrew = true;</span>
+            } finally {
+<span class="nc" id="L663">                closeQuietly(argCursor);</span>
+            }
+<span class="nc" id="L665">            r.check(queryTooFewThrew,</span>
+                    &quot;executeQuery() with fewer arguments than placeholders throws&quot;);
+
+            // A literal question mark inside a string is not a placeholder, so a port that counts
+            // them by scanning the text has to skip quoted content.
+<span class="nc" id="L670">            boolean literalOk = true;</span>
+            try {
+<span class="nc" id="L672">                db.execute(&quot;INSERT INTO conf_args (a, b) VALUES ('is it? yes', ?)&quot;,</span>
+                        new String[] {&quot;bound&quot;});
+<span class="nc" id="L674">            } catch (IOException err) {</span>
+<span class="nc" id="L675">                literalOk = false;</span>
+<span class="nc" id="L676">            }</span>
+<span class="nc" id="L677">            r.check(literalOk, &quot;a question mark inside a string literal is not counted as a &quot;</span>
+                    + &quot;placeholder&quot;);
+
+<span class="nc" id="L680">            db.execute(&quot;DROP TABLE IF EXISTS conf_args&quot;);</span>
+        }
+
+<span class="nc" id="L683">        db.execute(&quot;DROP TABLE IF EXISTS conf_m1&quot;);</span>
+<span class="nc" id="L684">        db.execute(&quot;DROP TABLE IF EXISTS conf_m2&quot;);</span>
+<span class="nc" id="L685">    }</span>
+
+    // ------------------------------------------------------------------ cursor
+
+    /// Checks cursor navigation, positions, metadata and null reads.
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: an open database, left usable
+    ///
+    /// - `mode`: `#MODE_STRICT` or `#MODE_LEGACY`
+    ///
+    /// - `r`: receives the results
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the scratch table cannot be created
+    public static void runCursor(Database db, int mode, Reporter r) throws IOException {
+<span class="nc" id="L703">        noteDatabase(db);</span>
+<span class="nc" id="L704">        db.execute(&quot;DROP TABLE IF EXISTS conf_cur&quot;);</span>
+<span class="nc" id="L705">        db.execute(&quot;CREATE TABLE conf_cur (id INTEGER PRIMARY KEY, name TEXT)&quot;);</span>
+<span class="nc bnc" id="L706" title="All 2 branches missed.">        for (int iter = 0; iter &lt; 5; iter++) {</span>
+<span class="nc" id="L707">            db.execute(&quot;INSERT INTO conf_cur (id, name) VALUES (?, ?)&quot;,</span>
+<span class="nc" id="L708">                    new Object[] {Integer.valueOf(iter), &quot;row&quot; + iter});</span>
+        }
+
+        // ---- metadata is available before the first next()
+<span class="nc" id="L712">        Cursor cur = db.executeQuery(&quot;SELECT id, name AS alias_name FROM conf_cur ORDER BY id&quot;);</span>
+        try {
+<span class="nc bnc" id="L714" title="All 2 branches missed.">            r.check(cur.getColumnCount() == 2, &quot;getColumnCount before the first next()&quot;);</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">            r.check(cur.getColumnIndex(&quot;alias_name&quot;) == 1,</span>
+                    &quot;getColumnIndex resolves the result set label of an aliased column&quot;);
+<span class="nc bnc" id="L717" title="All 2 branches missed.">            r.check(cur.getColumnIndex(&quot;ALIAS_NAME&quot;) == 1, &quot;getColumnIndex is case-insensitive&quot;);</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">            r.check(cur.getColumnIndex(&quot;no_such_column&quot;) == -1,</span>
+                    &quot;getColumnIndex returns -1 for an unknown column&quot;);
+<span class="nc" id="L720">            r.check(&quot;alias_name&quot;.equalsIgnoreCase(cur.getColumnName(1)),</span>
+<span class="nc" id="L721">                    &quot;getColumnName reports the result set label, got &quot; + cur.getColumnName(1));</span>
+        } finally {
+<span class="nc" id="L723">            closeQuietly(cur);</span>
+        }
+
+        // ---- positions
+<span class="nc" id="L727">        cur = db.executeQuery(&quot;SELECT id, name FROM conf_cur ORDER BY id&quot;);</span>
+        try {
+<span class="nc bnc" id="L729" title="All 4 branches missed.">            int base = (mode == MODE_LEGACY &amp;&amp; portKind() == PORT_SIMULATOR) ? 1 : 0;</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">            if (base == 1) {</span>
+<span class="nc" id="L731">                r.info(&quot;legacy: the simulator reports positions counted from one&quot;);</span>
+            }
+<span class="nc bnc" id="L733" title="All 2 branches missed.">            r.check(cur.getPosition() == -1 + base,</span>
+<span class="nc" id="L734">                    &quot;a new cursor sits before the first row, position &quot; + cur.getPosition());</span>
+<span class="nc" id="L735">            r.check(cur.next(), &quot;next() reaches the first row&quot;);</span>
+<span class="nc bnc" id="L736" title="All 2 branches missed.">            r.check(cur.getPosition() == base, &quot;the first row is at position &quot; + base);</span>
+
+<span class="nc bnc" id="L738" title="All 4 branches missed.">            if (mode == MODE_LEGACY &amp;&amp; portKind() == PORT_IOS) {</span>
+<span class="nc" id="L739">                r.check(cur.first(), &quot;legacy: first() reports success&quot;);</span>
+<span class="nc" id="L740">                r.info(&quot;legacy: first() rewinds without landing on a row on iOS&quot;);</span>
+            } else {
+<span class="nc" id="L742">                r.check(cur.first(), &quot;first() lands on the first row&quot;);</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">                r.check(cur.getPosition() == base, &quot;first() leaves position at &quot; + base);</span>
+<span class="nc bnc" id="L744" title="All 4 branches missed.">                r.check(cur.next() &amp;&amp; cur.getPosition() == 1 + base, &quot;next() advances to row 1&quot;);</span>
+<span class="nc bnc" id="L745" title="All 4 branches missed.">                r.check(cur.prev() &amp;&amp; cur.getPosition() == base, &quot;prev() returns to row 0&quot;);</span>
+<span class="nc" id="L746">                r.check(cur.last(), &quot;last() lands on the last row&quot;);</span>
+<span class="nc bnc" id="L747" title="All 2 branches missed.">                r.check(cur.getPosition() == 4 + base, &quot;last() leaves position at &quot; + (4 + base));</span>
+<span class="nc bnc" id="L748" title="All 4 branches missed.">                r.check(cur.position(2) &amp;&amp; cur.getPosition() == 2 + base, &quot;position(2) seeks to row 2&quot;);</span>
+<span class="nc" id="L749">                r.check(&quot;row2&quot;.equals(cur.getRow().getString(1)),</span>
+                        &quot;position(2) really is the third row&quot;);
+<span class="nc bnc" id="L751" title="All 2 branches missed.">                r.check(!cur.position(99), &quot;position() beyond the end returns false&quot;);</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">                r.check(!cur.position(-1), &quot;position(-1) returns false&quot;);</span>
+<span class="nc bnc" id="L753" title="All 2 branches missed.">                r.check(cur.getPosition() == -1 + base, &quot;position(-1) rewinds to before the first row&quot;);</span>
+            }
+        } finally {
+<span class="nc" id="L756">            closeQuietly(cur);</span>
+        }
+
+        // ---- stepping past the end repeatedly must not move the row count
+<span class="nc" id="L760">        cur = db.executeQuery(&quot;SELECT id FROM conf_cur ORDER BY id&quot;);</span>
+        try {
+<span class="nc" id="L762">            int walked = 0;</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">            while (cur.next()) {</span>
+<span class="nc" id="L764">                walked++;</span>
+            }
+<span class="nc bnc" id="L766" title="All 2 branches missed.">            r.check(walked == 5, &quot;walking the whole result set sees every row, saw &quot; + walked);</span>
+<span class="nc" id="L767">            int countAfterFirstExhaustion = Database.count(cur);</span>
+            // Every one of these must stay false. SQLite resets and re-executes a statement when
+            // stepped after it is done, so a port that steps again hands back the first row while
+            // reporting a position past the end - the same query silently answering differently
+            // depending on how many times it was walked.
+<span class="nc bnc" id="L772" title="All 6 branches missed.">            boolean steppedPastEnd = cur.next() || cur.next() || cur.next();</span>
+<span class="nc bnc" id="L773" title="All 2 branches missed.">            r.check(!steppedPastEnd, &quot;next() past the end keeps returning false rather than &quot;</span>
+                    + &quot;re-running the query&quot;);
+<span class="nc" id="L775">            boolean offRowAfterEnd = true;</span>
+            try {
+<span class="nc" id="L777">                cur.getRow().getString(0);</span>
+<span class="nc" id="L778">                offRowAfterEnd = false;</span>
+<span class="nc" id="L779">            } catch (IOException expected) {</span>
+                // Off a row is what this should be.
+<span class="nc" id="L781">            }</span>
+<span class="nc" id="L782">            r.check(offRowAfterEnd, &quot;the cursor stays off a row after being stepped past the end&quot;);</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">            if (countAfterFirstExhaustion &gt;= 0) {</span>
+<span class="nc bnc" id="L784" title="All 2 branches missed.">                r.check(Database.count(cur) == countAfterFirstExhaustion,</span>
+                        &quot;calling next() past the end repeatedly does not inflate the row count, was &quot;
+<span class="nc" id="L786">                        + countAfterFirstExhaustion + &quot; now &quot; + Database.count(cur));</span>
+            }
+<span class="nc" id="L788">            r.check(cur.last(), &quot;last() still finds a row after the cursor was over-stepped&quot;);</span>
+<span class="nc bnc" id="L789" title="All 4 branches missed.">            int lastBase = (mode == MODE_LEGACY &amp;&amp; portKind() == PORT_SIMULATOR) ? 1 : 0;</span>
+<span class="nc bnc" id="L790" title="All 2 branches missed.">            r.check(cur.getPosition() == 4 + lastBase,</span>
+                    &quot;last() lands on the final row after over-stepping, position &quot;
+<span class="nc" id="L792">                    + cur.getPosition());</span>
+        } finally {
+<span class="nc" id="L794">            closeQuietly(cur);</span>
+        }
+
+        // ---- an empty result set
+<span class="nc" id="L798">        cur = db.executeQuery(&quot;SELECT id FROM conf_cur WHERE id = 12345&quot;);</span>
+        try {
+<span class="nc bnc" id="L800" title="All 4 branches missed.">            if (mode == MODE_LEGACY &amp;&amp; portKind() == PORT_IOS) {</span>
+<span class="nc" id="L801">                r.info(&quot;legacy: first() reports success on an empty result set on iOS&quot;);</span>
+            } else {
+<span class="nc bnc" id="L803" title="All 2 branches missed.">                r.check(!cur.first(), &quot;first() is false for an empty result set&quot;);</span>
+<span class="nc bnc" id="L804" title="All 2 branches missed.">                r.check(!cur.next(), &quot;next() is false for an empty result set&quot;);</span>
+<span class="nc bnc" id="L805" title="All 2 branches missed.">                r.check(!cur.last(), &quot;last() is false for an empty result set&quot;);</span>
+            }
+        } finally {
+<span class="nc" id="L808">            closeQuietly(cur);</span>
+        }
+
+        // ---- getRow off a row
+<span class="nc bnc" id="L812" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+<span class="nc" id="L813">            cur = db.executeQuery(&quot;SELECT id FROM conf_cur ORDER BY id&quot;);</span>
+            try {
+<span class="nc" id="L815">                boolean threw = false;</span>
+                try {
+<span class="nc" id="L817">                    cur.getRow();</span>
+<span class="nc" id="L818">                } catch (IOException err) {</span>
+<span class="nc" id="L819">                    threw = true;</span>
+<span class="nc" id="L820">                }</span>
+<span class="nc" id="L821">                r.check(threw, &quot;getRow() before the first row throws&quot;);</span>
+            } finally {
+<span class="nc" id="L823">                closeQuietly(cur);</span>
+            }
+        }
+
+        // ---- nulls and wasNull
+<span class="nc" id="L828">        db.execute(&quot;DROP TABLE IF EXISTS conf_null&quot;);</span>
+<span class="nc" id="L829">        db.execute(&quot;CREATE TABLE conf_null (a TEXT, b INTEGER)&quot;);</span>
+<span class="nc" id="L830">        db.execute(&quot;INSERT INTO conf_null (a, b) VALUES (NULL, 0)&quot;);</span>
+<span class="nc" id="L831">        cur = db.executeQuery(&quot;SELECT a, b FROM conf_null&quot;);</span>
+        try {
+            Row row;
+<span class="nc bnc" id="L834" title="All 6 branches missed.">            if (mode == MODE_LEGACY &amp;&amp; (portKind() == PORT_IOS || portKind() == PORT_ANDROID)) {</span>
+<span class="nc" id="L835">                cur.next();</span>
+<span class="nc" id="L836">                row = cur.getRow();</span>
+<span class="nc" id="L837">                r.check(Database.wasNull(row),</span>
+                        &quot;legacy: wasNull() reports true before any value has been read&quot;);
+            } else {
+<span class="nc" id="L840">                cur.next();</span>
+<span class="nc" id="L841">                row = cur.getRow();</span>
+<span class="nc bnc" id="L842" title="All 2 branches missed.">                if (Database.supportsWasNull(row)) {</span>
+<span class="nc bnc" id="L843" title="All 2 branches missed.">                    r.check(!Database.wasNull(row), &quot;wasNull() is false before any value is read&quot;);</span>
+                }
+            }
+<span class="nc bnc" id="L846" title="All 2 branches missed.">            r.check(row.getString(0) == null, &quot;a SQL NULL reads back as null from getString&quot;);</span>
+<span class="nc bnc" id="L847" title="All 2 branches missed.">            if (Database.supportsWasNull(row)) {</span>
+<span class="nc" id="L848">                r.check(Database.wasNull(row), &quot;wasNull() is true after reading a NULL&quot;);</span>
+<span class="nc bnc" id="L849" title="All 2 branches missed.">                r.check(row.getInteger(1) == 0, &quot;a stored zero reads back as 0&quot;);</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">                r.check(!Database.wasNull(row), &quot;wasNull() is false after reading a stored zero&quot;);</span>
+            } else {
+<span class="nc" id="L852">                r.check(false, &quot;every port implements RowExt&quot;);</span>
+            }
+        } finally {
+<span class="nc" id="L855">            closeQuietly(cur);</span>
+        }
+
+        // ---- cursor close is idempotent, and a closed cursor rejects use
+<span class="nc" id="L859">        cur = db.executeQuery(&quot;SELECT id FROM conf_cur&quot;);</span>
+<span class="nc" id="L860">        cur.close();</span>
+<span class="nc" id="L861">        boolean secondCloseThrew = false;</span>
+        try {
+<span class="nc" id="L863">            cur.close();</span>
+<span class="nc" id="L864">        } catch (IOException err) {</span>
+<span class="nc" id="L865">            secondCloseThrew = true;</span>
+<span class="nc" id="L866">        }</span>
+<span class="nc bnc" id="L867" title="All 2 branches missed.">        r.check(!secondCloseThrew, &quot;closing a cursor twice is a no-op&quot;);</span>
+<span class="nc" id="L868">        boolean useThrew = false;</span>
+        try {
+<span class="nc" id="L870">            cur.next();</span>
+<span class="nc" id="L871">        } catch (IOException err) {</span>
+<span class="nc" id="L872">            useThrew = true;</span>
+<span class="nc" id="L873">        }</span>
+<span class="nc" id="L874">        r.check(useThrew, &quot;using a closed cursor throws&quot;);</span>
+
+        // ---- a column index the result set does not have is a programming error, not a null
+<span class="nc" id="L877">        cur = db.executeQuery(&quot;SELECT id, name FROM conf_cur ORDER BY id&quot;);</span>
+        try {
+<span class="nc" id="L879">            cur.next();</span>
+<span class="nc" id="L880">            Row row = cur.getRow();</span>
+<span class="nc" id="L881">            r.check(readRejectsColumn(row, 2),</span>
+                    &quot;reading past the last column raises IOException rather than answering null&quot;);
+<span class="nc" id="L883">            r.check(readRejectsColumn(row, -1),</span>
+                    &quot;reading a negative column raises IOException rather than answering null&quot;);
+<span class="nc" id="L885">            boolean nameRejected = false;</span>
+            try {
+<span class="nc" id="L887">                cur.getColumnName(99);</span>
+<span class="nc" id="L888">            } catch (IOException expected) {</span>
+<span class="nc" id="L889">                nameRejected = true;</span>
+<span class="nc" id="L890">            } catch (RuntimeException unchecked) {</span>
+<span class="nc" id="L891">                r.check(false, &quot;getColumnName out of range raises IOException, not &quot;</span>
+<span class="nc" id="L892">                        + unchecked.getClass().getName());</span>
+<span class="nc" id="L893">            }</span>
+<span class="nc" id="L894">            r.check(nameRejected, &quot;getColumnName rejects an index the result set does not have&quot;);</span>
+        } finally {
+<span class="nc" id="L896">            closeQuietly(cur);</span>
+        }
+
+<span class="nc" id="L899">        db.execute(&quot;DROP TABLE IF EXISTS conf_null&quot;);</span>
+<span class="nc" id="L900">        db.execute(&quot;DROP TABLE IF EXISTS conf_cur&quot;);</span>
+<span class="nc" id="L901">    }</span>
+
+    /// The null array `execute(String, Object[])` has to accept as &quot;no parameters at all&quot;.
+    ///
+    /// A method rather than `(Object[]) null` at the call site, which sits inside a block that
+    /// catches Throwable: a failed cast is not an exception on every runtime this framework
+    /// targets, so a cast there is one whose failure nothing could catch.
+    private static Object[] noParameterArray() {
+<span class="nc" id="L909">        return null;</span>
+    }
+
+    /// Renders a string as code points, so a failure names what actually came back rather than
+    /// printing characters a device log may not be able to show.
+    private static String describeText(String value) {
+<span class="nc bnc" id="L915" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L916">            return &quot;null&quot;;</span>
+        }
+<span class="nc" id="L918">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L919">        out.append('[');</span>
+<span class="nc bnc" id="L920" title="All 2 branches missed.">        for (int iter = 0; iter &lt; value.length(); iter++) {</span>
+<span class="nc bnc" id="L921" title="All 2 branches missed.">            if (iter &gt; 0) {</span>
+<span class="nc" id="L922">                out.append(' ');</span>
+            }
+<span class="nc" id="L924">            out.append(Integer.toHexString(value.charAt(iter)));</span>
+        }
+<span class="nc" id="L926">        out.append(']');</span>
+<span class="nc" id="L927">        return out.toString();</span>
+    }
+
+    /// Reports whether reading `index` off `row` fails the way the contract says it should.
+    ///
+    /// A port whose engine substitutes SQL NULL for an out-of-range column - the SQLite C API does
+    /// exactly that - would otherwise return null or zero here, which the caller cannot tell from
+    /// stored data.
+    private static boolean readRejectsColumn(Row row, int index) {
+        try {
+<span class="nc" id="L937">            row.getString(index);</span>
+<span class="nc" id="L938">            return false;</span>
+<span class="nc" id="L939">        } catch (IOException expected) {</span>
+<span class="nc" id="L940">            return true;</span>
+<span class="nc" id="L941">        } catch (RuntimeException unchecked) {</span>
+<span class="nc" id="L942">            return false;</span>
+        }
+    }
+
+    // ------------------------------------------------------------------ transactions
+
+    /// Checks commit, rollback and the flat transaction rules.
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: an open database, left usable
+    ///
+    /// - `mode`: `#MODE_STRICT` or `#MODE_LEGACY`
+    ///
+    /// - `r`: receives the results
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the scratch table cannot be created
+    public static void runTransactions(Database db, int mode, Reporter r) throws IOException {
+<span class="nc" id="L962">        noteDatabase(db);</span>
+<span class="nc" id="L963">        db.execute(&quot;DROP TABLE IF EXISTS conf_tx&quot;);</span>
+<span class="nc" id="L964">        db.execute(&quot;CREATE TABLE conf_tx (id INTEGER PRIMARY KEY)&quot;);</span>
+
+        // ---- a transaction opened by SQL is the same transaction
+        // The API offers two ways to open one and only one of them goes through
+        // beginTransaction(). If they disagree, changeKey() can replace the database underneath a
+        // transaction it cannot see, and a commit can address one that has already ended.
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+<span class="nc" id="L971">            db.execute(&quot;BEGIN&quot;);</span>
+<span class="nc" id="L972">            r.check(db.isInTransaction(), &quot;execute(\&quot;BEGIN\&quot;) opens a transaction the API sees&quot;);</span>
+<span class="nc" id="L973">            db.execute(&quot;ROLLBACK&quot;);</span>
+<span class="nc bnc" id="L974" title="All 2 branches missed.">            r.check(!db.isInTransaction(), &quot;execute(\&quot;ROLLBACK\&quot;) ends it&quot;);</span>
+
+            // Mixed, in both directions: whichever way a transaction is opened, the other way of
+            // ending it has to work. On an engine reached through a driver that keeps its own
+            // transaction state -- the simulator's -- these are the calls that catch the two
+            // states drifting apart, because one of them throws.
+<span class="nc" id="L980">            boolean mixedCommitWorked = false;</span>
+            try {
+<span class="nc" id="L982">                db.execute(&quot;BEGIN&quot;);</span>
+<span class="nc" id="L983">                db.execute(&quot;INSERT INTO conf_tx (id) VALUES (91)&quot;);</span>
+<span class="nc" id="L984">                db.commitTransaction();</span>
+<span class="nc" id="L985">                mixedCommitWorked = true;</span>
+<span class="nc" id="L986">            } catch (IOException err) {</span>
+<span class="nc" id="L987">                r.check(false, &quot;commitTransaction() ends a transaction execute(\&quot;BEGIN\&quot;) opened: &quot;</span>
+<span class="nc" id="L988">                        + err.getMessage());</span>
+<span class="nc" id="L989">            }</span>
+<span class="nc bnc" id="L990" title="All 2 branches missed.">            if (mixedCommitWorked) {</span>
+<span class="nc bnc" id="L991" title="All 2 branches missed.">                r.check(rowCount(db, &quot;conf_tx&quot;) == 1, &quot;and the row it committed is there&quot;);</span>
+<span class="nc bnc" id="L992" title="All 2 branches missed.">                r.check(!db.isInTransaction(), &quot;and nothing is left open&quot;);</span>
+<span class="nc" id="L993">                db.execute(&quot;DELETE FROM conf_tx&quot;);</span>
+            }
+
+            // BEGIN IMMEDIATE takes its write lock up front, which is the whole reason to write
+            // it. It has to be a transaction like any other here; a port that reduced it to a
+            // deferred BEGIN would still pass this, but one that rejected it or lost track of it
+            // would not.
+<span class="nc" id="L1000">            boolean immediateWorked = false;</span>
+            try {
+<span class="nc" id="L1002">                db.execute(&quot;BEGIN IMMEDIATE&quot;);</span>
+<span class="nc" id="L1003">                immediateWorked = db.isInTransaction();</span>
+<span class="nc" id="L1004">                db.execute(&quot;INSERT INTO conf_tx (id) VALUES (93)&quot;);</span>
+<span class="nc" id="L1005">                db.commitTransaction();</span>
+<span class="nc" id="L1006">            } catch (IOException err) {</span>
+<span class="nc" id="L1007">                r.check(false, &quot;BEGIN IMMEDIATE opens a transaction: &quot; + err.getMessage());</span>
+<span class="nc" id="L1008">            }</span>
+<span class="nc" id="L1009">            r.check(immediateWorked, &quot;execute(\&quot;BEGIN IMMEDIATE\&quot;) opens a transaction&quot;);</span>
+<span class="nc bnc" id="L1010" title="All 2 branches missed.">            if (immediateWorked) {</span>
+<span class="nc bnc" id="L1011" title="All 2 branches missed.">                r.check(rowCount(db, &quot;conf_tx&quot;) == 1, &quot;and its insert committed&quot;);</span>
+<span class="nc" id="L1012">                db.execute(&quot;DELETE FROM conf_tx&quot;);</span>
+            }
+
+<span class="nc" id="L1015">            db.beginTransaction();</span>
+<span class="nc" id="L1016">            db.execute(&quot;COMMIT&quot;);</span>
+<span class="nc bnc" id="L1017" title="All 2 branches missed.">            r.check(!db.isInTransaction(),</span>
+                    &quot;a transaction the API opened is ended by execute(\&quot;COMMIT\&quot;)&quot;);
+            // And the connection is usable afterwards rather than left mid-transaction.
+<span class="nc" id="L1020">            boolean usableAfter = false;</span>
+            try {
+<span class="nc" id="L1022">                db.beginTransaction();</span>
+<span class="nc" id="L1023">                db.execute(&quot;INSERT INTO conf_tx (id) VALUES (92)&quot;);</span>
+<span class="nc" id="L1024">                db.rollbackTransaction();</span>
+<span class="nc" id="L1025">                usableAfter = true;</span>
+<span class="nc" id="L1026">            } catch (IOException err) {</span>
+<span class="nc" id="L1027">                r.check(false, &quot;a transaction still works after execute(\&quot;COMMIT\&quot;) ended one: &quot;</span>
+<span class="nc" id="L1028">                        + err.getMessage());</span>
+<span class="nc" id="L1029">            }</span>
+<span class="nc bnc" id="L1030" title="All 2 branches missed.">            if (usableAfter) {</span>
+<span class="nc bnc" id="L1031" title="All 2 branches missed.">                r.check(rowCount(db, &quot;conf_tx&quot;) == 0, &quot;and that rollback discarded its insert&quot;);</span>
+            }
+        }
+
+        // ---- commit persists
+<span class="nc" id="L1036">        db.beginTransaction();</span>
+<span class="nc" id="L1037">        db.execute(&quot;INSERT INTO conf_tx (id) VALUES (1)&quot;);</span>
+<span class="nc" id="L1038">        db.commitTransaction();</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">        r.check(rowCount(db, &quot;conf_tx&quot;) == 1, &quot;a committed insert persists&quot;);</span>
+
+        // ---- rollback discards
+<span class="nc" id="L1042">        db.beginTransaction();</span>
+<span class="nc" id="L1043">        db.execute(&quot;INSERT INTO conf_tx (id) VALUES (2)&quot;);</span>
+<span class="nc" id="L1044">        db.rollbackTransaction();</span>
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">        r.check(rowCount(db, &quot;conf_tx&quot;) == 1, &quot;a rolled back insert is discarded&quot;);</span>
+
+        // ---- autocommit is restored after a rollback
+<span class="nc" id="L1048">        db.execute(&quot;INSERT INTO conf_tx (id) VALUES (3)&quot;);</span>
+<span class="nc bnc" id="L1049" title="All 2 branches missed.">        r.check(rowCount(db, &quot;conf_tx&quot;) == 2,</span>
+                &quot;a statement after a rollback autocommits rather than joining an open transaction&quot;);
+
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">        if (mode == MODE_STRICT) {</span>
+            // ---- a failed commit ends the transaction rather than wedging the database
+<span class="nc" id="L1054">            db.execute(&quot;DROP TABLE IF EXISTS conf_fk_child&quot;);</span>
+<span class="nc" id="L1055">            db.execute(&quot;DROP TABLE IF EXISTS conf_fk_parent&quot;);</span>
+<span class="nc" id="L1056">            db.execute(&quot;CREATE TABLE conf_fk_parent (id INTEGER PRIMARY KEY)&quot;);</span>
+<span class="nc" id="L1057">            db.execute(&quot;CREATE TABLE conf_fk_child (id INTEGER PRIMARY KEY, parent INTEGER &quot;</span>
+                    + &quot;REFERENCES conf_fk_parent(id) DEFERRABLE INITIALLY DEFERRED)&quot;);
+<span class="nc" id="L1059">            boolean deferredConstraintsWork = true;</span>
+            try {
+<span class="nc" id="L1061">                db.execute(&quot;PRAGMA foreign_keys = ON&quot;);</span>
+<span class="nc" id="L1062">                db.beginTransaction();</span>
+<span class="nc" id="L1063">                db.execute(&quot;INSERT INTO conf_fk_child (id, parent) VALUES (1, 999)&quot;);</span>
+<span class="nc" id="L1064">                db.commitTransaction();</span>
+                // The engine did not enforce the constraint, so there is nothing to recover from.
+<span class="nc" id="L1066">                deferredConstraintsWork = false;</span>
+<span class="nc" id="L1067">            } catch (IOException expected) {</span>
+                // The commit failed, which is the interesting case. The engines disagree about
+                // what they leave behind - Android has already ended the transaction, the SQLite
+                // C API and JDBC have not - so the contract is that the port reconciles that and
+                // the database comes back with no transaction open either way.
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">                r.check(!db.isInTransaction(),</span>
+                        &quot;a failed commit leaves no transaction open rather than wedging the &quot;
+                        + &quot;database with one that can never be committed&quot;);
+<span class="nc" id="L1075">                boolean reusable = true;</span>
+                try {
+<span class="nc" id="L1077">                    db.beginTransaction();</span>
+<span class="nc" id="L1078">                    db.rollbackTransaction();</span>
+<span class="nc" id="L1079">                } catch (IOException err) {</span>
+<span class="nc" id="L1080">                    reusable = false;</span>
+<span class="nc" id="L1081">                }</span>
+<span class="nc" id="L1082">                r.check(reusable, &quot;a new transaction can be started after a failed commit&quot;);</span>
+<span class="nc" id="L1083">            } catch (RuntimeException unchecked) {</span>
+                // Caught deliberately: the contract is that every failure is an IOException, so an
+                // engine exception escaping unwrapped is itself the finding, and reporting it beats
+                // letting it abort the whole group.
+<span class="nc" id="L1087">                deferredConstraintsWork = false;</span>
+<span class="nc" id="L1088">                r.check(false, &quot;a failed commit raises IOException rather than &quot;</span>
+<span class="nc" id="L1089">                        + unchecked.getClass().getName());</span>
+                try {
+<span class="nc bnc" id="L1091" title="All 2 branches missed.">                    if (db.isInTransaction()) {</span>
+<span class="nc" id="L1092">                        db.rollbackTransaction();</span>
+                    }
+<span class="nc" id="L1094">                } catch (Throwable ignored) {</span>
+                    // Already reported.
+<span class="nc" id="L1096">                }</span>
+<span class="nc" id="L1097">            }</span>
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">            if (!deferredConstraintsWork) {</span>
+<span class="nc" id="L1099">                r.info(&quot;this engine did not enforce the deferred foreign key, so the &quot;</span>
+                        + &quot;failed-commit recovery path was not exercised&quot;);
+<span class="nc bnc" id="L1101" title="All 2 branches missed.">                if (db.isInTransaction()) {</span>
+<span class="nc" id="L1102">                    db.rollbackTransaction();</span>
+                }
+            }
+<span class="nc" id="L1105">            db.execute(&quot;PRAGMA foreign_keys = OFF&quot;);</span>
+<span class="nc" id="L1106">            db.execute(&quot;DROP TABLE IF EXISTS conf_fk_child&quot;);</span>
+<span class="nc" id="L1107">            db.execute(&quot;DROP TABLE IF EXISTS conf_fk_parent&quot;);</span>
+
+            // ---- nesting is rejected
+<span class="nc" id="L1110">            db.beginTransaction();</span>
+<span class="nc" id="L1111">            boolean nestedThrew = false;</span>
+            try {
+<span class="nc" id="L1113">                db.beginTransaction();</span>
+<span class="nc" id="L1114">            } catch (IOException err) {</span>
+<span class="nc" id="L1115">                nestedThrew = true;</span>
+<span class="nc" id="L1116">            }</span>
+<span class="nc" id="L1117">            r.check(nestedThrew, &quot;a nested beginTransaction() throws&quot;);</span>
+<span class="nc" id="L1118">            db.rollbackTransaction();</span>
+
+            // ---- an orphan commit or rollback is rejected
+<span class="nc" id="L1121">            boolean orphanCommitThrew = false;</span>
+            try {
+<span class="nc" id="L1123">                db.commitTransaction();</span>
+<span class="nc" id="L1124">            } catch (IOException err) {</span>
+<span class="nc" id="L1125">                orphanCommitThrew = true;</span>
+<span class="nc" id="L1126">            }</span>
+<span class="nc" id="L1127">            r.check(orphanCommitThrew, &quot;commitTransaction() with no transaction open throws&quot;);</span>
+
+<span class="nc" id="L1129">            boolean orphanRollbackThrew = false;</span>
+            try {
+<span class="nc" id="L1131">                db.rollbackTransaction();</span>
+<span class="nc" id="L1132">            } catch (IOException err) {</span>
+<span class="nc" id="L1133">                orphanRollbackThrew = true;</span>
+<span class="nc" id="L1134">            }</span>
+<span class="nc" id="L1135">            r.check(orphanRollbackThrew, &quot;rollbackTransaction() with no transaction open throws&quot;);</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">        } else if (portKind() == PORT_ANDROID) {</span>
+<span class="nc" id="L1137">            db.beginTransaction();</span>
+<span class="nc" id="L1138">            boolean nestedThrew = false;</span>
+            try {
+<span class="nc" id="L1140">                db.beginTransaction();</span>
+<span class="nc" id="L1141">            } catch (IOException err) {</span>
+<span class="nc" id="L1142">                nestedThrew = true;</span>
+<span class="nc" id="L1143">            }</span>
+<span class="nc bnc" id="L1144" title="All 2 branches missed.">            r.check(!nestedThrew, &quot;legacy: a nested beginTransaction() is accepted on Android&quot;);</span>
+<span class="nc" id="L1145">            db.rollbackTransaction();</span>
+<span class="nc" id="L1146">            db.rollbackTransaction();</span>
+        }
+
+<span class="nc" id="L1149">        db.execute(&quot;DROP TABLE IF EXISTS conf_tx&quot;);</span>
+<span class="nc" id="L1150">    }</span>
+
+    // ------------------------------------------------------------------ encryption
+
+    /// Checks encrypted opens, the wrong-key path and the on-disk result.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: a scratch database name, created and deleted here
+    ///
+    /// - `mode`: `#MODE_STRICT` or `#MODE_LEGACY`
+    ///
+    /// - `r`: receives the results
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the scratch database cannot be created
+    public static void runEncryption(String databaseName, int mode, Reporter r) throws IOException {
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">        if (!Database.isEncryptionSupported()) {</span>
+            // Asking for encryption where it is unavailable must fail loudly rather than
+            // quietly handing back a plaintext database, so check that even here.
+<span class="nc" id="L1171">            boolean refused = false;</span>
+<span class="nc" id="L1172">            Database db = null;</span>
+            try {
+<span class="nc" id="L1174">                db = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(&quot;secret&quot;));</span>
+<span class="nc" id="L1175">            } catch (DatabaseEncryptionException err) {</span>
+<span class="nc bnc" id="L1176" title="All 2 branches missed.">                refused = err.getErrorCode() == DatabaseEncryptionException.NOT_SUPPORTED;</span>
+<span class="nc" id="L1177">            } catch (IOException err) {</span>
+<span class="nc" id="L1178">                refused = false;</span>
+            } finally {
+<span class="nc" id="L1180">                closeQuietly(db);</span>
+            }
+<span class="nc" id="L1182">            r.check(refused, &quot;requesting encryption where it is unsupported raises NOT_SUPPORTED &quot;</span>
+                    + &quot;rather than returning a plaintext database&quot;);
+<span class="nc" id="L1184">            r.skip(&quot;encryption-unsupported-on-&quot; + Display.getInstance().getPlatformName());</span>
+<span class="nc" id="L1185">            return;</span>
+        }
+
+<span class="nc" id="L1188">        deleteQuietly(databaseName);</span>
+<span class="nc" id="L1189">        String passphrase = &quot;correct horse battery staple&quot;;</span>
+
+        // Whether the bytes behind a database can be read at all, established against a database
+        // known to be plaintext rather than assumed from the platform. A port can hand back a path
+        // that opens and still is not the database file: the browser keeps its databases in a
+        // storage pool whose slots begin with the pool's own metadata, so a read there succeeds and
+        // never looks like SQLite -- which silently satisfies every &quot;this is not plaintext&quot; check
+        // and fails only the one that wants the opposite.
+<span class="nc" id="L1197">        boolean storedBytesVisible = storedBytesAreVisible(r, databaseName);</span>
+
+        // ---- round trip
+<span class="nc" id="L1200">        Database db = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(passphrase));</span>
+        try {
+<span class="nc" id="L1202">            db.execute(&quot;CREATE TABLE secret (id INTEGER PRIMARY KEY, v TEXT)&quot;);</span>
+<span class="nc" id="L1203">            db.execute(&quot;INSERT INTO secret (id, v) VALUES (1, 'classified')&quot;);</span>
+        } finally {
+<span class="nc" id="L1205">            closeQuietly(db);</span>
+        }
+
+<span class="nc" id="L1208">        db = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(passphrase));</span>
+<span class="nc" id="L1209">        Cursor cur = null;</span>
+        try {
+<span class="nc" id="L1211">            cur = db.executeQuery(&quot;SELECT v FROM secret WHERE id = 1&quot;);</span>
+<span class="nc bnc" id="L1212" title="All 4 branches missed.">            r.check(cur.next() &amp;&amp; &quot;classified&quot;.equals(cur.getRow().getString(0)),</span>
+                    &quot;an encrypted database round trips with the correct passphrase&quot;);
+        } finally {
+<span class="nc" id="L1215">            closeQuietly(cur);</span>
+<span class="nc" id="L1216">            closeQuietly(db);</span>
+        }
+
+        // ---- the single most valuable assertion here: the bytes on disk are not plaintext
+<span class="nc" id="L1220">        checkStoredBytes(r, storedBytesVisible, databaseName, false,</span>
+                &quot;the encrypted database does not begin with a plaintext SQLite header&quot;);
+<span class="nc" id="L1222">        r.check(Database.isEncrypted(databaseName), &quot;isEncrypted reports true for it&quot;);</span>
+
+        // ---- no key at all is rejected
+        //
+        // The proof of encryption that needs no access to the bytes. Where a port keeps its
+        // databases somewhere the checks above cannot read, this is what is left to say the
+        // contents are not simply sitting there for anyone who opens the database.
+        //
+        // On its own database, because asking is destructive: Android hands an unkeyed open to
+        // the platform SQLite, which reports the ciphertext as corruption, and the default error
+        // handler answers corruption by deleting the file. Every assertion after this one would
+        // then be run against whatever was left.
+<span class="nc" id="L1234">        String unkeyedName = databaseName + &quot;-nokey&quot;;</span>
+<span class="nc" id="L1235">        deleteQuietly(unkeyedName);</span>
+<span class="nc" id="L1236">        Database unkeyed = Database.openOrCreate(unkeyedName, DatabaseConfig.passphrase(passphrase));</span>
+        try {
+<span class="nc" id="L1238">            unkeyed.execute(&quot;CREATE TABLE secret (id INTEGER PRIMARY KEY, v TEXT)&quot;);</span>
+<span class="nc" id="L1239">            unkeyed.execute(&quot;INSERT INTO secret (id, v) VALUES (1, 'classified')&quot;);</span>
+        } finally {
+<span class="nc" id="L1241">            closeQuietly(unkeyed);</span>
+        }
+<span class="nc" id="L1243">        boolean noKeyRejected = false;</span>
+<span class="nc" id="L1244">        unkeyed = null;</span>
+        try {
+<span class="nc" id="L1246">            unkeyed = Database.openOrCreate(unkeyedName);</span>
+<span class="nc" id="L1247">            Cursor probe = unkeyed.executeQuery(&quot;SELECT v FROM secret&quot;);</span>
+<span class="nc bnc" id="L1248" title="All 4 branches missed.">            noKeyRejected = !probe.next() || !&quot;classified&quot;.equals(probe.getRow().getString(0));</span>
+<span class="nc" id="L1249">            probe.close();</span>
+<span class="nc" id="L1250">        } catch (IOException err) {</span>
+<span class="nc" id="L1251">            noKeyRejected = true;</span>
+        } finally {
+<span class="nc" id="L1253">            closeQuietly(unkeyed);</span>
+        }
+<span class="nc" id="L1255">        r.check(noKeyRejected, &quot;an encrypted database does not give up its rows without a key&quot;);</span>
+<span class="nc" id="L1256">        deleteQuietly(unkeyedName);</span>
+
+        // ---- the wrong passphrase is rejected
+<span class="nc" id="L1259">        boolean wrongKeyRejected = false;</span>
+<span class="nc" id="L1260">        Database bad = null;</span>
+        try {
+<span class="nc" id="L1262">            bad = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(&quot;wrong&quot;));</span>
+<span class="nc" id="L1263">            Cursor probe = bad.executeQuery(&quot;SELECT v FROM secret&quot;);</span>
+<span class="nc" id="L1264">            probe.next();</span>
+<span class="nc" id="L1265">            probe.close();</span>
+<span class="nc" id="L1266">        } catch (DatabaseEncryptionException err) {</span>
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">            wrongKeyRejected = err.getErrorCode() == DatabaseEncryptionException.WRONG_KEY;</span>
+<span class="nc bnc" id="L1268" title="All 2 branches missed.">            if (!wrongKeyRejected) {</span>
+<span class="nc" id="L1269">                r.info(&quot;a wrong passphrase reported code &quot; + err.getErrorCode()</span>
+                        + &quot; rather than WRONG_KEY&quot;);
+            }
+<span class="nc" id="L1272">        } catch (IOException err) {</span>
+<span class="nc" id="L1273">            r.info(&quot;a wrong passphrase raised a plain IOException: &quot; + err.getMessage());</span>
+        } finally {
+<span class="nc" id="L1275">            closeQuietly(bad);</span>
+        }
+<span class="nc" id="L1277">        r.check(wrongKeyRejected, &quot;the wrong passphrase raises WRONG_KEY&quot;);</span>
+
+        // ---- re-keying
+<span class="nc" id="L1280">        db = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(passphrase));</span>
+        try {
+<span class="nc" id="L1282">            db.changeKey(DatabaseConfig.passphrase(&quot;a different secret&quot;));</span>
+        } finally {
+<span class="nc" id="L1284">            closeQuietly(db);</span>
+        }
+<span class="nc" id="L1286">        db = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(&quot;a different secret&quot;));</span>
+<span class="nc" id="L1287">        cur = null;</span>
+        try {
+<span class="nc" id="L1289">            cur = db.executeQuery(&quot;SELECT v FROM secret WHERE id = 1&quot;);</span>
+<span class="nc bnc" id="L1290" title="All 4 branches missed.">            r.check(cur.next() &amp;&amp; &quot;classified&quot;.equals(cur.getRow().getString(0)),</span>
+                    &quot;the database opens with the new passphrase after changeKey&quot;);
+        } finally {
+<span class="nc" id="L1293">            closeQuietly(cur);</span>
+<span class="nc" id="L1294">            closeQuietly(db);</span>
+        }
+<span class="nc" id="L1296">        boolean oldKeyRejected = false;</span>
+<span class="nc" id="L1297">        Database old = null;</span>
+        try {
+<span class="nc" id="L1299">            old = Database.openOrCreate(databaseName, DatabaseConfig.passphrase(passphrase));</span>
+<span class="nc" id="L1300">            Cursor probe = old.executeQuery(&quot;SELECT v FROM secret&quot;);</span>
+<span class="nc" id="L1301">            probe.next();</span>
+<span class="nc" id="L1302">            probe.close();</span>
+<span class="nc" id="L1303">        } catch (IOException err) {</span>
+<span class="nc" id="L1304">            oldKeyRejected = true;</span>
+        } finally {
+<span class="nc" id="L1306">            closeQuietly(old);</span>
+        }
+<span class="nc" id="L1308">        r.check(oldKeyRejected, &quot;the previous passphrase no longer opens the database&quot;);</span>
+<span class="nc" id="L1309">        deleteQuietly(databaseName);</span>
+
+        // ---- managed keys
+<span class="nc" id="L1312">        String managedName = databaseName + &quot;-managed&quot;;</span>
+<span class="nc" id="L1313">        deleteQuietly(managedName);</span>
+<span class="nc" id="L1314">        Database managed = null;</span>
+        try {
+<span class="nc" id="L1316">            managed = Database.openOrCreate(managedName, DatabaseConfig.managed());</span>
+<span class="nc" id="L1317">            managed.execute(&quot;CREATE TABLE m (id INTEGER PRIMARY KEY)&quot;);</span>
+<span class="nc" id="L1318">            managed.execute(&quot;INSERT INTO m (id) VALUES (1)&quot;);</span>
+<span class="nc" id="L1319">            managed.close();</span>
+<span class="nc" id="L1320">            managed = Database.openOrCreate(managedName, DatabaseConfig.managed());</span>
+<span class="nc bnc" id="L1321" title="All 2 branches missed.">            r.check(rowCount(managed, &quot;m&quot;) == 1,</span>
+                    &quot;a managed-key database reopens with the same generated key&quot;);
+<span class="nc" id="L1323">            r.info(&quot;managed keys are hardware backed here: &quot;</span>
+<span class="nc" id="L1324">                    + DatabaseConfig.managed().isKeyHardwareBacked());</span>
+<span class="nc" id="L1325">        } catch (DatabaseEncryptionException err) {</span>
+<span class="nc bnc" id="L1326" title="All 2 branches missed.">            if (err.getErrorCode() == DatabaseEncryptionException.KEY_UNAVAILABLE) {</span>
+                // A note rather than a skip. Managed keys need a non-prompting secure store, which
+                // not every port has, but everything else in this group -- passphrases, raw keys,
+                // re-keying, conversion, ciphertext on disk -- has already run and been asserted
+                // by the time we get here. Reporting the group as skipped would hide all of that
+                // behind one unavailable sub-feature and read as &quot;encryption is untested on this
+                // port&quot; when the opposite is true. The missing capability is SecureStorage's, and
+                // it is reported under SecureStorage.
+<span class="nc" id="L1334">                r.info(&quot;managed keys are unavailable here, so only the generated-key case is &quot;</span>
+<span class="nc" id="L1335">                        + &quot;untested: &quot; + err.getMessage());</span>
+            } else {
+<span class="nc" id="L1337">                r.check(false, &quot;managed key open failed: &quot; + err.getMessage());</span>
+            }
+        } finally {
+<span class="nc" id="L1340">            closeQuietly(managed);</span>
+        }
+<span class="nc" id="L1342">        Database.forgetManagedKey(managedName);</span>
+<span class="nc" id="L1343">        deleteQuietly(managedName);</span>
+
+        // ---- converting an existing plaintext database
+<span class="nc" id="L1346">        String migrateName = databaseName + &quot;-migrate&quot;;</span>
+<span class="nc" id="L1347">        deleteQuietly(migrateName);</span>
+<span class="nc" id="L1348">        Database plain = Database.openOrCreate(migrateName);</span>
+        try {
+<span class="nc" id="L1350">            plain.execute(&quot;CREATE TABLE p (id INTEGER PRIMARY KEY, v TEXT)&quot;);</span>
+<span class="nc" id="L1351">            plain.execute(&quot;INSERT INTO p (id, v) VALUES (1, 'was plaintext')&quot;);</span>
+        } finally {
+<span class="nc" id="L1353">            closeQuietly(plain);</span>
+        }
+<span class="nc" id="L1355">        Database.encrypt(migrateName, DatabaseConfig.passphrase(passphrase));</span>
+<span class="nc" id="L1356">        checkStoredBytes(r, storedBytesVisible, migrateName, false,</span>
+                &quot;encrypt() leaves ciphertext on disk&quot;);
+<span class="nc" id="L1358">        Database migrated = Database.openOrCreate(migrateName,</span>
+<span class="nc" id="L1359">                DatabaseConfig.passphrase(passphrase));</span>
+<span class="nc" id="L1360">        cur = null;</span>
+        try {
+<span class="nc" id="L1362">            cur = migrated.executeQuery(&quot;SELECT v FROM p WHERE id = 1&quot;);</span>
+<span class="nc bnc" id="L1363" title="All 4 branches missed.">            r.check(cur.next() &amp;&amp; &quot;was plaintext&quot;.equals(cur.getRow().getString(0)),</span>
+                    &quot;encrypt() preserves the existing rows&quot;);
+        } finally {
+<span class="nc" id="L1366">            closeQuietly(cur);</span>
+<span class="nc" id="L1367">            closeQuietly(migrated);</span>
+        }
+<span class="nc" id="L1369">        Database.decrypt(migrateName, DatabaseConfig.passphrase(passphrase));</span>
+<span class="nc" id="L1370">        checkStoredBytes(r, storedBytesVisible, migrateName, true,</span>
+                &quot;decrypt() restores a plaintext SQLite file&quot;);
+        // Asked of the port as well as of the bytes. Where the bytes cannot be read this is the
+        // only thing left that says the conversion happened, and it was the missing half: the
+        // encrypted side has been asserted since the beginning and the decrypted side never was.
+<span class="nc bnc" id="L1375" title="All 2 branches missed.">        r.check(!Database.isEncrypted(migrateName), &quot;isEncrypted is false again after decrypt()&quot;);</span>
+<span class="nc" id="L1376">        deleteQuietly(migrateName);</span>
+<span class="nc" id="L1377">    }</span>
+
+    // ------------------------------------------------------------------ helpers
+
+    /// Identifies the running port, so the legacy checks can assert what that port used to do.
+    ///
+    /// The simulator is detected first and separately: under a device skin it reports the
+    /// *simulated* platform name, so the name alone cannot tell a simulator run from a device.
+    ///
+    /// Tolerates a display that is not up, which is how the groups taking a `Database` directly
+    /// can be driven from a plain unit test.
+    private static int portKind() {
+<span class="nc bnc" id="L1389" title="All 2 branches missed.">        if (portKindOverride != PORT_AUTODETECT) {</span>
+<span class="nc" id="L1390">            return portKindOverride;</span>
+        }
+<span class="nc bnc" id="L1392" title="All 2 branches missed.">        if (portKindFromDatabase != PORT_AUTODETECT) {</span>
+<span class="nc" id="L1393">            return portKindFromDatabase;</span>
+        }
+        try {
+<span class="nc" id="L1396">            String platform = Display.getInstance().getPlatformName();</span>
+<span class="nc bnc" id="L1397" title="All 2 branches missed.">            if (&quot;ios&quot;.equals(platform)) {</span>
+<span class="nc" id="L1398">                return PORT_IOS;</span>
+            }
+<span class="nc bnc" id="L1400" title="All 2 branches missed.">            if (&quot;and&quot;.equals(platform)) {</span>
+<span class="nc" id="L1401">                return PORT_ANDROID;</span>
+            }
+<span class="nc bnc" id="L1403" title="All 2 branches missed.">            if (Display.getInstance().isSimulator()) {</span>
+<span class="nc" id="L1404">                return PORT_SIMULATOR;</span>
+            }
+<span class="nc" id="L1406">        } catch (Throwable displayNotUp) {</span>
+<span class="nc" id="L1407">            return PORT_OTHER;</span>
+<span class="nc" id="L1408">        }</span>
+<span class="nc" id="L1409">        return PORT_OTHER;</span>
+    }
+
+    /// Autodetected from a database implementation, or `#PORT_AUTODETECT` before one is seen.
+<span class="nc" id="L1413">    private static int portKindFromDatabase = PORT_AUTODETECT;</span>
+
+    /// Records which port a database came from, which is the only unambiguous signal available.
+    ///
+    /// `Display` cannot answer this. The desktop simulator reports the platform name of the skin it
+    /// is wearing and answers `isSimulator()` with true -- and so does a real iOS build running on
+    /// the iOS Simulator, which is where this suite runs in CI. Asking `isSimulator()` first read
+    /// every iOS Simulator run as a desktop one and applied the wrong port's legacy expectations to
+    /// it; asking the platform name first would still confuse the desktop simulator wearing an iOS
+    /// skin for iOS. The implementation class behind the `Database` is neither.
+    private static void noteDatabase(Database db) {
+<span class="nc bnc" id="L1424" title="All 4 branches missed.">        if (db == null || portKindFromDatabase != PORT_AUTODETECT) {</span>
+<span class="nc" id="L1425">            return;</span>
+        }
+<span class="nc" id="L1427">        String impl = db.getClass().getName();</span>
+<span class="nc bnc" id="L1428" title="All 2 branches missed.">        if (impl.startsWith(&quot;com.codename1.impl.javase.&quot;)) {</span>
+<span class="nc" id="L1429">            portKindFromDatabase = PORT_SIMULATOR;</span>
+<span class="nc bnc" id="L1430" title="All 2 branches missed.">        } else if (impl.startsWith(&quot;com.codename1.impl.ios.&quot;)) {</span>
+<span class="nc" id="L1431">            portKindFromDatabase = PORT_IOS;</span>
+<span class="nc bnc" id="L1432" title="All 2 branches missed.">        } else if (impl.startsWith(&quot;com.codename1.impl.android.&quot;)) {</span>
+<span class="nc" id="L1433">            portKindFromDatabase = PORT_ANDROID;</span>
+        } else {
+<span class="nc" id="L1435">            portKindFromDatabase = PORT_OTHER;</span>
+        }
+<span class="nc" id="L1437">    }</span>
+
+    /// The blob-query capability could not be determined.
+    private static final int CAPABILITY_UNKNOWN = -1;
+
+    /// The platform reports that it does not support blob query parameters.
+    private static final int CAPABILITY_NO = 0;
+
+    /// The platform reports that it supports blob query parameters.
+    private static final int CAPABILITY_YES = 1;
+
+    /// Reads the blob-query capability.
+    ///
+    /// Reports `#CAPABILITY_UNKNOWN` rather than guessing when the display is not up, so that a
+    /// harness driving a `Database` directly does not assert the opposite of what the port
+    /// actually supports.
+    private static int blobQueryParametersSupported() {
+        try {
+<span class="nc bnc" id="L1455" title="All 2 branches missed.">            return Database.isBlobQueryParameterSupported() ? CAPABILITY_YES : CAPABILITY_NO;</span>
+<span class="nc" id="L1456">        } catch (Throwable displayNotUp) {</span>
+<span class="nc" id="L1457">            return CAPABILITY_UNKNOWN;</span>
+        }
+    }
+
+    /// The stored bytes could not be read, so neither answer below is available.
+    private static final int HEADER_UNREADABLE = -1;
+
+    /// The stored bytes do not begin with SQLite's plaintext header.
+    private static final int HEADER_ENCRYPTED = 0;
+
+    /// The stored bytes begin with SQLite's plaintext header.
+    private static final int HEADER_PLAINTEXT = 1;
+
+    /// Whether the file behind a database begins with SQLite's plaintext header.
+    ///
+    /// Three answers rather than two, because a platform that keeps its databases somewhere other
+    /// than the filesystem -- the browser's storage pool has no path to open -- can give neither.
+    /// Folding that into &quot;not plaintext&quot; is what made the ciphertext checks pass on a port where
+    /// nothing was read at all, which is the failure this suite exists to catch.
+    private static int plaintextHeaderState(String databaseName) {
+<span class="nc" id="L1477">        String path = Database.getDatabasePath(databaseName);</span>
+<span class="nc bnc" id="L1478" title="All 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L1479">            return HEADER_UNREADABLE;</span>
+        }
+        try {
+<span class="nc" id="L1482">            InputStream in = null;</span>
+            try {
+<span class="nc" id="L1484">                in = FileSystemStorage.getInstance().openInputStream(path);</span>
+<span class="nc bnc" id="L1485" title="All 2 branches missed.">                if (in == null) {</span>
+<span class="nc" id="L1486">                    return HEADER_UNREADABLE;</span>
+                }
+<span class="nc" id="L1488">                byte[] header = new byte[15];</span>
+<span class="nc" id="L1489">                int offset = 0;</span>
+<span class="nc bnc" id="L1490" title="All 2 branches missed.">                while (offset &lt; header.length) {</span>
+<span class="nc" id="L1491">                    int read = in.read(header, offset, header.length - offset);</span>
+<span class="nc bnc" id="L1492" title="All 2 branches missed.">                    if (read &lt; 0) {</span>
+<span class="nc" id="L1493">                        return HEADER_UNREADABLE;</span>
+                    }
+<span class="nc" id="L1495">                    offset += read;</span>
+<span class="nc" id="L1496">                }</span>
+                // Compare bytes rather than decoding: the header is fixed ASCII, and decoding it
+                // would depend on the platform default charset.
+<span class="nc" id="L1499">                byte[] expected = {'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm',</span>
+                    'a', 't', ' ', '3'};
+<span class="nc bnc" id="L1501" title="All 2 branches missed.">                for (int iter = 0; iter &lt; expected.length; iter++) {</span>
+<span class="nc bnc" id="L1502" title="All 2 branches missed.">                    if (header[iter] != expected[iter]) {</span>
+<span class="nc" id="L1503">                        return HEADER_ENCRYPTED;</span>
+                    }
+                }
+<span class="nc" id="L1506">                return HEADER_PLAINTEXT;</span>
+            } finally {
+<span class="nc bnc" id="L1508" title="All 2 branches missed.">                if (in != null) {</span>
+<span class="nc" id="L1509">                    in.close();</span>
+                }
+            }
+<span class="nc" id="L1512">        } catch (IOException err) {</span>
+<span class="nc" id="L1513">            return HEADER_UNREADABLE;</span>
+        }
+    }
+
+    /// Asserts what the stored bytes are, where the platform lets them be read.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reporter
+    /// - `databaseName`: the database whose file to look at
+    /// - `expectPlaintext`: whether the file should begin with the plaintext header
+    /// - `message`: what is being asserted
+    private static void checkStoredBytes(Reporter r, boolean storedBytesVisible,
+            String databaseName, boolean expectPlaintext, String message) {
+<span class="nc bnc" id="L1527" title="All 2 branches missed.">        if (!storedBytesVisible) {</span>
+<span class="nc" id="L1528">            r.info(&quot;the stored bytes are not reachable on this platform, so this was not&quot;</span>
+                    + &quot; checked: &quot; + message);
+<span class="nc" id="L1530">            return;</span>
+        }
+<span class="nc bnc" id="L1532" title="All 4 branches missed.">        r.check((plaintextHeaderState(databaseName) == HEADER_PLAINTEXT) == expectPlaintext,</span>
+                message);
+<span class="nc" id="L1534">    }</span>
+
+    /// Whether reading a database's stored bytes gives back the database.
+    ///
+    /// Calibrated against a plaintext database rather than assumed, because the failure it guards
+    /// against looks exactly like success: a port whose path is not the database file still reads
+    /// something, and that something is never an SQLite header, so every &quot;this is not plaintext&quot;
+    /// assertion passes without a database having been read at all.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reporter, told once when the checks cannot run
+    /// - `databaseName`: the database under test, whose name the probe borrows
+    private static boolean storedBytesAreVisible(Reporter r, String databaseName) {
+<span class="nc" id="L1548">        String probeName = databaseName + &quot;-bytes-probe&quot;;</span>
+<span class="nc" id="L1549">        deleteQuietly(probeName);</span>
+        try {
+<span class="nc" id="L1551">            Database probe = Database.openOrCreate(probeName);</span>
+            try {
+<span class="nc" id="L1553">                probe.execute(&quot;CREATE TABLE probe (id INTEGER PRIMARY KEY)&quot;);</span>
+            } finally {
+<span class="nc" id="L1555">                closeQuietly(probe);</span>
+            }
+<span class="nc bnc" id="L1557" title="All 2 branches missed.">            boolean visible = plaintextHeaderState(probeName) == HEADER_PLAINTEXT;</span>
+<span class="nc bnc" id="L1558" title="All 2 branches missed.">            if (!visible) {</span>
+<span class="nc" id="L1559">                r.info(&quot;a plaintext database does not read back as one here, so this platform does &quot;</span>
+                        + &quot;not expose its databases as files and the ciphertext-on-disk checks &quot;
+                        + &quot;cannot run&quot;);
+            }
+<span class="nc" id="L1563">            return visible;</span>
+<span class="nc" id="L1564">        } catch (IOException err) {</span>
+<span class="nc" id="L1565">            r.info(&quot;a probe database could not be created, so the ciphertext-on-disk checks cannot &quot;</span>
+<span class="nc" id="L1566">                    + &quot;run: &quot; + err.getMessage());</span>
+<span class="nc" id="L1567">            return false;</span>
+        } finally {
+<span class="nc" id="L1569">            deleteQuietly(probeName);</span>
+        }
+    }
+
+    private static int countTables(Database db, String first, String second) throws IOException {
+<span class="nc" id="L1574">        Cursor cur = db.executeQuery(&quot;SELECT count(*) FROM sqlite_master WHERE name IN (?, ?)&quot;,</span>
+                new String[] {first, second});
+        try {
+<span class="nc" id="L1577">            cur.next();</span>
+<span class="nc" id="L1578">            return cur.getRow().getInteger(0);</span>
+        } finally {
+<span class="nc" id="L1580">            closeQuietly(cur);</span>
+        }
+    }
+
+    private static int rowCount(Database db, String table) throws IOException {
+<span class="nc" id="L1585">        Cursor cur = db.executeQuery(&quot;SELECT count(*) FROM &quot; + table);</span>
+        try {
+<span class="nc" id="L1587">            cur.next();</span>
+<span class="nc" id="L1588">            return cur.getRow().getInteger(0);</span>
+        } finally {
+<span class="nc" id="L1590">            closeQuietly(cur);</span>
+        }
+    }
+
+    private static void closeQuietly(Database db) {
+<span class="nc bnc" id="L1595" title="All 2 branches missed.">        if (db != null) {</span>
+            try {
+<span class="nc" id="L1597">                db.close();</span>
+<span class="nc" id="L1598">            } catch (Throwable ignored) {</span>
+                // A close failure must not mask the assertion that was actually being made.
+<span class="nc" id="L1600">            }</span>
+        }
+<span class="nc" id="L1602">    }</span>
+
+    private static void closeQuietly(Cursor cur) {
+<span class="nc bnc" id="L1605" title="All 2 branches missed.">        if (cur != null) {</span>
+            try {
+<span class="nc" id="L1607">                cur.close();</span>
+<span class="nc" id="L1608">            } catch (Throwable ignored) {</span>
+                // As above.
+<span class="nc" id="L1610">            }</span>
+        }
+<span class="nc" id="L1612">    }</span>
+
+    private static void deleteQuietly(String databaseName) {
+        try {
+<span class="nc bnc" id="L1616" title="All 2 branches missed.">            if (Database.exists(databaseName)) {</span>
+<span class="nc" id="L1617">                Database.delete(databaseName);</span>
+            }
+<span class="nc" id="L1619">        } catch (Throwable ignored) {</span>
+            // Best effort cleanup between groups.
+<span class="nc" id="L1621">        }</span>
+<span class="nc" id="L1622">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

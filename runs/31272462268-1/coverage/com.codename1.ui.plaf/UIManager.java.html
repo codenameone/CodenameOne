@@ -1,0 +1,2730 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UIManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">UIManager.java</span></div><h1>UIManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.io.Log;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Image;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.plaf.StyleParser.BorderInfo;
+import com.codename1.ui.plaf.StyleParser.FontInfo;
+import com.codename1.ui.plaf.StyleParser.ImageInfo;
+import com.codename1.ui.plaf.StyleParser.MarginInfo;
+import com.codename1.ui.plaf.StyleParser.PaddingInfo;
+import com.codename1.ui.plaf.StyleParser.StyleInfo;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.ui.util.Resources;
+import com.codename1.util.StringUtil;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Vector;
+
+/// Central point singleton managing the look of the application, this class allows us to
+/// customize the styles (themes) as well as the look instance.
+///
+/// @author Chen Fishbein
+public class UIManager {
+
+    static UIManager instance;
+    /// This member is used by the resource editor
+<span class="fc" id="L63">    static boolean accessible = true;</span>
+    /// This member is used by the resource editor
+<span class="fc" id="L65">    static boolean localeAccessible = true;</span>
+<span class="fc" id="L66">    private final HashMap&lt;String, Style&gt; styles = new HashMap&lt;String, Style&gt;();</span>
+<span class="fc" id="L67">    private final HashMap&lt;String, Style&gt; selectedStyles = new HashMap&lt;String, Style&gt;();</span>
+<span class="fc" id="L68">    private final HashMap&lt;String, Object&gt; themeConstants = new HashMap&lt;String, Object&gt;();</span>
+    /// Useful for caching theme images so they are not loaded twice in case
+    /// an image reference is used it two places in the theme (e.g. same background
+    /// to title and menu bar).
+<span class="fc" id="L72">    private final HashMap&lt;String, Image&gt; imageCache = new HashMap&lt;String, Image&gt;();</span>
+    private LookAndFeel current;
+    private HashMap&lt;String, Object&gt; themeProps;
+<span class="fc" id="L75">    private Style defaultStyle = new Style();</span>
+<span class="fc" id="L76">    private Style defaultSelectedStyle = new Style();</span>
+    private boolean useLargerTextScale;
+    /// Tracks the original (unscaled) Font we replaced in themeProps when
+    /// [#applyLargerTextScaleToThemeFonts] last ran. Without this, each scale
+    /// change derives from the previously-scaled font and compounds, so going
+    /// XL -&gt; XXL over-scales and going XXL -&gt; Large never shrinks back. The
+    /// parallel scaledFontDerived map records the Font we wrote, so we only
+    /// restore entries that the theme has not overwritten in the meantime.
+<span class="fc" id="L84">    private final Map&lt;String, Font&gt; scaledFontOriginals = new HashMap&lt;String, Font&gt;();</span>
+<span class="fc" id="L85">    private final Map&lt;String, Font&gt; scaledFontDerived = new HashMap&lt;String, Font&gt;();</span>
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    private Hashtable resourceBundle;
+    private Map&lt;String, String&gt; bundle;
+    private boolean wasThemeInstalled;
+    /// This EventDispatcher holds all listeners who would like to register to
+    /// Theme refreshed event
+    private EventDispatcher themelisteners;
+    // Cache used to keep track of parsed styles.
+    private Map&lt;String, String&gt; parseCache;
+<span class="fc" id="L97">    UIManager() {</span>
+        // Lazy initialization of instance for js port compatibility.  We will
+        // do a double-lazy initialization to try to best prevent regressions
+        // from other projects that may be out of sync.  E.g. the Designer project
+        // uses the &quot;instance&quot; property directly.  This should guarantee that
+        // instance will be set
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (instance == null) {</span>
+<span class="fc" id="L104">            instance = this;</span>
+        }
+<span class="fc" id="L106">        current = new DefaultLookAndFeel(this);</span>
+<span class="fc" id="L107">        resetThemeProps(null);</span>
+<span class="fc" id="L108">    }</span>
+
+    /// Singleton instance method
+    ///
+    /// #### Returns
+    ///
+    /// Instance of the ui manager
+    public static UIManager getInstance() {
+<span class="fc" id="L116">        UIManager currentInstance = instance;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (currentInstance == null) {</span>
+<span class="fc" id="L118">            synchronized (UIManager.class) {</span>
+<span class="fc" id="L119">                currentInstance = instance;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                if (currentInstance == null) {</span>
+<span class="fc" id="L121">                    currentInstance = UIManagerHolder.INSTANCE;</span>
+<span class="fc" id="L122">                    instance = currentInstance;</span>
+                }
+<span class="fc" id="L124">            }</span>
+        }
+<span class="fc" id="L126">        return currentInstance;</span>
+    }
+
+    /// This factory method allows creating a new UIManager instance, this is usefull where an application
+    /// has some screens with different context
+    ///
+    /// #### Returns
+    ///
+    /// a new UIManager instance
+    public static UIManager createInstance() {
+<span class="nc" id="L136">        return new UIManager();</span>
+    }
+
+    private static Image parseImage(String value) throws IOException {
+<span class="nc" id="L140">        int index = 0;</span>
+<span class="nc" id="L141">        byte[] imageData = new byte[value.length() / 2];</span>
+<span class="nc" id="L142">        int vlen = value.length();</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        while (index &lt; vlen) {</span>
+<span class="nc" id="L144">            String byteStr = value.substring(index, index + 2);</span>
+<span class="nc" id="L145">            imageData[index / 2] = Integer.valueOf(byteStr, 16).byteValue();</span>
+<span class="nc" id="L146">            index += 2;</span>
+<span class="nc" id="L147">        }</span>
+<span class="nc" id="L148">        ByteArrayInputStream in = new ByteArrayInputStream(imageData);</span>
+<span class="nc" id="L149">        Image image = Image.createImage(in);</span>
+<span class="nc" id="L150">        in.close();</span>
+<span class="nc" id="L151">        return image;</span>
+    }
+
+    private static Font parseFont(String fontStr) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (fontStr.startsWith(&quot;System&quot;)) {</span>
+<span class="nc" id="L156">            int face = 0;</span>
+<span class="nc" id="L157">            int style = 0;</span>
+<span class="nc" id="L158">            int size = 0;</span>
+            String faceStr;
+            String styleStr;
+            String sizeStr;
+<span class="nc" id="L162">            String sysFont = fontStr.substring(fontStr.indexOf(&quot;{&quot;) + 1, fontStr.indexOf(&quot;}&quot;));</span>
+<span class="nc" id="L163">            faceStr = sysFont.substring(0, sysFont.indexOf(&quot;;&quot;));</span>
+<span class="nc" id="L164">            sysFont = sysFont.substring(sysFont.indexOf(&quot;;&quot;) + 1);</span>
+<span class="nc" id="L165">            styleStr = sysFont.substring(0, sysFont.indexOf(&quot;;&quot;));</span>
+<span class="nc" id="L166">            sizeStr = sysFont.substring(sysFont.indexOf(&quot;;&quot;) + 1);</span>
+
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (faceStr.indexOf(&quot;FACE_SYSTEM&quot;) &gt; -1) {</span>
+<span class="nc" id="L169">                face = Font.FACE_SYSTEM;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            } else if (faceStr.indexOf(&quot;FACE_MONOSPACE&quot;) &gt; -1) {</span>
+<span class="nc" id="L171">                face = Font.FACE_MONOSPACE;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            } else if (faceStr.indexOf(&quot;FACE_PROPORTIONAL&quot;) &gt; -1) {</span>
+<span class="nc" id="L173">                face = Font.FACE_PROPORTIONAL;</span>
+            }
+
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (styleStr.indexOf(&quot;STYLE_PLAIN&quot;) &gt; -1) {</span>
+<span class="nc" id="L177">                style = Font.STYLE_PLAIN;</span>
+            } else {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if (styleStr.indexOf(&quot;STYLE_BOLD&quot;) &gt; -1) {</span>
+<span class="nc" id="L180">                    style = Font.STYLE_BOLD;</span>
+                }
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                if (styleStr.indexOf(&quot;STYLE_ITALIC&quot;) &gt; -1) {</span>
+<span class="nc" id="L183">                    style = style | Font.STYLE_ITALIC;</span>
+                }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                if (styleStr.indexOf(&quot;STYLE_UNDERLINED&quot;) &gt; -1) {</span>
+<span class="nc" id="L186">                    style = style | Font.STYLE_UNDERLINED;</span>
+                }
+            }
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (sizeStr.indexOf(&quot;SIZE_SMALL&quot;) &gt; -1) {</span>
+<span class="nc" id="L191">                size = Font.SIZE_SMALL;</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            } else if (sizeStr.indexOf(&quot;SIZE_MEDIUM&quot;) &gt; -1) {</span>
+<span class="nc" id="L193">                size = Font.SIZE_MEDIUM;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            } else if (sizeStr.indexOf(&quot;SIZE_LARGE&quot;) &gt; -1) {</span>
+<span class="nc" id="L195">                size = Font.SIZE_LARGE;</span>
+            }
+
+
+<span class="nc" id="L199">            return Font.createSystemFont(face, style, size);</span>
+        } else {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            if (fontStr.toLowerCase().startsWith(&quot;bitmap&quot;)) {</span>
+                try {
+<span class="nc" id="L203">                    String bitmapFont = fontStr.substring(fontStr.indexOf(&quot;{&quot;) + 1, fontStr.indexOf(&quot;}&quot;));</span>
+                    String nameStr;
+<span class="nc" id="L205">                    nameStr = bitmapFont;</span>
+
+
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    if (nameStr.toLowerCase().startsWith(&quot;highcontrast&quot;)) {</span>
+<span class="nc" id="L209">                        nameStr = nameStr.substring(nameStr.indexOf(&quot;;&quot;) + 1);</span>
+<span class="nc" id="L210">                        Font f = Font.getBitmapFont(nameStr);</span>
+<span class="nc" id="L211">                        f.addContrast((byte) 30);</span>
+<span class="nc" id="L212">                        return f;</span>
+                    }
+
+<span class="nc" id="L215">                    return Font.getBitmapFont(nameStr);</span>
+<span class="nc" id="L216">                } catch (Exception ex) {</span>
+                    // illegal argument exception?
+<span class="nc" id="L218">                    Log.e(ex);</span>
+                }
+            }
+        }
+        // illegal argument?
+<span class="nc" id="L223">        return null;</span>
+    }
+
+    /// This is a shorthand notation for boilerplate code for initializing the first theme in the given resource file
+    /// and catching/doing nothing with the IOException since this would be invoked too early in the program
+    /// where we would be out of options if something like that happens. Effectively this is the same as writing:
+    ///
+    /// ```java
+    /// Resources theme = null;
+    /// try {
+    ///     theme = Resources.openLayered(resourceFile);
+    ///     UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
+    /// } catch (IOException e) {
+    ///     Log.e(e);
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceFile`: the name of the resource file starting with / and without the res extension
+    ///
+    /// #### Returns
+    ///
+    /// the resource file or null in case of a failure
+    public static Resources initFirstTheme(String resourceFile) {
+        try {
+<span class="nc" id="L249">            Resources theme = Resources.openLayered(resourceFile);</span>
+<span class="nc" id="L250">            UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));</span>
+<span class="nc" id="L251">            Resources.setGlobalResources(theme);</span>
+<span class="nc" id="L252">            return theme;</span>
+<span class="nc" id="L253">        } catch (IOException e) {</span>
+<span class="nc" id="L254">            Log.e(e);</span>
+        }
+<span class="nc" id="L256">        return null;</span>
+    }
+
+    /// Same as the initFirstTheme method, but unlike that method this allows specifying the theme resource name
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceFile`: the name of the resource file starting with / and without the res extension
+    ///
+    /// - `resName`: the name of the theme to use from the file if it contains more than one theme
+    ///
+    /// #### Returns
+    ///
+    /// the resource file or null in case of a failure
+    public static Resources initNamedTheme(String resourceFile, String resName) {
+        try {
+<span class="nc" id="L272">            Resources theme = Resources.openLayered(resourceFile);</span>
+<span class="nc" id="L273">            UIManager.getInstance().setThemeProps(theme.getTheme(resName));</span>
+<span class="nc" id="L274">            Resources.setGlobalResources(theme);</span>
+<span class="nc" id="L275">            return theme;</span>
+<span class="nc" id="L276">        } catch (IOException e) {</span>
+<span class="nc" id="L277">            Log.e(e);</span>
+        }
+<span class="nc" id="L279">        return null;</span>
+    }
+
+    /// Checks if larger text scaling is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// true if larger text scaling should be applied.
+    public boolean isUseLargerTextScale() {
+<span class="nc" id="L288">        return useLargerTextScale;</span>
+    }
+
+    /// Enables or disables scaling fonts when larger text is enabled on the device.
+    /// This can also be enabled via the `useLargerTextScaleBool` theme constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `useLargerTextScale`: @param useLargerTextScale true to apply `Display#getLargerTextScale()` when
+    /// `Display#isLargerTextEnabled()` is true.
+    public void setUseLargerTextScale(boolean useLargerTextScale) {
+<span class="fc" id="L299">        this.useLargerTextScale = useLargerTextScale;</span>
+<span class="fc" id="L300">    }</span>
+
+    /// Indicates if a theme was previously installed since the last reset
+    ///
+    /// #### Returns
+    ///
+    /// true if setThemeProps was invoked
+    public boolean wasThemeInstalled() {
+<span class="nc" id="L308">        return wasThemeInstalled;</span>
+    }
+
+    /// Returns the currently installed look and feel
+    ///
+    /// #### Returns
+    ///
+    /// the currently installed look and feel
+    public LookAndFeel getLookAndFeel() {
+<span class="fc" id="L317">        return current;</span>
+    }
+
+    /// Sets the currently installed look and feel
+    ///
+    /// #### Parameters
+    ///
+    /// - `plaf`: the look and feel for the application
+    public void setLookAndFeel(LookAndFeel plaf) {
+<span class="fc" id="L326">        current.uninstall();</span>
+<span class="fc" id="L327">        current = plaf;</span>
+<span class="fc" id="L328">    }</span>
+
+    /// Allows a developer to programmatically install a style into the UI manager
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id matching the given style
+    ///
+    /// - `style`: the style object to install
+    public void setComponentStyle(String id, Style style) {
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+            //if no id return the default style
+<span class="nc" id="L340">            id = &quot;&quot;;</span>
+        } else {
+<span class="fc" id="L342">            id = id + &quot;.&quot;;</span>
+        }
+
+<span class="fc" id="L345">        styles.put(id, style);</span>
+<span class="fc" id="L346">    }</span>
+
+    /// Allows a developer to programmatically install a style into the UI manager
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id matching the given style
+    ///
+    /// - `style`: the style object to install
+    ///
+    /// - `type`: press, dis or other custom type
+    public void setComponentStyle(String id, Style style, String type) {
+<span class="pc bpc" id="L358" title="2 of 4 branches missed.">        if (type != null &amp;&amp; type.length() &gt; 0) {</span>
+<span class="pc bpc" id="L359" title="2 of 4 branches missed.">            if (id == null || id.length() == 0) {</span>
+                //if no id return the default style
+<span class="nc" id="L361">                id = type + &quot;#&quot;;</span>
+            } else {
+<span class="fc" id="L363">                id = id + &quot;.&quot; + type + &quot;#&quot;;</span>
+            }
+        } else {
+<span class="nc bnc" id="L366" title="All 4 branches missed.">            if (id == null || id.length() == 0) {</span>
+                //if no id return the default style
+<span class="nc" id="L368">                id = &quot;&quot;;</span>
+            } else {
+<span class="nc" id="L370">                id = id + &quot;.&quot;;</span>
+            }
+        }
+
+<span class="fc" id="L374">        styles.put(id, style);</span>
+<span class="fc" id="L375">    }</span>
+
+    /// Allows a developer to programmatically install a style into the UI manager
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id matching the given style
+    ///
+    /// - `style`: the style object to install
+    public void setComponentSelectedStyle(String id, Style style) {
+<span class="pc bpc" id="L385" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+            //if no id return the default style
+<span class="nc" id="L387">            id = &quot;&quot;;</span>
+        } else {
+<span class="fc" id="L389">            id = id + &quot;.&quot;;</span>
+        }
+
+<span class="fc" id="L392">        selectedStyles.put(id, style);</span>
+<span class="fc" id="L393">    }</span>
+
+    /// Returns the style of the component with the given id or a **new instance** of the default
+    /// style.
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose style we want
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
+    public final Style getComponentStyle(String id) {
+<span class="fc" id="L408">        return getComponentStyleImpl(id, false, &quot;&quot;);</span>
+    }
+
+    /// Gets the IconUIID for the given UIID.  If the theme defines a style that is named ${id}Icon (i.e. the id with &quot;Icon&quot; suffix)
+    /// such that it derives from id, then this style is deemed to be the icon style corresponding with id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: The UIID to check for a companion UIID.
+    ///
+    /// #### Returns
+    ///
+    /// The IconUIID corresponding to the given ID - or null if none is defined in the theme.
+    ///
+    public String getIconUIIDFor(String id) {
+<span class="pc bpc" id="L423" title="2 of 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+<span class="nc" id="L424">            return null;</span>
+        }
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (themeProps == null) {</span>
+<span class="nc" id="L427">            return null;</span>
+        }
+<span class="fc" id="L429">        String iconUIID = id + &quot;Icon&quot;;</span>
+        // Check the derive property of this icon style to make sure it points to id.
+        // (The icon style must derive the main style).
+<span class="fc" id="L432">        String baseStyle = (String) themeProps.get(iconUIID + &quot;.derive&quot;);</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (!id.equals(baseStyle)) {</span>
+<span class="fc" id="L434">            return null;</span>
+        }
+<span class="fc" id="L436">        return iconUIID;</span>
+
+    }
+
+    /// Returns the style of the component with the given baseStyle or a **new instance** of the default
+    /// style, but overrides styles based on the directives in the styleStrings.
+    ///
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
+    ///
+    /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
+    /// overridden by the styles provided in styleString.
+    ///
+    /// - `id`: the component id into which the resulting style is to be cached.
+    ///
+    /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
+    /// is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    /// and values
+    /// correspond to properties of `Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
+    public Style parseComponentStyle(Resources theme, String baseStyle, String id, String... styleString) {
+<span class="nc" id="L464">        return parseStyle(theme, id, &quot;&quot;, baseStyle, false, styleString);</span>
+    }
+
+    /// Returns the selected style of the component with the given id or a **new instance** of the default
+    /// style.
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose selected style we want
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
+    public Style getComponentSelectedStyle(String id) {
+<span class="fc" id="L480">        return getComponentStyleImpl(id, true, &quot;sel#&quot;);</span>
+    }
+
+    /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default
+    /// style, but overrides styles based on the directives in the styleStrings.
+    ///
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
+    ///
+    /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
+    /// overridden by the styles provided in styleString.
+    ///
+    /// - `id`: the component id into which the resulting style is to be cached.
+    ///
+    /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
+    /// is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    /// and values
+    /// correspond to properties of `Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
+    public Style parseComponentSelectedStyle(Resources theme, String baseStyle, String id, String... styleString) {
+<span class="nc" id="L507">        return parseStyle(theme, id, &quot;sel#&quot;, baseStyle, true, styleString);</span>
+    }
+
+    /// Returns a custom style for the component with the given id, this method always returns a
+    /// new instance. Custom styles allow us to install application specific or component specific
+    /// style attributes such as pressed, disabled, hover etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the component id whose custom style we want
+    ///
+    /// - `type`: the style type
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
+    public Style getComponentCustomStyle(String id, String type) {
+<span class="fc" id="L524">        return getComponentStyleImpl(id, false, type + &quot;#&quot;);</span>
+    }
+
+    /// Returns the selected style of the component with the given baseStyle or a **new instance** of the default
+    /// style, but overrides styles based on the directives in the styleStrings.
+    ///
+    /// This method will always return a new style instance to prevent modification of the global
+    /// style object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme file used to retrieve images that are referenced by the styleString
+    ///
+    /// - `baseStyle`: @param baseStyle   The component ID that serves as the base style for this style.  These base styles are
+    /// overridden by the styles provided in styleString.
+    ///
+    /// - `id`: the component id into which the resulting style is to be cached.
+    ///
+    /// - `type`: the style type
+    ///
+    /// - `styleString`: @param styleString Array of style strings to override the styles in baseStyle.  Style string syntax is
+    /// is key1:value1; key2:value2; key3:value3; etc....  While this is similar to CSS, it is not CSS.  The keys
+    /// and values
+    /// correspond to properties of `Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// the appropriate style (this method never returns null)
+    public Style parseComponentCustomStyle(Resources theme, String baseStyle, String id, String type, String... styleString) {
+<span class="nc" id="L553">        return parseStyle(theme, id, type + &quot;#&quot;, baseStyle, false, styleString);</span>
+    }
+
+    private Style getComponentStyleImpl(String id, boolean selected, String prefix) {
+        try {
+<span class="fc" id="L558">            Style style = null;</span>
+
+<span class="fc bfc" id="L560" title="All 4 branches covered.">            if (id == null || id.length() == 0) {</span>
+                //if no id return the default style
+<span class="fc" id="L562">                id = &quot;&quot;;</span>
+            } else {
+<span class="fc" id="L564">                id = id + &quot;.&quot;;</span>
+            }
+
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            if (selected) {</span>
+<span class="fc" id="L568">                style = selectedStyles.get(id);</span>
+
+<span class="fc bfc" id="L570" title="All 2 branches covered.">                if (style == null) {</span>
+<span class="fc" id="L571">                    style = createStyle(id, prefix, true);</span>
+<span class="fc" id="L572">                    selectedStyles.put(id, style);</span>
+                }
+            } else {
+<span class="fc bfc" id="L575" title="All 2 branches covered.">                if (prefix.length() == 0) {</span>
+<span class="fc" id="L576">                    style = styles.get(id);</span>
+
+<span class="fc bfc" id="L578" title="All 2 branches covered.">                    if (style == null) {</span>
+<span class="fc" id="L579">                        style = createStyle(id, prefix, false);</span>
+<span class="fc" id="L580">                        styles.put(id, style);</span>
+                    }
+                } else {
+<span class="fc" id="L583">                    return createStyle(id, prefix, false);</span>
+                }
+            }
+
+<span class="fc" id="L587">            return new Style(style);</span>
+<span class="nc" id="L588">        } catch (Throwable err) {</span>
+            // fail gracefully for an illegal style, this is useful for the resource editor
+<span class="nc" id="L590">            Log.p(&quot;Error creating style &quot; + id + &quot; selected: &quot; + selected + &quot; prefix: &quot; + prefix);</span>
+<span class="nc" id="L591">            Log.e(err);</span>
+<span class="nc" id="L592">            return new Style(defaultStyle);</span>
+        }
+    }
+
+    /// #### Returns
+    ///
+    /// the name of the current theme for theme switching UI's
+    public String getThemeName() {
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        if (themeProps != null) {</span>
+<span class="nc" id="L601">            return (String) themeProps.get(&quot;name&quot;);</span>
+        }
+<span class="nc" id="L603">        return null;</span>
+    }
+
+    // for internal use by the resource editor
+    HashMap&lt;String, Object&gt; getThemeProps() {
+<span class="fc" id="L608">        return themeProps;</span>
+    }
+
+    /// Allows manual theme loading from a hashtable of key/value pairs
+    ///
+    /// #### Parameters
+    ///
+    /// - `themeProps`: the properties of the given theme
+    public void setThemeProps(Hashtable themeProps) {
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">        if (accessible) {</span>
+<span class="fc" id="L618">            setThemePropsImpl(themeProps);</span>
+        }
+<span class="fc" id="L620">        wasThemeInstalled = true;</span>
+<span class="fc" id="L621">    }</span>
+
+    /// Initializes the theme properties with the current &quot;defaults&quot;
+    ///
+    /// #### Parameters
+    ///
+    /// - `installedTheme`: @param installedTheme the theme to be installed or null, this is used
+    /// to check if style inheritance is used in which case we must NOT init
+    /// style defaults for that particular component
+    private void resetThemeProps(Hashtable installedTheme) {
+<span class="fc" id="L631">        themeProps = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L632">        wasThemeInstalled = false;</span>
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        if (current == null) {</span>
+<span class="nc" id="L634">            current = new DefaultLookAndFeel(this);</span>
+        }
+<span class="fc" id="L636">        String disabledColor = Integer.toHexString(getLookAndFeel().getDisableColor());</span>
+<span class="fc" id="L637">        Integer centerAlign = Integer.valueOf(Component.CENTER);</span>
+<span class="fc" id="L638">        Integer rightAlign = Integer.valueOf(Component.RIGHT);</span>
+<span class="fc" id="L639">        Integer leftAlign = Integer.valueOf(Component.LEFT);</span>
+
+        // global settings
+<span class="fc" id="L642">        themeProps.put(&quot;sel#transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L643">        themeProps.put(&quot;dis#fgColor&quot;, disabledColor);</span>
+
+<span class="fc" id="L645">        Boolean darkModeBoolean = (Boolean) themeProps.get(&quot;@darkModeBool&quot;);</span>
+<span class="pc bpc" id="L646" title="3 of 4 branches missed.">        boolean darkMode = darkModeBoolean != null &amp;&amp; darkModeBoolean.booleanValue() &amp;&amp;</span>
+<span class="pc bnc" id="L647" title="All 4 branches missed.">                CN.isDarkMode() != null &amp;&amp; CN.isDarkMode().booleanValue();</span>
+
+<span class="fc" id="L649">        Font lightFont = Font.getDefaultFont();</span>
+<span class="fc" id="L650">        Font italic = Font.createSystemFont(Font.FACE_SYSTEM,</span>
+                Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
+<span class="fc" id="L652">        Font bold = Font.createSystemFont(Font.FACE_SYSTEM,</span>
+                Font.STYLE_BOLD, Font.SIZE_MEDIUM);
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">        if (Font.isNativeFontSchemeSupported()) {</span>
+<span class="fc" id="L655">            int size = Display.getInstance().convertToPixels(2.5f);</span>
+<span class="fc" id="L656">            lightFont = Font.createTrueTypeFont(&quot;native:MainLight&quot;, &quot;native:MainLight&quot;).derive(size, Font.STYLE_PLAIN);</span>
+<span class="fc" id="L657">            italic = Font.createTrueTypeFont(&quot;native:ItalicLight&quot;, &quot;native:ItalicLight&quot;).derive(size, Font.STYLE_ITALIC);</span>
+<span class="fc" id="L658">            bold = Font.createTrueTypeFont(Font.NATIVE_MAIN_BOLD, Font.NATIVE_MAIN_BOLD).derive(size, Font.STYLE_BOLD);</span>
+        }
+
+        // component specific settings
+<span class="fc bfc" id="L662" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ToolbarSearch.derive&quot;)) {</span>
+<span class="fc" id="L663">            themeProps.put(&quot;ToolbarSearch.derive&quot;, &quot;Toolbar&quot;);</span>
+        }
+
+<span class="fc" id="L666">        themeProps.put(&quot;ToolbarLandscape.derive&quot;, &quot;Toolbar&quot;);</span>
+<span class="fc" id="L667">        themeProps.put(&quot;TitleCommandLandscape.derive&quot;, &quot;TitleCommand&quot;);</span>
+<span class="fc" id="L668">        themeProps.put(&quot;BackCommandLandscape.derive&quot;, &quot;BackCommand&quot;);</span>
+<span class="fc" id="L669">        themeProps.put(&quot;TitleLandscape.derive&quot;, &quot;Title&quot;);</span>
+<span class="fc" id="L670">        themeProps.put(&quot;StatusBarLandscape.derive&quot;, &quot;StatusBar&quot;);</span>
+<span class="fc" id="L671">        String foreground = &quot;0&quot;;</span>
+<span class="fc" id="L672">        String background = &quot;ffffff&quot;;</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">        if (darkMode) {</span>
+<span class="nc" id="L674">            foreground = &quot;ffffff&quot;;</span>
+<span class="nc" id="L675">            background = &quot;0&quot;;</span>
+        }
+
+<span class="fc bfc" id="L678" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextFieldSearch.derive&quot;)) {</span>
+<span class="fc" id="L679">            themeProps.put(&quot;TextFieldSearch.derive&quot;, &quot;Title&quot;);</span>
+<span class="fc" id="L680">            themeProps.put(&quot;TextFieldSearch.align&quot;, leftAlign);</span>
+<span class="fc" id="L681">            themeProps.put(&quot;TextFieldSearch.sel#align&quot;, leftAlign);</span>
+<span class="fc" id="L682">            themeProps.put(&quot;TextFieldSearch.press#align&quot;, leftAlign);</span>
+<span class="fc" id="L683">            themeProps.put(&quot;TextFieldSearch.dis#align&quot;, leftAlign);</span>
+<span class="fc" id="L684">            themeProps.put(&quot;TextFieldSearch.sel#derive&quot;, &quot;TextFieldSearch&quot;);</span>
+<span class="fc" id="L685">            themeProps.put(&quot;TextFieldSearch.press#derive&quot;, &quot;TextFieldSearch&quot;);</span>
+<span class="fc" id="L686">            themeProps.put(&quot;TextFieldSearch.dis#derive&quot;, &quot;TextFieldSearch&quot;);</span>
+        }
+
+<span class="fc bfc" id="L689" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextHintSearch.derive&quot;)) {</span>
+<span class="fc" id="L690">            themeProps.put(&quot;TextHintSearch.derive&quot;, &quot;TextHint&quot;);</span>
+<span class="fc" id="L691">            themeProps.put(&quot;TextHintSearch.transparency&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L694" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AccordionItem.derive&quot;)) {</span>
+<span class="fc" id="L695">            themeProps.put(&quot;AccordionItem.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L696">            themeProps.put(&quot;AccordionItem.padding&quot;, &quot;1,1,1,1&quot;);</span>
+<span class="fc" id="L697">            themeProps.put(&quot;AccordionItem.border&quot;, Border.createLineBorder(1));</span>
+        }
+
+<span class="pc bpc" id="L700" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AccordionHeader.derive&quot;)) {</span>
+<span class="fc" id="L701">            themeProps.put(&quot;AccordionHeader.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L702">            themeProps.put(&quot;AccordionHeader.sel#margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L703">            themeProps.put(&quot;AccordionHeader.press#margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L704">            themeProps.put(&quot;AccordionHeader.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L705">            themeProps.put(&quot;AccordionHeader.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L706">            themeProps.put(&quot;AccordionHeader.press#padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L709" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SignatureButton.derive&quot;)) {</span>
+<span class="fc" id="L710">            themeProps.put(&quot;SignatureButton.align&quot;, centerAlign);</span>
+<span class="fc" id="L711">            themeProps.put(&quot;SignatureButton.sel#derive&quot;, &quot;SignatureButton&quot;);</span>
+<span class="fc" id="L712">            themeProps.put(&quot;SignatureButton.press#derive&quot;, &quot;SignatureButton&quot;);</span>
+<span class="fc" id="L713">            themeProps.put(&quot;SignatureButton.dis#derive&quot;, &quot;SignatureButton&quot;);</span>
+        }
+
+<span class="pc bpc" id="L716" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SignatureButtonBox.derive&quot;)) {</span>
+<span class="fc" id="L717">            themeProps.put(&quot;SignatureButtonBox.fgColor&quot;, foreground);</span>
+<span class="fc" id="L718">            themeProps.put(&quot;SignatureButtonBox.sel#derive&quot;, &quot;SignatureButtonBox&quot;);</span>
+<span class="fc" id="L719">            themeProps.put(&quot;SignatureButtonBox.press#derive&quot;, &quot;SignatureButtonBox&quot;);</span>
+<span class="fc" id="L720">            themeProps.put(&quot;SignatureButtonBox.dis#derive&quot;, &quot;SignatureButtonBox&quot;);</span>
+        }
+
+<span class="pc bpc" id="L723" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SignaturePanel.derive&quot;)) {</span>
+<span class="fc" id="L724">            themeProps.put(&quot;SignaturePanel.bgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L725">            themeProps.put(&quot;SignaturePanel.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L726">            themeProps.put(&quot;SignaturePanel.sel#derive&quot;, &quot;SignaturePanel&quot;);</span>
+<span class="fc" id="L727">            themeProps.put(&quot;SignaturePanel.press#derive&quot;, &quot;SignaturePanel&quot;);</span>
+<span class="fc" id="L728">            themeProps.put(&quot;SignaturePanel.dis#derive&quot;, &quot;SignaturePanel&quot;);</span>
+        }
+
+<span class="pc bpc" id="L731" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SignaturePanelBox.derive&quot;)) {</span>
+<span class="fc" id="L732">            themeProps.put(&quot;SignaturePanelBox.fgColor&quot;, &quot;666666&quot;);</span>
+<span class="fc" id="L733">            themeProps.put(&quot;SignaturePanelBox.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L734">            themeProps.put(&quot;SignaturePanelBox.sel#derive&quot;, &quot;SignaturePanelBox&quot;);</span>
+<span class="fc" id="L735">            themeProps.put(&quot;SignaturePanelBox.press#derive&quot;, &quot;SignaturePanelBox&quot;);</span>
+<span class="fc" id="L736">            themeProps.put(&quot;SignaturePanelBox.dis#derive&quot;, &quot;SignaturePanelBox&quot;);</span>
+        }
+
+<span class="pc bpc" id="L739" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SignaturePanelSignature.derive&quot;)) {</span>
+<span class="fc" id="L740">            themeProps.put(&quot;SignaturePanelSignature.fgColor&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L741">            themeProps.put(&quot;SignaturePanelSignature.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L742">            themeProps.put(&quot;SignaturePanelSignature.sel#derive&quot;, &quot;SignaturePanelSignature&quot;);</span>
+<span class="fc" id="L743">            themeProps.put(&quot;SignaturePanelSignature.press#derive&quot;, &quot;SignaturePanelSignature&quot;);</span>
+<span class="fc" id="L744">            themeProps.put(&quot;SignaturePanelSignature.dis#derive&quot;, &quot;SignaturePanelSignature&quot;);</span>
+        }
+
+
+<span class="pc bpc" id="L748" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ToastBar.derive&quot;)) {</span>
+<span class="fc" id="L749">            themeProps.put(&quot;ToastBar.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">            if (darkMode) {</span>
+<span class="nc" id="L751">                themeProps.put(&quot;ToastBar.bgColor&quot;, &quot;dddddd&quot;);</span>
+            } else {
+<span class="fc" id="L753">                themeProps.put(&quot;ToastBar.bgColor&quot;, &quot;0&quot;);</span>
+            }
+<span class="fc" id="L755">            themeProps.put(&quot;ToastBar.transparency&quot;, &quot;200&quot;);</span>
+<span class="fc" id="L756">            themeProps.put(&quot;ToastBar.bgType&quot;, Byte.valueOf(Style.BACKGROUND_NONE));</span>
+<span class="fc" id="L757">            themeProps.put(&quot;ToastBar.border&quot;, Border.createEmpty());</span>
+<span class="fc" id="L758">            themeProps.put(&quot;ToastBar.sel#derive&quot;, &quot;ToastBar&quot;);</span>
+<span class="fc" id="L759">            themeProps.put(&quot;ToastBar.press#derive&quot;, &quot;ToastBar&quot;);</span>
+<span class="fc" id="L760">            themeProps.put(&quot;ToastBar.dis#derive&quot;, &quot;ToastBar&quot;);</span>
+        }
+
+<span class="pc bpc" id="L763" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ToastBarMessage.derive&quot;)) {</span>
+
+<span class="fc" id="L765">            themeProps.put(&quot;ToastBarMessage.font&quot;, lightFont);</span>
+<span class="fc" id="L766">            themeProps.put(&quot;ToastBarMessage.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L767">            themeProps.put(&quot;ToastBarMessage.fgColor&quot;, &quot;FFFFFF&quot;);</span>
+<span class="fc" id="L768">            themeProps.put(&quot;ToastBarMessage.bgType&quot;, Byte.valueOf(Style.BACKGROUND_NONE));</span>
+<span class="fc" id="L769">            themeProps.put(&quot;ToastBarMessage.border&quot;, Border.createEmpty());</span>
+<span class="fc" id="L770">            themeProps.put(&quot;ToastBarMessage.sel#derive&quot;, &quot;ToastBarMessage&quot;);</span>
+<span class="fc" id="L771">            themeProps.put(&quot;ToastBarMessage.press#derive&quot;, &quot;ToastBarMessage&quot;);</span>
+<span class="fc" id="L772">            themeProps.put(&quot;ToastBarMessage.dis#derive&quot;, &quot;ToastBarMessage&quot;);</span>
+        }
+
+<span class="pc bpc" id="L775" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Sheet.derive&quot;)) {</span>
+<span class="fc" id="L776">            themeProps.put(&quot;Sheet.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L777">            themeProps.put(&quot;Sheet.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L778">            themeProps.put(&quot;Sheet.bgType&quot;, Byte.valueOf(Style.BACKGROUND_NONE));</span>
+<span class="pc bpc" id="L779" title="1 of 2 branches missed.">            if (darkMode) {</span>
+<span class="nc" id="L780">                themeProps.put(&quot;Sheet.bgColor&quot;, &quot;333333&quot;);</span>
+            } else {
+<span class="fc" id="L782">                themeProps.put(&quot;Sheet.bgColor&quot;, &quot;FFFFFF&quot;);</span>
+            }
+<span class="fc" id="L784">            themeProps.put(&quot;Sheet.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L785">            themeProps.put(&quot;Sheet.border&quot;, RoundRectBorder.create()</span>
+                    //.topOnlyMode(true)
+
+<span class="fc" id="L788">                    .bottomLeftMode(false)</span>
+<span class="fc" id="L789">                    .bottomRightMode(false)</span>
+<span class="fc" id="L790">                    .cornerRadius(2f));</span>
+<span class="fc" id="L791">            themeProps.put(&quot;Sheet.sel#derive&quot;, &quot;Sheet&quot;);</span>
+<span class="fc" id="L792">            themeProps.put(&quot;Sheet.press#derive&quot;, &quot;Sheet&quot;);</span>
+<span class="fc" id="L793">            themeProps.put(&quot;Sheet.dis#derive&quot;, &quot;Sheet&quot;);</span>
+<span class="fc" id="L794">            themeProps.put(&quot;SheetTitle.fgColor&quot;, foreground);</span>
+<span class="fc" id="L795">            themeProps.put(&quot;SheetTitle.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L796">            themeProps.put(&quot;SheetTitle.font&quot;, bold);</span>
+<span class="fc" id="L797">            themeProps.put(&quot;SheetTitle.align&quot;, centerAlign);</span>
+<span class="fc" id="L798">            themeProps.put(&quot;SheetTitle.sel#derive&quot;, &quot;SheetTitle&quot;);</span>
+<span class="fc" id="L799">            themeProps.put(&quot;SheetTitle.press#derive&quot;, &quot;SheetTitle&quot;);</span>
+<span class="fc" id="L800">            themeProps.put(&quot;SheetTitle.dis#derive&quot;, &quot;SheetTitle&quot;);</span>
+
+<span class="fc" id="L802">            themeProps.put(&quot;SheetTitleBar.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L803">            themeProps.put(&quot;SheetTitleBar.border&quot;, Border.createCompoundBorder(Border.createEmpty(), Border.createLineBorder(1, 0xcccccc), Border.createEmpty(), Border.createEmpty()));</span>
+<span class="fc" id="L804">            themeProps.put(&quot;SheetTitleBar.sel#derive&quot;, &quot;SheetTitleBar&quot;);</span>
+<span class="fc" id="L805">            themeProps.put(&quot;SheetTitleBar.press#derive&quot;, &quot;SheetTitleBar&quot;);</span>
+<span class="fc" id="L806">            themeProps.put(&quot;SheetTitleBar.dis#derive&quot;, &quot;SheetTitleBar&quot;);</span>
+
+<span class="pc bpc" id="L808" title="1 of 2 branches missed.">            if (darkMode) {</span>
+<span class="nc" id="L809">                themeProps.put(&quot;SheetBackButton.fgColor&quot;, &quot;999999&quot;);</span>
+            } else {
+<span class="fc" id="L811">                themeProps.put(&quot;SheetBackButton.fgColor&quot;, &quot;333333&quot;);</span>
+            }
+<span class="fc" id="L813">            themeProps.put(&quot;SheetBackButton.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L814">            themeProps.put(&quot;SheetBackButton.border&quot;, Border.createEmpty());</span>
+<span class="fc" id="L815">            themeProps.put(&quot;SheetBackButton.sel#derive&quot;, &quot;SheetBackButton&quot;);</span>
+<span class="fc" id="L816">            themeProps.put(&quot;SheetBackButton.press#derive&quot;, &quot;SheetBackButton&quot;);</span>
+<span class="fc" id="L817">            themeProps.put(&quot;SheetBackButton.dis#derive&quot;, &quot;SheetBackButton&quot;);</span>
+
+
+        }
+
+<span class="pc bpc" id="L822" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ChartComponent.derive&quot;)) {</span>
+<span class="fc" id="L823">            themeProps.put(&quot;ChartComponent.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L824">            themeProps.put(&quot;ChartComponent.sel#derive&quot;, &quot;ChartComponent&quot;);</span>
+<span class="fc" id="L825">            themeProps.put(&quot;ChartComponent.press#derive&quot;, &quot;ChartComponent&quot;);</span>
+        }
+
+<span class="pc bpc" id="L828" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Button.derive&quot;)) {</span>
+<span class="fc" id="L829">            themeProps.put(&quot;Button.border&quot;, Border.getDefaultBorder());</span>
+<span class="fc" id="L830">            themeProps.put(&quot;Button.padding&quot;, &quot;4,4,4,4&quot;);</span>
+        }
+<span class="pc bpc" id="L832" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Button.sel#derive&quot;)) {</span>
+<span class="fc" id="L833">            themeProps.put(&quot;Button.sel#border&quot;, Border.getDefaultBorder());</span>
+<span class="fc" id="L834">            themeProps.put(&quot;Button.sel#bgColor&quot;, &quot;a0a0a0&quot;);</span>
+<span class="fc" id="L835">            themeProps.put(&quot;Button.sel#padding&quot;, &quot;4,4,4,4&quot;);</span>
+        }
+<span class="fc bfc" id="L837" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;RaisedButton.derive&quot;)) {</span>
+<span class="fc" id="L838">            themeProps.put(&quot;RaisedButton.derive&quot;, &quot;Button&quot;);</span>
+<span class="fc" id="L839">            themeProps.put(&quot;RaisedButton.sel#derive&quot;, &quot;Button.sel&quot;);</span>
+<span class="fc" id="L840">            themeProps.put(&quot;RaisedButton.press#derive&quot;, &quot;Button.press&quot;);</span>
+<span class="fc" id="L841">            themeProps.put(&quot;RaisedButton.dis#derive&quot;, &quot;Button.dis&quot;);</span>
+        }
+
+<span class="fc bfc" id="L844" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Button.press#derive&quot;)) {</span>
+<span class="fc" id="L845">            themeProps.put(&quot;Button.press#border&quot;, Border.getDefaultBorder().createPressedVersion());</span>
+<span class="fc" id="L846">            themeProps.put(&quot;Button.press#derive&quot;, &quot;Button&quot;);</span>
+<span class="fc" id="L847">            themeProps.put(&quot;Button.press#padding&quot;, &quot;4,4,4,4&quot;);</span>
+        }
+<span class="fc" id="L849">        themeProps.put(&quot;Button.dis#derive&quot;, &quot;Button&quot;);</span>
+
+<span class="pc bpc" id="L851" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CalendarTitle.derive&quot;)) {</span>
+<span class="fc" id="L852">            themeProps.put(&quot;CalendarTitle.align&quot;, centerAlign);</span>
+        }
+
+<span class="pc bpc" id="L855" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CalendarMultipleDay.derive&quot;)) {</span>
+<span class="fc" id="L856">            themeProps.put(&quot;CalendarMultipleDay.border&quot;, Border.getDefaultBorder());</span>
+<span class="fc" id="L857">            themeProps.put(&quot;CalendarMultipleDay.align&quot;, centerAlign);</span>
+        }
+<span class="fc" id="L859">        themeProps.put(&quot;CalendarMultipleDay.sel#derive&quot;, &quot;CalendarMultipleDay&quot;);</span>
+
+<span class="pc bpc" id="L861" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CalendarSelectedDay.derive&quot;)) {</span>
+<span class="fc" id="L862">            themeProps.put(&quot;CalendarSelectedDay.border&quot;, Border.getDefaultBorder());</span>
+<span class="fc" id="L863">            themeProps.put(&quot;CalendarSelectedDay.align&quot;, centerAlign);</span>
+        }
+<span class="fc" id="L865">        themeProps.put(&quot;CalendarSelectedDay.sel#derive&quot;, &quot;CalendarSelectedDay&quot;);</span>
+
+<span class="pc bpc" id="L867" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CalendarDay.derive&quot;)) {</span>
+<span class="fc" id="L868">            themeProps.put(&quot;CalendarDay.align&quot;, centerAlign);</span>
+        }
+<span class="fc" id="L870">        themeProps.put(&quot;CalendarDay.dis#derive&quot;, &quot;CalendarDay&quot;);</span>
+<span class="fc" id="L871">        themeProps.put(&quot;CalendarDay.press#derive&quot;, &quot;CalendarDay&quot;);</span>
+
+<span class="pc bpc" id="L873" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CalendarDay.sel#derive&quot;)) {</span>
+<span class="fc" id="L874">            themeProps.put(&quot;CalendarDay.sel#align&quot;, centerAlign);</span>
+        }
+
+<span class="pc bpc" id="L877" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ComboBox.derive&quot;)) {</span>
+<span class="fc" id="L878">            themeProps.put(&quot;ComboBox.border&quot;, Border.getDefaultBorder());</span>
+        }
+<span class="fc" id="L880">        themeProps.put(&quot;ComboBox.sel#derive&quot;, &quot;ComboBox&quot;);</span>
+
+<span class="pc bpc" id="L882" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;MenuButton.derive&quot;)) {</span>
+<span class="fc" id="L883">            themeProps.put(&quot;MenuButton.transparency&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L886" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ComboBoxItem.derive&quot;)) {</span>
+<span class="fc" id="L887">            themeProps.put(&quot;ComboBoxItem.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L888">            themeProps.put(&quot;ComboBoxItem.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="fc" id="L890">        themeProps.put(&quot;ComboBoxItem.sel#derive&quot;, &quot;ComboBoxItem&quot;);</span>
+<span class="fc" id="L891">        themeProps.put(&quot;ComboBoxItem.dis#derive&quot;, &quot;ComboBoxItem&quot;);</span>
+
+<span class="pc bpc" id="L893" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ComboBoxList.derive&quot;)) {</span>
+<span class="fc" id="L894">            themeProps.put(&quot;ComboBoxList.margin&quot;, &quot;2,2,2,2&quot;);</span>
+<span class="fc" id="L895">            themeProps.put(&quot;ComboBoxList.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L896">            themeProps.put(&quot;ComboBoxList.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="pc bpc" id="L898" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ComboBoxList.sel#derive&quot;)) {</span>
+<span class="fc" id="L899">            themeProps.put(&quot;ComboBoxList.sel#margin&quot;, &quot;2,2,2,2&quot;);</span>
+<span class="fc" id="L900">            themeProps.put(&quot;ComboBoxList.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L901">            themeProps.put(&quot;ComboBoxList.sel#transparency&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L904" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ComboBoxPopup.derive&quot;)) {</span>
+<span class="fc" id="L905">            themeProps.put(&quot;ComboBoxPopup.border&quot;, Border.getDefaultBorder());</span>
+        }
+<span class="fc" id="L907">        themeProps.put(&quot;ComboBoxPopup.sel#derive&quot;, &quot;ComboBoxPopup&quot;);</span>
+
+<span class="pc bpc" id="L909" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Command.derive&quot;)) {</span>
+<span class="fc" id="L910">            themeProps.put(&quot;Command.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L911">            themeProps.put(&quot;Command.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="fc" id="L913">        themeProps.put(&quot;Command.sel#derive&quot;, &quot;Command&quot;);</span>
+<span class="fc" id="L914">        themeProps.put(&quot;Command.dis#derive&quot;, &quot;Command&quot;);</span>
+
+<span class="pc bpc" id="L916" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CommandList.derive&quot;)) {</span>
+<span class="fc" id="L917">            themeProps.put(&quot;CommandList.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L918">            themeProps.put(&quot;CommandList.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L919">            themeProps.put(&quot;CommandList.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="fc" id="L921">        themeProps.put(&quot;CommandList.sel#derive&quot;, &quot;CommandList&quot;);</span>
+
+<span class="fc bfc" id="L923" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ComponentGroup.derive&quot;)) {</span>
+<span class="fc" id="L924">            themeProps.put(&quot;ComponentGroup.derive&quot;, &quot;Container&quot;);</span>
+        }
+
+<span class="pc bpc" id="L927" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Container.derive&quot;)) {</span>
+<span class="fc" id="L928">            themeProps.put(&quot;Container.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L929">            themeProps.put(&quot;Container.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L930">            themeProps.put(&quot;Container.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="fc" id="L932">        themeProps.put(&quot;Container.sel#derive&quot;, &quot;Container&quot;);</span>
+<span class="fc" id="L933">        themeProps.put(&quot;Container.dis#derive&quot;, &quot;Container&quot;);</span>
+<span class="fc" id="L934">        themeProps.put(&quot;Container.press#derive&quot;, &quot;Container&quot;);</span>
+
+<span class="pc bpc" id="L936" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Switch.derive&quot;)) {</span>
+<span class="fc" id="L937">            themeProps.put(&quot;Switch.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L938">            themeProps.put(&quot;Switch.bgColor&quot;, &quot;9F9E9E&quot;);</span>
+<span class="fc" id="L939">            themeProps.put(&quot;Switch.fgColor&quot;, &quot;EDEDED&quot;);</span>
+        }
+<span class="pc bpc" id="L941" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Switch.sel#derive&quot;)) {</span>
+<span class="fc" id="L942">            themeProps.put(&quot;Switch.sel#transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L943">            themeProps.put(&quot;Switch.sel#bgColor&quot;, &quot;757E84&quot;);</span>
+<span class="fc" id="L944">            themeProps.put(&quot;Switch.sel#fgColor&quot;, &quot;222C32&quot;);</span>
+        }
+<span class="fc bfc" id="L946" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;OnOffSwitch.derive&quot;)) {</span>
+<span class="fc" id="L947">            themeProps.put(&quot;OnOffSwitch.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L948">            themeProps.put(&quot;OnOffSwitch.bgColor&quot;, &quot;222222&quot;);</span>
+<span class="fc" id="L949">            themeProps.put(&quot;OnOffSwitch.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L950">            themeProps.put(&quot;OnOffSwitch.font&quot;, lightFont);</span>
+        }
+<span class="fc bfc" id="L952" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;OnOffSwitch.sel#derive&quot;)) {</span>
+<span class="fc" id="L953">            themeProps.put(&quot;OnOffSwitch.sel#transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L954">            themeProps.put(&quot;OnOffSwitch.sel#bgColor&quot;, &quot;222222&quot;);</span>
+<span class="fc" id="L955">            themeProps.put(&quot;OnOffSwitch.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L956">            themeProps.put(&quot;OnOffSwitch.sel#font&quot;, lightFont);</span>
+        }
+
+<span class="pc bpc" id="L959" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ContentPane.derive&quot;)) {</span>
+<span class="fc" id="L960">            themeProps.put(&quot;ContentPane.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L961">            themeProps.put(&quot;ContentPane.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L962">            themeProps.put(&quot;ContentPane.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="fc" id="L964">        themeProps.put(&quot;ContentPane.sel#derive&quot;, &quot;ContentPane&quot;);</span>
+
+<span class="fc bfc" id="L966" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PopupDialog.derive&quot;)) {</span>
+<span class="fc" id="L967">            themeProps.put(&quot;PopupDialog.derive&quot;, &quot;Dialog&quot;);</span>
+<span class="fc" id="L968">            themeProps.put(&quot;PopupDialog.border&quot;, RoundRectBorder.create().</span>
+<span class="fc" id="L969">                    cornerRadius(2f).</span>
+<span class="fc" id="L970">                    shadowOpacity(60).shadowSpread(3.0f));</span>
+<span class="fc" id="L971">            themeProps.put(&quot;PopupDialog.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L972">            themeProps.put(&quot;PopupDialog.bgColor&quot;, background);</span>
+<span class="fc" id="L973">            themeProps.put(&quot;PopupDialog.padding&quot;, &quot;4,4,4,4&quot;);</span>
+<span class="fc" id="L974">            themeProps.put(&quot;PopupDialog.padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+        }
+
+<span class="fc bfc" id="L977" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TooltipDialog.derive&quot;)) {</span>
+<span class="fc" id="L978">            themeProps.put(&quot;TooltipDialog.derive&quot;, &quot;Dialog&quot;);</span>
+<span class="fc" id="L979">            themeProps.put(&quot;TooltipDialog.border&quot;, RoundRectBorder.create().</span>
+<span class="fc" id="L980">                    cornerRadius(2f));</span>
+<span class="fc" id="L981">            themeProps.put(&quot;TooltipDialog.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L982">            themeProps.put(&quot;TooltipDialog.bgColor&quot;, &quot;dddddd&quot;);</span>
+<span class="fc" id="L983">            themeProps.put(&quot;TooltipDialog.padding&quot;, &quot;4,4,4,4&quot;);</span>
+<span class="fc" id="L984">            themeProps.put(&quot;TooltipDialog.padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+        }
+
+<span class="fc bfc" id="L987" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Tooltip.derive&quot;)) {</span>
+<span class="fc" id="L988">            themeProps.put(&quot;Tooltip.derive&quot;, &quot;Label&quot;);</span>
+<span class="fc" id="L989">            themeProps.put(&quot;Tooltip.fgColor&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L990">            themeProps.put(&quot;Tooltip.align&quot;, centerAlign);</span>
+<span class="fc" id="L991">            themeProps.put(&quot;TooltipDialog.padding&quot;, &quot;2,2,2,2&quot;);</span>
+<span class="fc" id="L992">            themeProps.put(&quot;TooltipDialog.padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+        }
+
+<span class="pc bpc" id="L995" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;DialogContentPane.derive&quot;)) {</span>
+<span class="fc" id="L996">            themeProps.put(&quot;DialogContentPane.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L997">            themeProps.put(&quot;DialogContentPane.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L998">            themeProps.put(&quot;DialogContentPane.transparency&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="fc bfc" id="L1001" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PopupContentPane.derive&quot;)) {</span>
+<span class="fc" id="L1002">            themeProps.put(&quot;PopupContentPane.derive&quot;, &quot;DialogContentPane&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1005" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;DialogTitle.derive&quot;)) {</span>
+<span class="fc" id="L1006">            themeProps.put(&quot;DialogTitle.align&quot;, centerAlign);</span>
+        }
+
+<span class="fc bfc" id="L1009" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PopupDialogTitle.derive&quot;)) {</span>
+<span class="fc" id="L1010">            themeProps.put(&quot;PopupDialogTitle.derive&quot;, &quot;DialogTitle&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1013" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Form.derive&quot;)) {</span>
+<span class="fc" id="L1014">            themeProps.put(&quot;Form.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1015">            themeProps.put(&quot;Form.margin&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="fc" id="L1017">        themeProps.put(&quot;Form.sel#derive&quot;, &quot;Form&quot;);</span>
+
+<span class="pc bpc" id="L1019" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;HorizontalScroll.derive&quot;)) {</span>
+<span class="fc" id="L1020">            themeProps.put(&quot;HorizontalScroll.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1021">            themeProps.put(&quot;HorizontalScroll.padding&quot;, &quot;1,1,1,1&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1024" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;HorizontalScrollThumb.derive&quot;)) {</span>
+<span class="fc" id="L1025">            themeProps.put(&quot;HorizontalScrollThumb.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1026">            themeProps.put(&quot;HorizontalScrollThumb.bgColor&quot;, foreground);</span>
+<span class="fc" id="L1027">            themeProps.put(&quot;HorizontalScrollThumb.margin&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1030" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;List.derive&quot;)) {</span>
+<span class="fc" id="L1031">            themeProps.put(&quot;List.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1032">            themeProps.put(&quot;List.margin&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="fc" id="L1034">        themeProps.put(&quot;List.sel#derive&quot;, &quot;List&quot;);</span>
+
+<span class="fc bfc" id="L1036" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ListRenderer.derive&quot;)) {</span>
+<span class="fc" id="L1037">            themeProps.put(&quot;ListRenderer.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="fc bfc" id="L1039" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ListRenderer.sel#derive&quot;)) {</span>
+<span class="fc" id="L1040">            themeProps.put(&quot;ListRenderer.sel#transparency&quot;, &quot;100&quot;);</span>
+        }
+<span class="fc" id="L1042">        themeProps.put(&quot;ListRenderer.dis#derive&quot;, &quot;ListRenderer&quot;);</span>
+
+<span class="pc bpc" id="L1044" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Menu.derive&quot;)) {</span>
+<span class="fc" id="L1045">            themeProps.put(&quot;Menu.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="fc" id="L1047">        themeProps.put(&quot;Menu.sel#derive&quot;, &quot;Menu&quot;);</span>
+
+<span class="fc bfc" id="L1049" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PopupContentPane.derive&quot;)) {</span>
+<span class="fc" id="L1050">            themeProps.put(&quot;PopupContentPane.transparency&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1053" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Scroll.derive&quot;)) {</span>
+<span class="fc" id="L1054">            themeProps.put(&quot;Scroll.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1055">            int halfMM = Display.getInstance().convertToPixels(10, true) / 20;</span>
+<span class="fc" id="L1056">            halfMM = Math.max(1, halfMM);</span>
+<span class="fc" id="L1057">            themeProps.put(&quot;Scroll.padding&quot;, halfMM + &quot;,&quot; + halfMM + &quot;,&quot; + halfMM + &quot;,&quot; + halfMM);</span>
+        }
+
+<span class="pc bpc" id="L1060" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ScrollThumb.derive&quot;)) {</span>
+<span class="fc" id="L1061">            themeProps.put(&quot;ScrollThumb.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1062">            themeProps.put(&quot;ScrollThumb.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1063">            themeProps.put(&quot;ScrollThumb.bgColor&quot;, foreground);</span>
+        }
+
+<span class="pc bpc" id="L1066" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SliderFull.derive&quot;)) {</span>
+<span class="fc" id="L1067">            themeProps.put(&quot;SliderFull.bgColor&quot;, foreground);</span>
+        }
+<span class="fc" id="L1069">        themeProps.put(&quot;SliderFull.sel#derive&quot;, &quot;SliderFull&quot;);</span>
+
+<span class="pc bpc" id="L1071" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SoftButton.derive&quot;)) {</span>
+<span class="fc" id="L1072">            themeProps.put(&quot;SoftButton.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1073">            themeProps.put(&quot;SoftButton.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1074">            themeProps.put(&quot;SoftButton.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="fc" id="L1076">        themeProps.put(&quot;SoftButton.sel#derive&quot;, &quot;SoftButton&quot;);</span>
+
+<span class="fc bfc" id="L1078" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SoftButtonCenter.derive&quot;)) {</span>
+<span class="fc" id="L1079">            themeProps.put(&quot;SoftButtonCenter.align&quot;, centerAlign);</span>
+<span class="fc" id="L1080">            themeProps.put(&quot;SoftButtonCenter.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1081">            themeProps.put(&quot;SoftButtonCenter.derive&quot;, &quot;SoftButton&quot;);</span>
+<span class="fc" id="L1082">            themeProps.put(&quot;SoftButtonCenter.padding&quot;, &quot;4,4,4,4&quot;);</span>
+        }
+<span class="fc" id="L1084">        themeProps.put(&quot;SoftButtonCenter.sel#derive&quot;, &quot;SoftButtonCenter&quot;);</span>
+<span class="fc" id="L1085">        themeProps.put(&quot;SoftButtonCenter.press#derive&quot;, &quot;SoftButtonCenter&quot;);</span>
+<span class="fc" id="L1086">        themeProps.put(&quot;SoftButtonCenter.dis#derive&quot;, &quot;SoftButtonCenter&quot;);</span>
+
+<span class="fc bfc" id="L1088" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SoftButtonLeft.derive&quot;)) {</span>
+<span class="fc" id="L1089">            themeProps.put(&quot;SoftButtonLeft.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1090">            themeProps.put(&quot;SoftButtonLeft.derive&quot;, &quot;SoftButton&quot;);</span>
+<span class="fc" id="L1091">            themeProps.put(&quot;SoftButtonLeft.padding&quot;, &quot;4,4,4,4&quot;);</span>
+        }
+<span class="fc" id="L1093">        themeProps.put(&quot;SoftButtonLeft.sel#derive&quot;, &quot;SoftButtonLeft&quot;);</span>
+<span class="fc" id="L1094">        themeProps.put(&quot;SoftButtonLeft.press#derive&quot;, &quot;SoftButtonLeft&quot;);</span>
+<span class="fc" id="L1095">        themeProps.put(&quot;SoftButtonLeft.dis#derive&quot;, &quot;SoftButtonLeft&quot;);</span>
+
+<span class="fc bfc" id="L1097" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SoftButtonRight.derive&quot;)) {</span>
+<span class="fc" id="L1098">            themeProps.put(&quot;SoftButtonRight.align&quot;, rightAlign);</span>
+<span class="fc" id="L1099">            themeProps.put(&quot;SoftButtonRight.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1100">            themeProps.put(&quot;SoftButtonRight.derive&quot;, &quot;SoftButton&quot;);</span>
+<span class="fc" id="L1101">            themeProps.put(&quot;SoftButtonRight.padding&quot;, &quot;4,4,4,4&quot;);</span>
+        }
+<span class="fc" id="L1103">        themeProps.put(&quot;SoftButtonRight.sel#derive&quot;, &quot;SoftButtonRight&quot;);</span>
+<span class="fc" id="L1104">        themeProps.put(&quot;SoftButtonRight.press#derive&quot;, &quot;SoftButtonRight&quot;);</span>
+<span class="fc" id="L1105">        themeProps.put(&quot;SoftButtonRight.dis#derive&quot;, &quot;SoftButtonRight&quot;);</span>
+
+<span class="pc bpc" id="L1107" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Spinner.derive&quot;)) {</span>
+<span class="fc" id="L1108">            themeProps.put(&quot;Spinner.border&quot;, Border.getDefaultBorder());</span>
+        }
+<span class="fc" id="L1110">        themeProps.put(&quot;Spinner.sel#derive&quot;, &quot;Spinner&quot;);</span>
+
+<span class="pc bpc" id="L1112" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SpinnerOverlay.derive&quot;)) {</span>
+<span class="fc" id="L1113">            themeProps.put(&quot;SpinnerOverlay.transparency&quot;, &quot;0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1116" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Tab.derive&quot;)) {</span>
+<span class="fc" id="L1117">            themeProps.put(&quot;Tab.margin&quot;, &quot;1,1,1,1&quot;);</span>
+        }
+
+<span class="fc bfc" id="L1120" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Tab.sel#derive&quot;)) {</span>
+<span class="fc" id="L1121">            themeProps.put(&quot;Tab.sel#derive&quot;, &quot;Tab&quot;);</span>
+<span class="fc" id="L1122">            themeProps.put(&quot;Tab.sel#border&quot;, Border.createLineBorder(1));</span>
+        }
+
+        // deprecated so there is no need to referesh this....
+<span class="fc" id="L1126">        themeProps.put(&quot;TabbedPane.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1127">        themeProps.put(&quot;TabbedPane.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1128">        themeProps.put(&quot;TabbedPane.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1129">        themeProps.put(&quot;TabbedPane.sel#margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1130">        themeProps.put(&quot;TabbedPane.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+
+
+<span class="pc bpc" id="L1133" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Table.derive&quot;)) {</span>
+<span class="fc" id="L1134">            themeProps.put(&quot;Table.border&quot;, Border.getDefaultBorder());</span>
+        }
+<span class="fc" id="L1136">        themeProps.put(&quot;Table.sel#derive&quot;, &quot;Table&quot;);</span>
+
+<span class="pc bpc" id="L1138" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TableCell.derive&quot;)) {</span>
+<span class="fc" id="L1139">            themeProps.put(&quot;TableCell.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="fc" id="L1141">        themeProps.put(&quot;TableCell.sel#derive&quot;, &quot;TableCell&quot;);</span>
+
+<span class="pc bpc" id="L1143" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TableHeader.derive&quot;)) {</span>
+<span class="fc" id="L1144">            themeProps.put(&quot;TableHeader.transparency&quot;, &quot;0&quot;);</span>
+        }
+<span class="fc" id="L1146">        themeProps.put(&quot;TableHeader.sel#derive&quot;, &quot;TableHeader&quot;);</span>
+
+<span class="pc bpc" id="L1148" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Tabs.derive&quot;)) {</span>
+<span class="fc" id="L1149">            themeProps.put(&quot;Tabs.bgColor&quot;, &quot;a0a0a0&quot;);</span>
+<span class="fc" id="L1150">            themeProps.put(&quot;Tabs.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1153" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TabsContainer.derive&quot;)) {</span>
+<span class="fc" id="L1154">            themeProps.put(&quot;TabsContainer.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1155">            themeProps.put(&quot;TabsContainer.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1156">            themeProps.put(&quot;TabsContainer.bgColor&quot;, &quot;a0a0a0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1159" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextArea.derive&quot;)) {</span>
+<span class="fc" id="L1160">            themeProps.put(&quot;TextArea.border&quot;, Border.getDefaultBorder());</span>
+        }
+<span class="fc" id="L1162">        themeProps.put(&quot;TextArea.sel#derive&quot;, &quot;TextArea&quot;);</span>
+<span class="fc" id="L1163">        themeProps.put(&quot;TextArea.dis#derive&quot;, &quot;TextArea&quot;);</span>
+
+<span class="pc bpc" id="L1165" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextField.derive&quot;)) {</span>
+<span class="fc" id="L1166">            themeProps.put(&quot;TextField.border&quot;, Border.getDefaultBorder());</span>
+        }
+
+<span class="fc" id="L1169">        themeProps.put(&quot;InvalidEmblem.derive&quot;, &quot;Label&quot;);</span>
+<span class="fc" id="L1170">        themeProps.put(&quot;InvalidEmblem.fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1171">        themeProps.put(&quot;InvalidEmblem.transparency&quot;, &quot;0&quot;);</span>
+
+<span class="fc" id="L1173">        themeProps.put(&quot;TextField.sel#derive&quot;, &quot;TextField&quot;);</span>
+<span class="fc" id="L1174">        themeProps.put(&quot;TextField.dis#derive&quot;, &quot;TextField&quot;);</span>
+<span class="fc bfc" id="L1175" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextFieldInvalid.derive&quot;)) {</span>
+<span class="fc" id="L1176">            themeProps.put(&quot;TextFieldInvalid.derive&quot;, &quot;TextField&quot;);</span>
+<span class="fc" id="L1177">            themeProps.put(&quot;TextFieldInvalid.fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1178">            themeProps.put(&quot;TextFieldInvalid.sel#fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1179">            themeProps.put(&quot;TextFieldInvalid.sel#fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1180">            themeProps.put(&quot;TextFieldInvalid.sel#derive&quot;, &quot;TextField&quot;);</span>
+<span class="fc" id="L1181">            themeProps.put(&quot;TextFieldInvalid.dis#derive&quot;, &quot;TextField&quot;);</span>
+        }
+
+<span class="fc bfc" id="L1184" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextAreaInvalid.derive&quot;)) {</span>
+<span class="fc" id="L1185">            themeProps.put(&quot;TextAreaInvalid.derive&quot;, &quot;TextArea&quot;);</span>
+<span class="fc" id="L1186">            themeProps.put(&quot;TextAreaInvalid.fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1187">            themeProps.put(&quot;TextAreaInvalid.sel#fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1188">            themeProps.put(&quot;TextAreaInvalid.sel#fgColor&quot;, &quot;ff0000&quot;);</span>
+<span class="fc" id="L1189">            themeProps.put(&quot;TextAreaInvalid.sel#derive&quot;, &quot;TextArea&quot;);</span>
+<span class="fc" id="L1190">            themeProps.put(&quot;TextAreaInvalid.dis#derive&quot;, &quot;TextArea&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1193" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextHint.derive&quot;)) {</span>
+<span class="fc" id="L1194">            themeProps.put(&quot;TextHint.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1195">            themeProps.put(&quot;TextHint.fgColor&quot;, &quot;cccccc&quot;);</span>
+<span class="fc" id="L1196">            themeProps.put(&quot;TextHint.font&quot;, italic);</span>
+        }
+
+<span class="pc bpc" id="L1199" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Title.derive&quot;)) {</span>
+<span class="fc" id="L1200">            themeProps.put(&quot;Title.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1201">            themeProps.put(&quot;Title.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1202">            themeProps.put(&quot;Title.align&quot;, centerAlign);</span>
+        }
+<span class="fc" id="L1204">        themeProps.put(&quot;Title.sel#derive&quot;, &quot;Title&quot;);</span>
+
+<span class="fc bfc" id="L1206" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TitleArea.derive&quot;)) {</span>
+<span class="fc" id="L1207">            themeProps.put(&quot;TitleArea.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1208">            themeProps.put(&quot;TitleArea.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1209">            themeProps.put(&quot;TitleArea.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1212" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TouchCommand.derive&quot;)) {</span>
+<span class="fc" id="L1213">            themeProps.put(&quot;TouchCommand.border&quot;, Border.getDefaultBorder());</span>
+<span class="fc" id="L1214">            themeProps.put(&quot;TouchCommand.padding&quot;, &quot;10,10,10,10&quot;);</span>
+<span class="fc" id="L1215">            themeProps.put(&quot;TouchCommand.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1216">            themeProps.put(&quot;TouchCommand.align&quot;, centerAlign);</span>
+        }
+<span class="fc bfc" id="L1218" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TouchCommand.press#derive&quot;)) {</span>
+<span class="fc" id="L1219">            themeProps.put(&quot;TouchCommand.press#border&quot;, Border.getDefaultBorder().createPressedVersion());</span>
+<span class="fc" id="L1220">            themeProps.put(&quot;TouchCommand.press#derive&quot;, &quot;TouchCommand&quot;);</span>
+        }
+<span class="fc" id="L1222">        themeProps.put(&quot;TouchCommand.sel#derive&quot;, &quot;TouchCommand&quot;);</span>
+<span class="fc bfc" id="L1223" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TouchCommand.dis#derive&quot;)) {</span>
+<span class="fc" id="L1224">            themeProps.put(&quot;TouchCommand.dis#derive&quot;, &quot;TouchCommand&quot;);</span>
+<span class="fc" id="L1225">            themeProps.put(&quot;TouchCommand.dis#fgColor&quot;, disabledColor);</span>
+        }
+
+
+<span class="pc bpc" id="L1229" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AdsComponent.sel#derive&quot;)) {</span>
+<span class="fc" id="L1230">            themeProps.put(&quot;AdsComponent.sel#border&quot;, Border.getDefaultBorder());</span>
+<span class="fc" id="L1231">            themeProps.put(&quot;AdsComponent.sel#padding&quot;, &quot;2,2,2,2&quot;);</span>
+<span class="fc" id="L1232">            themeProps.put(&quot;AdsComponent.sel#transparency&quot;, &quot;0&quot;);</span>
+
+        }
+<span class="fc" id="L1235">        themeProps.put(&quot;AdsComponent#derive&quot;, &quot;Container&quot;);</span>
+<span class="fc" id="L1236">        themeProps.put(&quot;WebBrowser#derive&quot;, &quot;Container&quot;);</span>
+
+<span class="fc bfc" id="L1238" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;MapZoomOut.derive&quot;)) {</span>
+<span class="fc" id="L1239">            themeProps.put(&quot;MapZoomOut.derive&quot;, &quot;Button&quot;);</span>
+        }
+<span class="fc" id="L1241">        themeProps.put(&quot;MapZoomOut.sel#derive&quot;, &quot;Button.sel&quot;);</span>
+<span class="fc" id="L1242">        themeProps.put(&quot;MapZoomOut.press#derive&quot;, &quot;Button.press&quot;);</span>
+
+<span class="fc bfc" id="L1244" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;MapZoomIn.derive&quot;)) {</span>
+<span class="fc" id="L1245">            themeProps.put(&quot;MapZoomIn.derive&quot;, &quot;Button&quot;);</span>
+        }
+<span class="fc" id="L1247">        themeProps.put(&quot;MapZoomIn.sel#derive&quot;, &quot;Button.sel&quot;);</span>
+<span class="fc" id="L1248">        themeProps.put(&quot;MapZoomIn.press#derive&quot;, &quot;Button.press&quot;);</span>
+
+<span class="fc bfc" id="L1250" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SideCommand.derive&quot;)) {</span>
+<span class="fc" id="L1251">            themeProps.put(&quot;SideCommand.derive&quot;, &quot;TouchCommand&quot;);</span>
+<span class="fc" id="L1252">            themeProps.put(&quot;SideCommand.align&quot;, leftAlign);</span>
+        }
+<span class="pc bpc" id="L1254" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SideCommand.sel#.derive&quot;)) {</span>
+<span class="fc" id="L1255">            themeProps.put(&quot;SideCommand.sel#derive&quot;, &quot;TouchCommand.sel&quot;);</span>
+<span class="fc" id="L1256">            themeProps.put(&quot;SideCommand.sel#align&quot;, leftAlign);</span>
+        }
+<span class="pc bpc" id="L1258" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SideCommand.press#.derive&quot;)) {</span>
+<span class="fc" id="L1259">            themeProps.put(&quot;SideCommand.press#derive&quot;, &quot;TouchCommand.press&quot;);</span>
+<span class="fc" id="L1260">            themeProps.put(&quot;SideCommand.press#align&quot;, leftAlign);</span>
+        }
+
+<span class="fc bfc" id="L1263" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;RightSideCommand.derive&quot;)) {</span>
+<span class="fc" id="L1264">            themeProps.put(&quot;RightSideCommand.derive&quot;, &quot;SideCommand&quot;);</span>
+<span class="fc" id="L1265">            themeProps.put(&quot;RightSideCommand.align&quot;, rightAlign);</span>
+        }
+<span class="pc bpc" id="L1267" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;RightSideCommand.sel#.derive&quot;)) {</span>
+<span class="fc" id="L1268">            themeProps.put(&quot;RightSideCommand.sel#derive&quot;, &quot;SideCommand.sel&quot;);</span>
+<span class="fc" id="L1269">            themeProps.put(&quot;RightSideCommand.sel#align&quot;, rightAlign);</span>
+        }
+<span class="pc bpc" id="L1271" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;RightSideCommand.press#.derive&quot;)) {</span>
+<span class="fc" id="L1272">            themeProps.put(&quot;RightSideCommand.press#derive&quot;, &quot;SideCommand.press&quot;);</span>
+<span class="fc" id="L1273">            themeProps.put(&quot;RightSideCommand.press#align&quot;, rightAlign);</span>
+        }
+
+<span class="pc bpc" id="L1276" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;SideNavigationPanel.derive&quot;)) {</span>
+<span class="fc" id="L1277">            themeProps.put(&quot;SideNavigationPanel.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1278">            themeProps.put(&quot;SideNavigationPanel.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1279">            themeProps.put(&quot;SideNavigationPanel.bgColor&quot;, &quot;343434&quot;);</span>
+<span class="fc" id="L1280">            themeProps.put(&quot;SideNavigationPanel.transparency&quot;, &quot;255&quot;);</span>
+        }
+
+<span class="fc bfc" id="L1283" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;RightSideNavigationPanel.derive&quot;)) {</span>
+<span class="fc" id="L1284">            themeProps.put(&quot;RightSideNavigationPanel.derive&quot;, &quot;SideNavigationPanel&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1287" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PullToRefresh.derive&quot;)) {</span>
+<span class="fc" id="L1288">            themeProps.put(&quot;PullToRefresh.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1289">            themeProps.put(&quot;PullToRefresh.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1290">            themeProps.put(&quot;PullToRefresh.align&quot;, centerAlign);</span>
+<span class="fc" id="L1291">            themeProps.put(&quot;PullToRefresh.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1292">            themeProps.put(&quot;PullToRefresh.fgColor&quot;, foreground);</span>
+        }
+
+<span class="pc bpc" id="L1295" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AutoCompletePopup.derive&quot;)) {</span>
+<span class="fc" id="L1296">            themeProps.put(&quot;AutoCompletePopup.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1297">            themeProps.put(&quot;AutoCompletePopup.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1298">            themeProps.put(&quot;AutoCompletePopup.border&quot;, Border.createLineBorder(1));</span>
+        }
+<span class="pc bpc" id="L1300" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AutoCompletePopup.sel#derive&quot;)) {</span>
+<span class="fc" id="L1301">            themeProps.put(&quot;AutoCompletePopup.sel#transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1302">            themeProps.put(&quot;AutoCompletePopup.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1303">            themeProps.put(&quot;AutoCompletePopup.sel#border&quot;, Border.createLineBorder(1));</span>
+        }
+<span class="pc bpc" id="L1305" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AutoCompleteList.derive&quot;)) {</span>
+<span class="fc" id="L1306">            themeProps.put(&quot;AutoCompleteList.margin&quot;, &quot;1,1,1,1&quot;);</span>
+<span class="fc" id="L1307">            themeProps.put(&quot;AutoCompleteList.padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="pc bpc" id="L1309" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AutoCompleteList.sel#derive&quot;)) {</span>
+<span class="fc" id="L1310">            themeProps.put(&quot;AutoCompleteList.sel#margin&quot;, &quot;1,1,1,1&quot;);</span>
+<span class="fc" id="L1311">            themeProps.put(&quot;AutoCompleteList.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+<span class="pc bpc" id="L1313" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;AutoCompleteList.press#derive&quot;)) {</span>
+<span class="fc" id="L1314">            themeProps.put(&quot;AutoCompleteList.press#margin&quot;, &quot;1,1,1,1&quot;);</span>
+<span class="fc" id="L1315">            themeProps.put(&quot;AutoCompleteList.press#padding&quot;, &quot;0,0,0,0&quot;);</span>
+        }
+
+
+<span class="pc bpc" id="L1319" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CommandList.derive&quot;)) {</span>
+<span class="fc" id="L1320">            themeProps.put(&quot;CommandList.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1321">            themeProps.put(&quot;CommandList.border&quot;, Border.createLineBorder(1));</span>
+        }
+<span class="fc bfc" id="L1323" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;CommandList.sel#derive&quot;)) {</span>
+<span class="fc" id="L1324">            themeProps.put(&quot;CommandList.sel#transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1325">            themeProps.put(&quot;CommandList.sel#border&quot;, Border.createLineBorder(1));</span>
+        }
+
+        // The default Toolbar.derive=TitleArea was historically added so
+        // legacy themes that styled TitleArea got the same look on Toolbar
+        // for free. The modern themes (and any user theme that wires
+        // TitleArea.derive=Toolbar) flips the relationship the other way -
+        // setting both directions creates a cycle that infinite-loops
+        // createStyle when the resolver follows derive recursively. Skip
+        // the legacy default in that case.
+<span class="fc bfc" id="L1335" title="All 2 branches covered.">        boolean userDeclaredTitleAreaDerivesToolbar = installedTheme != null</span>
+<span class="fc bfc" id="L1336" title="All 2 branches covered.">                &amp;&amp; &quot;Toolbar&quot;.equals(installedTheme.get(&quot;TitleArea.derive&quot;));</span>
+<span class="fc bfc" id="L1337" title="All 4 branches covered.">        if (!userDeclaredTitleAreaDerivesToolbar</span>
+<span class="fc bfc" id="L1338" title="All 2 branches covered.">                &amp;&amp; (installedTheme == null || !installedTheme.containsKey(&quot;Toolbar.derive&quot;))) {</span>
+<span class="fc" id="L1339">            themeProps.put(&quot;Toolbar.derive&quot;, &quot;TitleArea&quot;);</span>
+        }
+<span class="pc bpc" id="L1341" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;FloatingActionButton.derive&quot;)) {</span>
+<span class="fc" id="L1342">            themeProps.put(&quot;FloatingActionButton.fgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1343">            themeProps.put(&quot;FloatingActionButton.bgColor&quot;, &quot;d32f2f&quot;);</span>
+<span class="fc" id="L1344">            themeProps.put(&quot;FloatingActionButton.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1345">            themeProps.put(&quot;FloatingActionButton.marUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1346">            themeProps.put(&quot;FloatingActionButton.margin&quot;, &quot;0,2,1,2&quot;);</span>
+        }
+<span class="pc bpc" id="L1348" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;FloatingActionButton.press#derive&quot;)) {</span>
+<span class="fc" id="L1349">            themeProps.put(&quot;FloatingActionButton.press#fgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1350">            themeProps.put(&quot;FloatingActionButton.press#bgColor&quot;, &quot;b71c1c&quot;);</span>
+<span class="fc" id="L1351">            themeProps.put(&quot;FloatingActionButton.sel#transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1352">            themeProps.put(&quot;FloatingActionButton.press#marUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1353">            themeProps.put(&quot;FloatingActionButton.press#margin&quot;, &quot;0,2,1,2&quot;);</span>
+        }
+<span class="pc bpc" id="L1355" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;FloatingActionButton.sel#derive&quot;)) {</span>
+<span class="fc" id="L1356">            themeProps.put(&quot;FloatingActionButton.sel#fgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1357">            themeProps.put(&quot;FloatingActionButton.sel#transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1358">            themeProps.put(&quot;FloatingActionButton.sel#bgColor&quot;, &quot;b71c1c&quot;);</span>
+<span class="fc" id="L1359">            themeProps.put(&quot;FloatingActionButton.sel#marUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1360">            themeProps.put(&quot;FloatingActionButton.sel#margin&quot;, &quot;0,2,1,2&quot;);</span>
+        }
+<span class="pc bpc" id="L1362" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;RefreshLabel.derive&quot;)) {</span>
+<span class="fc" id="L1363">            themeProps.put(&quot;RefreshLabel.fgColor&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1364">            themeProps.put(&quot;RefreshLabel.bgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1365">            themeProps.put(&quot;RefreshLabel.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1366">            themeProps.put(&quot;RefreshLabel.marUnit&quot;, new byte[]{Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});</span>
+<span class="fc" id="L1367">            themeProps.put(&quot;RefreshLabel.padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1368">            themeProps.put(&quot;RefreshLabel.margin&quot;, &quot;1,1,1,1&quot;);</span>
+<span class="fc" id="L1369">            themeProps.put(&quot;RefreshLabel.padding&quot;, &quot;2,3,2,3&quot;);</span>
+        }
+<span class="pc bpc" id="L1371" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Badge.derive&quot;)) {</span>
+<span class="fc" id="L1372">            themeProps.put(&quot;Badge.fgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1373">            themeProps.put(&quot;Badge.bgColor&quot;, &quot;d32f2f&quot;);</span>
+<span class="fc" id="L1374">            themeProps.put(&quot;Badge.press#fgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1375">            themeProps.put(&quot;Badge.press#bgColor&quot;, &quot;b71c1c&quot;);</span>
+<span class="fc" id="L1376">            themeProps.put(&quot;Badge.sel#fgColor&quot;, &quot;ffffff&quot;);</span>
+<span class="fc" id="L1377">            themeProps.put(&quot;Badge.sel#bgColor&quot;, &quot;b71c1c&quot;);</span>
+<span class="fc" id="L1378">            themeProps.put(&quot;Badge#padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1379">            themeProps.put(&quot;Badge#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1380">            themeProps.put(&quot;Badge.sel#padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1381">            themeProps.put(&quot;Badge.sel#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1382">            themeProps.put(&quot;Badge.press#padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1383">            themeProps.put(&quot;Badge.press#padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="pc bpc" id="L1384" title="1 of 2 branches missed.">            if (Font.isNativeFontSchemeSupported()) {</span>
+<span class="fc" id="L1385">                Font fnt = lightFont.derive(Display.getInstance().convertToPixels(1.5f), Font.STYLE_PLAIN);</span>
+<span class="fc" id="L1386">                themeProps.put(&quot;Badge.font&quot;, fnt);</span>
+<span class="fc" id="L1387">                themeProps.put(&quot;Badge.sel#font&quot;, fnt);</span>
+<span class="fc" id="L1388">                themeProps.put(&quot;Badge.press#font&quot;, fnt);</span>
+            }
+<span class="fc" id="L1390">            themeProps.put(&quot;Badge.align&quot;, centerAlign);</span>
+<span class="fc" id="L1391">            themeProps.put(&quot;Badge.sel#align&quot;, centerAlign);</span>
+<span class="fc" id="L1392">            themeProps.put(&quot;Badge.press#align&quot;, centerAlign);</span>
+        }
+<span class="pc bpc" id="L1394" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;FloatingActionText.derive&quot;)) {</span>
+<span class="fc" id="L1395">            themeProps.put(&quot;FloatingActionText.bgColor&quot;, background);</span>
+<span class="fc" id="L1396">            themeProps.put(&quot;FloatingActionText.fgColor&quot;, &quot;a0a0a0&quot;);</span>
+<span class="fc" id="L1397">            themeProps.put(&quot;FloatingActionText.align&quot;, rightAlign);</span>
+        }
+<span class="fc bfc" id="L1399" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;ErrorLabel.derive&quot;)) {</span>
+<span class="fc" id="L1400">            themeProps.put(&quot;ErrorLabel.derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1401">            themeProps.put(&quot;ErrorLabel.sel#derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1402">            themeProps.put(&quot;ErrorLabel.press#derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1403">            themeProps.put(&quot;ErrorLabel.fgColor&quot;, &quot;ff1744&quot;);</span>
+<span class="fc" id="L1404">            themeProps.put(&quot;ErrorLabel.sel#fgColor&quot;, &quot;ff1744&quot;);</span>
+<span class="fc" id="L1405">            themeProps.put(&quot;ErrorLabel.press#fgColor&quot;, &quot;ff1744&quot;);</span>
+        }
+<span class="fc bfc" id="L1407" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;InputComponentAction.derive&quot;)) {</span>
+<span class="fc" id="L1408">            themeProps.put(&quot;InputComponentAction.derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1409">            themeProps.put(&quot;InputComponentAction.font&quot;, Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 3f));</span>
+        }
+<span class="fc bfc" id="L1411" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;DescriptionLabel.derive&quot;)) {</span>
+<span class="fc" id="L1412">            themeProps.put(&quot;DescriptionLabel.derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1413">            themeProps.put(&quot;DescriptionLabel.sel#derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1414">            themeProps.put(&quot;DescriptionLabel.press#derive&quot;, &quot;FloatingHint&quot;);</span>
+<span class="fc" id="L1415">            themeProps.put(&quot;DescriptionLabel.fgColor&quot;, &quot;666666&quot;);</span>
+<span class="fc" id="L1416">            themeProps.put(&quot;DescriptionLabel.sel#fgColor&quot;, &quot;666666&quot;);</span>
+<span class="fc" id="L1417">            themeProps.put(&quot;DescriptionLabel.press#fgColor&quot;, &quot;666666&quot;);</span>
+        }
+<span class="fc bfc" id="L1419" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;TextComponent.derive&quot;)) {</span>
+<span class="fc" id="L1420">            themeProps.put(&quot;TextComponent.derive&quot;, &quot;Container&quot;);</span>
+        }
+
+<span class="fc bfc" id="L1423" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Spinner3DRow.derive&quot;)) {</span>
+            // For the rows of the Spinner3D widget
+<span class="fc" id="L1425">            themeProps.put(&quot;Spinner3DRow.derive&quot;, &quot;Label&quot;);</span>
+<span class="fc" id="L1426">            themeProps.put(&quot;Spinner3DRow.sel#derive&quot;, &quot;Label&quot;);</span>
+<span class="fc" id="L1427">            themeProps.put(&quot;Spinner3DRow.fgColor&quot;, &quot;878A93&quot;);</span>
+<span class="fc" id="L1428">            themeProps.put(&quot;Spinner3DRow.transparency&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L1429">            themeProps.put(&quot;Spinner3DRow.sel#fgColor&quot;, &quot;2A2B2F&quot;);</span>
+<span class="fc" id="L1430">            themeProps.put(&quot;Spinner3DRow.border&quot;, Border.createEmpty());</span>
+<span class="fc" id="L1431">            themeProps.put(&quot;Spinner3DRow.align&quot;, centerAlign);</span>
+<span class="fc" id="L1432">            themeProps.put(&quot;Spinner3DRow.sel#align&quot;, centerAlign);</span>
+<span class="fc" id="L1433">            themeProps.put(&quot;Spinner3DRow.padding&quot;, &quot;1.5,1.5,1,1&quot;);</span>
+<span class="fc" id="L1434">            themeProps.put(&quot;Spinner3DRow.sel#padding&quot;, &quot;1.5,1.5,1,1&quot;);</span>
+<span class="fc" id="L1435">            themeProps.put(&quot;Spinner3DRow.padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+<span class="fc" id="L1436">            themeProps.put(&quot;Spinner3DRow.sel#padUnit&quot;, new byte[]{Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS, Style.UNIT_TYPE_DIPS});</span>
+
+<span class="fc" id="L1438">            themeProps.put(&quot;Spinner3DRow.font&quot;, Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 2.8f));</span>
+<span class="fc" id="L1439">            themeProps.put(&quot;Spinner3DRow.sel#font&quot;, Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT, 2.8f));</span>
+        }
+
+<span class="fc bfc" id="L1442" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Spinner3DOverlay.bgColor&quot;)) {</span>
+<span class="fc" id="L1443">            themeProps.put(&quot;Spinner3DOverlay.transparency&quot;, &quot;255&quot;);</span>
+<span class="fc" id="L1444">            themeProps.put(&quot;Spinner3DOverlay.bgColor&quot;, &quot;efeff4&quot;);</span>
+<span class="fc" id="L1445">            themeProps.put(&quot;Spinner3DOverlay.fgColor&quot;, &quot;abb8b7&quot;);</span>
+
+        }
+
+<span class="fc bfc" id="L1449" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PickerDialog.border&quot;)) {</span>
+            // For the interaction dialog when showing a Picker in lightweight mode
+<span class="fc" id="L1451">            themeProps.put(&quot;PickerDialog.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1452">            themeProps.put(&quot;PickerDialog.border&quot;, Border.createEmpty());</span>
+        }
+
+<span class="fc bfc" id="L1455" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PickerDialogTablet.derive&quot;)) {</span>
+<span class="fc" id="L1456">            themeProps.put(&quot;PickerDialogTablet.derive&quot;, &quot;Dialog&quot;);</span>
+        }
+
+<span class="fc bfc" id="L1459" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PickerDialogContent.bgColor&quot;)) {</span>
+            // For the content pane of the interaction dialog when showing a Picker in lightweight mode
+<span class="fc" id="L1461">            themeProps.put(&quot;PickerDialogContent.padding&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1462">            themeProps.put(&quot;PickerDialogContent.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1463">            themeProps.put(&quot;PickerDialogContent.border&quot;, Border.createEmpty());</span>
+<span class="fc" id="L1464">            themeProps.put(&quot;PickerDialogContent.bgColor&quot;, &quot;D1D4DD&quot;);</span>
+<span class="fc" id="L1465">            themeProps.put(&quot;PickerDialogContent.transparency&quot;, &quot;255&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1468" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PicketDialogContentTablet.derive&quot;)) {</span>
+<span class="fc" id="L1469">            themeProps.put(&quot;PickerDialogContentTablet.derive&quot;, &quot;PopupContentPane&quot;);</span>
+        }
+
+
+<span class="pc bpc" id="L1473" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PickerButtonBarTablet&quot;)) {</span>
+<span class="pc bpc" id="L1474" title="1 of 4 branches missed.">            if (installedTheme != null &amp;&amp; installedTheme.containsKey(&quot;PickerButtonBarTabletNative&quot;)) {</span>
+<span class="nc" id="L1475">                themeProps.put(&quot;PickerButtonBarTablet.derive&quot;, &quot;PickerButtonBarTabletNative&quot;);</span>
+            } else {
+<span class="fc" id="L1477">                themeProps.put(&quot;PickerButtonBarTablet.derive&quot;, &quot;Container&quot;);</span>
+            }
+        }
+
+<span class="pc bpc" id="L1481" title="1 of 4 branches missed.">        if (installedTheme == null || !installedTheme.containsKey(&quot;PickerButton&quot;)) {</span>
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+<span class="fc" id="L1483">            themeProps.put(&quot;PickerButton.derive&quot;, &quot;Button&quot;);</span>
+<span class="fc" id="L1484">            themeProps.put(&quot;PickerButton.sel#derive&quot;, &quot;Button.sel&quot;);</span>
+<span class="fc" id="L1485">            themeProps.put(&quot;PickerButton.press#derive&quot;, &quot;Button.pres&quot;);</span>
+        }
+
+
+<span class="fc bfc" id="L1489" title="All 4 branches covered.">        if (installedTheme == null || !installedTheme.containsKey(&quot;Picker.derive&quot;)) {</span>
+<span class="fc" id="L1490">            themeProps.put(&quot;Picker.derive&quot;, &quot;TextField&quot;);</span>
+<span class="fc" id="L1491">            themeProps.put(&quot;Picker.sel#derive&quot;, &quot;TextField.sel&quot;);</span>
+<span class="fc" id="L1492">            themeProps.put(&quot;Picker.press#derive&quot;, &quot;TextField.press&quot;);</span>
+<span class="fc" id="L1493">            themeProps.put(&quot;Picker.dis#derive&quot;, &quot;TextField.dis&quot;);</span>
+<span class="fc" id="L1494">            themeProps.put(&quot;Picker.sel#border&quot;, Border.createLineBorder(1, 0x206afb));</span>
+        }
+
+
+<span class="fc" id="L1498">    }</span>
+
+    /// Adds the given theme properties on top of the existing properties without
+    /// clearing the existing theme first
+    ///
+    /// #### Parameters
+    ///
+    /// - `themeProps`: the properties of the given theme
+    public void addThemeProps(Hashtable themeProps) {
+<span class="pc bpc" id="L1507" title="1 of 2 branches missed.">        if (accessible) {</span>
+<span class="fc" id="L1508">            dropSupersededBindings(themeProps);</span>
+<span class="fc" id="L1509">            buildTheme(themeProps);</span>
+<span class="fc" id="L1510">            styles.clear();</span>
+<span class="fc" id="L1511">            selectedStyles.clear();</span>
+<span class="fc" id="L1512">            imageCache.clear();</span>
+<span class="fc" id="L1513">            current.refreshTheme(false);</span>
+        }
+<span class="fc" id="L1515">    }</span>
+
+    /// CSSWatcher's live-reload funnels every recompile through
+    /// [#addThemeProps], which never clears [#themeConstants]. When a user
+    /// replaces a `var()`-bound CSS rule with a literal, the recompiled
+    /// theme.res carries the new style value but no longer emits the
+    /// matching `@cn1-bind:&lt;key&gt;` entry. Without intervention the stale
+    /// binding left in `themeConstants` would let [#applyThemeBindings]
+    /// stomp the user's literal change back to the previous binding's
+    /// resolved value -- visibly hiding every CSS edit.
+    ///
+    /// This pre-pass runs only on the overlay entry point (`addThemeProps`),
+    /// not on the full reset path ([#setThemePropsImpl] -&gt; [#buildTheme],
+    /// which clears `themeConstants` itself, and the `@includeNativeBool`
+    /// layered initial load whose existing screenshots depend on bindings
+    /// staying in place). For each style key being re-set by the incoming
+    /// load that does NOT re-assert its binding, drop the matching binding
+    /// from `themeConstants` so the new literal wins.
+    private void dropSupersededBindings(Hashtable themeProps) {
+<span class="pc bpc" id="L1534" title="2 of 6 branches missed.">        if (themeProps == null || themeConstants == null || themeConstants.isEmpty()) {</span>
+<span class="fc" id="L1535">            return;</span>
+        }
+<span class="fc" id="L1537">        Enumeration e = themeProps.keys();</span>
+<span class="fc bfc" id="L1538" title="All 2 branches covered.">        while (e.hasMoreElements()) {</span>
+<span class="fc" id="L1539">            Object keyObj = e.nextElement();</span>
+<span class="pc bpc" id="L1540" title="1 of 2 branches missed.">            if (!(keyObj instanceof String)) {</span>
+<span class="nc" id="L1541">                continue;</span>
+            }
+<span class="fc" id="L1543">            String key = (String) keyObj;</span>
+<span class="fc bfc" id="L1544" title="All 2 branches covered.">            if (key.startsWith(&quot;@&quot;)) {</span>
+<span class="fc" id="L1545">                continue;</span>
+            }
+<span class="fc" id="L1547">            String boundConstant = &quot;cn1-bind:&quot; + key;</span>
+<span class="pc bpc" id="L1548" title="1 of 2 branches missed.">            if (themeConstants.containsKey(boundConstant)</span>
+<span class="fc bfc" id="L1549" title="All 2 branches covered.">                    &amp;&amp; !themeProps.containsKey(&quot;@&quot; + boundConstant)) {</span>
+<span class="fc" id="L1550">                themeConstants.remove(boundConstant);</span>
+            }
+<span class="fc" id="L1552">        }</span>
+<span class="fc" id="L1553">    }</span>
+
+    /// Scales the font sizes of the current theme by the given factor, e.g.
+    /// a factor of 1.2 increases all font sizes by 20% and a factor of 0.8
+    /// decreases them by 20%. Only fonts that support scaling (TTF or native:
+    /// fonts, see [Font#isTTFNativeFont()]) are affected; system fonts are
+    /// skipped since their size is fixed by the underlying platform.
+    ///
+    /// The zoom is applied relative to the current state of the theme, so
+    /// calling this method repeatedly compounds the effect. To undo a zoom,
+    /// either reapply the theme or call this method with the reciprocal
+    /// factor.
+    ///
+    /// **Note:** this updates the theme definitions and clears the cached
+    /// styles, but components already shown on a form continue to render
+    /// with the Font instances they captured before the call. To apply the
+    /// new sizes to a live form, invoke `refreshTheme()` on it (typically
+    /// `CN.getCurrentForm().refreshTheme()`) after calling this method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `factor`: the multiplier applied to every scalable font size. Must
+    ///   be greater than zero.
+    public void zoomFonts(float factor) {
+<span class="fc bfc" id="L1577" title="All 2 branches covered.">        if (factor &lt;= 0f) {</span>
+<span class="fc" id="L1578">            throw new IllegalArgumentException(&quot;Zoom factor must be greater than zero&quot;);</span>
+        }
+<span class="fc bfc" id="L1580" title="All 2 branches covered.">        if (factor == 1f) {</span>
+<span class="fc" id="L1581">            return;</span>
+        }
+<span class="fc bfc" id="L1583" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : themeProps.entrySet()) {</span>
+<span class="fc bfc" id="L1584" title="All 2 branches covered.">            if (!entry.getKey().endsWith(Style.FONT)) {</span>
+<span class="fc" id="L1585">                continue;</span>
+            }
+<span class="fc" id="L1587">            Object value = entry.getValue();</span>
+<span class="fc" id="L1588">            Font font = null;</span>
+<span class="pc bpc" id="L1589" title="1 of 2 branches missed.">            if (value instanceof Font) {</span>
+<span class="fc" id="L1590">                font = (Font) value;</span>
+<span class="nc bnc" id="L1591" title="All 2 branches missed.">            } else if (value instanceof String) {</span>
+<span class="nc" id="L1592">                Font parsed = parseFont((String) value);</span>
+<span class="nc bnc" id="L1593" title="All 4 branches missed.">                if (parsed != null &amp;&amp; parsed.isTTFNativeFont()) {</span>
+<span class="nc" id="L1594">                    font = parsed;</span>
+                }
+            }
+<span class="pc bpc" id="L1597" title="1 of 4 branches missed.">            if (font == null || !font.isTTFNativeFont()) {</span>
+<span class="fc" id="L1598">                continue;</span>
+            }
+<span class="fc" id="L1600">            Font scaled = scaleFontByFactor(font, factor);</span>
+<span class="pc bpc" id="L1601" title="2 of 4 branches missed.">            if (scaled != null &amp;&amp; scaled != font) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L1602">                entry.setValue(scaled);</span>
+            }
+<span class="fc" id="L1604">        }</span>
+<span class="fc" id="L1605">        Font defFont = defaultStyle.getFont();</span>
+<span class="pc bpc" id="L1606" title="1 of 4 branches missed.">        if (defFont != null &amp;&amp; defFont.isTTFNativeFont()) {</span>
+<span class="fc" id="L1607">            Font scaled = scaleFontByFactor(defFont, factor);</span>
+<span class="pc bpc" id="L1608" title="2 of 4 branches missed.">            if (scaled != null &amp;&amp; scaled != defFont) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L1609">                defaultStyle.setFont(scaled);</span>
+            }
+        }
+<span class="fc" id="L1612">        Font defSelFont = defaultSelectedStyle.getFont();</span>
+<span class="pc bpc" id="L1613" title="1 of 4 branches missed.">        if (defSelFont != null &amp;&amp; defSelFont.isTTFNativeFont()) {</span>
+<span class="fc" id="L1614">            Font scaled = scaleFontByFactor(defSelFont, factor);</span>
+<span class="pc bpc" id="L1615" title="2 of 4 branches missed.">            if (scaled != null &amp;&amp; scaled != defSelFont) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L1616">                defaultSelectedStyle.setFont(scaled);</span>
+            }
+        }
+<span class="fc" id="L1619">        styles.clear();</span>
+<span class="fc" id="L1620">        selectedStyles.clear();</span>
+<span class="fc" id="L1621">        imageCache.clear();</span>
+<span class="fc" id="L1622">        current.refreshTheme(false);</span>
+<span class="fc" id="L1623">    }</span>
+
+    private Font scaleFontByFactor(Font font, float factor) {
+<span class="pc bpc" id="L1626" title="2 of 4 branches missed.">        if (font == null || !font.isTTFNativeFont()) {</span>
+<span class="nc" id="L1627">            return font;</span>
+        }
+<span class="fc" id="L1629">        float baseSize = font.getPixelSize();</span>
+<span class="pc bpc" id="L1630" title="1 of 2 branches missed.">        if (baseSize &lt;= 0) {</span>
+<span class="nc" id="L1631">            baseSize = font.getHeight();</span>
+        }
+<span class="pc bpc" id="L1633" title="1 of 2 branches missed.">        if (baseSize &lt;= 0) {</span>
+<span class="nc" id="L1634">            return font;</span>
+        }
+        try {
+<span class="fc" id="L1637">            return font.derive(baseSize * factor, font.getStyle());</span>
+<span class="nc" id="L1638">        } catch (Exception ex) {</span>
+<span class="nc" id="L1639">            Log.e(ex);</span>
+<span class="nc" id="L1640">            return font;</span>
+        }
+    }
+
+    /// Invalidates the cached Style instances and re-runs the theme build pass
+    /// against the currently installed theme properties. Callers use this after
+    /// state changes that affect style resolution (notably `Display.setDarkMode`,
+    /// which makes `$Dark&lt;UIID&gt;` entries eligible) without reloading the theme
+    /// from a resource file. Components styled after this call resolve against
+    /// the refreshed theme; already-resolved Style references on existing
+    /// components keep their old values until those components re-fetch their
+    /// styles.
+    public void refreshTheme() {
+<span class="pc bpc" id="L1653" title="2 of 4 branches missed.">        if (!accessible || themeProps == null) {</span>
+<span class="nc" id="L1654">            return;</span>
+        }
+<span class="fc" id="L1656">        Hashtable props = new Hashtable();</span>
+<span class="fc bfc" id="L1657" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : themeProps.entrySet()) {</span>
+<span class="fc" id="L1658">            props.put(e.getKey(), e.getValue());</span>
+<span class="fc" id="L1659">        }</span>
+        // buildTheme strips `@`-prefixed constants into themeConstants and
+        // drops them from the main themeProps map. Round-tripping through
+        // setThemePropsImpl would therefore lose every constant - so
+        // re-add them from themeConstants with the `@` restored, matching
+        // the shape buildTheme expects on input.
+<span class="pc bpc" id="L1665" title="1 of 2 branches missed.">        if (themeConstants != null) {</span>
+<span class="pc bpc" id="L1666" title="1 of 2 branches missed.">            for (Map.Entry&lt;String, Object&gt; e : themeConstants.entrySet()) {</span>
+<span class="nc" id="L1667">                props.put(&quot;@&quot; + e.getKey(), e.getValue());</span>
+<span class="nc" id="L1668">            }</span>
+        }
+<span class="fc" id="L1670">        setThemePropsImpl(props);</span>
+<span class="fc" id="L1671">    }</span>
+
+    /// Returns a theme constant defined in the resource editor
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or the default if the constant isn't in the theme
+    public int getThemeConstant(String constantName, int def) {
+<span class="fc" id="L1685">        String v = (String) themeConstants.get(constantName);</span>
+<span class="fc bfc" id="L1686" title="All 2 branches covered.">        if (v != null) {</span>
+            try {
+<span class="fc" id="L1688">                return Integer.parseInt(v);</span>
+<span class="nc" id="L1689">            } catch (NumberFormatException err) {</span>
+<span class="nc" id="L1690">                Log.e(err);</span>
+            }
+        }
+<span class="fc" id="L1693">        return def;</span>
+    }
+
+    /// Returns a theme constant defined in the resource editor
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or the default if the constant isn't in the theme
+    public final String getThemeConstant(String constantName, String def) {
+<span class="fc" id="L1708">        String v = (String) themeConstants.get(constantName);</span>
+<span class="fc bfc" id="L1709" title="All 2 branches covered.">        if (v != null) {</span>
+<span class="fc" id="L1710">            return v;</span>
+        }
+<span class="fc" id="L1712">        return def;</span>
+    }
+
+    /// Returns a theme constant defined in the resource editor as a boolean value
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// - `def`: default value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or the default if the constant isn't in the theme
+    public final boolean isThemeConstant(String constantName, boolean def) {
+<span class="fc" id="L1727">        String c = getThemeConstant(constantName, null);</span>
+<span class="fc bfc" id="L1728" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L1729">            return def;</span>
+        }
+<span class="pc bpc" id="L1731" title="1 of 4 branches missed.">        return &quot;true&quot;.equalsIgnoreCase(c) || &quot;1&quot;.equals(c);</span>
+    }
+
+    /// Returns a theme constant defined in the resource editor as a boolean value or null if the constant isn't defined
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// #### Returns
+    ///
+    /// the value of the constant or null if the constant isn't in the theme
+    public Boolean isThemeConstant(String constantName) {
+<span class="fc" id="L1744">        String c = getThemeConstant(constantName, null);</span>
+<span class="fc bfc" id="L1745" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L1746">            return null;</span>
+        }
+<span class="pc bpc" id="L1748" title="3 of 4 branches missed.">        if (&quot;true&quot;.equalsIgnoreCase(c) || &quot;1&quot;.equals(c)) {</span>
+<span class="fc" id="L1749">            return Boolean.TRUE;</span>
+        }
+<span class="nc" id="L1751">        return Boolean.FALSE;</span>
+    }
+
+    /// Returns a theme constant defined in the resource editor
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// #### Returns
+    ///
+    /// the image if defined
+    public Image getThemeImageConstant(String constantName) {
+<span class="fc" id="L1764">        return (Image) themeConstants.get(constantName);</span>
+    }
+
+    /// Returns a theme mask constant
+    ///
+    /// #### Parameters
+    ///
+    /// - `constantName`: the name of the constant
+    ///
+    /// #### Returns
+    ///
+    /// the mask if defined
+    public Object getThemeMaskConstant(String constantName) {
+<span class="fc" id="L1777">        Object o = themeConstants.get(constantName + &quot;Mask&quot;);</span>
+<span class="pc bpc" id="L1778" title="1 of 2 branches missed.">        if (o != null) {</span>
+<span class="nc" id="L1779">            return o;</span>
+        }
+<span class="fc" id="L1781">        Image i = (Image) themeConstants.get(constantName);</span>
+<span class="pc bpc" id="L1782" title="1 of 2 branches missed.">        if (i == null) {</span>
+<span class="fc" id="L1783">            return null;</span>
+        }
+<span class="nc" id="L1785">        o = i.createMask();</span>
+<span class="nc" id="L1786">        themeConstants.put(constantName + &quot;Mask&quot;, o);</span>
+<span class="nc" id="L1787">        return o;</span>
+    }
+
+    void setThemePropsImpl(Hashtable themeProps) {
+<span class="fc" id="L1791">        resetThemeProps(themeProps);</span>
+<span class="fc" id="L1792">        styles.clear();</span>
+<span class="fc" id="L1793">        themeConstants.clear();</span>
+<span class="fc" id="L1794">        selectedStyles.clear();</span>
+<span class="fc" id="L1795">        imageCache.clear();</span>
+<span class="pc bpc" id="L1796" title="1 of 2 branches missed.">        if (themelisteners != null) {</span>
+<span class="nc" id="L1797">            themelisteners.fireActionEvent(new ActionEvent(themeProps, ActionEvent.Type.Theme));</span>
+        }
+<span class="fc" id="L1799">        buildTheme(themeProps);</span>
+<span class="fc" id="L1800">        breakTitleAreaToolbarDeriveCycle();</span>
+<span class="fc" id="L1801">        current.refreshTheme(true);</span>
+<span class="fc" id="L1802">    }</span>
+
+    /// resetThemeProps decides whether to install the legacy
+    /// `Toolbar.derive=TitleArea` default by inspecting only the *immediate*
+    /// installedTheme it was handed. When a user theme has
+    /// `@includeNativeBool: true`, buildTheme later layers in a native theme
+    /// (e.g. iOS Modern's `TitleArea.derive=Toolbar`) and the user theme on
+    /// top - and those layers can flip the derive direction without the
+    /// outer reset noticing. Once both `Toolbar.derive=TitleArea` and
+    /// `TitleArea.derive=Toolbar` exist in the merged themeProps,
+    /// `createStyle` recurses indefinitely and Logs `Error creating style
+    /// TitleArea` (the catch returns a default style, but the cycle leaves
+    /// the chrome unstyled and the app effectively stuck). Drop the legacy
+    /// default once we can see the merged state.
+    private void breakTitleAreaToolbarDeriveCycle() {
+<span class="pc bpc" id="L1817" title="1 of 2 branches missed.">        if (themeProps == null) {</span>
+<span class="nc" id="L1818">            return;</span>
+        }
+<span class="fc" id="L1820">        Object titleAreaDerive = themeProps.get(&quot;TitleArea.derive&quot;);</span>
+<span class="fc bfc" id="L1821" title="All 2 branches covered.">        if (&quot;Toolbar&quot;.equals(titleAreaDerive)) {</span>
+<span class="fc" id="L1822">            Object toolbarDerive = themeProps.get(&quot;Toolbar.derive&quot;);</span>
+<span class="pc bpc" id="L1823" title="1 of 2 branches missed.">            if (&quot;TitleArea&quot;.equals(toolbarDerive)) {</span>
+<span class="nc" id="L1824">                themeProps.remove(&quot;Toolbar.derive&quot;);</span>
+            }
+        }
+<span class="fc" id="L1827">    }</span>
+
+    private void buildTheme(Hashtable themeProps) {
+        // A new theme may change constants that the platform consults while deriving
+        // fonts (e.g. a native theme's text letter spacing). Flush the derived-font
+        // cache so those fonts are rebuilt against the incoming constants rather than
+        // returning a paint derived under the previous (or no) theme.
+<span class="fc" id="L1834">        Font.clearDerivedFontCache();</span>
+<span class="fc" id="L1835">        String con = (String) themeProps.get(&quot;@includeNativeBool&quot;);</span>
+<span class="pc bpc" id="L1836" title="3 of 6 branches missed.">        if (con != null &amp;&amp; &quot;true&quot;.equalsIgnoreCase(con) &amp;&amp; Display.getInstance().hasNativeTheme()) {</span>
+<span class="nc" id="L1837">            boolean a = accessible;</span>
+<span class="nc" id="L1838">            accessible = true;</span>
+<span class="nc" id="L1839">            Display.getInstance().installNativeTheme();</span>
+<span class="nc" id="L1840">            accessible = a;</span>
+        }
+<span class="fc" id="L1842">        Enumeration e = themeProps.keys();</span>
+<span class="fc bfc" id="L1843" title="All 2 branches covered.">        while (e.hasMoreElements()) {</span>
+<span class="fc" id="L1844">            String key = (String) e.nextElement();</span>
+
+            // this is a constant not a theme entry
+<span class="fc bfc" id="L1847" title="All 2 branches covered.">            if (key.startsWith(&quot;@&quot;)) {</span>
+<span class="fc" id="L1848">                themeConstants.put(key.substring(1), themeProps.get(key));</span>
+<span class="fc" id="L1849">                continue;</span>
+            }
+<span class="fc" id="L1851">            this.themeProps.put(key, themeProps.get(key));</span>
+<span class="fc" id="L1852">        }</span>
+
+<span class="fc" id="L1854">        applyThemeBindings();</span>
+
+<span class="fc" id="L1856">        updateLargerTextScaleSettingFromTheme();</span>
+
+<span class="pc bpc" id="L1858" title="1 of 2 branches missed.">        if (!this.themeProps.containsKey(&quot;PickerButtonBar.derive&quot;)) {</span>
+            // For the button bar (with Cancel and Done) of the Picker interaction dialog in lightweight mode
+<span class="pc bpc" id="L1860" title="1 of 2 branches missed.">            if (this.themeProps.containsKey(&quot;PickerButtonBarNative.derive&quot;)) {</span>
+<span class="nc" id="L1861">                this.themeProps.put(&quot;PickerButtonBar.derive&quot;, &quot;PickerButtonBarNative&quot;);</span>
+            } else {
+<span class="fc" id="L1863">                this.themeProps.put(&quot;PickerButtonBar.margin&quot;, &quot;0,0,0,0&quot;);</span>
+<span class="fc" id="L1864">                this.themeProps.put(&quot;PickerButtonBar.border&quot;, Border.createCompoundBorder(Border.createLineBorder(1, ColorUtil.rgb(148, 150, 151)), Border.createEmpty(), Border.createEmpty(), Border.createEmpty()));</span>
+<span class="fc" id="L1865">                this.themeProps.put(&quot;PickerButtonBar.bgColor&quot;, &quot;F0F1F3&quot;);</span>
+<span class="fc" id="L1866">                this.themeProps.put(&quot;PickerButtonBar.transparency&quot;, &quot;255&quot;);</span>
+            }
+        }
+
+<span class="fc bfc" id="L1870" title="All 2 branches covered.">        if (!this.themeProps.containsKey(&quot;PickerButtonTablet.derive&quot;)) {</span>
+            // For the buttons of the picker in lightweight mode (the Cancel and Done buttons)
+<span class="pc bpc" id="L1872" title="1 of 2 branches missed.">            if (this.themeProps.containsKey(&quot;PickerButtonTabletNative.derive&quot;)) {</span>
+<span class="nc" id="L1873">                this.themeProps.put(&quot;PickerButtonTablet.derive&quot;, &quot;PickerButtonTabletNative&quot;);</span>
+<span class="nc" id="L1874">                this.themeProps.put(&quot;PickerButtonTablet.sel#derive&quot;, &quot;PickerButtonTabletNative.sel&quot;);</span>
+<span class="nc" id="L1875">                this.themeProps.put(&quot;PickerButtonTablet.press#derive&quot;, &quot;PickerButtonTabletNative.press&quot;);</span>
+            } else {
+<span class="fc" id="L1877">                this.themeProps.put(&quot;PickerButtonTablet.derive&quot;, &quot;Button&quot;);</span>
+<span class="fc" id="L1878">                this.themeProps.put(&quot;PickerButtonTablet.sel#derive&quot;, &quot;Button&quot;);</span>
+<span class="fc" id="L1879">                this.themeProps.put(&quot;PickerButtonTablet.press#derive&quot;, &quot;Button&quot;);</span>
+            }
+        }
+
+<span class="fc" id="L1883">        applyLargerTextScaleToThemeFonts();</span>
+
+        // necessary to clear up the style so we don't get resedue from the previous UI
+<span class="fc" id="L1886">        defaultStyle = new Style();</span>
+
+        //create's the default style
+<span class="fc" id="L1889">        defaultStyle = createStyle(&quot;&quot;, &quot;&quot;, false);</span>
+<span class="fc" id="L1890">        defaultSelectedStyle = new Style(defaultStyle);</span>
+<span class="fc" id="L1891">        defaultSelectedStyle = createStyle(&quot;&quot;, &quot;sel#&quot;, true);</span>
+<span class="fc" id="L1892">        applyLargerTextScaleToDefaultStyles();</span>
+
+<span class="fc" id="L1894">        String overlayThemes = (String) themeProps.get(&quot;@OverlayThemes&quot;);</span>
+<span class="pc bpc" id="L1895" title="1 of 2 branches missed.">        if (overlayThemes != null) {</span>
+<span class="nc" id="L1896">            java.util.List&lt;String&gt; overlayThemesArr = StringUtil.tokenize(overlayThemes, ',');</span>
+<span class="nc bnc" id="L1897" title="All 2 branches missed.">            for (String th : overlayThemesArr) {</span>
+<span class="nc" id="L1898">                th = th.trim();</span>
+<span class="nc bnc" id="L1899" title="All 2 branches missed.">                if (th.length() == 0) {</span>
+<span class="nc" id="L1900">                    continue;</span>
+                }
+                try {
+<span class="nc" id="L1903">                    Resources res = Resources.openLayered(&quot;/&quot; + th);</span>
+<span class="nc" id="L1904">                    boolean a = accessible;</span>
+<span class="nc" id="L1905">                    accessible = true;</span>
+<span class="nc" id="L1906">                    addThemeProps(res.getTheme(res.getThemeResourceNames()[0]));</span>
+<span class="nc" id="L1907">                    accessible = a;</span>
+<span class="nc" id="L1908">                } catch (Exception ex) {</span>
+<span class="nc" id="L1909">                    System.err.println(&quot;Failed to load overlay theme file specified by @overlayThemes theme constant: &quot; + th);</span>
+<span class="nc" id="L1910">                    Log.e(ex);</span>
+<span class="nc" id="L1911">                }</span>
+<span class="nc" id="L1912">            }</span>
+        }
+
+<span class="fc" id="L1915">    }</span>
+
+    /// Theme entries can be bound to a named theme constant via a
+    /// `@cn1-bind:&amp;lt;themeKey&amp;gt;=&amp;lt;varName&amp;gt;` pseudo-constant emitted by the CSS
+    /// compiler when it expands a `var(--name, fallback)` reference. The
+    /// compiler still inlines `fallback` as the baked-in default (so themes
+    /// load correctly with no override), but additionally records that the
+    /// resolved style property tracks `--name`.
+    ///
+    /// At runtime, callers tune the palette by injecting an `@&amp;lt;varName&amp;gt;`
+    /// constant via [#addThemeProps]. This method walks the binding entries
+    /// and overlays the override value onto every bound style key, so a
+    /// single `addThemeProps({&quot;@accent-color&quot;: &quot;ff2d95&quot;})` call retunes
+    /// every UIID whose CSS rule referenced `var(--accent-color, ...)`.
+    /// Bindings without a matching override are left at their baked-in
+    /// default (whatever was already in themeProps from the initial load).
+    private void applyThemeBindings() {
+<span class="pc bpc" id="L1932" title="2 of 6 branches missed.">        if (themeConstants == null || themeConstants.isEmpty() || themeProps == null) {</span>
+<span class="fc" id="L1933">            return;</span>
+        }
+<span class="fc" id="L1935">        final String prefix = &quot;cn1-bind:&quot;;</span>
+<span class="fc bfc" id="L1936" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : themeConstants.entrySet()) {</span>
+<span class="fc" id="L1937">            String constantKey = entry.getKey();</span>
+<span class="pc bpc" id="L1938" title="1 of 4 branches missed.">            if (constantKey == null || !constantKey.startsWith(prefix)) {</span>
+<span class="fc" id="L1939">                continue;</span>
+            }
+<span class="fc" id="L1941">            Object varNameObj = entry.getValue();</span>
+<span class="pc bpc" id="L1942" title="1 of 2 branches missed.">            if (!(varNameObj instanceof String)) {</span>
+<span class="nc" id="L1943">                continue;</span>
+            }
+<span class="fc" id="L1945">            String varName = ((String) varNameObj).trim();</span>
+<span class="pc bpc" id="L1946" title="1 of 2 branches missed.">            if (varName.length() == 0) {</span>
+<span class="nc" id="L1947">                continue;</span>
+            }
+<span class="fc" id="L1949">            Object override = themeConstants.get(varName);</span>
+<span class="fc bfc" id="L1950" title="All 2 branches covered.">            if (!(override instanceof String)) {</span>
+<span class="fc" id="L1951">                continue;</span>
+            }
+<span class="fc" id="L1953">            String themeKey = constantKey.substring(prefix.length());</span>
+<span class="pc bpc" id="L1954" title="1 of 2 branches missed.">            if (themeKey.length() == 0) {</span>
+<span class="nc" id="L1955">                continue;</span>
+            }
+            // Only retune keys that are already present in themeProps so a
+            // stale binding entry (left over after the bound rule was
+            // dropped from the source CSS) can't materialize a phantom
+            // style key from the user's override value.
+<span class="fc bfc" id="L1961" title="All 2 branches covered.">            if (!themeProps.containsKey(themeKey)) {</span>
+<span class="fc" id="L1962">                continue;</span>
+            }
+<span class="fc" id="L1964">            String overrideValue = (String) override;</span>
+<span class="pc bpc" id="L1965" title="1 of 2 branches missed.">            if (themeKey.endsWith(&quot;Color&quot;)) {</span>
+<span class="fc" id="L1966">                overrideValue = normalizeBoundColorValue(overrideValue);</span>
+<span class="fc bfc" id="L1967" title="All 2 branches covered.">                if (overrideValue == null) {</span>
+<span class="fc" id="L1968">                    continue;</span>
+                }
+            }
+<span class="fc" id="L1971">            themeProps.put(themeKey, overrideValue);</span>
+<span class="fc" id="L1972">            syncBoundRoundBorderColor(themeKey, overrideValue);</span>
+<span class="fc" id="L1973">        }</span>
+<span class="fc" id="L1974">    }</span>
+
+    /// A RoundBorder paints its own serialized color rather than Style.bgColor.
+    /// Keep that legacy representation and geometry intact, but synchronize the
+    /// border when a compiler-emitted background-color binding is applied.
+    /// This avoids switching the border into UIID painter mode, which is not
+    /// supported consistently across ports and can change circle/pill geometry.
+    private void syncBoundRoundBorderColor(String themeKey, String colorValue) {
+<span class="fc" id="L1982">        final String suffix = &quot;bgColor&quot;;</span>
+<span class="fc bfc" id="L1983" title="All 2 branches covered.">        if (!themeKey.endsWith(suffix)) {</span>
+<span class="fc" id="L1984">            return;</span>
+        }
+<span class="fc" id="L1986">        String borderKey = themeKey.substring(0, themeKey.length() - suffix.length()) + &quot;border&quot;;</span>
+<span class="fc" id="L1987">        Object border = themeProps.get(borderKey);</span>
+<span class="fc bfc" id="L1988" title="All 2 branches covered.">        if (border instanceof RoundBorder) {</span>
+<span class="fc" id="L1989">            ((RoundBorder) border).color(Integer.parseInt(colorValue, 16));</span>
+        }
+<span class="fc" id="L1991">    }</span>
+
+    /// `loadTheme` stores color theme entries as plain hex strings (no `#`,
+    /// lowercase). User-supplied overrides may use either form, so trim a
+    /// leading `#` and lowercase the value before assigning it to a bound
+    /// color key. Returns null when the value can't be parsed as a 3- or
+    /// 6-digit hex color so the binding falls through to its default.
+    private static String normalizeBoundColorValue(String raw) {
+<span class="pc bpc" id="L1999" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L2000">            return null;</span>
+        }
+<span class="fc" id="L2002">        String value = raw.trim();</span>
+<span class="pc bpc" id="L2003" title="1 of 2 branches missed.">        if (value.length() == 0) {</span>
+<span class="nc" id="L2004">            return null;</span>
+        }
+<span class="fc bfc" id="L2006" title="All 2 branches covered.">        if (value.charAt(0) == '#') {</span>
+<span class="fc" id="L2007">            value = value.substring(1);</span>
+        }
+<span class="fc bfc" id="L2009" title="All 2 branches covered.">        if (value.length() == 3) {</span>
+<span class="fc" id="L2010">            char r = value.charAt(0);</span>
+<span class="fc" id="L2011">            char g = value.charAt(1);</span>
+<span class="fc" id="L2012">            char b = value.charAt(2);</span>
+<span class="fc" id="L2013">            value = &quot;&quot; + r + r + g + g + b + b;</span>
+        }
+<span class="fc bfc" id="L2015" title="All 2 branches covered.">        if (value.length() != 6) {</span>
+<span class="fc" id="L2016">            return null;</span>
+        }
+<span class="fc bfc" id="L2018" title="All 2 branches covered.">        for (int i = 0; i &lt; 6; i++) {</span>
+<span class="fc" id="L2019">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L2020" title="4 of 12 branches missed.">            boolean hex = (c &gt;= '0' &amp;&amp; c &lt;= '9') || (c &gt;= 'a' &amp;&amp; c &lt;= 'f') || (c &gt;= 'A' &amp;&amp; c &lt;= 'F');</span>
+<span class="pc bpc" id="L2021" title="1 of 2 branches missed.">            if (!hex) {</span>
+<span class="nc" id="L2022">                return null;</span>
+            }
+        }
+<span class="fc" id="L2025">        return value.toLowerCase();</span>
+    }
+
+    private Map&lt;String, String&gt; parseCache() {
+<span class="nc bnc" id="L2029" title="All 2 branches missed.">        if (parseCache == null) {</span>
+<span class="nc" id="L2030">            parseCache = new HashMap&lt;String, String&gt;();</span>
+        }
+<span class="nc" id="L2032">        return parseCache;</span>
+    }
+
+    private void updateLargerTextScaleSettingFromTheme() {
+<span class="fc" id="L2036">        Boolean useScale = isThemeConstant(&quot;useLargerTextScaleBool&quot;);</span>
+<span class="fc bfc" id="L2037" title="All 2 branches covered.">        if (useScale != null) {</span>
+<span class="fc" id="L2038">            useLargerTextScale = useScale.booleanValue();</span>
+        }
+<span class="fc" id="L2040">    }</span>
+
+    private float getEffectiveLargerTextScale() {
+<span class="fc bfc" id="L2043" title="All 2 branches covered.">        if (!useLargerTextScale) {</span>
+<span class="fc" id="L2044">            return 1f;</span>
+        }
+<span class="fc" id="L2046">        Display display = Display.getInstance();</span>
+<span class="fc bfc" id="L2047" title="All 2 branches covered.">        if (!display.isLargerTextEnabled()) {</span>
+<span class="fc" id="L2048">            return 1f;</span>
+        }
+<span class="fc" id="L2050">        return display.getLargerTextScale();</span>
+    }
+
+    private Font scaleFontForLargerText(Font font, float scale) {
+<span class="pc bpc" id="L2054" title="2 of 6 branches missed.">        if (font == null || !font.isTTFNativeFont() || scale &lt;= 1f) {</span>
+<span class="fc" id="L2055">            return font;</span>
+        }
+<span class="fc" id="L2057">        float baseSize = font.getPixelSize();</span>
+<span class="fc bfc" id="L2058" title="All 2 branches covered.">        if (baseSize &lt;= 0) {</span>
+<span class="fc" id="L2059">            baseSize = font.getHeight();</span>
+        }
+<span class="pc bpc" id="L2061" title="1 of 2 branches missed.">        if (baseSize &lt;= 0) {</span>
+<span class="nc" id="L2062">            return font;</span>
+        }
+        try {
+<span class="fc" id="L2065">            return font.derive(baseSize * scale, font.getStyle());</span>
+<span class="nc" id="L2066">        } catch (Exception ex) {</span>
+<span class="nc" id="L2067">            Log.e(ex);</span>
+<span class="nc" id="L2068">            return font;</span>
+        }
+    }
+
+    private void applyLargerTextScaleToThemeFonts() {
+        // Roll back any prior scaling we applied so this pass always derives
+        // from the original installed font. Without the rollback, repeated
+        // refreshes compound (each scale multiplies the previously-derived
+        // pixel size) and a return to scale 1.0 never actually shrinks fonts.
+<span class="fc bfc" id="L2077" title="All 2 branches covered.">        if (!scaledFontOriginals.isEmpty()) {</span>
+<span class="fc bfc" id="L2078" title="All 2 branches covered.">            for (Map.Entry&lt;String, Font&gt; entry : scaledFontOriginals.entrySet()) {</span>
+<span class="fc" id="L2079">                String key = entry.getKey();</span>
+<span class="fc" id="L2080">                Object current = themeProps.get(key);</span>
+<span class="fc" id="L2081">                Font derived = scaledFontDerived.get(key);</span>
+                // Only restore when the theme still holds the Font we wrote;
+                // an intervening setThemeProps/addThemeProps may have replaced
+                // it with a new original we must keep.
+<span class="fc bfc" id="L2085" title="All 2 branches covered.">                if (current == derived) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L2086">                    themeProps.put(key, entry.getValue());</span>
+                }
+<span class="fc" id="L2088">            }</span>
+<span class="fc" id="L2089">            scaledFontOriginals.clear();</span>
+<span class="fc" id="L2090">            scaledFontDerived.clear();</span>
+        }
+
+<span class="fc" id="L2093">        float scale = getEffectiveLargerTextScale();</span>
+<span class="fc bfc" id="L2094" title="All 2 branches covered.">        if (scale &lt;= 1f) {</span>
+<span class="fc" id="L2095">            return;</span>
+        }
+<span class="fc bfc" id="L2097" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : themeProps.entrySet()) {</span>
+<span class="fc bfc" id="L2098" title="All 2 branches covered.">            if (!entry.getKey().endsWith(Style.FONT)) {</span>
+<span class="fc" id="L2099">                continue;</span>
+            }
+<span class="fc" id="L2101">            Object value = entry.getValue();</span>
+<span class="pc bpc" id="L2102" title="1 of 2 branches missed.">            if (value instanceof Font) {</span>
+<span class="fc" id="L2103">                Font original = (Font) value;</span>
+<span class="fc" id="L2104">                Font scaled = scaleFontForLargerText(original, scale);</span>
+<span class="pc bpc" id="L2105" title="1 of 2 branches missed.">                if (scaled != original) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L2106">                    scaledFontOriginals.put(entry.getKey(), original);</span>
+<span class="fc" id="L2107">                    scaledFontDerived.put(entry.getKey(), scaled);</span>
+<span class="fc" id="L2108">                    entry.setValue(scaled);</span>
+                }
+            }
+<span class="fc" id="L2111">        }</span>
+<span class="fc" id="L2112">    }</span>
+
+    private void applyLargerTextScaleToDefaultStyles() {
+<span class="fc" id="L2115">        float scale = getEffectiveLargerTextScale();</span>
+<span class="fc bfc" id="L2116" title="All 2 branches covered.">        if (scale &lt;= 1f) {</span>
+<span class="fc" id="L2117">            return;</span>
+        }
+<span class="pc bpc" id="L2119" title="1 of 2 branches missed.">        if (!themeProps.containsKey(Style.FONT)) {</span>
+<span class="fc" id="L2120">            defaultStyle.setFont(scaleFontForLargerText(defaultStyle.getFont(), scale));</span>
+        }
+<span class="pc bpc" id="L2122" title="1 of 2 branches missed.">        if (!themeProps.containsKey(&quot;sel#&quot; + Style.FONT)) {</span>
+<span class="fc" id="L2123">            defaultSelectedStyle.setFont(scaleFontForLargerText(defaultSelectedStyle.getFont(), scale));</span>
+        }
+<span class="fc" id="L2125">    }</span>
+
+    /// Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
+    /// to override the styles in `com.codename1.ui.Component`
+    ///
+    /// #### Parameters
+    ///
+    /// - `theme`: Theme used to retrieve images referenced in the style strings.
+    ///
+    /// - `id`: The style ID (UIID) to use to cache the style inside the theme.
+    ///
+    /// - `prefix`: Prefix to use for styles.  Corresponds to the prefix argument in `boolean, java.lang.String) @param baseStyle The style class from which this new style should derive. @param selected True if this is for a selected style. @param styleString Array of style strings to be parsed. The format is key1:value1; key2:value2; etc.... While this looks similar to CSS, it is important to note that it is NOT CSS. The keys and values correspond to the properties of {@link com.codename1.ui.plaf.Style` and their associated values.
+    ///
+    /// #### Returns
+    ///
+    /// @return A style object representing the styles that were provided in the styleString.
+    ///
+    /// Example Usage
+    ///
+    /// `Style s = parseStyle(theme, &quot;Button[MyCustomButton]&quot;, &quot;&quot;, &quot;Button&quot;, false,
+    /// &quot;fgColor:ff0000; font:18mm; border: 1px solid ff0000; bgType:none; padding: 3mm; margin: 1mm&quot;);
+    ///
+    /// // Create a 9-piece image border on the fly:
+    /// Style s = parseStyle(theme, &quot;Button[MyCustomButton]&quot;, &quot;&quot;, &quot;Button&quot;, false,
+    /// &quot;border:splicedImage /notes.png 0.3 0.4 0.3 0.4&quot;);
+    /// // This splices the image found at /notes.png into 9 pieces.  Splice insets are specified by the 4 floating point values
+    /// // at the end of the border directive:  [top] [right] [bottom] [left].`
+    Style parseStyle(Resources theme, String id, String prefix, String baseStyle, boolean selected, String... styleString) {
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">        String cacheKey = selected ? id + &quot;.sel&quot; : id + &quot;.&quot; + prefix;</span>
+<span class="nc" id="L2154">        String originalId = id;</span>
+<span class="nc bnc" id="L2155" title="All 4 branches missed.">        if (id == null || id.length() == 0) {</span>
+            //if no id return the default style
+<span class="nc" id="L2157">            id = &quot;&quot;;</span>
+        } else {
+<span class="nc" id="L2159">            id = id + &quot;.&quot;;</span>
+        }
+<span class="nc bnc" id="L2161" title="All 10 branches missed.">        if (Arrays.toString(styleString).equals(parseCache().get(cacheKey)) &amp;&amp; ((selected &amp;&amp; selectedStyles.containsKey(id)) || (!selected &amp;&amp; this.styles.containsKey(id)))) {</span>
+
+<span class="nc" id="L2163">            return getComponentStyleImpl(originalId, selected, prefix);</span>
+        }
+<span class="nc" id="L2165">        parseCache().put(cacheKey, Arrays.toString(styleString));</span>
+<span class="nc bnc" id="L2166" title="All 2 branches missed.">        Style base = baseStyle != null ? getComponentStyleImpl(baseStyle, selected, prefix) : null;</span>
+<span class="nc" id="L2167">        Map&lt;String, String&gt; styles = new HashMap&lt;String, String&gt;();</span>
+<span class="nc bnc" id="L2168" title="All 2 branches missed.">        for (String str : styleString) {</span>
+<span class="nc" id="L2169">            StyleParser.parseString(styles, str);</span>
+        }
+<span class="nc" id="L2171">        StyleInfo styleInfo = new StyleInfo(styles);</span>
+
+
+<span class="nc bnc" id="L2174" title="All 4 branches missed.">        if (prefix != null &amp;&amp; prefix.length() &gt; 0) {</span>
+<span class="nc" id="L2175">            id += prefix;</span>
+        }
+<span class="nc bnc" id="L2177" title="All 2 branches missed.">        if (themeProps == null) {</span>
+<span class="nc" id="L2178">            resetThemeProps(null);</span>
+        }
+<span class="nc bnc" id="L2180" title="All 2 branches missed.">        if (baseStyle != null) {</span>
+<span class="nc" id="L2181">            themeProps.put(id + &quot;derive&quot;, baseStyle);</span>
+        } else {
+<span class="nc" id="L2183">            themeProps.remove(id + &quot;derive&quot;);</span>
+        }
+<span class="nc" id="L2185">        Integer bgColor = styleInfo.getBgColor();</span>
+<span class="nc bnc" id="L2186" title="All 2 branches missed.">        if (bgColor != null) {</span>
+<span class="nc" id="L2187">            themeProps.put(id + Style.BG_COLOR, Integer.toHexString(bgColor));</span>
+        } else {
+<span class="nc" id="L2189">            themeProps.remove(id + Style.BG_COLOR);</span>
+        }
+<span class="nc" id="L2191">        Integer fgColor = styleInfo.getFgColor();</span>
+<span class="nc bnc" id="L2192" title="All 2 branches missed.">        if (fgColor != null) {</span>
+<span class="nc" id="L2193">            themeProps.put(id + Style.FG_COLOR, Integer.toHexString(fgColor));</span>
+        } else {
+<span class="nc" id="L2195">            themeProps.remove(id + Style.FG_COLOR);</span>
+        }
+<span class="nc" id="L2197">        BorderInfo border = styleInfo.getBorder();</span>
+<span class="nc bnc" id="L2198" title="All 2 branches missed.">        if (border != null) {</span>
+<span class="nc" id="L2199">            themeProps.put(id + Style.BORDER, border.createBorder(theme));</span>
+        } else {
+<span class="nc" id="L2201">            themeProps.remove(id + Style.BORDER);</span>
+        }
+<span class="nc" id="L2203">        Integer bgType = styleInfo.getBgType();</span>
+<span class="nc bnc" id="L2204" title="All 2 branches missed.">        if (bgType != null) {</span>
+<span class="nc" id="L2205">            themeProps.put(id + Style.BACKGROUND_TYPE, bgType.byteValue());</span>
+        } else {
+<span class="nc" id="L2207">            themeProps.remove(id + Style.BACKGROUND_TYPE);</span>
+        }
+<span class="nc" id="L2209">        ImageInfo bgImage = styleInfo.getBgImage();</span>
+<span class="nc bnc" id="L2210" title="All 2 branches missed.">        if (bgImage != null) {</span>
+<span class="nc" id="L2211">            themeProps.put(id + Style.BG_IMAGE, bgImage.getImage(theme));</span>
+        } else {
+<span class="nc" id="L2213">            themeProps.remove(id + Style.BG_IMAGE);</span>
+        }
+
+<span class="nc" id="L2216">        MarginInfo margin = styleInfo.getMargin();</span>
+<span class="nc bnc" id="L2217" title="All 2 branches missed.">        if (margin != null) {</span>
+<span class="nc" id="L2218">            float[] marginArr = margin.createMargin(base);</span>
+<span class="nc" id="L2219">            themeProps.put(id + Style.MARGIN, marginArr[Component.TOP] + &quot;,&quot; + marginArr[Component.BOTTOM] + &quot;,&quot; + marginArr[Component.LEFT] + &quot;,&quot; + marginArr[Component.RIGHT]);</span>
+<span class="nc" id="L2220">            byte[] unitArr = margin.createMarginUnit(base);</span>
+<span class="nc" id="L2221">            themeProps.put(id + Style.MARGIN_UNIT, new byte[]{unitArr[Component.TOP], unitArr[Component.BOTTOM], unitArr[Component.LEFT], unitArr[Component.RIGHT]});</span>
+<span class="nc" id="L2222">        } else {</span>
+<span class="nc" id="L2223">            themeProps.remove(id + Style.MARGIN);</span>
+<span class="nc" id="L2224">            themeProps.remove(id + Style.MARGIN_UNIT);</span>
+        }
+<span class="nc" id="L2226">        PaddingInfo padding = styleInfo.getPadding();</span>
+<span class="nc bnc" id="L2227" title="All 2 branches missed.">        if (padding != null) {</span>
+<span class="nc" id="L2228">            float[] paddingArr = padding.createPadding(base);</span>
+<span class="nc" id="L2229">            themeProps.put(id + Style.PADDING, paddingArr[Component.TOP] + &quot;,&quot; + paddingArr[Component.BOTTOM] + &quot;,&quot; + paddingArr[Component.LEFT] + &quot;,&quot; + paddingArr[Component.RIGHT]);</span>
+<span class="nc" id="L2230">            byte[] unitArr = padding.createPaddingUnit(base);</span>
+<span class="nc" id="L2231">            themeProps.put(id + Style.PADDING_UNIT, new byte[]{unitArr[Component.TOP], unitArr[Component.BOTTOM], unitArr[Component.LEFT], unitArr[Component.RIGHT]});</span>
+<span class="nc" id="L2232">        } else {</span>
+<span class="nc" id="L2233">            themeProps.remove(id + Style.PADDING);</span>
+<span class="nc" id="L2234">            themeProps.remove(id + Style.PADDING_UNIT);</span>
+        }
+
+<span class="nc" id="L2237">        Integer transparency = styleInfo.getTransparency();</span>
+<span class="nc bnc" id="L2238" title="All 2 branches missed.">        if (transparency != null) {</span>
+<span class="nc" id="L2239">            themeProps.put(id + Style.TRANSPARENCY, String.valueOf(transparency.intValue()));</span>
+        } else {
+<span class="nc" id="L2241">            themeProps.remove(id + Style.TRANSPARENCY);</span>
+        }
+<span class="nc" id="L2243">        Integer opacity = styleInfo.getOpacity();</span>
+<span class="nc bnc" id="L2244" title="All 2 branches missed.">        if (opacity != null) {</span>
+<span class="nc" id="L2245">            themeProps.put(id + Style.OPACITY, String.valueOf(opacity.intValue()));</span>
+        } else {
+<span class="nc" id="L2247">            themeProps.remove(id + Style.OPACITY);</span>
+        }
+<span class="nc" id="L2249">        Integer alignment = styleInfo.getAlignment();</span>
+<span class="nc bnc" id="L2250" title="All 2 branches missed.">        if (alignment != null) {</span>
+<span class="nc" id="L2251">            themeProps.put(id + Style.ALIGNMENT, alignment);</span>
+        } else {
+<span class="nc" id="L2253">            themeProps.remove(id + Style.ALIGNMENT);</span>
+        }
+<span class="nc" id="L2255">        Integer textDecoration = styleInfo.getTextDecoration();</span>
+<span class="nc bnc" id="L2256" title="All 2 branches missed.">        if (textDecoration != null) {</span>
+<span class="nc" id="L2257">            themeProps.put(id + Style.TEXT_DECORATION, textDecoration);</span>
+        } else {
+<span class="nc" id="L2259">            themeProps.remove(id + Style.TEXT_DECORATION);</span>
+        }
+
+<span class="nc" id="L2262">        FontInfo font = styleInfo.getFont();</span>
+<span class="nc bnc" id="L2263" title="All 2 branches missed.">        if (font != null) {</span>
+<span class="nc" id="L2264">            themeProps.put(id + Style.FONT, font.createFont(base));</span>
+        } else {
+<span class="nc" id="L2266">            themeProps.remove(id + Style.FONT);</span>
+        }
+
+<span class="nc bnc" id="L2269" title="All 2 branches missed.">        if (selected) {</span>
+<span class="nc" id="L2270">            selectedStyles.remove(id);</span>
+        } else {
+<span class="nc" id="L2272">            this.styles.remove(id);</span>
+        }
+
+<span class="nc" id="L2275">        return getComponentStyleImpl(originalId, selected, prefix);</span>
+
+    }
+
+    Style createStyle(String id, String prefix, boolean selected) {
+<span class="fc" id="L2280">        return createStyle(id, prefix, selected, true);</span>
+    }
+
+    private Style createStyle(String id, String prefix, boolean selected, boolean allowDarkStyle) {
+        Style style;
+<span class="fc" id="L2285">        String originalId = id;</span>
+<span class="pc bpc" id="L2286" title="1 of 4 branches missed.">        if (prefix != null &amp;&amp; prefix.length() &gt; 0) {</span>
+<span class="fc" id="L2287">            id += prefix;</span>
+        }
+<span class="fc bfc" id="L2289" title="All 4 branches covered.">        boolean useDarkStyle = allowDarkStyle &amp;&amp; shouldUseDarkStyle(id);</span>
+<span class="fc bfc" id="L2290" title="All 2 branches covered.">        if (useDarkStyle) {</span>
+<span class="fc" id="L2291">            id = &quot;$Dark&quot; + id;</span>
+        }
+
+<span class="fc" id="L2294">        String baseStyle = (String) themeProps.get(id + &quot;derive&quot;);</span>
+<span class="fc bfc" id="L2295" title="All 4 branches covered.">        if (baseStyle == null &amp;&amp; useDarkStyle) {</span>
+<span class="fc" id="L2296">            style = new Style(createStyle(originalId, prefix, selected, false));</span>
+        } else {
+<span class="fc" id="L2298">            style = null;</span>
+        }
+<span class="fc bfc" id="L2300" title="All 4 branches covered.">        if (style == null &amp;&amp; baseStyle != null) {</span>
+<span class="pc bpc" id="L2301" title="1 of 4 branches missed.">            if (baseStyle.indexOf('.') &gt; -1 &amp;&amp; baseStyle.indexOf('#') &lt; 0) {</span>
+<span class="fc" id="L2302">                baseStyle += &quot;#&quot;;</span>
+            }
+            // probably a theme mistake ignore
+<span class="fc bfc" id="L2305" title="All 2 branches covered.">            if (!(baseStyle + &quot;.&quot;).equals(id)) {</span>
+<span class="fc" id="L2306">                int pos = baseStyle.indexOf('.');</span>
+<span class="fc bfc" id="L2307" title="All 2 branches covered.">                if (pos &gt; -1) {</span>
+<span class="fc" id="L2308">                    String baseId = baseStyle.substring(0, pos);</span>
+<span class="fc" id="L2309">                    String basePrefix = baseStyle.substring(pos + 1);</span>
+<span class="fc bfc" id="L2310" title="All 2 branches covered.">                    style = new Style(getComponentStyleImpl(baseId, basePrefix.indexOf(&quot;sel&quot;) &gt; -1, basePrefix));</span>
+<span class="fc" id="L2311">                } else {</span>
+<span class="fc" id="L2312">                    style = new Style(getComponentStyle(baseStyle));</span>
+                }
+<span class="fc" id="L2314">            } else {</span>
+<span class="pc bpc" id="L2315" title="1 of 2 branches missed.">                if (selected) {</span>
+<span class="nc" id="L2316">                    style = new Style(defaultSelectedStyle);</span>
+                } else {
+<span class="fc" id="L2318">                    style = new Style(defaultStyle);</span>
+                }
+            }
+<span class="fc bfc" id="L2321" title="All 2 branches covered.">        } else if (style == null) {</span>
+<span class="fc bfc" id="L2322" title="All 2 branches covered.">            if (selected) {</span>
+<span class="fc" id="L2323">                style = new Style(defaultSelectedStyle);</span>
+            } else {
+<span class="fc" id="L2325">                style = new Style(defaultStyle);</span>
+            }
+        }
+<span class="pc bpc" id="L2328" title="1 of 2 branches missed.">        if (themeProps != null) {</span>
+            String bgColor;
+            String fgColor;
+            Object border;
+
+<span class="fc" id="L2333">            bgColor = (String) themeProps.get(id + Style.BG_COLOR);</span>
+<span class="fc" id="L2334">            fgColor = (String) themeProps.get(id + Style.FG_COLOR);</span>
+<span class="fc" id="L2335">            border = themeProps.get(id + Style.BORDER);</span>
+<span class="fc" id="L2336">            Object bgImage = themeProps.get(id + Style.BG_IMAGE);</span>
+<span class="fc" id="L2337">            String transperency = (String) themeProps.get(id + Style.TRANSPARENCY);</span>
+<span class="fc" id="L2338">            String opacity = (String) themeProps.get(id + Style.OPACITY);</span>
+<span class="fc" id="L2339">            String margin = (String) themeProps.get(id + Style.MARGIN);</span>
+<span class="fc" id="L2340">            String padding = (String) themeProps.get(id + Style.PADDING);</span>
+<span class="fc" id="L2341">            Object font = themeProps.get(id + Style.FONT);</span>
+<span class="fc" id="L2342">            Integer alignment = (Integer) themeProps.get(id + Style.ALIGNMENT);</span>
+
+<span class="fc" id="L2344">            Integer textDecoration = (Integer) themeProps.get(id + Style.TEXT_DECORATION);</span>
+<span class="fc" id="L2345">            Byte backgroundType = (Byte) themeProps.get(id + Style.BACKGROUND_TYPE);</span>
+<span class="fc" id="L2346">            Object[] backgroundGradient = (Object[]) themeProps.get(id + Style.BACKGROUND_GRADIENT);</span>
+<span class="fc" id="L2347">            byte[] paddingUnit = (byte[]) themeProps.get(id + Style.PADDING_UNIT);</span>
+<span class="fc" id="L2348">            byte[] marginUnit = (byte[]) themeProps.get(id + Style.MARGIN_UNIT);</span>
+<span class="pc bpc" id="L2349" title="1 of 2 branches missed.">            if (themeProps.containsKey(id + Style.ELEVATION)) {</span>
+<span class="nc" id="L2350">                style.setElevation((Integer) themeProps.get(id + Style.ELEVATION));</span>
+            }
+<span class="fc bfc" id="L2352" title="All 2 branches covered.">            if (themeProps.containsKey(id + Style.ICON_GAP)) {</span>
+<span class="pc bpc" id="L2353" title="1 of 2 branches missed.">                if (themeProps.containsKey(id + Style.ICON_GAP_UNIT)) {</span>
+<span class="fc" id="L2354">                    style.setIconGapUnit((Byte) themeProps.get(id + Style.ICON_GAP_UNIT));</span>
+                } else {
+<span class="nc" id="L2356">                    style.setIconGapUnit(Style.UNIT_TYPE_PIXELS);</span>
+                }
+<span class="fc" id="L2358">                style.setIconGap((Float) themeProps.get(id + Style.ICON_GAP));</span>
+            }
+<span class="pc bpc" id="L2360" title="1 of 2 branches missed.">            if (themeProps.containsKey(id + Style.FG_ALPHA)) {</span>
+<span class="nc" id="L2361">                style.setFgAlpha((Integer) themeProps.get(id + Style.FG_ALPHA));</span>
+            }
+<span class="pc bpc" id="L2363" title="1 of 2 branches missed.">            if (themeProps.containsKey(id + Style.SURFACE)) {</span>
+<span class="nc" id="L2364">                style.setSurface((Boolean) themeProps.get(id + Style.SURFACE));</span>
+            }
+<span class="fc bfc" id="L2366" title="All 2 branches covered.">            if (bgColor != null) {</span>
+<span class="fc" id="L2367">                style.setBgColor(Integer.parseInt(bgColor, 16));</span>
+            }
+<span class="fc bfc" id="L2369" title="All 2 branches covered.">            if (fgColor != null) {</span>
+<span class="fc" id="L2370">                style.setFgColor(Integer.parseInt(fgColor, 16));</span>
+            }
+<span class="fc bfc" id="L2372" title="All 2 branches covered.">            if (transperency != null) {</span>
+<span class="fc" id="L2373">                style.setBgTransparency(Integer.parseInt(transperency));</span>
+            } else {
+<span class="fc bfc" id="L2375" title="All 2 branches covered.">                if (selected) {</span>
+<span class="fc" id="L2376">                    transperency = (String) themeProps.get(originalId + Style.TRANSPARENCY);</span>
+<span class="fc bfc" id="L2377" title="All 2 branches covered.">                    if (transperency != null) {</span>
+<span class="fc" id="L2378">                        style.setBgTransparency(Integer.parseInt(transperency));</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L2382" title="1 of 2 branches missed.">            if (opacity != null) {</span>
+<span class="nc" id="L2383">                style.setOpacity(Integer.parseInt(opacity));</span>
+            } else {
+<span class="fc bfc" id="L2385" title="All 2 branches covered.">                if (selected) {</span>
+<span class="fc" id="L2386">                    opacity = (String) themeProps.get(originalId + Style.OPACITY);</span>
+<span class="pc bpc" id="L2387" title="1 of 2 branches missed.">                    if (opacity != null) {</span>
+<span class="nc" id="L2388">                        style.setBgTransparency(Integer.parseInt(opacity));</span>
+                    }
+                }
+            }
+<span class="fc bfc" id="L2392" title="All 2 branches covered.">            if (margin != null) {</span>
+<span class="fc" id="L2393">                float[] marginArr = toFloatArray(margin.trim());</span>
+<span class="fc" id="L2394">                style.setMargin(marginArr[0], marginArr[1], marginArr[2], marginArr[3]);</span>
+            }
+<span class="fc bfc" id="L2396" title="All 2 branches covered.">            if (padding != null) {</span>
+<span class="fc" id="L2397">                float[] paddingArr = toFloatArray(padding.trim());</span>
+<span class="fc" id="L2398">                style.setPadding(paddingArr[0], paddingArr[1], paddingArr[2], paddingArr[3]);</span>
+            }
+<span class="fc bfc" id="L2400" title="All 2 branches covered.">            if (paddingUnit != null) {</span>
+<span class="fc" id="L2401">                style.setPaddingUnit(paddingUnit);</span>
+            } else {
+                // special case for pixel based padding
+<span class="fc bfc" id="L2404" title="All 2 branches covered.">                if (padding != null) {</span>
+<span class="fc" id="L2405">                    style.setPaddingUnit(null);</span>
+                }
+            }
+<span class="fc bfc" id="L2408" title="All 2 branches covered.">            if (marginUnit != null) {</span>
+<span class="fc" id="L2409">                style.setMarginUnit(marginUnit);</span>
+            } else {
+                // special case for pixel based margin
+<span class="fc bfc" id="L2412" title="All 2 branches covered.">                if (margin != null) {</span>
+<span class="fc" id="L2413">                    style.setMarginUnit(null);</span>
+                }
+            }
+<span class="fc bfc" id="L2416" title="All 2 branches covered.">            if (alignment != null) {</span>
+<span class="fc" id="L2417">                style.setAlignment(alignment.intValue());</span>
+            }
+<span class="pc bpc" id="L2419" title="1 of 2 branches missed.">            if (textDecoration != null) {</span>
+<span class="nc" id="L2420">                style.setTextDecoration(textDecoration.intValue());</span>
+            }
+<span class="fc bfc" id="L2422" title="All 2 branches covered.">            if (backgroundType != null) {</span>
+<span class="fc" id="L2423">                style.setBackgroundType(backgroundType.byteValue());</span>
+            }
+<span class="pc bpc" id="L2425" title="1 of 2 branches missed.">            if (backgroundGradient != null) {</span>
+<span class="nc bnc" id="L2426" title="All 2 branches missed.">                if (backgroundGradient.length &lt; 5) {</span>
+<span class="nc" id="L2427">                    Object[] a = new Object[5];</span>
+<span class="nc" id="L2428">                    System.arraycopy(backgroundGradient, 0, a, 0, backgroundGradient.length);</span>
+<span class="nc" id="L2429">                    backgroundGradient = a;</span>
+<span class="nc" id="L2430">                    backgroundGradient[4] = Float.valueOf(1);</span>
+                }
+<span class="nc" id="L2432">                style.setBackgroundGradient(backgroundGradient);</span>
+            }
+<span class="fc" id="L2434">            Object gradient = themeProps.get(id + Style.GRADIENT);</span>
+<span class="pc bpc" id="L2435" title="1 of 2 branches missed.">            if (gradient instanceof com.codename1.ui.Gradient) {</span>
+<span class="nc" id="L2436">                style.setGradient((com.codename1.ui.Gradient) gradient);</span>
+            }
+<span class="fc" id="L2438">            Object filterBlur = themeProps.get(id + Style.FILTER_BLUR);</span>
+<span class="pc bpc" id="L2439" title="1 of 2 branches missed.">            if (filterBlur instanceof Number) {</span>
+<span class="nc" id="L2440">                style.setFilterBlurRadius(((Number) filterBlur).floatValue());</span>
+            }
+<span class="fc" id="L2442">            Object backdropFilterBlur = themeProps.get(id + Style.BACKDROP_FILTER_BLUR);</span>
+<span class="pc bpc" id="L2443" title="1 of 2 branches missed.">            if (backdropFilterBlur instanceof Number) {</span>
+<span class="nc" id="L2444">                style.setBackdropFilterBlurRadius(((Number) backdropFilterBlur).floatValue());</span>
+            }
+<span class="fc" id="L2446">            Object filterMatrix = themeProps.get(id + Style.FILTER_COLOR_MATRIX);</span>
+<span class="pc bpc" id="L2447" title="1 of 2 branches missed.">            if (filterMatrix instanceof float[]) {</span>
+<span class="nc" id="L2448">                style.setFilterColorMatrix((float[]) filterMatrix);</span>
+            }
+<span class="fc" id="L2450">            Object backdropFilterMatrix = themeProps.get(id + Style.BACKDROP_FILTER_COLOR_MATRIX);</span>
+<span class="pc bpc" id="L2451" title="1 of 2 branches missed.">            if (backdropFilterMatrix instanceof float[]) {</span>
+<span class="nc" id="L2452">                style.setBackdropFilterColorMatrix((float[]) backdropFilterMatrix);</span>
+            }
+<span class="pc bpc" id="L2454" title="1 of 2 branches missed.">            if (bgImage != null) {</span>
+<span class="nc" id="L2455">                Image im = null;</span>
+<span class="nc bnc" id="L2456" title="All 2 branches missed.">                if (bgImage instanceof String) {</span>
+                    try {
+<span class="nc" id="L2458">                        String bgImageStr = (String) bgImage;</span>
+<span class="nc bnc" id="L2459" title="All 2 branches missed.">                        if (imageCache.containsKey(bgImageStr)) {</span>
+<span class="nc" id="L2460">                            im = imageCache.get(bgImageStr);</span>
+                        } else {
+<span class="nc bnc" id="L2462" title="All 2 branches missed.">                            if (bgImageStr.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L2463">                                im = Image.createImage(bgImageStr);</span>
+                            } else {
+<span class="nc" id="L2465">                                im = parseImage((String) bgImage);</span>
+                            }
+<span class="nc" id="L2467">                            imageCache.put(bgImageStr, im);</span>
+                        }
+<span class="nc" id="L2469">                        themeProps.put(id + Style.BG_IMAGE, im);</span>
+<span class="nc" id="L2470">                    } catch (IOException ex) {</span>
+<span class="nc" id="L2471">                        Log.p(&quot;failed to parse image for id = &quot; + id + Style.BG_IMAGE);</span>
+<span class="nc" id="L2472">                    }</span>
+                } else {
+                    // we shouldn't normally but we might get a multi-image from the resource editor
+<span class="nc bnc" id="L2475" title="All 2 branches missed.">                    if (bgImage instanceof Image) {</span>
+<span class="nc" id="L2476">                        im = (Image) bgImage;</span>
+                    }
+                }
+                // this code should not excute in the resource editor!
+<span class="nc bnc" id="L2480" title="All 2 branches missed.">                if (id.indexOf(&quot;Form&quot;) &gt; -1) {</span>
+<span class="nc bnc" id="L2481" title="All 2 branches missed.">                    if ((im.getWidth() != Display.getInstance().getDisplayWidth() ||</span>
+<span class="nc bnc" id="L2482" title="All 6 branches missed.">                            im.getHeight() != Display.getInstance().getDisplayHeight()) &amp;&amp; style.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED &amp;&amp; accessible) {</span>
+<span class="nc" id="L2483">                        im.scale(Display.getInstance().getDisplayWidth(),</span>
+<span class="nc" id="L2484">                                Display.getInstance().getDisplayHeight());</span>
+                    }
+                }
+<span class="nc" id="L2487">                style.setBgImage(im);</span>
+            }
+<span class="fc bfc" id="L2489" title="All 2 branches covered.">            if (font != null) {</span>
+<span class="pc bpc" id="L2490" title="1 of 2 branches missed.">                if (font instanceof String) {</span>
+<span class="nc" id="L2491">                    style.setFont(parseFont((String) font));</span>
+                } else {
+<span class="fc" id="L2493">                    style.setFont((Font) font);</span>
+                }
+            }
+<span class="fc bfc" id="L2496" title="All 2 branches covered.">            if (themeProps.containsKey(id + Style.LETTER_SPACING)) {</span>
+<span class="fc" id="L2497">                float ls = ((Number) themeProps.get(id + Style.LETTER_SPACING)).floatValue();</span>
+<span class="fc" id="L2498">                style.setLetterSpacing(ls);</span>
+                // Bake the spacing into the style's font so it is applied
+                // consistently for both text measurement and rendering.
+<span class="fc" id="L2501">                Font lsFont = style.getFont();</span>
+<span class="pc bpc" id="L2502" title="2 of 4 branches missed.">                if (ls != 0 &amp;&amp; lsFont != null) {</span>
+<span class="fc" id="L2503">                    style.setFont(lsFont.deriveLetterSpacing(ls));</span>
+                }
+            }
+<span class="fc bfc" id="L2506" title="All 2 branches covered.">            if (border != null) {</span>
+<span class="fc" id="L2507">                style.setBorder((Border) border);</span>
+            }
+<span class="fc" id="L2509">            style.resetModifiedFlag();</span>
+        }
+
+<span class="fc" id="L2512">        return style;</span>
+    }
+
+    private boolean shouldUseDarkStyle(String id) {
+<span class="pc bpc" id="L2516" title="3 of 8 branches missed.">        if (themeProps == null || id == null || id.length() == 0 || id.startsWith(&quot;$Dark&quot;)) {</span>
+<span class="fc" id="L2517">            return false;</span>
+        }
+<span class="fc" id="L2519">        Boolean darkMode = CN.isDarkMode();</span>
+<span class="pc bpc" id="L2520" title="1 of 6 branches missed.">        return darkMode != null &amp;&amp; darkMode.booleanValue() &amp;&amp; hasStyleDefinition(&quot;$Dark&quot; + id);</span>
+    }
+
+    private boolean hasStyleDefinition(String styleId) {
+<span class="fc bfc" id="L2524" title="All 2 branches covered.">        for (String key : themeProps.keySet()) {</span>
+<span class="fc bfc" id="L2525" title="All 2 branches covered.">            if (key.startsWith(styleId)) {</span>
+<span class="fc" id="L2526">                return true;</span>
+            }
+<span class="fc" id="L2528">        }</span>
+<span class="fc" id="L2529">        return false;</span>
+    }
+
+    /// This method is used to parse the margin and the padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `str`
+    private float[] toFloatArray(String str) {
+<span class="fc" id="L2538">        float[] retVal = new float[4];</span>
+<span class="fc" id="L2539">        str = str + &quot;,&quot;;</span>
+<span class="fc" id="L2540">        int rlen = retVal.length;</span>
+<span class="fc bfc" id="L2541" title="All 2 branches covered.">        for (int i = 0; i &lt; rlen; i++) {</span>
+<span class="fc" id="L2542">            retVal[i] = Float.parseFloat(str.substring(0, str.indexOf(&quot;,&quot;)));</span>
+<span class="fc" id="L2543">            str = str.substring(str.indexOf(&quot;,&quot;) + 1);</span>
+        }
+<span class="fc" id="L2545">        return retVal;</span>
+    }
+
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Returns
+    ///
+    /// the localization bundle
+    ///
+    /// #### Deprecated
+    ///
+    /// this method uses the old resource bundle hashtable, use the new getBundle() method
+    public Hashtable getResourceBundle() {
+<span class="pc bpc" id="L2560" title="1 of 4 branches missed.">        if (resourceBundle == null &amp;&amp; bundle != null) {</span>
+<span class="fc" id="L2561">            resourceBundle = new Hashtable(bundle);</span>
+        }
+<span class="fc" id="L2563">        return resourceBundle;</span>
+    }
+
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceBundle`: the localization bundle
+    ///
+    /// #### Deprecated
+    ///
+    /// this method uses the old resource bundle hashtable, use the new setBundle() method
+    public void setResourceBundle(Hashtable resourceBundle) {
+<span class="nc bnc" id="L2578" title="All 2 branches missed.">        if (localeAccessible) {</span>
+<span class="nc" id="L2579">            this.resourceBundle = resourceBundle;</span>
+<span class="nc bnc" id="L2580" title="All 2 branches missed.">            if (resourceBundle != null) {</span>
+<span class="nc" id="L2581">                String v = (String) resourceBundle.get(&quot;@rtl&quot;);</span>
+<span class="nc bnc" id="L2582" title="All 2 branches missed.">                if (v != null) {</span>
+<span class="nc" id="L2583">                    getLookAndFeel().setRTL(&quot;true&quot;.equalsIgnoreCase(v));</span>
+
+                    // update some &quot;bidi sensitive&quot; variables in the LaF
+<span class="nc" id="L2586">                    current.refreshTheme(false);</span>
+                }
+<span class="nc" id="L2588">                bundle = new HashMap&lt;String, String&gt;((Hashtable&lt;String, String&gt;) resourceBundle);</span>
+<span class="nc" id="L2589">            } else {</span>
+<span class="nc" id="L2590">                bundle = null;</span>
+            }
+        }
+<span class="nc" id="L2593">    }</span>
+
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Returns
+    ///
+    /// the localization bundle
+    public Map&lt;String, String&gt; getBundle() {
+<span class="fc" id="L2603">        return bundle;</span>
+    }
+
+    /// The resource bundle allows us to implicitly localize the UI on the fly, once its
+    /// installed all internal application strings query the resource bundle and extract
+    /// their values from this table if applicable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resourceBundle`: the localization bundle
+    public void setBundle(Map&lt;String, String&gt; bundle) {
+<span class="pc bpc" id="L2614" title="1 of 2 branches missed.">        if (localeAccessible) {</span>
+<span class="fc" id="L2615">            this.bundle = bundle;</span>
+<span class="pc bpc" id="L2616" title="1 of 2 branches missed.">            if (bundle != null) {</span>
+<span class="fc" id="L2617">                String v = bundle.get(&quot;@rtl&quot;);</span>
+<span class="pc bpc" id="L2618" title="1 of 2 branches missed.">                if (v != null) {</span>
+<span class="nc" id="L2619">                    getLookAndFeel().setRTL(&quot;true&quot;.equalsIgnoreCase(v));</span>
+
+                    // update some &quot;bidi sensitive&quot; variables in the LaF
+<span class="nc" id="L2622">                    current.refreshTheme(false);</span>
+                }
+<span class="fc" id="L2624">                String textFieldInputMode = bundle.get(&quot;@im&quot;);</span>
+<span class="pc bpc" id="L2625" title="3 of 4 branches missed.">                if (textFieldInputMode != null &amp;&amp; textFieldInputMode.length() &gt; 0) {</span>
+<span class="nc" id="L2626">                    String[] tokenized = toStringArray(StringUtil.tokenizeString(textFieldInputMode, '|'));</span>
+<span class="nc" id="L2627">                    TextField.setDefaultInputModeOrder(tokenized);</span>
+<span class="nc" id="L2628">                    int tlen = tokenized.length;</span>
+<span class="nc bnc" id="L2629" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; tlen; iter++) {</span>
+<span class="nc" id="L2630">                        String val = tokenized[iter];</span>
+<span class="nc" id="L2631">                        String actual = bundle.get(&quot;@im-&quot; + val);</span>
+                        // val can be null for builtin input mode types...
+<span class="nc bnc" id="L2633" title="All 2 branches missed.">                        if (actual != null) {</span>
+<span class="nc" id="L2634">                            TextField.addInputMode(val, parseTextFieldInputMode(actual), Character.isUpperCase(val.charAt(0)));</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="fc" id="L2640">    }</span>
+
+    private Hashtable parseTextFieldInputMode(String s) {
+<span class="nc" id="L2643">        Vector tokens = StringUtil.tokenizeString(s, '|');</span>
+<span class="nc" id="L2644">        Hashtable response = new Hashtable();</span>
+<span class="nc" id="L2645">        int count = tokens.size();</span>
+<span class="nc bnc" id="L2646" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L2647">            String t = (String) tokens.elementAt(iter);</span>
+<span class="nc" id="L2648">            int pos = t.indexOf('=');</span>
+<span class="nc" id="L2649">            String key = t.substring(0, pos);</span>
+<span class="nc" id="L2650">            String val = t.substring(pos + 1);</span>
+<span class="nc" id="L2651">            response.put(Integer.valueOf(key), val);</span>
+        }
+<span class="nc" id="L2653">        return response;</span>
+    }
+
+    private String[] toStringArray(Vector v) {
+<span class="nc" id="L2657">        String[] arr = new String[v.size()];</span>
+<span class="nc" id="L2658">        int alen = arr.length;</span>
+<span class="nc bnc" id="L2659" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L2660">            arr[iter] = (String) v.elementAt(iter);</span>
+        }
+<span class="nc" id="L2662">        return arr;</span>
+    }
+
+    /// Localizes the given string from the resource bundle if such a String exists in the
+    /// resource bundle. If no key exists in the bundle then or a bundle is not installed
+    /// the default value is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The key used to lookup in the resource bundle
+    ///
+    /// - `defaultValue`: the value returned if no such key exists
+    ///
+    /// #### Returns
+    ///
+    /// either default value or the appropriate value
+    public final String localize(String key, String defaultValue) {
+<span class="fc" id="L2679">        onLocalize(key, defaultValue);</span>
+<span class="fc bfc" id="L2680" title="All 4 branches covered.">        if (bundle != null &amp;&amp; key != null) {</span>
+<span class="fc" id="L2681">            Object o = bundle.get(key);</span>
+<span class="fc bfc" id="L2682" title="All 2 branches covered.">            if (o != null) {</span>
+<span class="fc" id="L2683">                return (String) o;</span>
+            }
+        }
+<span class="fc" id="L2686">        return defaultValue;</span>
+    }
+
+    /// Callback for subclasses that wish to track localization invocations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: The key used to lookup in the resource bundle
+    ///
+    /// - `defaultValue`: the value returned if no such key exists
+    protected void onLocalize(String key, String defaultValue) {
+<span class="fc" id="L2697">    }</span>
+
+    /// Adds a Theme refresh listener.
+    /// The listenres will get a callback when setThemeProps method is invoked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: an ActionListener to be added
+    public void addThemeRefreshListener(ActionListener l) {
+
+<span class="nc bnc" id="L2707" title="All 2 branches missed.">        if (themelisteners == null) {</span>
+<span class="nc" id="L2708">            themelisteners = new EventDispatcher();</span>
+        }
+<span class="nc" id="L2710">        themelisteners.addListener(l);</span>
+<span class="nc" id="L2711">    }</span>
+
+    /// Removes a Theme refresh listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: an ActionListener to be removed
+    public void removeThemeRefreshListener(ActionListener l) {
+
+<span class="nc bnc" id="L2720" title="All 2 branches missed.">        if (themelisteners == null) {</span>
+<span class="nc" id="L2721">            return;</span>
+        }
+<span class="nc" id="L2723">        themelisteners.removeListener(l);</span>
+<span class="nc" id="L2724">    }</span>
+
+    private static class UIManagerHolder {
+<span class="fc" id="L2727">        private static final UIManager INSTANCE = new UIManager();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

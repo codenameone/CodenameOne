@@ -1,0 +1,1229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChartComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts</a> &gt; <span class="el_source">ChartComponent.java</span></div><h1>ChartComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.charts;
+
+import com.codename1.charts.models.Point;
+import com.codename1.charts.models.SeriesSelection;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.views.AbstractChart;
+import com.codename1.charts.views.XYChart;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Transform;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Shape;
+
+import java.util.ArrayList;
+
+
+/// The top level component for displaying charts
+///
+/// The `charts` package enables Codename One developers to add charts
+/// and visualizations to their apps without having to include external libraries
+/// or embedding web views. We also wanted to harness the new features in the
+/// graphics pipeline to maximize performance.
+///
+/// Features
+///
+/// - **Built-in support for many common types of charts**
+/// including bar charts, line charts, stacked charts, scatter charts, pie charts
+/// and more.
+///
+/// - **Pinch Zoom** - The
+/// `com.codename1.charts,ChartComponent` class includes optional pinch
+/// zoom support.
+///
+/// - **Panning Support** - The
+/// `com.codename1.charts,ChartComponent` class includes optional support
+/// for panning.
+///
+/// Chart Types
+///
+/// The `com.codename1.charts` package includes models and renderers
+/// for many different types of charts. It is also extensible so that you can add
+/// your own chart types if required. The following screen shots demonstrate a
+/// small sampling of the types of charts that can be created.
+///
+///   *
+///
+///
+///
+///   **
+///
+/// The above screenshots were taken from the
+/// [ChartsDemo app](https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo). Y ou can start playing with this app by checking it out from our git
+/// repository.
+///
+/// How to Create A Chart
+///
+/// Adding a chart to your app involves four steps:
+///
+/// - **Build the model**. You can construct a model (aka data
+/// set) for the chart using one of the existing model classes in the
+/// `com.codename1.charts.models` package. Essentially, this is just
+/// where you add the data that you want to display.
+///
+/// -  **Set up a renderer**. You can create a renderer for your
+/// chart using one of the existing renderer classes in the
+/// `com.codename1.charts.renderers` package. The renderer allows you
+/// to specify how the chart should look. E.g. the colors, fonts, styles, to use.
+///
+/// -  **Create the Chart View**. Use one of the existing
+/// *view* classes in the
+/// `com.codename1.charts.views` package.
+///
+/// -  **Create a `com.codename1.charts,ChartComponent` **.
+/// In order to add your chart to the UI, you need to wrap it in a
+/// `com.codename1.charts,ChartComponent` object.
+///
+/// You can check out the
+/// [ChartsDemo](https://github.com/codenameone/codenameone-demos/tree/master/ChartsDemo)
+/// app for specific examples, but here is a high level view of some code that
+/// creates a Pie Chart.
+///
+/// ```java
+/// /**
+///  * Creates a renderer for the specified colors.
+///  */
+/// private DefaultRenderer buildCategoryRenderer(int[] colors) {
+///     DefaultRenderer renderer = new DefaultRenderer();
+///     renderer.setLabelsTextSize(15);
+///     renderer.setLegendTextSize(15);
+///     renderer.setMargins(new int[]{20, 30, 15, 0});
+///     for (int color : colors) {
+///         SimpleSeriesRenderer r = new SimpleSeriesRenderer();
+///         r.setColor(color);
+///         renderer.addSeriesRenderer(r);
+///     }
+///     return renderer;
+/// }
+///
+/// /**
+///  * Builds a category series using the provided values.
+///  *
+///  * @param titles the series titles
+///  * @param values the values
+///  * @return the category series
+///  */
+/// protected CategorySeries buildCategoryDataset(String title, double[] values) {
+///     CategorySeries series = new CategorySeries(title);
+///     int k = 0;
+///     for (double value : values) {
+///         series.add(&quot;Project &quot; + ++k, value);
+///     }
+///
+///     return series;
+/// }
+///
+/// public Form createPieChartForm() {
+///     // Generate the values
+///     double[] values = new double[]{12, 14, 11, 10, 19};
+///
+///     // Set up the renderer
+///     int[] colors = new int[]{ColorUtil.BLUE, ColorUtil.GREEN, ColorUtil.MAGENTA, ColorUtil.YELLOW, ColorUtil.CYAN};
+///     DefaultRenderer renderer = buildCategoryRenderer(colors);
+///     renderer.setZoomButtonsVisible(true);
+///     renderer.setZoomEnabled(true);
+///     renderer.setChartTitleTextSize(20);
+///     renderer.setDisplayValues(true);
+///     renderer.setShowLabels(true);
+///     SimpleSeriesRenderer r = renderer.getSeriesRendererAt(0);
+///     r.setGradientEnabled(true);
+///     r.setGradientStart(0, ColorUtil.BLUE);
+///     r.setGradientStop(0, ColorUtil.GREEN);
+///     r.setHighlighted(true);
+///
+///     // Create the chart ... pass the values and renderer to the chart object.
+///     PieChart chart = new PieChart(buildCategoryDataset(&quot;Project budget&quot;, values), renderer);
+///
+///     // Wrap the chart in a Component so we can add it to a form
+///     ChartComponent c = new ChartComponent(chart);
+///
+///     // Create a form and show it.
+///     Form f = new Form(&quot;Budget&quot;, new BorderLayout());
+///     f.add(BorderLayout.CENTER, c);
+///     return f;
+///
+/// }
+/// ```
+///
+/// The charts package is derived work from the excellent
+/// [open source aChartEngine API.](http://www.achartengine.org/)
+///
+/// @author shannah
+public class ChartComponent extends Component {
+
+    /// Util object for rendering the chart.
+<span class="fc" id="L183">    private final ChartUtil util = new ChartUtil();</span>
+<span class="fc" id="L184">    private final ArrayList&lt;IZoomTransition&gt; animations = new ArrayList&lt;IZoomTransition&gt;();</span>
+    /// The chart that is to be rendered in this component.
+    private AbstractChart chart;
+    /// The transform for the chart.  This can be used to scale, translate, and
+    /// rotate the chart.  This transform assumes its origin at the (absoluteX, absoluteY)
+    /// of the component at the time it is drawn rather than the screen's origin as is
+    /// normally the case with transforms.  This allows the transform to be applied consistently
+    /// with respect to the chart's coordinates even when the component is moved around the screen.
+<span class="fc" id="L192">    private Transform transform = null;</span>
+
+    /// The transform that was applied during the last paint() method.
+    /// This is generally the `#transform` concatenated with a
+    /// translation to the screen origin from the component's origin.  This
+    /// is used to convert chart coordinates to screen coordinates and respond
+    /// properly to events.
+<span class="fc" id="L199">    private Transform currentTransform = null;</span>
+
+    /// Flag to enable panning the chart.  Default is false.
+<span class="fc" id="L202">    private boolean panEnabled = false;</span>
+
+    /// During a pan operation, used to store the transform as it was before
+    /// the start of the pan.
+<span class="fc" id="L206">    private Transform dragTransformStart = null;</span>
+
+<span class="fc" id="L208">    private Transform tmpTransform = null;</span>
+
+    /// The starting position of a pan operation.
+<span class="fc" id="L211">    private Point dragStart = null;</span>
+
+    /// Flag to enable pinch zoom.
+<span class="fc" id="L214">    private boolean zoomEnabled = false;</span>
+
+    /// During a pinch zoom operation, this is the middle point between the
+    /// two touch points at the start of the zoom operation.  This is in
+    /// screen coordinates.
+<span class="fc" id="L219">    private Point zoomStart = null;</span>
+
+    /// During a pinch zoom operation, this is the transform as it was at the start
+    /// of the zoom.
+<span class="fc" id="L223">    private Transform zoomTransformStart = null;</span>
+
+    /// During a pinch zoom operation, this is the distance between the two touch
+    /// points at the start of the zoom operation.
+<span class="fc" id="L227">    private double zoomDistStart = 0;</span>
+    private BBox dragStartBBox;
+    private BBox zoomStartBBox;
+    private double zoomDistStartX;
+    private double zoomDistStartY;
+    private BBox initialZoomBBox;
+
+    /// Creates a new chart component to display the provided chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`: The chart to be displayed in this component.
+<span class="fc" id="L239">    public ChartComponent(AbstractChart chart) {</span>
+<span class="fc" id="L240">        setUIIDFinal(&quot;ChartComponent&quot;);</span>
+<span class="fc" id="L241">        this.chart = chart;</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L243">            XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L244">            zoomEnabled = xyChart.getRenderer().isZoomEnabled();</span>
+<span class="fc" id="L245">            panEnabled = xyChart.getRenderer().isPanEnabled();</span>
+        }
+<span class="fc" id="L247">    }</span>
+
+    /// Gets the chart that is being displayed in this component.
+    public AbstractChart getChart() {
+<span class="fc" id="L251">        return chart;</span>
+    }
+
+    /// Sets the chart to be displayed in this component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `chart`
+    public void setChart(AbstractChart chart) {
+<span class="nc" id="L260">        this.chart = chart;</span>
+<span class="nc" id="L261">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L265">        return new Dimension(</span>
+<span class="fc" id="L266">                Display.getInstance().convertToPixels(100, true),</span>
+<span class="fc" id="L267">                Display.getInstance().convertToPixels(100, false)</span>
+        );
+    }
+
+    /// Paints the chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `g`
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L278">        super.paint(g);</span>
+<span class="fc" id="L279">        boolean oldAntialias = g.isAntiAliased();</span>
+<span class="fc" id="L280">        g.setAntiAliased(true);</span>
+
+<span class="fc" id="L282">        boolean transformed = false;</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (getTransform() != null) {</span>
+<span class="nc" id="L284">            transformed = true;</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            if (tmpTransform == null) {</span>
+<span class="nc" id="L286">                tmpTransform = Transform.makeIdentity();</span>
+            }
+<span class="nc" id="L288">            g.getTransform(tmpTransform);</span>
+
+<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (currentTransform == null) {</span>
+<span class="nc" id="L291">                currentTransform = Transform.makeIdentity();</span>
+            } else {
+<span class="nc" id="L293">                currentTransform.setIdentity();</span>
+            }
+<span class="nc" id="L295">            currentTransform.concatenate(transform);</span>
+            // Earlier this conjugated `transform` with T(absX, absY) to
+            // compensate for the xTranslate/yTranslate the platform was
+            // adding to vertex coords. Graphics.setTransform() now performs
+            // that conjugation uniformly across iOS / Android / JavaSE, so
+            // doing it manually here would shift the chart by 2*absX,
+            // 2*absY. Pass the user's transform through unchanged.
+
+<span class="nc" id="L303">            g.setTransform(currentTransform);</span>
+        } else {
+<span class="fc" id="L305">            currentTransform = null;</span>
+        }
+
+
+<span class="fc" id="L309">        util.paintChart(g, chart, getBounds(), getAbsoluteX(), getAbsoluteY());</span>
+
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (transformed) {</span>
+<span class="nc" id="L312">            g.setTransform(tmpTransform);</span>
+        }
+
+<span class="fc" id="L315">        g.setAntiAliased(oldAntialias);</span>
+<span class="fc" id="L316">    }</span>
+
+    /// Converts screen coordinates to chart coordinates.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: screen x position
+    ///
+    /// - `y`: screen y position
+    ///
+    /// #### Returns
+    ///
+    /// The chart coordinate corresponding to the given screen coordinate.
+    public Point screenToChartCoord(int x, int y) {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (currentTransform != null) {</span>
+<span class="fc" id="L331">            Transform inverse = currentTransform.getInverse();</span>
+<span class="fc" id="L332">            float[] pt = inverse.transformPoint(new float[]{x, y, 0});</span>
+<span class="fc" id="L333">            x = (int) pt[0];</span>
+<span class="fc" id="L334">            y = (int) pt[1];</span>
+
+        }
+<span class="fc" id="L337">        return new Point(x - getAbsoluteX(), y - getAbsoluteY());</span>
+    }
+
+    /// Returns the screen position from a chart coordinate
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x position within the chart
+    ///
+    /// - `y`: the y position within the chart
+    ///
+    /// #### Returns
+    ///
+    /// a position within the screen
+    public Point chartToScreenCoord(int x, int y) {
+<span class="fc" id="L352">        x += getAbsoluteX();</span>
+<span class="fc" id="L353">        y += getAbsoluteY();</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (currentTransform != null) {</span>
+<span class="fc" id="L355">            float[] pt = currentTransform.transformPoint(new float[]{x, y, 0});</span>
+<span class="fc" id="L356">            x = (int) pt[0];</span>
+<span class="fc" id="L357">            y = (int) pt[1];</span>
+
+        }
+<span class="fc" id="L360">        return new Point(x, y);</span>
+    }
+
+    /// Converts a chart coordinate spaced shape to the same shape in the screen coordinate space
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: shape in screen coordinates
+    ///
+    /// #### Returns
+    ///
+    /// same shape using chart space coordinates
+    public Shape screenToChartShape(Shape s) {
+<span class="fc" id="L373">        GeneralPath p = new GeneralPath();</span>
+<span class="fc" id="L374">        Transform t = Transform.makeIdentity();</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (currentTransform != null) {</span>
+<span class="nc" id="L376">            t.concatenate(currentTransform.getInverse());</span>
+        }
+<span class="fc" id="L378">        t.translate(-getAbsoluteX(), -getAbsoluteY());</span>
+<span class="fc" id="L379">        p.append(s.getPathIterator(t), false);</span>
+<span class="fc" id="L380">        return p;</span>
+    }
+
+    /// Converts a screen coordinate spaced shape to the same shape in the chart  coordinate space
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: shape in chart  coordinates
+    ///
+    /// #### Returns
+    ///
+    /// same shape using screen coordinate space
+    public Shape chartToScreenShape(Shape s) {
+<span class="fc" id="L393">        GeneralPath p = new GeneralPath();</span>
+<span class="fc" id="L394">        Transform inverse = Transform.makeTranslation(getAbsoluteX(), getAbsoluteY());</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (currentTransform != null) {</span>
+<span class="nc" id="L396">            inverse.concatenate(currentTransform);</span>
+        }
+
+<span class="fc" id="L399">        p.append(s.getPathIterator(inverse), false);</span>
+<span class="fc" id="L400">        return p;</span>
+    }
+
+    /// Zooms the view port to show a specified shape.  The shape should be
+    /// expressed in chart coordinates (not screen coordinates).
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The shape that should be shown.
+    public void zoomToShapeInChartCoords(Shape s) {
+<span class="nc" id="L410">        zoomToShapeInChartCoords(s, 1);</span>
+
+<span class="nc" id="L412">    }</span>
+
+    /// Zooms the view port to show a specified shape.  The shape should be
+    /// expressed in chart coordinates (not screen coordinates).
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The shape that should be shown.
+    ///
+    /// - `duration`: The duration of the transition.
+    ///
+    /// #### See also
+    ///
+    /// - #zoomTo(double, double, double, double, int)
+    public void zoomToShapeInChartCoords(Shape s, int duration) {
+<span class="fc" id="L427">        Rectangle r = s.getBounds();</span>
+<span class="fc" id="L428">        zoomTransition(r.getX(), r.getX() + r.getWidth(), r.getY(), r.getY() + r.getHeight(), duration);</span>
+<span class="fc" id="L429">    }</span>
+
+    /// Zooms the chart in an animated fashion to the specified axis ranges.  This is effectively
+    /// the same as using `int)` except
+    /// it allows you to specify coordinates as doubles.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minX`: The lower bound of the X-axis after zoom.
+    ///
+    /// - `maxX`: The upper bound of the X-axis after zoom.
+    ///
+    /// - `minY`: The lower bound of the Y-axis after zoom.
+    ///
+    /// - `maxY`: THe upper bound of the Y-axis after zoom.
+    ///
+    /// - `duration`: Transition time (ms).
+    public void zoomTo(double minX, double maxX, double minY, double maxY, int duration) {
+<span class="fc" id="L447">        zoomTransition(minX, maxX, minY, maxY, duration);</span>
+<span class="fc" id="L448">    }</span>
+
+    @Override
+    public void pointerPressed(int x, int y) {
+
+<span class="fc" id="L453">        Point chartCoord = screenToChartCoord(x, y);</span>
+<span class="fc" id="L454">        SeriesSelection sel = chart.getSeriesAndPointForScreenCoordinate(chartCoord);</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">        if (sel == null) {</span>
+<span class="nc" id="L456">            super.pointerPressed(x, y);</span>
+<span class="nc" id="L457">            return;</span>
+        }
+
+<span class="fc" id="L460">        seriesPressed(sel);</span>
+<span class="fc" id="L461">        super.pointerPressed(x, y); //To change body of generated methods, choose Tools | Templates.</span>
+
+<span class="fc" id="L463">    }</span>
+
+    /// Called when a pointer is pressed on a series in the chart.  This can be
+    /// overridden by subclasses to respond to this event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`
+    protected void seriesPressed(SeriesSelection sel) {
+
+<span class="fc" id="L473">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L477">        dragStart = null;</span>
+<span class="fc" id="L478">        zoomStartBBox = null;</span>
+<span class="fc" id="L479">        dragStartBBox = null;</span>
+<span class="fc" id="L480">        dragTransformStart = null;</span>
+<span class="fc" id="L481">        zoomStart = null;</span>
+<span class="fc" id="L482">        zoomDistStart = 0;</span>
+<span class="fc" id="L483">        zoomTransformStart = null;</span>
+
+<span class="fc" id="L485">        Point chartCoord = screenToChartCoord(x, y);</span>
+<span class="fc" id="L486">        SeriesSelection sel = chart.getSeriesAndPointForScreenCoordinate(chartCoord);</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (sel == null) {</span>
+<span class="nc" id="L488">            super.pointerReleased(x, y);</span>
+<span class="nc" id="L489">            return;</span>
+        }
+
+<span class="fc" id="L492">        seriesReleased(sel);</span>
+<span class="fc" id="L493">        super.pointerReleased(x, y); //To change body of generated methods, choose Tools | Templates.</span>
+<span class="fc" id="L494">    }</span>
+
+    /// Called when a pointer is released from a series in the chart.  This can be
+    /// overridden in subclasses to handle these events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sel`
+    protected void seriesReleased(SeriesSelection sel) {
+
+<span class="fc" id="L504">    }</span>
+
+    /// Gets the transform for the chart.  This can be used to scale, translate, and
+    /// rotate the chart.  This transform assumes its origin at the (absoluteX, absoluteY)
+    /// of the component at the time it is drawn rather than the screen's origin as is
+    /// normally the case with transforms.  This allows the transform to be applied consistently
+    /// with respect to the chart's coordinates even when the component is moved around the screen.
+    ///
+    /// #### Returns
+    ///
+    /// The transform for the chart in component coordinates.
+    public Transform getTransform() {
+<span class="fc" id="L516">        return transform;</span>
+    }
+
+    /// Sets the transform for the chart.  Transforms origin assumed to be at (getAbsoluteX, getAbsoluteY).
+    ///
+    /// #### Parameters
+    ///
+    /// - `transform`: the transform to set
+    public void setTransform(Transform transform) {
+<span class="nc" id="L525">        this.transform = transform;</span>
+<span class="nc" id="L526">    }</span>
+
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+<span class="fc bfc" id="L530" title="All 2 branches covered.">        if (x.length &gt; 1) {</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">            if (!zoomEnabled) {</span>
+<span class="nc" id="L532">                super.pointerDragged(x, y);</span>
+<span class="nc" id="L533">                return;</span>
+            }
+            // Pinch zoom
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">            if (chart instanceof XYChart) {</span>
+<span class="fc" id="L537">                XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L538">                double[] panLimits = xyChart.getRenderer().getPanLimits();</span>
+
+<span class="fc bfc" id="L540" title="All 2 branches covered.">                if (zoomStart == null) {</span>
+<span class="fc" id="L541">                    zoomStart = new Point((x[0] + x[1]) / 2f, (y[0] + y[1]) / 2f);</span>
+
+<span class="fc" id="L543">                    zoomDistStartX = Math.abs(x[0] - x[1]);</span>
+<span class="fc" id="L544">                    zoomDistStartY = Math.abs(y[0] - y[1]);</span>
+
+
+<span class="fc" id="L547">                    zoomStartBBox = getBBox();</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                    if (initialZoomBBox == null) {</span>
+<span class="fc" id="L549">                        initialZoomBBox = zoomStartBBox.translateScreenCoords(0, 0);</span>
+                    }
+
+                } else {
+<span class="fc" id="L553">                    int dx = Math.abs(x[0] - x[1]);</span>
+<span class="fc" id="L554">                    int dy = Math.abs(y[0] - y[1]);</span>
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                    if (dx == 0) {</span>
+<span class="nc" id="L556">                        dx = 1;</span>
+                    }
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                    if (dy == 0) {</span>
+<span class="nc" id="L559">                        dy = 1;</span>
+                    }
+
+<span class="fc" id="L562">                    double zoomX = (double) zoomDistStartX / dx;</span>
+<span class="fc" id="L563">                    double zoomY = (double) zoomDistStartY / dy;</span>
+
+
+<span class="fc" id="L566">                    BBox newBounds = zoomStartBBox.scaleScreenCoords((float) zoomX, (float) zoomY);</span>
+
+<span class="fc" id="L568">                    double minX = newBounds.minX;</span>
+<span class="fc" id="L569">                    double minY = newBounds.minY;</span>
+<span class="fc" id="L570">                    double maxX = newBounds.maxX;</span>
+<span class="fc" id="L571">                    double maxY = newBounds.maxY;</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                    if (panLimits != null) {</span>
+
+                        // Make sure that this zoom doesn't exceed the maxZoomIn value
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                        if (minX &lt; panLimits[0]) {</span>
+<span class="nc" id="L576">                            maxX = maxX + panLimits[0] - minX;</span>
+<span class="nc" id="L577">                            minX = panLimits[0];</span>
+                        }
+<span class="nc bnc" id="L579" title="All 2 branches missed.">                        if (minY &lt; panLimits[2]) {</span>
+<span class="nc" id="L580">                            maxY = maxY + panLimits[2] - minY;</span>
+<span class="nc" id="L581">                            minY = panLimits[2];</span>
+                        }
+
+<span class="nc bnc" id="L584" title="All 2 branches missed.">                        if (maxX &gt; panLimits[1]) {</span>
+<span class="nc" id="L585">                            minX = minX + panLimits[1] - maxX;</span>
+<span class="nc" id="L586">                            maxX = panLimits[1];</span>
+                        }
+
+<span class="nc bnc" id="L589" title="All 2 branches missed.">                        if (maxY &gt; panLimits[3]) {</span>
+<span class="nc" id="L590">                            minY = minY + panLimits[3] - maxY;</span>
+<span class="nc" id="L591">                            maxY = panLimits[3];</span>
+                        }
+
+                    }
+
+<span class="fc" id="L596">                    double[] zoomLimits = xyChart.getRenderer().getZoomLimits();</span>
+<span class="pc bpc" id="L597" title="5 of 6 branches missed.">                    if (zoomLimits != null &amp;&amp; zoomLimits[0] != 0 &amp;&amp; maxX - minX &lt; zoomLimits[0]) { // PMD Fix: CollapsibleIfStatements</span>
+<span class="nc" id="L598">                        maxX = xyChart.getRenderer().getXAxisMax();</span>
+<span class="nc" id="L599">                        minX = xyChart.getRenderer().getXAxisMin();</span>
+                    }
+<span class="pc bpc" id="L601" title="5 of 6 branches missed.">                    if (zoomLimits != null &amp;&amp; zoomLimits[1] != 0 &amp;&amp; maxX - minX &gt; zoomLimits[1]) { // PMD Fix: CollapsibleIfStatements</span>
+<span class="nc" id="L602">                        maxX = xyChart.getRenderer().getXAxisMax();</span>
+<span class="nc" id="L603">                        minX = xyChart.getRenderer().getXAxisMin();</span>
+                    }
+<span class="pc bpc" id="L605" title="5 of 6 branches missed.">                    if (zoomLimits != null &amp;&amp; zoomLimits[2] != 0 &amp;&amp; maxY - minY &lt; zoomLimits[2]) { // PMD Fix: CollapsibleIfStatements</span>
+<span class="nc" id="L606">                        maxY = xyChart.getRenderer().getYAxisMax();</span>
+<span class="nc" id="L607">                        minY = xyChart.getRenderer().getYAxisMin();</span>
+                    }
+<span class="pc bpc" id="L609" title="5 of 6 branches missed.">                    if (zoomLimits != null &amp;&amp; zoomLimits[3] != 0 &amp;&amp; maxY - minY &gt; zoomLimits[3]) { // PMD Fix: CollapsibleIfStatements</span>
+<span class="nc" id="L610">                        maxY = xyChart.getRenderer().getYAxisMax();</span>
+<span class="nc" id="L611">                        minY = xyChart.getRenderer().getYAxisMin();</span>
+                    }
+
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">                    if (!xyChart.getRenderer().isZoomXEnabled()) {</span>
+<span class="nc" id="L615">                        minX = xyChart.getRenderer().getXAxisMin();</span>
+<span class="nc" id="L616">                        maxX = xyChart.getRenderer().getXAxisMax();</span>
+                    }
+
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">                    if (!xyChart.getRenderer().isZoomYEnabled()) {</span>
+<span class="nc" id="L620">                        minY = xyChart.getRenderer().getYAxisMin();</span>
+<span class="nc" id="L621">                        maxY = xyChart.getRenderer().getYAxisMax();</span>
+                    }
+
+<span class="fc" id="L624">                    xyChart.getRenderer().setRange(new double[]{minX, maxX, minY, maxY});</span>
+<span class="fc" id="L625">                    chartBoundsChanged();</span>
+<span class="fc" id="L626">                    this.repaint();</span>
+                }
+<span class="fc" id="L628">            } else {</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                if (zoomStart == null) {</span>
+<span class="nc" id="L630">                    zoomStart = new Point((x[0] + x[1]) / 2f, (y[0] + y[1]) / 2f);</span>
+<span class="nc" id="L631">                    zoomTransformStart = Transform.makeIdentity();</span>
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                    if (transform != null) {</span>
+<span class="nc" id="L633">                        zoomTransformStart.concatenate(transform);</span>
+                    }
+<span class="nc" id="L635">                    double dx = Math.abs(x[0] - x[1]) / 2f;</span>
+<span class="nc" id="L636">                    double dy = Math.abs(y[0] - y[1]) / 2f;</span>
+<span class="nc" id="L637">                    zoomDistStart = Math.sqrt(dx * dx + dy * dy);</span>
+
+
+<span class="nc" id="L640">                } else {</span>
+<span class="nc" id="L641">                    double dx = Math.abs(x[0] - x[1]) / 2f;</span>
+<span class="nc" id="L642">                    double dy = Math.abs(y[0] - y[1]) / 2f;</span>
+<span class="nc" id="L643">                    double zoomDist = Math.sqrt(dx * dx + dy * dy);</span>
+<span class="nc bnc" id="L644" title="All 2 branches missed.">                    if (zoomDist == 0) {</span>
+<span class="nc" id="L645">                        zoomDist = 1;</span>
+                    }
+<span class="nc" id="L647">                    transform = Transform.makeIdentity();</span>
+<span class="nc" id="L648">                    transform.translate(zoomStart.getX(), zoomStart.getY());</span>
+<span class="nc" id="L649">                    transform.scale((float) (zoomDist / zoomDistStart), (float) (zoomDist / zoomDistStart));</span>
+<span class="nc" id="L650">                    transform.translate(-zoomStart.getX(), -zoomStart.getY());</span>
+<span class="nc" id="L651">                    transform.concatenate(zoomTransformStart);</span>
+<span class="nc" id="L652">                    this.repaint();</span>
+<span class="nc" id="L653">                }</span>
+            }
+
+
+        } else {
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">            if (!isPanEnabled()) {</span>
+<span class="nc" id="L659">                super.pointerDragged(x, y);</span>
+<span class="nc" id="L660">                return;</span>
+            }
+
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">            if (chart instanceof XYChart) {</span>
+<span class="fc" id="L664">                XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L665">                double[] panLimits = xyChart.getRenderer().getPanLimits();</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">                if (dragStartBBox == null) {</span>
+<span class="fc" id="L667">                    dragStart = new Point(x[0], y[0]);</span>
+<span class="fc" id="L668">                    dragStartBBox = getBBox();</span>
+                } else {
+<span class="fc" id="L670">                    float tx = x[0] - dragStart.getX();</span>
+<span class="fc" id="L671">                    float ty = y[0] - dragStart.getY();</span>
+<span class="fc" id="L672">                    BBox newBounds = dragStartBBox.translateScreenCoords(-tx, ty);</span>
+<span class="fc" id="L673">                    double minX = newBounds.minX;</span>
+<span class="fc" id="L674">                    double minY = newBounds.minY;</span>
+<span class="fc" id="L675">                    double maxX = newBounds.maxX;</span>
+<span class="fc" id="L676">                    double maxY = newBounds.maxY;</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">                    if (panLimits != null) {</span>
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                        if (minX &lt; panLimits[0]) {</span>
+<span class="nc" id="L679">                            maxX = maxX + panLimits[0] - minX;</span>
+<span class="nc" id="L680">                            minX = panLimits[0];</span>
+                        }
+<span class="nc bnc" id="L682" title="All 2 branches missed.">                        if (minY &lt; panLimits[2]) {</span>
+<span class="nc" id="L683">                            maxY = maxY + panLimits[2] - minY;</span>
+<span class="nc" id="L684">                            minY = panLimits[2];</span>
+                        }
+
+<span class="nc bnc" id="L687" title="All 2 branches missed.">                        if (maxX &gt; panLimits[1]) {</span>
+<span class="nc" id="L688">                            minX = minX + panLimits[1] - maxX;</span>
+<span class="nc" id="L689">                            maxX = panLimits[1];</span>
+                        }
+
+<span class="nc bnc" id="L692" title="All 2 branches missed.">                        if (maxY &gt; panLimits[3]) {</span>
+<span class="nc" id="L693">                            minY = minY + panLimits[3] - maxY;</span>
+<span class="nc" id="L694">                            maxY = panLimits[3];</span>
+                        }
+
+                    }
+
+<span class="fc bfc" id="L699" title="All 2 branches covered.">                    if (!xyChart.getRenderer().isPanXEnabled()) {</span>
+<span class="fc" id="L700">                        minX = xyChart.getRenderer().getXAxisMin();</span>
+<span class="fc" id="L701">                        maxX = xyChart.getRenderer().getXAxisMax();</span>
+                    }
+<span class="fc bfc" id="L703" title="All 2 branches covered.">                    if (!xyChart.getRenderer().isPanYEnabled()) {</span>
+<span class="fc" id="L704">                        minY = xyChart.getRenderer().getYAxisMin();</span>
+<span class="fc" id="L705">                        maxY = xyChart.getRenderer().getYAxisMax();</span>
+                    }
+<span class="fc" id="L707">                    xyChart.getRenderer().setRange(new double[]{minX, maxX, minY, maxY});</span>
+<span class="fc" id="L708">                    chartBoundsChanged();</span>
+                }
+<span class="fc" id="L710">            } else {</span>
+<span class="nc bnc" id="L711" title="All 2 branches missed.">                if (dragStart == null) {</span>
+<span class="nc" id="L712">                    dragStart = new Point(x[0], y[0]);</span>
+<span class="nc" id="L713">                    dragTransformStart = Transform.makeIdentity();</span>
+<span class="nc bnc" id="L714" title="All 2 branches missed.">                    if (transform != null) {</span>
+<span class="nc" id="L715">                        dragTransformStart.concatenate(transform);</span>
+                    }
+
+                } else {
+<span class="nc" id="L719">                    transform = Transform.makeIdentity();</span>
+<span class="nc" id="L720">                    transform.translate(x[0] - dragStart.getX(), y[0] - dragStart.getY());</span>
+<span class="nc" id="L721">                    transform.concatenate(dragTransformStart);</span>
+<span class="nc" id="L722">                    this.repaint();</span>
+                }
+            }
+        }
+
+<span class="fc" id="L727">        super.pointerDragged(x, y); //To change body of generated methods, choose Tools | Templates.</span>
+<span class="fc" id="L728">    }</span>
+
+
+    /// Checks if panning is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// the panEnabled
+    public boolean isPanEnabled() {
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L738">            return ((XYChart) chart).getRenderer().isPanEnabled();</span>
+        }
+<span class="nc" id="L740">        return panEnabled;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `panEnabled`: the panEnabled to set
+    public void setPanEnabled(boolean panEnabled) {
+<span class="fc" id="L747">        this.panEnabled = panEnabled;</span>
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L749">            XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L750">            xyChart.getRenderer().setPanEnabled(panEnabled);</span>
+        }
+<span class="fc" id="L752">    }</span>
+
+    /// Enables or disables pan on x and y axes separately. Pass a different
+    /// value for each axis to lock panning to a single direction; for example
+    /// `setPanEnabled(true, false)` lets the user pan left/right but pins the
+    /// Y axis (a useful pattern for time-series charts).
+    ///
+    /// #### Parameters
+    ///
+    /// - `panXEnabled`: True to enable panning along the x-axis.
+    ///
+    /// - `panYEnabled`: True to enable panning along the y-axis.
+    public void setPanEnabled(boolean panXEnabled, boolean panYEnabled) {
+<span class="pc bpc" id="L765" title="1 of 4 branches missed.">        this.panEnabled = panXEnabled || panYEnabled;</span>
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L767">            XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L768">            xyChart.getRenderer().setPanEnabled(panXEnabled, panYEnabled);</span>
+        }
+<span class="fc" id="L770">    }</span>
+
+    /// Checks whether panning is enabled along the X-axis.
+    public boolean isPanXEnabled() {
+<span class="nc bnc" id="L774" title="All 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="nc" id="L775">            return ((XYChart) chart).getRenderer().isPanXEnabled();</span>
+        }
+<span class="nc" id="L777">        return panEnabled;</span>
+    }
+
+    /// Checks whether panning is enabled along the Y-axis.
+    public boolean isPanYEnabled() {
+<span class="nc bnc" id="L782" title="All 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="nc" id="L783">            return ((XYChart) chart).getRenderer().isPanYEnabled();</span>
+        }
+<span class="nc" id="L785">        return panEnabled;</span>
+    }
+
+    /// Sets the pan limits if panning is enabled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minX`: The minimum X-axis value for panning.
+    ///
+    /// - `maxX`: The maximum X-axis value for panning.
+    ///
+    /// - `minY`: The minimum Y-axis value for panning.
+    ///
+    /// - `maxY`: The maximum Y-axis value for panning.
+    public void setPanLimits(double minX, double maxX, double minY, double maxY) {
+<span class="fc bfc" id="L800" title="All 2 branches covered.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L801">            XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L802">            XYMultipleSeriesRenderer r = xyChart.getRenderer();</span>
+<span class="fc" id="L803">            r.setPanLimits(new double[]{minX, maxX, minY, maxY});</span>
+<span class="fc" id="L804">        } else {</span>
+<span class="fc" id="L805">            throw new RuntimeException(&quot;setPanLimits() only supported for XYCharts&quot;);</span>
+        }
+<span class="fc" id="L807">    }</span>
+
+    /// Removes the pan limits which may have been previously set with `double, double, double)`
+    public void clearPanLimits() {
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L812">            ((XYChart) chart).getRenderer().setPanLimits(null);</span>
+        }
+<span class="fc" id="L814">    }</span>
+
+    /// Checks whether zoom is enabled.
+    ///
+    /// #### Returns
+    ///
+    /// the zoomEnabled
+    public boolean isZoomEnabled() {
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L823">            return ((XYChart) chart).getRenderer().isZoomEnabled();</span>
+        }
+<span class="nc" id="L825">        return zoomEnabled;</span>
+    }
+
+    /// Enables or disables zoom on both x and y axes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoomEnabled`: the zoomEnabled to set
+    public void setZoomEnabled(boolean zoomEnabled) {
+<span class="fc" id="L834">        this.zoomEnabled = zoomEnabled;</span>
+<span class="pc bpc" id="L835" title="3 of 4 branches missed.">        setFocusable(isFocusable() || zoomEnabled);</span>
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L837">            XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L838">            xyChart.getRenderer().setZoomEnabled(zoomEnabled, zoomEnabled);</span>
+        }
+<span class="fc" id="L840">    }</span>
+
+    /// Checks whether zoom is enabled on the X-axis.
+    public boolean isZoomXEnabled() {
+<span class="nc bnc" id="L844" title="All 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="nc" id="L845">            return ((XYChart) chart).getRenderer().isZoomXEnabled();</span>
+        }
+<span class="nc" id="L847">        return zoomEnabled;</span>
+    }
+
+    /// Checks whether zoom is enabled on the Y-axis.
+    public boolean isZoomYEnabled() {
+<span class="nc bnc" id="L852" title="All 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="nc" id="L853">            return ((XYChart) chart).getRenderer().isZoomYEnabled();</span>
+        }
+<span class="nc" id="L855">        return zoomEnabled;</span>
+    }
+
+    /// Sets the zoom limits.
+    ///
+    /// **NOTE: This method is only applicable when showing an `XYChart`**  It will throw a
+    /// RuntimeException if called while a different kind of chart is being shown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minRangeX`: @param minRangeX The minimum distance from `XYMultipleSeriesRenderer#getXAxisMin()` to
+    /// `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming in.  0 means no limit.
+    ///
+    /// - `maxRangeX`: @param maxRangeX The maximum distance from `XYMultipleSeriesRenderer#getXAxisMin()` to
+    /// `XYMultipleSeriesRenderer#getXAxisMax()` that can be achieved by zooming out.  0 means no limit.
+    ///
+    /// - `minRangeY`: @param minRangeY The minimum distance from `XYMultipleSeriesRenderer#getYAxisMin()` to
+    /// `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming in. 0 means no limit.
+    ///
+    /// - `maxRangeY`: @param maxRangeY The maximum distance from `XYMultipleSeriesRenderer#getYAxisMin()` to
+    /// `XYMultipleSeriesRenderer#getYAxisMax()` that can be achieved by zooming out. 0 means no limit.
+    public void setZoomLimits(double minRangeX, double maxRangeX, double minRangeY, double maxRangeY) {
+<span class="pc bpc" id="L877" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="nc" id="L878">            XYChart xyChart = (XYChart) chart;</span>
+<span class="nc" id="L879">            xyChart.getRenderer().setZoomLimits(new double[]{minRangeX, maxRangeX, minRangeY, maxRangeY});</span>
+<span class="nc" id="L880">        } else {</span>
+<span class="fc" id="L881">            throw new RuntimeException(&quot;setZoomLimits() only supported for XY charts&quot;);</span>
+        }
+
+<span class="nc" id="L884">    }</span>
+
+    /// Enables or disables zoom on x and y axes separately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `zoomX`: True to enable zooming x axis.
+    ///
+    /// - `zoomY`: True to enable zooming y axis.
+    public void setZoomEnabled(boolean zoomX, boolean zoomY) {
+<span class="pc bpc" id="L894" title="2 of 4 branches missed.">        this.zoomEnabled = zoomX || zoomY;</span>
+<span class="pc bpc" id="L895" title="3 of 4 branches missed.">        setFocusable(isFocusable() || zoomEnabled);</span>
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L897">            ((XYChart) chart).getRenderer().setZoomEnabled(zoomX, zoomY);</span>
+        }
+<span class="fc" id="L899">    }</span>
+
+
+    private void zoomTransition(double minX, double maxX, double minY, double maxY, int duration) {
+<span class="fc bfc" id="L903" title="All 2 branches covered.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L904">            BBox currentViewPort = getBBox();</span>
+
+<span class="fc" id="L906">            BBox targetViewPort = getBBox(</span>
+                    minX, maxX,
+                    minY, maxY,
+<span class="fc" id="L909">                    (int) currentViewPort.topLeft.getX(), (int) currentViewPort.topLeft.getY(),</span>
+<span class="fc" id="L910">                    (int) currentViewPort.bottomRight.getX(), (int) currentViewPort.bottomRight.getY()</span>
+            );
+
+<span class="fc" id="L913">            ZoomTransitionXY zt = new ZoomTransitionXY(currentViewPort, targetViewPort, duration);</span>
+<span class="fc" id="L914">            animations.add(zt);</span>
+<span class="pc bpc" id="L915" title="1 of 2 branches missed.">            if (animations.size() == 1) {</span>
+<span class="fc" id="L916">                zt.start();</span>
+            }
+<span class="fc" id="L918">        } else {</span>
+<span class="fc" id="L919">            Shape currentViewPort = screenToChartShape(new Rectangle(getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight()));</span>
+<span class="fc" id="L920">            float[] currentRect = currentViewPort.getBounds2D();</span>
+
+<span class="fc" id="L922">            float currentAspect = currentRect[2] / currentRect[3];</span>
+<span class="fc" id="L923">            Rectangle newViewPort = new Rectangle((int) minX, (int) (maxX - minX), (int) minY, (int) (maxY - minY));</span>
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            if (newViewPort.getHeight() != 0) {</span>
+<span class="fc" id="L925">                float newAspect = (float) newViewPort.getWidth() / (float) newViewPort.getHeight();</span>
+<span class="pc bpc" id="L926" title="1 of 2 branches missed.">                if (newAspect != currentAspect) {</span>
+<span class="fc" id="L927">                    newViewPort.setHeight((int) (((double) newViewPort.getWidth()) / currentAspect));</span>
+                }
+            }
+
+<span class="fc" id="L931">            ZoomTransition zt = new ZoomTransition(currentViewPort.getBounds(), newViewPort, duration);</span>
+
+<span class="fc" id="L933">            animations.add(zt);</span>
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">            if (animations.size() == 1) {</span>
+<span class="fc" id="L935">                zt.start();</span>
+            }
+        }
+<span class="fc" id="L938">    }</span>
+
+    private BBox getBBox() {
+<span class="pc bpc" id="L941" title="1 of 2 branches missed.">        if (chart instanceof XYChart) {</span>
+<span class="fc" id="L942">            XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L943">            double minX = xyChart.getRenderer().getXAxisMin();</span>
+<span class="fc" id="L944">            double maxX = xyChart.getRenderer().getXAxisMax();</span>
+<span class="fc" id="L945">            double minY = xyChart.getRenderer().getYAxisMin();</span>
+<span class="fc" id="L946">            double maxY = xyChart.getRenderer().getYAxisMax();</span>
+<span class="fc" id="L947">            return getBBox(minX, maxX, minY, maxY,</span>
+<span class="fc" id="L948">                    getAbsoluteX() + getStyle().getPaddingLeft(false) + xyChart.getRenderer().getMargins()[1],</span>
+<span class="fc" id="L949">                    getAbsoluteY() + getStyle().getPaddingTop() + xyChart.getRenderer().getMargins()[0],</span>
+<span class="fc" id="L950">                    getAbsoluteX() + getWidth() - getStyle().getPaddingRight(false) - xyChart.getRenderer().getMargins()[3],</span>
+<span class="fc" id="L951">                    getAbsoluteY() + getHeight() - getStyle().getPaddingBottom() - xyChart.getRenderer().getMargins()[2]);</span>
+
+
+        }
+<span class="nc" id="L955">        return null;</span>
+    }
+
+    private BBox getBBox(double minX, double maxX, double minY, double maxY, int topLeftX, int topLeftY, int bottomRightX, int bottomRightY) {
+
+<span class="fc" id="L960">        Point topLeft = new Point(topLeftX, topLeftY);</span>
+<span class="fc" id="L961">        Point bottomRight = new Point(bottomRightX, bottomRightY);</span>
+
+<span class="pc bpc" id="L963" title="2 of 4 branches missed.">        if (bottomRight.getX() == topLeft.getX() || topLeft.getY() == bottomRight.getY()) {</span>
+            // If the we don't have height or width, forget about scaling
+<span class="nc" id="L965">            return null;</span>
+        }
+
+<span class="fc" id="L968">        double xScale = (bottomRight.getX() - topLeft.getX()) / (maxX - minX);</span>
+<span class="fc" id="L969">        double yScale = (bottomRight.getY() - topLeft.getY()) / (maxY - minY);</span>
+
+
+<span class="fc" id="L972">        BBox out = new BBox();</span>
+<span class="fc" id="L973">        out.topLeft = topLeft;</span>
+<span class="fc" id="L974">        out.bottomRight = bottomRight;</span>
+<span class="fc" id="L975">        out.minX = minX;</span>
+<span class="fc" id="L976">        out.maxX = maxX;</span>
+<span class="fc" id="L977">        out.minY = minY;</span>
+<span class="fc" id="L978">        out.maxY = maxY;</span>
+<span class="fc" id="L979">        out.scaleX = xScale;</span>
+<span class="fc" id="L980">        out.scaleY = yScale;</span>
+<span class="fc" id="L981">        return out;</span>
+    }
+
+    /// Subclasses can override this method to be informed when the chart bounds change
+    /// due to panning or zooming.
+    protected void chartBoundsChanged() {
+
+<span class="fc" id="L988">    }</span>
+
+    private interface IZoomTransition {
+        void start();
+    }
+
+    private class ZoomTransition implements Animation, IZoomTransition {
+        private final Rectangle currentViewPort;
+        private final Rectangle newViewPort;
+        private final Transform origTransform;
+        private final Motion motion;
+<span class="fc" id="L999">        private boolean finished = false;</span>
+
+<span class="fc" id="L1001">        ZoomTransition(Rectangle currentViewPort, Rectangle newViewPort, int duration) {</span>
+
+<span class="fc" id="L1003">            this.currentViewPort = currentViewPort;</span>
+<span class="fc" id="L1004">            this.newViewPort = newViewPort;</span>
+<span class="fc" id="L1005">            this.motion = Motion.createLinearMotion(0, 100, duration);</span>
+<span class="fc" id="L1006">            this.origTransform = Transform.makeIdentity();</span>
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">            if (transform != null) {</span>
+<span class="nc" id="L1008">                this.origTransform.setTransform(transform);</span>
+            }
+
+<span class="fc" id="L1011">        }</span>
+
+        @Override
+        public void start() {
+<span class="fc" id="L1015">            Form f = ChartComponent.this.getComponentForm();</span>
+<span class="pc bpc" id="L1016" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L1017">                f.registerAnimated(this);</span>
+<span class="fc" id="L1018">                this.motion.start();</span>
+            } else {
+<span class="nc" id="L1020">                animations.remove(this);</span>
+            }
+<span class="fc" id="L1022">        }</span>
+
+        public void cleanup() {
+<span class="nc" id="L1025">            Form f = ChartComponent.this.getComponentForm();</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc" id="L1027">                f.deregisterAnimated(this);</span>
+            }
+<span class="nc" id="L1029">        }</span>
+
+        @Override
+        public boolean animate() {
+
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">            if (finished) {</span>
+<span class="nc" id="L1035">                animations.remove(this);</span>
+<span class="nc bnc" id="L1036" title="All 2 branches missed.">                if (!animations.isEmpty()) {</span>
+<span class="nc" id="L1037">                    animations.get(0).start();</span>
+                }
+<span class="nc" id="L1039">                cleanup();</span>
+<span class="nc" id="L1040">                return false;</span>
+<span class="nc bnc" id="L1041" title="All 2 branches missed.">            } else if (motion.isFinished()) {</span>
+<span class="nc" id="L1042">                finished = true;</span>
+
+            }
+<span class="nc" id="L1045">            return true;</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="nc" id="L1050">            Rectangle newBounds = new Rectangle(newViewPort.getBounds());</span>
+<span class="nc" id="L1051">            Rectangle currentBounds = new Rectangle(currentViewPort.getBounds());</span>
+
+
+<span class="nc" id="L1054">            double nW = newBounds.getWidth();</span>
+<span class="nc" id="L1055">            double nH = newBounds.getHeight();</span>
+<span class="nc" id="L1056">            double cW = currentBounds.getWidth();</span>
+<span class="nc" id="L1057">            double cH = currentBounds.getHeight();</span>
+
+<span class="nc" id="L1059">            double scale = cW / nW;</span>
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">            if (nH * scale &gt; cH) {</span>
+<span class="nc" id="L1061">                scale = cH / nH;</span>
+            }
+<span class="nc" id="L1063">            Point newCenter = new Point(newBounds.getX() + newBounds.getWidth() / 2, newBounds.getY() + newBounds.getHeight() / 2);</span>
+<span class="nc" id="L1064">            Point currentCenter = new Point(currentBounds.getX() + currentBounds.getWidth() / 2, currentBounds.getY() + currentBounds.getHeight() / 2);</span>
+<span class="nc" id="L1065">            double motionVal = motion.getValue();</span>
+
+<span class="nc" id="L1067">            double tx = ((double) newCenter.getX() - currentCenter.getX()) * motionVal / 100.0;</span>
+<span class="nc" id="L1068">            double ty = ((double) newCenter.getY() - currentCenter.getY()) * motionVal / 100.0;</span>
+
+<span class="nc" id="L1070">            scale = 1.0 + (scale - 1f) * motionVal / 100.0;</span>
+
+<span class="nc" id="L1072">            Transform t = Transform.makeIdentity();</span>
+<span class="nc" id="L1073">            t.setTransform(origTransform);</span>
+
+<span class="nc" id="L1075">            int cX = (int) (currentCenter.getX() + tx);</span>
+<span class="nc" id="L1076">            int cY = (int) (currentCenter.getY() + ty);</span>
+
+<span class="nc" id="L1078">            t.translate(currentCenter.getX(), currentCenter.getY());</span>
+<span class="nc" id="L1079">            t.scale((float) scale, (float) scale);</span>
+<span class="nc" id="L1080">            t.translate(-cX, -cY);</span>
+
+<span class="nc" id="L1082">            setTransform(t);</span>
+<span class="nc" id="L1083">            ChartComponent.this.repaint();</span>
+
+<span class="nc" id="L1085">        }</span>
+
+    }
+
+    private class ZoomTransitionXY implements Animation, IZoomTransition {
+        private final BBox currentViewPort;
+        private final BBox newViewPort;
+        private final Motion motion;
+<span class="fc" id="L1093">        private boolean finished = false;</span>
+
+<span class="fc" id="L1095">        ZoomTransitionXY(BBox currentViewPort, BBox newViewPort, int duration) {</span>
+
+<span class="fc" id="L1097">            this.currentViewPort = currentViewPort;</span>
+<span class="fc" id="L1098">            this.newViewPort = newViewPort;</span>
+<span class="fc" id="L1099">            this.motion = Motion.createLinearMotion(0, 100, duration);</span>
+<span class="fc" id="L1100">        }</span>
+
+        @Override
+        public void start() {
+<span class="fc" id="L1104">            Form f = ChartComponent.this.getComponentForm();</span>
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L1106">                f.registerAnimated(this);</span>
+<span class="fc" id="L1107">                this.motion.start();</span>
+            } else {
+<span class="nc" id="L1109">                animations.remove(this);</span>
+            }
+<span class="fc" id="L1111">        }</span>
+
+        public void cleanup() {
+<span class="fc" id="L1114">            Form f = ChartComponent.this.getComponentForm();</span>
+<span class="pc bpc" id="L1115" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L1116">                f.deregisterAnimated(this);</span>
+            }
+<span class="fc" id="L1118">        }</span>
+
+        @Override
+        public boolean animate() {
+
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">            if (finished) {</span>
+<span class="fc" id="L1124">                animations.remove(this);</span>
+<span class="pc bpc" id="L1125" title="1 of 2 branches missed.">                if (!animations.isEmpty()) {</span>
+<span class="nc" id="L1126">                    animations.get(0).start();</span>
+                }
+<span class="fc" id="L1128">                cleanup();</span>
+<span class="fc" id="L1129">                return false;</span>
+<span class="pc bpc" id="L1130" title="1 of 2 branches missed.">            } else if (motion.isFinished()) {</span>
+<span class="fc" id="L1131">                chartBoundsChanged();</span>
+<span class="fc" id="L1132">                finished = true;</span>
+
+            }
+<span class="fc" id="L1135">            return true;</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="pc bpc" id="L1140" title="1 of 2 branches missed.">            if (chart instanceof XYChart) {</span>
+<span class="fc" id="L1141">                XYChart xyChart = (XYChart) chart;</span>
+<span class="fc" id="L1142">                double motionVal = motion.getValue() / 100.0;</span>
+<span class="fc" id="L1143">                double diff = newViewPort.minX - currentViewPort.minX;</span>
+<span class="fc" id="L1144">                double minX = currentViewPort.minX + diff * motionVal;</span>
+
+<span class="fc" id="L1146">                diff = newViewPort.maxX - currentViewPort.maxX;</span>
+<span class="fc" id="L1147">                double maxX = currentViewPort.maxX + diff * motionVal;</span>
+
+<span class="fc" id="L1149">                diff = newViewPort.minY - currentViewPort.minY;</span>
+<span class="fc" id="L1150">                double minY = currentViewPort.minY + diff * motionVal;</span>
+
+<span class="fc" id="L1152">                diff = newViewPort.maxY - currentViewPort.maxY;</span>
+<span class="fc" id="L1153">                double maxY = currentViewPort.maxY + diff * motionVal;</span>
+
+<span class="fc" id="L1155">                xyChart.getRenderer().setXAxisMin(minX);</span>
+<span class="fc" id="L1156">                xyChart.getRenderer().setXAxisMax(maxX);</span>
+<span class="fc" id="L1157">                xyChart.getRenderer().setYAxisMin(minY);</span>
+<span class="fc" id="L1158">                xyChart.getRenderer().setYAxisMax(maxY);</span>
+
+<span class="fc" id="L1160">                ChartComponent.this.repaint();</span>
+            }
+
+<span class="fc" id="L1163">        }</span>
+
+    }
+
+<span class="fc" id="L1167">    private class BBox {</span>
+        // screen coords
+        Point topLeft;
+        Point bottomRight;
+
+        // Chart coords
+        double minX;
+        double maxX;
+        double minY;
+        double maxY;
+
+        double scaleX;
+        double scaleY;
+
+        BBox translateScreenCoords(float x, float y) {
+<span class="fc" id="L1182">            BBox out = new BBox();</span>
+<span class="fc" id="L1183">            out.topLeft = new Point(topLeft.getX() + x, topLeft.getY() + y);</span>
+<span class="fc" id="L1184">            out.bottomRight = new Point(bottomRight.getX() + x, topLeft.getY() + y);</span>
+
+<span class="fc" id="L1186">            float tXChart = (float) (x / scaleX);</span>
+<span class="fc" id="L1187">            float tYChart = (float) (y / scaleY);</span>
+
+<span class="fc" id="L1189">            out.minX = minX + tXChart;</span>
+<span class="fc" id="L1190">            out.maxX = maxX + tXChart;</span>
+<span class="fc" id="L1191">            out.minY = minY + tYChart;</span>
+<span class="fc" id="L1192">            out.maxY = maxY + tYChart;</span>
+<span class="fc" id="L1193">            out.scaleX = scaleX;</span>
+<span class="fc" id="L1194">            out.scaleY = scaleY;</span>
+<span class="fc" id="L1195">            return out;</span>
+        }
+
+        BBox scaleScreenCoords(float x, float y) {
+<span class="fc" id="L1199">            BBox out = new BBox();</span>
+
+<span class="fc" id="L1201">            Point center = new Point(</span>
+<span class="fc" id="L1202">                    0.5f * (topLeft.getX() + bottomRight.getX()),</span>
+<span class="fc" id="L1203">                    0.5f * (topLeft.getY() + bottomRight.getY())</span>
+            );
+
+<span class="fc" id="L1206">            double cX = (minX + maxX) / 2;</span>
+<span class="fc" id="L1207">            double cY = (minY + maxY) / 2;</span>
+
+<span class="fc" id="L1209">            float width = (bottomRight.getX() - topLeft.getX()) * x;</span>
+<span class="fc" id="L1210">            float height = (bottomRight.getY() - topLeft.getY()) * y;</span>
+
+<span class="fc" id="L1212">            out.topLeft = new Point(center.getX() - width / 2, center.getY() - height / 2);</span>
+<span class="fc" id="L1213">            out.bottomRight = new Point(center.getX() + width / 2, center.getY() + height / 2);</span>
+
+            //float tXChart = (float)( x / scaleX);
+            //float tYChart = (float)(y / scaleY);
+
+<span class="fc" id="L1218">            out.minX = cX - width / 2 / scaleX;</span>
+<span class="fc" id="L1219">            out.maxX = cX + width / 2 / scaleX;</span>
+<span class="fc" id="L1220">            out.minY = cY - height / 2 / scaleY;</span>
+<span class="fc" id="L1221">            out.maxY = cY + height / 2 / scaleY;</span>
+<span class="fc" id="L1222">            out.scaleX = scaleX;</span>
+<span class="fc" id="L1223">            out.scaleY = scaleY;</span>
+<span class="fc" id="L1224">            return out;</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

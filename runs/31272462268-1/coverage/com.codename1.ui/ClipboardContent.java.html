@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClipboardContent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ClipboardContent.java</span></div><h1>ClipboardContent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A set of alternative clipboard representations keyed by MIME type. A clipboard write should
+/// normally include `text/plain` plus any richer formats it can provide. Clipboard readers negotiate
+/// by inspecting `#getMimeTypes()` and requesting the representation they understand best.
+///
+/// Values are usually `String` or `byte[]`. Ports may support additional native value types, but must
+/// retain the plain-text representation when one is supplied.
+<span class="fc" id="L35">public class ClipboardContent {</span>
+    public static final String MIME_TEXT = &quot;text/plain&quot;;
+    public static final String MIME_HTML = &quot;text/html&quot;;
+    public static final String MIME_RTF = &quot;text/rtf&quot;;
+    public static final String MIME_MARKDOWN = &quot;text/markdown&quot;;
+    public static final String MIME_ASCIIDOC = &quot;text/asciidoc&quot;;
+    /// PNG image bytes (`byte[]`).
+    public static final String MIME_PNG = &quot;image/png&quot;;
+    /// JPEG image bytes (`byte[]`).
+    public static final String MIME_JPEG = &quot;image/jpeg&quot;;
+    /// GIF image bytes (`byte[]`).
+    public static final String MIME_GIF = &quot;image/gif&quot;;
+    /// A local file reference (a file path / URI `String`, or a `String[]` for several files).
+    public static final String MIME_FILE = &quot;application/x-file-list&quot;;
+
+<span class="fc" id="L50">    private final List&lt;String&gt; mimeTypes = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L51">    private final List&lt;Object&gt; values = new ArrayList&lt;Object&gt;();</span>
+
+    /// Adds or replaces a representation. Passing null removes the MIME type.
+    public ClipboardContent setData(String mimeType, Object value) {
+<span class="fc" id="L55">        String normalized = normalizeMimeType(mimeType);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (normalized.length() == 0) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;MIME type must not be empty&quot;);</span>
+        }
+<span class="fc" id="L59">        int index = mimeTypes.indexOf(normalized);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            if (index &gt;= 0) {</span>
+<span class="nc" id="L62">                mimeTypes.remove(index);</span>
+<span class="nc" id="L63">                values.remove(index);</span>
+            }
+<span class="nc" id="L65">            return this;</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (index &gt;= 0) {</span>
+<span class="nc" id="L68">            values.set(index, value);</span>
+        } else {
+<span class="fc" id="L70">            mimeTypes.add(normalized);</span>
+<span class="fc" id="L71">            values.add(value);</span>
+        }
+<span class="fc" id="L73">        return this;</span>
+    }
+
+    /// Returns the representation for a MIME type, or null when it isn't available.
+    public Object getData(String mimeType) {
+<span class="fc" id="L78">        int index = mimeTypes.indexOf(normalizeMimeType(mimeType));</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        return index &lt; 0 ? null : values.get(index);</span>
+    }
+
+    /// Returns the binary (`byte[]`) representation for a MIME type -- e.g. the raw bytes of an image
+    /// or file -- or null when it isn't available or isn't binary.
+    public byte[] getBytes(String mimeType) {
+<span class="fc" id="L85">        Object value = getData(mimeType);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        return value instanceof byte[] ? (byte[]) value : null;</span>
+    }
+
+    /// Returns a string representation, or null when the value isn't a string.
+    public String getText(String mimeType) {
+<span class="fc" id="L91">        Object value = getData(mimeType);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        return value instanceof String ? (String) value : null;</span>
+    }
+
+    /// Returns true when this content includes the requested MIME type.
+    public boolean hasMimeType(String mimeType) {
+<span class="nc" id="L97">        return mimeTypes.contains(normalizeMimeType(mimeType));</span>
+    }
+
+    /// Returns the available MIME types in preference order.
+    public String[] getMimeTypes() {
+<span class="nc" id="L102">        return mimeTypes.toArray(new String[mimeTypes.size()]);</span>
+    }
+
+    /// Returns the first available MIME type from the caller's preference list, or null.
+    public String findPreferredMimeType(String[] preferredMimeTypes) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (preferredMimeTypes == null) {</span>
+<span class="nc" id="L108">            return null;</span>
+        }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (String preferredMimeType : preferredMimeTypes) {</span>
+<span class="fc" id="L111">            String mimeType = normalizeMimeType(preferredMimeType);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (mimeTypes.contains(mimeType)) {</span>
+<span class="fc" id="L113">                return mimeType;</span>
+            }
+        }
+<span class="fc" id="L116">        return null;</span>
+    }
+
+    private static String normalizeMimeType(String mimeType) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (mimeType == null) {</span>
+<span class="nc" id="L121">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L123">        int semicolon = mimeType.indexOf(';');</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        String value = semicolon &lt; 0 ? mimeType : mimeType.substring(0, semicolon);</span>
+<span class="fc" id="L125">        return value.trim().toLowerCase();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

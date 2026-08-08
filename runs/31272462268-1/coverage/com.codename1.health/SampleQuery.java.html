@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SampleQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">SampleQuery.java</span></div><h1>SampleQuery.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Describes a read against [HealthStore]. Fluent setters return `this`.
+///
+/// ```java
+/// SampleQuery q = new SampleQuery()
+///         .addType(HealthDataType.HEART_RATE)
+///         .setTimeRange(HealthTimeRange.lastHours(24))
+///         .setSortDescending(true)
+///         .setLimit(500);
+/// ```
+///
+/// #### Always set a limit for high-frequency types
+///
+/// A year of continuous heart rate is on the order of half a million
+/// samples. The default limit of 10,000 exists so that a naive query
+/// cannot exhaust the heap on a phone; raise it deliberately, and prefer
+/// paging through [HealthStore#readSamplePage(SampleQuery)] over asking
+/// for everything at once.
+<span class="fc" id="L46">public final class SampleQuery {</span>
+
+    /// The limit applied when none is set.
+    public static final int DEFAULT_LIMIT = 10000;
+
+<span class="fc" id="L51">    private final List&lt;HealthDataType&gt; types = new ArrayList&lt;HealthDataType&gt;();</span>
+<span class="fc" id="L52">    private final List&lt;String&gt; sources = new ArrayList&lt;String&gt;();</span>
+    private HealthTimeRange timeRange;
+<span class="fc" id="L54">    private int limit = DEFAULT_LIMIT;</span>
+    private boolean sortDescending;
+    private HealthUnit unit;
+<span class="fc" id="L57">    private boolean flattenSeries = true;</span>
+<span class="fc" id="L58">    private long sleepSessionGapMillis = 15 * 60 * 1000L;</span>
+    private String pageToken;
+
+    /// Adds a type to read. At least one is required.
+    public SampleQuery addType(HealthDataType type) {
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (type != null &amp;&amp; !types.contains(type)) {</span>
+<span class="fc" id="L64">            types.add(type);</span>
+        }
+<span class="fc" id="L66">        return this;</span>
+    }
+
+    /// The types this query reads.
+    public List&lt;HealthDataType&gt; getTypes() {
+<span class="fc" id="L71">        return Collections.unmodifiableList(types);</span>
+    }
+
+    /// Restricts the query to samples written by one app, identified by
+    /// its bundle id or package name -- see [HealthSource#getBundleId()].
+    /// Call more than once to allow several.
+    ///
+    /// Worth doing when a phone and a watch both record the same activity:
+    /// see the double-counting warning on [AggregateQuery].
+    public SampleQuery addSource(String bundleId) {
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        if (bundleId != null &amp;&amp; !sources.contains(bundleId)) {</span>
+<span class="fc" id="L82">            sources.add(bundleId);</span>
+        }
+<span class="fc" id="L84">        return this;</span>
+    }
+
+    /// The source filter, empty when unrestricted.
+    public List&lt;String&gt; getSources() {
+<span class="fc" id="L89">        return Collections.unmodifiableList(sources);</span>
+    }
+
+    /// The span to read. Required.
+    public SampleQuery setTimeRange(HealthTimeRange timeRange) {
+<span class="fc" id="L94">        this.timeRange = timeRange;</span>
+<span class="fc" id="L95">        return this;</span>
+    }
+
+    /// The span this query reads, or null when unset.
+    public HealthTimeRange getTimeRange() {
+<span class="fc" id="L100">        return timeRange;</span>
+    }
+
+    /// Caps how many samples come back. Must be positive.
+    ///
+    /// **On Android the cap is per data type when a query names several.**
+    /// Health Connect pages per record type, so a limit of ten over two
+    /// types can return twenty. Neither alternative works: dividing the
+    /// budget cannot find a newest-ten that all lives in one type, and
+    /// trimming the merged page discards records the per-type
+    /// continuation tokens have already moved past. Honouring it exactly
+    /// needs an incremental k-way merge across the types, which is not
+    /// implemented yet. Query one type at a time where the cap has to be
+    /// exact -- which is also what iOS does, since `HKSampleQuery` reads
+    /// one type per query.
+    public SampleQuery setLimit(int limit) {
+<span class="fc" id="L116">        this.limit = limit;</span>
+<span class="fc" id="L117">        return this;</span>
+    }
+
+    /// The sample cap.
+    public int getLimit() {
+<span class="fc" id="L122">        return limit;</span>
+    }
+
+    /// Returns the newest samples first. Default is oldest first.
+    public SampleQuery setSortDescending(boolean sortDescending) {
+<span class="fc" id="L127">        this.sortDescending = sortDescending;</span>
+<span class="fc" id="L128">        return this;</span>
+    }
+
+    /// `true` when results come back newest first.
+    public boolean isSortDescending() {
+<span class="fc" id="L133">        return sortDescending;</span>
+    }
+
+    /// Returns values in `unit` instead of the type's canonical unit.
+    ///
+    /// #### Throws
+    ///
+    /// The unit is validated when the query runs, not here: a unit that
+    /// measures the wrong dimension fails with
+    /// [HealthError#UNIT_MISMATCH] before the platform is touched.
+    public SampleQuery setUnit(HealthUnit unit) {
+<span class="fc" id="L144">        this.unit = unit;</span>
+<span class="fc" id="L145">        return this;</span>
+    }
+
+    /// The requested unit, or null for each type's canonical unit.
+    public HealthUnit getUnit() {
+<span class="fc" id="L150">        return unit;</span>
+    }
+
+    /// Whether to expand [SeriesSample] records into individual
+    /// [QuantitySample] objects. Defaults to `true`.
+    ///
+    /// Leave it on and both platforms return the same thing, so your code
+    /// is identical across them. Turn it off when you need a series'
+    /// record identity -- to delete it, for instance.
+    ///
+    /// **Only Health Connect and the local stores group measurements into
+    /// records**, so only they have anything to withhold. HealthKit
+    /// stores each measurement separately and the iOS port returns
+    /// ordinary [QuantitySample] objects whichever way this is set -- not
+    /// one-point series -- so code that turns flattening off and then
+    /// casts to [SeriesSample] fails there. Test the type rather than
+    /// assuming it.
+    public SampleQuery setFlattenSeries(boolean flattenSeries) {
+<span class="fc" id="L168">        this.flattenSeries = flattenSeries;</span>
+<span class="fc" id="L169">        return this;</span>
+    }
+
+    /// `true` when series are expanded into individual samples.
+    public boolean isFlattenSeries() {
+<span class="fc" id="L174">        return flattenSeries;</span>
+    }
+
+    /// The gap that separates two sleep sessions, for the iOS port's
+    /// session reassembly. Defaults to 15 minutes.
+    ///
+    /// HealthKit stores sleep as a run of category samples with no session
+    /// object, so the port is meant to group samples separated by less
+    /// than this gap into one [SleepSample]. Raise it if your users nap;
+    /// lower it if you would rather see brief wakings split the night.
+    /// Ignored on Android, where sessions are stored natively.
+    ///
+    /// #### It does nothing in this release
+    ///
+    /// The reassembly it configures is not implemented. The iOS type map
+    /// carries quantity types only, so [HealthDataType#SLEEP] is refused
+    /// before a query runs and there is no run of category samples for
+    /// this gap to group. The value is stored and returned faithfully and
+    /// changes no behaviour anywhere; it is kept rather than removed
+    /// because the grouping is the shape the port will need, and a
+    /// setting that silently did nothing without saying so is what this
+    /// note exists to prevent.
+
+    /// The gap that separates two sleep sessions.
+    ///
+    /// The [Duration] form of [#setSleepSessionGapMillis(long)], which is the type the rest of
+    /// the framework speaks; the millis form stays for the ports and the
+    /// wire format.
+    public SampleQuery setSleepSessionGap(java.time.Duration value) {
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L204">            throw new IllegalArgumentException(&quot;a duration is required&quot;);</span>
+        }
+<span class="fc" id="L206">        return setSleepSessionGapMillis((long) value.toMillis());</span>
+    }
+
+    /// The gap that separates two sleep sessions, as a [Duration].
+    public java.time.Duration getSleepSessionGap() {
+<span class="fc" id="L211">        return java.time.Duration.ofMillis(getSleepSessionGapMillis());</span>
+    }
+
+    public SampleQuery setSleepSessionGapMillis(long gapMillis) {
+<span class="fc" id="L215">        this.sleepSessionGapMillis = gapMillis;</span>
+<span class="fc" id="L216">        return this;</span>
+    }
+
+    /// The sleep-session grouping gap in milliseconds.
+    public long getSleepSessionGapMillis() {
+<span class="fc" id="L221">        return sleepSessionGapMillis;</span>
+    }
+
+    /// Continues a previous read from [SamplePage#getNextPageToken()].
+    public SampleQuery setPageToken(String pageToken) {
+<span class="fc" id="L226">        this.pageToken = pageToken;</span>
+<span class="fc" id="L227">        return this;</span>
+    }
+
+    /// The continuation token, or null to start from the beginning.
+    public String getPageToken() {
+<span class="fc" id="L232">        return pageToken;</span>
+    }
+
+    /// Validates the query and throws if it cannot be run.
+    ///
+    /// Called by [HealthStore] before the platform is touched, so a
+    /// malformed query fails immediately and locally rather than as an
+    /// opaque platform error later.
+    ///
+    /// #### Throws
+    ///
+    /// - `HealthException`: with [HealthError#INVALID_ARGUMENT] for a
+    ///   missing type or range or a non-positive limit, and
+    ///   [HealthError#UNIT_MISMATCH] when the requested unit does not
+    ///   match a requested type's dimension.
+    public void validate() throws HealthException {
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (types.isEmpty()) {</span>
+<span class="nc" id="L249">            throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;a sample query needs at least one data type&quot;);
+        }
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (timeRange == null) {</span>
+<span class="nc" id="L253">            throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;a sample query needs a time range&quot;);
+        }
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (limit &lt; 1) {</span>
+<span class="nc" id="L257">            throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;limit must be positive, got &quot; + limit);
+        }
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (unit != null) {</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            for (HealthDataType t : types) {</span>
+<span class="fc" id="L262">                HealthUnit canonical = t.getCanonicalUnit();</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                if (canonical == null) {</span>
+<span class="nc" id="L264">                    throw new HealthException(HealthError.UNIT_MISMATCH,</span>
+<span class="nc" id="L265">                            t.getId() + &quot; has no numeric value, so the query&quot;</span>
+<span class="nc" id="L266">                                    + &quot; unit &quot; + unit.getSymbol()</span>
+                                    + &quot; does not apply to it&quot;);
+                }
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                if (!canonical.isCompatibleWith(unit)) {</span>
+<span class="nc" id="L270">                    throw new HealthException(HealthError.UNIT_MISMATCH,</span>
+<span class="nc" id="L271">                            t.getId() + &quot; is measured in &quot;</span>
+<span class="nc" id="L272">                                    + canonical.getDimension() + &quot; but &quot;</span>
+<span class="nc" id="L273">                                    + unit.getSymbol() + &quot; measures &quot;</span>
+<span class="nc" id="L274">                                    + unit.getDimension());</span>
+                }
+<span class="fc" id="L276">            }</span>
+        }
+<span class="fc" id="L278">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

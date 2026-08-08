@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BleSensorSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">BleSensorSession.java</span></div><h1>BleSensorSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.gatt.GattCharacteristic;
+import com.codename1.bluetooth.gatt.GattNotificationListener;
+import com.codename1.bluetooth.gatt.GattService;
+import com.codename1.bluetooth.le.BlePeripheral;
+import com.codename1.bluetooth.le.ConnectionEvent;
+import com.codename1.bluetooth.le.ConnectionListener;
+import com.codename1.bluetooth.le.ConnectionState;
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+
+import java.util.List;
+import com.codename1.impl.health.EdtResult;
+
+/// The GATT transport behind [SensorSession]: connects, discovers the
+/// profile's service, subscribes to its measurement characteristic and
+/// feeds raw values into the shared decoder.
+///
+/// Package-private -- apps see only [SensorSession].
+final class BleSensorSession extends SensorSession {
+
+    /// Battery Service, `0x180F`, and its Battery Level characteristic.
+<span class="fc" id="L49">    private static final BluetoothUuid BATTERY_SERVICE =</span>
+<span class="fc" id="L50">            BluetoothUuid.fromShort(0x180F);</span>
+<span class="fc" id="L51">    private static final BluetoothUuid BATTERY_LEVEL =</span>
+<span class="fc" id="L52">            BluetoothUuid.fromShort(0x2A19);</span>
+
+    /// Body Sensor Location, `0x2A38`, on the Heart Rate service.
+<span class="fc" id="L55">    private static final BluetoothUuid BODY_SENSOR_LOCATION =</span>
+<span class="fc" id="L56">            BluetoothUuid.fromShort(0x2A38);</span>
+
+    /// Heart Rate Control Point, `0x2A39`. Writing `0x01` resets the
+    /// accumulated energy-expended counter.
+<span class="fc" id="L60">    private static final BluetoothUuid HEART_RATE_CONTROL_POINT =</span>
+<span class="fc" id="L61">            BluetoothUuid.fromShort(0x2A39);</span>
+
+    /// How many times the reconnect ladder may stumble on discovery or
+    /// subscription before the session is retired. Bounded so a device
+    /// that has genuinely changed does not get reconnected at forever;
+    /// more than one so a single transient failure does not end a session
+    /// the caller still wants.
+    private static final int MAX_RECONNECT_FAILURES = 3;
+
+    private final BlePeripheral peripheral;
+    private GattCharacteristic measurement;
+    /// Read and written from connection callbacks and from stop(), which
+    /// are not the same thread. Guarded by [#lifecycleLock], like the
+    /// count below -- a lock rather than `volatile`, which this codebase
+    /// does not use.
+    private Reconnector reconnectListener;
+
+    /// The measurement listener currently registered, and the
+    /// characteristic it is registered on. Guarded by [#lifecycleLock].
+    ///
+    /// Both, because a reconnect rediscovers the database and hands back
+    /// a different [GattCharacteristic] instance for the same UUID:
+    /// unsubscribing the old listener against the new characteristic
+    /// removes nothing. BlePeripheral keeps its subscription map across a
+    /// disconnect -- only the armed set is cleared -- and each listener
+    /// holds this session, its app listeners, its workout and the GATT
+    /// tree it was discovered from, so a session that ended or a
+    /// reconnect that replaced one leaked all of it for as long as the
+    /// port cached the peripheral, which is for ever.
+    private GattNotificationListener measurementListener;
+    /// Guarded by [#lifecycleLock]; see [#measurementListener].
+    private GattCharacteristic measurementListenerOn;
+
+    /// Guards what the session does to the transport, and the failure
+    /// count.
+    ///
+    /// Volatile would not be enough for the count: the increment and the
+    /// test against the limit are one decision, and two callbacks racing
+    /// through a volatile `++` can lose a count and let the ladder run
+    /// past the bound it exists to enforce.
+    ///
+    /// It also serializes starting against tearing down. Those are the
+    /// two places that register a connection listener and open or close
+    /// the link, and interleaved they left a stopped session holding a
+    /// live connection and a listener nobody would ever remove -- see
+    /// [#start(com.codename1.util.AsyncResource)].
+<span class="fc" id="L107">    private final Object lifecycleLock = new Object();</span>
+    /// Guarded by [#lifecycleLock].
+    private int reconnectFailures;
+
+    BleSensorSession(String sensorId, HealthSensorProfile profile,
+            SensorSessionOptions options, BlePeripheral peripheral) {
+<span class="fc" id="L113">        super(sensorId, profile, options);</span>
+<span class="fc" id="L114">        this.peripheral = peripheral;</span>
+<span class="fc" id="L115">    }</span>
+
+    /// Connects, discovers and subscribes, resolving `out` once
+    /// measurements can start arriving.
+    void start(final AsyncResource&lt;SensorSession&gt; out) {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!setState(SensorSessionState.CONNECTING)) {</span>
+            // stop() won between the check above and this line. The
+            // session is already disconnected and off the registry, so
+            // connecting the peripheral now would leave a stopped
+            // session holding a live link that nothing will close.
+<span class="fc" id="L125">            failStopped(out);</span>
+<span class="fc" id="L126">            return;</span>
+        }
+        // Registering the listener and opening the link happen under the
+        // lock teardown takes, and the terminal state is re-read inside
+        // it. Winning the transition above is not enough on its own: a
+        // stop() arriving in the gap ran its whole teardown -- removing a
+        // listener that was not registered yet and disconnecting a link
+        // that had not opened -- and then this registered a listener
+        // nobody would remove and connected a session already off the
+        // registry.
+<span class="fc" id="L136">        synchronized (lifecycleLock) {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (isTerminal()) {</span>
+<span class="nc" id="L138">                failStopped(out);</span>
+<span class="nc" id="L139">                return;</span>
+            }
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">            if (options().isAutoReconnect() &amp;&amp; reconnectListener == null) {</span>
+                // A strap that walks out of range mid-workout otherwise
+                // leaves the session marked STREAMING forever, receiving
+                // nothing and never retrying, which is the opposite of
+                // what the default promises.
+<span class="fc" id="L146">                Reconnector listener = new Reconnector(this);</span>
+<span class="fc" id="L147">                reconnectListener = listener;</span>
+<span class="fc" id="L148">                peripheral.addConnectionListener(listener);</span>
+            }
+<span class="fc" id="L150">            peripheral.connect().onResult(new AsyncResult&lt;BlePeripheral&gt;() {</span>
+                @Override
+                public void onReady(BlePeripheral value, Throwable err) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    if (err != null) {</span>
+<span class="nc" id="L154">                        failStart(out, err);</span>
+<span class="nc" id="L155">                        return;</span>
+                    }
+<span class="fc" id="L157">                    discover(out);</span>
+<span class="fc" id="L158">                }</span>
+            });
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">    }</span>
+
+    /// Re-runs discovery and subscription after an unexpected drop.
+    void reconnect() {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (!options().isAutoReconnect()) {</span>
+<span class="nc" id="L166">            return;</span>
+        }
+        // The transition is the check. Reading the state first and then
+        // moving it is two steps, and stop() runs between them: a
+        // DISCONNECTED listener fires on the EDT while a connect,
+        // discovery or subscribe callback is on another thread, so the
+        // read saw a live session, teardown disconnected and unregistered
+        // it, and this went on to reconnect a handle the manager no
+        // longer holds -- leaving a stopped session's peripheral
+        // connected with nothing left to disconnect it.
+        //
+        // setState refuses out of either terminal state under the state
+        // lock, and answers true when the session is already CONNECTING,
+        // so this covers what the separate terminal check covered and
+        // closes the window it left open.
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!setState(SensorSessionState.CONNECTING)) {</span>
+<span class="fc" id="L182">            return;</span>
+        }
+        // The transport work under the lock teardown takes, and the
+        // terminal state re-read inside it -- exactly as start() does.
+        // Winning the transition is not enough on its own: a stop() in
+        // the gap disconnected and unregistered the session, and this
+        // then opened the link again on a session nobody holds.
+<span class="fc" id="L189">        synchronized (lifecycleLock) {</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (isTerminal()) {</span>
+<span class="nc" id="L191">                return;</span>
+            }
+            // The cumulative trackers hold the previous connection's
+            // baseline. A sensor that power-cycled while away restarts its
+            // counters at zero, and even one that did not will have
+            // wrapped its 16-bit event timer several times across the gap,
+            // so the first delta after reconnecting would publish a large
+            // fabricated cadence into the live workout and into anything
+            // persisted from it.
+<span class="fc" id="L200">            resetCounters();</span>
+<span class="fc" id="L201">            reconnectInLock();</span>
+<span class="fc" id="L202">        }</span>
+<span class="fc" id="L203">    }</span>
+
+    /// The reconnect's transport half. Call with [#lifecycleLock] held.
+    private void reconnectInLock() {
+<span class="fc" id="L207">        peripheral.connect().onResult(new AsyncResult&lt;BlePeripheral&gt;() {</span>
+            @Override
+            public void onReady(BlePeripheral value, Throwable err) {
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                if (err == null) {</span>
+<span class="fc" id="L211">                    discover(null);</span>
+<span class="fc" id="L212">                    return;</span>
+                }
+                // Counted, not ignored. A failed connect publishes
+                // DISCONNECTED, the listener fires on that transition and
+                // reconnects immediately, so a sensor that has gone for
+                // good span the whole ladder at full speed and never
+                // reached the three-failure limit -- which only discovery
+                // and subscribe failures were incrementing.
+<span class="fc" id="L220">                failReconnect(wrapStartFailure(err));</span>
+<span class="fc" id="L221">            }</span>
+        });
+<span class="fc" id="L223">    }</span>
+
+    /// Watches for the link dropping while the session is still wanted.
+    ///
+    /// Named rather than anonymous so it can be removed again on stop and
+    /// so SpotBugs sees no synthetic outer reference.
+    private static final class Reconnector implements ConnectionListener {
+        private final BleSensorSession session;
+
+<span class="fc" id="L232">        Reconnector(BleSensorSession session) {</span>
+<span class="fc" id="L233">            this.session = session;</span>
+<span class="fc" id="L234">        }</span>
+
+        @Override
+        public void connectionStateChanged(ConnectionEvent event) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            if (event.getState() == ConnectionState.DISCONNECTED) {</span>
+                // The subscription dies with the link. Clearing it here
+                // rather than at the next subscribe is what makes a
+                // packet queued before the drop identifiable as stale:
+                // until this ran, the old listener was still the
+                // session's current registration and its late delivery
+                // was published as a fresh reading. It also stops the
+                // listener outliving the connection it belonged to.
+<span class="fc" id="L246">                session.releaseMeasurementListener();</span>
+            }
+            // Only a session that actually got streaming reconnects. A
+            // failed initial connect publishes DISCONNECTED too, and
+            // retrying from there resurrected a session the caller had
+            // already been told had failed -- streaming and routing
+            // samples while absent from getActiveSessions().
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (event.getState() == ConnectionState.DISCONNECTED</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                    &amp;&amp; (session.getState() == SensorSessionState.STREAMING</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                        || session.getState()</span>
+                            == SensorSessionState.CONNECTING)
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                    &amp;&amp; session.hasStreamed()) {</span>
+<span class="fc" id="L258">                session.reconnect();</span>
+            }
+<span class="fc" id="L260">        }</span>
+    }
+
+    private void discover(final AsyncResource&lt;SensorSession&gt; out) {
+<span class="fc" id="L264">        peripheral.discoverServices().onResult(</span>
+<span class="fc" id="L265">                new AsyncResult&lt;List&lt;GattService&gt;&gt;() {</span>
+                    @Override
+                    public void onReady(List&lt;GattService&gt; value,
+                            Throwable err) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                        if (err != null) {</span>
+<span class="fc" id="L270">                            failStart(out, err);</span>
+<span class="fc" id="L271">                            return;</span>
+                        }
+<span class="fc" id="L273">                        GattService service = peripheral.getService(</span>
+<span class="fc" id="L274">                                getProfile().getServiceUuid());</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                        if (service == null) {</span>
+<span class="nc" id="L276">                            failStart(out, new HealthException(</span>
+                                    HealthError.TYPE_NOT_SUPPORTED,
+                                    &quot;this device does not expose the &quot;
+<span class="nc" id="L279">                                            + getProfile().getName()</span>
+                                            + &quot; service&quot;));
+<span class="nc" id="L281">                            return;</span>
+                        }
+<span class="fc" id="L283">                        measurement = service.getCharacteristic(</span>
+<span class="fc" id="L284">                                getProfile().getMeasurementUuid());</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                        if (measurement == null) {</span>
+<span class="nc" id="L286">                            failStart(out, new HealthException(</span>
+                                    HealthError.TYPE_NOT_SUPPORTED,
+                                    &quot;this device exposes the &quot;
+<span class="nc" id="L289">                                            + getProfile().getName()</span>
+                                            + &quot; service but not its measurement&quot;
+                                            + &quot; characteristic&quot;));
+<span class="nc" id="L292">                            return;</span>
+                        }
+<span class="fc" id="L294">                        readOptionalMetadata(service);</span>
+<span class="fc" id="L295">                        subscribe(out);</span>
+<span class="fc" id="L296">                    }</span>
+                });
+<span class="fc" id="L298">    }</span>
+
+    /// Reads the extras a device may or may not expose. Failures here are
+    /// deliberately ignored: a strap without a battery service is still a
+    /// perfectly good strap, and refusing to stream over a missing
+    /// optional characteristic would be worse than not knowing the
+    /// battery level.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private void readOptionalMetadata(GattService service) {
+<span class="fc" id="L307">        GattService battery = peripheral.getService(BATTERY_SERVICE);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (battery != null) {</span>
+<span class="fc" id="L309">            GattCharacteristic level =</span>
+<span class="fc" id="L310">                    battery.getCharacteristic(BATTERY_LEVEL);</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">            if (level != null) {</span>
+<span class="fc" id="L312">                peripheral.readCharacteristic(level).onResult(</span>
+<span class="fc" id="L313">                        new AsyncResult&lt;byte[]&gt;() {</span>
+                            @Override
+                            public void onReady(byte[] value, Throwable err) {
+<span class="pc bpc" id="L316" title="3 of 6 branches missed.">                                if (err == null &amp;&amp; value != null</span>
+                                        &amp;&amp; value.length &gt; 0) {
+                                    // 0 to 100, and nothing else. The
+                                    // Battery Level characteristic
+                                    // reserves everything above 100, and
+                                    // a peripheral that answers 0xFF for
+                                    // &quot;unknown&quot; was reported to the app
+                                    // as a 255% battery. Left unset
+                                    // instead, which getBatteryPercent
+                                    // already documents as null when the
+                                    // device does not report one.
+<span class="fc" id="L327">                                    int percent = value[0] &amp; 0xFF;</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">                                    if (percent &lt;= 100) {</span>
+<span class="fc" id="L329">                                        setBatteryPercent(</span>
+<span class="fc" id="L330">                                                Integer.valueOf(percent));</span>
+                                    }
+                                }
+<span class="fc" id="L333">                            }</span>
+                        });
+            }
+        }
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (getProfile() == HealthSensorProfile.HEART_RATE) {</span>
+<span class="fc" id="L338">            GattCharacteristic loc =</span>
+<span class="fc" id="L339">                    service.getCharacteristic(BODY_SENSOR_LOCATION);</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (loc != null) {</span>
+<span class="fc" id="L341">                peripheral.readCharacteristic(loc).onResult(</span>
+<span class="fc" id="L342">                        new AsyncResult&lt;byte[]&gt;() {</span>
+                            @Override
+                            public void onReady(byte[] value, Throwable err) {
+                                // Reserved values are not a placement.
+                                // The profile defines 0 to 6 and reserves
+                                // the rest, and a peripheral answering 42
+                                // was handed to the app as a location it
+                                // could only render as &quot;Unknown&quot; -- which
+                                // says the sensor is worn somewhere
+                                // unnamed, not that it did not say.
+<span class="pc bpc" id="L352" title="3 of 6 branches missed.">                                if (err == null &amp;&amp; value != null</span>
+                                        &amp;&amp; value.length &gt; 0
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                                        &amp;&amp; BodySensorLocation.isDefined(</span>
+                                                value[0] &amp; 0xFF)) {
+<span class="fc" id="L356">                                    setBodySensorLocation(value[0] &amp; 0xFF);</span>
+                                }
+<span class="fc" id="L358">                            }</span>
+                        });
+            }
+        }
+<span class="fc" id="L362">    }</span>
+
+    private void subscribe(final AsyncResource&lt;SensorSession&gt; out) {
+        // The Bluetooth layer picks notify or indicate from the
+        // characteristic's own properties, which matters here: blood
+        // pressure, weight and temperature are indicate-only.
+<span class="fc" id="L368">        final GattNotificationListener listener =</span>
+<span class="fc" id="L369">                new GattNotificationListener() {</span>
+                    @Override
+                    public void valueChanged(
+                            GattCharacteristic characteristic,
+                            byte[] value) {
+                        // A notification can still arrive between stop()
+                        // and the CCCD actually being disarmed. An early
+                        // out only: onMeasurement makes the same check
+                        // atomically with the teardown, which this one
+                        // cannot, since the state can change between it
+                        // and the call below.
+                        //
+                        // Both terminal states, not STOPPED alone -- the
+                        // reconnect ladder retires a session as FAILED.
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                        if (isTerminal()) {</span>
+<span class="nc" id="L384">                            return;</span>
+                        }
+                        // And only from the subscription the session is
+                        // actually on. The transport keeps its listener
+                        // map across a disconnect, so a packet queued
+                        // before the link dropped can be dispatched after
+                        // it and was published as a fresh reading, timed
+                        // by its arrival.
+                        //
+                        // By registration rather than by state: the pair
+                        // is recorded before the CCCD write completes, so
+                        // a reading that beats the subscribe callback is
+                        // still this connection's and is accepted --
+                        // which is the only reading a weight scale or a
+                        // blood-pressure cuff will send, on a reconnect
+                        // as much as on the first connect.
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">                        if (!isCurrentSubscription(characteristic, this)) {</span>
+<span class="nc" id="L401">                            return;</span>
+                        }
+<span class="fc" id="L403">                        onMeasurement(value, System.currentTimeMillis());</span>
+<span class="fc" id="L404">                    }</span>
+                };
+<span class="fc" id="L406">        final GattCharacteristic on = measurement;</span>
+        // The previous one goes first. A reconnect subscribes again, and
+        // leaving the old listener registered means two of them decoding
+        // every notification into the same session -- and the older one
+        // pinning the GATT tree it came from.
+<span class="fc" id="L411">        releaseMeasurementListener();</span>
+<span class="fc" id="L412">        synchronized (lifecycleLock) {</span>
+<span class="fc" id="L413">            measurementListener = listener;</span>
+<span class="fc" id="L414">            measurementListenerOn = on;</span>
+<span class="fc" id="L415">        }</span>
+<span class="fc" id="L416">        peripheral.subscribe(on, listener)</span>
+<span class="fc" id="L417">                .onResult(new AsyncResult&lt;Boolean&gt;() {</span>
+                    @Override
+                    public void onReady(Boolean value, Throwable err) {
+                        // Stopping does not cancel a subscribe already in
+                        // flight, and the reconnect path issues one
+                        // without anybody waiting on it. A completion
+                        // arriving after stop() used to move the session
+                        // from STOPPED back to STREAMING -- already
+                        // unregistered from the manager and disconnected,
+                        // yet reporting itself live and delivering
+                        // notifications. Stopped is terminal.
+<span class="fc bfc" id="L428" title="All 2 branches covered.">                        if (isTerminal()) {</span>
+<span class="fc" id="L429">                            failLateSubscribe(out, on, listener);</span>
+<span class="fc" id="L430">                            return;</span>
+                        }
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">                        if (err != null) {</span>
+<span class="nc" id="L433">                            failStart(out, err);</span>
+<span class="nc" id="L434">                            return;</span>
+                        }
+                        // The transition is the check. The read above is
+                        // one step and the move is another, and stop()
+                        // runs between them -- so a subscription the
+                        // session no longer wants was left armed and the
+                        // caller was handed a stopped session as a
+                        // successful start.
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">                        if (!setState(SensorSessionState.STREAMING)) {</span>
+<span class="nc" id="L443">                            failLateSubscribe(out, on, listener);</span>
+<span class="nc" id="L444">                            return;</span>
+                        }
+                        // A run of failures only retires the session when
+                        // it is uninterrupted: a strap that reconnects
+                        // cleanly has spent whatever budget it used
+                        // getting there.
+<span class="fc" id="L450">                        synchronized (lifecycleLock) {</span>
+<span class="fc" id="L451">                            reconnectFailures = 0;</span>
+<span class="fc" id="L452">                        }</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">                        if (out != null) {</span>
+<span class="fc" id="L454">                            out.complete(BleSensorSession.this);</span>
+                        }
+<span class="fc" id="L456">                    }</span>
+                });
+<span class="fc" id="L458">    }</span>
+
+    /// Whether this session has ended, however it ended.
+    ///
+    /// Tears down a subscription that completed after the session stopped.
+    ///
+    /// Best effort: the peripheral is normally already disconnected by
+    /// then, in which case this fails harmlessly. Leaving it is the worse
+    /// option -- a live characteristic notification on a session the app
+    /// has finished with.
+    /// Fails a start that lost to teardown.
+    ///
+    /// Every path that gives up because the session ended settles the
+    /// caller's resource. Returning quietly left an app that stopped a
+    /// session while its start was in flight waiting on a `connect()`
+    /// that could never complete -- indistinguishable, from where it
+    /// stands, from a strap that is merely slow.
+    private void failStopped(AsyncResource&lt;SensorSession&gt; out) {
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        if (out != null) {</span>
+<span class="fc" id="L477">            out.error(new HealthException(HealthError.SESSION_STATE,</span>
+<span class="fc" id="L478">                    &quot;the &quot; + getProfile().getName() + &quot; session was&quot;</span>
+                            + &quot; stopped before it started streaming&quot;));
+        }
+<span class="fc" id="L481">    }</span>
+
+    /// Tears down a subscription whose session ended while it was in
+    /// flight, and settles whoever was waiting on the start.
+    ///
+    /// Both ways of losing that race come here. Returning without
+    /// completing the resource left an app that stopped a session while
+    /// its first subscribe was in flight waiting for a callback that could
+    /// never arrive -- and the reconnect path passes null, because nobody
+    /// is waiting on those.
+    private void failLateSubscribe(AsyncResource&lt;SensorSession&gt; out,
+            GattCharacteristic on, GattNotificationListener listener) {
+<span class="fc" id="L493">        unsubscribeLate(on, listener);</span>
+<span class="fc" id="L494">        failStopped(out);</span>
+<span class="fc" id="L495">    }</span>
+
+    /// Removes a listener whose subscribe landed after the session ended.
+    ///
+    /// Against the characteristic it was registered on, not the session's
+    /// current one: a reconnect replaces that instance, and unsubscribing
+    /// from the new one removes nothing while the old registration keeps
+    /// this session alive.
+    private void unsubscribeLate(GattCharacteristic on,
+            GattNotificationListener listener) {
+<span class="fc" id="L505">        forget(on, listener);</span>
+        try {
+<span class="fc" id="L507">            peripheral.unsubscribe(on, listener);</span>
+<span class="nc" id="L508">        } catch (Throwable t) {</span>
+<span class="nc" id="L509">            com.codename1.io.Log.p(&quot;[health] late unsubscribe after stop: &quot;</span>
+                    + t);
+<span class="fc" id="L511">        }</span>
+<span class="fc" id="L512">    }</span>
+
+    /// Whether `listener` on `c` is the subscription this session is
+    /// currently reading from.
+    ///
+    /// Identity on both: a reconnect rediscovers the database, so the
+    /// same UUID comes back as a different [GattCharacteristic], and the
+    /// listener registered against the old one belongs to a connection
+    /// that is over.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private boolean isCurrentSubscription(GattCharacteristic c,
+            GattNotificationListener listener) {
+<span class="fc" id="L524">        synchronized (lifecycleLock) {</span>
+<span class="pc bpc" id="L525" title="2 of 4 branches missed.">            return measurementListener == listener</span>
+                    &amp;&amp; measurementListenerOn == c;
+        }
+    }
+
+    /// Drops the remembered pair if it is still the one given.
+    ///
+    /// Identity on purpose: the question is whether this is the same
+    /// registration, and a reconnect can produce an equal-looking
+    /// characteristic for the same UUID that is a different object with
+    /// a different listener on it.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private void forget(GattCharacteristic on,
+            GattNotificationListener listener) {
+<span class="fc" id="L539">        synchronized (lifecycleLock) {</span>
+<span class="pc bpc" id="L540" title="3 of 4 branches missed.">            if (measurementListener == listener</span>
+                    &amp;&amp; measurementListenerOn == on) {
+<span class="nc" id="L542">                measurementListener = null;</span>
+<span class="nc" id="L543">                measurementListenerOn = null;</span>
+            }
+<span class="fc" id="L545">        }</span>
+<span class="fc" id="L546">    }</span>
+
+    /// Unsubscribes the measurement listener this session registered, if
+    /// it still has one.
+    ///
+    /// Called when a reconnect is about to register another and when the
+    /// session ends, because BlePeripheral holds its subscription map
+    /// across a disconnect and each listener holds this session.
+    private void releaseMeasurementListener() {
+        GattNotificationListener previous;
+        GattCharacteristic on;
+<span class="fc" id="L557">        synchronized (lifecycleLock) {</span>
+<span class="fc" id="L558">            previous = measurementListener;</span>
+<span class="fc" id="L559">            on = measurementListenerOn;</span>
+<span class="fc" id="L560">            measurementListener = null;</span>
+<span class="fc" id="L561">            measurementListenerOn = null;</span>
+<span class="fc" id="L562">        }</span>
+<span class="pc bpc" id="L563" title="1 of 4 branches missed.">        if (previous == null || on == null) {</span>
+<span class="fc" id="L564">            return;</span>
+        }
+        try {
+<span class="fc" id="L567">            peripheral.unsubscribe(on, previous);</span>
+<span class="nc" id="L568">        } catch (Throwable t) {</span>
+<span class="nc" id="L569">            com.codename1.io.Log.p(&quot;[health] could not unsubscribe the&quot;</span>
+                    + &quot; measurement listener: &quot; + t);
+<span class="fc" id="L571">        }</span>
+<span class="fc" id="L572">    }</span>
+
+    /// Reports a failed start.
+    ///
+    /// `out` is null on the reconnect path: nobody is waiting on a
+    /// resource that was already resolved when the session first started,
+    /// and completing it a second time -- or dereferencing it -- would
+    /// throw on the BLE callback thread.
+    private void failStart(AsyncResource&lt;SensorSession&gt; out, Throwable err) {
+<span class="fc" id="L581">        HealthException wrapped = wrapStartFailure(err);</span>
+<span class="pc bpc" id="L582" title="1 of 4 branches missed.">        if (out == null &amp;&amp; !isTerminal()) {</span>
+            // No caller waiting means this came from the reconnect ladder,
+            // and a session that has streamed before is one the caller
+            // still wants. Failing it here retired the whole session over
+            // one transient discovery or subscribe error: FAILED is not a
+            // state the reconnect listener retries from, and the session
+            // had already been dropped from the active registry, so the
+            // documented auto-reconnect stopped for good after a single
+            // stumble.
+<span class="fc" id="L591">            failReconnect(wrapped);</span>
+<span class="fc" id="L592">            return;</span>
+        }
+<span class="fc" id="L594">        endSession();</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        if (out != null) {</span>
+<span class="fc" id="L596">            out.error(wrapped);</span>
+        } else {
+<span class="nc" id="L598">            fireError(wrapped);</span>
+        }
+<span class="fc" id="L600">    }</span>
+
+    /// Terminal teardown for a session that has failed.
+    ///
+    /// Every step matters and each was missing at some point. The listener
+    /// goes first so the disconnect below is not mistaken for a dropped
+    /// link and retried. The link is dropped because a failure after a
+    /// successful connect -- discovery or subscribe, on the first attempt
+    /// or the last reconnect -- otherwise left a live, unusable connection
+    /// and a registered listener behind a handle the caller had been told
+    /// was finished, with nothing but an explicit `stop()` to reclaim
+    /// them.
+    private void endSession() {
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">        if (isTerminal()) {</span>
+            // Two paths reach here -- a discovery or subscribe failure,
+            // and the reconnect ladder giving up -- and a session tears
+            // down once. The second pass used to flush again, which is
+            // how a buffer refilled by a failed final write went out a
+            // second time.
+<span class="nc" id="L619">            return;</span>
+        }
+<span class="fc" id="L621">        synchronized (lifecycleLock) {</span>
+<span class="fc" id="L622">            endSessionLocked();</span>
+<span class="fc" id="L623">        }</span>
+<span class="fc" id="L624">    }</span>
+
+    /// The teardown itself, under [#lifecycleLock] -- see [#stop()] for
+    /// why the transport work and the transition are one critical
+    /// section.
+    private void endSessionLocked() {
+<span class="fc" id="L630">        Reconnector listener = reconnectListener;</span>
+<span class="fc" id="L631">        reconnectListener = null;</span>
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">        if (listener != null) {</span>
+<span class="fc" id="L633">            peripheral.removeConnectionListener(listener);</span>
+        }
+<span class="fc" id="L635">        releaseMeasurementListener();</span>
+<span class="fc" id="L636">        setState(SensorSessionState.FAILED);</span>
+        // The buffered readings go to the store, exactly as stop() does
+        // with them. A session that gave up reconnecting still holds
+        // whatever arrived since the last batch boundary -- up to a full
+        // storeBatchMillis of it, sixty seconds by default -- and the
+        // transition above cancels the timer that would have written it.
+        // Without this they sat in the buffer until the process ended and
+        // were never seen again, silently.
+<span class="fc" id="L644">        flushPendingWrites();</span>
+<span class="fc" id="L645">        forgetFromManager();</span>
+<span class="fc" id="L646">        peripheral.disconnect();</span>
+<span class="fc" id="L647">    }</span>
+
+    private HealthException wrapStartFailure(Throwable err) {
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">        return err instanceof HealthException</span>
+                ? (HealthException) err
+                : new HealthException(HealthError.SENSOR_DISCONNECTED,
+<span class="fc" id="L653">                        &quot;could not start the &quot; + getProfile().getName()</span>
+                                + &quot; session&quot;, err);
+    }
+
+    /// Reports a reconnect-path failure and lets the ladder try again.
+    ///
+    /// The link is dropped deliberately. Leaving a connected-but-unusable
+    /// peripheral in place would be a quieter failure than the one this
+    /// replaces: the reconnect listener only fires on a disconnection, so
+    /// a session left sitting on a live link with no subscription would
+    /// never retry and never report itself broken either.
+    ///
+    /// Attempts are counted so this cannot cycle forever against a device
+    /// that has genuinely changed -- a peripheral reflashed with different
+    /// services will never expose the measurement characteristic again,
+    /// and the session should end rather than reconnect at it all day.
+    private void failReconnect(HealthException wrapped) {
+        boolean giveUp;
+<span class="fc" id="L671">        synchronized (lifecycleLock) {</span>
+<span class="fc" id="L672">            reconnectFailures++;</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">            giveUp = reconnectFailures &gt;= MAX_RECONNECT_FAILURES;</span>
+<span class="fc" id="L674">        }</span>
+<span class="fc bfc" id="L675" title="All 2 branches covered.">        if (giveUp) {</span>
+<span class="fc" id="L676">            endSession();</span>
+<span class="fc" id="L677">            fireError(wrapped);</span>
+<span class="fc" id="L678">            return;</span>
+        }
+<span class="fc" id="L680">        fireError(wrapped);</span>
+<span class="fc" id="L681">        peripheral.disconnect();</span>
+<span class="fc" id="L682">    }</span>
+
+    @Override
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    public AsyncResource&lt;Boolean&gt; resetEnergyExpended() {
+<span class="nc" id="L687">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="nc bnc" id="L688" title="All 2 branches missed.">        if (getProfile() != HealthSensorProfile.HEART_RATE) {</span>
+<span class="nc" id="L689">            out.error(new HealthException(HealthError.NOT_SUPPORTED,</span>
+                    &quot;energy expended applies to the heart rate profile&quot;));
+<span class="nc" id="L691">            return out;</span>
+        }
+<span class="nc" id="L693">        GattService service =</span>
+<span class="nc" id="L694">                peripheral.getService(getProfile().getServiceUuid());</span>
+<span class="nc bnc" id="L695" title="All 2 branches missed.">        GattCharacteristic cp = service == null ? null</span>
+<span class="nc" id="L696">                : service.getCharacteristic(HEART_RATE_CONTROL_POINT);</span>
+<span class="nc bnc" id="L697" title="All 2 branches missed.">        if (cp == null) {</span>
+<span class="nc" id="L698">            out.error(new HealthException(HealthError.NOT_SUPPORTED,</span>
+                    &quot;this strap does not expose the heart rate control&quot;
+                            + &quot; point&quot;));
+<span class="nc" id="L701">            return out;</span>
+        }
+        // The control point is a reliable write: the strap acknowledges
+        // it, and a silently dropped reset would leave the energy counter
+        // accumulating across what the user thinks are separate workouts.
+<span class="nc" id="L706">        return peripheral.writeCharacteristic(cp, new byte[] { 0x01 }, true);</span>
+    }
+
+    @Override
+    public void stop() {
+<span class="fc bfc" id="L711" title="All 2 branches covered.">        if (isTerminal()) {</span>
+            // Either terminal state, not STOPPED alone. A session the
+            // reconnect ladder had already retired as FAILED went through
+            // the whole teardown a second time -- flushing again, and
+            // reporting itself as STOPPED, which is a different account
+            // of how it ended than the one its listeners were given.
+<span class="fc" id="L717">            return;</span>
+        }
+        // Under the lock start() holds while it registers and connects,
+        // so the two cannot interleave: either this finds a link to close
+        // and a listener to remove, or start() finds a session already
+        // terminal and touches the transport at all.
+<span class="fc" id="L723">        synchronized (lifecycleLock) {</span>
+<span class="fc" id="L724">            Reconnector listener = reconnectListener;</span>
+<span class="fc" id="L725">            reconnectListener = null;</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            if (listener != null) {</span>
+                // Removed before the state changes, so the disconnect this
+                // method causes is not mistaken for a dropped link.
+<span class="fc" id="L729">                peripheral.removeConnectionListener(listener);</span>
+            }
+<span class="fc" id="L731">            releaseMeasurementListener();</span>
+<span class="fc" id="L732">            setState(SensorSessionState.STOPPED);</span>
+            // A short ride would otherwise lose whatever had not reached a
+            // batch boundary yet.
+<span class="fc" id="L735">            flushPendingWrites();</span>
+<span class="fc" id="L736">            forgetFromManager();</span>
+<span class="fc" id="L737">            peripheral.disconnect();</span>
+<span class="fc" id="L738">        }</span>
+<span class="fc" id="L739">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

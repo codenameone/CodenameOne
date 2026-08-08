@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldSignals.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">ShieldSignals.java</span></div><h1>ShieldSignals.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+import com.codename1.ui.Display;
+import java.util.Vector;
+
+/// Collection point for runtime self-protection observations.
+///
+/// The framework's own detections report here, and so can a cn1lib or the app itself when it
+/// notices something the platform checks cannot see -- a failed server-side consistency check, a
+/// suspicious sequence of user actions. Everything recorded here is offered to the attestation
+/// service on the next token fetch, where the policy engine decides what it means.
+///
+/// The bus is bounded: it keeps only the most recent observations, and repeat reports of the same
+/// id collapse onto the existing entry rather than accumulating. A hooking framework that trips a
+/// detector on every frame must not be able to exhaust memory.
+public final class ShieldSignals {
+
+    private static final int MAX_SIGNALS = 32;
+
+<span class="fc" id="L42">    private static final Vector signals = new Vector();</span>
+<span class="fc" id="L43">    private static final Vector listeners = new Vector();</span>
+
+    private ShieldSignals() {
+    }
+
+    /// Records an observation. Repeat reports of an id already present update that entry in place.
+    /// Safe to call from any thread; listeners are notified on the EDT.
+    ///
+    /// An identical repeat still updates the stored entry -- the snapshot is meant to hold
+    /// the most recent observation of each signal -- but does not notify again.
+    public static void add(ShieldSignal signal) {
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (signal == null || signal.getId() == null) {</span>
+<span class="nc" id="L55">            return;</span>
+        }
+<span class="fc" id="L57">        synchronized (signals) {</span>
+<span class="fc" id="L58">            boolean replaced = false;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            for (int i = 0; i &lt; signals.size(); i++) {</span>
+<span class="fc" id="L60">                ShieldSignal existing = (ShieldSignal) signals.elementAt(i);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                if (existing.getId().equals(signal.getId())) {</span>
+                    // Nothing new to say. Re-reporting an identical observation is the
+                    // normal case, not an edge one: AppShield.getSignals() re-adds
+                    // everything collectSignals() returns, so a listener that refreshes
+                    // its view by calling getSignals() notified itself, forever. Even
+                    // without that, a detector polling on a timer queued a runnable per
+                    // poll per signal onto the EDT -- an unbounded queue behind a bus
+                    // whose whole selling point is that it is bounded.
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                    boolean sameObservation = existing.getSeverity() == signal.getSeverity()</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                            &amp;&amp; sameDetail(existing.getDetail(), signal.getDetail());</span>
+                    // The entry is replaced either way, and only the NOTIFICATION is
+                    // suppressed. Keeping the old object was a second bug hiding behind
+                    // the first: this bus documents itself as holding the most recent
+                    // observation of each signal, and a persistent one -- a root, a
+                    // hooking framework -- is re-reported on every poll, so the entry the
+                    // engine and the server were shown kept the timestamp of the first
+                    // sighting hours after the fact. &quot;When did this device last look
+                    // compromised&quot; is a question the answer is used for.
+<span class="fc" id="L79">                    signals.setElementAt(signal, i);</span>
+<span class="fc" id="L80">                    replaced = true;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                    if (sameObservation) {</span>
+<span class="fc" id="L82">                        return;</span>
+                    }
+                    break;
+                }
+            }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (!replaced) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (signals.size() &gt;= MAX_SIGNALS) {</span>
+<span class="fc" id="L89">                    signals.removeElementAt(0);</span>
+                }
+<span class="fc" id="L91">                signals.addElement(signal);</span>
+            }
+<span class="fc" id="L93">        }</span>
+        // Outside the lock on every path. Display.callSerially runs the task inline when
+        // the EDT is not up yet, so notifying in here would run application listeners
+        // while holding the signal monitor -- and a listener that waits on anything which
+        // needs that monitor deadlocks.
+        //
+        // Which is why the ordering problem is solved at the far end instead. Two workers
+        // reporting different observations of one id could interleave as: A stores, B
+        // stores over it, B enqueues, A enqueues -- and listeners then finished on A while
+        // snapshot() already answered B, with nothing later guaranteed to correct them.
+        // The dispatch checks on arrival whether it still describes the current
+        // observation and drops itself if it does not, so the last thing a listener is
+        // told is always what the bus holds. A superseded observation is not worth
+        // announcing: it was already wrong when it was queued.
+<span class="fc" id="L107">        notifyListeners(signal);</span>
+<span class="fc" id="L108">    }</span>
+
+    /// Whether two observations of one signal say the same thing.
+    ///
+    /// The detail is what distinguishes &quot;accessibility service X&quot; from &quot;service Y&quot; under
+    /// one id, so a change in it is a new observation and a repeat of it is not.
+    private static boolean sameDetail(String a, String b) {
+<span class="pc bpc" id="L115" title="3 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    /// Convenience overload for the common case.
+    public static void add(String id, int severity, String detail) {
+<span class="fc" id="L120">        add(new ShieldSignal(id, severity, detail));</span>
+<span class="fc" id="L121">    }</span>
+
+    /// The observations recorded so far. Never null.
+    public static ShieldSignal[] snapshot() {
+<span class="fc" id="L125">        synchronized (signals) {</span>
+<span class="fc" id="L126">            ShieldSignal[] out = new ShieldSignal[signals.size()];</span>
+<span class="fc" id="L127">            signals.copyInto(out);</span>
+<span class="fc" id="L128">            return out;</span>
+        }
+    }
+
+    /// True when any recorded observation is at or above the given severity.
+    public static boolean hasSignalAtLeast(int severity) {
+<span class="fc" id="L134">        synchronized (signals) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (int i = 0; i &lt; signals.size(); i++) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (((ShieldSignal) signals.elementAt(i)).getSeverity() &gt;= severity) {</span>
+<span class="fc" id="L137">                    return true;</span>
+                }
+            }
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">        return false;</span>
+    }
+
+    /// Discards every recorded observation. Intended for tests and for the simulator's
+    /// signal-faking menu.
+    public static void clear() {
+<span class="fc" id="L147">        synchronized (signals) {</span>
+<span class="fc" id="L148">            signals.removeAllElements();</span>
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">    }</span>
+
+    static void addListener(ShieldListener l) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L154">            return;</span>
+        }
+<span class="fc" id="L156">        synchronized (listeners) {</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (!listeners.contains(l)) {</span>
+<span class="fc" id="L158">                listeners.addElement(l);</span>
+            }
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">    }</span>
+
+    static void removeListener(ShieldListener l) {
+<span class="fc" id="L164">        synchronized (listeners) {</span>
+<span class="fc" id="L165">            listeners.removeElement(l);</span>
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">    }</span>
+
+    private static void notifyListeners(ShieldSignal signal) {
+        ShieldListener[] copy;
+<span class="fc" id="L171">        synchronized (listeners) {</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (listeners.isEmpty()) {</span>
+<span class="nc" id="L173">                return;</span>
+            }
+<span class="fc" id="L175">            copy = new ShieldListener[listeners.size()];</span>
+<span class="fc" id="L176">            listeners.copyInto(copy);</span>
+<span class="fc" id="L177">        }</span>
+<span class="fc" id="L178">        Display.getInstance().callSerially(new SignalDispatch(copy, signal));</span>
+<span class="fc" id="L179">    }</span>
+
+    /// The entry the bus holds for this report's id, when it still says the same thing --
+    /// and null when it does not.
+    ///
+    /// What matters at delivery is the OBSERVATION, not the object. Identity alone was the
+    /// obvious reading -- a newer report replaces the entry, so a different object means
+    /// this one was superseded -- and it dropped notifications that nothing else was going
+    /// to send. An identical repeat replaces the entry too, and deliberately queues
+    /// nothing; a detector polling on a timer therefore silenced the first sighting of a
+    /// signal whenever its second poll landed while the first notification was still in
+    /// flight. That first sighting is the notification listeners exist for, and the signal
+    /// sat in [#snapshot()] with nobody told.
+    ///
+    /// So the question is whether the entry still says the same thing. A superseded report
+    /// -- a different severity or detail -- is still dropped, which is what this exists
+    /// for; the cost is that two reports of the same observation can both be announced,
+    /// and being told twice about a signal that is genuinely there is not a defect.
+    ///
+    /// The ENTRY comes back, not a yes. Two reports that say the same thing are not the
+    /// same object: [ShieldSignal] stamps every instance, and the replacement is kept
+    /// precisely because its stamp is the latest sighting. Answering the question and then
+    /// announcing the object that asked it would hand a listener the older stamp for a
+    /// sighting the bus has already refreshed -- and no later notification is coming, since
+    /// the repeat that refreshed it queued nothing.
+    static ShieldSignal currentObservation(ShieldSignal signal) {
+<span class="fc" id="L205">        synchronized (signals) {</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            for (int i = 0; i &lt; signals.size(); i++) {</span>
+<span class="fc" id="L207">                ShieldSignal existing = (ShieldSignal) signals.elementAt(i);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                if (existing.getId().equals(signal.getId())) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    if (existing == signal // NOPMD identity: the ordinary case</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                            || (existing.getSeverity() == signal.getSeverity()</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                            &amp;&amp; sameDetail(existing.getDetail(), signal.getDetail()))) {</span>
+<span class="fc" id="L212">                        return existing;</span>
+                    }
+<span class="fc" id="L214">                    return null;</span>
+                }
+            }
+<span class="nc" id="L217">        }</span>
+        // Cleared, or evicted by the bound. Either way nothing is claiming it now.
+<span class="nc" id="L219">        return null;</span>
+    }
+
+    private static final class SignalDispatch implements Runnable {
+        private final ShieldListener[] targets;
+        private final ShieldSignal signal;
+
+<span class="fc" id="L226">        SignalDispatch(ShieldListener[] targets, ShieldSignal signal) {</span>
+<span class="fc" id="L227">            this.targets = targets;</span>
+<span class="fc" id="L228">            this.signal = signal;</span>
+<span class="fc" id="L229">        }</span>
+
+        @Override
+        public void run() {
+            // Resolved here rather than at enqueue time, because the point is the state
+            // at delivery: a report that has been superseded between being queued and
+            // arriving would otherwise leave listeners holding an observation the bus
+            // itself no longer has.
+            //
+            // And what is announced is the entry, not the report that queued this. They
+            // say the same thing or the dispatch would have been dropped, but the entry
+            // is the one carrying the latest sighting's timestamp -- which is the whole
+            // reason an identical repeat replaces it.
+<span class="fc" id="L242">            ShieldSignal current = currentObservation(signal);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (current == null) {</span>
+<span class="fc" id="L244">                return;</span>
+            }
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (ShieldListener target : targets) {</span>
+<span class="fc" id="L247">                target.signalRaised(current);</span>
+            }
+<span class="fc" id="L249">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

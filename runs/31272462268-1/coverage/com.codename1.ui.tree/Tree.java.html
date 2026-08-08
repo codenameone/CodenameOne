@@ -1,0 +1,948 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tree.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.tree</a> &gt; <span class="el_source">Tree.java</span></div><h1>Tree.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.tree;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.components.SpanButton;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Vector;
+
+/// The `Tree` component allows constructing simple tree component hierarchies that can be expanded
+/// seamlessly with no limit. The tree is bound to a model that can provide data with free form depth such as file system
+/// or similarly structured data.
+///
+/// To customize the look of the tree the component can be derived and component creation can be replaced.
+///
+/// ```java
+/// class StringArrayTreeModel implements TreeModel {
+///     String[][] arr = new String[][] {
+///             {&quot;Colors&quot;, &quot;Letters&quot;, &quot;Numbers&quot;},
+///             {&quot;Red&quot;, &quot;Green&quot;, &quot;Blue&quot;},
+///             {&quot;A&quot;, &quot;B&quot;, &quot;C&quot;},
+///             {&quot;1&quot;, &quot;2&quot;, &quot;3&quot;}
+///         };
+///
+///     public Vector getChildren(Object parent) {
+///         if(parent == null) {
+///             Vector v = new Vector();
+///             for(int iter = 0 ; iter  iter + 1 &amp;&amp; arr[iter + 1] != null) {
+///                     for(int i = 0 ; i
+///
+/// And heres a more &quot;real world&quot; example showing an XML hierarchy in a `Tree`:
+///
+/// ```java
+/// class XMLTreeModel implements TreeModel {
+/// private Element root;
+/// public XMLTreeModel(Element e) {
+/// root = e;
+/// }
+///
+/// public Vector getChildren(Object parent) {
+/// if(parent == null) {
+/// Vector c = new Vector();
+/// c.addElement(root);
+/// return c;
+/// }
+/// Vector result = new Vector();
+/// Element e = (Element)parent;
+/// for(int iter = 0 ; iter
+///
+/// Another real world example showing the `com.codename1.io.FileSystemStorage` as a tree:
+///
+/// ```java
+/// Form hi = new Form(&quot;FileSystemTree&quot;, new BorderLayout());
+/// TreeModel tm = new TreeModel() {
+/// @Override
+///     public Vector getChildren(Object parent) {
+///         String[] files;
+///         if(parent == null) {
+///             files = FileSystemStorage.getInstance().getRoots();
+///             return new Vector(Arrays.asList(files));
+///         } else {
+///             try {
+///                 files = FileSystemStorage.getInstance().listFiles((String)parent);
+///             } catch(IOException err) {
+///                 Log.e(err);
+///                 files = new String[0];
+///             }
+///         }
+///         String p = (String)parent;
+///         Vector result = new Vector();
+///         for(String s : files) {
+///             result.add(p + s);
+///         }
+///         return result;
+///     }
+/// @Override
+///     public boolean isLeaf(Object node) {
+///         return !FileSystemStorage.getInstance().isDirectory((String)node);
+///     }
+/// };
+/// Tree t = new Tree(tm) {
+/// @Override
+///     protected String childToDisplayLabel(Object child) {
+///         String n = (String)child;
+///         int pos = n.lastIndexOf(&quot;/&quot;);
+///         if(pos
+/// @author Shai Almog
+public class Tree extends Container {
+    private static final String KEY_OBJECT = &quot;TREE_OBJECT&quot;;
+    private static final String KEY_PARENT = &quot;TREE_PARENT&quot;;
+    private static final String KEY_EXPANDED = &quot;TREE_NODE_EXPANDED&quot;;
+    private static final String KEY_DEPTH = &quot;TREE_DEPTH&quot;;
+    private static final int depthIndent = 2;
+    private static Image folder;
+    private static Image openFolder;
+    private static Image nodeImage;
+<span class="fc" id="L137">    private final EventDispatcher leafListener = new EventDispatcher();</span>
+<span class="fc" id="L138">    private final ActionListener expansionListener = new Handler();</span>
+    private TreeModel model;
+    private boolean multilineMode;
+
+    /// Constructor for usage by GUI builder and automated tools, normally one
+    /// should use the version that accepts the model
+    public Tree() {
+<span class="fc" id="L145">        this(new StringArrayTreeModel(new String[][]{</span>
+                {&quot;Colors&quot;, &quot;Letters&quot;, &quot;Numbers&quot;},
+                {&quot;Red&quot;, &quot;Green&quot;, &quot;Blue&quot;},
+                {&quot;A&quot;, &quot;B&quot;, &quot;C&quot;},
+                {&quot;1&quot;, &quot;2&quot;, &quot;3&quot;}
+        }));
+<span class="fc" id="L151">    }</span>
+
+    /// Construct a tree with the given tree model
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: represents the contents of the tree
+<span class="fc" id="L158">    public Tree(TreeModel model) {</span>
+<span class="fc" id="L159">        this.model = model;</span>
+<span class="fc" id="L160">        setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L161">        initDefaultIcons();</span>
+<span class="fc" id="L162">        buildBranch(null, 0, this);</span>
+<span class="fc" id="L163">        setScrollableY(true);</span>
+<span class="fc" id="L164">        setUIIDFinal(&quot;Tree&quot;);</span>
+<span class="fc" id="L165">    }</span>
+
+    private static synchronized void initDefaultIcons() {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (folder == null) {</span>
+<span class="fc" id="L169">            folder = UIManager.getInstance().getThemeImageConstant(&quot;treeFolderImage&quot;);</span>
+<span class="fc" id="L170">            openFolder = UIManager.getInstance().getThemeImageConstant(&quot;treeFolderOpenImage&quot;);</span>
+<span class="fc" id="L171">            nodeImage = UIManager.getInstance().getThemeImageConstant(&quot;treeNodeImage&quot;);</span>
+        }
+<span class="fc" id="L173">    }</span>
+
+    /// Sets the icon for a tree folder
+    ///
+    /// #### Parameters
+    ///
+    /// - `folderIcon`: the icon for a folder within the tree
+    public static void setFolderIcon(Image folderIcon) {
+<span class="nc" id="L181">        folder = folderIcon;</span>
+<span class="nc" id="L182">    }</span>
+
+    /// Sets the icon for a tree folder in its expanded state
+    ///
+    /// #### Parameters
+    ///
+    /// - `folderIcon`: the icon for a folder within the tree
+    public static void setFolderOpenIcon(Image folderIcon) {
+<span class="nc" id="L190">        openFolder = folderIcon;</span>
+<span class="nc" id="L191">    }</span>
+
+    /// Sets the icon for a tree node
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeIcon`: the icon for a node within the tree
+    public static void setNodeIcon(Image nodeIcon) {
+<span class="nc" id="L199">        nodeImage = nodeIcon;</span>
+<span class="nc" id="L200">    }</span>
+
+    /// Gets the state of the tree in a format that can be restored later
+    /// by either the same tree or a different tree whose model includes the same
+    /// nodes.
+    ///
+    /// #### Returns
+    ///
+    /// A TreeState object that can be passed to `#setTreeState(com.codename1.ui.tree.Tree.TreeState)`
+    public TreeState getTreeState() {
+<span class="fc" id="L210">        State out = new State();</span>
+<span class="fc" id="L211">        out.extractStateFrom(this);</span>
+<span class="fc" id="L212">        return out;</span>
+    }
+
+    /// Sets the tree state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: The state, which was returned from the `#getTreeState()` method.
+    public void setTreeState(TreeState state) {
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        if (state instanceof State) {</span>
+<span class="fc" id="L222">            ((State) state).applyStateTo(this);</span>
+        }
+<span class="fc" id="L224">    }</span>
+
+    /// Toggles a mode where rows in the tree can be broken since span buttons will
+    /// be used instead of plain buttons.
+    ///
+    /// #### Returns
+    ///
+    /// the multilineMode
+    public boolean isMultilineMode() {
+<span class="nc" id="L233">        return multilineMode;</span>
+    }
+
+    /// Toggles a mode where rows in the tree can be broken since span buttons will
+    /// be used instead of plain buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `multilineMode`: the multilineMode to set
+    public void setMultilineMode(boolean multilineMode) {
+<span class="fc" id="L243">        this.multilineMode = multilineMode;</span>
+<span class="fc" id="L244">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L249">        return new String[]{&quot;data&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L255">        return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArray2DClass()};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L261">        return new String[]{&quot;String[][]&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (&quot;data&quot;.equals(name)) {</span>
+<span class="nc" id="L268">            return ((StringArrayTreeModel) model).arr;</span>
+        }
+<span class="nc" id="L270">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (&quot;data&quot;.equals(name)) {</span>
+<span class="nc" id="L277">            setModel(new StringArrayTreeModel((String[][]) value));</span>
+<span class="nc" id="L278">            return null;</span>
+        }
+<span class="nc" id="L280">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// Returns the tree model instance
+    ///
+    /// #### Returns
+    ///
+    /// the tree model
+    public TreeModel getModel() {
+<span class="fc" id="L289">        return model;</span>
+    }
+
+    /// Sets the tree model to a new value
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the model of the tree
+    public void setModel(TreeModel model) {
+<span class="fc" id="L298">        this.model = model;</span>
+<span class="fc" id="L299">        removeAll();</span>
+<span class="fc" id="L300">        buildBranch(null, 0, this);</span>
+<span class="fc" id="L301">    }</span>
+
+    private Container expandNode(boolean animate, Component c) {
+<span class="nc" id="L304">        return expandNode(animate, c, true);</span>
+    }
+
+    private Container expandNode(boolean animate, Component c, boolean revalidate) {
+<span class="nc" id="L308">        return expandNodeImpl(animate, c, revalidate);</span>
+    }
+
+    private Container expandNodeImpl(boolean animate, Component c) {
+<span class="nc" id="L312">        return expandNodeImpl(animate, c, true);</span>
+    }
+
+    private Container expandNodeImpl(boolean animate, Component c, boolean revalidate) {
+<span class="nc" id="L316">        Container p = c.getParent().getLeadParent();</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L318">            c = p;</span>
+        }
+<span class="nc" id="L320">        c.putClientProperty(KEY_EXPANDED, &quot;true&quot;);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        if (openFolder == null) {</span>
+<span class="nc" id="L322">            setNodeMaterialIcon(FontImage.MATERIAL_FOLDER, c, 3);</span>
+        } else {
+<span class="nc" id="L324">            setNodeIcon(openFolder, c);</span>
+        }
+<span class="nc" id="L326">        int depth = ((Integer) c.getClientProperty(KEY_DEPTH)).intValue();</span>
+<span class="nc" id="L327">        Container parent = c.getParent();</span>
+<span class="nc" id="L328">        Object o = c.getClientProperty(KEY_OBJECT);</span>
+<span class="nc" id="L329">        Container dest = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="nc" id="L330">        parent.addComponent(BorderLayout.CENTER, dest);</span>
+<span class="nc" id="L331">        buildBranch(o, depth, dest);</span>
+<span class="nc bnc" id="L332" title="All 4 branches missed.">        if (isInitialized() &amp;&amp; animate) {</span>
+<span class="nc" id="L333">            dest.setHeight(0);</span>
+<span class="nc" id="L334">            dest.setVisible(true);</span>
+<span class="nc" id="L335">            animateLayoutAndWait(300);</span>
+            //parent.animateHierarchyAndWait(300);
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (multilineMode) {</span>
+<span class="nc" id="L338">                revalidate();</span>
+            }
+        } else {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            if (revalidate) {</span>
+<span class="nc" id="L342">                parent.revalidate();</span>
+            }
+        }
+<span class="nc" id="L345">        return dest;</span>
+    }
+
+    /// This method returns true if the given node is expanded.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: a Component that represents a tree node.
+    ///
+    /// #### Returns
+    ///
+    /// true if this tree node is expanded
+    protected boolean isExpanded(Component node) {
+<span class="fc" id="L358">        Object e = node.getClientProperty(KEY_EXPANDED);</span>
+<span class="pc bpc" id="L359" title="3 of 4 branches missed.">        return e != null &amp;&amp; &quot;true&quot;.equals(e);</span>
+    }
+
+    private Container expandPathNode(boolean animate, Container parent, Object node) {
+<span class="fc" id="L363">        int cc = parent.getComponentCount();</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        for (int iter = 0; iter &lt; cc; iter++) {</span>
+<span class="fc" id="L365">            Component current = parent.getComponentAt(iter);</span>
+<span class="fc" id="L366">            Object o = current.getClientProperty(KEY_OBJECT);</span>
+
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">            if (!model.isLeaf(o)) {</span>
+                //if(current instanceof Container) {
+<span class="nc" id="L370">                BorderLayout bl = (BorderLayout) ((Container) current).getLayout();</span>
+
+                // the tree component is always at north expanded or otherwise
+<span class="nc" id="L373">                current = bl.getNorth();</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">                if (Objects.equals(o, node)) {</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                    if (isExpanded(current)) {</span>
+<span class="nc" id="L376">                        return (Container) bl.getCenter();</span>
+                    }
+<span class="nc" id="L378">                    return expandNodeImpl(animate, current);</span>
+                }
+            }
+        }
+<span class="fc" id="L382">        return null;</span>
+    }
+
+    private void collapsePathNode(Container parent, Object node) {
+<span class="fc" id="L386">        int cc = parent.getComponentCount();</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (int iter = 0; iter &lt; cc; iter++) {</span>
+<span class="fc" id="L388">            Component current = parent.getComponentAt(iter);</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">            if (isExpanded(current)) {</span>
+<span class="nc" id="L390">                BorderLayout bl = (BorderLayout) ((Container) current).getLayout();</span>
+
+                // the tree component is always at north expanded or otherwise
+<span class="nc" id="L393">                current = bl.getNorth();</span>
+<span class="nc" id="L394">                Object o = current.getClientProperty(KEY_OBJECT);</span>
+<span class="nc bnc" id="L395" title="All 4 branches missed.">                if (o != null &amp;&amp; o.equals(node)) {</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                    if (isExpanded(current)) {</span>
+<span class="nc" id="L397">                        collapseNode(current, null);</span>
+                    }
+<span class="nc" id="L399">                    return;</span>
+                }
+            }
+        }
+<span class="fc" id="L403">    }</span>
+
+    /// Finds the component for a model node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: The node from the model.
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding component in the UI or null if not found.
+    ///
+    public Component findNodeComponent(Object node) {
+<span class="fc" id="L416">        return findNodeComponent(node, this);</span>
+    }
+
+    /// Finds the component for a model node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: Model node whose view we seek.
+    ///
+    /// - `root`: A root component - we check root and its descendents.
+    ///
+    /// #### Returns
+    ///
+    /// The corresponding UI component for node, or null if not found.
+    ///
+    public Component findNodeComponent(Object node, Component root) {
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L433">            return findNodeComponent(node, this);</span>
+        }
+<span class="fc" id="L435">        Object rootNode = root.getClientProperty(KEY_OBJECT);</span>
+
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        if (node.equals(rootNode)) {</span>
+<span class="fc" id="L438">            return root;</span>
+        }
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (root instanceof Container) {</span>
+<span class="fc" id="L441">            int len = ((Container) root).getComponentCount();</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L443">                Component found = findNodeComponent(node, ((Container) root).getComponentAt(i));</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">                if (found != null) {</span>
+<span class="fc" id="L445">                    return found;</span>
+                }
+            }
+        }
+<span class="fc" id="L449">        return null;</span>
+    }
+
+    /// Expands the tree path
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path to expand
+    public void expandPath(Object... path) {
+<span class="fc" id="L458">        expandPath(isInitialized(), path);</span>
+<span class="fc" id="L459">    }</span>
+
+    /// Expands the tree path
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path to expand
+    ///
+    /// - `animate`: whether to animate expansion
+    public void expandPath(boolean animate, Object... path) {
+<span class="fc" id="L469">        Container c = this;</span>
+<span class="fc" id="L470">        int plen = path.length;</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; plen; iter++) {</span>
+<span class="fc" id="L472">            c = expandPathNode(animate, c, path[iter]);</span>
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">            if (c == null) {</span>
+<span class="fc" id="L474">                return;</span>
+            }
+        }
+<span class="nc" id="L477">    }</span>
+
+    /// Collapses the last element in the path
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path to the element that should be collapsed
+    public void collapsePath(Object... path) {
+<span class="fc" id="L485">        Container c = this;</span>
+<span class="fc" id="L486">        int plen = path.length;</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; plen - 1; iter++) {</span>
+<span class="nc" id="L488">            c = expandPathNode(isInitialized(), c, path[iter]);</span>
+        }
+<span class="fc" id="L490">        collapsePathNode(c, path[plen - 1]);</span>
+<span class="fc" id="L491">    }</span>
+
+    private void collapseNode(Component c) {
+<span class="nc" id="L494">        collapseNode(c, CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300));</span>
+<span class="nc" id="L495">    }</span>
+
+    private void collapseNode(Component c, Transition t) {
+<span class="nc" id="L498">        Container lead = c.getParent().getLeadParent();</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        if (lead != null) {</span>
+<span class="nc" id="L500">            c = lead;</span>
+        }
+<span class="nc" id="L502">        c.putClientProperty(KEY_EXPANDED, null);</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">        if (folder == null) {</span>
+<span class="nc" id="L504">            setNodeMaterialIcon(FontImage.MATERIAL_FOLDER, c, 3);</span>
+        } else {
+<span class="nc" id="L506">            setNodeIcon(folder, c);</span>
+        }
+<span class="nc" id="L508">        Container p = c.getParent();</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        for (int iter = 0; iter &lt; p.getComponentCount(); iter++) {</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">            if (p.getComponentAt(iter) != c) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                if (t == null) {</span>
+<span class="nc" id="L512">                    p.removeComponent(p.getComponentAt(iter));</span>
+<span class="nc" id="L513">                    break; // there should only be one container with all children</span>
+                } else {
+<span class="nc" id="L515">                    Component dest = p.getComponentAt(iter);</span>
+<span class="nc" id="L516">                    dest.setHidden(true);</span>
+
+<span class="nc" id="L518">                    animateLayoutAndWait(300);</span>
+<span class="nc" id="L519">                    p.removeComponent(dest);</span>
+
+                }
+            }
+        }
+<span class="nc" id="L524">    }</span>
+
+    /// Returns the currently selected item in the tree
+    ///
+    /// #### Returns
+    ///
+    /// the object selected within the tree
+    public Object getSelectedItem() {
+<span class="nc" id="L532">        Component c = getComponentForm().getFocused();</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L534">            return c.getClientProperty(KEY_OBJECT);</span>
+        }
+<span class="nc" id="L536">        return null;</span>
+    }
+
+    /// Gets the parent model node for a component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeComponent`: The UI for a node.
+    ///
+    /// #### Returns
+    ///
+    /// The model node's parent, or null if not found.
+    public Object getParentNode(Component nodeComponent) {
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        if (nodeComponent == null) {</span>
+<span class="nc" id="L550">            return null;</span>
+        }
+<span class="nc" id="L552">        return nodeComponent.getClientProperty(KEY_PARENT);</span>
+
+    }
+
+    /// Gets the UI component corresponding to the parent model mode of the node
+    /// corresponding with the given UI component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeComponent`: UI component, whose node we seek the parent.
+    ///
+    /// #### Returns
+    ///
+    /// UI component for the given node's parent.
+    ///
+    public Component getParentComponent(Component nodeComponent) {
+<span class="nc bnc" id="L568" title="All 2 branches missed.">        if (nodeComponent == null) {</span>
+<span class="nc" id="L569">            return null;</span>
+        }
+<span class="nc" id="L571">        return findNodeComponent(getParentNode(nodeComponent));</span>
+    }
+
+    /// Refreshes a node of the tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nodeComponent`: The node component.
+    ///
+    public void refreshNode(Component nodeComponent) {
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        if (nodeComponent == null) {</span>
+<span class="nc" id="L582">            throw new IllegalArgumentException(&quot;refreshNode expects a non-null argument&quot;);</span>
+        }
+<span class="nc" id="L584">        Object node = nodeComponent.getClientProperty(KEY_OBJECT);</span>
+<span class="nc bnc" id="L585" title="All 2 branches missed.">        if (node == null) {</span>
+<span class="nc" id="L586">            return;</span>
+        }
+<span class="nc" id="L588">        Object nodeParent = nodeComponent.getClientProperty(KEY_PARENT);</span>
+<span class="nc" id="L589">        int depth = ((Integer) nodeComponent.getClientProperty(KEY_DEPTH)).intValue();</span>
+<span class="nc" id="L590">        Container parentCnt = nodeComponent.getParent();</span>
+<span class="nc bnc" id="L591" title="All 2 branches missed.">        if (parentCnt == null) {</span>
+<span class="nc" id="L592">            return;</span>
+        }
+<span class="nc" id="L594">        boolean expanded = isExpanded(nodeComponent);</span>
+<span class="nc" id="L595">        Component newCmp = createNode(node, depth);</span>
+<span class="nc" id="L596">        Object current = node;</span>
+<span class="nc" id="L597">        newCmp.putClientProperty(KEY_OBJECT, current);</span>
+<span class="nc" id="L598">        newCmp.putClientProperty(KEY_PARENT, nodeParent);</span>
+<span class="nc" id="L599">        newCmp.putClientProperty(KEY_DEPTH, depth);</span>
+<span class="nc" id="L600">        newCmp.getAllStyles().setMarginLeft(nodeComponent.getStyle().getMarginLeft(nodeComponent.isRTL()));</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">        if (model.isLeaf(current)) {</span>
+<span class="nc" id="L602">            parentCnt.replace(nodeComponent, newCmp, null);</span>
+<span class="nc" id="L603">            bindNodeListener(new Handler(current), newCmp);</span>
+        } else {
+<span class="nc" id="L605">            Container componentArea = new Container(new BorderLayout());</span>
+<span class="nc" id="L606">            componentArea.addComponent(BorderLayout.NORTH, newCmp);</span>
+<span class="nc" id="L607">            parentCnt.getParent().replace(parentCnt, componentArea, null);</span>
+<span class="nc" id="L608">            bindNodeListener(expansionListener, newCmp);</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">            if (expanded) {</span>
+<span class="nc" id="L610">                expandNode(false, newCmp, false);</span>
+            }
+        }
+
+
+<span class="nc" id="L615">        revalidateLater();</span>
+<span class="nc" id="L616">    }</span>
+
+    /// Adds the child components of a tree branch to the given container.
+    private void buildBranch(Object parent, int depth, Container destination) {
+<span class="fc" id="L620">        Vector children = model.getChildren(parent);</span>
+<span class="fc" id="L621">        int size = children.size();</span>
+<span class="fc" id="L622">        Integer depthVal = Integer.valueOf(depth + 1);</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L624">            final Object current = children.elementAt(iter);</span>
+<span class="fc" id="L625">            Component nodeComponent = createNode(current, depth);</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">            if (model.isLeaf(current)) {</span>
+<span class="fc" id="L627">                destination.addComponent(nodeComponent);</span>
+<span class="fc" id="L628">                bindNodeListener(new Handler(current), nodeComponent);</span>
+            } else {
+<span class="fc" id="L630">                Container componentArea = new Container(new BorderLayout());</span>
+<span class="fc" id="L631">                componentArea.addComponent(BorderLayout.NORTH, nodeComponent);</span>
+<span class="fc" id="L632">                destination.addComponent(componentArea);</span>
+<span class="fc" id="L633">                bindNodeListener(expansionListener, nodeComponent);</span>
+            }
+<span class="fc" id="L635">            nodeComponent.putClientProperty(KEY_OBJECT, current);</span>
+<span class="fc" id="L636">            nodeComponent.putClientProperty(KEY_PARENT, parent);</span>
+<span class="fc" id="L637">            nodeComponent.putClientProperty(KEY_DEPTH, depthVal);</span>
+        }
+<span class="fc" id="L639">    }</span>
+
+    /// Creates a node within the tree, this method is protected allowing tree to be
+    /// subclassed to replace the rendering logic of individual tree buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node object from the model to display on the button
+    ///
+    /// - `depth`: the depth within the tree (normally represented by indenting the entry)
+    ///
+    /// #### Returns
+    ///
+    /// a button representing the node within the tree
+    ///
+    /// #### Deprecated
+    ///
+    /// replaced with createNode, bindNodeListener and setNodeIcon
+    protected Button createNodeComponent(Object node, int depth) {
+<span class="fc" id="L658">        Button cmp = new Button(childToDisplayLabel(node));</span>
+<span class="fc" id="L659">        cmp.setUIID(&quot;TreeNode&quot;);</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        if (model.isLeaf(node)) {</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">            if (nodeImage == null) {</span>
+<span class="fc" id="L662">                FontImage.setMaterialIcon(cmp, FontImage.MATERIAL_DESCRIPTION, 3);</span>
+            } else {
+<span class="nc" id="L664">                cmp.setIcon(nodeImage);</span>
+            }
+        } else {
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            if (folder == null) {</span>
+<span class="fc" id="L668">                FontImage.setMaterialIcon(cmp, FontImage.MATERIAL_FOLDER, 3);</span>
+            } else {
+<span class="nc" id="L670">                cmp.setIcon(folder);</span>
+            }
+        }
+<span class="fc" id="L673">        updateNodeComponentStyle(cmp.getAllStyles(), depth);</span>
+<span class="fc" id="L674">        return cmp;</span>
+    }
+
+    /// Since a node may be any component type developers should override this method to
+    /// add support for binding the click listener to the given component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener interface
+    ///
+    /// - `node`: node component returned by createNode
+    protected void bindNodeListener(ActionListener l, Component node) {
+<span class="fc bfc" id="L686" title="All 2 branches covered.">        if (node instanceof Button) {</span>
+<span class="fc" id="L687">            ((Button) node).addActionListener(l);</span>
+<span class="fc" id="L688">            return;</span>
+        }
+<span class="fc" id="L690">        ((SpanButton) node).addActionListener(l);</span>
+<span class="fc" id="L691">    }</span>
+
+    /// Sets the icon for the given node similar in scope to bindNodeListener
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the icon for the node
+    ///
+    /// - `node`: the node instance
+    protected void setNodeIcon(Image icon, Component node) {
+<span class="nc bnc" id="L701" title="All 2 branches missed.">        if (node instanceof Button) {</span>
+<span class="nc" id="L702">            ((Button) node).setIcon(icon);</span>
+<span class="nc" id="L703">            return;</span>
+        }
+<span class="nc" id="L705">        ((SpanButton) node).setIcon(icon);</span>
+<span class="nc" id="L706">    }</span>
+
+    /// Sets material icon for the node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: Material icon code.  See `FontImage`
+    ///
+    /// - `node`: The node to set the icon for.
+    ///
+    /// - `size`: The size in millimetres for the icon.
+    ///
+    protected void setNodeMaterialIcon(char c, Component node, float size) {
+<span class="nc" id="L719">        FontImage.setMaterialIcon(node, FontImage.MATERIAL_FOLDER, 3);</span>
+<span class="nc" id="L720">    }</span>
+
+    /// Creates a node within the tree, this method is protected allowing tree to be
+    /// subclassed to replace the rendering logic of individual tree buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the node object from the model to display on the button
+    ///
+    /// - `depth`: the depth within the tree (normally represented by indenting the entry)
+    ///
+    /// #### Returns
+    ///
+    /// a button representing the node within the tree
+    protected Component createNode(Object node, int depth) {
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        if (multilineMode) {</span>
+<span class="fc" id="L736">            SpanButton cmp = new SpanButton(childToDisplayLabel(node));</span>
+<span class="fc" id="L737">            cmp.setUIID(&quot;TreeNode&quot;);</span>
+<span class="fc" id="L738">            cmp.setTextUIID(&quot;TreeNode&quot;);</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">            if (model.isLeaf(node)) {</span>
+<span class="fc" id="L740">                cmp.setIcon(nodeImage);</span>
+            } else {
+<span class="fc" id="L742">                cmp.setIcon(folder);</span>
+            }
+<span class="fc" id="L744">            updateNodeComponentStyle(cmp.getAllStyles(), depth);</span>
+<span class="fc" id="L745">            return cmp;</span>
+        }
+<span class="fc" id="L747">        return createNodeComponent(node, depth);</span>
+    }
+
+    private void updateNodeComponentStyle(Style s, int depth) {
+<span class="fc" id="L751">        s.setMarginUnit(Style.UNIT_TYPE_DIPS);</span>
+<span class="fc" id="L752">        s.setMarginLeft(depth * depthIndent);</span>
+<span class="fc" id="L753">    }</span>
+
+    /// Converts a tree child to a label, this method can be overriden for
+    /// simple rendering effects
+    ///
+    /// #### Returns
+    ///
+    /// a string representing the given tree node
+    protected String childToDisplayLabel(Object child) {
+<span class="fc" id="L762">        return child.toString();</span>
+    }
+
+    /// A listener that fires when a leaf is clicked
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener to fire when the leaf is clicked
+    public void addLeafListener(ActionListener l) {
+<span class="fc" id="L771">        leafListener.addListener(l);</span>
+<span class="fc" id="L772">    }</span>
+
+    /// Removes the listener that fires when a leaf is clicked
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: listener to remove
+    public void removeLeafListener(ActionListener l) {
+<span class="nc" id="L780">        leafListener.removeListener(l);</span>
+<span class="nc" id="L781">    }</span>
+
+    /// Gets the model for a component in the tree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: The component whose model we want to obtain.
+    ///
+    /// #### Returns
+    ///
+    /// The model.
+    ///
+    protected Object getModel(Component node) {
+<span class="nc" id="L794">        return node.getClientProperty(KEY_OBJECT);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L800">        Dimension d = super.calcPreferredSize();</span>
+
+        // if the tree is entirely collapsed try to reserve at least 6 rows for the content
+<span class="fc" id="L803">        int count = getComponentCount();</span>
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">            if (getComponentAt(iter) instanceof Container) {</span>
+<span class="fc" id="L806">                return d;</span>
+            }
+        }
+<span class="nc" id="L809">        int size = Math.max(1, model.getChildren(null).size());</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (size &lt; 6) {</span>
+<span class="nc" id="L811">            return new Dimension(Math.max(d.getWidth(), Display.getInstance().getDisplayWidth() / 4 * 3),</span>
+<span class="nc" id="L812">                    d.getHeight() / size * 6);</span>
+        }
+<span class="nc" id="L814">        return d;</span>
+    }
+
+    /// A marker interface used for Tree state returned from `#getTreeState()` and
+    /// passed to `#setTreeState(com.codename1.ui.tree.Tree.TreeState)` for retaining
+    /// state in a Tree when the model is changed.
+    public interface TreeState {
+
+    }
+
+<span class="fc" id="L824">    private static class State implements TreeState {</span>
+<span class="fc" id="L825">        Set&lt;Object&gt; expandedSet = new HashSet&lt;Object&gt;();</span>
+
+        private void extractStateFrom(final Tree tree) {
+<span class="fc" id="L828">            expandedSet.clear();</span>
+<span class="fc" id="L829">            ComponentSelector.select(&quot;*&quot;, tree).each(new ComponentSelector.ComponentClosure() {</span>
+
+                @Override
+                public void call(Component c) {
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">                    if (tree.isExpanded(c)) {</span>
+<span class="nc" id="L834">                        Object o = c.getClientProperty(KEY_OBJECT);</span>
+<span class="nc" id="L835">                        expandedSet.add(o);</span>
+                    }
+<span class="fc" id="L837">                }</span>
+            });
+
+
+<span class="fc" id="L841">        }</span>
+
+
+        private void applyStateTo(Tree tree) {
+<span class="fc" id="L845">            applyStateTo(tree, tree);</span>
+<span class="fc" id="L846">        }</span>
+
+        private void applyStateTo(final Tree tree, Container parent) {
+<span class="fc" id="L849">            ComponentSelector.select(&quot;*&quot;, parent).each(new ComponentSelector.ComponentClosure() {</span>
+
+                @Override
+                public void call(Component cmp) {
+<span class="fc" id="L853">                    Object o = cmp.getClientProperty(KEY_OBJECT);</span>
+
+<span class="fc bfc" id="L855" title="All 2 branches covered.">                    if (o != null) {</span>
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">                        if (expandedSet.contains(o)) {</span>
+<span class="nc bnc" id="L857" title="All 2 branches missed.">                            if (!tree.isExpanded(cmp)) {</span>
+<span class="nc" id="L858">                                Container dest = tree.expandNode(false, cmp, false);</span>
+<span class="nc" id="L859">                                applyStateTo(tree, dest);</span>
+
+<span class="nc" id="L861">                            }</span>
+
+                        } else {
+<span class="pc bpc" id="L864" title="1 of 2 branches missed.">                            if (tree.isExpanded(cmp)) {</span>
+<span class="nc" id="L865">                                tree.collapseNode(cmp, null);</span>
+                            }
+                        }
+
+                    }
+<span class="fc" id="L870">                }</span>
+
+            });
+
+<span class="fc" id="L874">        }</span>
+    }
+
+    static class StringArrayTreeModel implements TreeModel {
+        String[][] arr;
+
+<span class="fc" id="L880">        StringArrayTreeModel(String[][] arr) {</span>
+<span class="fc" id="L881">            this.arr = arr;</span>
+<span class="fc" id="L882">        }</span>
+
+        @Override
+        public Vector getChildren(Object parent) {
+<span class="fc bfc" id="L886" title="All 2 branches covered.">            if (parent == null) {</span>
+<span class="fc" id="L887">                Vector v = new Vector();</span>
+<span class="fc" id="L888">                int a0len = arr[0].length;</span>
+<span class="fc bfc" id="L889" title="All 2 branches covered.">                for (int iter = 0; iter &lt; a0len; iter++) {</span>
+<span class="fc" id="L890">                    v.addElement(arr[0][iter]);</span>
+                }
+<span class="fc" id="L892">                return v;</span>
+            }
+<span class="fc" id="L894">            int alen = arr.length;</span>
+<span class="fc" id="L895">            int aolen = arr[0].length;</span>
+<span class="fc" id="L896">            Vector v = new Vector();</span>
+<span class="fc bfc" id="L897" title="All 2 branches covered.">            for (int iter = 0; iter &lt; aolen; iter++) {</span>
+<span class="fc bfc" id="L898" title="All 2 branches covered.">                if (parent.equals(arr[0][iter])) {</span>
+<span class="pc bpc" id="L899" title="2 of 4 branches missed.">                    if (alen &gt; iter + 1 &amp;&amp; arr[iter + 1] != null) {</span>
+<span class="fc" id="L900">                        int ailen = arr[iter + 1].length;</span>
+<span class="fc bfc" id="L901" title="All 2 branches covered.">                        for (int i = 0; i &lt; ailen; i++) {</span>
+<span class="fc" id="L902">                            v.addElement(arr[iter + 1][i]);</span>
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L907">            return v;</span>
+        }
+
+        @Override
+        public boolean isLeaf(Object node) {
+<span class="fc" id="L912">            Vector v = getChildren(node);</span>
+<span class="fc" id="L913">            return v.isEmpty();</span>
+        }
+    }
+
+    /// This class unifies two action listeners into a single class to reduce the size overhead
+    private class Handler implements ActionListener {
+        private Object current;
+
+<span class="fc" id="L921">        public Handler() {</span>
+<span class="fc" id="L922">        }</span>
+
+<span class="fc" id="L924">        public Handler(Object current) {</span>
+<span class="fc" id="L925">            this.current = current;</span>
+<span class="fc" id="L926">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L930" title="1 of 2 branches missed.">            if (current != null) {</span>
+<span class="fc" id="L931">                leafListener.fireActionEvent(new ActionEvent(current, ActionEvent.Type.Other));</span>
+<span class="fc" id="L932">                return;</span>
+            }
+<span class="nc" id="L934">            Component c = (Component) evt.getSource();</span>
+<span class="nc" id="L935">            Container lead = c.getParent().getLeadParent();</span>
+<span class="nc bnc" id="L936" title="All 2 branches missed.">            if (lead != null) {</span>
+<span class="nc" id="L937">                c = lead;</span>
+            }
+<span class="nc" id="L939">            Object e = c.getClientProperty(KEY_EXPANDED);</span>
+<span class="nc bnc" id="L940" title="All 4 branches missed.">            if (e != null &amp;&amp; &quot;true&quot;.equals(e)) {</span>
+<span class="nc" id="L941">                collapseNode(c);</span>
+            } else {
+<span class="nc" id="L943">                expandNode(isInitialized(), c);</span>
+            }
+<span class="nc" id="L945">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

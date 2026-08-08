@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Joint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">Joint.java</span></div><h1>Joint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.dynamics.World;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+// updated to rev 100
+/// The base joint class. Joints are used to constrain two bodies together in various fashions. Some
+/// joints also feature limits and motors.
+///
+/// @author Daniel Murphy
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">public abstract class Joint {</span>
+
+  public static Joint create(World world, JointDef def) {
+    // Joint joint = null;
+<span class="pc bpc" id="L41" title="1 of 12 branches missed.">    switch (def.type) {</span>
+      case MOUSE:
+<span class="fc" id="L43">        return new MouseJoint(world.getPool(), (MouseJointDef) def);</span>
+      case DISTANCE:
+<span class="fc" id="L45">        return new DistanceJoint(world.getPool(), (DistanceJointDef) def);</span>
+      case PRISMATIC:
+<span class="fc" id="L47">        return new PrismaticJoint(world.getPool(), (PrismaticJointDef) def);</span>
+      case REVOLUTE:
+<span class="fc" id="L49">        return new RevoluteJoint(world.getPool(), (RevoluteJointDef) def);</span>
+      case WELD:
+<span class="fc" id="L51">        return new WeldJoint(world.getPool(), (WeldJointDef) def);</span>
+      case FRICTION:
+<span class="fc" id="L53">        return new FrictionJoint(world.getPool(), (FrictionJointDef) def);</span>
+      case WHEEL:
+<span class="fc" id="L55">        return new WheelJoint(world.getPool(), (WheelJointDef) def);</span>
+      case GEAR:
+<span class="fc" id="L57">        return new GearJoint(world.getPool(), (GearJointDef) def);</span>
+      case PULLEY:
+<span class="fc" id="L59">        return new PulleyJoint(world.getPool(), (PulleyJointDef) def);</span>
+      case CONSTANT_VOLUME:
+<span class="fc" id="L61">        return new ConstantVolumeJoint(world, (ConstantVolumeJointDef) def);</span>
+      case ROPE:
+<span class="fc" id="L63">        return new RopeJoint(world.getPool(), (RopeJointDef) def);</span>
+      case UNKNOWN:
+      default:
+<span class="nc" id="L66">        return null;</span>
+    }
+  }
+
+  public static void destroy(Joint joint) {
+<span class="fc" id="L71">    joint.destructor();</span>
+<span class="fc" id="L72">  }</span>
+
+  private final JointType m_type;
+  public Joint m_prev;
+  public Joint m_next;
+  public JointEdge m_edgeA;
+  public JointEdge m_edgeB;
+  protected Body m_bodyA;
+  protected Body m_bodyB;
+
+  public boolean m_islandFlag;
+  private boolean m_collideConnected;
+
+  public Object m_userData;
+
+  protected IWorldPool pool;
+
+  // Cache here per time step to reduce cache misses.
+  // final Vec2 m_localCenterA, m_localCenterB;
+  // float m_invMassA, m_invIA;
+  // float m_invMassB, m_invIB;
+
+<span class="fc" id="L94">  protected Joint(IWorldPool worldPool, JointDef def) {</span>
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">    assert (def.bodyA != def.bodyB);</span>
+
+<span class="fc" id="L97">    pool = worldPool;</span>
+<span class="fc" id="L98">    m_type = def.type;</span>
+<span class="fc" id="L99">    m_prev = null;</span>
+<span class="fc" id="L100">    m_next = null;</span>
+<span class="fc" id="L101">    m_bodyA = def.bodyA;</span>
+<span class="fc" id="L102">    m_bodyB = def.bodyB;</span>
+<span class="fc" id="L103">    m_collideConnected = def.collideConnected;</span>
+<span class="fc" id="L104">    m_islandFlag = false;</span>
+<span class="fc" id="L105">    m_userData = def.userData;</span>
+
+<span class="fc" id="L107">    m_edgeA = new JointEdge();</span>
+<span class="fc" id="L108">    m_edgeA.joint = null;</span>
+<span class="fc" id="L109">    m_edgeA.other = null;</span>
+<span class="fc" id="L110">    m_edgeA.prev = null;</span>
+<span class="fc" id="L111">    m_edgeA.next = null;</span>
+
+<span class="fc" id="L113">    m_edgeB = new JointEdge();</span>
+<span class="fc" id="L114">    m_edgeB.joint = null;</span>
+<span class="fc" id="L115">    m_edgeB.other = null;</span>
+<span class="fc" id="L116">    m_edgeB.prev = null;</span>
+<span class="fc" id="L117">    m_edgeB.next = null;</span>
+
+    // m_localCenterA = new Vec2();
+    // m_localCenterB = new Vec2();
+<span class="fc" id="L121">  }</span>
+
+  /// get the type of the concrete joint.
+  ///
+  /// @return
+  public JointType getType() {
+<span class="fc" id="L127">    return m_type;</span>
+  }
+
+  /// get the first body attached to this joint.
+  public final Body getBodyA() {
+<span class="fc" id="L132">    return m_bodyA;</span>
+  }
+
+  /// get the second body attached to this joint.
+  ///
+  /// @return
+  public final Body getBodyB() {
+<span class="fc" id="L139">    return m_bodyB;</span>
+  }
+
+  /// get the anchor point on bodyA in world coordinates.
+  ///
+  /// @return
+  public abstract void getAnchorA(Vec2 out);
+
+  /// get the anchor point on bodyB in world coordinates.
+  ///
+  /// @return
+  public abstract void getAnchorB(Vec2 out);
+
+  /// get the reaction force on body2 at the joint anchor in Newtons.
+  ///
+  /// @param inv_dt
+  /// @return
+  public abstract void getReactionForce(float inv_dt, Vec2 out);
+
+  /// get the reaction torque on body2 in N*m.
+  ///
+  /// @param inv_dt
+  /// @return
+  public abstract float getReactionTorque(float inv_dt);
+
+  /// get the next joint the world joint list.
+  public Joint getNext() {
+<span class="fc" id="L166">    return m_next;</span>
+  }
+
+  /// get the user data pointer.
+  public Object getUserData() {
+<span class="nc" id="L171">    return m_userData;</span>
+  }
+
+  /// Set the user data pointer.
+  public void setUserData(Object data) {
+<span class="nc" id="L176">    m_userData = data;</span>
+<span class="nc" id="L177">  }</span>
+
+  // / Get collide connected.
+  // / Note: modifying the collide connect flag won't work correctly because
+  // / the flag is only checked when fixture AABBs begin to overlap.
+  public final boolean getCollideConnected() {
+<span class="fc" id="L183">    return m_collideConnected;</span>
+  }
+
+  /// Short-cut function to determine if either body is inactive.
+  ///
+  /// @return
+  public boolean isActive() {
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">    return m_bodyA.isActive() &amp;&amp; m_bodyB.isActive();</span>
+  }
+
+  public abstract void initVelocityConstraints(SolverData data);
+
+  public abstract void solveVelocityConstraints(SolverData data);
+
+  /// This returns true if the position errors are within tolerance.
+  ///
+  /// @param baumgarte
+  /// @return
+  public abstract boolean solvePositionConstraints(SolverData data);
+
+  /// Override to handle destruction of joint
+<span class="fc" id="L204">  public void destructor() {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">ShieldConfig.java</span></div><h1>ShieldConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+import com.codename1.io.ConnectionRequest;
+import java.util.Enumeration;
+import java.util.Hashtable;
+
+/// Configuration for [AppShield#init(ShieldConfig)]. Chainable.
+///
+/// ```java
+/// AppShield.init(new ShieldConfig()
+///     .protect(&quot;api.mybank.example&quot;, HostPolicy.PROTECTED)
+///     .protect(&quot;*.mybank.example&quot;, HostPolicy.PROTECTED));
+/// ```
+///
+/// The defaults are chosen so that adding the shield to an existing app changes nothing until
+/// hosts are explicitly protected: no host is touched, failures are open, and signal collection is
+/// on because reporting costs nothing and is what makes the service useful.
+<span class="fc" id="L40">public final class ShieldConfig {</span>
+
+    /// Header that carries the attestation token.
+    ///
+    /// Deliberately not `Authorization`: that slot belongs to the app's own user authentication,
+    /// and the two answer different questions -- who the user is, versus whether this is a genuine
+    /// unmodified app on an uncompromised device. A backend needs both, so they must compose.
+    public static final String DEFAULT_TOKEN_HEADER = &quot;X-CN1-Attest&quot;;
+
+    private static final String DEFAULT_ENDPOINT = &quot;https://cloud.codenameone.com/api/v2/attest&quot;;
+
+<span class="fc" id="L51">    private String endpoint = DEFAULT_ENDPOINT;</span>
+<span class="fc" id="L52">    private String tokenHeader = DEFAULT_TOKEN_HEADER;</span>
+<span class="fc" id="L53">    private FailureMode defaultFailureMode = FailureMode.OPEN;</span>
+    /// Hosts registered without an explicit policy. Their policy is resolved from the default at
+    /// read time, so it does not depend on the order the builder was called in.
+<span class="fc" id="L56">    private final java.util.Vector implicitHosts = new java.util.Vector();</span>
+<span class="fc" id="L57">    private int refreshThresholdPercent = 50;</span>
+<span class="fc" id="L58">    private boolean collectSignals = true;</span>
+<span class="fc" id="L59">    private final Hashtable hostPolicies = new Hashtable();</span>
+
+    /// Overrides the attestation service endpoint. Only needed for a private deployment or a test
+    /// double.
+    public ShieldConfig endpoint(String url) {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (url != null) {</span>
+<span class="nc" id="L65">            this.endpoint = url;</span>
+        }
+<span class="nc" id="L67">        return this;</span>
+    }
+
+    /// Overrides the header used to carry the token. Change this only if it collides with
+    /// something already in use on your backend.
+    ///
+    /// `Content-Type` is refused. [com.codename1.io.ConnectionRequest#addRequestHeader]
+    /// special-cases that name into the request's own content type rather than the header
+    /// map, so the token would replace the request's media type and -- because the removal
+    /// path only clears the map -- would survive a redirect to an unprotected host and be
+    /// handed to it. A leak with no symptom on the way there.
+    ///
+    /// @throws IllegalArgumentException if the name cannot carry a token safely
+    public ShieldConfig tokenHeader(String name) {
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        if (name != null &amp;&amp; name.length() &gt; 0) {</span>
+<span class="fc" id="L82">            String normalized = ShieldHosts.normalize(name);</span>
+            // Before every reserved-name check, because folding case does not make a
+            // malformed name comparable: &quot;Cookie &quot; normalizes to &quot;cookie &quot;, matches
+            // nothing on any list below, and walks straight past the checks written for
+            // exactly that name. The name then goes on the wire -- HttpURLConnection
+            // accepts a trailing space -- where an intermediary is entitled to reject the
+            // malformed field or read it as something else, so a fail-closed host ends up
+            // with attach() reporting success and a backend that received no token.
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (!isFieldNameToken(name)) {</span>
+<span class="fc" id="L91">                throw new IllegalArgumentException(name + &quot; is not a legal HTTP header &quot;</span>
+                        + &quot;name, so it cannot carry the attestation token: field names are &quot;
+                        + &quot;tokens, with no spaces and no separators. Whatever survives on &quot;
+                        + &quot;the wire is not what was asked for. Use a header of your own, &quot;
+                        + &quot;or leave the default &quot; + DEFAULT_TOKEN_HEADER + &quot;.&quot;);
+            }
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if (&quot;content-type&quot;.equals(normalized)) {</span>
+<span class="fc" id="L98">                throw new IllegalArgumentException(&quot;Content-Type cannot carry the &quot;</span>
+                        + &quot;attestation token: it is not stored as an ordinary header, so it &quot;
+                        + &quot;cannot be cleared when a request redirects off a protected host, &quot;
+                        + &quot;and the token would follow the redirect. Use a header of your &quot;
+                        + &quot;own, or leave the default &quot; + DEFAULT_TOKEN_HEADER + &quot;.&quot;);
+            }
+            // The cookie header NAME is configurable at runtime
+            // (ConnectionRequest.setCookieHeader), so a hard-coded &quot;cookie&quot; in the list
+            // below is only the default. An app that renames it and then picks the same
+            // name for the token loses the token to its own cookie string -- written
+            // after the request's own headers, exactly as the default name is.
+<span class="fc" id="L109">            if (ShieldHosts.normalize(ConnectionRequest.getCookieHeader())</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                    .equals(normalized)) {</span>
+<span class="fc" id="L111">                throw new IllegalArgumentException(name + &quot; cannot carry the &quot;</span>
+                        + &quot;attestation token: it is this app's cookie header, which &quot;
+                        + &quot;ConnectionRequest writes from its own cookie store after the &quot;
+                        + &quot;request's headers are in place -- so the token would be &quot;
+                        + &quot;overwritten after attach() reported success. Use a header of &quot;
+                        + &quot;your own, or leave the default &quot; + DEFAULT_TOKEN_HEADER + &quot;.&quot;);
+            }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (String reserved : TRANSPORT_HEADERS) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (reserved.equals(normalized)) {</span>
+<span class="fc" id="L120">                    throw new IllegalArgumentException(name + &quot; cannot carry the &quot;</span>
+                            + &quot;attestation token: it is connection or framing metadata, &quot;
+                            + &quot;which the HTTP transport owns. Depending on the platform it &quot;
+                            + &quot;is overwritten, refused, or acted on -- so attach() would &quot;
+                            + &quot;report success while the backend received a request with no &quot;
+                            + &quot;token, or a malformed one. Use a header of your own, or &quot;
+                            + &quot;leave the default &quot; + DEFAULT_TOKEN_HEADER + &quot;.&quot;);
+                }
+            }
+<span class="fc" id="L129">            this.tokenHeader = name;</span>
+        }
+<span class="fc" id="L131">        return this;</span>
+    }
+
+    /// Whether this is a legal HTTP field name -- an RFC 9110 token, so no spaces, no
+    /// separators, nothing outside printable ASCII.
+    ///
+    /// Rejecting rather than trimming, for the same reason the websocket handshake does:
+    /// a caller that wrote a trailing space meant one header and a lenient server would
+    /// read another, and quietly repairing the difference is how the two ends stop
+    /// agreeing about what was sent.
+    private static boolean isFieldNameToken(String name) {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L143">            char c = name.charAt(i);</span>
+<span class="fc bfc" id="L144" title="All 4 branches covered.">            if (c &lt;= 0x20 || c &gt;= 0x7f) {</span>
+<span class="fc" id="L145">                return false;</span>
+            }
+<span class="pc bpc" id="L147" title="13 of 34 branches missed.">            if (c == '(' || c == ')' || c == '&lt;' || c == '&gt;' || c == '@' || c == ','</span>
+                    || c == ';' || c == ':' || c == '\\' || c == '&quot;' || c == '/'
+                    || c == '[' || c == ']' || c == '?' || c == '=' || c == '{'
+                    || c == '}') {
+<span class="fc" id="L151">                return false;</span>
+            }
+        }
+<span class="fc" id="L154">        return true;</span>
+    }
+
+    /// Header names the transport owns, so an attestation token put in one does not
+    /// arrive as a header at all.
+    ///
+    /// Four families, all lower-cased for comparison because header names are
+    /// case-insensitive:
+    ///
+    /// - framing (`content-length`, `transfer-encoding`) -- the transport computes these
+    ///   from the body it is about to send, and a value that disagrees is either
+    ///   discarded or produces a request the server rejects outright;
+    /// - routing (`host`) -- this selects the virtual host, so overwriting it sends the
+    ///   request somewhere else entirely;
+    /// - hop-by-hop (`connection`, `keep-alive`, `proxy-connection`, `te`, `trailer`,
+    ///   `upgrade`, `proxy-authorization`, `proxy-authenticate`) -- defined to be
+    ///   consumed by the next hop and not forwarded, so the token would be stripped in
+    ///   transit by a proxy that is behaving correctly;
+    /// - written by a port on the way out (`accept-encoding`, `x-http-method-override`)
+    ///   -- the Android implementation clears `Accept-Encoding` on a HEAD request to work
+    ///   around a platform bug, and sets `X-HTTP-Method-Override` itself when its PATCH
+    ///   fallback is in use. Both overwrite whatever was there, so a token in one of them
+    ///   is replaced between `attach()` reporting success and the request going out, and
+    ///   only on the platform and request shape that triggers it.
+    ///
+    /// Refused rather than warned about, because the failure has no symptom on the
+    /// client: `attach()` returns having set the header, and the request reaches the
+    /// backend without a usable token. The developer sees a working call and a backend
+    /// that says they are unauthenticated.
+<span class="fc" id="L183">    private static final String[] TRANSPORT_HEADERS = {</span>
+        &quot;host&quot;, &quot;content-length&quot;, &quot;transfer-encoding&quot;, &quot;connection&quot;,
+        &quot;keep-alive&quot;, &quot;proxy-connection&quot;, &quot;te&quot;, &quot;trailer&quot;, &quot;upgrade&quot;,
+        // The two proxy-credential headers are hop-by-hop like the rest, and worth
+        // naming because they do not LOOK like transport plumbing -- they look like a
+        // place credentials belong, which is exactly why someone would pick one. A
+        // forward proxy consumes them; the origin never sees the token, and the failure
+        // appears only once a user is behind such a proxy, on a network nobody testing
+        // this was on.
+        &quot;proxy-authorization&quot;, &quot;proxy-authenticate&quot;,
+        // Not transport metadata: these are written by a port. Android clears
+        // Accept-Encoding on HEAD around a platform bug and sets X-HTTP-Method-Override
+        // for its PATCH fallback, both after the request's own headers are in place. The
+        // failure is worse than a plain collision because it is conditional -- one HTTP
+        // method, one platform -- so it would pass every test that did not happen to use
+        // that shape.
+        &quot;accept-encoding&quot;, &quot;x-http-method-override&quot;,
+        // And User-Agent, which JavaSEPort rewrites to a fixed BlackBerry string for any
+        // URL containing facebook.com -- an old patch for getting a readable login page.
+        // Conditional on the HOST, so a token there works everywhere until the one
+        // request that matters.
+        &quot;user-agent&quot;,
+        // Cookie is not transport framing, but it fails the same way and worse.
+        // ConnectionRequest emits userHeaders first and THEN calls setHeader(&quot;Cookie&quot;,
+        // ...) with the generated cookie string, so with cookie handling on and any
+        // stored cookie the token is overwritten by the request itself -- after
+        // attach() has reported success. A fail-closed host would then send a protected
+        // request with no token and no indication anything went wrong.
+        &quot;cookie&quot;
+    };
+
+    /// The failure mode applied to hosts registered without an explicit one.
+    public ShieldConfig defaultFailureMode(FailureMode mode) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (mode != null) {</span>
+<span class="fc" id="L217">            this.defaultFailureMode = mode;</span>
+        }
+<span class="fc" id="L219">        return this;</span>
+    }
+
+    /// How far through a token's lifetime to trigger a background refresh, as a percentage.
+    /// Refreshing early is what stops a request ever having to wait on the network.
+    public ShieldConfig refreshThresholdPercent(int percent) {
+<span class="nc bnc" id="L225" title="All 4 branches missed.">        if (percent &gt; 0 &amp;&amp; percent &lt; 100) {</span>
+<span class="nc" id="L226">            this.refreshThresholdPercent = percent;</span>
+        }
+<span class="nc" id="L228">        return this;</span>
+    }
+
+    /// Whether to gather runtime self-protection observations. On by default; they ride along with
+    /// the token fetch, so there is no extra request and no extra battery cost.
+    public ShieldConfig collectSignals(boolean collect) {
+<span class="nc" id="L234">        this.collectSignals = collect;</span>
+<span class="nc" id="L235">        return this;</span>
+    }
+
+    /// Registers a host to protect. Accepts an exact host or a leading `*.` wildcard covering its
+    /// subdomains. Hosts not registered here are never touched.
+    public ShieldConfig protect(String hostPattern, HostPolicy policy) {
+<span class="pc bpc" id="L241" title="2 of 4 branches missed.">        if (hostPattern != null &amp;&amp; hostPattern.length() &gt; 0) {</span>
+<span class="fc" id="L242">            String key = ShieldHosts.normalize(hostPattern);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (policy == null) {</span>
+                // Recorded as implicit rather than resolved now. A builder is chained in
+                // whatever order reads well, so `.protect(h).defaultFailureMode(CLOSED)`
+                // must mean the same thing as the reverse -- snapshotting the default at
+                // registration time left the host fail-open while the finished config
+                // reported a closed default, which is the kind of disagreement nobody
+                // finds until it matters.
+<span class="fc" id="L250">                hostPolicies.remove(key);</span>
+<span class="fc" id="L251">                implicitHosts.addElement(key);</span>
+            } else {
+<span class="fc" id="L253">                implicitHosts.removeElement(key);</span>
+<span class="fc" id="L254">                hostPolicies.put(key, policy);</span>
+            }
+        }
+<span class="fc" id="L257">        return this;</span>
+    }
+
+    /// Registers a host with the default policy, which honours
+    /// [#defaultFailureMode(FailureMode)].
+    public ShieldConfig protect(String hostPattern) {
+<span class="fc" id="L263">        return protect(hostPattern, null);</span>
+    }
+
+    /// The policy used when a host is registered without an explicit one.
+    ///
+    /// Built from [#defaultFailureMode(FailureMode)] rather than returning the
+    /// [HostPolicy#PROTECTED] constant, whose mode is always
+    /// [FailureMode#OPEN] -- otherwise setting a fail-closed default would
+    /// silently do nothing for every host registered the short way, which is
+    /// most of them.
+    private HostPolicy implicitPolicy() {
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (defaultFailureMode == FailureMode.OPEN) {</span>
+<span class="fc" id="L275">            return HostPolicy.PROTECTED;</span>
+        }
+<span class="fc" id="L277">        return new HostPolicy(true, true, defaultFailureMode);</span>
+    }
+
+    public String getEndpoint() {
+<span class="nc" id="L281">        return endpoint;</span>
+    }
+
+    public String getTokenHeader() {
+<span class="fc" id="L285">        return tokenHeader;</span>
+    }
+
+    public FailureMode getDefaultFailureMode() {
+<span class="fc" id="L289">        return defaultFailureMode;</span>
+    }
+
+    public int getRefreshThresholdPercent() {
+<span class="nc" id="L293">        return refreshThresholdPercent;</span>
+    }
+
+    public boolean isCollectSignals() {
+<span class="fc" id="L297">        return collectSignals;</span>
+    }
+
+    /// Resolves a host to its policy: exact match first, then the nearest `*.` wildcard, then
+    /// [HostPolicy#UNPROTECTED]. Never returns null.
+    public HostPolicy policyFor(String host) {
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (host == null) {</span>
+<span class="fc" id="L304">            return HostPolicy.UNPROTECTED;</span>
+        }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        for (String key : ShieldHosts.lookupKeys(host)) {</span>
+<span class="fc" id="L307">            HostPolicy match = policyForKey(key);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            if (match != null) {</span>
+<span class="fc" id="L309">                return match;</span>
+            }
+        }
+<span class="fc" id="L312">        return HostPolicy.UNPROTECTED;</span>
+    }
+
+    /// The policy registered for an exact key, or null. Implicit registrations resolve against the
+    /// default as it stands now, not as it stood when they were registered.
+    ///
+    /// Reachable from [AppShield] so runtime registrations can be resolved against the
+    /// configured ones key by key, most specific first, rather than one table entirely
+    /// before the other.
+    HostPolicy policyForKey(String key) {
+<span class="fc" id="L322">        Object explicit = hostPolicies.get(key);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (explicit != null) {</span>
+<span class="fc" id="L324">            return (HostPolicy) explicit;</span>
+        }
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        return implicitHosts.contains(key) ? implicitPolicy() : null;</span>
+    }
+
+    /// True when at least one host is registered, so callers can skip work entirely.
+    public boolean hasProtectedHosts() {
+<span class="pc bpc" id="L331" title="2 of 4 branches missed.">        return !hostPolicies.isEmpty() || !implicitHosts.isEmpty();</span>
+    }
+
+    /// The registered host patterns, explicit and implicit alike.
+    public Enumeration protectedHosts() {
+<span class="nc" id="L336">        java.util.Vector all = new java.util.Vector();</span>
+<span class="nc" id="L337">        Enumeration keys = hostPolicies.keys();</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        while (keys.hasMoreElements()) {</span>
+<span class="nc" id="L339">            all.addElement(keys.nextElement());</span>
+        }
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        for (int i = 0; i &lt; implicitHosts.size(); i++) {</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            if (!all.contains(implicitHosts.elementAt(i))) {</span>
+<span class="nc" id="L343">                all.addElement(implicitHosts.elementAt(i));</span>
+            }
+        }
+<span class="nc" id="L346">        return all.elements();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

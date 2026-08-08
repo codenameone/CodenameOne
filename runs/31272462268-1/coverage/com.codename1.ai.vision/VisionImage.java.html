@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VisionImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.vision</a> &gt; <span class="el_source">VisionImage.java</span></div><h1>VisionImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.vision;
+
+import com.codename1.camera.CameraFrame;
+import com.codename1.camera.FrameFormat;
+
+/// Immutable input for encoded still images or raw camera pixels. Factory
+/// methods defensively copy their arrays. In particular,
+/// {@link #fromCameraFrame(CameraFrame)} detaches from callback-owned buffers
+/// that a camera backend may recycle when the callback returns.
+public final class VisionImage {
+    private final byte[] encodedBytes;
+    private final byte[] pixels;
+    private final int width;
+    private final int height;
+    private final int rotationDegrees;
+    private final long timestampNanos;
+    private final FrameFormat format;
+
+    private VisionImage(byte[] encodedBytes, byte[] pixels, int width, int height,
+                        int rotationDegrees, long timestampNanos, FrameFormat format) {
+<span class="fc" id="L43">        this(encodedBytes, pixels, width, height, rotationDegrees,</span>
+                timestampNanos, format, true);
+<span class="fc" id="L45">    }</span>
+
+    private VisionImage(byte[] encodedBytes, byte[] pixels, int width, int height,
+                        int rotationDegrees, long timestampNanos,
+<span class="fc" id="L49">                        FrameFormat format, boolean copyData) {</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        this.encodedBytes = copyData ? copy(encodedBytes) : encodedBytes;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        this.pixels = copyData ? copy(pixels) : pixels;</span>
+<span class="fc" id="L52">        this.width = width;</span>
+<span class="fc" id="L53">        this.height = height;</span>
+<span class="fc" id="L54">        this.rotationDegrees = normalizeRotation(rotationDegrees);</span>
+<span class="fc" id="L55">        this.timestampNanos = timestampNanos;</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        this.format = format == null ? FrameFormat.JPEG : format;</span>
+<span class="fc" id="L57">    }</span>
+
+    static VisionImage detachedCameraData(byte[] data, boolean raw,
+                                          int width, int height,
+                                          int rotationDegrees,
+                                          long timestampNanos,
+                                          FrameFormat format) {
+<span class="pc bpc" id="L64" title="3 of 6 branches missed.">        return new VisionImage(raw ? null : data, raw ? data : null,</span>
+                width, height, rotationDegrees, timestampNanos,
+                raw ? format : FrameFormat.JPEG, false);
+    }
+
+    /// Creates an encoded JPEG or PNG input whose stored pixels are already
+    /// upright. This method does not inspect EXIF orientation metadata. Use
+    /// {@link #encoded(byte[], int)} when the encoded image needs a clockwise
+    /// display rotation before analysis.
+    ///
+    /// @param bytes complete encoded image, copied by this method
+    /// @return immutable image input
+    /// @throws IllegalArgumentException if {@code bytes} is {@code null} or empty
+    public static VisionImage encoded(byte[] bytes) {
+<span class="fc" id="L78">        return encoded(bytes, 0);</span>
+    }
+
+    /// Creates an encoded JPEG or PNG input with display orientation metadata.
+    /// The rotation describes how the stored pixels must be rotated clockwise
+    /// to appear upright; for example, pass {@code 90} for a portrait JPEG
+    /// whose pixels are stored in landscape orientation. Decoders on Android
+    /// and Apple platforms receive this value directly, so detected bounds and
+    /// points use the displayed orientation. This method does not parse EXIF;
+    /// callers loading an image outside {@link #fromCameraFrame(CameraFrame)}
+    /// must supply the EXIF-derived rotation when it is relevant.
+    ///
+    /// @param bytes complete encoded image, copied by this method
+    /// @param rotationDegrees clockwise display rotation; only 0, 90, 180,
+    ///  or 270 degrees are supported
+    /// @return immutable image input
+    /// @throws IllegalArgumentException if {@code bytes} is {@code null} or
+    ///  empty, or if the rotation is not a quarter turn
+    public static VisionImage encoded(byte[] bytes, int rotationDegrees) {
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (bytes == null || bytes.length == 0) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;Image bytes must not be empty&quot;);</span>
+        }
+<span class="fc" id="L100">        return new VisionImage(bytes, null, 0, 0, rotationDegrees, 0,</span>
+                FrameFormat.JPEG);
+    }
+
+    /// Creates raw NV21 or RGBA8888 input with display orientation metadata.
+    /// @param bytes pixel buffer in {@code format}, copied by this method
+    /// @param width unrotated pixel width
+    /// @param height unrotated pixel height
+    /// @param format supported raw frame format
+    /// @param rotationDegrees clockwise display rotation; only 0, 90, 180,
+    ///  or 270 degrees are supported
+    /// @return immutable image input
+    /// @throws IllegalArgumentException if the data or dimensions are empty,
+    ///  if {@code format} is not {@link FrameFormat#NV21} or
+    ///  {@link FrameFormat#RGBA8888}, or if the rotation is not a quarter turn
+    public static VisionImage pixels(byte[] bytes, int width, int height,
+                                     FrameFormat format, int rotationDegrees) {
+<span class="pc bpc" id="L117" title="4 of 8 branches missed.">        if (bytes == null || bytes.length == 0 || width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;Pixels and positive dimensions are required&quot;);</span>
+        }
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        if (format != FrameFormat.NV21</span>
+                &amp;&amp; format != FrameFormat.RGBA8888) {
+<span class="fc" id="L122">            throw new IllegalArgumentException(</span>
+                    &quot;Raw pixels require NV21 or RGBA8888 format; &quot;
+                    + &quot;use encoded() for JPEG or PNG data&quot;);
+        }
+<span class="fc" id="L126">        return new VisionImage(null, bytes, width, height, rotationDegrees, 0, format);</span>
+    }
+
+    /// Copies the buffer selected by the camera frame's format, together with
+    /// its timestamp and orientation. JPEG frames copy only
+    /// {@link CameraFrame#getJpegBytes()}; NV21 and RGBA8888 frames copy only
+    /// {@link CameraFrame#getRawBytes()} when the port supplies that buffer.
+    /// If a port cannot supply the requested raw format, this method copies
+    /// the always-available JPEG fallback instead. This preserves the raw
+    /// pipeline without creating an empty image on JPEG-only camera ports.
+    ///
+    /// @param frame callback-owned frame
+    /// @return detached immutable input safe for asynchronous analysis
+    /// @throws IllegalArgumentException if the frame reports a rotation other
+    ///  than 0, 90, 180, or 270 degrees
+    public static VisionImage fromCameraFrame(CameraFrame frame) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (frame == null) {</span>
+<span class="nc" id="L143">            throw new NullPointerException(&quot;frame&quot;);</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        FrameFormat format = frame.getFormat() == null</span>
+<span class="fc" id="L146">                ? FrameFormat.JPEG : frame.getFormat();</span>
+<span class="fc" id="L147">        byte[] raw = frame.getRawBytes();</span>
+<span class="pc bpc" id="L148" title="1 of 6 branches missed.">        boolean useRaw = format != FrameFormat.JPEG</span>
+                &amp;&amp; raw != null &amp;&amp; raw.length &gt; 0;
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        byte[] encoded = useRaw ? null : frame.getJpegBytes();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        byte[] pixels = useRaw ? raw : null;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!useRaw) {</span>
+<span class="fc" id="L153">            format = FrameFormat.JPEG;</span>
+        }
+<span class="fc" id="L155">        return new VisionImage(encoded, pixels,</span>
+<span class="fc" id="L156">                frame.getWidth(), frame.getHeight(), frame.getRotationDegrees(),</span>
+<span class="fc" id="L157">                frame.getTimestampNanos(), format);</span>
+    }
+
+    /// @return a defensive copy of encoded bytes, or {@code null} for raw input
+    public byte[] getEncodedBytes() {
+<span class="fc" id="L162">        return copy(encodedBytes);</span>
+    }
+
+    /// Returns the immutable object's backing encoded buffer to a port
+    /// implementation. Application code must use {@link #getEncodedBytes()},
+    /// which preserves the class's defensive-copy contract.
+    ///
+    /// @return the backing encoded buffer, or {@code null} for a raw image
+    /// @hidden
+    public byte[] getEncodedBytesUnsafe() {
+<span class="fc" id="L172">        return encodedBytes;</span>
+    }
+
+    /// @return a defensive copy of raw pixels, or {@code null} for encoded input
+    public byte[] getPixels() {
+<span class="fc" id="L177">        return copy(pixels);</span>
+    }
+
+    /// Returns the immutable object's backing pixel buffer to a port
+    /// implementation. The returned array must never be modified or retained
+    /// beyond the native call that consumes it.
+    ///
+    /// @return the backing pixel buffer, or {@code null} for an encoded image
+    /// @hidden
+    public byte[] getPixelsUnsafe() {
+<span class="nc" id="L187">        return pixels;</span>
+    }
+
+    /// @return raw pixel width, or zero for encoded input
+    public int getWidth() {
+<span class="nc" id="L192">        return width;</span>
+    }
+
+    /// @return raw pixel height, or zero for encoded input
+    public int getHeight() {
+<span class="nc" id="L197">        return height;</span>
+    }
+
+    /// @return normalized clockwise rotation: 0, 90, 180, or 270
+    public int getRotationDegrees() {
+<span class="fc" id="L202">        return rotationDegrees;</span>
+    }
+
+    /// @return capture timestamp in nanoseconds, or zero for manual input
+    public long getTimestampNanos() {
+<span class="fc" id="L207">        return timestampNanos;</span>
+    }
+
+    /// @return encoded/raw frame format
+    public FrameFormat getFormat() {
+<span class="fc" id="L212">        return format;</span>
+    }
+
+    private static byte[] copy(byte[] value) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L217">            return null;</span>
+        }
+<span class="fc" id="L219">        byte[] out = new byte[value.length];</span>
+<span class="fc" id="L220">        System.arraycopy(value, 0, out, 0, value.length);</span>
+<span class="fc" id="L221">        return out;</span>
+    }
+
+    private static int normalizeRotation(int value) {
+<span class="fc" id="L225">        int out = value % 360;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (out &lt; 0) {</span>
+<span class="fc" id="L227">            out += 360;</span>
+        }
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (out % 90 != 0) {</span>
+<span class="fc" id="L230">            throw new IllegalArgumentException(</span>
+                    &quot;Rotation must be 0, 90, 180, or 270 degrees&quot;);
+        }
+<span class="fc" id="L233">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

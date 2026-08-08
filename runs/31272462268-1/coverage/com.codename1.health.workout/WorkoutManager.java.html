@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkoutManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.workout</a> &gt; <span class="el_source">WorkoutManager.java</span></div><h1>WorkoutManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.workout;
+
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
+import com.codename1.util.AsyncResource;
+import com.codename1.impl.health.EdtResult;
+
+/// Starts and tracks workout recordings.
+///
+/// Obtain one from [com.codename1.health.Health#getWorkouts()]; it is
+/// never null.
+///
+/// #### Check what the platform will actually do for you
+///
+/// Two capabilities that are easy to conflate, and that this API keeps
+/// separate on purpose:
+///
+/// - [#isLiveSessionSupported()] -- the OS runs a real session, keeping
+///   the app alive while it records.
+/// - [#isSensorCollectionSupported()] -- the OS also gathers heart rate
+///   and energy into that session by itself.
+///
+/// **Both are `false` on every platform in this release.** No port
+/// implements an OS-owned session yet, so every workout is recorded: the
+/// framework keeps the clock and the rollup, and persists what you feed
+/// it when the session ends. That is exactly the flow Google documents
+/// for Android phones, and it is why these are queryable facts rather
+/// than assumptions -- code that branches on them today keeps working
+/// unchanged when a port starts answering true.
+///
+/// Where the second is false, a workout records only what you feed it.
+/// Building a UI with a live heart-rate readout without checking would
+/// produce an app that works on a watch and shows a permanent dash on a
+/// phone.
+///
+/// ```java
+/// WorkoutManager workouts = Health.getInstance().getWorkouts();
+/// workouts.startSession(new WorkoutConfiguration()
+///         .setActivityType(WorkoutActivityType.RUNNING)
+///         .setLocationType(WorkoutLocationType.OUTDOOR))
+///     .onResult((session, err) -&gt; {
+///         if (err != null) { Log.e(err); return; }
+///         // startSession() only builds the session; this starts the
+///         // clock and moves it to RUNNING, and until it is called
+///         // addSamples() and end() fail with SESSION_STATE.
+///         session.start();
+///         if (!session.isLive()) {
+///             status.setText(&quot;Recording - connect a strap for heart rate&quot;);
+///         }
+///     });
+/// ```
+<span class="fc" id="L74">public class WorkoutManager {</span>
+
+    private WorkoutSession activeSession;
+
+    /// Guards [#activeSession] so the one-at-a-time rule is a rule
+    /// rather than a race.
+<span class="fc" id="L80">    private final Object sessionLock = new Object();</span>
+
+    /// Whether the operating system provides a real workout session that
+    /// keeps the app alive and owns the recording.
+    ///
+    /// `false` everywhere in this release: no port overrides this, so a
+    /// workout is always recorded by the framework rather than owned by
+    /// the OS. Health Connect has no such concept at all on phones, and
+    /// `androidx.health.services` is Wear OS only; HealthKit does have
+    /// `HKWorkoutSession`, but nothing here drives it yet.
+    /// [#startSession(WorkoutConfiguration)] works regardless, in
+    /// recorded mode.
+    public boolean isLiveSessionSupported() {
+<span class="fc" id="L93">        return false;</span>
+    }
+
+    /// Whether the operating system collects sensor data into the session
+    /// on its own, without the app feeding samples in.
+    ///
+    /// `false` on every platform in this release. It is the OS-owned
+    /// session that would do the collecting, and no port runs one yet --
+    /// so a workout contains what you fed it through
+    /// [WorkoutSession#addSamples(java.util.List)], and nothing else.
+    public boolean isSensorCollectionSupported() {
+<span class="fc" id="L104">        return false;</span>
+    }
+
+    /// Starts a workout.
+    ///
+    /// Only one session may run at a time; starting another while one is
+    /// active fails with [HealthError#SESSION_STATE] rather than silently
+    /// abandoning the first, because an abandoned workout is data the user
+    /// believed was being recorded.
+    public final AsyncResource&lt;WorkoutSession&gt; startSession(
+            WorkoutConfiguration configuration) {
+<span class="fc" id="L115">        AsyncResource&lt;WorkoutSession&gt; out =</span>
+                new EdtResult&lt;WorkoutSession&gt;();
+        WorkoutSession session;
+        // The check, the creation and the assignment as one step. Read
+        // and then written, two callers both found nothing running and
+        // both were handed a session they could start: the second
+        // assignment only hid the first from getActiveSession(), while
+        // both went on collecting and both persisted a workout at the
+        // end -- which is the opposite of what the one-at-a-time rule
+        // exists to promise.
+<span class="fc" id="L125">        synchronized (sessionLock) {</span>
+<span class="fc" id="L126">            WorkoutSession existing = activeSession;</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">            if (existing != null &amp;&amp; isRunning(existing)) {</span>
+<span class="fc" id="L128">                out.error(new HealthException(HealthError.SESSION_STATE,</span>
+                        &quot;a workout is already in progress; end or discard&quot;
+                                + &quot; it before starting another&quot;));
+<span class="fc" id="L131">                return out;</span>
+            }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            session = createSession(</span>
+                    configuration == null ? new WorkoutConfiguration()
+                            : configuration);
+<span class="fc" id="L136">            activeSession = session;</span>
+<span class="fc" id="L137">            session.setManager(this);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        out.complete(session);</span>
+<span class="fc" id="L140">        return out;</span>
+    }
+
+    /// The session currently running or paused, or null.
+    public final WorkoutSession getActiveSession() {
+        WorkoutSession s;
+<span class="fc" id="L146">        synchronized (sessionLock) {</span>
+<span class="fc" id="L147">            s = activeSession;</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            if (s != null &amp;&amp; !isRunning(s)) {</span>
+                // Dropped, not just hidden. Reporting null while still
+                // holding the reference kept a finished session -- its
+                // recording, its listeners and its statistics -- reachable
+                // through this manager until another was started, which for
+                // an app that runs one workout is the life of the process.
+<span class="nc" id="L154">                activeSession = null;</span>
+<span class="nc" id="L155">                s = null;</span>
+            }
+<span class="fc" id="L157">        }</span>
+<span class="fc" id="L158">        return s;</span>
+    }
+
+    /// Drops `session` if it is the one being held.
+    ///
+    /// Called by the session itself when it reaches a terminal state. The
+    /// identity test matters: a session that ended after another had already
+    /// been started must not clear the newer one.
+    final void releaseIfCurrent(WorkoutSession session) {
+<span class="fc" id="L167">        synchronized (sessionLock) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (activeSession == session) { //NOPMD CompareObjectsWithEquals</span>
+                // Identity, not equality: the question is whether this is the
+                // instance being held, not whether an equal one is.
+<span class="fc" id="L171">                activeSession = null;</span>
+            }
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">    }</span>
+
+    private static boolean isRunning(WorkoutSession s) {
+<span class="fc" id="L177">        WorkoutSessionState state = s.getState();</span>
+<span class="pc bpc" id="L178" title="7 of 8 branches missed.">        return state == WorkoutSessionState.NOT_STARTED</span>
+                || state == WorkoutSessionState.PREPARING
+                || state == WorkoutSessionState.RUNNING
+                || state == WorkoutSessionState.PAUSED;
+    }
+
+    /// Creates the session object. Ports override to return a session
+    /// backed by a real platform workout; the default records in shared
+    /// code and writes on end.
+    protected WorkoutSession createSession(WorkoutConfiguration config) {
+<span class="fc" id="L188">        return new RecordedWorkoutSession(config);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,3163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StyleParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">StyleParser.java</span></div><h1>StyleParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.Resources;
+import com.codename1.util.CaseInsensitiveOrder;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Parses Style strings into StyleInfo objects, which can be converted to Style objects at runtime.
+///
+/// This class
+/// is the basis for the inline style functionality:
+///
+/// - `Component#setInlineAllStyles(java.lang.String)`
+///
+/// - `Component#getInlineAllStyles()`
+///
+/// - `Component#setInlineSelectedStyles(java.lang.String)`
+///
+/// - `Component#getInlineSelectedStyles()`
+///
+/// - etc..
+///
+/// Style strings are strings which describe a style, and are in a particular format that `StyleParser` knows how to
+/// parse.  The general format of a style string is key1:value1; key2:value2; ... keyn:valuen;.  I.e. a set of key-value pairs
+/// with pairs separated by semi-colons, and keys and values separated by a colon.  This is very similar to CSS, but it is **NOT** CSS.
+/// Style string keys and values are closely related to the properties of the `Style` class and their associated values.
+///
+/// Supported Keys
+///
+/// The following keys are supported:
+///
+///
+/// - fgColor - The foreground color as a hex string.  E.g. ff0000.
+///
+/// - bgColor - The background color as a hex string. E.g. ff0000.
+///
+/// - transparency - The background transparency as an integer. 0-255.
+///
+/// - textDecoration - The text decoration.  One of underline, overline,
+/// 3d, 3d_lowered, 3d_shadow_north, strikethru, or none.
+///
+/// - opacity - The opacity as an integer.  0-255
+///
+/// - padding - The padding as a sequence of 1, 2, 3, or 4 values.  See &quot;Padding and Margin Strings&quot; below for details on the format.
+///
+/// - margin - The margin as a sequence of 1, 2, 3, or 4, values. See &quot;Padding and Margin Strings&quot; below for details on the format.
+///
+/// - font - The font.  See &quot;Font Strings&quot; below for details on the format.
+///
+/// - border - The border.  See &quot;Border Strings&quot; below for details on the format.
+///
+/// - bgType - The background type. See &quot;Background Type Values&quot; below for details on the available options.
+///
+/// Padding and Margin Strings
+///
+/// The padding and margin keys can take values the same format as is used for CSS margin and padding directives. That is the value
+///   can be expressed as a space-separated sequence of scalar values (i.e. float values with a unit suffix).  Some examples:
+///
+/// - padding:0px - Sets all padding to zero pixels.
+///
+/// - padding:2mm 1px - Sets vertical padding to 2 millimetres, and horizontal padding to 1 pixel.
+///
+/// - padding:2mm 1px inherit - Sets top padding to 1 millimetres,  horizontal padding to 1 pixel, and bottom padding to inherit the parent style's bottom padding.
+///
+/// - padding:1mm 2px inherit 4mm - Top padding=1 millimetre.  Right padding=2 pixels.  Bottom padding inherits parent style's bottom padding. Left padding=4 millimetres.
+///
+/// All of the examples above use padding, but the same format is used for margin.  They demonstrate the use of 1, 2, 3, and 4 value sequences, and their meaning. In general terms
+/// these formats can be described as:
+///
+/// -  - Sets padding on all sites to
+///
+/// -   - Top and bottom padding set to .  Left and right padding set to
+///
+/// -    - Top=.  Left and right = .  Bottom = bottom.
+///
+/// -     - Top=. Right=right. Bottom=bottom. Left=left.  In other words, values applied clock-wise, starting on top side.
+///
+/// Font Strings
+///
+/// Fonts strings can take any of the following formats:
+///
+/// -    - E.g. 3mm Arial.ttf /Arial.ttf or 12px native:MainRegular native:MainRegular
+///
+/// -   - E.g. 3mm Arial.ttf or 3mm native:ItalicBlack.
+///
+/// -  - E.g. 3mm or 12px.  When only specifying the size, the font family will be dictated by the parent style.
+///
+/// -   - E.g. Arial.ttf /Arial.ttf or native:MainBold native:MainBold.  When omitting font size (as this format does), the size
+/// is dictated by the parent style.
+///
+/// - | - E.g. Arial.ttf or /Arial.ttf, or native:MainRegular  Strings starting with a / are assumed to be files.  The corresponding font name
+/// is then derived by removing the slash and the trailing .ttf.  When omitting font size (as this format does), the size is dictated by the parent style.
+///
+/// Border Strings
+///
+/// The border property accepts several different formats for its value.  This is due to the many different kinds of
+/// borders that can be created.  The following are some of the formats.
+///
+/// **Line Border**
+///
+///  solid  - E.g. 1mm solid ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Dashed Border**
+///
+///  dashed  - E.g. 1mm dashed ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Dotted Border**
+///
+///  dotted  - E.g. 1mm dotted ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Underline Border**
+///
+///  underline  - E.g. 1mm underline ff0000.   should be expressed as a scalar value with unit.  E.g. 1mm, or 2px.
+///  should be an RGB hex string.  E.g ff0000 for red.
+///
+/// **Image Border**
+///
+/// image   ...  - A 9-piece image border.  The  ..  values are strings which refer to images either on the classpath, or in the theme resource file.
+/// If the image string starts with /, then it is assumed to be on the classpath.  The order of the images corresponds to the parameters of `com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image, com.codename1.ui.Image)`.
+///
+/// image    - A 9-piece image border, but with the images corresponding to the parameters of `com.codename1.ui.Image, com.codename1.ui.Image)`.
+///
+/// horizontalImage    - A 3-piece horizontal image border.  Image parameters correspond with `com.codename1.ui.Image, com.codename1.ui.Image)` parameters.
+///
+/// verticalImage    - A 3-piece horizontal image border.  Image parameters correspond with `com.codename1.ui.Image, com.codename1.ui.Image)` parameters.
+///
+/// splicedImage      - A 9-piece image border that is generated from a single image, but with inset values specifying where the image should be sliced to create the 9 sub-images.
+///
+/// **Parameters:**
+///
+/// -  The image to use.  If this begins with /, then the image will be found on the classpath.  Otherwise it will be found in the theme resource file.
+///
+/// - , , ,  - The insets along which  is sliced to generate the 9-subimages.  These values are
+/// expressed as a floating point number between 0.0 and 1.0, where 1.0 is the full width or height of the image depending on the orientation (horizontal or vertical) or the inset.  If image
+/// is 100 pixels by 100 pixels, then a top inset of 0.4 would cause a slice to occur at 40 pixels from the top of the image (i.e. the top-left, top, and top-right slices would each be 40 pixels high.
+///
+/// @author shannah
+<span class="nc" id="L174">public abstract class StyleParser {</span>
+
+    public static final byte UNIT_INHERIT = 99;
+<span class="fc" id="L177">    private static final Map&lt;String, Integer&gt; BG_TYPES = createBgTypes();</span>
+
+    /// Parses a style string into a Map
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`
+    ///
+    /// - `str`
+    static StyleInfo parseString(StyleInfo out, String str) {
+<span class="fc" id="L187">        Map&lt;String, String&gt; map = parseString(new HashMap&lt;String, String&gt;(), str);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; e : map.entrySet()) {</span>
+<span class="fc" id="L189">            out.values.put(e.getKey(), e.getValue());</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        return out;</span>
+    }
+
+    static StyleInfo parseString(String str) {
+<span class="fc" id="L195">        return parseString(new StyleInfo(), str);</span>
+    }
+
+    static Map&lt;String, String&gt; parseString(Map&lt;String, String&gt; out, String str) {
+<span class="fc" id="L199">        String[] rules = Util.split(str, &quot;;&quot;);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (String rule : rules) {</span>
+<span class="fc" id="L201">            rule = rule.trim();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            if (rule.length() == 0) {</span>
+<span class="fc" id="L203">                continue;</span>
+            }
+<span class="fc" id="L205">            int pos = rule.indexOf(&quot;:&quot;);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (pos == -1) {</span>
+<span class="nc" id="L207">                continue;</span>
+            }
+<span class="fc" id="L209">            String key = rule.substring(0, pos);</span>
+<span class="fc bfc" id="L210" title="All 4 branches covered.">            if (&quot;font&quot;.equals(key) &amp;&amp; out.containsKey(&quot;font&quot;)) {</span>
+                // We may need to merge font rules
+<span class="fc" id="L212">                FontInfo newFinfo = StyleParser.parseFont(new FontInfo(), rule.substring(pos + 1));</span>
+<span class="fc" id="L213">                FontInfo origFinfo = StyleParser.parseFont(new FontInfo(), out.get(&quot;font&quot;));</span>
+<span class="fc" id="L214">                Float newSize = newFinfo.getSize();</span>
+<span class="pc bpc" id="L215" title="3 of 4 branches missed.">                if (newSize != null &amp;&amp; newFinfo.getSizeUnit() != StyleParser.UNIT_INHERIT) {</span>
+<span class="nc" id="L216">                    origFinfo.setSize(newSize);</span>
+<span class="nc" id="L217">                    origFinfo.setSizeUnit(newFinfo.getSizeUnit());</span>
+                }
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                if (newFinfo.getName() != null) {</span>
+<span class="fc" id="L220">                    origFinfo.setName(newFinfo.getName());</span>
+                }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                if (newFinfo.getFile() != null) {</span>
+<span class="fc" id="L223">                    origFinfo.setFile(newFinfo.getFile());</span>
+                }
+<span class="fc" id="L225">                out.put(key, origFinfo.toString());</span>
+<span class="fc" id="L226">            } else {</span>
+<span class="fc" id="L227">                out.put(key, rule.substring(pos + 1));</span>
+            }
+
+        }
+<span class="fc" id="L231">        return out;</span>
+    }
+
+    static MarginInfo parseMargin(MarginInfo out, String margin) {
+<span class="nc" id="L235">        out.setValues(parseTRBLValue(margin));</span>
+<span class="nc" id="L236">        return out;</span>
+    }
+
+    static MarginInfo parseMargin(String margin) {
+<span class="fc" id="L240">        ScalarValue[] v = parseTRBLValue(margin);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L242">            return null;</span>
+        }
+<span class="fc" id="L244">        return new MarginInfo(v);</span>
+    }
+
+    static String parseMargin(Style baseStyle, String margin) {
+<span class="fc" id="L248">        ScalarValue[] vals = parseTRBLValue(margin);</span>
+<span class="fc" id="L249">        StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (vals[Component.TOP].getUnit() == UNIT_INHERIT) {</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.margin[Component.TOP]);</span>
+        } else {
+<span class="nc" id="L253">            sb.append(vals[Component.TOP].getValue());</span>
+        }
+<span class="fc" id="L255">        sb.append(&quot;,&quot;);</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (vals[Component.BOTTOM].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.margin[Component.BOTTOM]);</span>
+        } else {
+<span class="fc" id="L259">            sb.append(vals[Component.BOTTOM].getValue());</span>
+        }
+<span class="fc" id="L261">        sb.append(&quot;,&quot;);</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (vals[Component.LEFT].getUnit() == UNIT_INHERIT) {</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.margin[Component.LEFT]);</span>
+        } else {
+<span class="nc" id="L265">            sb.append(vals[Component.LEFT].getValue());</span>
+        }
+<span class="fc" id="L267">        sb.append(&quot;,&quot;);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (vals[Component.RIGHT].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.margin[Component.RIGHT]);</span>
+        } else {
+<span class="fc" id="L271">            sb.append(vals[Component.RIGHT].getValue());</span>
+        }
+<span class="fc" id="L273">        return sb.toString();</span>
+    }
+
+    static PaddingInfo parsePadding(PaddingInfo out, String padding) {
+<span class="nc" id="L277">        out.setValues(parseTRBLValue(padding));</span>
+<span class="nc" id="L278">        return out;</span>
+    }
+
+    static PaddingInfo parsePadding(String padding) {
+<span class="fc" id="L282">        ScalarValue[] v = parseTRBLValue(padding);</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L284">            return null;</span>
+        }
+<span class="fc" id="L286">        return new PaddingInfo(v);</span>
+    }
+
+    static String parsePadding(Style baseStyle, String padding) {
+<span class="nc" id="L290">        ScalarValue[] vals = parseTRBLValue(padding);</span>
+<span class="nc" id="L291">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if (vals[Component.TOP].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.padding[Component.TOP]);</span>
+        } else {
+<span class="nc" id="L295">            sb.append(vals[Component.TOP].getValue());</span>
+        }
+<span class="nc" id="L297">        sb.append(&quot;,&quot;);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (vals[Component.BOTTOM].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.padding[Component.BOTTOM]);</span>
+        } else {
+<span class="nc" id="L301">            sb.append(vals[Component.BOTTOM].getValue());</span>
+        }
+<span class="nc" id="L303">        sb.append(&quot;,&quot;);</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (vals[Component.LEFT].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.padding[Component.LEFT]);</span>
+        } else {
+<span class="nc" id="L307">            sb.append(vals[Component.LEFT].getValue());</span>
+        }
+<span class="nc" id="L309">        sb.append(&quot;,&quot;);</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (vals[Component.RIGHT].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            sb.append(baseStyle == null ? 0 : baseStyle.padding[Component.RIGHT]);</span>
+        } else {
+<span class="nc" id="L313">            sb.append(vals[Component.RIGHT].getValue());</span>
+        }
+<span class="nc" id="L315">        return sb.toString();</span>
+    }
+
+    static byte[] parsePaddingUnit(Style baseStyle, String padding) {
+<span class="nc" id="L319">        ScalarValue[] vals = parseTRBLValue(padding);</span>
+<span class="nc" id="L320">        byte[] out = new byte[4];</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (vals[i].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                out[i] = baseStyle == null ? Style.UNIT_TYPE_PIXELS : baseStyle.paddingUnit[i];</span>
+            } else {
+<span class="nc" id="L325">                out[i] = vals[i].getUnit();</span>
+            }
+        }
+<span class="nc" id="L328">        return out;</span>
+    }
+
+    static byte[] parseMarginUnit(Style baseStyle, String margin) {
+<span class="nc" id="L332">        ScalarValue[] vals = parseTRBLValue(margin);</span>
+<span class="nc" id="L333">        byte[] out = new byte[4];</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            if (vals[i].getUnit() == UNIT_INHERIT) {</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">                out[i] = baseStyle == null ? Style.UNIT_TYPE_PIXELS : baseStyle.marginUnit[i];</span>
+            } else {
+<span class="nc" id="L338">                out[i] = vals[i].getUnit();</span>
+            }
+        }
+<span class="nc" id="L341">        return out;</span>
+    }
+
+    static Integer parseAlignment(String alignment) {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (Character.isDigit(alignment.charAt(0))) {</span>
+<span class="nc" id="L346">            return Integer.parseInt(alignment);</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        } else if (&quot;center&quot;.equalsIgnoreCase(alignment)) {</span>
+<span class="nc" id="L348">            return Component.CENTER;</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        } else if (&quot;left&quot;.equalsIgnoreCase(alignment)) {</span>
+<span class="nc" id="L350">            return Component.LEFT;</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        } else if (&quot;right&quot;.equalsIgnoreCase(alignment)) {</span>
+<span class="nc" id="L352">            return Component.RIGHT;</span>
+        }
+<span class="nc" id="L354">        return null;</span>
+    }
+
+    private static String getAlignmentString(Integer alignment) {
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (alignment == null) {</span>
+<span class="nc" id="L359">            return null;</span>
+        }
+<span class="nc bnc" id="L361" title="All 4 branches missed.">        switch (alignment) {</span>
+            case Component.CENTER:
+<span class="nc" id="L363">                return &quot;center&quot;;</span>
+            case Component.LEFT:
+<span class="nc" id="L365">                return &quot;left&quot;;</span>
+            case Component.RIGHT:
+<span class="nc" id="L367">                return &quot;right&quot;;</span>
+            default:
+<span class="nc" id="L369">                return null;</span>
+        }
+    }
+
+    private static float getMMValue(String val) {
+<span class="nc" id="L374">        ScalarValue v = parseSingleTRBLValue(val);</span>
+<span class="nc bnc" id="L375" title="All 4 branches missed.">        switch (v.getUnit()) {</span>
+            case Style.UNIT_TYPE_PIXELS:
+<span class="nc" id="L377">                return (float) v.getValue() / Display.getInstance().convertToPixels(1f);</span>
+            case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L379">                return (float) v.getValue();</span>
+            case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+<span class="nc" id="L381">                return (float) Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0)</span>
+<span class="nc" id="L382">                        / Display.getInstance().convertToPixels(1f);</span>
+            default:
+<span class="nc" id="L384">                return 0;</span>
+        }
+    }
+
+    private static String parseStroke(BorderInfo out, String rem) {
+        // parse the stroke
+<span class="nc" id="L390">        int p1 = rem.indexOf(&quot;(&quot;);</span>
+<span class="nc" id="L391">        int p2 = rem.indexOf(&quot;)&quot;);</span>
+<span class="nc bnc" id="L392" title="All 4 branches missed.">        if (p1 != -1 &amp;&amp; p2 != -1) {</span>
+<span class="nc" id="L393">            String strokeStr = rem.substring(p1 + 1, p2).trim();</span>
+<span class="nc" id="L394">            String[] strokeArgs = Util.split(strokeStr, &quot; &quot;);</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            for (String strokeArg : strokeArgs) {</span>
+<span class="nc" id="L396">                strokeArg = strokeArg.trim();</span>
+<span class="nc bnc" id="L397" title="All 4 branches missed.">                if (strokeArg.endsWith(&quot;mm&quot;) || strokeArg.endsWith(&quot;px&quot;)) {</span>
+<span class="nc" id="L398">                    ScalarValue sv = parseScalarValue(strokeArg);</span>
+<span class="nc" id="L399">                    out.width = (float) sv.value;</span>
+<span class="nc" id="L400">                    out.widthUnit = sv.unit;</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                } else if (strokeArg.length() &gt; 0) {</span>
+                    //int strokeColor = Integer.parseInt(strokeArg, 16);
+<span class="nc bnc" id="L403" title="All 2 branches missed.">                    if (strokeArg.length() == 8) {</span>
+                        // there is an alpha bit
+<span class="nc" id="L405">                        out.setStrokeOpacity(Integer.parseInt(strokeArg.substring(0, 2), 16) &amp; 0xff);</span>
+<span class="nc" id="L406">                        out.setStrokeColor(Integer.parseInt(strokeArg.substring(2), 16) &amp; 0xffffff);</span>
+                    } else {
+<span class="nc" id="L408">                        out.setStrokeOpacity(0xff);</span>
+<span class="nc" id="L409">                        out.setStrokeColor(Integer.parseInt(strokeArg, 16) &amp; 0xffffff);</span>
+                    }
+                }
+            }
+<span class="nc" id="L413">            rem = rem.substring(p2 + 1);</span>
+<span class="nc" id="L414">        } else {</span>
+
+<span class="nc" id="L416">            rem = rem.substring(6); // at least get past stroke</span>
+        }
+<span class="nc" id="L418">        return rem;</span>
+    }
+
+    private static String parseShadow(BorderInfo out, String rem) {
+<span class="nc" id="L422">        int p1 = rem.indexOf(&quot;(&quot;);</span>
+<span class="nc" id="L423">        int p2 = rem.indexOf(&quot;)&quot;);</span>
+<span class="nc bnc" id="L424" title="All 4 branches missed.">        if (p1 != -1 &amp;&amp; p2 != -1) {</span>
+<span class="nc" id="L425">            String shadowStr = rem.substring(p1 + 1, p2);</span>
+<span class="nc" id="L426">            String[] shadowArgs = Util.split(shadowStr, &quot; &quot;);</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">            for (String shadowArg : shadowArgs) {</span>
+<span class="nc" id="L428">                shadowArg = shadowArg.trim();</span>
+<span class="nc bnc" id="L429" title="All 6 branches missed.">                if (shadowArg.startsWith(&quot;shadowSpread:&quot;) || shadowArg.endsWith(&quot;mm&quot;) || shadowArg.endsWith(&quot;px&quot;)) {</span>
+<span class="nc" id="L430">                    int colonPos = shadowArg.indexOf(&quot;:&quot;);</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                    if (colonPos != -1) {</span>
+<span class="nc" id="L432">                        shadowArg = shadowArg.substring(colonPos + 1);</span>
+                    }
+<span class="nc" id="L434">                    out.setShadowSpread(parseScalarValue(shadowArg));</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">                } else if (shadowArg.startsWith(&quot;x:&quot;)) {</span>
+<span class="nc" id="L436">                    out.setShadowX(Float.parseFloat(shadowArg.substring(shadowArg.indexOf(&quot;:&quot;) + 1).trim()));</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">                } else if (shadowArg.startsWith(&quot;y:&quot;)) {</span>
+<span class="nc" id="L438">                    out.setShadowY(Float.parseFloat(shadowArg.substring(shadowArg.indexOf(&quot;:&quot;) + 1).trim()));</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                } else if (shadowArg.startsWith(&quot;blur:&quot;)) {</span>
+<span class="nc" id="L440">                    out.setShadowBlur(Float.parseFloat(shadowArg.substring(shadowArg.indexOf(&quot;:&quot;) + 1).trim()));</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                } else if (shadowArg.startsWith(&quot;opacity:&quot;)) {</span>
+<span class="nc" id="L442">                    out.setShadowOpacity(Integer.parseInt(shadowArg.substring(shadowArg.indexOf(&quot;:&quot;) + 1).trim()));</span>
+                }
+            }
+
+<span class="nc bnc" id="L446" title="All 2 branches missed.">            if (out.getShadowSpread() == null) {</span>
+<span class="nc" id="L447">                out.setShadowSpread(parseScalarValue(&quot;0.5mm&quot;));</span>
+            }
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            if (out.getShadowX() == null) {</span>
+<span class="nc" id="L450">                out.setShadowX((float) 0.5);</span>
+            }
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (out.getShadowY() == null) {</span>
+<span class="nc" id="L453">                out.setShadowY((float) 0.5);</span>
+            }
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            if (out.getShadowBlur() == null) {</span>
+<span class="nc" id="L456">                out.setShadowBlur((float) 0.1);</span>
+            }
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            if (out.getShadowOpacity() == null) {</span>
+<span class="nc" id="L459">                out.setShadowOpacity(128);</span>
+            }
+<span class="nc" id="L461">            rem = rem.substring(p2 + 1);</span>
+<span class="nc" id="L462">        } else {</span>
+<span class="nc" id="L463">            rem = rem.substring(6); // at least get past the shadow param</span>
+        }
+<span class="nc" id="L465">        return rem;</span>
+    }
+
+    private static BorderInfo parseRoundBorder(BorderInfo out, String args, String[] parts1) {
+<span class="nc" id="L469">        int plen = parts1.length;</span>
+<span class="nc" id="L470">        out.setType(&quot;round&quot;);</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        if (plen &gt; 1) {</span>
+            int nextSpacePos;
+<span class="nc" id="L473">            String rem = args;</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">            while ((nextSpacePos = rem.indexOf(&quot; &quot;)) != -1) {</span>
+<span class="nc" id="L475">                rem = rem.substring(nextSpacePos + 1).trim();</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">                if (rem.startsWith(&quot;rect&quot;)) {</span>
+<span class="nc" id="L477">                    out.setRectangle(true);</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">                } else if (rem.startsWith(&quot;stroke&quot;)) {</span>
+<span class="nc" id="L479">                    rem = parseStroke(out, rem);</span>
+
+<span class="nc bnc" id="L481" title="All 2 branches missed.">                } else if (rem.startsWith(&quot;shadow&quot;)) {</span>
+<span class="nc" id="L482">                    rem = parseShadow(out, rem);</span>
+<span class="nc bnc" id="L483" title="All 4 branches missed.">                } else if (rem.length() == 8 || rem.indexOf(&quot; &quot;) == 8) {</span>
+<span class="nc" id="L484">                    String colorStr = rem.substring(0, 8);</span>
+<span class="nc" id="L485">                    out.color = Integer.parseInt(colorStr.substring(2), 16) &amp; 0xffffff;</span>
+<span class="nc" id="L486">                    out.setOpacity(Integer.parseInt(colorStr.substring(0, 2), 16) &amp; 0xff);</span>
+<span class="nc" id="L487">                    rem = rem.substring(8);</span>
+<span class="nc" id="L488">                } else {</span>
+<span class="nc" id="L489">                    int spacePos = rem.indexOf(&quot; &quot;);</span>
+
+<span class="nc" id="L491">                    String colorStr = rem;</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">                    if (spacePos != -1) {</span>
+<span class="nc" id="L493">                        colorStr = colorStr.substring(0, spacePos);</span>
+                    }
+<span class="nc bnc" id="L495" title="All 4 branches missed.">                    if (colorStr.length() &gt; 0 &amp;&amp; colorStr.length() &lt;= 6) {</span>
+<span class="nc" id="L496">                        out.color = Integer.parseInt(colorStr, 16) &amp; 0xffffff;</span>
+<span class="nc" id="L497">                        out.setOpacity(255);</span>
+                    }
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                    if (rem.length() &gt;= colorStr.length()) {</span>
+<span class="nc" id="L500">                        rem = rem.substring(colorStr.length());</span>
+                    }
+
+
+<span class="nc" id="L504">                }</span>
+            }
+        }
+
+<span class="nc" id="L508">        return out;</span>
+    }
+
+    private static BorderInfo parseRoundRectBorder(BorderInfo out, String args, String[] parts1) {
+<span class="nc" id="L512">        int plen = parts1.length;</span>
+<span class="nc" id="L513">        out.setType(&quot;roundRect&quot;);</span>
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        if (plen &gt; 1) {</span>
+            int nextSpacePos;
+<span class="nc" id="L516">            String rem = args;</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">            while ((nextSpacePos = rem.indexOf(&quot; &quot;)) != -1) {</span>
+<span class="nc" id="L518">                rem = rem.substring(nextSpacePos + 1).trim();</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                if (rem.startsWith(&quot;stroke&quot;)) {</span>
+<span class="nc" id="L520">                    rem = parseStroke(out, rem);</span>
+
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                } else if (rem.startsWith(&quot;shadow&quot;)) {</span>
+<span class="nc" id="L523">                    rem = parseShadow(out, rem);</span>
+<span class="nc bnc" id="L524" title="All 4 branches missed.">                } else if (rem.startsWith(&quot;-&quot;) || rem.startsWith(&quot;+&quot;)) {</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">                    boolean value = rem.charAt(0) == '+';</span>
+<span class="nc" id="L526">                    String flagName = rem.substring(1);</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                    if (flagName.startsWith(&quot;top-only&quot;)) {</span>
+<span class="nc" id="L528">                        out.setTopOnlyMode(value);</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">                    } else if (flagName.startsWith(&quot;bottom-only&quot;)) {</span>
+<span class="nc" id="L530">                        out.setBottomOnlyMode(value);</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                    } else if (flagName.startsWith(&quot;top-left&quot;)) {</span>
+<span class="nc" id="L532">                        out.setTopLeftMode(value);</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">                    } else if (flagName.startsWith(&quot;top-right&quot;)) {</span>
+<span class="nc" id="L534">                        out.setTopRightMode(value);</span>
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                    } else if (flagName.startsWith(&quot;bottom-left&quot;)) {</span>
+<span class="nc" id="L536">                        out.setBottomLeftMode(value);</span>
+<span class="nc bnc" id="L537" title="All 2 branches missed.">                    } else if (flagName.startsWith(&quot;bottom-right&quot;)) {</span>
+<span class="nc" id="L538">                        out.setBottomRightMode(value);</span>
+                    }
+<span class="nc bnc" id="L540" title="All 4 branches missed.">                } else if (rem.length() &gt; 0 &amp;&amp; Character.isDigit(rem.charAt(0))) {</span>
+<span class="nc" id="L541">                    out.setCornerRadius(getMMValue(rem));</span>
+                }
+            }
+        }
+
+<span class="nc" id="L546">        return out;</span>
+    }
+
+    static BorderInfo parseBorder(BorderInfo out, String args) {
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">        if (args == null) {</span>
+<span class="nc" id="L551">            out.setType(&quot;empty&quot;);</span>
+<span class="nc" id="L552">            return out;</span>
+        }
+<span class="fc" id="L554">        args = args.trim();</span>
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">        if (&quot;none&quot;.equals(args)) {</span>
+<span class="nc" id="L556">            out.setType(&quot;empty&quot;);</span>
+<span class="nc" id="L557">            return out;</span>
+        }
+<span class="fc" id="L559">        String[] parts1 = Util.split(args, &quot; &quot;);</span>
+<span class="fc" id="L560">        int plen = parts1.length;</span>
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (plen == 0) {</span>
+<span class="nc" id="L562">            out.setType(&quot;empty&quot;);</span>
+<span class="nc" id="L563">            return out;</span>
+        }
+
+<span class="pc bpc" id="L566" title="7 of 8 branches missed.">        if (plen &gt; 3 &amp;&amp; (&quot;image&quot;.equals(parts1[0]) || &quot;horizontalImage&quot;.equals(parts1[0]) || &quot;verticalImage&quot;.equals(parts1[0]))) {</span>
+<span class="nc" id="L567">            out.setType(parts1[0]);</span>
+
+<span class="nc" id="L569">            out.setImages(new String[plen - 1]);</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">            for (int i = 1; i &lt; plen; i++) {</span>
+<span class="nc" id="L571">                out.getImages()[i - 1] = parts1[i];</span>
+            }
+<span class="nc" id="L573">            return out;</span>
+        }
+
+<span class="pc bpc" id="L576" title="3 of 4 branches missed.">        if (&quot;splicedImage&quot;.equals(parts1[0]) &amp;&amp; plen == 6) {</span>
+<span class="nc" id="L577">            out.setType(parts1[0]);</span>
+<span class="nc" id="L578">            out.setSpliceImage(parts1[1]);</span>
+<span class="nc" id="L579">            out.setSpliceInsets(parts1[2] + &quot; &quot; + parts1[3] + &quot; &quot; + parts1[4] + &quot; &quot; + parts1[5]);</span>
+<span class="nc" id="L580">            return out;</span>
+        }
+
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">        if (&quot;round&quot;.equals(parts1[0])) {</span>
+<span class="nc" id="L584">            return parseRoundBorder(out, args, parts1);</span>
+        }
+
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (&quot;roundRect&quot;.equals(parts1[0])) {</span>
+<span class="nc" id="L588">            return parseRoundRectBorder(out, args, parts1);</span>
+        }
+
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">        if (plen == 3) {</span>
+<span class="fc" id="L592">            String type = parts1[1];</span>
+<span class="fc" id="L593">            out.setColor(Integer.parseInt(parts1[2], 16));</span>
+<span class="fc" id="L594">            ScalarValue thicknessVal = parseSingleTRBLValue(parts1[0]);</span>
+<span class="fc" id="L595">            out.setWidth((float) thicknessVal.getValue());</span>
+<span class="fc" id="L596">            out.setWidthUnit(thicknessVal.getUnit());</span>
+<span class="pc bpc" id="L597" title="3 of 4 branches missed.">            if ((&quot;solid&quot;.equals(type) || &quot;line&quot;.equals(type))) {</span>
+<span class="fc" id="L598">                out.setType(&quot;line&quot;);</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">            } else if (&quot;dashed&quot;.equals(type)) {</span>
+<span class="nc" id="L600">                out.setType(&quot;dashed&quot;);</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">            } else if (&quot;dotted&quot;.equals(type)) {</span>
+<span class="nc" id="L602">                out.setType(&quot;dotted&quot;);</span>
+<span class="nc bnc" id="L603" title="All 2 branches missed.">            } else if (&quot;underline&quot;.equals(type)) {</span>
+<span class="nc" id="L604">                out.setType(&quot;underline&quot;);</span>
+            }
+<span class="fc" id="L606">            return out;</span>
+        }
+
+<span class="nc" id="L609">        out.setType(&quot;empty&quot;);</span>
+<span class="nc" id="L610">        return out;</span>
+
+    }
+
+    static Border parseBorder(Resources theme, String args) {
+<span class="nc" id="L615">        BorderInfo info = parseBorder(new BorderInfo(), args);</span>
+<span class="nc" id="L616">        return info.createBorder(theme);</span>
+
+    }
+
+    private static Image getImage(Resources theme, String imageStr) {
+<span class="fc" id="L621">        Image im = null;</span>
+
+        try {
+
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (imageStr.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L626">                im = Image.createImage(imageStr);</span>
+            } else {
+<span class="nc" id="L628">                im = theme.getImage(imageStr);</span>
+            }
+
+
+<span class="fc" id="L632">        } catch (IOException ex) {</span>
+<span class="fc" id="L633">            Log.p(&quot;failed to parse image&quot;);</span>
+<span class="nc" id="L634">        }</span>
+<span class="fc" id="L635">        return im;</span>
+    }
+
+    private static FontInfo parseFontSize(FontInfo out, String arg) {
+<span class="fc" id="L639">        arg = arg.trim();</span>
+<span class="fc" id="L640">        ScalarValue sizeVal = parseSingleTRBLValue(arg);</span>
+<span class="fc" id="L641">        out.setSize((float) sizeVal.getValue());</span>
+<span class="fc" id="L642">        out.setSizeUnit(sizeVal.getUnit());</span>
+<span class="fc" id="L643">        return out;</span>
+    }
+
+    private static FontInfo parseFontName(FontInfo out, String arg) {
+<span class="fc" id="L647">        arg = arg.trim();</span>
+<span class="pc bpc" id="L648" title="2 of 4 branches missed.">        if (arg.length() &gt; 0 &amp;&amp; arg.charAt(0) == '/') {</span>
+<span class="nc" id="L649">            arg = arg.substring(1);</span>
+        }
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        if (arg.indexOf('/') != -1) {</span>
+<span class="nc" id="L652">            arg = arg.substring(0, arg.indexOf('/')).trim();</span>
+        } else {
+<span class="fc" id="L654">            int len = arg.length();</span>
+<span class="fc bfc" id="L655" title="All 4 branches covered.">            if (len &gt; 3 &amp;&amp; arg.charAt(len - 4) == '.') {</span>
+<span class="fc" id="L656">                arg = arg.substring(0, len - 4);</span>
+            }
+        }
+<span class="fc" id="L659">        out.setName(arg);</span>
+
+<span class="fc" id="L661">        return out;</span>
+    }
+
+    /// True when the argument already names a font file rather than a bare
+    /// family, for either of the container extensions the runtime loads.
+    ///
+    /// Uses endsWith rather than comparing indexOf against length - 4: for a
+    /// name shorter than the suffix both sides are -1, so a three character
+    /// family like &quot;Foo&quot; would look as though it already carried an extension
+    /// and would be left without one.
+    private static boolean hasFontFileSuffix(String arg) {
+<span class="fc bfc" id="L672" title="All 4 branches covered.">        return endsWithIgnoreCase(arg, &quot;.ttf&quot;) || endsWithIgnoreCase(arg, &quot;.otf&quot;);</span>
+    }
+
+    /// Case-insensitive suffix test that doesn't route through toLowerCase, so
+    /// the result can't depend on the default locale.
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+<span class="pc bpc" id="L678" title="1 of 4 branches missed.">        return value != null &amp;&amp; value.length() &gt;= suffix.length()</span>
+<span class="fc bfc" id="L679" title="All 2 branches covered.">                &amp;&amp; value.regionMatches(true, value.length() - suffix.length(), suffix, 0, suffix.length());</span>
+    }
+
+    private static FontInfo parseFontFile(FontInfo out, String arg) {
+<span class="fc" id="L683">        arg = arg.trim();</span>
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">        if (arg.indexOf('/') != -1) {</span>
+<span class="nc" id="L685">            arg = arg.substring(arg.indexOf('/'));</span>
+        }
+<span class="pc bpc" id="L687" title="2 of 4 branches missed.">        if (arg.length() &gt; 0 &amp;&amp; arg.charAt(0) == '/') {</span>
+<span class="nc" id="L688">            arg = arg.substring(1);</span>
+        } else {
+            // A bare family name gets the default .ttf suffix, but an explicit
+            // .ttf/.otf is left alone -- appending to &quot;Foo.otf&quot; would ask for
+            // &quot;Foo.otf.ttf&quot; and lose the font.
+<span class="fc bfc" id="L693" title="All 2 branches covered.">            arg = arg.indexOf(&quot;native:&quot;) == 0 ? arg :</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">                    hasFontFileSuffix(arg) ? arg :</span>
+                            arg + &quot;.ttf&quot;;
+        }
+<span class="fc" id="L697">        out.setFile(arg);</span>
+<span class="fc" id="L698">        return out;</span>
+    }
+
+    private static boolean isFontSizeArg(String arg) {
+<span class="pc bpc" id="L702" title="2 of 6 branches missed.">        return arg != null &amp;&amp; arg.length() &gt; 0 &amp;&amp; Character.isDigit(arg.charAt(0));</span>
+    }
+
+    static FontInfo parseFont(FontInfo out, String font) {
+<span class="pc bpc" id="L706" title="2 of 4 branches missed.">        if (font == null || font.trim().length() == 0) {</span>
+<span class="nc" id="L707">            return null;</span>
+        }
+<span class="fc" id="L709">        font = font.trim();</span>
+<span class="fc" id="L710">        String[] args = Util.split(font, &quot; &quot;);</span>
+<span class="fc" id="L711">        int len = args.length;</span>
+<span class="fc bfc" id="L712" title="All 2 branches covered.">        if (len == 1) {</span>
+<span class="fc" id="L713">            String arg = args[0].trim();</span>
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">            if (arg.length() == 0) {</span>
+<span class="nc" id="L715">                out.setSize(null);</span>
+<span class="nc" id="L716">                out.setSizeUnit(UNIT_INHERIT);</span>
+<span class="nc" id="L717">                out.setFile(null);</span>
+<span class="nc" id="L718">                out.setName(null);</span>
+<span class="nc" id="L719">                return out;</span>
+            }
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">            if (isFontSizeArg(arg)) {</span>
+                // This is a size
+<span class="nc" id="L723">                parseFontSize(out, arg);</span>
+<span class="nc" id="L724">                out.setName(null);</span>
+<span class="nc" id="L725">                out.setFile(null);</span>
+<span class="nc" id="L726">                return out;</span>
+
+            } else {
+<span class="fc" id="L729">                out.setSizeUnit(UNIT_INHERIT);</span>
+<span class="fc" id="L730">                out.setSize(null);</span>
+<span class="fc" id="L731">                parseFontName(out, arg);</span>
+<span class="fc" id="L732">                parseFontFile(out, arg);</span>
+
+            }
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        } else if (len == 2) {</span>
+<span class="fc bfc" id="L736" title="All 2 branches covered.">            if (isFontSizeArg(args[0])) {</span>
+<span class="fc" id="L737">                parseFontSize(out, args[0]);</span>
+<span class="fc" id="L738">                parseFontName(out, args[1]);</span>
+<span class="fc" id="L739">                parseFontFile(out, args[1]);</span>
+<span class="fc" id="L740">                return out;</span>
+            } else {
+<span class="fc" id="L742">                out.setSize(null);</span>
+<span class="fc" id="L743">                out.setSizeUnit(UNIT_INHERIT);</span>
+<span class="fc" id="L744">                parseFontName(out, args[0]);</span>
+<span class="fc" id="L745">                parseFontFile(out, args[1]);</span>
+<span class="fc" id="L746">                return out;</span>
+
+            }
+
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        } else if (len == 3) {</span>
+<span class="fc" id="L751">            parseFontSize(out, args[0]);</span>
+<span class="fc" id="L752">            parseFontName(out, args[1]);</span>
+<span class="fc" id="L753">            parseFontFile(out, args[2]);</span>
+<span class="fc" id="L754">            return out;</span>
+        } else {
+<span class="nc" id="L756">            throw new IllegalArgumentException(&quot;Failed to parse font&quot;);</span>
+        }
+<span class="fc" id="L758">        return out;</span>
+    }
+
+    static Font parseFont(Style baseStyle, String font) {
+<span class="nc bnc" id="L762" title="All 4 branches missed.">        if (font == null || font.trim().length() == 0) {</span>
+<span class="nc" id="L763">            return null;</span>
+        }
+<span class="nc" id="L765">        FontInfo finfo = parseFont(new FontInfo(), font);</span>
+<span class="nc" id="L766">        return finfo.createFont(baseStyle);</span>
+
+    }
+
+    private static ScalarValue[] parseTRBLValue(String val) {
+<span class="fc" id="L771">        ScalarValue[] out = new ScalarValue[4];</span>
+<span class="fc" id="L772">        String[] parts = Util.split(val, &quot; &quot;);</span>
+<span class="fc" id="L773">        int len = parts.length;</span>
+<span class="pc bpc" id="L774" title="2 of 5 branches missed.">        switch (len) {</span>
+            case 1:
+<span class="fc" id="L776">                ScalarValue v = parseSingleTRBLValue(parts[0]);</span>
+<span class="fc bfc" id="L777" title="All 2 branches covered.">                for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc" id="L778">                    out[i] = v;</span>
+                }
+<span class="fc" id="L780">                return out;</span>
+
+            case 2: {
+<span class="fc" id="L783">                ScalarValue v1 = parseSingleTRBLValue(parts[0]);</span>
+<span class="fc" id="L784">                ScalarValue v2 = parseSingleTRBLValue(parts[1]);</span>
+<span class="fc" id="L785">                out[Component.TOP] = out[Component.BOTTOM] = v1;</span>
+<span class="fc" id="L786">                out[Component.LEFT] = out[Component.RIGHT] = v2;</span>
+<span class="fc" id="L787">                return out;</span>
+            }
+            case 3: {
+<span class="nc" id="L790">                ScalarValue v1 = parseSingleTRBLValue(parts[0]);</span>
+<span class="nc" id="L791">                ScalarValue v2 = parseSingleTRBLValue(parts[1]);</span>
+<span class="nc" id="L792">                ScalarValue v3 = parseSingleTRBLValue(parts[2]);</span>
+<span class="nc" id="L793">                out[Component.TOP] = v1;</span>
+<span class="nc" id="L794">                out[Component.LEFT] = out[Component.RIGHT] = v2;</span>
+<span class="nc" id="L795">                out[Component.BOTTOM] = v3;</span>
+<span class="nc" id="L796">                return out;</span>
+            }
+            case 4: {
+<span class="fc" id="L799">                ScalarValue v1 = parseSingleTRBLValue(parts[0]);</span>
+<span class="fc" id="L800">                ScalarValue v2 = parseSingleTRBLValue(parts[1]);</span>
+<span class="fc" id="L801">                ScalarValue v3 = parseSingleTRBLValue(parts[2]);</span>
+<span class="fc" id="L802">                ScalarValue v4 = parseSingleTRBLValue(parts[3]);</span>
+<span class="fc" id="L803">                out[Component.TOP] = v1;</span>
+<span class="fc" id="L804">                out[Component.RIGHT] = v2;</span>
+<span class="fc" id="L805">                out[Component.BOTTOM] = v3;</span>
+<span class="fc" id="L806">                out[Component.LEFT] = v4;</span>
+<span class="fc" id="L807">                return out;</span>
+            }
+            default:
+<span class="nc" id="L810">                return null;</span>
+        }
+    }
+
+    private static ScalarValue parseSingleTRBLValue(String val) {
+<span class="fc" id="L815">        val = val.trim();</span>
+<span class="fc" id="L816">        int plen = val.length();</span>
+<span class="fc" id="L817">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L818">        ScalarValue out = new ScalarValue();</span>
+<span class="fc" id="L819">        boolean parsedValue = false;</span>
+<span class="fc bfc" id="L820" title="All 2 branches covered.">        for (int i = 0; i &lt; plen; i++) {</span>
+<span class="fc" id="L821">            char c = val.charAt(i);</span>
+<span class="pc bpc" id="L822" title="1 of 10 branches missed.">            if (!parsedValue &amp;&amp; (c == '%' || c == 'm' || c == 'p' || c == 'i')) {</span>
+<span class="fc bfc" id="L823" title="All 2 branches covered.">                out.setValue((sb.length() &gt; 0) ? Double.parseDouble(sb.toString()) : 0);</span>
+<span class="fc" id="L824">                parsedValue = true;</span>
+<span class="fc" id="L825">                sb.setLength(0);</span>
+<span class="fc" id="L826">                sb.append(c);</span>
+            } else {
+<span class="fc" id="L828">                sb.append(c);</span>
+            }
+        }
+
+<span class="fc bfc" id="L832" title="All 2 branches covered.">        if (parsedValue) {</span>
+<span class="fc" id="L833">            String unitStr = sb.toString();</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">            out.setUnit(&quot;mm&quot;.equals(unitStr) ? Style.UNIT_TYPE_DIPS :</span>
+<span class="fc bfc" id="L835" title="All 2 branches covered.">                    &quot;%&quot;.equals(unitStr) ? Style.UNIT_TYPE_SCREEN_PERCENTAGE :</span>
+<span class="fc bfc" id="L836" title="All 2 branches covered.">                            &quot;inherit&quot;.equals(unitStr) ? UNIT_INHERIT :</span>
+                                    Style.UNIT_TYPE_PIXELS);
+<span class="fc" id="L838">        } else {</span>
+<span class="fc" id="L839">            out.setUnit(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L840">            out.setValue(Double.parseDouble(sb.toString()));</span>
+        }
+<span class="fc" id="L842">        return out;</span>
+
+    }
+
+    static Image parseBgImage(Resources theme, String val) {
+<span class="nc bnc" id="L847" title="All 4 branches missed.">        if (val == null || val.trim().length() == 0) {</span>
+<span class="nc" id="L848">            return null;</span>
+        }
+<span class="nc" id="L850">        return getImage(theme, val);</span>
+    }
+
+    private static Map&lt;String, Integer&gt; bgTypes() {
+<span class="fc" id="L854">        return BG_TYPES;</span>
+    }
+
+    private static Map&lt;String, Integer&gt; createBgTypes() {
+<span class="fc" id="L858">        Map&lt;String, Integer&gt; map = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L859">        Object[] types = new Object[]{</span>
+<span class="fc" id="L860">                &quot;image_aligned_bottom&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM,</span>
+<span class="fc" id="L861">                &quot;image_aligned_top&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP,</span>
+<span class="fc" id="L862">                &quot;image_aligned_bottom_right&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT,</span>
+<span class="fc" id="L863">                &quot;image_aligned_bottom_left&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT,</span>
+<span class="fc" id="L864">                &quot;image_aligned_top_right&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT,</span>
+<span class="fc" id="L865">                &quot;image_aligned_top_left&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT,</span>
+<span class="fc" id="L866">                &quot;image_aligned_left&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_LEFT,</span>
+<span class="fc" id="L867">                &quot;image_aligned_right&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_RIGHT,</span>
+<span class="fc" id="L868">                &quot;image_aligned_center&quot;, (int) Style.BACKGROUND_IMAGE_ALIGNED_CENTER,</span>
+<span class="fc" id="L869">                &quot;image_scaled&quot;, (int) Style.BACKGROUND_IMAGE_SCALED,</span>
+<span class="fc" id="L870">                &quot;image_scaled_fill&quot;, (int) Style.BACKGROUND_IMAGE_SCALED_FILL,</span>
+<span class="fc" id="L871">                &quot;image_scaled_fit&quot;, (int) Style.BACKGROUND_IMAGE_SCALED_FIT,</span>
+<span class="fc" id="L872">                &quot;image_tile_both&quot;, (int) Style.BACKGROUND_IMAGE_TILE_BOTH,</span>
+<span class="fc" id="L873">                &quot;image_tile_horizontal&quot;, (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL,</span>
+<span class="fc" id="L874">                &quot;image_tile_vertical&quot;, (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL,</span>
+<span class="fc" id="L875">                &quot;image_tile_horizontal_align_bottom&quot;, (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM,</span>
+<span class="fc" id="L876">                &quot;image_tile_horizontal_align_top&quot;, (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP,</span>
+<span class="fc" id="L877">                &quot;image_tile_horizontal_align_center&quot;, (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER,</span>
+<span class="fc" id="L878">                &quot;image_tile_vertical_align_left&quot;, (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT,</span>
+<span class="fc" id="L879">                &quot;image_tile_vertical_align_right&quot;, (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT,</span>
+<span class="fc" id="L880">                &quot;image_tile_vertical_align_center&quot;, (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER,</span>
+<span class="fc" id="L881">                &quot;gradient_radial&quot;, (int) Style.BACKGROUND_GRADIENT_RADIAL,</span>
+<span class="fc" id="L882">                &quot;gradient_linear_horizontal&quot;, (int) Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,</span>
+<span class="fc" id="L883">                &quot;gradient_linear_vertical&quot;, (int) Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL,</span>
+<span class="fc" id="L884">                &quot;gradient_linear&quot;, (int) Style.BACKGROUND_GRADIENT_LINEAR,</span>
+<span class="fc" id="L885">                &quot;gradient_radial_full&quot;, (int) Style.BACKGROUND_GRADIENT_RADIAL_FULL,</span>
+<span class="fc" id="L886">                &quot;gradient_conic&quot;, (int) Style.BACKGROUND_GRADIENT_CONIC,</span>
+<span class="fc" id="L887">                &quot;gradient_repeating_linear&quot;, (int) Style.BACKGROUND_GRADIENT_REPEATING_LINEAR,</span>
+<span class="fc" id="L888">                &quot;gradient_repeating_radial&quot;, (int) Style.BACKGROUND_GRADIENT_REPEATING_RADIAL,</span>
+<span class="fc" id="L889">                &quot;none&quot;, (int) Style.BACKGROUND_NONE</span>
+        };
+<span class="fc" id="L891">        int len = types.length;</span>
+<span class="fc bfc" id="L892" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i += 2) {</span>
+<span class="fc" id="L893">            map.put((String) types[i], (Integer) types[i + 1]);</span>
+        }
+<span class="fc" id="L895">        return map;</span>
+    }
+
+    /// Gets the available background type strings (which can be passed to `StyleInfo#setBgType(java.lang.String)`
+    public static List&lt;String&gt; getBackgroundTypes() {
+<span class="fc" id="L900">        ArrayList&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L901">        out.addAll(bgTypes().keySet());</span>
+<span class="fc" id="L902">        Collections.sort(out, new CaseInsensitiveOrder());</span>
+<span class="fc" id="L903">        return out;</span>
+    }
+
+    private static &lt;T, V&gt; Map&lt;T, V&gt; flip(Map&lt;V, T&gt; map) {
+<span class="nc" id="L907">        Map&lt;T, V&gt; out = new HashMap&lt;T, V&gt;();</span>
+<span class="nc bnc" id="L908" title="All 2 branches missed.">        for (Map.Entry&lt;V, T&gt; e : map.entrySet()) {</span>
+<span class="nc" id="L909">            out.put(e.getValue(), e.getKey());</span>
+
+<span class="nc" id="L911">        }</span>
+<span class="nc" id="L912">        return out;</span>
+    }
+
+    static Integer parseBgType(String val) {
+
+<span class="nc bnc" id="L917" title="All 4 branches missed.">        if (val == null || val.length() == 0) {</span>
+<span class="nc" id="L918">            return null;</span>
+        }
+<span class="nc bnc" id="L920" title="All 2 branches missed.">        if (Character.isDigit(val.charAt(0))) {</span>
+<span class="nc" id="L921">            return Integer.parseInt(val);</span>
+        }
+<span class="nc" id="L923">        Map&lt;String, Integer&gt; bgTypes = bgTypes();</span>
+<span class="nc bnc" id="L924" title="All 2 branches missed.">        if (bgTypes.containsKey(val)) {</span>
+<span class="nc" id="L925">            return bgTypes.get(val);</span>
+        }
+
+<span class="nc" id="L928">        return null;</span>
+    }
+
+    /// Checks if a string is a valid scalar value.  A scalar value should be in the
+    /// format  where  is an integer
+    /// or decimal number, and  is a unit - one of mm, px, or %.
+    ///
+    /// There is one special value: &quot;inherit&quot; which indicates that the scalar value just inherits from its
+    /// parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: String value to validate.
+    ///
+    /// #### Returns
+    ///
+    /// True if the value is a valid scalar value.
+    public static boolean validateScalarValue(String val) {
+        try {
+<span class="fc" id="L947">            parseSingleTRBLValue(val);</span>
+<span class="fc" id="L948">            return true;</span>
+<span class="fc" id="L949">        } catch (Throwable t) {</span>
+<span class="fc" id="L950">            return false;</span>
+        }
+    }
+
+    /// Parses a string into a scalar value.  A scalar value should be in the
+    /// format  where  is an integer
+    /// or decimal number, and  is a unit - one of mm, px, or %.
+    ///
+    /// There is one special value: &quot;inherit&quot; which indicates that the scalar value just inherits from its
+    /// parent.
+    ///
+    /// #### Parameters
+    ///
+    /// - `val`: String that should be a valid scalar value.
+    public static ScalarValue parseScalarValue(String val) {
+<span class="fc" id="L965">        return parseSingleTRBLValue(val);</span>
+    }
+
+    /// Gets a list of the background types that are supported.
+    public static List&lt;String&gt; getSupportedBackgroundTypes() {
+<span class="fc" id="L970">        ArrayList&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L971">        out.addAll(BG_TYPES.keySet());</span>
+<span class="fc" id="L972">        return out;</span>
+    }
+
+    private static String format(double d, int decimalPlaces) {
+<span class="fc bfc" id="L976" title="All 2 branches covered.">        for (int i = 0; i &lt; decimalPlaces; i++) {</span>
+<span class="fc" id="L977">            d *= 10;</span>
+        }
+<span class="fc" id="L979">        d = Math.round(d);</span>
+<span class="fc bfc" id="L980" title="All 2 branches covered.">        for (int i = 0; i &lt; decimalPlaces; i++) {</span>
+<span class="fc" id="L981">            d /= 10;</span>
+        }
+
+<span class="fc" id="L984">        String dStr = String.valueOf(d);</span>
+<span class="fc" id="L985">        int decPos = dStr.indexOf(&quot;.&quot;);</span>
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">        if (decPos != -1) {</span>
+<span class="fc" id="L987">            int decLen = dStr.length() - decPos;</span>
+<span class="pc bpc" id="L988" title="1 of 2 branches missed.">            if (decLen &gt; decimalPlaces) {</span>
+<span class="fc" id="L989">                dStr = dStr.substring(0, dStr.length() - (decLen - decimalPlaces));</span>
+
+            }
+        }
+<span class="fc" id="L993">        return dStr;</span>
+    }
+
+    /// Encapsulates a scalar value with a unit.
+    public static class ScalarValue {
+        private byte unit;
+        private double value;
+
+
+        /// Creates a new scalar value given magnitude and unit.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: The value to set.
+        ///
+        /// - `unit`: The unit of the value. One of `#UNIT_INHERIT`, `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `Style#UNIT_TYPE_SCREEN_PERCENTAGE`.
+<span class="fc" id="L1009">        public ScalarValue(double value, byte unit) {</span>
+<span class="fc" id="L1010">            this.value = value;</span>
+<span class="fc" id="L1011">            this.unit = unit;</span>
+<span class="fc" id="L1012">        }</span>
+
+<span class="fc" id="L1014">        public ScalarValue() {</span>
+<span class="fc" id="L1015">        }</span>
+
+        /// #### Returns
+        ///
+        /// the unit of the value.  One of `#UNIT_INHERIT`, `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `Style#UNIT_TYPE_SCREEN_PERCENTAGE`.
+        public byte getUnit() {
+<span class="fc" id="L1021">            return unit;</span>
+        }
+
+        /// #### Parameters
+        ///
+        /// - `unit`: the unit of the value.  One of `#UNIT_INHERIT`, `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `Style#UNIT_TYPE_SCREEN_PERCENTAGE`.
+        public void setUnit(byte unit) {
+<span class="fc" id="L1028">            this.unit = unit;</span>
+<span class="fc" id="L1029">        }</span>
+
+        /// #### Returns
+        ///
+        /// the value of the scalar.
+        public double getValue() {
+<span class="fc" id="L1035">            return value;</span>
+        }
+
+        /// #### Parameters
+        ///
+        /// - `value`: the value of the scalar.
+        public void setValue(double value) {
+<span class="fc" id="L1042">            this.value = value;</span>
+<span class="fc" id="L1043">        }</span>
+
+        /// Returns the scalar value in CN1 style string format.  E.g.  12mm, 3px, 5%, or inherit
+        @Override
+        public String toString() {
+<span class="pc bpc" id="L1048" title="3 of 4 branches missed.">            switch (unit) {</span>
+                case UNIT_INHERIT:
+<span class="nc" id="L1050">                    return &quot;inherit&quot;;</span>
+                case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L1052">                    return value + &quot;mm&quot;;</span>
+                case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+<span class="nc" id="L1054">                    return value + &quot;%&quot;;</span>
+                default:
+<span class="fc" id="L1056">                    return ((int) Math.round(value)) + &quot;px&quot;;</span>
+            }
+        }
+
+        /// Formats this scalar value (including units) but rounding to the given number
+        /// of decimal places.
+        ///
+        /// #### Parameters
+        ///
+        /// - `decimalPlaces`
+        public String toString(int decimalPlaces) {
+<span class="pc bpc" id="L1067" title="3 of 4 branches missed.">            switch (unit) {</span>
+                case UNIT_INHERIT:
+<span class="nc" id="L1069">                    return &quot;inherit&quot;;</span>
+                case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L1071">                    return StyleParser.format(value, decimalPlaces) + &quot;mm&quot;;</span>
+                case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+<span class="fc" id="L1073">                    return StyleParser.format(value, decimalPlaces) + &quot;%&quot;;</span>
+                default:
+<span class="nc" id="L1075">                    return ((int) Math.round(value)) + &quot;px&quot;;</span>
+            }
+        }
+
+        /// Gets the magnitude of this scalar value in pixels.
+        public int getPixelValue() {
+<span class="nc bnc" id="L1081" title="All 4 branches missed.">            switch (unit) {</span>
+                case UNIT_INHERIT:
+<span class="nc" id="L1083">                    return 0;</span>
+                case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L1085">                    return Display.getInstance().convertToPixels((float) value);</span>
+                case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
+<span class="nc" id="L1087">                    return (int) (Display.getInstance().getDisplayWidth() * value / 100f);</span>
+                default:
+<span class="nc" id="L1089">                    return ((int) Math.round(value));</span>
+            }
+        }
+
+    }
+
+    /// Encapculates a style string in structured format.
+    public static class StyleInfo {
+        Map&lt;String, String&gt; values;
+
+        /// Parses the given style strings and encapsulates their details in
+        /// a StyleInfo object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `styleString`: One or more style strings.
+<span class="fc" id="L1105">        public StyleInfo(String... styleString) {</span>
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">            if (styleString == null) {</span>
+<span class="fc" id="L1107">                this.values = new HashMap&lt;String, String&gt;();</span>
+            } else {
+<span class="fc" id="L1109">                HashMap&lt;String, String&gt; vals = new HashMap&lt;String, String&gt;();</span>
+<span class="fc bfc" id="L1110" title="All 2 branches covered.">                for (String str : styleString) {</span>
+<span class="pc bpc" id="L1111" title="2 of 4 branches missed.">                    if (str != null &amp;&amp; str.length() &gt; 0) {</span>
+<span class="fc" id="L1112">                        parseString(vals, str);</span>
+                    }
+                }
+<span class="fc" id="L1115">                this.values = vals;</span>
+            }
+<span class="fc" id="L1117">        }</span>
+
+        /// Creates a new StyleInfo given the parsed Map of keys and values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`
+<span class="fc" id="L1124">        public StyleInfo(Map&lt;String, String&gt; values) {</span>
+<span class="fc" id="L1125">            this.values = values;</span>
+<span class="fc" id="L1126">        }</span>
+
+        /// Creates a new StyleInfo.
+        public StyleInfo() {
+<span class="fc" id="L1130">            this(new HashMap&lt;String, String&gt;());</span>
+<span class="fc" id="L1131">        }</span>
+
+        /// Creates a new style info by copying styles from existing style info.
+        ///
+        /// #### Parameters
+        ///
+        /// - `info`: Style to copy.
+        public StyleInfo(StyleInfo info) {
+<span class="fc" id="L1139">            this(info.toStyleString());</span>
+<span class="fc" id="L1140">        }</span>
+
+        /// #### Returns
+        ///
+        /// The padding of the style.  Will return null if padding wasn't specified.
+        public PaddingInfo getPadding() {
+<span class="pc bpc" id="L1146" title="1 of 2 branches missed.">            if (values.containsKey(&quot;padding&quot;)) {</span>
+<span class="fc" id="L1147">                return parsePadding(values.get(&quot;padding&quot;));</span>
+            }
+<span class="nc" id="L1149">            return null;</span>
+        }
+
+        /// Sets the padding.
+        ///
+        /// #### Parameters
+        ///
+        /// - `padding`: A valid padding string.  E.g. &quot;1mm&quot;, or &quot;2mm 3px 0 5mm&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setPadding(String padding) {
+<span class="nc bnc" id="L1162" title="All 4 branches missed.">            if (padding == null || padding.trim().length() == 0) {</span>
+<span class="nc" id="L1163">                values.remove(&quot;padding&quot;);</span>
+            } else {
+<span class="nc" id="L1165">                values.put(&quot;padding&quot;, padding);</span>
+            }
+<span class="nc" id="L1167">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The margin of the style.  Will return null if margin wasn't specified.
+        public MarginInfo getMargin() {
+<span class="pc bpc" id="L1174" title="1 of 2 branches missed.">            if (values.containsKey(&quot;margin&quot;)) {</span>
+<span class="fc" id="L1175">                return parseMargin(values.get(&quot;margin&quot;));</span>
+            }
+<span class="nc" id="L1177">            return null;</span>
+        }
+
+        /// Sets the margin.
+        ///
+        /// #### Parameters
+        ///
+        /// - `margin`: A valid margin string.  E.g. &quot;1mm&quot;, or &quot;2mm 3px 0 0&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setMargin(String margin) {
+<span class="pc bpc" id="L1190" title="2 of 4 branches missed.">            if (margin == null || margin.trim().length() == 0) {</span>
+<span class="nc" id="L1191">                values.remove(&quot;margin&quot;);</span>
+            } else {
+<span class="fc" id="L1193">                values.put(&quot;margin&quot;, margin);</span>
+            }
+<span class="fc" id="L1195">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The border of the style.  Will return null if border wasn't specified.
+        public BorderInfo getBorder() {
+<span class="fc bfc" id="L1202" title="All 2 branches covered.">            if (values.containsKey(&quot;border&quot;)) {</span>
+<span class="fc" id="L1203">                return parseBorder(new BorderInfo(), values.get(&quot;border&quot;));</span>
+            }
+<span class="fc" id="L1205">            return null;</span>
+        }
+
+        /// Sets the border
+        ///
+        /// #### Parameters
+        ///
+        /// - `border`: A valid border string. E.g. &quot;1px solid ff0000&quot;, or &quot;splicedImage notes.png 0.25 0.25 0.25 0.25&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setBorder(String border) {
+<span class="pc bpc" id="L1218" title="2 of 4 branches missed.">            if (border == null || border.trim().length() == 0) {</span>
+<span class="nc" id="L1219">                values.remove(&quot;border&quot;);</span>
+            } else {
+<span class="fc" id="L1221">                values.put(&quot;border&quot;, border);</span>
+            }
+<span class="fc" id="L1223">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The font of the style.  Will return null if font wasn't specified.
+        public FontInfo getFont() {
+<span class="fc bfc" id="L1230" title="All 2 branches covered.">            if (values.containsKey(&quot;font&quot;)) {</span>
+<span class="fc" id="L1231">                return parseFont(new FontInfo(), values.get(&quot;font&quot;));</span>
+            }
+<span class="fc" id="L1233">            return null;</span>
+        }
+
+        /// Sets the font in the style info.
+        ///
+        /// #### Parameters
+        ///
+        /// - `font`: A valid font style string.  E.g. &quot;2mm native:MainRegular&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setFont(String font) {
+<span class="fc" id="L1246">            values.put(&quot;font&quot;, font);</span>
+<span class="fc" id="L1247">            return this;</span>
+        }
+
+        /// Sets the font size in the style.
+        ///
+        /// #### Parameters
+        ///
+        /// - `fontSize`: A valid font size.  E.g. &quot;2mm&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setFontSize(String fontSize) {
+<span class="fc" id="L1260">            FontInfo finfo = getFont();</span>
+<span class="pc bpc" id="L1261" title="1 of 2 branches missed.">            if (finfo == null) {</span>
+<span class="nc" id="L1262">                finfo = parseFont(new FontInfo(), fontSize);</span>
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">                if (finfo != null) {</span>
+<span class="nc" id="L1264">                    setFont(finfo.toString());</span>
+                }
+            } else {
+<span class="fc" id="L1267">                FontInfo tmp = parseFont(new FontInfo(), fontSize);</span>
+<span class="pc bpc" id="L1268" title="1 of 2 branches missed.">                if (tmp != null) {</span>
+<span class="fc" id="L1269">                    finfo.setSize(tmp.getSize());</span>
+<span class="fc" id="L1270">                    finfo.setSizeUnit(tmp.getSizeUnit());</span>
+<span class="fc" id="L1271">                    setFont(finfo.toString());</span>
+                } else {
+<span class="nc" id="L1273">                    finfo.setSizeUnit(UNIT_INHERIT);</span>
+<span class="nc" id="L1274">                    setFont(finfo.toString());</span>
+                }
+            }
+
+<span class="fc" id="L1278">            return this;</span>
+        }
+
+        /// Sets the font name.
+        ///
+        /// #### Parameters
+        ///
+        /// - `fontName`: A valid font name.  E.g. &quot;native:MainRegular&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setFontName(String fontName) {
+<span class="fc" id="L1291">            FontInfo finfo = getFont();</span>
+<span class="pc bpc" id="L1292" title="1 of 2 branches missed.">            if (finfo == null) {</span>
+<span class="nc" id="L1293">                finfo = parseFont(new FontInfo(), fontName);</span>
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">                if (finfo != null) {</span>
+<span class="nc" id="L1295">                    setFont(finfo.toString());</span>
+                }
+            } else {
+<span class="fc" id="L1298">                FontInfo tmp = parseFont(new FontInfo(), fontName);</span>
+<span class="pc bpc" id="L1299" title="1 of 2 branches missed.">                if (tmp != null) {</span>
+<span class="fc" id="L1300">                    finfo.setName(tmp.getName());</span>
+<span class="fc" id="L1301">                    finfo.setFile(tmp.getFile());</span>
+<span class="fc" id="L1302">                    setFont(finfo.toString());</span>
+                } else {
+<span class="nc" id="L1304">                    finfo.setName(null);</span>
+<span class="nc" id="L1305">                    finfo.setFile(null);</span>
+<span class="nc" id="L1306">                    setFont(finfo.toString());</span>
+                }
+            }
+<span class="fc" id="L1309">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The background color of the style.  Will return null if bgColor wasn't specified.
+        public Integer getBgColor() {
+<span class="pc bpc" id="L1316" title="1 of 2 branches missed.">            if (values.containsKey(&quot;bgColor&quot;)) {</span>
+<span class="fc" id="L1317">                return Integer.parseInt(values.get(&quot;bgColor&quot;), 16);</span>
+            }
+<span class="nc" id="L1319">            return null;</span>
+        }
+
+        /// Sets the background color.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bgColor`: A valid color string.  E.g. &quot;ff0000&quot;
+        public StyleInfo setBgColor(String bgColor) {
+<span class="pc bpc" id="L1328" title="3 of 4 branches missed.">            if (bgColor == null || bgColor.trim().length() == 0) {</span>
+<span class="fc" id="L1329">                values.remove(&quot;bgColor&quot;);</span>
+            } else {
+<span class="nc" id="L1331">                values.put(&quot;bgColor&quot;, bgColor);</span>
+            }
+<span class="fc" id="L1333">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The foreground color of the style.  Will return null if fgColor wasn't specified.
+        public Integer getFgColor() {
+<span class="pc bpc" id="L1340" title="1 of 2 branches missed.">            if (values.containsKey(&quot;fgColor&quot;)) {</span>
+<span class="fc" id="L1341">                return Integer.parseInt(values.get(&quot;fgColor&quot;), 16);</span>
+            }
+<span class="nc" id="L1343">            return null;</span>
+        }
+
+        /// Sets the foreground color.
+        ///
+        /// #### Parameters
+        ///
+        /// - `fgColor`: A valid color string.  E.g. &quot;ff0000&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setFgColor(String fgColor) {
+<span class="nc bnc" id="L1356" title="All 4 branches missed.">            if (fgColor == null || fgColor.trim().length() == 0) {</span>
+<span class="nc" id="L1357">                values.remove(&quot;fgColor&quot;);</span>
+            } else {
+<span class="nc" id="L1359">                values.put(&quot;fgColor&quot;, fgColor);</span>
+            }
+<span class="nc" id="L1361">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The background transparency of the style.  Will return null if transparency wasn't specified.
+        public Integer getTransparency() {
+<span class="pc bpc" id="L1368" title="1 of 2 branches missed.">            if (values.containsKey(&quot;transparency&quot;)) {</span>
+<span class="nc" id="L1369">                return Integer.parseInt(values.get(&quot;transparency&quot;));</span>
+            }
+<span class="fc" id="L1371">            return null;</span>
+        }
+
+        /// Sets the transparency.
+        ///
+        /// #### Parameters
+        ///
+        /// - `transparency`: A valid transparency string (0-255).  E.g. &quot;255&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setTransparency(String transparency) {
+<span class="nc bnc" id="L1384" title="All 4 branches missed.">            if (transparency == null || transparency.trim().length() == 0) {</span>
+<span class="nc" id="L1385">                values.remove(&quot;transparency&quot;);</span>
+            } else {
+<span class="nc" id="L1387">                values.put(&quot;transparency&quot;, transparency);</span>
+            }
+<span class="nc" id="L1389">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The opacity of the style.  Will return null if the opacity wasn't specified.
+        public Integer getOpacity() {
+<span class="pc bpc" id="L1396" title="1 of 2 branches missed.">            if (values.containsKey(&quot;opacity&quot;)) {</span>
+<span class="nc" id="L1397">                return Integer.parseInt(values.get(&quot;opacity&quot;));</span>
+            }
+<span class="fc" id="L1399">            return null;</span>
+        }
+
+        /// Sets the opacity.
+        ///
+        /// #### Parameters
+        ///
+        /// - `opacity`: A valid opacity string (0-255).  E.g. &quot;255&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setOpacity(String opacity) {
+<span class="nc bnc" id="L1412" title="All 4 branches missed.">            if (opacity == null || opacity.trim().length() == 0) {</span>
+<span class="nc" id="L1413">                values.remove(&quot;opacity&quot;);</span>
+            } else {
+<span class="nc" id="L1415">                values.put(&quot;opacity&quot;, opacity);</span>
+            }
+<span class="nc" id="L1417">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// @return The alignment of the style.  One of `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`.  Or null if
+        /// alignment wasn't specified.
+        public Integer getAlignment() {
+<span class="pc bpc" id="L1425" title="1 of 2 branches missed.">            if (values.containsKey(&quot;alignment&quot;)) {</span>
+<span class="nc" id="L1426">                return parseAlignment(values.get(&quot;alignment&quot;));</span>
+            }
+<span class="fc" id="L1428">            return null;</span>
+        }
+
+        /// Sets the alignment for this style.  One of `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`: One of `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setAlignment(int alignment) {
+<span class="nc" id="L1441">            values.put(&quot;alignment&quot;, String.valueOf(alignment));</span>
+<span class="nc" id="L1442">            return this;</span>
+        }
+
+        /// Sets the alignment for this style as a String.  Accepts either a string representation of the integer values for `Component#LEFT`, `Component#RIGHT`, `Component#CENTER`.  Or the
+        /// literal strings &quot;center&quot;, &quot;left&quot;, or &quot;right&quot;.  Or null to unset this property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `alignment`
+        public StyleInfo setAlignment(String alignment) {
+<span class="nc bnc" id="L1452" title="All 4 branches missed.">            if (alignment == null || alignment.length() == 0) {</span>
+<span class="nc" id="L1453">                values.remove(&quot;alignment&quot;);</span>
+            } else {
+<span class="nc" id="L1455">                values.put(&quot;alignment&quot;, alignment);</span>
+            }
+<span class="nc" id="L1457">            return this;</span>
+        }
+
+        /// Returns the alignment as a string.  &quot;center&quot;, &quot;left&quot;, &quot;right&quot;, or null.
+        public String getAlignmentAsString() {
+<span class="nc" id="L1462">            return getAlignmentString(getAlignment());</span>
+        }
+
+        /// Gets the background type.  Will return null if bgType wasn't specified.  Returns one of Style.BACKGROUND_XXX constants.
+        public Integer getBgType() {
+<span class="pc bpc" id="L1467" title="1 of 2 branches missed.">            if (values.containsKey(&quot;bgType&quot;)) {</span>
+<span class="nc" id="L1468">                return parseBgType(values.get(&quot;bgType&quot;));</span>
+            }
+<span class="fc" id="L1470">            return null;</span>
+        }
+
+        /// Sets the background type as a string.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: A valid background type string.  E.g. &quot;image_scaled_fit&quot;
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setBgType(String type) {
+<span class="nc" id="L1483">            values.put(&quot;bgType&quot;, type);</span>
+<span class="nc" id="L1484">            return this;</span>
+        }
+
+        /// Sets the background type as one of the Style.BACKGROUND_XXX constants.
+        ///
+        /// #### Parameters
+        ///
+        /// - `i`: A background type.  One of Style.BACKGROUND_XXX constants.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setBgType(Integer i) {
+<span class="nc" id="L1497">            setBgType(flip(bgTypes()).get(i));</span>
+<span class="nc" id="L1498">            return this;</span>
+        }
+
+        /// Gets the bgType as a string.
+        public String getBgTypeAsString() {
+<span class="nc" id="L1503">            Integer bgType = getBgType();</span>
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">            if (bgType == null) {</span>
+<span class="nc" id="L1505">                return null;</span>
+            }
+<span class="nc" id="L1507">            Map&lt;Integer, String&gt; inverseMap = flip(bgTypes());</span>
+<span class="nc bnc" id="L1508" title="All 2 branches missed.">            if (inverseMap.containsKey(bgType)) {</span>
+<span class="nc" id="L1509">                return inverseMap.get(bgType);</span>
+            }
+<span class="nc" id="L1511">            return null;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The background image for the style.  Will return null if bgImage wasn't specified.
+        public ImageInfo getBgImage() {
+<span class="pc bpc" id="L1518" title="1 of 2 branches missed.">            if (values.containsKey(&quot;bgImage&quot;)) {</span>
+<span class="nc" id="L1519">                return new ImageInfo(values.get(&quot;bgImage&quot;));</span>
+            }
+<span class="fc" id="L1521">            return null;</span>
+
+        }
+
+        /// Sets the background image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bgImage`: A valid image string.  E.g. &quot;notes.png&quot; (to refer to the notes.png image in the theme), or &quot;/notes.png&quot; to refer to notes.png in the src directory.
+        ///
+        /// #### Returns
+        ///
+        /// Self for chaining.
+        public StyleInfo setBgImage(String bgImage) {
+<span class="nc" id="L1535">            values.put(&quot;bgImage&quot;, bgImage);</span>
+<span class="nc" id="L1536">            return this;</span>
+        }
+
+        /// #### Returns
+        ///
+        /// The text decoration of the style.  Will return null if textDecoration wasn't specified.  Returns one of Style.TEXT_DECORATION_XXX constants.
+        public Integer getTextDecoration() {
+<span class="pc bpc" id="L1543" title="1 of 2 branches missed.">            if (values.containsKey(&quot;textDecoration&quot;)) {</span>
+<span class="nc" id="L1544">                String val = values.get(&quot;textDecoration&quot;);</span>
+<span class="nc bnc" id="L1545" title="All 2 branches missed.">                if (&quot;3d&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1546">                    return (int) Style.TEXT_DECORATION_3D;</span>
+                }
+
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">                if (&quot;3d_lowered&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1550">                    return (int) Style.TEXT_DECORATION_3D_LOWERED;</span>
+                }
+
+<span class="nc bnc" id="L1553" title="All 2 branches missed.">                if (&quot;3D_SHADOW_NORTH&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1554">                    return (int) Style.TEXT_DECORATION_3D_SHADOW_NORTH;</span>
+                }
+
+<span class="nc bnc" id="L1557" title="All 2 branches missed.">                if (&quot;none&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1558">                    return (int) Style.TEXT_DECORATION_NONE;</span>
+                }
+
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">                if (&quot;overline&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1562">                    return (int) Style.TEXT_DECORATION_OVERLINE;</span>
+                }
+
+<span class="nc bnc" id="L1565" title="All 2 branches missed.">                if (&quot;strikethru&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1566">                    return (int) Style.TEXT_DECORATION_STRIKETHRU;</span>
+                }
+
+<span class="nc bnc" id="L1569" title="All 2 branches missed.">                if (&quot;underine&quot;.equalsIgnoreCase(val)) {</span>
+<span class="nc" id="L1570">                    return (int) Style.TEXT_DECORATION_UNDERLINE;</span>
+                }
+
+            }
+<span class="fc" id="L1574">            return null;</span>
+        }
+
+        /// Gets the text decoration as a string.
+        ///
+        /// #### Returns
+        ///
+        /// A valid text decoration string or null.  Text decoration strings include &quot;3d&quot;, &quot;3d_lowered&quot;, &quot;3d_shadow_north&quot;, &quot;none&quot;, &quot;strikethru&quot;, &quot;overline&quot;, and &quot;underline&quot;
+        public String getTextDecorationAsString() {
+<span class="nc bnc" id="L1583" title="All 2 branches missed.">            if (values.containsKey(&quot;textDecoration&quot;)) {</span>
+<span class="nc" id="L1584">                return values.get(&quot;textDecoration&quot;);</span>
+            }
+<span class="nc" id="L1586">            return null;</span>
+        }
+
+        /// Builds a style string that is encapsulated by this style object.  The output of this can be passed to methods like `Component#setInlineAllStyles(java.lang.String)`
+        ///
+        /// #### Returns
+        ///
+        /// A style string.
+        public String toStyleString() {
+<span class="fc" id="L1595">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1596">            FontInfo finfo = getFont();</span>
+<span class="pc bpc" id="L1597" title="1 of 2 branches missed.">            if (finfo != null) {</span>
+<span class="fc" id="L1598">                sb.append(&quot;font:&quot;).append(finfo).append(&quot;; &quot;);</span>
+            }
+<span class="fc" id="L1600">            BorderInfo binfo = getBorder();</span>
+<span class="pc bpc" id="L1601" title="1 of 2 branches missed.">            if (binfo != null) {</span>
+<span class="nc" id="L1602">                sb.append(&quot;border:&quot;).append(binfo).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1605">            Integer bgColor = getBgColor();</span>
+<span class="pc bpc" id="L1606" title="1 of 2 branches missed.">            if (bgColor != null) {</span>
+<span class="fc" id="L1607">                sb.append(&quot;bgColor:&quot;).append(Integer.toHexString(bgColor)).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1610">            Integer fgColor = getFgColor();</span>
+<span class="pc bpc" id="L1611" title="1 of 2 branches missed.">            if (fgColor != null) {</span>
+<span class="fc" id="L1612">                sb.append(&quot;fgColor:&quot;).append(Integer.toHexString(fgColor)).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1615">            Integer transparency = getTransparency();</span>
+<span class="pc bpc" id="L1616" title="1 of 2 branches missed.">            if (transparency != null) {</span>
+<span class="nc" id="L1617">                sb.append(&quot;transparency:&quot;).append(transparency).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1620">            Integer opacity = getOpacity();</span>
+<span class="pc bpc" id="L1621" title="1 of 2 branches missed.">            if (opacity != null) {</span>
+<span class="nc" id="L1622">                sb.append(&quot;opacity:&quot;).append(opacity).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1625">            Integer bgType = getBgType();</span>
+<span class="pc bpc" id="L1626" title="1 of 2 branches missed.">            if (bgType != null) {</span>
+<span class="nc" id="L1627">                sb.append(&quot;bgType:&quot;).append(getBgTypeAsString()).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1630">            ImageInfo image = getBgImage();</span>
+<span class="pc bpc" id="L1631" title="1 of 2 branches missed.">            if (image != null) {</span>
+<span class="nc" id="L1632">                sb.append(&quot;bgImage:&quot;).append(getBgImage().toString()).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1635">            Integer alignment = getAlignment();</span>
+<span class="pc bpc" id="L1636" title="1 of 2 branches missed.">            if (alignment != null) {</span>
+<span class="nc" id="L1637">                sb.append(&quot;alignment:&quot;).append(getAlignmentAsString()).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1640">            MarginInfo margin = getMargin();</span>
+<span class="pc bpc" id="L1641" title="1 of 2 branches missed.">            if (margin != null) {</span>
+<span class="fc" id="L1642">                sb.append(&quot;margin:&quot;).append(margin).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1645">            PaddingInfo padding = getPadding();</span>
+<span class="pc bpc" id="L1646" title="1 of 2 branches missed.">            if (padding != null) {</span>
+<span class="fc" id="L1647">                sb.append(&quot;padding:&quot;).append(padding).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1650">            Integer textDecoration = getTextDecoration();</span>
+<span class="pc bpc" id="L1651" title="1 of 2 branches missed.">            if (textDecoration != null) {</span>
+<span class="nc" id="L1652">                sb.append(&quot;textDecoration:&quot;).append(getTextDecorationAsString()).append(&quot;; &quot;);</span>
+            }
+
+<span class="fc" id="L1655">            return sb.toString().trim();</span>
+        }
+    }
+
+    /// Encapsulates an image that is referenced by a style string.
+    public static class ImageInfo {
+        private final String image;
+
+        /// Creates an ImageInfo to wrap the specified image.
+        ///
+        /// #### Parameters
+        ///
+        /// - `image`: @param image Either the path to an image on the classpath (signified by a leading '/', or
+        /// the name of an image that can be found in the theme resource file.
+<span class="fc" id="L1669">        public ImageInfo(String image) {</span>
+<span class="fc" id="L1670">            this.image = image;</span>
+<span class="fc" id="L1671">        }</span>
+
+        @Override
+        public String toString() {
+<span class="fc" id="L1675">            return image;</span>
+        }
+
+        /// Gets the image object that this image info references.
+        ///
+        /// #### Parameters
+        ///
+        /// - `theme`: @param theme The theme resource file to use to get the image.  Note: If the image name has a leading '/', then
+        /// the image will be loaded from the classpath.  Otherwise the theme resource file will be used.
+        public Image getImage(Resources theme) {
+<span class="fc" id="L1685">            return StyleParser.getImage(theme, image);</span>
+        }
+    }
+
+    /// Base class for style values that consist of 4 scalar values, such as padding and margin.
+    public static class BoxInfo {
+        protected ScalarValue[] values;
+
+        /// Creates a new box with the specified scalar values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`: A 4-element array of scalar values.
+<span class="fc" id="L1698">        public BoxInfo(ScalarValue[] values) {</span>
+<span class="pc bpc" id="L1699" title="1 of 2 branches missed.">            if (values.length != 4) {</span>
+<span class="nc" id="L1700">                throw new IllegalArgumentException(&quot;BoxInfo expected 4-element array&quot;);</span>
+            }
+<span class="fc" id="L1702">            this.values = values;</span>
+<span class="fc" id="L1703">        }</span>
+
+        /// Returns string of values in     format.
+        @Override
+        public String toString() {
+<span class="fc" id="L1708">            return toString(Component.TOP) + &quot; &quot; + toString(Component.RIGHT) + &quot; &quot; + toString(Component.BOTTOM) + &quot; &quot; + toString(Component.LEFT);</span>
+        }
+
+        /// Returns the string representation of one of the sides of the box.
+        ///
+        /// #### Parameters
+        ///
+        /// - `side`: One of `Component#TOP`, `Component#RIGHT`, `Component#BOTTOM`, `Component#LEFT`.
+        public String toString(int side) {
+<span class="fc" id="L1717">            return values[side].toString();</span>
+        }
+
+        /// Gets the scalar values of this box as a 4-element array.
+        public ScalarValue[] getValues() {
+<span class="nc" id="L1722">            return values;</span>
+        }
+
+        /// Sets the scalar values of this box as a 4-element array.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`
+        public void setValues(ScalarValue[] values) {
+<span class="nc bnc" id="L1731" title="All 2 branches missed.">            if (values.length != 4) {</span>
+<span class="nc" id="L1732">                throw new IllegalArgumentException(&quot;BoxInfo requires array with 4 values.&quot;);</span>
+            }
+<span class="nc" id="L1734">            this.values = values;</span>
+<span class="nc" id="L1735">        }</span>
+
+        /// Gets a value for a side.
+        ///
+        /// #### Parameters
+        ///
+        /// - `side`: One of `Component#TOP`, `Component#RIGHT`, `Component#BOTTOM`, `Component#LEFT`.
+        ///
+        /// #### Returns
+        ///
+        /// The value portion of the scalar value.
+        public ScalarValue getValue(int side) {
+<span class="fc" id="L1747">            return values[side];</span>
+        }
+
+    }
+
+    /// Encapsulates information about the padding in a style string.
+    public static class PaddingInfo extends BoxInfo {
+
+        /// Creates a new PaddingInfo.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`: 4-element array of scalar values.  Indices are `Component#TOP`, `Component#BOTTOM`, `Component#LEFT` and `Component#RIGHT`.
+        public PaddingInfo(ScalarValue[] values) {
+<span class="fc" id="L1761">            super(values);</span>
+<span class="fc" id="L1762">        }</span>
+
+        /// Generates a 4-element float array with the padding values - in the same format as used in the theme resource files.  This will use the provided base style
+        /// to calculate the padding for sides that were specified as inherit.
+        ///
+        /// #### Parameters
+        ///
+        /// - `baseStyle`: The base style used to get the padding on sides where the style string specified inherit.
+        ///
+        /// #### Returns
+        ///
+        /// 4-element float array.
+        float[] createPadding(Style baseStyle) {
+<span class="nc" id="L1775">            float[] out = new float[4];</span>
+<span class="nc bnc" id="L1776" title="All 2 branches missed.">            for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L1777">                out[i] = createPadding(baseStyle, i);</span>
+            }
+<span class="nc" id="L1779">            return out;</span>
+
+        }
+
+        float createPadding(Style baseStyle, int side) {
+<span class="nc" id="L1784">            ScalarValue v = values[side];</span>
+<span class="nc bnc" id="L1785" title="All 2 branches missed.">            switch (v.unit) {</span>
+                case UNIT_INHERIT: {
+<span class="nc" id="L1787">                    int px = baseStyle.getPadding(side);</span>
+<span class="nc" id="L1788">                    byte[] units = baseStyle.getPaddingUnit();</span>
+<span class="nc bnc" id="L1789" title="All 2 branches missed.">                    if (units == null) {</span>
+<span class="nc" id="L1790">                        return px;</span>
+                    }
+<span class="nc bnc" id="L1792" title="All 2 branches missed.">                    switch (units[side]) {</span>
+                        case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L1794">                            return px / (float) Display.getInstance().convertToPixels(1f);</span>
+                        default:
+<span class="nc" id="L1796">                            return px;</span>
+                    }
+                }
+                default:
+<span class="nc" id="L1800">                    return (float) v.value;</span>
+
+            }
+
+        }
+
+        byte[] createPaddingUnit(Style baseStyle) {
+<span class="nc" id="L1807">            byte[] out = new byte[4];</span>
+<span class="nc bnc" id="L1808" title="All 2 branches missed.">            for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L1809">                out[i] = createPaddingUnit(baseStyle, i);</span>
+            }
+<span class="nc" id="L1811">            return out;</span>
+
+        }
+
+        byte createPaddingUnit(Style baseStyle, int side) {
+<span class="nc" id="L1816">            ScalarValue v = values[side];</span>
+<span class="nc bnc" id="L1817" title="All 2 branches missed.">            switch (v.unit) {</span>
+                case UNIT_INHERIT: {
+<span class="nc" id="L1819">                    byte[] units = baseStyle.getPaddingUnit();</span>
+<span class="nc bnc" id="L1820" title="All 2 branches missed.">                    if (units == null) {</span>
+<span class="nc" id="L1821">                        return Style.UNIT_TYPE_PIXELS;</span>
+                    }
+<span class="nc" id="L1823">                    return units[side];</span>
+                }
+                default:
+<span class="nc" id="L1826">                    return v.unit;</span>
+
+            }
+        }
+    }
+
+    /// Encapsulates information about the padding in a style string.
+    public static class MarginInfo extends BoxInfo {
+        /// Creates a new MarginInfo.
+        ///
+        /// #### Parameters
+        ///
+        /// - `values`: 4-element array of scalar values.  Indices are `Component#TOP`, `Component#BOTTOM`, `Component#LEFT` and `Component#RIGHT`.
+        public MarginInfo(ScalarValue[] values) {
+<span class="fc" id="L1840">            super(values);</span>
+<span class="fc" id="L1841">        }</span>
+
+        float[] createMargin(Style baseStyle) {
+<span class="nc" id="L1844">            float[] out = new float[4];</span>
+<span class="nc bnc" id="L1845" title="All 2 branches missed.">            for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L1846">                out[i] = createMargin(baseStyle, i);</span>
+            }
+<span class="nc" id="L1848">            return out;</span>
+
+        }
+
+        float createMargin(Style baseStyle, int side) {
+<span class="nc" id="L1853">            ScalarValue v = values[side];</span>
+<span class="nc bnc" id="L1854" title="All 2 branches missed.">            switch (v.unit) {</span>
+                case UNIT_INHERIT: {
+<span class="nc" id="L1856">                    int px = baseStyle.getPadding(side);</span>
+<span class="nc" id="L1857">                    byte[] units = baseStyle.getMarginUnit();</span>
+<span class="nc bnc" id="L1858" title="All 2 branches missed.">                    if (units == null) {</span>
+<span class="nc" id="L1859">                        return px;</span>
+                    }
+<span class="nc bnc" id="L1861" title="All 2 branches missed.">                    switch (units[side]) {</span>
+                        case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L1863">                            return px / (float) Display.getInstance().convertToPixels(1f);</span>
+                        default:
+<span class="nc" id="L1865">                            return px;</span>
+                    }
+                }
+                default:
+<span class="nc" id="L1869">                    return (float) v.value;</span>
+
+            }
+
+        }
+
+        byte[] createMarginUnit(Style baseStyle) {
+<span class="nc" id="L1876">            byte[] out = new byte[4];</span>
+<span class="nc bnc" id="L1877" title="All 2 branches missed.">            for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L1878">                out[i] = createMarginUnit(baseStyle, i);</span>
+            }
+<span class="nc" id="L1880">            return out;</span>
+
+        }
+
+        byte createMarginUnit(Style baseStyle, int side) {
+<span class="nc" id="L1885">            ScalarValue v = values[side];</span>
+<span class="nc bnc" id="L1886" title="All 2 branches missed.">            switch (v.unit) {</span>
+                case UNIT_INHERIT: {
+<span class="nc" id="L1888">                    byte[] units = baseStyle.getMarginUnit();</span>
+<span class="nc bnc" id="L1889" title="All 2 branches missed.">                    if (units == null) {</span>
+<span class="nc" id="L1890">                        return Style.UNIT_TYPE_PIXELS;</span>
+                    }
+
+<span class="nc" id="L1893">                    return units[side];</span>
+                }
+                default:
+<span class="nc" id="L1896">                    return v.unit;</span>
+
+            }
+        }
+    }
+
+    /// Encapsulates information about the border property of a style string.
+<span class="fc" id="L1903">    public static class BorderInfo {</span>
+
+        // Used for round and roundrect border
+        private Integer opacity;
+        private Integer strokeColor;
+        private Integer strokeOpacity;
+        private Integer shadowOpacity;
+        private Float shadowX;
+        private Float shadowY;
+        private Float shadowBlur;
+        private ScalarValue shadowSpread;
+
+        // Used for round border
+        private Boolean rectangle;
+
+        // Used for roundrect border
+        private Boolean topOnlyMode;
+        private Boolean bottomOnlyMode;
+        private Boolean topLeftMode;
+        private Boolean topRightMode;
+        private Boolean bottomLeftMode;
+        private Boolean bottomRightMode;
+        private Float cornerRadius;
+
+        /// The type of the border.  E.g. line, dashed, image, etc..
+        private String type;
+
+        /// Used only by splicedImage border.  The name/path of the image to use for the image border.
+        private String spliceImage;
+
+        /// Used by image, horizontalImage, and verticalImage borders.  The names of images to use for these types of borders.
+        private String[] images;
+
+        /// The inset string for a splicedImage border.
+        private String spliceInsets;
+
+        /// The thickness for line/dashed/dotted/underline border
+        private Float width;
+
+        /// The unit for line/dashed/dotted/underline border
+        private byte widthUnit;
+
+        /// The color for a line/dashed/dotted/underline border.
+        private Integer color;
+
+        private static double round(double d, int decimalPlaces) {
+<span class="nc bnc" id="L1949" title="All 2 branches missed.">            for (int i = 0; i &lt; decimalPlaces; i++) {</span>
+<span class="nc" id="L1950">                d *= 10;</span>
+            }
+<span class="nc" id="L1952">            d = Math.round(d);</span>
+<span class="nc bnc" id="L1953" title="All 2 branches missed.">            for (int i = 0; i &lt; decimalPlaces; i++) {</span>
+<span class="nc" id="L1954">                d /= 10;</span>
+            }
+
+<span class="nc" id="L1957">            String dStr = String.valueOf(d);</span>
+<span class="nc" id="L1958">            int decPos = dStr.indexOf(&quot;.&quot;);</span>
+<span class="nc bnc" id="L1959" title="All 2 branches missed.">            if (decPos != -1) {</span>
+<span class="nc" id="L1960">                int decLen = dStr.length() - decPos;</span>
+<span class="nc bnc" id="L1961" title="All 2 branches missed.">                if (decLen &gt; decimalPlaces) {</span>
+<span class="nc" id="L1962">                    dStr = dStr.substring(0, dStr.length() - (decLen - decimalPlaces));</span>
+<span class="nc" id="L1963">                    d = Double.parseDouble(dStr);</span>
+                }
+            }
+
+<span class="nc" id="L1967">            return d;</span>
+        }
+
+        /// Form &quot;splicedImage&quot; type
+        private String splicedImageToString() {
+<span class="nc" id="L1972">            return getType() + &quot; &quot; + getSpliceImage() + &quot; &quot; + getSpliceInsets();</span>
+        }
+
+        /// For &quot;image&quot;, &quot;horizontalImage&quot;, and &quot;verticalImage&quot; types
+        private String imageToString() {
+<span class="nc" id="L1977">            StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L1978">            sb.append(getType()).append(&quot; &quot;);</span>
+<span class="nc bnc" id="L1979" title="All 2 branches missed.">            for (String img : getImages()) {</span>
+<span class="nc" id="L1980">                sb.append(img).append(&quot; &quot;);</span>
+            }
+<span class="nc" id="L1982">            return sb.toString().trim();</span>
+        }
+
+        /// Used for &quot;line&quot;, &quot;dashed&quot;, &quot;dotted&quot;, and &quot;underline&quot; types.
+        private String lineToString() {
+<span class="pc bpc" id="L1987" title="1 of 2 branches missed.">            int color = getColor() == null ? 0 : getColor();</span>
+<span class="fc" id="L1988">            return widthString() + &quot; &quot; + lineTypeString() + &quot; &quot; + Integer.toHexString(color);</span>
+        }
+
+        private void shadowToString(StringBuilder sb) {
+<span class="nc" id="L1992">            sb.append(&quot;shadow(&quot;);</span>
+<span class="nc" id="L1993">            sb.append(&quot;opacity:&quot;).append(getShadowOpacity()).append(&quot; &quot;);</span>
+<span class="nc bnc" id="L1994" title="All 2 branches missed.">            if (getShadowSpread() != null) {</span>
+<span class="nc" id="L1995">                sb.append(&quot;spread:&quot;).append(getShadowSpread().toString()).append(&quot; &quot;);</span>
+            }
+<span class="nc bnc" id="L1997" title="All 2 branches missed.">            if (getShadowX() != null) {</span>
+<span class="nc" id="L1998">                sb.append(&quot;x:&quot;).append(round(getShadowX(), 3)).append(&quot; &quot;);</span>
+            }
+<span class="nc bnc" id="L2000" title="All 2 branches missed.">            if (getShadowY() != null) {</span>
+<span class="nc" id="L2001">                sb.append(&quot;y:&quot;).append(round(getShadowY(), 3)).append(&quot; &quot;);</span>
+            }
+<span class="nc bnc" id="L2003" title="All 2 branches missed.">            if (getShadowBlur() != null) {</span>
+<span class="nc" id="L2004">                sb.append(&quot;blur:&quot;).append(round(getShadowBlur(), 3)).append(&quot; &quot;);</span>
+            }
+
+<span class="nc" id="L2007">            sb.append(&quot;) &quot;);</span>
+<span class="nc" id="L2008">        }</span>
+
+        private void strokeToString(StringBuilder sb) {
+<span class="nc" id="L2011">            sb.append(&quot;stroke(&quot;);</span>
+<span class="nc bnc" id="L2012" title="All 2 branches missed.">            if (width != null) {</span>
+<span class="nc" id="L2013">                sb.append(widthString()).append(&quot; &quot;);</span>
+            }
+<span class="nc" id="L2015">            int c = getStrokeColor() &amp; 0xffffff;</span>
+<span class="nc" id="L2016">            String hex = Integer.toHexString(c);</span>
+<span class="nc bnc" id="L2017" title="All 2 branches missed.">            while (hex.length() &lt; 6) {</span>
+<span class="nc" id="L2018">                hex = &quot;0&quot; + hex;</span>
+            }
+<span class="nc bnc" id="L2020" title="All 4 branches missed.">            if (getStrokeOpacity() != null &amp;&amp; getStrokeOpacity() != 255) {</span>
+<span class="nc" id="L2021">                String opacityStr = Integer.toHexString(getStrokeOpacity());</span>
+<span class="nc bnc" id="L2022" title="All 2 branches missed.">                while (opacityStr.length() &lt; 2) {</span>
+<span class="nc" id="L2023">                    opacityStr = &quot;0&quot; + opacityStr;</span>
+                }
+<span class="nc" id="L2025">                hex = opacityStr + hex;</span>
+            }
+<span class="nc" id="L2027">            sb.append(hex).append(&quot;) &quot;);</span>
+<span class="nc" id="L2028">        }</span>
+
+        private void colorToString(StringBuilder sb) {
+<span class="nc bnc" id="L2031" title="All 2 branches missed.">            String hex = color != null ? Integer.toHexString(color &amp; 0xffffff) : &quot;000000&quot;;</span>
+<span class="nc bnc" id="L2032" title="All 2 branches missed.">            while (hex.length() &lt; 6) {</span>
+<span class="nc" id="L2033">                hex = &quot;0&quot; + hex;</span>
+            }
+
+<span class="nc bnc" id="L2036" title="All 2 branches missed.">            if (getOpacity() != null) {</span>
+<span class="nc" id="L2037">                String opacityStr = Integer.toHexString(getOpacity() &amp; 0xff);</span>
+<span class="nc bnc" id="L2038" title="All 2 branches missed.">                while (opacityStr.length() &lt; 2) {</span>
+<span class="nc" id="L2039">                    opacityStr = &quot;0&quot; + opacityStr;</span>
+                }
+<span class="nc" id="L2041">                hex = opacityStr + hex;</span>
+            }
+<span class="nc" id="L2043">            sb.append(hex).append(&quot; &quot;);</span>
+<span class="nc" id="L2044">        }</span>
+
+        /// Used for &quot;round&quot; type
+        private String roundToString() {
+<span class="nc" id="L2048">            StringBuilder sb = new StringBuilder();</span>
+
+<span class="nc" id="L2050">            sb.append(&quot;round &quot;);</span>
+<span class="nc bnc" id="L2051" title="All 2 branches missed.">            if (color != null) {</span>
+<span class="nc" id="L2052">                colorToString(sb);</span>
+            }
+<span class="nc bnc" id="L2054" title="All 4 branches missed.">            if (getShadowOpacity() != null &amp;&amp; getShadowOpacity() != 0) {</span>
+<span class="nc" id="L2055">                shadowToString(sb);</span>
+            }
+<span class="nc bnc" id="L2057" title="All 6 branches missed.">            if (width != null &amp;&amp; width != 0 &amp;&amp; getStrokeColor() != null) {</span>
+<span class="nc" id="L2058">                strokeToString(sb);</span>
+
+            }
+<span class="nc bnc" id="L2061" title="All 4 branches missed.">            if (getRectangle() != null &amp;&amp; getRectangle()) {</span>
+<span class="nc" id="L2062">                sb.append(&quot;rect&quot;).append(&quot; &quot;);</span>
+            }
+
+<span class="nc" id="L2065">            return sb.toString().trim();</span>
+        }
+
+        private String roundRectToString() {
+<span class="nc" id="L2069">            StringBuilder sb = new StringBuilder();</span>
+
+<span class="nc" id="L2071">            sb.append(&quot;roundRect &quot;);</span>
+<span class="nc bnc" id="L2072" title="All 2 branches missed.">            if (color != null) {</span>
+<span class="nc" id="L2073">                colorToString(sb);</span>
+            }
+<span class="nc bnc" id="L2075" title="All 4 branches missed.">            if (getShadowOpacity() != null &amp;&amp; getShadowOpacity() != 0) {</span>
+<span class="nc" id="L2076">                shadowToString(sb);</span>
+            }
+<span class="nc bnc" id="L2078" title="All 6 branches missed.">            if (width != null &amp;&amp; width != 0 &amp;&amp; getStrokeColor() != null) {</span>
+<span class="nc" id="L2079">                strokeToString(sb);</span>
+
+            }
+<span class="nc bnc" id="L2082" title="All 2 branches missed.">            if (getTopLeftMode() != null) {</span>
+<span class="nc bnc" id="L2083" title="All 2 branches missed.">                String prefix = getTopLeftMode() ? &quot;+&quot; : &quot;-&quot;;</span>
+<span class="nc" id="L2084">                sb.append(prefix).append(&quot;top-left &quot;);</span>
+            }
+<span class="nc bnc" id="L2086" title="All 2 branches missed.">            if (getTopRightMode() != null) {</span>
+<span class="nc bnc" id="L2087" title="All 2 branches missed.">                String prefix = getTopRightMode() ? &quot;+&quot; : &quot;-&quot;;</span>
+<span class="nc" id="L2088">                sb.append(prefix).append(&quot;top-right &quot;);</span>
+            }
+<span class="nc bnc" id="L2090" title="All 2 branches missed.">            if (getBottomLeftMode() != null) {</span>
+<span class="nc bnc" id="L2091" title="All 2 branches missed.">                String prefix = getBottomLeftMode() ? &quot;+&quot; : &quot;-&quot;;</span>
+<span class="nc" id="L2092">                sb.append(prefix).append(&quot;bottom-left &quot;);</span>
+            }
+<span class="nc bnc" id="L2094" title="All 2 branches missed.">            if (getBottomRightMode() != null) {</span>
+<span class="nc bnc" id="L2095" title="All 2 branches missed.">                String prefix = getBottomRightMode() ? &quot;+&quot; : &quot;-&quot;;</span>
+<span class="nc" id="L2096">                sb.append(prefix).append(&quot;bottom-right &quot;);</span>
+            }
+<span class="nc bnc" id="L2098" title="All 2 branches missed.">            if (getTopOnlyMode() != null) {</span>
+<span class="nc bnc" id="L2099" title="All 2 branches missed.">                String prefix = getTopOnlyMode() ? &quot;+&quot; : &quot;-&quot;;</span>
+<span class="nc" id="L2100">                sb.append(prefix).append(&quot;top-only &quot;);</span>
+            }
+<span class="nc bnc" id="L2102" title="All 2 branches missed.">            if (getBottomOnlyMode() != null) {</span>
+<span class="nc bnc" id="L2103" title="All 2 branches missed.">                String prefix = getBottomOnlyMode() ? &quot;+&quot; : &quot;-&quot;;</span>
+<span class="nc" id="L2104">                sb.append(prefix).append(&quot;bottom-only &quot;);</span>
+            }
+<span class="nc bnc" id="L2106" title="All 2 branches missed.">            if (cornerRadius != null) {</span>
+<span class="nc" id="L2107">                sb.append(round(cornerRadius, 2)).append(&quot;mm&quot;);</span>
+            }
+<span class="nc" id="L2109">            return sb.toString().trim();</span>
+        }
+
+        /// Returns the border as a style string value.  This value is formatted in a way that can be parsed by the StyleParser.
+        @Override
+        public String toString() {
+<span class="pc bpc" id="L2115" title="1 of 2 branches missed.">            if (&quot;splicedImage&quot;.equals(getType())) {</span>
+<span class="nc" id="L2116">                return splicedImageToString();</span>
+<span class="pc bpc" id="L2117" title="3 of 6 branches missed.">            } else if (&quot;image&quot;.equals(getType()) || &quot;horizontalImage&quot;.equals(getType()) || &quot;verticalImage&quot;.equals(getType())) {</span>
+<span class="nc" id="L2118">                return imageToString();</span>
+<span class="pc bpc" id="L2119" title="7 of 8 branches missed.">            } else if (&quot;line&quot;.equals(getType()) || &quot;dashed&quot;.equals(getType()) || &quot;dotted&quot;.equals(getType()) || &quot;underline&quot;.equals(getType())) {</span>
+<span class="fc" id="L2120">                return lineToString();</span>
+<span class="nc bnc" id="L2121" title="All 2 branches missed.">            } else if (&quot;round&quot;.equals(getType())) {</span>
+<span class="nc" id="L2122">                return roundToString();</span>
+<span class="nc bnc" id="L2123" title="All 2 branches missed.">            } else if (&quot;roundRect&quot;.equals(getType())) {</span>
+<span class="nc" id="L2124">                return roundRectToString();</span>
+            } else {
+<span class="nc" id="L2126">                return &quot;none&quot;;</span>
+            }
+        }
+
+        /// Returns width as a string, including units.  If the width isn't set, this outputs &quot;1px&quot;.
+        public String widthString() {
+<span class="pc bpc" id="L2132" title="1 of 2 branches missed.">            if (width == null) {</span>
+<span class="nc" id="L2133">                return &quot;1px&quot;;</span>
+            }
+<span class="fc" id="L2135">            return getWidth() + widthUnitString();</span>
+        }
+
+        /// Returns the border color as a hex string.  If no color is set, this returns the empty string.
+        public String colorString() {
+<span class="nc bnc" id="L2140" title="All 2 branches missed.">            if (color == null) {</span>
+<span class="nc" id="L2141">                return &quot;&quot;;</span>
+            }
+<span class="nc" id="L2143">            return Integer.toHexString(color);</span>
+        }
+
+        private String widthUnitString() {
+<span class="pc bpc" id="L2147" title="1 of 2 branches missed.">            switch (getWidthUnit()) {</span>
+                case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L2149">                    return &quot;mm&quot;;</span>
+                default:
+<span class="fc" id="L2151">                    return &quot;px&quot;;</span>
+            }
+        }
+
+        private String lineTypeString() {
+<span class="pc bpc" id="L2156" title="1 of 2 branches missed.">            if (&quot;line&quot;.equals(getType())) {</span>
+<span class="fc" id="L2157">                return &quot;solid&quot;;</span>
+            }
+<span class="nc" id="L2159">            return getType();</span>
+        }
+
+        private Border createLineBorder() {
+<span class="nc bnc" id="L2163" title="All 2 branches missed.">            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {</span>
+<span class="nc" id="L2164">                return Border.createLineBorder(getWidth(), getColor());</span>
+            } else {
+<span class="nc" id="L2166">                return Border.createLineBorder(getWidth().intValue(), getColor());</span>
+            }
+        }
+
+        private Border createDashedBorder() {
+<span class="nc bnc" id="L2171" title="All 2 branches missed.">            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {</span>
+<span class="nc" id="L2172">                return Border.createDashedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());</span>
+            } else {
+<span class="nc" id="L2174">                return Border.createDashedBorder(getWidth().intValue(), getColor());</span>
+            }
+        }
+
+        private Border createDottedBorder() {
+<span class="nc bnc" id="L2179" title="All 2 branches missed.">            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {</span>
+<span class="nc" id="L2180">                return Border.createDottedBorder(Display.getInstance().convertToPixels(getWidth()), getColor());</span>
+            } else {
+<span class="nc" id="L2182">                return Border.createDottedBorder(getWidth().intValue(), getColor());</span>
+            }
+        }
+
+        private Border createUnderlineBorder() {
+<span class="nc bnc" id="L2187" title="All 2 branches missed.">            if (this.getWidthUnit() == Style.UNIT_TYPE_DIPS) {</span>
+<span class="nc" id="L2188">                return Border.createUnderlineBorder(Display.getInstance().convertToPixels(getWidth()), getColor());</span>
+            } else {
+<span class="nc" id="L2190">                return Border.createUnderlineBorder(getWidth().intValue(), getColor());</span>
+            }
+        }
+
+        private Border createImageBorder(Resources theme) {
+<span class="nc" id="L2195">            int ilen = getImages().length;</span>
+<span class="nc bnc" id="L2196" title="All 2 branches missed.">            if (ilen == 9) {</span>
+<span class="nc" id="L2197">                return Border.createImageBorder(getImage(theme, getImages()[0]),</span>
+<span class="nc" id="L2198">                        getImage(theme, getImages()[1]),</span>
+<span class="nc" id="L2199">                        getImage(theme, getImages()[2]),</span>
+<span class="nc" id="L2200">                        getImage(theme, getImages()[3]),</span>
+<span class="nc" id="L2201">                        getImage(theme, getImages()[4]),</span>
+<span class="nc" id="L2202">                        getImage(theme, getImages()[5]),</span>
+<span class="nc" id="L2203">                        getImage(theme, getImages()[6]),</span>
+<span class="nc" id="L2204">                        getImage(theme, getImages()[7]),</span>
+<span class="nc" id="L2205">                        getImage(theme, getImages()[8])</span>
+                );
+            }
+<span class="nc bnc" id="L2208" title="All 2 branches missed.">            if (ilen == 3) {</span>
+<span class="nc" id="L2209">                return Border.createImageBorder(getImage(theme, getImages()[0]),</span>
+<span class="nc" id="L2210">                        getImage(theme, getImages()[1]),</span>
+<span class="nc" id="L2211">                        getImage(theme, getImages()[2])</span>
+                );
+            }
+<span class="nc" id="L2214">            return Border.createEmpty();</span>
+        }
+
+        private Border createHorizontalImageBorder(Resources theme) {
+<span class="nc" id="L2218">            return Border.createHorizonalImageBorder(getImage(theme, getImages()[0]),</span>
+<span class="nc" id="L2219">                    getImage(theme, getImages()[1]),</span>
+<span class="nc" id="L2220">                    getImage(theme, getImages()[2])</span>
+            );
+        }
+
+        private Border createVerticalImageBorder(Resources theme) {
+<span class="nc" id="L2225">            return Border.createVerticalImageBorder(getImage(theme, getImages()[0]),</span>
+<span class="nc" id="L2226">                    getImage(theme, getImages()[1]),</span>
+<span class="nc" id="L2227">                    getImage(theme, getImages()[2])</span>
+            );
+        }
+
+        private Border createSplicedImageBorder(Resources theme) {
+<span class="nc" id="L2232">            double[] insets = getSpliceInsets(new double[4]);</span>
+<span class="nc" id="L2233">            return Border.createImageSplicedBorder(getImage(theme, getSpliceImage()), insets[Component.TOP], insets[Component.RIGHT], insets[Component.BOTTOM], insets[Component.LEFT]);</span>
+
+        }
+
+        private Border createRoundBorder() {
+<span class="nc" id="L2238">            RoundBorder b = RoundBorder.create();</span>
+<span class="nc bnc" id="L2239" title="All 2 branches missed.">            if (width != null) {</span>
+<span class="nc" id="L2240">                b.stroke(getWidthInPixels(), false);</span>
+            }
+<span class="nc bnc" id="L2242" title="All 2 branches missed.">            if (getOpacity() != null) {</span>
+<span class="nc" id="L2243">                b.opacity(getOpacity());</span>
+            }
+<span class="nc bnc" id="L2245" title="All 2 branches missed.">            if (getStrokeColor() != null) {</span>
+<span class="nc" id="L2246">                b.strokeColor(getStrokeColor());</span>
+            }
+<span class="nc bnc" id="L2248" title="All 2 branches missed.">            if (getStrokeOpacity() != null) {</span>
+<span class="nc" id="L2249">                b.strokeOpacity(getStrokeOpacity());</span>
+            }
+<span class="nc bnc" id="L2251" title="All 2 branches missed.">            if (getShadowOpacity() != null) {</span>
+<span class="nc" id="L2252">                b.shadowOpacity(getShadowOpacity());</span>
+            }
+<span class="nc bnc" id="L2254" title="All 2 branches missed.">            if (getShadowSpread() != null) {</span>
+<span class="nc" id="L2255">                b.shadowSpread(getShadowSpread().getPixelValue(), false);</span>
+            }
+<span class="nc bnc" id="L2257" title="All 2 branches missed.">            if (getShadowX() != null) {</span>
+<span class="nc" id="L2258">                b.shadowX(getShadowX());</span>
+            }
+<span class="nc bnc" id="L2260" title="All 2 branches missed.">            if (getShadowY() != null) {</span>
+<span class="nc" id="L2261">                b.shadowY(getShadowY());</span>
+            }
+<span class="nc bnc" id="L2263" title="All 2 branches missed.">            if (getShadowBlur() != null) {</span>
+<span class="nc" id="L2264">                b.shadowBlur(getShadowBlur());</span>
+            }
+<span class="nc bnc" id="L2266" title="All 4 branches missed.">            if (getRectangle() != null &amp;&amp; getRectangle()) {</span>
+<span class="nc" id="L2267">                b.rectangle(getRectangle());</span>
+            }
+<span class="nc bnc" id="L2269" title="All 2 branches missed.">            if (color != null) {</span>
+<span class="nc" id="L2270">                b.color(color);</span>
+            }
+<span class="nc" id="L2272">            return b;</span>
+        }
+
+        private Border createRoundRectBorder() {
+<span class="nc" id="L2276">            RoundRectBorder b = RoundRectBorder.create();</span>
+<span class="nc bnc" id="L2277" title="All 2 branches missed.">            if (width != null) {</span>
+
+<span class="nc" id="L2279">                b.stroke(getWidthInPixels(), false);</span>
+            }
+<span class="nc bnc" id="L2281" title="All 2 branches missed.">            if (getStrokeColor() != null) {</span>
+<span class="nc" id="L2282">                b.strokeColor(getStrokeColor());</span>
+            }
+<span class="nc bnc" id="L2284" title="All 2 branches missed.">            if (getStrokeOpacity() != null) {</span>
+<span class="nc" id="L2285">                b.strokeOpacity(getStrokeOpacity());</span>
+            }
+<span class="nc bnc" id="L2287" title="All 2 branches missed.">            if (getShadowOpacity() != null) {</span>
+<span class="nc" id="L2288">                b.shadowOpacity(getShadowOpacity());</span>
+            }
+<span class="nc bnc" id="L2290" title="All 2 branches missed.">            if (getShadowSpread() != null) {</span>
+<span class="nc" id="L2291">                ScalarValue sv = getShadowSpread();</span>
+<span class="nc bnc" id="L2292" title="All 3 branches missed.">                switch (sv.unit) {</span>
+                    case Style.UNIT_TYPE_PIXELS:
+<span class="nc" id="L2294">                        b.shadowSpread(sv.getPixelValue());</span>
+<span class="nc" id="L2295">                        break;</span>
+                    case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L2297">                        b.shadowSpread((float) sv.getValue());</span>
+<span class="nc" id="L2298">                        break;</span>
+                    default:
+                        break;
+                }
+            }
+<span class="nc bnc" id="L2303" title="All 2 branches missed.">            if (getShadowX() != null) {</span>
+<span class="nc" id="L2304">                b.shadowX(getShadowX());</span>
+            }
+<span class="nc bnc" id="L2306" title="All 2 branches missed.">            if (getShadowY() != null) {</span>
+<span class="nc" id="L2307">                b.shadowY(getShadowY());</span>
+            }
+<span class="nc bnc" id="L2309" title="All 2 branches missed.">            if (getShadowBlur() != null) {</span>
+<span class="nc" id="L2310">                b.shadowBlur(getShadowBlur());</span>
+            }
+<span class="nc bnc" id="L2312" title="All 2 branches missed.">            if (getTopOnlyMode() != null) {</span>
+<span class="nc" id="L2313">                b.topOnlyMode(getTopOnlyMode());</span>
+            }
+<span class="nc bnc" id="L2315" title="All 2 branches missed.">            if (getBottomOnlyMode() != null) {</span>
+<span class="nc" id="L2316">                b.bottomOnlyMode(getBottomOnlyMode());</span>
+            }
+<span class="nc bnc" id="L2318" title="All 2 branches missed.">            if (getTopLeftMode() != null) {</span>
+<span class="nc" id="L2319">                b.topLeftMode(getTopLeftMode());</span>
+            }
+<span class="nc bnc" id="L2321" title="All 2 branches missed.">            if (getTopRightMode() != null) {</span>
+<span class="nc" id="L2322">                b.topRightMode(getTopRightMode());</span>
+            }
+<span class="nc bnc" id="L2324" title="All 2 branches missed.">            if (getBottomLeftMode() != null) {</span>
+<span class="nc" id="L2325">                b.bottomLeftMode(getBottomLeftMode());</span>
+            }
+<span class="nc bnc" id="L2327" title="All 2 branches missed.">            if (getBottomRightMode() != null) {</span>
+<span class="nc" id="L2328">                b.bottomRightMode(getBottomRightMode());</span>
+            }
+<span class="nc bnc" id="L2330" title="All 2 branches missed.">            if (cornerRadius != null) {</span>
+<span class="nc" id="L2331">                b.cornerRadius(cornerRadius);</span>
+            }
+<span class="nc" id="L2333">            return b;</span>
+        }
+
+        /// Creates the border that is described by this border info.
+        ///
+        /// #### Parameters
+        ///
+        /// - `theme`: Theme resource file used to load images that are referenced.
+        ///
+        /// #### Returns
+        ///
+        /// A Border.
+        public Border createBorder(Resources theme) {
+<span class="nc bnc" id="L2346" title="All 6 branches missed.">            if (getType() == null || &quot;empty&quot;.equals(getType()) || &quot;none&quot;.equals(getType())) {</span>
+<span class="nc" id="L2347">                return Border.createEmpty();</span>
+            }
+<span class="nc bnc" id="L2349" title="All 2 branches missed.">            if (&quot;line&quot;.equals(getType())) {</span>
+<span class="nc" id="L2350">                return createLineBorder();</span>
+            }
+<span class="nc bnc" id="L2352" title="All 2 branches missed.">            if (&quot;dashed&quot;.equals(getType())) {</span>
+<span class="nc" id="L2353">                return createDashedBorder();</span>
+            }
+<span class="nc bnc" id="L2355" title="All 2 branches missed.">            if (&quot;dotted&quot;.equals(getType())) {</span>
+<span class="nc" id="L2356">                return createDottedBorder();</span>
+            }
+<span class="nc bnc" id="L2358" title="All 2 branches missed.">            if (&quot;underline&quot;.equals(getType())) {</span>
+<span class="nc" id="L2359">                return createUnderlineBorder();</span>
+            }
+<span class="nc bnc" id="L2361" title="All 2 branches missed.">            if (&quot;image&quot;.equals(getType())) {</span>
+<span class="nc" id="L2362">                return createImageBorder(theme);</span>
+            }
+<span class="nc bnc" id="L2364" title="All 2 branches missed.">            if (&quot;horizontalImage&quot;.equals(getType())) {</span>
+<span class="nc" id="L2365">                return createHorizontalImageBorder(theme);</span>
+            }
+<span class="nc bnc" id="L2367" title="All 2 branches missed.">            if (&quot;verticalImage&quot;.equals(getType())) {</span>
+<span class="nc" id="L2368">                return createVerticalImageBorder(theme);</span>
+            }
+<span class="nc bnc" id="L2370" title="All 2 branches missed.">            if (&quot;splicedImage&quot;.equals(getType())) {</span>
+<span class="nc" id="L2371">                return createSplicedImageBorder(theme);</span>
+            }
+<span class="nc bnc" id="L2373" title="All 2 branches missed.">            if (&quot;round&quot;.equals(getType())) {</span>
+<span class="nc" id="L2374">                return createRoundBorder();</span>
+            }
+<span class="nc bnc" id="L2376" title="All 2 branches missed.">            if (&quot;roundRect&quot;.equals(getType())) {</span>
+<span class="nc" id="L2377">                return createRoundRectBorder();</span>
+            }
+<span class="nc" id="L2379">            return Border.createEmpty();</span>
+
+        }
+
+        /// For a splicedImage border, this gets the spliced insets as a 4-element array of double values.
+        ///
+        /// #### Parameters
+        ///
+        /// - `out`: An out parameter.  4-element array of insets.  Indices `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, and `Component#RIGHT`.
+        ///
+        /// #### Returns
+        ///
+        /// 4-element array of insets.  Indices `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, and `Component#RIGHT`.
+        public double[] getSpliceInsets(double[] out) {
+<span class="nc" id="L2393">            String[] parts = Util.split(getSpliceInsets(), &quot; &quot;);</span>
+
+<span class="nc" id="L2395">            out[Component.TOP] = Double.parseDouble(parts[0]);</span>
+<span class="nc" id="L2396">            out[Component.RIGHT] = Double.parseDouble(parts[1]);</span>
+<span class="nc" id="L2397">            out[Component.BOTTOM] = Double.parseDouble(parts[2]);</span>
+<span class="nc" id="L2398">            out[Component.LEFT] = Double.parseDouble(parts[3]);</span>
+<span class="nc" id="L2399">            return out;</span>
+        }
+
+        /// The border type.  E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
+        ///
+        /// #### Returns
+        ///
+        /// the type
+        public String getType() {
+<span class="fc" id="L2408">            return type;</span>
+        }
+
+        /// Sets the border type.
+        ///
+        /// #### Parameters
+        ///
+        /// - `type`: the type to set. E.g. line, dashed, dotted, underline, image, horizontalImage, verticalImage, splicedImage.
+        public void setType(String type) {
+<span class="fc" id="L2417">            this.type = type;</span>
+<span class="fc" id="L2418">        }</span>
+
+        /// The image to use for a splicedImage border.
+        ///
+        /// #### Returns
+        ///
+        /// the spliceImage
+        public String getSpliceImage() {
+<span class="nc" id="L2426">            return spliceImage;</span>
+        }
+
+        /// Sets the image to use for a splicedImage border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `spliceImage`: the spliceImage to set
+        public void setSpliceImage(String spliceImage) {
+<span class="nc" id="L2435">            this.spliceImage = spliceImage;</span>
+<span class="nc" id="L2436">        }</span>
+
+        /// Gets the images to use for image, horizontalImage, and verticalImage borders.
+        ///
+        /// #### Returns
+        ///
+        /// the images
+        public String[] getImages() {
+<span class="nc" id="L2444">            return images;</span>
+        }
+
+        /// Sets the images used by image, horizontalImage, and verticalImage borders.
+        ///
+        /// #### Parameters
+        ///
+        /// - `images`: the images to set
+        public void setImages(String[] images) {
+<span class="nc" id="L2453">            this.images = images;</span>
+<span class="nc" id="L2454">        }</span>
+
+        /// For splicedImage border, this gets the splice insets as a single string.
+        ///
+        /// #### Returns
+        ///
+        /// the spliceInsets
+        public String getSpliceInsets() {
+<span class="nc" id="L2462">            return spliceInsets;</span>
+        }
+
+        /// Sest the splice insets for a splicedImage border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `spliceInsets`: the spliceInsets to set
+        public void setSpliceInsets(String spliceInsets) {
+<span class="nc" id="L2471">            this.spliceInsets = spliceInsets;</span>
+<span class="nc" id="L2472">        }</span>
+
+        /// For a splicedImage border, sets the splice insets as a 4-element array.
+        ///
+        /// #### Parameters
+        ///
+        /// - `insets`: 4-element array.  Indices Component#TOP , Component#BOTTOM, Component#LEFT, and Component#RIGHT.
+        public void setSpliceInsets(double[] insets) {
+<span class="nc" id="L2480">            this.spliceInsets = insets[Component.TOP] + &quot; &quot; + insets[Component.RIGHT] + &quot; &quot; + insets[Component.BOTTOM] + &quot; &quot; + insets[Component.LEFT];</span>
+<span class="nc" id="L2481">        }</span>
+
+        /// Sets the splicedImage border insets as a 4-element array and rounds each entry to the specified number of decimal places
+        ///
+        /// #### Parameters
+        ///
+        /// - `insets`: 4-element array of insets.Indices Component#TOP , Component#BOTTOM, Component#LEFT, and Component#RIGHT.
+        ///
+        /// - `decimalPlaces`: Number of decimal places to round to.
+        public void setSpliceInsets(double[] insets, int decimalPlaces) {
+<span class="nc" id="L2491">            this.spliceInsets =</span>
+<span class="nc" id="L2492">                    round(insets[Component.TOP], decimalPlaces) + &quot; &quot; +</span>
+<span class="nc" id="L2493">                            round(insets[Component.RIGHT], decimalPlaces) + &quot; &quot; +</span>
+<span class="nc" id="L2494">                            round(insets[Component.BOTTOM], decimalPlaces) + &quot; &quot; +</span>
+<span class="nc" id="L2495">                            round(insets[Component.LEFT], decimalPlaces);</span>
+<span class="nc" id="L2496">        }</span>
+
+        /// For a line/dashed/dotted/underline/round border, the thickness value.
+        ///
+        /// #### Returns
+        ///
+        /// the width
+        ///
+        /// #### See also
+        ///
+        /// - #getWidthUnit()
+        public Float getWidth() {
+<span class="fc" id="L2508">            return width;</span>
+        }
+
+        /// For a line/dashed/dotted/underline/round border, gets the thickness value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `width`: the width to set
+        ///
+        /// #### See also
+        ///
+        /// - #setWidthUnit(byte)
+        public void setWidth(Float width) {
+<span class="fc" id="L2521">            this.width = width;</span>
+<span class="fc" id="L2522">        }</span>
+
+        /// Gets the border thickness as a scalar value.  This is effectively the same
+        /// value as returned by `#getWidth()` and `#getWidthUnit()`
+        ///
+        /// #### Returns
+        ///
+        /// The thickness of the border.  Used with line, dashed, dotted, underline, and round borders.
+        public ScalarValue getThickness() {
+<span class="nc bnc" id="L2531" title="All 2 branches missed.">            return new ScalarValue(width == null ? 0 : width, widthUnit);</span>
+        }
+
+        /// For line/dashed/dotted/underline border.  The thickness in pixels.
+        ///
+        /// #### See also
+        ///
+        /// - #getWidth()
+        ///
+        /// #### Returns
+        ///
+        /// The thickness in pixels of the border line.
+        public Integer getWidthInPixels() {
+<span class="nc bnc" id="L2544" title="All 2 branches missed.">            if (width == null) {</span>
+<span class="nc" id="L2545">                return null;</span>
+            }
+<span class="nc bnc" id="L2547" title="All 2 branches missed.">            if (widthUnit == Style.UNIT_TYPE_DIPS) {</span>
+<span class="nc" id="L2548">                return Display.getInstance().convertToPixels(width);</span>
+            } else {
+<span class="nc" id="L2550">                return width.intValue();</span>
+            }
+        }
+
+        /// For a line/dashed/dotted/underline/round border, gets the unit of the thickness value.
+        ///
+        /// #### Returns
+        ///
+        /// the widthUnit
+        ///
+        /// #### See also
+        ///
+        /// - #getWidth()
+        public byte getWidthUnit() {
+<span class="fc" id="L2564">            return widthUnit;</span>
+        }
+
+        /// For a line/dashed/dotted/underline/round border, sets the unit of the thickness value.
+        ///
+        /// #### Parameters
+        ///
+        /// - `widthUnit`: the widthUnit to set
+        ///
+        /// #### See also
+        ///
+        /// - #setWidth(java.lang.Float)
+        public void setWidthUnit(byte widthUnit) {
+<span class="fc" id="L2577">            this.widthUnit = widthUnit;</span>
+<span class="fc" id="L2578">        }</span>
+
+        /// For a line/dashed/dotted/underline/round border, sets the color.  For round border
+        /// this gets the fill color.  For line border variants, it gets the stroke color.
+        ///
+        /// #### Returns
+        ///
+        /// the color
+        public Integer getColor() {
+<span class="fc" id="L2587">            return color;</span>
+        }
+
+        /// For a line/dashed/dotted/underline/round border, gets the color.  For
+        /// round border, this sets the fill color.  For line border variants, it sets the stroke color.
+        ///
+        /// #### Parameters
+        ///
+        /// - `color`: the color to set
+        public void setColor(Integer color) {
+<span class="fc" id="L2597">            this.color = color;</span>
+<span class="fc" id="L2598">        }</span>
+
+        /// Gets the fill opacity of round border.  Only used for round border
+        ///
+        /// #### Returns
+        ///
+        /// the opacity The opacity of the round border.
+        public Integer getOpacity() {
+<span class="nc" id="L2606">            return opacity;</span>
+        }
+
+        /// Sets teh fill opacity of round border.  Only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `opacity`: the opacity to set
+        public void setOpacity(Integer opacity) {
+<span class="nc" id="L2615">            this.opacity = opacity;</span>
+<span class="nc" id="L2616">        }</span>
+
+        /// Gets the stroke color for round border.  This is only used for round border.
+        /// Line border variants should use `#getColor()`
+        ///
+        /// #### Returns
+        ///
+        /// the strokeColor
+        public Integer getStrokeColor() {
+<span class="nc" id="L2625">            return strokeColor;</span>
+        }
+
+        /// Sets the stroke color for round border.  This is only used for round border.
+        /// Line border variants should use `#setColor(java.lang.Integer)`
+        ///
+        /// #### Parameters
+        ///
+        /// - `strokeColor`: the strokeColor to set
+        public void setStrokeColor(Integer strokeColor) {
+<span class="nc" id="L2635">            this.strokeColor = strokeColor;</span>
+<span class="nc" id="L2636">        }</span>
+
+        /// Gets the stroke opacity for round border.  This is only used for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the strokeOpacity
+        public Integer getStrokeOpacity() {
+<span class="nc" id="L2644">            return strokeOpacity;</span>
+        }
+
+        /// Sets the stroke opacity for round border.  This is only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `strokeOpacity`: the strokeOpacity to set
+        public void setStrokeOpacity(Integer strokeOpacity) {
+<span class="nc" id="L2653">            this.strokeOpacity = strokeOpacity;</span>
+<span class="nc" id="L2654">        }</span>
+
+        /// Sets the shadow opacity for round border.  This is only used for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowOpacity
+        public Integer getShadowOpacity() {
+<span class="nc" id="L2662">            return shadowOpacity;</span>
+        }
+
+        /// Sets the shadow opacity for round border.  This is only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowOpacity`: the shadowOpacity to set
+        public void setShadowOpacity(Integer shadowOpacity) {
+<span class="nc" id="L2671">            this.shadowOpacity = shadowOpacity;</span>
+<span class="nc" id="L2672">        }</span>
+
+        /// Gets the shadowX property of round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowX
+        public Float getShadowX() {
+<span class="nc" id="L2680">            return shadowX;</span>
+        }
+
+        /// Sets the shadowX property of round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowX`: the shadowX to set
+        public void setShadowX(Float shadowX) {
+<span class="nc" id="L2689">            this.shadowX = shadowX;</span>
+<span class="nc" id="L2690">        }</span>
+
+        /// Gets the shadowY property of round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowY
+        public Float getShadowY() {
+<span class="nc" id="L2698">            return shadowY;</span>
+        }
+
+        /// Sets the shadowY property of round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowY`: the shadowY to set
+        public void setShadowY(Float shadowY) {
+<span class="nc" id="L2707">            this.shadowY = shadowY;</span>
+<span class="nc" id="L2708">        }</span>
+
+        /// Gets the blur for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowBlur
+        public Float getShadowBlur() {
+<span class="nc" id="L2716">            return shadowBlur;</span>
+        }
+
+        /// Sets the blur for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowBlur`: the shadowBlur to set
+        public void setShadowBlur(Float shadowBlur) {
+<span class="nc" id="L2725">            this.shadowBlur = shadowBlur;</span>
+<span class="nc" id="L2726">        }</span>
+
+        /// Gets the shadow spread for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the shadowSpread
+        public ScalarValue getShadowSpread() {
+<span class="nc" id="L2734">            return shadowSpread;</span>
+        }
+
+        /// Sets the shadow spread for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `shadowSpread`: the shadowSpread to set
+        public void setShadowSpread(ScalarValue shadowSpread) {
+<span class="nc" id="L2743">            this.shadowSpread = shadowSpread;</span>
+<span class="nc" id="L2744">        }</span>
+
+        /// Sets the shadow spread for round border as a string.  String must be valid scalar
+        /// value.  E.g. 2mm, or 3px.
+        ///
+        /// #### Parameters
+        ///
+        /// - `val`
+        public void setShadowSpread(String val) {
+<span class="nc" id="L2753">            this.shadowSpread = parseScalarValue(val);</span>
+<span class="nc" id="L2754">        }</span>
+
+        /// Checks whether round border should grow to a rectangle.  Only used for round border.
+        ///
+        /// #### Returns
+        ///
+        /// the rectangle
+        public Boolean getRectangle() {
+<span class="nc" id="L2762">            return rectangle;</span>
+        }
+
+        /// Sets whether round border should grow to a rectangle.  Only used for round border.
+        ///
+        /// #### Parameters
+        ///
+        /// - `rectangle`: the rectangle to set
+        public void setRectangle(Boolean rectangle) {
+<span class="nc" id="L2771">            this.rectangle = rectangle;</span>
+<span class="nc" id="L2772">        }</span>
+
+        /// Used only for roundRect border.  The value to set for `RoundRectBorder#topOnlyMode(boolean)`.  Returns null
+        /// if this flag isn't set at all.
+        ///
+        /// #### Returns
+        ///
+        /// the topOnlyMode
+        public Boolean getTopOnlyMode() {
+<span class="nc" id="L2781">            return topOnlyMode;</span>
+        }
+
+        /// Used only for roundRect border.  The value to set for `RoundRectBorder#topOnlyMode(boolean)`.  Set to null to
+        /// not set this flag at all.
+        ///
+        /// #### Parameters
+        ///
+        /// - `topOnlyMode`: the topOnlyMode to set
+        public void setTopOnlyMode(Boolean topOnlyMode) {
+<span class="nc" id="L2791">            this.topOnlyMode = topOnlyMode;</span>
+<span class="nc" id="L2792">        }</span>
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomOnlyMode(boolean)`.  Returns null if
+        /// this property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the bottomOnlyMode
+        public Boolean getBottomOnlyMode() {
+<span class="nc" id="L2801">            return bottomOnlyMode;</span>
+        }
+
+        /// Used for roundRect border. The value to set for `RoundRectBorder#bottomOnlyMode(boolean)`.  Set to null to
+        /// ignore this property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bottomOnlyMode`: the bottomOnlyMode to set
+        public void setBottomOnlyMode(Boolean bottomOnlyMode) {
+<span class="nc" id="L2811">            this.bottomOnlyMode = bottomOnlyMode;</span>
+<span class="nc" id="L2812">        }</span>
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topLeftMode(boolean)`.  Returns null if
+        /// this property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the topLeftMode
+        public Boolean getTopLeftMode() {
+<span class="nc" id="L2821">            return topLeftMode;</span>
+        }
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topLeftMode(boolean)`.  Set null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `topLeftMode`: the topLeftMode to set
+        public void setTopLeftMode(Boolean topLeftMode) {
+<span class="nc" id="L2831">            this.topLeftMode = topLeftMode;</span>
+<span class="nc" id="L2832">        }</span>
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topRightMode(boolean)`.  Returns null if
+        /// property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the topRightMode
+        public Boolean getTopRightMode() {
+<span class="nc" id="L2841">            return topRightMode;</span>
+        }
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#topRightMode(boolean)`.  Sets null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `topRightMode`: the topRightMode to set
+        public void setTopRightMode(Boolean topRightMode) {
+<span class="nc" id="L2851">            this.topRightMode = topRightMode;</span>
+<span class="nc" id="L2852">        }</span>
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomLeftMode(boolean)`.  Returns null if
+        /// property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the bottomLeftMode
+        public Boolean getBottomLeftMode() {
+<span class="nc" id="L2861">            return bottomLeftMode;</span>
+        }
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomLeftMode(boolean)`.  Set null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bottomLeftMode`: the bottomLeftMode to set
+        public void setBottomLeftMode(Boolean bottomLeftMode) {
+<span class="nc" id="L2871">            this.bottomLeftMode = bottomLeftMode;</span>
+<span class="nc" id="L2872">        }</span>
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomRightMode(boolean)`.  Returns null
+        /// if property is ignored.
+        ///
+        /// #### Returns
+        ///
+        /// the bottomRightMode
+        public Boolean getBottomRightMode() {
+<span class="nc" id="L2881">            return bottomRightMode;</span>
+        }
+
+        /// Used for roundRect border.  The value to set for `RoundRectBorder#bottomRightMode(boolean)`.  Set null to ignore
+        /// property.
+        ///
+        /// #### Parameters
+        ///
+        /// - `bottomRightMode`: the bottomRightMode to set
+        public void setBottomRightMode(Boolean bottomRightMode) {
+<span class="nc" id="L2891">            this.bottomRightMode = bottomRightMode;</span>
+<span class="nc" id="L2892">        }</span>
+
+        /// Used for roundRect border.  The corner radius.
+        ///
+        /// #### Returns
+        ///
+        /// the cornerRadius
+        ///
+        /// #### See also
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
+        public Float getCornerRadius() {
+<span class="nc" id="L2904">            return cornerRadius;</span>
+        }
+
+        /// Used for roundRect border.  Sets the corner radius.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cornerRadius`: the cornerRadius to set
+        ///
+        /// #### See also
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
+        public void setCornerRadius(Float cornerRadius) {
+<span class="nc" id="L2917">            this.cornerRadius = cornerRadius;</span>
+<span class="nc" id="L2918">        }</span>
+
+        /// Used for roundRect border.  Sets the corner radius as a scalar value.  E.g. &quot;2mm&quot; or &quot;2px'
+        ///
+        /// #### Parameters
+        ///
+        /// - `cornerRadius`: the cornerRadius to set
+        ///
+        /// #### See also
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
+        ///
+        /// - #setCornerRadius(java.lang.Float)
+        ///
+        /// - #setCornerRadius(com.codename1.ui.plaf.StyleParser.ScalarValue)
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
+        public void setCornerRadius(String cornerRadius) {
+<span class="nc" id="L2936">            setCornerRadius(getMMValue(cornerRadius));</span>
+<span class="nc" id="L2937">        }</span>
+
+        /// Used for roundRect border.  Sets the corner radius
+        ///
+        /// #### Parameters
+        ///
+        /// - `sv`: The corner radius to set.
+        ///
+        /// #### See also
+        ///
+        /// - #setCornerRadius(java.lang.Float)
+        ///
+        /// - #setCornerRadius(java.lang.String)
+        ///
+        /// - RoundRectBorder#cornerRadius(float)
+        public void setCornerRadius(ScalarValue sv) {
+<span class="nc bnc" id="L2953" title="All 2 branches missed.">            switch (sv.getUnit()) {</span>
+                case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L2955">                    setCornerRadius((float) sv.getValue());</span>
+<span class="nc" id="L2956">                    break;</span>
+                default:
+<span class="nc" id="L2958">                    setCornerRadius(sv.getPixelValue() / (float) Display.getInstance().convertToPixels(1f));</span>
+            }
+<span class="nc" id="L2960">        }</span>
+    }
+
+    /// Encapsulates the value of the font property in a style string.
+<span class="fc" id="L2964">    public static class FontInfo {</span>
+        private Float size;
+        private byte sizeUnit;
+        private String name;
+        private String file;
+
+        /// Returns the font in a format that can be used as the value of the font property of a style string.
+        @Override
+        public String toString() {
+<span class="fc" id="L2973">            return (sizeString(&quot;&quot;) + nameString(&quot; &quot;) + fileString(&quot; &quot;)).trim();</span>
+        }
+
+        /// Gets the font size as a style string.  E.g. 18mm, or 12px.  If unit is inherit, this will just return an empty string.
+        ///
+        /// #### Parameters
+        ///
+        /// - `prefix`: String to prefix to the size.
+        public String sizeString(String prefix) {
+<span class="fc bfc" id="L2982" title="All 2 branches covered.">            if (getSize() == null) {</span>
+<span class="fc" id="L2983">                return prefix;</span>
+            }
+<span class="pc bpc" id="L2985" title="1 of 2 branches missed.">            if (getSizeUnit() == Style.UNIT_TYPE_DIPS) {</span>
+<span class="nc" id="L2986">                return prefix + getSize() + unitString();</span>
+<span class="pc bpc" id="L2987" title="1 of 2 branches missed.">            } else if (getSizeUnit() == StyleParser.UNIT_INHERIT) {</span>
+<span class="nc" id="L2988">                return prefix;</span>
+            } else {
+<span class="fc" id="L2990">                return prefix + getSize().intValue() + unitString();</span>
+            }
+        }
+
+        /// Gets the size of the font in pixels.
+        ///
+        /// #### Parameters
+        ///
+        /// - `baseStyle`: The base style to use in case the font size isn't specified in the style string.
+        public float getSizeInPixels(Style baseStyle) {
+<span class="pc bpc" id="L3000" title="2 of 4 branches missed.">            if (getSize() == null || getSizeUnit() == UNIT_INHERIT) {</span>
+<span class="nc" id="L3001">                Font f = baseStyle.getFont();</span>
+<span class="nc bnc" id="L3002" title="All 2 branches missed.">                if (f == null) {</span>
+<span class="nc" id="L3003">                    f = Font.getDefaultFont();</span>
+                }
+
+<span class="nc" id="L3006">                float pixS = f.getPixelSize();</span>
+<span class="nc bnc" id="L3007" title="All 2 branches missed.">                if (pixS &lt; 1) {</span>
+<span class="nc" id="L3008">                    pixS = f.getHeight();</span>
+                }
+<span class="nc" id="L3010">                return pixS;</span>
+
+            } else {
+<span class="pc bpc" id="L3013" title="1 of 2 branches missed.">                switch (getSizeUnit()) {</span>
+                    case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L3015">                        return Display.getInstance().convertToPixels(getSize());</span>
+                    default:
+<span class="fc" id="L3017">                        return getSize();</span>
+                }
+            }
+        }
+
+        private String unitString() {
+<span class="pc bpc" id="L3023" title="2 of 3 branches missed.">            switch (getSizeUnit()) {</span>
+                case Style.UNIT_TYPE_DIPS:
+<span class="nc" id="L3025">                    return &quot;mm&quot;;</span>
+                case Style.UNIT_TYPE_PIXELS:
+<span class="fc" id="L3027">                    return &quot;px&quot;;</span>
+                default:
+<span class="nc" id="L3029">                    return &quot;px&quot;;</span>
+            }
+        }
+
+        private String nameString(String prefix) {
+<span class="pc bpc" id="L3034" title="1 of 2 branches missed.">            if (getName() == null) {</span>
+<span class="nc" id="L3035">                return prefix;</span>
+            }
+<span class="fc" id="L3037">            return prefix + getName();</span>
+        }
+
+        private String fileString(String prefix) {
+<span class="pc bpc" id="L3041" title="1 of 2 branches missed.">            if (getFile() == null) {</span>
+<span class="nc" id="L3042">                return prefix;</span>
+            }
+<span class="fc" id="L3044">            return prefix + getFile();</span>
+        }
+
+        /// Gets the font size.
+        ///
+        /// #### Returns
+        ///
+        /// the size
+        ///
+        /// #### See also
+        ///
+        /// - #getSizeUnit()
+        public Float getSize() {
+<span class="fc" id="L3057">            return size;</span>
+        }
+
+        /// Sets the font size.
+        ///
+        /// #### Parameters
+        ///
+        /// - `size`: the size to set
+        ///
+        /// #### See also
+        ///
+        /// - #setSizeUnit(byte)
+        public void setSize(Float size) {
+<span class="fc" id="L3070">            this.size = size;</span>
+<span class="fc" id="L3071">        }</span>
+
+        /// Gets the font size unit.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `#UNIT_INHERIT`.
+        ///
+        /// #### Returns
+        ///
+        /// the sizeUnit
+        public byte getSizeUnit() {
+<span class="fc" id="L3079">            return sizeUnit;</span>
+        }
+
+        /// Sets the font size unit.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`, or `#UNIT_INHERIT`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `sizeUnit`: the sizeUnit to set
+        public void setSizeUnit(byte sizeUnit) {
+<span class="fc" id="L3088">            this.sizeUnit = sizeUnit;</span>
+<span class="fc" id="L3089">        }</span>
+
+        /// Gets the name of the font.
+        ///
+        /// #### Returns
+        ///
+        /// the name
+        public String getName() {
+<span class="fc" id="L3097">            return name;</span>
+        }
+
+        /// Sets the name of the font.
+        ///
+        /// #### Parameters
+        ///
+        /// - `name`: the name to set
+        public void setName(String name) {
+<span class="fc" id="L3106">            this.name = name;</span>
+<span class="fc" id="L3107">        }</span>
+
+        /// Gets the font file name.  Should start with &quot;/&quot;.
+        ///
+        /// #### Returns
+        ///
+        /// the file
+        public String getFile() {
+<span class="fc" id="L3115">            return file;</span>
+        }
+
+        /// Sets the font file name.  Should start with &quot;/&quot;.
+        ///
+        /// #### Parameters
+        ///
+        /// - `file`: the file to set
+        public void setFile(String file) {
+<span class="fc" id="L3124">            this.file = file;</span>
+<span class="fc" id="L3125">        }</span>
+
+        /// Creates a font based on this font information.
+        ///
+        /// #### Parameters
+        ///
+        /// - `baseStyle`: The base style to use in cases where aspects of the font aren't explicitly specified in the style string.
+        ///
+        /// #### Returns
+        ///
+        /// A font.
+        public Font createFont(Style baseStyle) {
+            Font f;
+<span class="nc bnc" id="L3138" title="All 2 branches missed.">            if (name == null) {</span>
+<span class="nc bnc" id="L3139" title="All 2 branches missed.">                if (baseStyle == null) {</span>
+<span class="nc" id="L3140">                    f = Font.getDefaultFont();</span>
+                } else {
+<span class="nc" id="L3142">                    f = baseStyle.getFont();</span>
+                }
+            } else {
+<span class="nc" id="L3145">                f = Font.createTrueTypeFont(name, file);</span>
+            }
+<span class="nc bnc" id="L3147" title="All 6 branches missed.">            if (f == null || (getSize() != null &amp;&amp; !f.isTTFNativeFont())) {</span>
+<span class="nc" id="L3148">                f = Font.createTrueTypeFont(Font.NATIVE_MAIN_REGULAR, Font.NATIVE_MAIN_REGULAR);</span>
+            }
+<span class="nc bnc" id="L3150" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc bnc" id="L3151" title="All 2 branches missed.">                if (f.isTTFNativeFont()) {</span>
+<span class="nc" id="L3152">                    return f.derive(getSizeInPixels(baseStyle), f.getStyle());</span>
+                } else {
+<span class="nc" id="L3154">                    return Font.getDefaultFont();</span>
+                }
+            } else {
+<span class="nc" id="L3157">                return Font.getDefaultFont();</span>
+            }
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

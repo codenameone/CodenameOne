@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutoCompleteTextField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">AutoCompleteTextField.java</span></div><h1>AutoCompleteTextField.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.FilterProxyListModel;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+
+/// An editable `com.codename1.ui.TextField` with completion suggestions
+/// that show up in a drop down menu while the user types in text.
+///
+/// This class uses the &quot;`TextField`&quot; UIID by default as well as &quot;`AutoCompletePopup`&quot; &amp;
+/// &quot;`AutoCompleteList`&quot; for the popup list details.
+///
+/// The sample below shows the more trivial use case for this widget:
+///
+/// ```java
+/// Form hi = new Form(&quot;Auto Complete&quot;, new BoxLayout(BoxLayout.Y_AXIS));
+/// AutoCompleteTextField ac = new AutoCompleteTextField(&quot;Short&quot;, &quot;Shock&quot;, &quot;Sholder&quot;, &quot;Shrek&quot;);
+/// ac.setMinimumElementsShownInPopup(5);
+/// hi.add(ac);
+/// ```
+///
+/// The following sample shows more dynamic usage of the class where the auto-complete model is mutated
+/// based on webservice results.
+///
+/// ```java
+/// public void showForm() {
+///   final DefaultListModel options = new DefaultListModel&lt;&gt;();
+///   AutoCompleteTextField ac = new AutoCompleteTextField(options) {
+/// @Override
+///       protected boolean filter(String text) {
+///           if(text.length() == 0) {
+///               return false;
+///           }
+///           String[] l = searchLocations(text);
+///           if(l == null || l.length == 0) {
+///               return false;
+///           }
+///
+///           options.removeAll();
+///           for(String s : l) {
+///               options.addItem(s);
+///           }
+///           return true;
+///       }
+///
+///   };
+///   ac.setMinimumElementsShownInPopup(5);
+///   hi.add(ac);
+///   hi.add(new SpanLabel(&quot;This demo requires a valid google API key to be set below &quot;
+///            + &quot;you can get this key for the webservice (not the native key) by following the instructions here: &quot;
+///            + &quot;https://developers.google.com/places/web-service/get-api-key&quot;));
+///   hi.add(apiKey);
+///   hi.getToolbar().addCommandToRightBar(&quot;Get Key&quot;, null, e -&gt; Display.getInstance().execute(&quot;https://developers.google.com/places/web-service/get-api-key&quot;));
+///   hi.show();
+/// }
+///
+/// TextField apiKey = new TextField();
+///
+/// String[] searchLocations(String text) {
+///     try {
+///         if(text.length() &gt; 0) {
+///             ConnectionRequest r = new ConnectionRequest();
+///             r.setPost(false);
+///             r.setUrl(&quot;https://maps.googleapis.com/maps/api/place/autocomplete/json&quot;);
+///             r.addArgument(&quot;key&quot;, apiKey.getText());
+///             r.addArgument(&quot;input&quot;, text);
+///             NetworkManager.getInstance().addToQueueAndWait(r);
+///             Map result = new JSONParser().parseJSON(new InputStreamReader(new ByteArrayInputStream(r.getResponseData()), &quot;UTF-8&quot;));
+///             String[] res = Result.fromContent(result).getAsStringArray(&quot;//description&quot;);
+///             return res;
+///         }
+///     } catch(Exception err) {
+///         Log.e(err);
+///     }
+///     return null;
+/// }
+/// ```
+/// @author Chen
+public class AutoCompleteTextField extends TextField {
+
+    public static final int POPUP_POSITION_AUTO = 0;
+    public static final int POPUP_POSITION_OVER = 1;
+    public static final int POPUP_POSITION_UNDER = 2;
+    private final Container popup;
+<span class="fc" id="L116">    private final ActionListener listener = new FormPointerListener();</span>
+<span class="fc" id="L117">    private final ActionListener pressListener = new FormPointerPressListener();</span>
+<span class="fc" id="L118">    private final ArrayList&lt;ActionListener&gt; listeners = new ArrayList&lt;ActionListener&gt;();</span>
+    boolean pressInBounds;
+<span class="fc" id="L120">    private boolean dontCalcSize = false;</span>
+    private FilterProxyListModel&lt;String&gt; filter;
+    private ListCellRenderer completionRenderer;
+    private String pickedText;
+    private int minimumLength;
+<span class="fc" id="L125">    private int popupPosition = POPUP_POSITION_AUTO;</span>
+    /// The number of elements shown for the auto complete popup
+<span class="fc" id="L127">    private int minimumElementsShownInPopup = -1;</span>
+
+    /// Constructor with completion suggestions
+    ///
+    /// #### Parameters
+    ///
+    /// - `completion`: a String array of suggestion for completion
+    public AutoCompleteTextField(String... completion) {
+<span class="fc" id="L135">        this(new DefaultListModel&lt;String&gt;(completion));</span>
+<span class="fc" id="L136">    }</span>
+
+    /// Constructor with completion suggestions, filtering is automatic in this case
+    ///
+    /// #### Parameters
+    ///
+    /// - `listModel`: a list model containing potential string suggestions
+<span class="fc" id="L143">    public AutoCompleteTextField(ListModel&lt;String&gt; listModel) {</span>
+<span class="fc" id="L144">        popup = new Container(new BoxLayout(BoxLayout.Y_AXIS)) {</span>
+
+            @Override
+            public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                if (dontCalcSize) {</span>
+<span class="fc" id="L149">                    return;</span>
+                }
+<span class="fc" id="L151">                super.setShouldCalcPreferredSize(shouldCalcPreferredSize);</span>
+<span class="fc" id="L152">            }</span>
+
+            @Override
+            public void refreshTheme(boolean merge) {
+<span class="nc" id="L156">            }</span>
+
+        };
+<span class="fc" id="L159">        popup.setOwner(this);</span>
+<span class="fc" id="L160">        filter = new FilterProxyListModel&lt;String&gt;(listModel);</span>
+<span class="fc" id="L161">        popup.setScrollable(false);</span>
+<span class="fc" id="L162">        popup.setUIID(&quot;AutoCompletePopup&quot;);</span>
+<span class="fc" id="L163">        setConstraint(TextArea.NON_PREDICTIVE);</span>
+<span class="fc" id="L164">        addCloseListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent e) {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                if (popup.isVisible()) {</span>
+<span class="fc" id="L168">                    popup.setVisible(false);</span>
+<span class="fc" id="L169">                    popup.setEnabled(false);</span>
+<span class="fc" id="L170">                    Form f = getComponentForm();</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    if (f != null) {</span>
+<span class="fc" id="L172">                        f.revalidateLater();</span>
+                    }
+                }
+<span class="fc" id="L175">            }</span>
+        });
+
+<span class="fc" id="L178">    }</span>
+
+    /// The default constructor is useful for cases of filter subclasses overriding the
+    /// getSuggestionModel value as well as for the GUI builder
+    public AutoCompleteTextField() {
+<span class="nc" id="L183">        this(new DefaultListModel(&quot;&quot;));</span>
+<span class="nc" id="L184">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L189">        super.initComponent();</span>
+<span class="fc" id="L190">        getComponentForm().addPointerPressedListener(pressListener);</span>
+<span class="fc" id="L191">        getComponentForm().addPointerReleasedListener(listener);</span>
+<span class="fc" id="L192">        Display.getInstance().callSerially(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="fc" id="L196">                addPopup(true);</span>
+<span class="fc" id="L197">            }</span>
+        });
+<span class="fc" id="L199">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L204">        super.deinitialize();</span>
+<span class="fc" id="L205">        getComponentForm().removePointerPressedListener(pressListener);</span>
+<span class="fc" id="L206">        getComponentForm().removePointerReleasedListener(listener);</span>
+<span class="fc" id="L207">        Display.getInstance().callSerially(new Runnable() {</span>
+
+            @Override
+            public void run() {
+<span class="fc" id="L211">                removePopup();</span>
+<span class="fc" id="L212">            }</span>
+        });
+<span class="fc" id="L214">    }</span>
+
+    /// Causes the popup UI to show
+    public void showPopup() {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (shouldShowPopup()) {</span>
+<span class="fc" id="L219">            pressInBounds = true;</span>
+<span class="fc" id="L220">            requestFocus();</span>
+<span class="fc" id="L221">            int m = minimumLength;</span>
+<span class="fc" id="L222">            minimumLength = 0;</span>
+<span class="fc" id="L223">            setTextImpl(getText(), true);</span>
+<span class="fc" id="L224">            minimumLength = m;</span>
+
+        }
+<span class="fc" id="L227">    }</span>
+
+    void setParentText(String text) {
+<span class="fc" id="L230">        super.setText(text);</span>
+<span class="fc" id="L231">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setText(String text) {
+<span class="fc" id="L236">        setTextImpl(text, false);</span>
+<span class="fc" id="L237">    }</span>
+
+    private void setTextImpl(String text, boolean forceUpdate) {
+<span class="fc" id="L240">        String old = getText();</span>
+<span class="fc" id="L241">        super.setText(text);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (!forceUpdate) {</span>
+<span class="pc bpc" id="L243" title="4 of 8 branches missed.">            if (text == null || text.equals(old) || (pickedText != null &amp;&amp; pickedText.equals(text))) {</span>
+<span class="fc" id="L244">                pickedText = null;</span>
+<span class="fc" id="L245">                return;</span>
+            }
+        }
+<span class="fc" id="L248">        pickedText = null;</span>
+<span class="fc" id="L249">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L250" title="1 of 4 branches missed.">        if (f != null &amp;&amp; filterImpl(text)) {</span>
+<span class="fc" id="L251">            updateFilterList();</span>
+        }
+<span class="fc" id="L253">    }</span>
+
+    /// In a case of an asynchronous filter this method can be invoked to refresh the completion list
+    protected void updateFilterList() {
+<span class="fc" id="L257">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L258" title="1 of 4 branches missed.">        boolean v = filter.getSize() &gt; 0 &amp;&amp; getText().length() &gt;= minimumLength;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (v != popup.isVisible()) {</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (popup.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L261">                popup.getComponentAt(0).setScrollY(0);</span>
+            }
+<span class="pc bpc" id="L263" title="1 of 4 branches missed.">            if (v &amp;&amp; popup.getAbsoluteX() != getAbsoluteX()) {</span>
+<span class="nc" id="L264">                removePopup();</span>
+<span class="nc" id="L265">                addPopup(false);</span>
+            }
+<span class="fc" id="L267">            popup.setVisible(v);</span>
+<span class="fc" id="L268">            popup.setEnabled(v);</span>
+<span class="fc" id="L269">            f.revalidate();</span>
+        }
+<span class="fc bfc" id="L271" title="All 4 branches covered.">        if (v &amp;&amp; popup.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L272">            int popupHeight = calcPopupHeight((List) popup.getComponentAt(0));</span>
+<span class="fc" id="L273">            popup.setHeight(popupHeight);</span>
+<span class="fc" id="L274">            dontCalcSize = false;</span>
+<span class="fc" id="L275">            popup.forceRevalidate();</span>
+<span class="fc" id="L276">            dontCalcSize = true;</span>
+        }
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L279">            f.revalidate();</span>
+        }
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L282">            dontCalcSize = false;</span>
+<span class="fc" id="L283">            f.revalidate();</span>
+<span class="fc" id="L284">            dontCalcSize = true;</span>
+        }
+
+<span class="fc" id="L287">    }</span>
+
+    /// Subclasses can override this method to perform more elaborate filter operations
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text to filter
+    ///
+    /// #### Returns
+    ///
+    /// true if the filter has changed the list, false if it hasn't or is working asynchronously
+    protected boolean filter(String text) {
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (filter != null) {</span>
+<span class="fc" id="L300">            filter.filter(text);</span>
+<span class="fc" id="L301">            return true;</span>
+        }
+<span class="nc" id="L303">        return false;</span>
+    }
+
+    private boolean filterImpl(String text) {
+<span class="fc" id="L307">        boolean res = filter(text);</span>
+<span class="pc bpc" id="L308" title="2 of 4 branches missed.">        if (filter != null &amp;&amp; popup != null) {</span>
+<span class="pc bpc" id="L309" title="1 of 4 branches missed.">            boolean v = filter.getSize() &gt; 0 &amp;&amp; text.length() &gt;= minimumLength;</span>
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">            if (v != popup.isVisible() &amp;&amp; popup.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L311">                popup.getComponentAt(0).setScrollY(0);</span>
+<span class="pc bpc" id="L312" title="2 of 4 branches missed.">                if (v &amp;&amp; popup.getAbsoluteX() != getAbsoluteX()) {</span>
+<span class="nc" id="L313">                    removePopup();</span>
+<span class="nc" id="L314">                    addPopup(false);</span>
+                }
+<span class="fc" id="L316">                popup.setVisible(v);</span>
+<span class="fc" id="L317">                popup.setEnabled(v);</span>
+            }
+<span class="fc" id="L319">            Form f = getComponentForm();</span>
+
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (popup.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L322">                int popupHeight = calcPopupHeight((List) popup.getComponentAt(0));</span>
+<span class="fc" id="L323">                popup.setHeight(popupHeight);</span>
+<span class="fc" id="L324">                dontCalcSize = false;</span>
+<span class="fc" id="L325">                popup.forceRevalidate();</span>
+<span class="fc" id="L326">                dontCalcSize = true;</span>
+            }
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L329">                f.revalidate();</span>
+            }
+        }
+<span class="fc" id="L332">        return res;</span>
+    }
+
+    /// Returns the list model to show within the completion list
+    ///
+    /// #### Returns
+    ///
+    /// the list model can be anything
+    protected ListModel&lt;String&gt; getSuggestionModel() {
+<span class="fc" id="L341">        return filter;</span>
+    }
+
+    /// Sets a custom renderer to the completion suggestions list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `completionRenderer`: a ListCellRenderer for the suggestions List
+    public void setCompletionRenderer(ListCellRenderer completionRenderer) {
+<span class="fc" id="L350">        this.completionRenderer = completionRenderer;</span>
+<span class="fc" id="L351">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int k) {
+<span class="pc bpc" id="L356" title="3 of 6 branches missed.">        if (popup != null &amp;&amp; popup.getParent() != null &amp;&amp; popup.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L357">            int game = Display.getInstance().getGameAction(k);</span>
+<span class="pc bpc" id="L358" title="3 of 6 branches missed.">            if (game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_FIRE) {</span>
+<span class="fc" id="L359">                popup.getComponentAt(0).keyPressed(k);</span>
+<span class="fc" id="L360">                return;</span>
+            }
+        }
+<span class="nc" id="L363">        super.keyPressed(k);</span>
+<span class="nc" id="L364">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int k) {
+<span class="pc bpc" id="L369" title="3 of 6 branches missed.">        if (popup != null &amp;&amp; popup.getParent() != null &amp;&amp; popup.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L370">            int game = Display.getInstance().getGameAction(k);</span>
+<span class="pc bpc" id="L371" title="3 of 6 branches missed.">            if (game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_FIRE) {</span>
+<span class="fc" id="L372">                popup.getComponentAt(0).keyReleased(k);</span>
+<span class="fc" id="L373">                return;</span>
+            }
+        }
+<span class="nc" id="L376">        super.keyReleased(k);</span>
+<span class="nc" id="L377">    }</span>
+
+    private void removePopup() {
+<span class="fc" id="L380">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L381" title="1 of 4 branches missed.">        if (f == null &amp;&amp; popup != null) {</span>
+<span class="fc" id="L382">            f = popup.getComponentForm();</span>
+        }
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L385">            Container lay = f.getLayeredPane(getClass(), true);</span>
+<span class="fc" id="L386">            Container parent = popup.getParent();</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L388">                lay.removeComponent(parent);</span>
+<span class="fc" id="L389">                popup.remove();</span>
+<span class="fc" id="L390">                f.revalidateLater();</span>
+            }
+
+        }
+<span class="fc" id="L394">    }</span>
+
+    /// Adds an action listener that fires an event when an entry in the auto-complete list is selected.
+    /// Notice that this method will only take effect when the popup is reshown, if it is invoked when
+    /// a popup is already showing it will have no effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the listener
+    public void addListListener(ActionListener a) {
+<span class="fc" id="L404">        listeners.add(a);</span>
+<span class="fc" id="L405">    }</span>
+
+    /// Removes an action listener that fires an event when an entry in the auto-complete list is selected.
+    /// Notice that this method will only take effect when the popup is reshown, if it is invoked when
+    /// a popup is already showing it will have no effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the listener
+    public void removeListListener(ActionListener a) {
+<span class="fc" id="L415">        listeners.remove(a);</span>
+<span class="fc" id="L416">    }</span>
+
+    private void addPopup(boolean updateFilter) {
+<span class="fc" id="L419">        final Form f = getComponentForm();</span>
+<span class="fc" id="L420">        popup.removeAll();</span>
+<span class="fc" id="L421">        popup.setVisible(false);</span>
+<span class="fc" id="L422">        popup.setEnabled(false);</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        if (updateFilter) {</span>
+<span class="fc" id="L424">            filter(getText());</span>
+        }
+<span class="fc" id="L426">        final List l = new List(getSuggestionModel());</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        if (getMinimumElementsShownInPopup() &gt; 0) {</span>
+<span class="fc" id="L428">            l.setMinElementHeight(getMinimumElementsShownInPopup());</span>
+        }
+<span class="fc" id="L430">        l.setScrollToSelected(false);</span>
+<span class="fc" id="L431">        l.setItemGap(0);</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        for (ActionListener al : listeners) {</span>
+<span class="fc" id="L433">            l.addActionListener(al);</span>
+<span class="fc" id="L434">        }</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if (completionRenderer == null) {</span>
+<span class="fc" id="L436">            ((DefaultListCellRenderer&lt;String&gt;) l.getRenderer()).setShowNumbers(false);</span>
+        } else {
+<span class="fc" id="L438">            l.setRenderer(completionRenderer);</span>
+        }
+<span class="fc" id="L440">        l.setUIID(&quot;AutoCompleteList&quot;);</span>
+<span class="fc" id="L441">        l.addActionListener(new ActionListener() {</span>
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">                if (shouldShowPopup()) {</span>
+<span class="fc" id="L446">                    pickedText = (String) l.getSelectedItem();</span>
+<span class="fc" id="L447">                    setParentText(pickedText);</span>
+<span class="fc" id="L448">                    fireActionEvent();</span>
+                    // relaunch text editing if we are still editing
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">                    if (Display.getInstance().isTextEditing(AutoCompleteTextField.this)) {</span>
+<span class="nc" id="L451">                        Display.getInstance().editString(AutoCompleteTextField.this, getMaxSize(), getConstraint(), (String) l.getSelectedItem());</span>
+                    }
+<span class="fc" id="L453">                    popup.setVisible(false);</span>
+<span class="fc" id="L454">                    popup.setEnabled(false);</span>
+<span class="fc" id="L455">                    f.revalidate();</span>
+                }
+<span class="fc" id="L457">            }</span>
+        });
+
+<span class="fc" id="L460">        byte[] units = popup.getStyle().getMarginUnit();</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">        if (units != null) {</span>
+<span class="nc" id="L462">            units[Component.LEFT] = Style.UNIT_TYPE_PIXELS;</span>
+<span class="nc" id="L463">            units[Component.TOP] = Style.UNIT_TYPE_PIXELS;</span>
+<span class="nc" id="L464">            popup.getAllStyles().setMarginUnit(units);</span>
+        }
+
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        int leftMargin = isRTL() ?</span>
+<span class="fc" id="L468">                Math.max(0, f.getWidth() - getAbsoluteX() - getWidth()) :</span>
+<span class="fc" id="L469">                Math.max(0, getAbsoluteX());</span>
+
+<span class="fc" id="L471">        popup.getAllStyles().setMargin(LEFT, leftMargin);</span>
+
+<span class="fc" id="L473">        int popupHeight = calcPopupHeight(l);</span>
+
+<span class="fc" id="L475">        popup.setPreferredW(getWidth());</span>
+<span class="fc" id="L476">        popup.setHeight(popupHeight);</span>
+<span class="fc" id="L477">        popup.setWidth(getWidth());</span>
+
+<span class="fc" id="L479">        popup.addComponent(l);</span>
+<span class="fc" id="L480">        popup.layoutContainer();</span>
+        //block the reflow of this popup, which can cause painting problems
+<span class="fc" id="L482">        dontCalcSize = true;</span>
+
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">            if (popup.getParent() == null) {</span>
+<span class="fc" id="L486">                Container lay = f.getLayeredPane(getClass(), true);</span>
+<span class="fc" id="L487">                lay.setLayout(new LayeredLayout());</span>
+<span class="fc" id="L488">                Container wrapper = new Container();</span>
+<span class="fc" id="L489">                wrapper.add(popup);</span>
+<span class="fc" id="L490">                lay.addComponent(wrapper);</span>
+            }
+<span class="fc" id="L492">            f.revalidate();</span>
+        }
+<span class="fc" id="L494">    }</span>
+
+    /// Indicates the minimum length of text in the field in order for a popup to show
+    /// the default is 0 where a popup is shown immediately for all text length if the number
+    /// is 2 a popup will only appear when there are two characters or more.
+    ///
+    /// #### Returns
+    ///
+    /// the minimumLength
+    public int getMinimumLength() {
+<span class="fc" id="L504">        return minimumLength;</span>
+    }
+
+    /// Indicates the minimum length of text in the field in order for a popup to show
+    /// the default is 0 where a popup is shown immediately for all text length if the number
+    /// is 2 a popup will only appear when there are two characters or more.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumLength`: the minimumLength to set
+    public void setMinimumLength(int minimumLength) {
+<span class="fc" id="L515">        this.minimumLength = minimumLength;</span>
+<span class="fc" id="L516">    }</span>
+
+    /// The number of elements shown for the auto complete popup
+    ///
+    /// #### Returns
+    ///
+    /// the minimumElementsShownInPopup
+    public int getMinimumElementsShownInPopup() {
+<span class="fc" id="L524">        return minimumElementsShownInPopup;</span>
+    }
+
+    /// The number of elements shown for the auto complete popup
+    ///
+    /// #### Parameters
+    ///
+    /// - `minimumElementsShownInPopup`: the minimumElementsShownInPopup to set
+    public void setMinimumElementsShownInPopup(int minimumElementsShownInPopup) {
+<span class="fc" id="L533">        this.minimumElementsShownInPopup = minimumElementsShownInPopup;</span>
+<span class="fc" id="L534">    }</span>
+
+    /// Set the autocomplete popup position in respect of the text field;
+    /// POPUP_POSITION_AUTO is the default and it means that the popup is placed
+    /// according to the available space.
+    ///
+    /// #### Parameters
+    ///
+    /// - `popupPosition`: @param popupPosition on of POPUP_POSITION_AUTO, POPUP_POSITION_OVER,
+    /// POPUP_POSITION_UNDER
+    public void setPopupPosition(int popupPosition) {
+<span class="fc" id="L545">        this.popupPosition = popupPosition;</span>
+<span class="fc" id="L546">    }</span>
+
+    private int calcPopupHeight(List l) {
+<span class="fc" id="L549">        int y = getAbsoluteY();</span>
+        int topMargin;
+        int popupHeight;
+<span class="fc" id="L552">        int items = l.getModel().getSize();</span>
+<span class="fc" id="L553">        final Form f = getComponentForm();</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">        if (f == null) {</span>
+            // for some reason this happens in the GUI builder
+<span class="nc" id="L556">            return 10;</span>
+        }
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (l.getModel() instanceof FilterProxyListModel) {</span>
+<span class="fc" id="L559">            items = ((FilterProxyListModel) l.getModel()).getUnderlying().getSize();</span>
+        }
+<span class="fc" id="L561">        int listHeight = items * l.getElementSize(false, true).getHeight();</span>
+<span class="pc bpc" id="L562" title="1 of 6 branches missed.">        if (popupPosition == POPUP_POSITION_UNDER || popupPosition == POPUP_POSITION_AUTO &amp;&amp; y &lt; f.getContentPane().getHeight() / 2) {</span>
+<span class="fc" id="L563">            topMargin = y - f.getTitleArea().getHeight() + getHeight();</span>
+<span class="fc" id="L564">            popupHeight = Math.min(listHeight, f.getContentPane().getHeight() / 2);</span>
+        } else {
+<span class="fc" id="L566">            popupHeight = Math.min(listHeight, f.getContentPane().getHeight() / 2);</span>
+<span class="fc" id="L567">            popupHeight = Math.min(popupHeight, y - f.getTitleArea().getHeight());</span>
+<span class="fc" id="L568">            topMargin = y - f.getTitleArea().getHeight() - popupHeight;</span>
+        }
+<span class="fc" id="L570">        popup.getAllStyles().setMargin(TOP, Math.max(0, topMargin));</span>
+<span class="fc" id="L571">        popup.setPreferredH(popupHeight);</span>
+<span class="fc" id="L572">        return popupHeight;</span>
+    }
+
+    /// Callback that allows subclasses to block the popup from showing
+    ///
+    /// #### Returns
+    ///
+    /// true to allow the popup if applicable, false to block it
+    protected boolean shouldShowPopup() {
+<span class="fc" id="L581">        return true;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L587">        return new String[]{&quot;completion&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L593">        return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L599">        return new String[]{&quot;String[]&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L605" title="All 2 branches missed.">        if (&quot;completion&quot;.equals(name)) {</span>
+<span class="nc" id="L606">            return getCompletion();</span>
+        }
+<span class="nc" id="L608">        return null;</span>
+    }
+
+    /// Returns the completion values
+    ///
+    /// #### Returns
+    ///
+    /// array of completion entries
+    public String[] getCompletion() {
+<span class="nc" id="L617">        String[] r = new String[filter.getUnderlying().getSize()];</span>
+<span class="nc" id="L618">        int rlen = r.length;</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">        for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="nc" id="L620">            r[iter] = (String) filter.getUnderlying().getItemAt(iter);</span>
+        }
+<span class="nc" id="L622">        return r;</span>
+    }
+
+    /// Sets the completion values
+    ///
+    /// #### Parameters
+    ///
+    /// - `completion`: the completion values
+    public void setCompletion(String... completion) {
+<span class="nc" id="L631">        filter = new FilterProxyListModel&lt;String&gt;(new DefaultListModel&lt;String&gt;(completion));</span>
+<span class="nc" id="L632">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L637" title="All 2 branches missed.">        if (&quot;completion&quot;.equals(name)) {</span>
+<span class="nc" id="L638">            filter = new FilterProxyListModel&lt;String&gt;(new DefaultListModel&lt;String&gt;((String[]) value));</span>
+<span class="nc" id="L639">            return null;</span>
+        }
+<span class="nc" id="L641">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// When enabled this makes the filter check that the string starts with rather than within the index
+    ///
+    /// #### Returns
+    ///
+    /// the startsWithMode
+    public boolean isStartsWithMode() {
+<span class="nc" id="L650">        return filter.isStartsWithMode();</span>
+    }
+
+    /// When enabled this makes the filter check that the string starts with rather than within the index
+    ///
+    /// #### Parameters
+    ///
+    /// - `startsWithMode`: the startsWithMode to set
+    public void setStartsWithMode(boolean startsWithMode) {
+<span class="nc" id="L659">        filter.setStartsWithMode(startsWithMode);</span>
+<span class="nc" id="L660">    }</span>
+
+<span class="fc" id="L662">    class FormPointerPressListener implements ActionListener {</span>
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L665">            pressInBounds = false;</span>
+<span class="fc" id="L666">            final Form f = getComponentForm();</span>
+<span class="fc" id="L667">            Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);</span>
+
+<span class="fc bfc" id="L669" title="All 2 branches covered.">            for (int i = 0; i &lt; layered.getComponentCount(); i++) {</span>
+<span class="fc" id="L670">                Container wrap = (Container) layered.getComponentAt(i);</span>
+<span class="fc" id="L671">                Component pop = wrap.getComponentAt(0);</span>
+<span class="fc bfc" id="L672" title="All 2 branches covered.">                if (pop.isVisible()) {</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">                    if (pop.contains(evt.getX(), evt.getY())) {</span>
+<span class="fc" id="L674">                        pressInBounds = true;</span>
+                    }
+                }
+            }
+<span class="fc" id="L678">        }</span>
+    }
+
+<span class="fc" id="L681">    class FormPointerListener implements ActionListener {</span>
+
+        @Override
+        public void actionPerformed(final ActionEvent evt) {
+<span class="fc" id="L685">            final Form f = getComponentForm();</span>
+<span class="fc" id="L686">            Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);</span>
+
+<span class="fc" id="L688">            boolean canOpenPopup = shouldShowPopup();</span>
+
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            for (int i = 0; i &lt; layered.getComponentCount(); i++) {</span>
+<span class="fc" id="L691">                Container wrap = (Container) layered.getComponentAt(i);</span>
+<span class="fc" id="L692">                Component pop = wrap.getComponentAt(0);</span>
+<span class="fc bfc" id="L693" title="All 2 branches covered.">                if (pop.isVisible()) {</span>
+<span class="pc bpc" id="L694" title="3 of 4 branches missed.">                    if (!pressInBounds &amp;&amp; !pop.contains(evt.getX(), evt.getY())) {</span>
+<span class="nc" id="L695">                        pop.setVisible(false);</span>
+<span class="nc" id="L696">                        pop.setEnabled(false);</span>
+<span class="nc" id="L697">                        f.revalidateLater();</span>
+<span class="nc" id="L698">                        evt.consume();</span>
+                    } else {
+<span class="fc" id="L700">                        canOpenPopup = false;</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L705" title="All 4 branches covered.">            if (!canOpenPopup || getText().length() &lt; getMinimumLength()) {</span>
+<span class="fc" id="L706">                return;</span>
+            }
+
+<span class="fc bfc" id="L709" title="All 2 branches covered.">            if (contains(evt.getX(), evt.getY())) {</span>
+                //if the suggestions are empty don't show the no need to show the popup
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">                if (popup.getComponentCount() == 0) {</span>
+<span class="nc" id="L712">                    return;</span>
+                }
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">                if (((List) popup.getComponentAt(0)).getModel().getSize() == 0) {</span>
+<span class="fc" id="L715">                    return;</span>
+                }
+                //something went wrong re-init the popup
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                if (popup.getAbsoluteX() != getAbsoluteX()) {</span>
+<span class="nc" id="L719">                    removePopup();</span>
+<span class="nc" id="L720">                    addPopup(true);</span>
+                }
+<span class="nc" id="L722">                evt.consume();</span>
+<span class="nc" id="L723">                popup.getComponentAt(0).setScrollY(0);</span>
+<span class="nc" id="L724">                popup.setVisible(true);</span>
+<span class="nc" id="L725">                popup.setEnabled(true);</span>
+<span class="nc" id="L726">                popup.revalidate();</span>
+<span class="nc" id="L727">                dontCalcSize = false;</span>
+<span class="nc" id="L728">                f.revalidate();</span>
+<span class="nc" id="L729">                dontCalcSize = true;</span>
+<span class="nc" id="L730">                Display.getInstance().callSerially(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="nc" id="L734">                        pointerReleased(evt.getX(), evt.getY());</span>
+<span class="nc" id="L735">                    }</span>
+                });
+            }
+<span class="fc" id="L738">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

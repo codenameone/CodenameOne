@@ -1,0 +1,912 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodeView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">CodeView.java</span></div><h1>CodeView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.ui.CodeCompletion;
+import com.codename1.ui.CodeDiagnostic;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.CodeEditor;
+import com.codename1.ui.TextInputConfig;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The pure code editor surface. It adds syntax highlighting (via an incremental `Tokenizer`), a line
+/// number gutter, bracket / quote auto close, tab expansion, auto indent, diagnostic squiggles and a
+/// code completion popup on top of the shared `EditorView` editing engine.
+public class CodeView extends EditorView {
+<span class="fc" id="L41">    private String languageId = &quot;text&quot;;</span>
+<span class="fc" id="L42">    private LanguageDef def = LanguageDef.forName(&quot;text&quot;);</span>
+<span class="fc" id="L43">    private SyntaxHighlighter tokenizer = new Tokenizer(def);</span>
+<span class="fc" id="L44">    private boolean plainHighlighter = true;</span>
+<span class="fc" id="L45">    private ThemePalette palette = ThemePalette.LIGHT;</span>
+<span class="fc" id="L46">    private boolean showLineNumbers = true;</span>
+<span class="fc" id="L47">    private int tabSize = 4;</span>
+
+    private int[] endStates;
+    private int validUpTo;
+
+    private List&lt;CodeDiagnostic&gt; diagnostics;
+
+    private boolean completionEnabled;
+    private List&lt;CodeCompletion&gt; completionAll;
+    private List&lt;CodeCompletion&gt; completionFiltered;
+    private int completionIndex;
+    private boolean completionVisible;
+    private int completionAnchor;
+    private int completionReqSeq;
+<span class="fc" id="L61">    private int completionPending = -1;</span>
+
+    /// Creates a code editor view.
+    public CodeView(EditorHost host) {
+<span class="fc" id="L65">        super(host, true);</span>
+<span class="fc" id="L66">        applyTheme();</span>
+<span class="fc" id="L67">    }</span>
+
+    // ---- configuration ----
+
+    /// Sets the highlighting language.
+    public void setLanguage(String language) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        this.languageId = language == null ? &quot;text&quot; : language;</span>
+<span class="fc" id="L74">        this.def = LanguageDef.forName(this.languageId);</span>
+<span class="fc" id="L75">        SyntaxHighlighter registered = CodeEditor.getRegisteredSyntaxHighlighter(this.languageId);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        this.tokenizer = registered == null ? new Tokenizer(def) : registered;</span>
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        this.plainHighlighter = registered == null &amp;&amp; def.isPlain();</span>
+<span class="fc" id="L78">        validUpTo = 0;</span>
+<span class="fc" id="L79">        repaint();</span>
+<span class="fc" id="L80">    }</span>
+
+    /// Returns the highlighting language id.
+    public String getLanguage() {
+<span class="nc" id="L84">        return languageId;</span>
+    }
+
+    /// Sets the color theme (`&quot;light&quot;` or `&quot;dark&quot;`).
+    public void setTheme(String theme) {
+<span class="nc" id="L89">        palette = ThemePalette.forName(theme);</span>
+<span class="nc" id="L90">        applyTheme();</span>
+<span class="nc" id="L91">        repaint();</span>
+<span class="nc" id="L92">    }</span>
+
+    private void applyTheme() {
+<span class="fc" id="L95">        setBackgroundColor(palette.getBackground());</span>
+<span class="fc" id="L96">        setTextColor(palette.getForeground());</span>
+<span class="fc" id="L97">        setSelectionColor(palette.getSelection());</span>
+<span class="fc" id="L98">    }</span>
+
+    /// Shows or hides the line number gutter.
+    public void setShowLineNumbers(boolean show) {
+<span class="nc" id="L102">        this.showLineNumbers = show;</span>
+<span class="nc" id="L103">        repaint();</span>
+<span class="nc" id="L104">    }</span>
+
+    /// Sets the number of spaces used for a tab / indentation step.
+    public void setTabSize(int tabSize) {
+<span class="nc" id="L108">        this.tabSize = Math.max(1, tabSize);</span>
+<span class="nc" id="L109">    }</span>
+
+    /// Sets the diagnostics to render.
+    public void setDiagnostics(List&lt;CodeDiagnostic&gt; diagnostics) {
+<span class="nc" id="L113">        this.diagnostics = diagnostics;</span>
+<span class="nc" id="L114">        repaint();</span>
+<span class="nc" id="L115">    }</span>
+
+    /// Enables or disables the completion popup.
+    public void setCompletionEnabled(boolean enabled) {
+<span class="fc" id="L119">        this.completionEnabled = enabled;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (!enabled) {</span>
+<span class="nc" id="L121">            hideCompletion();</span>
+        }
+<span class="fc" id="L123">    }</span>
+
+    // ---- gutter ----
+
+    @Override
+    protected int getContentLeftInset() {
+<span class="fc" id="L129">        return getStyle().getPaddingLeftNoRTL() + gutterWidth();</span>
+    }
+
+    private int gutterWidth() {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (!showLineNumbers) {</span>
+<span class="nc" id="L134">            return 0;</span>
+        }
+<span class="fc" id="L136">        Font f = getEditorFont();</span>
+<span class="fc" id="L137">        int digits = String.valueOf(Math.max(1, getDocument().getLineCount())).length();</span>
+<span class="fc" id="L138">        return f.charWidth('0') * digits + f.charWidth('0') * 2;</span>
+    }
+
+    @Override
+    protected void paintBeforeContent(Graphics g, int originX, int originY, int firstLine, int lastLine, int lineHeight, Font f) {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (!showLineNumbers) {</span>
+<span class="nc" id="L144">            return;</span>
+        }
+<span class="fc" id="L146">        g.setColor(palette.getGutterBackground());</span>
+<span class="fc" id="L147">        g.fillRect(getX(), getY(), originX - getX(), getHeight());</span>
+<span class="fc" id="L148">        int pad = f.charWidth('0');</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int ln = firstLine; ln &lt;= lastLine; ln++) {</span>
+<span class="fc" id="L150">            String num = String.valueOf(ln + 1);</span>
+<span class="fc" id="L151">            int nx = originX - pad - f.stringWidth(num);</span>
+<span class="fc" id="L152">            int ny = originY + ln * lineHeight;</span>
+<span class="fc" id="L153">            int marker = gutterMarkerColor(ln);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (marker != -1) {</span>
+<span class="nc" id="L155">                g.setColor(marker);</span>
+<span class="nc" id="L156">                int dia = Math.max(6, lineHeight / 2);</span>
+<span class="nc" id="L157">                g.fillArc(getX() + pad / 2, ny + (lineHeight - dia) / 2, dia, dia, 0, 360);</span>
+            }
+<span class="fc" id="L159">            g.setColor(palette.getGutterForeground());</span>
+<span class="fc" id="L160">            g.drawString(num, nx, ny);</span>
+        }
+<span class="fc" id="L162">    }</span>
+
+    private int gutterMarkerColor(int line) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (diagnostics == null) {</span>
+<span class="fc" id="L166">            return -1;</span>
+        }
+<span class="nc" id="L168">        int color = -1;</span>
+<span class="nc" id="L169">        int rank = -1;</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        for (CodeDiagnostic d : diagnostics) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (d == null) {</span>
+<span class="nc" id="L172">                continue;</span>
+            }
+<span class="nc bnc" id="L174" title="All 4 branches missed.">            if (line &gt;= d.getLine() - 1 &amp;&amp; line &lt;= d.getEndLine() - 1) {</span>
+<span class="nc" id="L175">                int r = severityRank(d.getSeverity());</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                if (r &gt; rank) {</span>
+<span class="nc" id="L177">                    rank = r;</span>
+<span class="nc" id="L178">                    color = severityColor(d.getSeverity());</span>
+                }
+            }
+<span class="nc" id="L181">        }</span>
+<span class="nc" id="L182">        return color;</span>
+    }
+
+    // ---- syntax coloring ----
+
+    @Override
+    protected void paintLine(Graphics g, int line, String text, int x, int y, int lineHeight, Font f) {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (text.length() == 0) {</span>
+<span class="fc" id="L190">            return;</span>
+        }
+        // Right-to-left / mixed lines need the bidi run renderer (per-token coloring falls back to the
+        // default foreground on those lines; code keywords are ASCII so this only affects RTL string and
+        // comment content).
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="nc" id="L196">            super.paintLine(g, line, text, x, y, lineHeight, f);</span>
+<span class="nc" id="L197">            return;</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (plainHighlighter) {</span>
+<span class="fc" id="L200">            g.setColor(getTextColor());</span>
+<span class="fc" id="L201">            g.drawString(text, x, y);</span>
+<span class="fc" id="L202">            return;</span>
+        }
+<span class="fc" id="L204">        ensureStates(line + 1);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        int startState = line == 0 ? 0 : endStates[line - 1];</span>
+<span class="fc" id="L206">        SyntaxHighlightResult tl = tokenizer.tokenize(text, startState);</span>
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">        if (tl == null || tl.tokens == null) {</span>
+            // the SyntaxHighlighter contract allows a null result (no highlighting for
+            // this line); paint plain instead of crashing the render loop
+<span class="nc" id="L210">            g.setColor(getTextColor());</span>
+<span class="nc" id="L211">            g.drawString(text, x, y);</span>
+<span class="nc" id="L212">            return;</span>
+        }
+<span class="fc" id="L214">        int pos = 0;</span>
+<span class="fc" id="L215">        int defColor = getTextColor();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int i = 0; i &lt; tl.tokens.size(); i++) {</span>
+<span class="fc" id="L217">            SyntaxToken t = tl.tokens.get(i);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (t.start &gt; pos) {</span>
+<span class="nc" id="L219">                drawSegment(g, f, text, pos, t.start, x, y, defColor);</span>
+            }
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            int color = ThemePalette.DARK.equals(palette) ? t.darkColor : t.lightColor;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            drawSegment(g, f, text, t.start, t.start + t.length, x, y,</span>
+<span class="fc" id="L223">                    color &lt; 0 ? palette.colorForKind(t.kind) : color);</span>
+<span class="fc" id="L224">            pos = t.start + t.length;</span>
+        }
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (pos &lt; text.length()) {</span>
+<span class="fc" id="L227">            drawSegment(g, f, text, pos, text.length(), x, y, defColor);</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    private void drawSegment(Graphics g, Font f, String text, int a, int b, int x, int y, int color) {
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (b &lt;= a) {</span>
+<span class="nc" id="L233">            return;</span>
+        }
+<span class="fc" id="L235">        int sx = x + f.substringWidth(text, 0, a);</span>
+<span class="fc" id="L236">        g.setColor(color);</span>
+<span class="fc" id="L237">        g.drawString(text.substring(a, b), sx, y);</span>
+<span class="fc" id="L238">    }</span>
+
+    private void ensureStates(int upto) {
+<span class="fc" id="L241">        int lc = getDocument().getLineCount();</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (upto &gt; lc) {</span>
+<span class="nc" id="L243">            upto = lc;</span>
+        }
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        if (endStates == null || endStates.length &lt; lc) {</span>
+<span class="fc" id="L246">            int[] ns = new int[Math.max(lc, 16)];</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">            if (endStates != null) {</span>
+<span class="nc" id="L248">                System.arraycopy(endStates, 0, ns, 0, Math.min(endStates.length, ns.length));</span>
+            }
+<span class="fc" id="L250">            endStates = ns;</span>
+        }
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (validUpTo &gt; lc) {</span>
+<span class="nc" id="L253">            validUpTo = lc;</span>
+        }
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int i = validUpTo; i &lt; upto; i++) {</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">            int st = i == 0 ? 0 : endStates[i - 1];</span>
+<span class="fc" id="L257">            SyntaxHighlightResult r = tokenizer.tokenize(getDocument().getLineText(i), st);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            endStates[i] = r == null ? st : r.endState;</span>
+        }
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (upto &gt; validUpTo) {</span>
+<span class="fc" id="L261">            validUpTo = upto;</span>
+        }
+<span class="fc" id="L263">    }</span>
+
+    @Override
+    protected void documentEdited(int fromOffset) {
+<span class="fc" id="L267">        int line = getDocument().lineOfOffset(fromOffset);</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (line &lt; validUpTo) {</span>
+<span class="nc" id="L269">            validUpTo = line;</span>
+        }
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (completionVisible) {</span>
+<span class="nc" id="L272">            refilterCompletion();</span>
+        }
+<span class="fc" id="L274">    }</span>
+
+    // ---- diagnostics ----
+
+    @Override
+    protected void paintLineDecorations(Graphics g, int line, String text, int x, int y, int lineHeight, Font f) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (diagnostics == null) {</span>
+<span class="fc" id="L281">            return;</span>
+        }
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        for (CodeDiagnostic d : diagnostics) {</span>
+<span class="nc bnc" id="L284" title="All 6 branches missed.">            if (d == null || line &lt; d.getLine() - 1 || line &gt; d.getEndLine() - 1) {</span>
+<span class="nc" id="L285">                continue;</span>
+            }
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            int cs = line == d.getLine() - 1 ? d.getColumn() - 1 : 0;</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            int ce = line == d.getEndLine() - 1 ? d.getEndColumn() - 1 : text.length();</span>
+<span class="nc" id="L289">            cs = clampI(cs, 0, text.length());</span>
+<span class="nc" id="L290">            ce = clampI(ce, 0, text.length());</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            if (ce &lt;= cs) {</span>
+<span class="nc" id="L292">                ce = Math.min(text.length(), cs + 1);</span>
+            }
+<span class="nc" id="L294">            int x1 = x + f.substringWidth(text, 0, cs);</span>
+<span class="nc" id="L295">            int x2 = x + f.substringWidth(text, 0, ce);</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            if (x2 &lt;= x1) {</span>
+<span class="nc" id="L297">                x2 = x1 + f.charWidth('m');</span>
+            }
+<span class="nc" id="L299">            drawSquiggle(g, x1, x2, y + lineHeight - 2, severityColor(d.getSeverity()));</span>
+<span class="nc" id="L300">        }</span>
+<span class="nc" id="L301">    }</span>
+
+    private void drawSquiggle(Graphics g, int x1, int x2, int y, int color) {
+<span class="nc" id="L304">        g.setColor(color);</span>
+<span class="nc" id="L305">        int amp = 2;</span>
+<span class="nc" id="L306">        boolean up = true;</span>
+<span class="nc" id="L307">        int x = x1;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        while (x &lt; x2) {</span>
+<span class="nc" id="L309">            int nx = Math.min(x2, x + 3);</span>
+<span class="nc bnc" id="L310" title="All 4 branches missed.">            g.drawLine(x, up ? y : y - amp, nx, up ? y - amp : y);</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            up = !up;</span>
+<span class="nc" id="L312">            x = nx;</span>
+<span class="nc" id="L313">        }</span>
+<span class="nc" id="L314">    }</span>
+
+    private int severityRank(String s) {
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (CodeDiagnostic.ERROR.equals(s)) {</span>
+<span class="nc" id="L318">            return 3;</span>
+        }
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (CodeDiagnostic.WARNING.equals(s)) {</span>
+<span class="nc" id="L321">            return 2;</span>
+        }
+<span class="nc" id="L323">        return 1;</span>
+    }
+
+    private int severityColor(String s) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (CodeDiagnostic.ERROR.equals(s)) {</span>
+<span class="nc" id="L328">            return palette.getErrorColor();</span>
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (CodeDiagnostic.WARNING.equals(s)) {</span>
+<span class="nc" id="L331">            return palette.getWarningColor();</span>
+        }
+<span class="nc" id="L333">        return palette.getInfoColor();</span>
+    }
+
+    // ---- typing behavior: auto close, tab, auto indent ----
+
+    @Override
+    protected boolean handleTypedText(String text) {
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (!isEditableState()) {</span>
+<span class="nc" id="L341">            return false;</span>
+        }
+<span class="pc bpc" id="L343" title="5 of 6 branches missed.">        if (completionVisible &amp;&amp; (&quot;\n&quot;.equals(text) || &quot;\t&quot;.equals(text))) {</span>
+<span class="nc" id="L344">            acceptCompletion();</span>
+<span class="nc" id="L345">            return true;</span>
+        }
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (&quot;\n&quot;.equals(text)) {</span>
+<span class="nc" id="L348">            autoIndentNewline();</span>
+<span class="nc" id="L349">            return true;</span>
+        }
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (&quot;\t&quot;.equals(text)) {</span>
+            // a tab that still arrives as committed text (rather than KEY_TAB) indents
+<span class="nc" id="L353">            indentSelection();</span>
+<span class="nc" id="L354">            return true;</span>
+        }
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (text.length() == 1) {</span>
+<span class="fc" id="L357">            char c = text.charAt(0);</span>
+<span class="pc bpc" id="L358" title="3 of 6 branches missed.">            if (c == '(' || c == '[' || c == '{') {</span>
+<span class="nc" id="L359">                insertPair(c, closeFor(c));</span>
+<span class="nc" id="L360">                onTypedChar(c);</span>
+<span class="nc" id="L361">                return true;</span>
+            }
+<span class="pc bpc" id="L363" title="3 of 6 branches missed.">            if (c == ')' || c == ']' || c == '}') {</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                if (skipOver(c)) {</span>
+<span class="nc" id="L365">                    return true;</span>
+                }
+<span class="nc" id="L367">                replaceRange(getSelectionStart(), getSelectionEnd(), text, true);</span>
+<span class="nc" id="L368">                onTypedChar(c);</span>
+<span class="nc" id="L369">                return true;</span>
+            }
+<span class="pc bpc" id="L371" title="3 of 6 branches missed.">            if (c == '&quot;' || c == '\'' || c == '`') {</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                if (skipOver(c)) {</span>
+<span class="nc" id="L373">                    return true;</span>
+                }
+<span class="nc" id="L375">                insertPair(c, c);</span>
+<span class="nc" id="L376">                onTypedChar(c);</span>
+<span class="nc" id="L377">                return true;</span>
+            }
+<span class="fc" id="L379">            replaceRange(getSelectionStart(), getSelectionEnd(), text, true);</span>
+<span class="fc" id="L380">            onTypedChar(c);</span>
+<span class="fc" id="L381">            return true;</span>
+        }
+<span class="fc" id="L383">        return false;</span>
+    }
+
+    private static char closeFor(char open) {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (open == '(') {</span>
+<span class="nc" id="L388">            return ')';</span>
+        }
+<span class="nc bnc" id="L390" title="All 2 branches missed.">        if (open == '[') {</span>
+<span class="nc" id="L391">            return ']';</span>
+        }
+<span class="nc" id="L393">        return '}';</span>
+    }
+
+    private void insertPair(char open, char close) {
+<span class="nc" id="L397">        int s = getSelectionStart();</span>
+<span class="nc" id="L398">        int e = getSelectionEnd();</span>
+<span class="nc" id="L399">        String inner = getDocument().substring(s, e);</span>
+<span class="nc" id="L400">        replaceRange(s, e, open + inner + close, true);</span>
+<span class="nc" id="L401">        moveCaret(s + 1 + inner.length(), false);</span>
+<span class="nc" id="L402">    }</span>
+
+    private boolean skipOver(char c) {
+<span class="nc" id="L405">        int caret = getCaretOffset();</span>
+<span class="nc bnc" id="L406" title="All 4 branches missed.">        if (getSelectionStart() == getSelectionEnd() &amp;&amp; caret &lt; getDocument().length()</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                &amp;&amp; getDocument().charAt(caret) == c) {</span>
+<span class="nc" id="L408">            moveCaret(caret + 1, false);</span>
+<span class="nc" id="L409">            return true;</span>
+        }
+<span class="nc" id="L411">        return false;</span>
+    }
+
+    private void insertSpaces(int n) {
+<span class="nc" id="L415">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L417">            sb.append(' ');</span>
+        }
+<span class="nc" id="L419">        replaceRange(getSelectionStart(), getSelectionEnd(), sb.toString(), true);</span>
+<span class="nc" id="L420">    }</span>
+
+    @Override
+    protected void handleTab(boolean dedent) {
+<span class="pc bpc" id="L424" title="3 of 4 branches missed.">        if (completionVisible &amp;&amp; !dedent) {</span>
+<span class="nc" id="L425">            acceptCompletion();</span>
+<span class="nc" id="L426">            return;</span>
+        }
+        // A plain caret tab (no selection) inserts to the next tab stop; a dedent, or a tab with a
+        // selection, indents / dedents every covered line as a block (IDE behavior).
+<span class="pc bpc" id="L430" title="1 of 4 branches missed.">        if (!dedent &amp;&amp; getSelectionStart() == getSelectionEnd()) {</span>
+<span class="nc" id="L431">            insertSpaces(tabSize);</span>
+<span class="nc" id="L432">            return;</span>
+        }
+<span class="fc" id="L434">        indentOrDedentLines(dedent);</span>
+<span class="fc" id="L435">    }</span>
+
+    private void indentSelection() {
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (getSelectionStart() == getSelectionEnd()) {</span>
+<span class="nc" id="L439">            insertSpaces(tabSize);</span>
+        } else {
+<span class="nc" id="L441">            indentOrDedentLines(false);</span>
+        }
+<span class="nc" id="L443">    }</span>
+
+    private void indentOrDedentLines(boolean dedent) {
+<span class="fc" id="L446">        int ss = getSelectionStart();</span>
+<span class="fc" id="L447">        int se = getSelectionEnd();</span>
+<span class="fc" id="L448">        int startLine = getDocument().lineOfOffset(ss);</span>
+<span class="fc" id="L449">        int endLine = getDocument().lineOfOffset(se);</span>
+        // a selection that ends exactly at a line's first column doesn't include that line
+<span class="pc bpc" id="L451" title="1 of 4 branches missed.">        if (endLine &gt; startLine &amp;&amp; se == getDocument().getLineStart(endLine)) {</span>
+<span class="nc" id="L452">            endLine--;</span>
+        }
+<span class="fc" id="L454">        int blockStart = getDocument().getLineStart(startLine);</span>
+<span class="fc" id="L455">        int blockEnd = getDocument().getLineEnd(endLine);</span>
+<span class="fc" id="L456">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        for (int line = startLine; line &lt;= endLine; line++) {</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            if (line &gt; startLine) {</span>
+<span class="fc" id="L459">                out.append('\n');</span>
+            }
+<span class="fc" id="L461">            String text = getDocument().getLineText(line);</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (dedent) {</span>
+<span class="fc" id="L463">                out.append(dedentLine(text));</span>
+            } else {
+<span class="fc bfc" id="L465" title="All 2 branches covered.">                for (int i = 0; i &lt; tabSize; i++) {</span>
+<span class="fc" id="L466">                    out.append(' ');</span>
+                }
+<span class="fc" id="L468">                out.append(text);</span>
+            }
+        }
+<span class="fc" id="L471">        replaceRange(blockStart, blockEnd, out.toString(), true);</span>
+<span class="fc" id="L472">        setSelectionRange(blockStart, blockStart + out.length());</span>
+<span class="fc" id="L473">    }</span>
+
+    /// Removes one indentation level from the front of `line`: a leading tab, or up to `tabSize`
+    /// leading spaces.
+    private String dedentLine(String line) {
+<span class="pc bpc" id="L478" title="2 of 4 branches missed.">        if (line.length() &gt; 0 &amp;&amp; line.charAt(0) == '\t') {</span>
+<span class="nc" id="L479">            return line.substring(1);</span>
+        }
+<span class="fc" id="L481">        int remove = 0;</span>
+<span class="pc bpc" id="L482" title="2 of 6 branches missed.">        while (remove &lt; tabSize &amp;&amp; remove &lt; line.length() &amp;&amp; line.charAt(remove) == ' ') {</span>
+<span class="fc" id="L483">            remove++;</span>
+        }
+<span class="fc" id="L485">        return line.substring(remove);</span>
+    }
+
+    private void autoIndentNewline() {
+<span class="nc" id="L489">        int caret = getCaretOffset();</span>
+<span class="nc" id="L490">        int cl = getDocument().lineOfOffset(caret);</span>
+<span class="nc" id="L491">        int lineStart = getDocument().getLineStart(cl);</span>
+<span class="nc" id="L492">        int col = caret - lineStart;</span>
+<span class="nc" id="L493">        String line = getDocument().getLineText(cl);</span>
+<span class="nc" id="L494">        StringBuilder indent = new StringBuilder();</span>
+<span class="nc bnc" id="L495" title="All 4 branches missed.">        for (int i = 0; i &lt; col &amp;&amp; i &lt; line.length(); i++) {</span>
+<span class="nc" id="L496">            char ch = line.charAt(i);</span>
+<span class="nc bnc" id="L497" title="All 4 branches missed.">            if (ch == ' ' || ch == '\t') {</span>
+<span class="nc" id="L498">                indent.append(ch);</span>
+            } else {
+                break;
+            }
+        }
+<span class="nc" id="L503">        boolean extra = lastNonSpaceOpensBlock(line, col);</span>
+<span class="nc" id="L504">        StringBuilder ins = new StringBuilder(&quot;\n&quot;).append(indent);</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">        if (extra) {</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">            for (int i = 0; i &lt; tabSize; i++) {</span>
+<span class="nc" id="L507">                ins.append(' ');</span>
+            }
+        }
+<span class="nc" id="L510">        replaceRange(getSelectionStart(), getSelectionEnd(), ins.toString(), true);</span>
+<span class="nc" id="L511">    }</span>
+
+    /// Returns whether the last non-whitespace character before `col` on `line` opens a block
+    /// (one of `{`, `:`, `(`, `[`).
+    private static boolean lastNonSpaceOpensBlock(String line, int col) {
+<span class="nc" id="L516">        int i = col - 1;</span>
+<span class="nc bnc" id="L517" title="All 8 branches missed.">        while (i &gt;= 0 &amp;&amp; i &lt; line.length() &amp;&amp; (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {</span>
+<span class="nc" id="L518">            i--;</span>
+        }
+<span class="nc bnc" id="L520" title="All 4 branches missed.">        if (i &lt; 0 || i &gt;= line.length()) {</span>
+<span class="nc" id="L521">            return false;</span>
+        }
+<span class="nc" id="L523">        char ch = line.charAt(i);</span>
+<span class="nc bnc" id="L524" title="All 8 branches missed.">        return ch == '{' || ch == ':' || ch == '(' || ch == '[';</span>
+    }
+
+    // ---- completion ----
+
+    private void onTypedChar(char c) {
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">        if (!completionEnabled) {</span>
+<span class="nc" id="L531">            return;</span>
+        }
+        // '.' triggers member completion (the provider resolves the receiver's type); identifier
+        // characters trigger / narrow the prefix. Anything else dismisses the popup.
+<span class="pc bpc" id="L535" title="1 of 4 branches missed.">        if (isIdentPart(c) || c == '.') {</span>
+<span class="fc" id="L536">            requestCompletion();</span>
+        } else {
+<span class="nc" id="L538">            hideCompletion();</span>
+        }
+<span class="fc" id="L540">    }</span>
+
+    private void requestCompletion() {
+<span class="fc" id="L543">        completionReqSeq++;</span>
+<span class="fc" id="L544">        completionPending = completionReqSeq;</span>
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        if (host() != null) {</span>
+<span class="fc" id="L546">            host().fireEditorEvent(&quot;complete&quot;, completionReqSeq + &quot;:&quot; + getCaretOffset());</span>
+        }
+<span class="fc" id="L548">    }</span>
+
+    /// Called by the backend with the provider's proposals for a request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `reqId`: the request sequence id
+    ///
+    /// - `items`: the proposals
+    public void showCompletions(int reqId, List&lt;CodeCompletion&gt; items) {
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (reqId != completionPending) {</span>
+<span class="nc" id="L559">            return;</span>
+        }
+<span class="fc" id="L561">        completionAll = items;</span>
+<span class="fc" id="L562">        completionAnchor = identifierStart(getCaretOffset());</span>
+<span class="fc" id="L563">        completionIndex = 0;</span>
+<span class="fc" id="L564">        refilterCompletion();</span>
+<span class="fc" id="L565">    }</span>
+
+    private int identifierStart(int off) {
+<span class="fc" id="L568">        int i = off;</span>
+<span class="fc bfc" id="L569" title="All 4 branches covered.">        while (i &gt; 0 &amp;&amp; isIdentPart(getDocument().charAt(i - 1))) {</span>
+<span class="fc" id="L570">            i--;</span>
+        }
+<span class="fc" id="L572">        return i;</span>
+    }
+
+    private void refilterCompletion() {
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">        if (completionAll == null) {</span>
+<span class="nc" id="L577">            hideCompletion();</span>
+<span class="nc" id="L578">            return;</span>
+        }
+<span class="fc" id="L580">        int caret = getCaretOffset();</span>
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">        if (caret &lt; completionAnchor) {</span>
+<span class="nc" id="L582">            hideCompletion();</span>
+<span class="nc" id="L583">            return;</span>
+        }
+<span class="fc" id="L585">        String prefix = getDocument().substring(completionAnchor, caret).toLowerCase();</span>
+<span class="fc" id="L586">        List&lt;CodeCompletion&gt; filtered = new ArrayList&lt;CodeCompletion&gt;();</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        for (CodeCompletion cc : completionAll) {</span>
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">            if (cc == null) {</span>
+<span class="nc" id="L589">                continue;</span>
+            }
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            String disp = cc.getDisplayText() != null ? cc.getDisplayText() : cc.getInsertText();</span>
+<span class="pc bpc" id="L592" title="1 of 4 branches missed.">            if (disp != null &amp;&amp; disp.toLowerCase().startsWith(prefix)) {</span>
+<span class="fc" id="L593">                filtered.add(cc);</span>
+            }
+<span class="fc" id="L595">        }</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        if (filtered.isEmpty()) {</span>
+<span class="fc" id="L597">            hideCompletion();</span>
+<span class="fc" id="L598">            return;</span>
+        }
+<span class="fc" id="L600">        completionFiltered = filtered;</span>
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">        if (completionIndex &gt;= filtered.size()) {</span>
+<span class="nc" id="L602">            completionIndex = filtered.size() - 1;</span>
+        }
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">        if (completionIndex &lt; 0) {</span>
+<span class="nc" id="L605">            completionIndex = 0;</span>
+        }
+<span class="fc" id="L607">        completionVisible = true;</span>
+<span class="fc" id="L608">        repaint();</span>
+<span class="fc" id="L609">    }</span>
+
+    private void hideCompletion() {
+<span class="fc" id="L612">        completionVisible = false;</span>
+<span class="fc" id="L613">        completionAll = null;</span>
+<span class="fc" id="L614">        completionFiltered = null;</span>
+<span class="fc" id="L615">        completionPending = -1;</span>
+<span class="fc" id="L616">        repaint();</span>
+<span class="fc" id="L617">    }</span>
+
+    private void acceptCompletion() {
+<span class="nc bnc" id="L620" title="All 6 branches missed.">        if (!completionVisible || completionFiltered == null || completionFiltered.isEmpty()) {</span>
+<span class="nc" id="L621">            return;</span>
+        }
+<span class="nc" id="L623">        CodeCompletion cc = completionFiltered.get(clampI(completionIndex, 0, completionFiltered.size() - 1));</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        String ins = cc.getInsertText() != null ? cc.getInsertText() : cc.getDisplayText();</span>
+<span class="nc bnc" id="L625" title="All 2 branches missed.">        replaceRange(completionAnchor, getCaretOffset(), ins == null ? &quot;&quot; : ins, true);</span>
+<span class="nc" id="L626">        hideCompletion();</span>
+<span class="nc" id="L627">    }</span>
+
+    // ---- popup painting ----
+
+    private String hoverTooltip;
+    private int hoverLocalX;
+    private int hoverLocalY;
+
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+<span class="nc bnc" id="L637" title="All 6 branches missed.">        if (x != null &amp;&amp; x.length &gt; 0 &amp;&amp; diagnostics != null) {</span>
+<span class="nc" id="L638">            int off = offsetAtPoint(x[0], y[0]);</span>
+<span class="nc" id="L639">            int localX = x[0] - getAbsoluteX();</span>
+<span class="nc" id="L640">            String msg = diagnosticMessageAt(off, localX);</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">            if (msg != null) {</span>
+<span class="nc" id="L642">                hoverTooltip = msg;</span>
+<span class="nc" id="L643">                hoverLocalX = localX;</span>
+<span class="nc" id="L644">                hoverLocalY = y[0] - getAbsoluteY();</span>
+<span class="nc" id="L645">                repaint();</span>
+<span class="nc" id="L646">                return;</span>
+            }
+        }
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        if (hoverTooltip != null) {</span>
+<span class="nc" id="L650">            hoverTooltip = null;</span>
+<span class="nc" id="L651">            repaint();</span>
+        }
+<span class="nc" id="L653">    }</span>
+
+    private String diagnosticMessageAt(int off, int localX) {
+<span class="nc" id="L656">        int line = getDocument().lineOfOffset(off);</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">        boolean inGutter = localX &lt; getContentLeftInset();</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">        for (CodeDiagnostic d : diagnostics) {</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">            if (d == null) {</span>
+<span class="nc" id="L660">                continue;</span>
+            }
+<span class="nc bnc" id="L662" title="All 4 branches missed.">            if (line &lt; d.getLine() - 1 || line &gt; d.getEndLine() - 1) {</span>
+<span class="nc" id="L663">                continue;</span>
+            }
+<span class="nc bnc" id="L665" title="All 2 branches missed.">            if (inGutter) {</span>
+<span class="nc" id="L666">                return d.getMessage();</span>
+            }
+<span class="nc" id="L668">            int sOff = lineColToOffset(d.getLine(), d.getColumn());</span>
+<span class="nc" id="L669">            int eOff = lineColToOffset(d.getEndLine(), d.getEndColumn());</span>
+<span class="nc bnc" id="L670" title="All 4 branches missed.">            if (off &gt;= sOff &amp;&amp; off &lt; eOff) {</span>
+<span class="nc" id="L671">                return d.getMessage();</span>
+            }
+<span class="nc" id="L673">        }</span>
+<span class="nc" id="L674">        return null;</span>
+    }
+
+    private int lineColToOffset(int line1, int col1) {
+<span class="nc" id="L678">        int line = clampI(line1 - 1, 0, getDocument().getLineCount() - 1);</span>
+<span class="nc" id="L679">        int base = getDocument().getLineStart(line);</span>
+<span class="nc" id="L680">        int max = getDocument().getLineEnd(line);</span>
+<span class="nc" id="L681">        return clampI(base + col1 - 1, base, max);</span>
+    }
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L686">        super.paint(g);</span>
+<span class="pc bpc" id="L687" title="2 of 6 branches missed.">        if (completionVisible &amp;&amp; completionFiltered != null &amp;&amp; !completionFiltered.isEmpty()) {</span>
+<span class="fc" id="L688">            paintCompletion(g);</span>
+        }
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (hoverTooltip != null) {</span>
+<span class="nc" id="L691">            paintTooltip(g);</span>
+        }
+<span class="fc" id="L693">    }</span>
+
+    private void paintTooltip(Graphics g) {
+<span class="nc" id="L696">        Font f = getEditorFont();</span>
+<span class="nc" id="L697">        int pad = f.charWidth('m');</span>
+<span class="nc" id="L698">        int tw = f.stringWidth(hoverTooltip) + pad * 2;</span>
+<span class="nc" id="L699">        int th = f.getHeight() + pad;</span>
+<span class="nc" id="L700">        int tx = getX() + hoverLocalX;</span>
+<span class="nc" id="L701">        int ty = getY() + hoverLocalY + getLineHeight() / 2;</span>
+<span class="nc bnc" id="L702" title="All 2 branches missed.">        if (tx + tw &gt; getX() + getWidth()) {</span>
+<span class="nc" id="L703">            tx = getX() + getWidth() - tw;</span>
+        }
+<span class="nc bnc" id="L705" title="All 2 branches missed.">        if (tx &lt; getX()) {</span>
+<span class="nc" id="L706">            tx = getX();</span>
+        }
+<span class="nc bnc" id="L708" title="All 2 branches missed.">        if (ty + th &gt; getY() + getHeight()) {</span>
+<span class="nc" id="L709">            ty = getY() + hoverLocalY - th;</span>
+        }
+<span class="nc" id="L711">        g.setColor(0x111111);</span>
+<span class="nc" id="L712">        g.fillRect(tx, ty, tw, th);</span>
+<span class="nc" id="L713">        g.setColor(0x454545);</span>
+<span class="nc" id="L714">        g.drawRect(tx, ty, tw - 1, th - 1);</span>
+<span class="nc" id="L715">        g.setColor(0xf0f0f0);</span>
+<span class="nc" id="L716">        g.setFont(f);</span>
+<span class="nc" id="L717">        g.drawString(hoverTooltip, tx + pad, ty + pad / 2);</span>
+<span class="nc" id="L718">    }</span>
+
+    private void paintCompletion(Graphics g) {
+<span class="fc" id="L721">        Font f = getEditorFont();</span>
+<span class="fc" id="L722">        int lh = getLineHeight();</span>
+<span class="fc" id="L723">        int caret = getCaretOffset();</span>
+<span class="fc" id="L724">        int cl = getDocument().lineOfOffset(caret);</span>
+<span class="fc" id="L725">        int col = caret - getDocument().getLineStart(cl);</span>
+<span class="fc" id="L726">        String line = getDocument().getLineText(cl);</span>
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">        if (col &gt; line.length()) {</span>
+<span class="nc" id="L728">            col = line.length();</span>
+        }
+<span class="fc" id="L730">        int px = getX() + getContentLeftInset() + f.substringWidth(line, 0, col) - getHorizontalScroll();</span>
+<span class="fc" id="L731">        int top = getY() + lineTop(cl);</span>
+<span class="fc" id="L732">        int visible = Math.min(completionFiltered.size(), 8);</span>
+<span class="fc" id="L733">        int itemH = lh;</span>
+<span class="fc" id="L734">        int boxW = 0;</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        for (CodeCompletion cc : completionFiltered) {</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">            String d = cc.getDisplayText() != null ? cc.getDisplayText() : cc.getInsertText();</span>
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">            if (d != null) {</span>
+<span class="fc" id="L738">                boxW = Math.max(boxW, f.stringWidth(d));</span>
+            }
+<span class="fc" id="L740">        }</span>
+<span class="fc" id="L741">        boxW += f.charWidth('m') * 2;</span>
+<span class="fc" id="L742">        int boxH = visible * itemH + 2;</span>
+<span class="fc" id="L743">        int boxY = top + lh;</span>
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">        if (boxY + boxH &gt; getY() + getHeight()) {</span>
+<span class="nc" id="L745">            boxY = top - boxH;</span>
+        }
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">        boolean dark = palette == ThemePalette.DARK; // NOPMD - intentional identity comparison</span>
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">        int popupBg = dark ? 0x252526 : 0xffffff;</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">        int border = dark ? 0x454545 : 0xc0c0c0;</span>
+<span class="fc" id="L750">        g.setColor(popupBg);</span>
+<span class="fc" id="L751">        g.fillRect(px, boxY, boxW, boxH);</span>
+<span class="fc" id="L752">        g.setColor(border);</span>
+<span class="fc" id="L753">        g.drawRect(px, boxY, boxW - 1, boxH - 1);</span>
+<span class="fc" id="L754">        int start = 0;</span>
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">        if (completionIndex &gt;= visible) {</span>
+<span class="nc" id="L756">            start = completionIndex - visible + 1;</span>
+        }
+<span class="fc bfc" id="L758" title="All 2 branches covered.">        for (int i = 0; i &lt; visible; i++) {</span>
+<span class="fc" id="L759">            int idx = start + i;</span>
+<span class="pc bpc" id="L760" title="1 of 2 branches missed.">            if (idx &gt;= completionFiltered.size()) {</span>
+<span class="nc" id="L761">                break;</span>
+            }
+<span class="fc" id="L763">            CodeCompletion cc = completionFiltered.get(idx);</span>
+<span class="fc" id="L764">            int iy = boxY + 1 + i * itemH;</span>
+<span class="fc bfc" id="L765" title="All 2 branches covered.">            if (idx == completionIndex) {</span>
+<span class="fc" id="L766">                g.setColor(palette.getSelection());</span>
+<span class="fc" id="L767">                g.fillRect(px + 1, iy, boxW - 2, itemH);</span>
+            }
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">            String d = cc.getDisplayText() != null ? cc.getDisplayText() : cc.getInsertText();</span>
+<span class="fc" id="L770">            g.setColor(palette.getForeground());</span>
+<span class="pc bpc" id="L771" title="1 of 2 branches missed.">            g.drawString(d == null ? &quot;&quot; : d, px + f.charWidth('m'), iy);</span>
+        }
+        // remember the popup bounds (component local) so touch taps can hit an item
+<span class="fc" id="L774">        popupLocalX = px - getX();</span>
+<span class="fc" id="L775">        popupLocalY = boxY - getY();</span>
+<span class="fc" id="L776">        popupW = boxW;</span>
+<span class="fc" id="L777">        popupH = boxH;</span>
+<span class="fc" id="L778">        popupItemH = itemH;</span>
+<span class="fc" id="L779">        popupStart = start;</span>
+<span class="fc" id="L780">    }</span>
+
+    private int popupLocalX;
+    private int popupLocalY;
+    private int popupW;
+    private int popupH;
+<span class="fc" id="L786">    private int popupItemH = 1;</span>
+    private int popupStart;
+
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="nc" id="L791">        int lx = x - getAbsoluteX();</span>
+<span class="nc" id="L792">        int ly = y - getAbsoluteY();</span>
+        // tap on the completion popup accepts the tapped proposal (touch has no arrow-key nav)
+<span class="nc bnc" id="L794" title="All 16 branches missed.">        if (completionVisible &amp;&amp; completionFiltered != null &amp;&amp; !completionFiltered.isEmpty()</span>
+                &amp;&amp; popupItemH &gt; 0 &amp;&amp; lx &gt;= popupLocalX &amp;&amp; lx &lt;= popupLocalX + popupW
+                &amp;&amp; ly &gt;= popupLocalY &amp;&amp; ly &lt;= popupLocalY + popupH) {
+<span class="nc" id="L797">            int idx = popupStart + (ly - popupLocalY) / popupItemH;</span>
+<span class="nc bnc" id="L798" title="All 4 branches missed.">            if (idx &gt;= 0 &amp;&amp; idx &lt; completionFiltered.size()) {</span>
+<span class="nc" id="L799">                completionIndex = idx;</span>
+<span class="nc" id="L800">                acceptCompletion();</span>
+            }
+<span class="nc" id="L802">            return;</span>
+        }
+        // tap on a squiggle / gutter icon shows its diagnostic (no hover on touch devices)
+<span class="nc bnc" id="L805" title="All 2 branches missed.">        if (diagnostics != null) {</span>
+<span class="nc" id="L806">            int off = offsetAtPoint(x, y);</span>
+<span class="nc" id="L807">            String msg = diagnosticMessageAt(off, lx);</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">            if (msg != null) {</span>
+<span class="nc" id="L809">                hoverTooltip = msg;</span>
+<span class="nc" id="L810">                hoverLocalX = lx;</span>
+<span class="nc" id="L811">                hoverLocalY = ly;</span>
+<span class="nc" id="L812">                repaint();</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">            } else if (hoverTooltip != null) {</span>
+<span class="nc" id="L814">                hoverTooltip = null;</span>
+<span class="nc" id="L815">                repaint();</span>
+            }
+        }
+<span class="nc" id="L818">        super.pointerPressed(x, y);</span>
+<span class="nc" id="L819">    }</span>
+
+    // ---- key routing for completion ----
+
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="nc bnc" id="L825" title="All 4 branches missed.">        if (completionVisible &amp;&amp; navigateCompletion(Display.getInstance().getGameAction(keyCode))) {</span>
+<span class="nc" id="L826">            return;</span>
+        }
+<span class="nc" id="L828">        super.keyPressed(keyCode);</span>
+<span class="nc" id="L829">    }</span>
+
+    @Override
+    public void keyRepeated(int keyCode) {
+<span class="nc bnc" id="L833" title="All 4 branches missed.">        if (completionVisible &amp;&amp; navigateCompletion(Display.getInstance().getGameAction(keyCode))) {</span>
+<span class="nc" id="L834">            return;</span>
+        }
+<span class="nc" id="L836">        super.keyRepeated(keyCode);</span>
+<span class="nc" id="L837">    }</span>
+
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="nc bnc" id="L841" title="All 2 branches missed.">        if (completionVisible) {</span>
+<span class="nc bnc" id="L842" title="All 2 branches missed.">            if (keyCode == 27) {</span>
+<span class="nc" id="L843">                hideCompletion();</span>
+<span class="nc" id="L844">                return;</span>
+            }
+<span class="nc bnc" id="L846" title="All 6 branches missed.">            if (keyCode == 10 || keyCode == 13 || keyCode == 9) {</span>
+<span class="nc" id="L847">                acceptCompletion();</span>
+<span class="nc" id="L848">                return;</span>
+            }
+        }
+<span class="nc" id="L851">        super.keyReleased(keyCode);</span>
+<span class="nc" id="L852">    }</span>
+
+    private boolean navigateCompletion(int action) {
+<span class="nc bnc" id="L855" title="All 2 branches missed.">        if (action == Display.GAME_UP) {</span>
+<span class="nc" id="L856">            completionIndex = Math.max(0, completionIndex - 1);</span>
+<span class="nc" id="L857">            repaint();</span>
+<span class="nc" id="L858">            return true;</span>
+        }
+<span class="nc bnc" id="L860" title="All 2 branches missed.">        if (action == Display.GAME_DOWN) {</span>
+<span class="nc" id="L861">            completionIndex = Math.min(completionFiltered.size() - 1, completionIndex + 1);</span>
+<span class="nc" id="L862">            repaint();</span>
+<span class="nc" id="L863">            return true;</span>
+        }
+<span class="nc" id="L865">        return false;</span>
+    }
+
+    @Override
+    public void onKeyCommand(int command, int modifiers) {
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">        if (completionVisible) {</span>
+<span class="nc bnc" id="L871" title="All 2 branches missed.">            if (command == KEY_UP) {</span>
+<span class="nc" id="L872">                completionIndex = Math.max(0, completionIndex - 1);</span>
+<span class="nc" id="L873">                repaint();</span>
+<span class="nc" id="L874">                return;</span>
+            }
+<span class="nc bnc" id="L876" title="All 2 branches missed.">            if (command == KEY_DOWN) {</span>
+<span class="nc" id="L877">                completionIndex = Math.min(completionFiltered.size() - 1, completionIndex + 1);</span>
+<span class="nc" id="L878">                repaint();</span>
+<span class="nc" id="L879">                return;</span>
+            }
+<span class="nc bnc" id="L881" title="All 2 branches missed.">            if (command == KEY_ESCAPE) {</span>
+<span class="nc" id="L882">                hideCompletion();</span>
+<span class="nc" id="L883">                return;</span>
+            }
+        }
+<span class="fc" id="L886">        super.onKeyCommand(command, modifiers);</span>
+<span class="fc" id="L887">    }</span>
+
+    @Override
+    public void onEditorAction(int action) {
+<span class="nc bnc" id="L891" title="All 4 branches missed.">        if (completionVisible &amp;&amp; action == TextInputConfig.ACTION_DEFAULT) {</span>
+<span class="nc" id="L892">            acceptCompletion();</span>
+<span class="nc" id="L893">            return;</span>
+        }
+<span class="nc" id="L895">        super.onEditorAction(action);</span>
+<span class="nc" id="L896">    }</span>
+
+    private static boolean isIdentPart(char c) {
+<span class="pc bpc" id="L899" title="9 of 16 branches missed.">        return (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '_' || c == '$';</span>
+    }
+
+    private static int clampI(int v, int lo, int hi) {
+<span class="nc bnc" id="L903" title="All 2 branches missed.">        if (v &lt; lo) {</span>
+<span class="nc" id="L904">            return lo;</span>
+        }
+<span class="nc bnc" id="L906" title="All 2 branches missed.">        if (v &gt; hi) {</span>
+<span class="nc" id="L907">            return hi;</span>
+        }
+<span class="nc" id="L909">        return v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

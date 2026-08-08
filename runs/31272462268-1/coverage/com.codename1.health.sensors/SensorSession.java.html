@@ -1,0 +1,958 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SensorSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">SensorSession.java</span></div><h1>SensorSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.health.BloodPressureSample;
+import com.codename1.health.HealthDataType;
+import com.codename1.health.HealthError;
+import com.codename1.health.Health;
+import com.codename1.health.workout.WorkoutSession;
+import com.codename1.health.HealthException;
+import com.codename1.health.HealthQuantity;
+import com.codename1.health.HealthSample;
+import com.codename1.impl.health.HealthWire;
+import com.codename1.health.HealthStore;
+import com.codename1.health.HealthWriteResult;
+import com.codename1.health.HealthUnit;
+import com.codename1.health.QuantitySample;
+import com.codename1.health.RecordingMethod;
+import com.codename1.health.SeriesSample;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import com.codename1.impl.health.EdtResult;
+
+/// A live connection to one health sensor, decoding its notifications into
+/// health samples.
+///
+/// Obtained from
+/// [HealthSensors#connect(HealthSensor,HealthSensorProfile,SensorSessionOptions)].
+/// All listener callbacks arrive on the EDT.
+///
+/// #### Derived values
+///
+/// Speed and cadence sensors transmit cumulative counters rather than
+/// rates, so this class differences consecutive notifications -- handling
+/// the counter and event-timer wraps that would otherwise produce spikes
+/// of tens of thousands of rpm. See [CumulativeCounterTracker].
+public class SensorSession {
+
+    private final String sensorId;
+    private final HealthSensorProfile profile;
+    private final SensorSessionOptions options;
+<span class="fc" id="L67">    private final List&lt;HealthSample&gt; pendingWrites =</span>
+            new ArrayList&lt;HealthSample&gt;();
+    private java.util.Timer flushTimer;
+<span class="fc" id="L70">    private final List&lt;SensorSampleListener&gt; listeners =</span>
+            new ArrayList&lt;SensorSampleListener&gt;();
+<span class="fc" id="L72">    private final Map&lt;String, HealthSample&gt; latest =</span>
+            new HashMap&lt;String, HealthSample&gt;();
+
+<span class="fc" id="L75">    private final CumulativeCounterTracker wheelTracker =</span>
+            new CumulativeCounterTracker(0x100000000L, 1024);
+<span class="fc" id="L77">    private final CumulativeCounterTracker crankTracker =</span>
+            new CumulativeCounterTracker(0x10000L, 1024);
+
+    /// Guards the cross-thread session fields. They are written on the
+    /// EDT and read from the flush timer's thread and from store
+    /// callbacks; without publication those threads could go on seeing a
+    /// running session after it had ended.
+    ///
+    /// A lock rather than `volatile`, which this codebase does not use.
+<span class="fc" id="L86">    private final Object stateLock = new Object();</span>
+    /// Guarded by [#stateLock].
+<span class="fc" id="L88">    private SensorSessionState state = SensorSessionState.CONNECTING;</span>
+    /// All three set as notifications decode -- on whichever thread the
+    /// transport delivers on -- and read by the app through the getters;
+    /// `streamed` also decides whether a reconnect is worth attempting.
+    /// Guarded by [#stateLock], found by going through the package for
+    /// the rest of this shape rather than waiting for each to be
+    /// reported.
+    private boolean streamed;
+    private Integer batteryPercent;
+<span class="fc" id="L97">    private int bodySensorLocation = -1;</span>
+
+    /// Ports and [HealthSensors] construct sessions.
+    protected SensorSession(String sensorId, HealthSensorProfile profile,
+<span class="fc" id="L101">            SensorSessionOptions options) {</span>
+<span class="fc" id="L102">        this.sensorId = sensorId;</span>
+<span class="fc" id="L103">        this.profile = profile;</span>
+        // A snapshot. The builder is fluent and callers reuse one, and a
+        // session reads these values for as long as it runs -- so
+        // reconfiguring the builder afterwards rerouted a connected
+        // strap's readings into a different workout or started
+        // persisting them.
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        this.options = options == null</span>
+<span class="fc" id="L110">                ? new SensorSessionOptions() : options.copy();</span>
+<span class="fc" id="L111">    }</span>
+
+    /// The stable identifier of the connected device -- see
+    /// [HealthSensor#getId()].
+    public final String getSensorId() {
+<span class="nc" id="L116">        return sensorId;</span>
+    }
+
+    /// The profile this session is speaking.
+    public final HealthSensorProfile getProfile() {
+<span class="fc" id="L121">        return profile;</span>
+    }
+
+    /// The options this session was created with.
+    ///
+    /// A copy, so that reconfiguring what this returns cannot change a
+    /// running session -- the same reason the session took a snapshot of
+    /// what it was given.
+    public final SensorSessionOptions getOptions() {
+<span class="fc" id="L130">        return options.copy();</span>
+    }
+
+    /// The session's own copy, which is not handed out.
+    ///
+    /// [#getOptions()] answers with a copy, and the session has no reason
+    /// to pay for one on a path that runs per notification.
+    final SensorSessionOptions options() {
+<span class="fc" id="L138">        return options;</span>
+    }
+
+    /// The current lifecycle state.
+    public final SensorSessionState getState() {
+<span class="fc" id="L143">        synchronized (stateLock) {</span>
+<span class="fc" id="L144">            return state;</span>
+        }
+    }
+
+    /// Registers a listener for measurements and state changes.
+    public final void addListener(SensorSampleListener listener) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L151">            return;</span>
+        }
+<span class="fc" id="L153">        synchronized (listeners) {</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (!listeners.contains(listener)) {</span>
+<span class="fc" id="L155">                listeners.add(listener);</span>
+            }
+<span class="fc" id="L157">        }</span>
+<span class="fc" id="L158">    }</span>
+
+    /// Removes a previously registered listener.
+    public final void removeListener(SensorSampleListener listener) {
+<span class="nc" id="L162">        synchronized (listeners) {</span>
+<span class="nc" id="L163">            listeners.remove(listener);</span>
+<span class="nc" id="L164">        }</span>
+<span class="nc" id="L165">    }</span>
+
+    /// The most recent sample of `type`, or `null` when none has arrived
+    /// or the last one is older than
+    /// [SensorSessionOptions#getStaleSampleMillis()].
+    ///
+    /// Returning null rather than a stale value is deliberate: a UI bound
+    /// to this shows a dash when the strap falls off, instead of
+    /// continuing to display the wearer's last heart rate as though it
+    /// were current.
+    public final HealthSample getLatest(HealthDataType type) {
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L177">            return null;</span>
+        }
+        HealthSample s;
+<span class="fc" id="L180">        synchronized (latest) {</span>
+<span class="fc" id="L181">            s = latest.get(type.getId());</span>
+<span class="fc" id="L182">        }</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L184">            return null;</span>
+        }
+<span class="fc" id="L186">        long age = System.currentTimeMillis() - s.getEndMillis();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        return age &gt; options.getStaleSampleMillis() ? null : s;</span>
+    }
+
+    /// The device's battery level as a percentage, or `null` when it does
+    /// not report one.
+    public final Integer getBatteryPercent() {
+<span class="fc" id="L193">        synchronized (stateLock) {</span>
+<span class="fc" id="L194">            return batteryPercent;</span>
+        }
+    }
+
+    /// Where a heart-rate sensor is worn, as a [BodySensorLocation]
+    /// constant, or `-1` when unreported.
+    public final int getBodySensorLocation() {
+<span class="fc" id="L201">        synchronized (stateLock) {</span>
+<span class="fc" id="L202">            return bodySensorLocation;</span>
+        }
+    }
+
+    /// Resets a heart-rate strap's accumulated energy-expended counter, by
+    /// writing `0x01` to the Heart Rate Control Point (`0x2A39`).
+    ///
+    /// Fails with [HealthError#NOT_SUPPORTED] on other profiles and on
+    /// straps that do not expose the control point.
+    public AsyncResource&lt;Boolean&gt; resetEnergyExpended() {
+<span class="nc" id="L212">        AsyncResource&lt;Boolean&gt; out = new EdtResult&lt;Boolean&gt;();</span>
+<span class="nc" id="L213">        out.error(new HealthException(HealthError.NOT_SUPPORTED,</span>
+                &quot;this session does not support resetting energy expended&quot;));
+<span class="nc" id="L215">        return out;</span>
+    }
+
+    /// Asks a glucose meter to replay stored records, delivering each one
+    /// through the normal sample listeners, and resolving with how many
+    /// were retrieved.
+    ///
+    /// **Not implemented in this release: this always fails with
+    /// [HealthError#NOT_SUPPORTED], on the glucose profile as well as any
+    /// other.** Replay runs over the Record Access Control Point, a
+    /// stateful request/response protocol on a second characteristic with
+    /// its own operators, filters and abort semantics, and shipping it
+    /// untested against real meters would be worse than saying plainly
+    /// that it is absent. [GlucoseRecordFilter] and the rest of the
+    /// vocabulary are here so the call site does not have to change when
+    /// it lands.
+    ///
+    /// Live glucose notifications are unaffected and work today.
+    public AsyncResource&lt;Integer&gt; requestStoredRecords(
+            GlucoseRecordFilter filter) {
+<span class="nc" id="L235">        AsyncResource&lt;Integer&gt; out = new EdtResult&lt;Integer&gt;();</span>
+<span class="nc" id="L236">        out.error(new HealthException(HealthError.NOT_SUPPORTED,</span>
+                &quot;replaying stored glucose records is not implemented in&quot;
+                        + &quot; this release; live measurements still arrive&quot;
+                        + &quot; through the sample listeners&quot;));
+<span class="nc" id="L240">        return out;</span>
+    }
+
+    /// Disconnects and stops delivering measurements. Idempotent.
+    public void stop() {
+<span class="nc" id="L245">        setState(SensorSessionState.STOPPED);</span>
+<span class="nc" id="L246">    }</span>
+
+    /// Drops this session from [HealthSensors#getActiveSessions()].
+    ///
+    /// Without it a stopped or failed session stayed in the registry for
+    /// the manager's lifetime, so the list documented as &quot;connected or
+    /// reconnecting&quot; filled up with dead sessions and kept their
+    /// peripherals and listeners alive with them.
+    protected final void forgetFromManager() {
+<span class="fc" id="L255">        Health.getInstance().getSensors().sessionEnded(this);</span>
+<span class="fc" id="L256">    }</span>
+
+    // ------------------------------------------------------------------
+    // decoding -- shared by every transport
+    // ------------------------------------------------------------------
+
+    /// Decodes one raw characteristic value and emits the resulting
+    /// samples. Called by the transport when a notification arrives.
+    ///
+    /// A malformed payload emits nothing and reports
+    /// [HealthError#INVALID_DATA] rather than throwing: one misbehaving
+    /// device must not take down the app.
+    protected final void onMeasurement(byte[] value, long receivedAtMillis) {
+<span class="fc" id="L269">        List&lt;HealthSample&gt; samples = decode(value, receivedAtMillis);</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (samples == null) {</span>
+<span class="nc" id="L271">            fireError(new HealthException(HealthError.INVALID_DATA,</span>
+<span class="nc" id="L272">                    profile.getName() + &quot; sensor sent a malformed &quot;</span>
+                            + &quot;measurement&quot;));
+<span class="nc" id="L274">            return;</span>
+        }
+        // Decoding stays outside the lock, since it touches nothing
+        // shared; everything that publishes the reading happens inside
+        // it, because ending the session takes the same lock.
+        //
+        // The transport's own check was check-then-act: it passed, stop()
+        // ran, and the reading was published anyway -- delivered to
+        // listeners of a session already gone from the registry, routed
+        // into a workout that had ended, and with write-through on,
+        // appended to a buffer whose final flush had already gone. That
+        // last one is the worst of the three: the append arms a timer
+        // that then refuses to drain, because teardown has set
+        // flushingStopped, so the sample is never persisted and nothing
+        // says so.
+<span class="fc" id="L289">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">            if (isTerminal()) {</span>
+<span class="nc" id="L291">                return;</span>
+            }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            for (HealthSample s : samples) {</span>
+<span class="fc" id="L294">                synchronized (latest) {</span>
+<span class="fc" id="L295">                    latest.put(s.getType().getId(), s);</span>
+<span class="fc" id="L296">                }</span>
+<span class="fc" id="L297">                fireSample(s);</span>
+<span class="fc" id="L298">            }</span>
+<span class="fc" id="L299">            route(samples);</span>
+<span class="fc" id="L300">        }</span>
+<span class="fc" id="L301">    }</span>
+
+    /// Sends decoded samples wherever the options said they should go.
+    ///
+    /// Both destinations were configurable and neither was read, so an
+    /// attached workout never saw a single reading and a write-through
+    /// session persisted nothing while reporting success.
+    private void route(List&lt;HealthSample&gt; samples) {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (samples.isEmpty()) {</span>
+<span class="nc" id="L310">            return;</span>
+        }
+<span class="fc" id="L312">        WorkoutSession workout = options.getWorkoutSession();</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (workout != null) {</span>
+<span class="nc" id="L314">            workout.addSamples(samples);</span>
+        }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (!options.isWriteToStore()) {</span>
+<span class="fc" id="L317">            return;</span>
+        }
+        // Batched rather than written per notification: a strap notifies
+        // about once a second, and a store round trip per reading would
+        // spend more time in the platform than in the app.
+        // Copies, not the instances just handed to the listeners and
+        // held by getLatest(). The batch sits here for up to a full
+        // storeBatchMillis, and an app that edited a reading it had been
+        // given -- its source, its identifier, its metadata -- changed
+        // what was about to be persisted, so the store recorded a
+        // provenance the sensor never reported.
+<span class="fc" id="L328">        List&lt;HealthSample&gt; buffered = new ArrayList&lt;HealthSample&gt;(</span>
+<span class="fc" id="L329">                samples.size());</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        for (HealthSample s : samples) {</span>
+<span class="fc" id="L331">            HealthSample copy = HealthWire.copyOf(s);</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            buffered.add(copy == null ? s : copy);</span>
+<span class="fc" id="L333">        }</span>
+<span class="fc" id="L334">        boolean startTimer = false;</span>
+<span class="fc" id="L335">        synchronized (pendingWrites) {</span>
+<span class="fc" id="L336">            startTimer = pendingWrites.isEmpty();</span>
+<span class="fc" id="L337">            pendingWrites.addAll(buffered);</span>
+<span class="fc" id="L338">        }</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (startTimer) {</span>
+            // Armed when the batch opens rather than checked when the next
+            // measurement arrives. A scale or a blood-pressure cuff sends
+            // one reading and then stays quiet, so a deadline that only
+            // advances on the next notification never fires and the reading
+            // is written only if the app happens to call stop() -- losing it
+            // outright if the process exits first.
+<span class="fc" id="L346">            scheduleFlush(options.getStoreBatchMillis());</span>
+        }
+<span class="fc" id="L348">    }</span>
+
+    private void scheduleFlush(int delayMillis) {
+<span class="fc" id="L351">        cancelFlush();</span>
+        // CLDC's Timer has no named/daemon constructor.
+<span class="fc" id="L353">        java.util.Timer t = new java.util.Timer();</span>
+        // Installed under the flag teardown sets, and scheduled there
+        // too. A caller that decided to re-arm and then lost the race
+        // installed its timer after teardown had cancelled them all, and
+        // the TimerTask held the ended session, its listeners and the
+        // peripheral until the batch delay elapsed -- a minute by
+        // default, and on the desktop a non-daemon thread that keeps the
+        // JVM up for it.
+        //
+        // Scheduling inside the lock as well, because teardown cancels
+        // whatever it finds in flushTimer: released between the two,
+        // this would be scheduling an already cancelled timer, which
+        // throws.
+<span class="fc" id="L366">        synchronized (pendingWrites) {</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            if (flushingStopped) {</span>
+<span class="nc" id="L368">                t.cancel();</span>
+<span class="nc" id="L369">                return;</span>
+            }
+<span class="fc" id="L371">            flushTimer = t;</span>
+<span class="fc" id="L372">            t.schedule(new FlushTask(this), Math.max(1, delayMillis));</span>
+<span class="fc" id="L373">        }</span>
+<span class="fc" id="L374">    }</span>
+
+    private void cancelFlush() {
+        java.util.Timer t;
+<span class="fc" id="L378">        synchronized (pendingWrites) {</span>
+<span class="fc" id="L379">            t = flushTimer;</span>
+<span class="fc" id="L380">            flushTimer = null;</span>
+<span class="fc" id="L381">        }</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (t != null) {</span>
+<span class="fc" id="L383">            t.cancel();</span>
+        }
+<span class="fc" id="L385">    }</span>
+
+    /// Named rather than anonymous so the timer holds no synthetic
+    /// reference beyond the session it flushes.
+    private static final class FlushTask extends java.util.TimerTask {
+        private final SensorSession session;
+
+<span class="fc" id="L392">        FlushTask(SensorSession session) {</span>
+<span class="fc" id="L393">            this.session = session;</span>
+<span class="fc" id="L394">        }</span>
+
+        @Override
+        public void run() {
+<span class="fc" id="L398">            session.flushIfRunning();</span>
+<span class="fc" id="L399">        }</span>
+    }
+
+    /// True once the session has ended. Guarded by `pendingWrites`, not
+    /// by being volatile, because the point is not visibility but
+    /// atomicity: a timer tick has to decide whether to claim the buffer
+    /// in the same breath as the session decides it has stopped.
+    private boolean flushingStopped;
+
+    /// The timer's flush: claims the buffer only while the session runs.
+    ///
+    /// Checking the state at the top of the tick was not enough. The
+    /// check passed, the session ended, and the write went out anyway --
+    /// one write from a session nobody holds a handle to, every time the
+    /// end landed inside that gap. The check and the claim are one
+    /// critical section now, and ending the session takes the same lock,
+    /// so a batch is either claimed while the session is still running or
+    /// never claimed at all.
+    private void flushIfRunning() {
+<span class="fc" id="L418">        cancelFlush();</span>
+        List&lt;HealthSample&gt; batch;
+<span class="fc" id="L420">        synchronized (pendingWrites) {</span>
+<span class="pc bpc" id="L421" title="2 of 4 branches missed.">            if (flushingStopped || pendingWrites.isEmpty()) {</span>
+<span class="nc" id="L422">                return;</span>
+            }
+<span class="fc" id="L424">            batch = new ArrayList&lt;HealthSample&gt;(pendingWrites);</span>
+<span class="fc" id="L425">            pendingWrites.clear();</span>
+<span class="fc" id="L426">        }</span>
+<span class="fc" id="L427">        writeBatch(batch);</span>
+<span class="fc" id="L428">    }</span>
+
+    /// Writes anything still buffered. Called when the session stops so a
+    /// short ride does not lose its last partial batch.
+    protected final void flushPendingWrites() {
+<span class="fc" id="L433">        cancelFlush();</span>
+        List&lt;HealthSample&gt; batch;
+<span class="fc" id="L435">        synchronized (pendingWrites) {</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (pendingWrites.isEmpty()) {</span>
+<span class="fc" id="L437">                return;</span>
+            }
+<span class="fc" id="L439">            batch = new ArrayList&lt;HealthSample&gt;(pendingWrites);</span>
+<span class="fc" id="L440">            pendingWrites.clear();</span>
+<span class="fc" id="L441">        }</span>
+<span class="fc" id="L442">        writeBatch(batch);</span>
+<span class="fc" id="L443">    }</span>
+
+    /// Sends a claimed batch to the store.
+    ///
+    /// The samples stay accounted for until the store confirms them.
+    /// Removing them from the buffer and ignoring the result meant a
+    /// revoked permission or an unavailable provider silently discarded a
+    /// scale or cuff reading the caller explicitly asked to persist.
+    private void writeBatch(List&lt;HealthSample&gt; batch) {
+<span class="fc" id="L452">        Health.getInstance().getStore().write(batch)</span>
+<span class="fc" id="L453">                .onResult(new WriteBack(this, batch));</span>
+<span class="fc" id="L454">    }</span>
+
+    /// Puts a failed batch back and tells the app it failed.
+    private static final class WriteBack
+            implements com.codename1.util.AsyncResult&lt;HealthWriteResult&gt; {
+        private final SensorSession session;
+        private final List&lt;HealthSample&gt; batch;
+
+<span class="fc" id="L462">        WriteBack(SensorSession session, List&lt;HealthSample&gt; batch) {</span>
+<span class="fc" id="L463">            this.session = session;</span>
+<span class="fc" id="L464">            this.batch = batch;</span>
+<span class="fc" id="L465">        }</span>
+
+        /// The tail of `batch` that the failed write did not commit.
+        ///
+        /// [HealthException#getPartialResult()] names the records that
+        /// went in, and the store writes chunks in order, so the
+        /// committed ones are a prefix. Counted in records rather than
+        /// samples because a series is one sample and many records.
+        ///
+        /// A series straddling the boundary is retried whole and may
+        /// duplicate the part of it that landed. That is the same trade
+        /// the write path already makes for one sample, rather than the
+        /// alternative of dropping measurements that were never stored.
+        private static List&lt;HealthSample&gt; uncommitted(
+                List&lt;HealthSample&gt; batch, Throwable error) {
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (!(error instanceof HealthException)) {</span>
+<span class="nc" id="L481">                return batch;</span>
+            }
+<span class="fc" id="L483">            HealthWriteResult partial =</span>
+<span class="fc" id="L484">                    ((HealthException) error).getPartialResult();</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">            if (partial == null) {</span>
+<span class="fc" id="L486">                return batch;</span>
+            }
+<span class="fc" id="L488">            int committed = partial.getSampleIds().size();</span>
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">            if (committed &lt;= 0) {</span>
+<span class="nc" id="L490">                return batch;</span>
+            }
+<span class="fc" id="L492">            int records = 0;</span>
+<span class="fc" id="L493">            int from = 0;</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">            for (int i = 0; i &lt; batch.size(); i++) {</span>
+<span class="fc" id="L495">                HealthSample s = batch.get(i);</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                records += s instanceof SeriesSample</span>
+<span class="pc" id="L497">                        ? ((SeriesSample) s).size() : 1;</span>
+<span class="fc bfc" id="L498" title="All 2 branches covered.">                if (records &gt; committed) {</span>
+<span class="fc" id="L499">                    break;</span>
+                }
+<span class="fc" id="L501">                from = i + 1;</span>
+            }
+<span class="fc" id="L503">            return new ArrayList&lt;HealthSample&gt;(</span>
+<span class="fc" id="L504">                    batch.subList(from, batch.size()));</span>
+        }
+
+        @Override
+        public void onReady(HealthWriteResult value, Throwable error) {
+<span class="fc bfc" id="L509" title="All 2 branches covered.">            if (error == null) {</span>
+<span class="fc" id="L510">                return;</span>
+            }
+            // Samples of a type the store will never accept are dropped
+            // rather than requeued. An Android cycling-power or cadence
+            // session produces types Health Connect can read but not
+            // write, so every batch failed validation and the retry below
+            // resent the identical batch for as long as the session
+            // streamed -- an error every storeBatchMillis, for ever, and
+            // a buffer that only grew. Retrying is right for a store that
+            // is busy or locked; it is pointless for one that has said
+            // no, and the answer does not change with time.
+            // Whatever a partly-successful write already committed is
+            // not sent again. A buffered batch larger than the platform's
+            // chunk can fail on a later chunk with the earlier ones
+            // already in the store, and requeuing the whole batch wrote
+            // those a second time -- duplicate records in the user's
+            // health data and every aggregate over them inflated, for as
+            // long as the session kept streaming.
+<span class="fc" id="L528">            List&lt;HealthSample&gt; outstanding = uncommitted(batch, error);</span>
+<span class="fc" id="L529">            List&lt;HealthSample&gt; retryable = new ArrayList&lt;HealthSample&gt;(</span>
+<span class="fc" id="L530">                    outstanding.size());</span>
+<span class="fc" id="L531">            List&lt;HealthDataType&gt; refused = new ArrayList&lt;HealthDataType&gt;();</span>
+<span class="fc" id="L532">            HealthStore store = Health.getInstance().getStore();</span>
+<span class="fc bfc" id="L533" title="All 2 branches covered.">            for (HealthSample s : outstanding) {</span>
+<span class="fc bfc" id="L534" title="All 2 branches covered.">                if (store.isWritable(s.getType())) {</span>
+<span class="fc" id="L535">                    retryable.add(s);</span>
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">                } else if (!refused.contains(s.getType())) {</span>
+<span class="fc" id="L537">                    refused.add(s.getType());</span>
+                }
+<span class="fc" id="L539">            }</span>
+<span class="fc bfc" id="L540" title="All 2 branches covered.">            if (!refused.isEmpty()) {</span>
+<span class="fc" id="L541">                com.codename1.io.Log.p(&quot;CN1 Health: this platform cannot&quot;</span>
+                        + &quot; write &quot; + refused + &quot;, so those sensor samples&quot;
+                        + &quot; are dropped rather than retried. Turn&quot;
+                        + &quot; setWriteToStore off for this session, or route&quot;
+                        + &quot; the readings to a workout instead.&quot;);
+            }
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            if (retryable.isEmpty()) {</span>
+<span class="fc" id="L548">                session.fireError(asHealthException(error));</span>
+<span class="fc" id="L549">                return;</span>
+            }
+            // Nothing is requeued once the session has ended, and the
+            // decision is taken under the buffer's own lock below.
+            // Anything left in that buffer afterwards could never be
+            // flushed by the session itself -- the re-arm is guarded and
+            // the timer cancelled -- so it sat there waiting for
+            // something else to drain it, and something else did:
+            // endSession() flushes unconditionally and has more than one
+            // caller, so a failed final write refilled the buffer and the
+            // next teardown wrote it again.
+            boolean requeued;
+<span class="fc" id="L561">            synchronized (session.pendingWrites) {</span>
+                // The flag and the buffer under one lock, because
+                // teardown sets that flag and drains the buffer under it
+                // too. Checked separately, this callback could see a live
+                // session, wait while the final flush ran, and then add
+                // its samples behind it -- into a buffer nothing will
+                // ever claim again, since the re-arm below correctly
+                // declines to schedule anything for a dead session.
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                requeued = !session.flushingStopped;</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">                if (requeued) {</span>
+<span class="fc" id="L571">                    session.pendingWrites.addAll(0, retryable);</span>
+                }
+<span class="fc" id="L573">            }</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">            if (!requeued) {</span>
+                // Teardown won. The samples are reported rather than left
+                // in a buffer nobody will read: this is the only notice
+                // the app gets that they were not stored.
+<span class="fc" id="L578">                session.fireError(asHealthException(error));</span>
+<span class="fc" id="L579">                return;</span>
+            }
+            // Re-armed explicitly, but only while the session is still
+            // running. Rescheduling from a session that has ended --
+            // where a permanent failure like a revoked permission or an
+            // unavailable store lands -- retried forever, keeping the
+            // dead session alive and firing store writes and errors after
+            // shutdown.
+            //
+            // Both terminal states, not just STOPPED: the reconnect
+            // ladder retires a session as FAILED, which passed a
+            // stopped-only check and left exactly the session nobody
+            // holds a handle to retrying on a timer.
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (!session.isTerminal()) {</span>
+<span class="fc" id="L593">                session.scheduleFlush(session.options()</span>
+<span class="fc" id="L594">                        .getStoreBatchMillis());</span>
+            }
+<span class="fc" id="L596">            session.fireError(asHealthException(error));</span>
+<span class="fc" id="L597">        }</span>
+
+        private static HealthException asHealthException(Throwable error) {
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">            return error instanceof HealthException</span>
+                    ? (HealthException) error
+                    : new HealthException(HealthError.UNKNOWN,
+                            &quot;could not persist sensor samples&quot;, error);
+        }
+    }
+
+    /// Whether this session has ended, however it ended.
+    ///
+    /// `STOPPED` is the caller asking; `FAILED` is the framework giving
+    /// up. Nothing may be scheduled from either -- the session is gone
+    /// from the manager's registry, so a timer armed here is one nobody
+    /// can cancel.
+    final boolean isTerminal() {
+<span class="fc" id="L614">        SensorSessionState s = getState();</span>
+<span class="fc bfc" id="L615" title="All 4 branches covered.">        return s == SensorSessionState.STOPPED</span>
+                || s == SensorSessionState.FAILED;
+    }
+
+    /// Decodes a payload into zero or more samples, or `null` when the
+    /// payload is malformed.
+    ///
+    /// A single notification can yield several samples: a cycling power
+    /// meter reports power and crank data in one packet, from which both
+    /// power and cadence are derived.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private List&lt;HealthSample&gt; decode(byte[] value, long at) {
+<span class="fc" id="L627">        List&lt;HealthSample&gt; out = new ArrayList&lt;HealthSample&gt;(2);</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">        if (profile == HealthSensorProfile.HEART_RATE) {</span>
+<span class="fc" id="L629">            HeartRateMeasurement m = HeartRateMeasurement.parse(value);</span>
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L631">                return null;</span>
+            }
+            // Only the rate becomes a sample. RR intervals are decoded by
+            // the parser and have no health data type to be a sample of --
+            // they are the input to HRV, not a measurement of it, and
+            // inventing a type for them would put a number in the store
+            // that no platform can read back. An app that needs them
+            // subscribes to 0x2A37 through com.codename1.bluetooth.le and
+            // calls HeartRateMeasurement.parse itself; both are public,
+            // and SensorSessionOptions#setWriteToStore documents the
+            // route. See HeartRateMeasurement#getRrIntervalCount().
+<span class="fc" id="L642">            out.add(quantity(HealthDataType.HEART_RATE, m.getHeartRate(),</span>
+                    HealthUnit.COUNT_PER_MINUTE, at));
+<span class="fc" id="L644">            return out;</span>
+        }
+<span class="nc bnc" id="L646" title="All 2 branches missed.">        if (profile == HealthSensorProfile.CYCLING_POWER) {</span>
+<span class="nc" id="L647">            CyclingPowerMeasurement m = CyclingPowerMeasurement.parse(value);</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L649">                return null;</span>
+            }
+<span class="nc" id="L651">            out.add(quantity(HealthDataType.POWER,</span>
+<span class="nc" id="L652">                    m.getInstantaneousPowerWatts(), HealthUnit.WATT, at));</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">            if (m.hasCrankData()) {</span>
+<span class="nc" id="L654">                double rpm = crankTracker.update(m.getCrankRevolutions(),</span>
+<span class="nc" id="L655">                        m.getLastCrankEventTime());</span>
+<span class="nc bnc" id="L656" title="All 2 branches missed.">                if (!Double.isNaN(rpm)) {</span>
+<span class="nc" id="L657">                    out.add(quantity(HealthDataType.CYCLING_CADENCE, rpm,</span>
+                            HealthUnit.COUNT_PER_MINUTE, at));
+                }
+            }
+<span class="nc" id="L661">            return out;</span>
+        }
+<span class="nc bnc" id="L663" title="All 2 branches missed.">        if (profile == HealthSensorProfile.CYCLING_SPEED_CADENCE) {</span>
+<span class="nc" id="L664">            CscMeasurement m = CscMeasurement.parse(value);</span>
+<span class="nc bnc" id="L665" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L666">                return null;</span>
+            }
+<span class="nc bnc" id="L668" title="All 2 branches missed.">            if (m.hasCrankData()) {</span>
+<span class="nc" id="L669">                double rpm = crankTracker.update(m.getCrankRevolutions(),</span>
+<span class="nc" id="L670">                        m.getLastCrankEventTime());</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">                if (!Double.isNaN(rpm)) {</span>
+<span class="nc" id="L672">                    out.add(quantity(HealthDataType.CYCLING_CADENCE, rpm,</span>
+                            HealthUnit.COUNT_PER_MINUTE, at));
+                }
+            }
+<span class="nc bnc" id="L676" title="All 2 branches missed.">            if (m.hasWheelData()) {</span>
+                // The wheel rate is deliberately not published. It is not
+                // cadence -- cadence is the crank, reported in the block
+                // below -- and a combination sensor sending both would
+                // otherwise emit two CYCLING_CADENCE samples per
+                // notification with very different values. Turning it into
+                // speed or distance needs a wheel circumference we do not
+                // have, and guessing the tyre size scales every distance
+                // the app ever reports.
+<span class="nc" id="L685">                wheelTracker.update(m.getWheelRevolutions(),</span>
+<span class="nc" id="L686">                        m.getLastWheelEventTime());</span>
+            }
+<span class="nc" id="L688">            return out;</span>
+        }
+<span class="nc bnc" id="L690" title="All 2 branches missed.">        if (profile == HealthSensorProfile.RUNNING_SPEED_CADENCE) {</span>
+<span class="nc" id="L691">            RscMeasurement m = RscMeasurement.parse(value);</span>
+<span class="nc bnc" id="L692" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L693">                return null;</span>
+            }
+<span class="nc" id="L695">            out.add(quantity(HealthDataType.SPEED,</span>
+<span class="nc" id="L696">                    m.getSpeedMetersPerSecond(), HealthUnit.METER_PER_SECOND,</span>
+                    at));
+<span class="nc" id="L698">            out.add(quantity(HealthDataType.RUNNING_CADENCE,</span>
+<span class="nc" id="L699">                    m.getCadenceStepsPerMinute(), HealthUnit.COUNT_PER_MINUTE,</span>
+                    at));
+<span class="nc" id="L701">            return out;</span>
+        }
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        if (profile == HealthSensorProfile.HEALTH_THERMOMETER) {</span>
+<span class="nc" id="L704">            TemperatureMeasurement m = TemperatureMeasurement.parse(value);</span>
+<span class="nc bnc" id="L705" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L706">                return null;</span>
+            }
+<span class="nc" id="L708">            out.add(quantity(HealthDataType.BODY_TEMPERATURE, m.getCelsius(),</span>
+                    HealthUnit.DEGREE_CELSIUS,
+<span class="nc bnc" id="L710" title="All 2 branches missed.">                    m.getTimestampMillis() &gt; 0 ? m.getTimestampMillis() : at));</span>
+<span class="nc" id="L711">            return out;</span>
+        }
+<span class="nc bnc" id="L713" title="All 2 branches missed.">        if (profile == HealthSensorProfile.WEIGHT_SCALE) {</span>
+<span class="nc" id="L714">            WeightMeasurement m = WeightMeasurement.parse(value);</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L716">                return null;</span>
+            }
+<span class="nc" id="L718">            out.add(quantity(HealthDataType.BODY_MASS, m.getWeightKg(),</span>
+                    HealthUnit.KILOGRAM,
+<span class="nc bnc" id="L720" title="All 2 branches missed.">                    m.getTimestampMillis() &gt; 0 ? m.getTimestampMillis() : at));</span>
+<span class="nc" id="L721">            return out;</span>
+        }
+<span class="nc bnc" id="L723" title="All 2 branches missed.">        if (profile == HealthSensorProfile.BLOOD_PRESSURE) {</span>
+<span class="nc" id="L724">            BloodPressureMeasurement m =</span>
+<span class="nc" id="L725">                    BloodPressureMeasurement.parse(value);</span>
+<span class="nc bnc" id="L726" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L727">                return null;</span>
+            }
+<span class="nc bnc" id="L729" title="All 2 branches missed.">            long when = m.getTimestampMillis() &gt; 0</span>
+<span class="nc" id="L730">                    ? m.getTimestampMillis() : at;</span>
+<span class="nc" id="L731">            BloodPressureSample s = BloodPressureSample.create(</span>
+<span class="nc" id="L732">                    m.getSystolicMmHg(), m.getDiastolicMmHg(), when);</span>
+<span class="nc bnc" id="L733" title="All 2 branches missed.">            if (m.hasPulse()) {</span>
+<span class="nc" id="L734">                s.setPulse(new HealthQuantity(m.getPulseBpm(),</span>
+                        HealthUnit.COUNT_PER_MINUTE));
+            }
+<span class="nc" id="L737">            s.setRecordingMethod(RecordingMethod.AUTOMATIC);</span>
+<span class="nc" id="L738">            out.add(s);</span>
+<span class="nc" id="L739">            return out;</span>
+        }
+<span class="nc bnc" id="L741" title="All 2 branches missed.">        if (profile == HealthSensorProfile.GLUCOSE) {</span>
+<span class="nc" id="L742">            GlucoseMeasurement m = GlucoseMeasurement.parse(value);</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">            if (m == null) {</span>
+<span class="nc" id="L744">                return null;</span>
+            }
+<span class="nc bnc" id="L746" title="All 4 branches missed.">            if (!m.hasConcentration() || m.isControlSolution()) {</span>
+                // A failed test, or a calibration against control fluid.
+                // Neither is the user's blood glucose and neither belongs
+                // in their record.
+<span class="nc" id="L750">                return out;</span>
+            }
+<span class="nc bnc" id="L752" title="All 2 branches missed.">            long when = m.getTimestampMillis() &gt; 0</span>
+<span class="nc" id="L753">                    ? m.getTimestampMillis() : at;</span>
+<span class="nc" id="L754">            out.add(quantity(HealthDataType.BLOOD_GLUCOSE,</span>
+<span class="nc" id="L755">                    m.getMillimolesPerLiter(), HealthUnit.MILLIMOLE_PER_LITER,</span>
+                    when));
+<span class="nc" id="L757">            return out;</span>
+        }
+<span class="nc" id="L759">        return out;</span>
+    }
+
+    private static QuantitySample quantity(HealthDataType type, double value,
+            HealthUnit unit, long at) {
+<span class="fc" id="L764">        QuantitySample s = QuantitySample.create(type,</span>
+                new HealthQuantity(value, unit), at);
+<span class="fc" id="L766">        s.setRecordingMethod(RecordingMethod.AUTOMATIC);</span>
+<span class="fc" id="L767">        return s;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // event plumbing
+    // ------------------------------------------------------------------
+
+    /// Records the device's battery level. Called by the transport.
+    protected final void setBatteryPercent(Integer percent) {
+<span class="fc" id="L776">        synchronized (stateLock) {</span>
+<span class="fc" id="L777">            this.batteryPercent = percent;</span>
+<span class="fc" id="L778">        }</span>
+<span class="fc" id="L779">    }</span>
+
+    /// Records where a heart-rate sensor is worn. Called by the transport.
+    protected final void setBodySensorLocation(int location) {
+<span class="fc" id="L783">        synchronized (stateLock) {</span>
+<span class="fc" id="L784">            this.bodySensorLocation = location;</span>
+<span class="fc" id="L785">        }</span>
+<span class="fc" id="L786">    }</span>
+
+    /// Forgets the cumulative-counter baselines, so the next notification
+    /// establishes a new one. Called by the transport on reconnect: a
+    /// sensor that power-cycled restarts its counters from zero.
+    protected final void resetCounters() {
+<span class="fc" id="L792">        wheelTracker.reset();</span>
+<span class="fc" id="L793">        crankTracker.reset();</span>
+<span class="fc" id="L794">    }</span>
+
+    /// Moves the session to a new state and notifies listeners.
+    /// True once this session has actually streamed.
+    ///
+    /// A failed initial connect also publishes DISCONNECTED, and
+    /// reconnecting from that resurrects a session the caller was already
+    /// told had failed.
+    protected final boolean hasStreamed() {
+<span class="fc" id="L803">        synchronized (stateLock) {</span>
+<span class="fc" id="L804">            return streamed;</span>
+        }
+    }
+
+    /// Moves to `newState`, reporting whether the move happened.
+    ///
+    /// A refusal is not merely a no-op for the caller: it means the
+    /// session went terminal underneath, and whatever the caller was
+    /// about to do next -- connect a peripheral, arm a timer -- would be
+    /// done on behalf of a session that has already been torn down.
+    protected final boolean setState(SensorSessionState newState) {
+<span class="fc" id="L815">        synchronized (stateLock) {</span>
+<span class="fc bfc" id="L816" title="All 2 branches covered.">            if (newState == SensorSessionState.STREAMING) {</span>
+<span class="fc" id="L817">                streamed = true;</span>
+            }
+<span class="pc bpc" id="L819" title="1 of 2 branches missed.">            if (newState == null) {</span>
+<span class="nc" id="L820">                return false;</span>
+            }
+<span class="fc bfc" id="L822" title="All 2 branches covered.">            if (newState == state) {</span>
+                // Already there, which is not a refusal: the caller's
+                // desired state holds, so it may carry on. Reporting this
+                // as failure made reconnect() abandon a ladder that was
+                // simply already in CONNECTING.
+<span class="fc" id="L827">                return true;</span>
+            }
+<span class="pc bpc" id="L829" title="1 of 4 branches missed.">            if (state == SensorSessionState.STOPPED</span>
+                    || state == SensorSessionState.FAILED) {
+                // Terminal is terminal. An asynchronous subscribe or
+                // reconnect callback can pass its own terminal check and
+                // arrive here after stop() has run on another thread --
+                // and it used to overwrite STOPPED with STREAMING, so a
+                // session already removed from the manager and
+                // disconnected reported itself live, and queued
+                // notifications passed the very guard that had just been
+                // set against them.
+<span class="fc" id="L839">                return false;</span>
+            }
+<span class="fc" id="L841">            state = newState;</span>
+            // Published under the lock, so listeners are told about the
+            // transitions in the order they happened. Enqueued outside
+            // it, a transition that had already released the lock could
+            // hand its notification to the EDT after stop() had handed
+            // over STOPPED -- so an app watched a stopped session appear
+            // to start connecting again, while getState() said STOPPED.
+            // The store guard above kept the state honest and said
+            // nothing about the order the news arrived in.
+            //
+            // Only the enqueue. callSerially appends to a queue and
+            // returns, and the runnable runs later on the EDT, so nothing
+            // waits for a listener while this is held.
+<span class="fc" id="L854">            Object[] snapshot = listenerSnapshot();</span>
+<span class="fc bfc" id="L855" title="All 2 branches covered.">            if (snapshot != null) {</span>
+<span class="fc" id="L856">                Display.getInstance().callSerially(</span>
+<span class="fc" id="L857">                        makeStateRunnable(this, snapshot, newState));</span>
+            }
+<span class="fc" id="L859">        }</span>
+        // The teardown below runs outside the lock: it takes the buffer's
+        // monitor and cancels a timer, and holding this one across them
+        // would order the two locks against every other path that touches
+        // both.
+<span class="fc bfc" id="L864" title="All 2 branches covered.">        if (isTerminal()) {</span>
+            // Nothing may be scheduled from a terminal state, and that
+            // includes what was scheduled just before reaching one: the
+            // session is gone from the manager's registry, so a timer
+            // left armed is one nobody can cancel.
+            //
+            // Under the buffer's lock so a timer tick cannot be midway
+            // through claiming it -- see flushIfRunning. The explicit
+            // flush endSession() performs next does not consult this
+            // flag, so a short ride still keeps its final partial batch.
+<span class="fc" id="L874">            synchronized (pendingWrites) {</span>
+<span class="fc" id="L875">                flushingStopped = true;</span>
+<span class="fc" id="L876">            }</span>
+<span class="fc" id="L877">            cancelFlush();</span>
+        }
+<span class="fc" id="L879">        return true;</span>
+    }
+
+    /// Delivers a sample to listeners on the EDT.
+    protected final void fireSample(HealthSample sample) {
+<span class="fc" id="L884">        Object[] snapshot = listenerSnapshot();</span>
+<span class="fc bfc" id="L885" title="All 2 branches covered.">        if (snapshot != null) {</span>
+<span class="fc" id="L886">            Display.getInstance().callSerially(</span>
+<span class="fc" id="L887">                    makeSampleRunnable(this, snapshot, sample));</span>
+        }
+<span class="fc" id="L889">    }</span>
+
+    /// Delivers an error to listeners on the EDT.
+    protected final void fireError(HealthException error) {
+<span class="fc" id="L893">        Object[] snapshot = listenerSnapshot();</span>
+<span class="fc bfc" id="L894" title="All 2 branches covered.">        if (snapshot != null) {</span>
+<span class="fc" id="L895">            Display.getInstance().callSerially(</span>
+<span class="fc" id="L896">                    makeErrorRunnable(this, snapshot, error));</span>
+        }
+<span class="fc" id="L898">    }</span>
+
+    private Object[] listenerSnapshot() {
+<span class="fc" id="L901">        synchronized (listeners) {</span>
+<span class="fc bfc" id="L902" title="All 2 branches covered.">            if (listeners.isEmpty()) {</span>
+<span class="fc" id="L903">                return null;</span>
+            }
+<span class="fc" id="L905">            return listeners.toArray();</span>
+        }
+    }
+
+    // The dispatch runnables are built in static methods so they carry no
+    // synthetic reference to the enclosing session (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+
+    private static Runnable makeSampleRunnable(final SensorSession session,
+            final Object[] listeners, final HealthSample sample) {
+<span class="fc" id="L915">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L918" title="All 2 branches covered.">                for (Object listener : listeners) {</span>
+<span class="fc" id="L919">                    ((SensorSampleListener) listener)</span>
+<span class="fc" id="L920">                            .sensorSample(session, sample);</span>
+                }
+<span class="fc" id="L922">            }</span>
+        };
+    }
+
+    private static Runnable makeStateRunnable(final SensorSession session,
+            final Object[] listeners, final SensorSessionState state) {
+<span class="fc" id="L928">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L931" title="All 2 branches covered.">                for (Object listener : listeners) {</span>
+<span class="fc" id="L932">                    ((SensorSampleListener) listener)</span>
+<span class="fc" id="L933">                            .sensorStateChanged(session, state);</span>
+                }
+<span class="fc" id="L935">            }</span>
+        };
+    }
+
+    private static Runnable makeErrorRunnable(final SensorSession session,
+            final Object[] listeners, final HealthException error) {
+<span class="fc" id="L941">        return new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L944" title="All 2 branches covered.">                for (Object listener : listeners) {</span>
+<span class="fc" id="L945">                    ((SensorSampleListener) listener)</span>
+<span class="fc" id="L946">                            .sensorError(session, error);</span>
+                }
+<span class="fc" id="L948">            }</span>
+        };
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L954">        return &quot;SensorSession[&quot; + profile.getName() + &quot; &quot; + sensorId + &quot; &quot;</span>
+                + state + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

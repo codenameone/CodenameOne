@@ -1,0 +1,1211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Simd.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">Simd.java</span></div><h1>Simd.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.util;
+
+import com.codename1.annotations.Concrete;
+import com.codename1.ui.CN;
+
+/// Portable SIMD API with Java fallback implementations.
+@Concrete(name = &quot;com.codename1.impl.ios.IOSSimd&quot;, win = &quot;com.codename1.impl.windows.WindowsSimd&quot;)
+<span class="fc" id="L17">public class Simd {</span>
+    /// Returns the singleton instance of the Simd class. Equivalent to `CN.getSimd();`
+    public static Simd get() {
+<span class="fc" id="L20">        return CN.getSimd();</span>
+    }
+
+    /// Returns true if SIMD instructions are natively supported
+    /// if this returns false the APIs in this class would still work
+    /// using fallback loop code
+    public boolean isSupported() {
+<span class="fc" id="L27">        return false;</span>
+    }
+
+    /// Returns true when *chained, fine-grained* byte shuffle/interleave pipelines
+    /// (as the Base64 SIMD codec uses: unpack/pack interleaved, byte shifts, table
+    /// lookups) are hardware-accelerated AND actually beat the compiler's
+    /// autovectorized scalar code. NEON platforms (iOS, Windows-on-Arm) return
+    /// true -- there the explicit codec is dramatically faster even at -O2. x86-64
+    /// returns false: its `/O2` autovectorizer already matches the scalar path and
+    /// SSE2 has no 3-way interleave, so the codec should stay scalar there. This is
+    /// distinct from {@link #isSupported()} -- the *fused* whole-array image ops
+    /// (alpha/mask blends) win on every platform and are gated on isSupported(),
+    /// not on this flag. Defaults to false (the generic scalar Simd).
+    public boolean isByteShuffleAccelerated() {
+<span class="nc" id="L41">        return false;</span>
+    }
+
+    /// Allocates an aligned memory block for efficient SIMD
+    /// operations. All operations MUST be performed on aligned
+    /// arrays and shouldn't use arrays created with `new`. Operations
+    /// on unaligned arrays might produce undefined results.
+    public byte[] allocByte(int size) {
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (size &lt; 16) {</span>
+<span class="fc" id="L50">            throw new IllegalArgumentException(&quot;size must be &gt;= 16&quot;);</span>
+        }
+<span class="fc" id="L52">        return new byte[size];</span>
+    }
+
+    /// Allocates an aligned memory block for efficient SIMD
+    /// operations. All operations MUST be performed on aligned
+    /// arrays and shouldn't use arrays created with `new`. Operations
+    /// on unaligned arrays might produce undefined results.
+    public int[] allocInt(int size) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (size &lt; 16) {</span>
+<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;size must be &gt;= 16&quot;);</span>
+        }
+<span class="fc" id="L63">        return new int[size];</span>
+    }
+
+    /// Allocates an aligned memory block for efficient SIMD
+    /// operations. All operations MUST be performed on aligned
+    /// arrays and shouldn't use arrays created with `new`. Operations
+    /// on unaligned arrays might produce undefined results.
+    public float[] allocFloat(int size) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (size &lt; 16) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(&quot;size must be &gt;= 16&quot;);</span>
+        }
+<span class="fc" id="L74">        return new float[size];</span>
+    }
+
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+    /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
+    /// when using it, and MUST treat its contents as undefined until written. Use `allocByte(int)`
+    /// for heap-backed arrays. The ParparVM lowering automatically falls back to a heap allocation
+    /// when the requested size would not fit safely on the per-thread stack, so this API is safe
+    /// to call with image-scale sizes - but using `allocByte(int)` directly is preferred when the
+    /// size is known to be large.
+    public byte[] allocaByte(int size) {
+<span class="fc" id="L85">        return allocByte(size);</span>
+    }
+
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+    /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
+    /// when using it, and MUST treat its contents as undefined until written. Use `allocInt(int)`
+    /// for heap-backed arrays. The ParparVM lowering automatically falls back to a heap allocation
+    /// when the requested size would not fit safely on the per-thread stack, so this API is safe
+    /// to call with image-scale sizes - but using `allocInt(int)` directly is preferred when the
+    /// size is known to be large.
+    public int[] allocaInt(int size) {
+<span class="fc" id="L96">        return allocInt(size);</span>
+    }
+
+    /// @deprecated This is a special scratch-allocation API. On ParparVM this may be lowered to a
+    /// stack-backed faux array, so callers MUST keep it method-local, MUST be extremely cautious
+    /// when using it, and MUST treat its contents as undefined until written. Use `allocFloat(int)`
+    /// for heap-backed arrays. The ParparVM lowering automatically falls back to a heap allocation
+    /// when the requested size would not fit safely on the per-thread stack, so this API is safe
+    /// to call with image-scale sizes - but using `allocFloat(int)` directly is preferred when the
+    /// size is known to be large.
+    public float[] allocaFloat(int size) {
+<span class="fc" id="L107">        return allocFloat(size);</span>
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized byte array while retaining
+    /// the same method-local constraints as `allocaByte(int)`.
+    public byte[] allocaByteZeroed(int size) {
+<span class="fc" id="L113">        byte[] out = allocaByte(size);</span>
+<span class="fc" id="L114">        fillByte(out, (byte) 0);</span>
+<span class="fc" id="L115">        return out;</span>
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized int array while retaining
+    /// the same method-local constraints as `allocaInt(int)`.
+    public int[] allocaIntZeroed(int size) {
+<span class="fc" id="L121">        int[] out = allocaInt(size);</span>
+<span class="fc" id="L122">        fillInt(out, 0);</span>
+<span class="fc" id="L123">        return out;</span>
+    }
+
+    /// Special scratch-allocation API that guarantees a zero-initialized float array while retaining
+    /// the same method-local constraints as `allocaFloat(int)`.
+    public float[] allocaFloatZeroed(int size) {
+<span class="fc" id="L129">        float[] out = allocaFloat(size);</span>
+<span class="fc" id="L130">        fillFloat(out, 0.0f);</span>
+<span class="fc" id="L131">        return out;</span>
+    }
+
+    /// Special scratch-allocation API that guarantees every byte starts with the same value while
+    /// retaining the same method-local constraints as `allocaByte(int)`.
+    public byte[] allocaByteFilled(int size, byte value) {
+<span class="fc" id="L137">        byte[] out = allocaByte(size);</span>
+<span class="fc" id="L138">        fillByte(out, value);</span>
+<span class="fc" id="L139">        return out;</span>
+    }
+
+    /// Special scratch-allocation API that guarantees every int starts with the same value while
+    /// retaining the same method-local constraints as `allocaInt(int)`.
+    public int[] allocaIntFilled(int size, int value) {
+<span class="fc" id="L145">        int[] out = allocaInt(size);</span>
+<span class="fc" id="L146">        fillInt(out, value);</span>
+<span class="fc" id="L147">        return out;</span>
+    }
+
+    /// Special scratch-allocation API that guarantees every float starts with the same value while
+    /// retaining the same method-local constraints as `allocaFloat(int)`.
+    public float[] allocaFloatFilled(int size, float value) {
+<span class="fc" id="L153">        float[] out = allocaFloat(size);</span>
+<span class="fc" id="L154">        fillFloat(out, value);</span>
+<span class="fc" id="L155">        return out;</span>
+    }
+
+    private static void fillByte(byte[] arr, byte value) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int i = 0; i &lt; arr.length; i++) {</span>
+<span class="fc" id="L160">            arr[i] = value;</span>
+        }
+<span class="fc" id="L162">    }</span>
+
+    private static void fillInt(int[] arr, int value) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; arr.length; i++) {</span>
+<span class="fc" id="L166">            arr[i] = value;</span>
+        }
+<span class="fc" id="L168">    }</span>
+
+    private static void fillFloat(float[] arr, float value) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (int i = 0; i &lt; arr.length; i++) {</span>
+<span class="fc" id="L172">            arr[i] = value;</span>
+        }
+<span class="fc" id="L174">    }</span>
+
+    /// Looks up values from a table using unsigned byte indices.
+    public void lookupBytes(byte[] table, byte[] indices, byte[] dst, int offset, int length) {
+<span class="fc" id="L178">        lookupBytes(table, indices, offset, dst, offset, length);</span>
+<span class="fc" id="L179">    }</span>
+
+    /// Looks up values from a table using unsigned byte indices.
+    public void lookupBytes(byte[] table, byte[] indices, int indicesOffset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L184">            int idx = indices[indicesOffset + i] &amp; 0xff;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            dst[dstOffset + i] = idx &lt; table.length ? table[idx] : 0;</span>
+        }
+<span class="fc" id="L187">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L192">            dst[dstOffset + i] = (byte) (srcA[srcAOffset + i] &amp; srcB[srcBOffset + i]);</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(byte[] srcA, int srcAOffset, byte[] srcB, int srcBOffset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L199">            dst[dstOffset + i] = (byte) (srcA[srcAOffset + i] | srcB[srcBOffset + i]);</span>
+        }
+<span class="fc" id="L201">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shl(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length) {
+<span class="fc" id="L205">        int shift = bits &amp; 7;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L207">            dst[dstOffset + i] = (byte) ((src[srcOffset + i] &amp; 0xff) &lt;&lt; shift);</span>
+        }
+<span class="fc" id="L209">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shrLogical(byte[] src, int srcOffset, int bits, byte[] dst, int dstOffset, int length) {
+<span class="fc" id="L213">        int shift = bits &amp; 7;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L215">            dst[dstOffset + i] = (byte) ((src[srcOffset + i] &amp; 0xff) &gt;&gt;&gt; shift);</span>
+        }
+<span class="fc" id="L217">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length) {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L222">            int srcIndex = srcOffset + i * 3;</span>
+<span class="fc" id="L223">            dst[dst0Offset + i] = src[srcIndex];</span>
+<span class="fc" id="L224">            dst[dst1Offset + i] = src[srcIndex + 1];</span>
+<span class="fc" id="L225">            dst[dst2Offset + i] = src[srcIndex + 2];</span>
+        }
+<span class="fc" id="L227">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void add(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L232">            dst[i] = clampByte(srcA[i] + srcB[i]);</span>
+        }
+<span class="fc" id="L234">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void sub(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L239">            dst[i] = clampByte(srcA[i] - srcB[i]);</span>
+        }
+<span class="nc" id="L241">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void mul(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L246">            dst[i] = clampByte(srcA[i] * srcB[i]);</span>
+        }
+<span class="nc" id="L248">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void min(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            dst[i] = srcA[i] &lt; srcB[i] ? srcA[i] : srcB[i];</span>
+        }
+<span class="nc" id="L255">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void max(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            dst[i] = srcA[i] &gt; srcB[i] ? srcA[i] : srcB[i];</span>
+        }
+<span class="nc" id="L262">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void abs(byte[] src, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L267">            int v = src[i];</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            if (v == Byte.MIN_VALUE) {</span>
+<span class="nc" id="L269">                dst[i] = Byte.MAX_VALUE;</span>
+            } else {
+<span class="nc" id="L271">                dst[i] = (byte) Math.abs(v);</span>
+            }
+        }
+<span class="nc" id="L274">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void clamp(byte[] src, byte[] dst, byte minValue, byte maxValue, int offset, int length) {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L279">            int v = src[i];</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            if (v &lt; minValue) {</span>
+<span class="nc" id="L281">                dst[i] = minValue;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            } else if (v &gt; maxValue) {</span>
+<span class="nc" id="L283">                dst[i] = maxValue;</span>
+            } else {
+<span class="nc" id="L285">                dst[i] = (byte) v;</span>
+            }
+        }
+<span class="nc" id="L288">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc" id="L292">        and(srcA, offset, srcB, offset, dst, offset, length);</span>
+<span class="nc" id="L293">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc" id="L297">        or(srcA, offset, srcB, offset, dst, offset, length);</span>
+<span class="nc" id="L298">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void xor(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L303">            dst[i] = (byte) (srcA[i] ^ srcB[i]);</span>
+        }
+<span class="nc" id="L305">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void not(byte[] src, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L310">            dst[i] = (byte) (~src[i]);</span>
+        }
+<span class="nc" id="L312">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            dstMask[i] = srcA[i] == srcB[i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L319">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(byte[] src, byte value, byte[] dstMask, int offset, int length) {
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            dstMask[i] = src[i] == value ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="fc" id="L326">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            dstMask[i] = srcA[i] &lt; srcB[i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L333">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(byte[] src, byte value, byte[] dstMask, int offset, int length) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            dstMask[i] = src[i] &lt; value ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="fc" id="L340">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpGt(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">            dstMask[i] = srcA[i] &gt; srcB[i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="fc" id="L347">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpRange(byte[] src, byte minValue, byte maxValue, byte[] dstMask, int offset, int length) {
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L352">            int v = src[i];</span>
+<span class="nc bnc" id="L353" title="All 4 branches missed.">            dstMask[i] = v &gt;= minValue &amp;&amp; v &lt;= maxValue ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L355">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];</span>
+        }
+<span class="fc" id="L362">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shl(byte[] src, int bits, byte[] dst, int offset, int length) {
+<span class="fc" id="L366">        shl(src, offset, bits, dst, offset, length);</span>
+<span class="fc" id="L367">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shrLogical(byte[] src, int bits, byte[] dst, int offset, int length) {
+<span class="fc" id="L371">        shrLogical(src, offset, bits, dst, offset, length);</span>
+<span class="fc" id="L372">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void addWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L377">            dst[i] = (byte) (srcA[i] + srcB[i]);</span>
+        }
+<span class="fc" id="L379">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void addWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L384">            dst[i] = (byte) (src[i] + value);</span>
+        }
+<span class="fc" id="L386">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void subWrapping(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L391">            dst[i] = (byte) (srcA[i] - srcB[i]);</span>
+        }
+<span class="fc" id="L393">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void subWrapping(byte[] src, byte value, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L398">            dst[i] = (byte) (src[i] - value);</span>
+        }
+<span class="fc" id="L400">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackUnsignedByteToInt(byte[] src, int[] dst, int offset, int length) {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L405">            dst[i] = src[i] &amp; 0xff;</span>
+        }
+<span class="fc" id="L407">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackUnsignedByteToInt(byte[] src, int srcOffset, int[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L412">            dst[dstOffset + i] = src[srcOffset + i] &amp; 0xff;</span>
+        }
+<span class="fc" id="L414">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackUnsignedByteToIntInterleaved3(byte[] src, int srcOffset, int[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int length) {
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L419">            int srcIndex = srcOffset + i * 3;</span>
+<span class="fc" id="L420">            dst[dst0Offset + i] = src[srcIndex] &amp; 0xff;</span>
+<span class="fc" id="L421">            dst[dst1Offset + i] = src[srcIndex + 1] &amp; 0xff;</span>
+<span class="fc" id="L422">            dst[dst2Offset + i] = src[srcIndex + 2] &amp; 0xff;</span>
+        }
+<span class="fc" id="L424">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved3(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, int length) {
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L429">            int srcIndex = srcOffset + i * 3;</span>
+<span class="fc" id="L430">            dst0[i] = src[srcIndex];</span>
+<span class="fc" id="L431">            dst1[i] = src[srcIndex + 1];</span>
+<span class="fc" id="L432">            dst2[i] = src[srcIndex + 2];</span>
+        }
+<span class="fc" id="L434">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length) {
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L439">            int srcIndex = srcOffset + i * 4;</span>
+<span class="fc" id="L440">            dst0[i] = src[srcIndex];</span>
+<span class="fc" id="L441">            dst1[i] = src[srcIndex + 1];</span>
+<span class="fc" id="L442">            dst2[i] = src[srcIndex + 2];</span>
+<span class="fc" id="L443">            dst3[i] = src[srcIndex + 3];</span>
+        }
+<span class="fc" id="L445">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void unpackBytesInterleaved4(byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length) {
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L450">            int srcIndex = srcOffset + i * 4;</span>
+<span class="fc" id="L451">            dst[dst0Offset + i] = src[srcIndex];</span>
+<span class="fc" id="L452">            dst[dst1Offset + i] = src[srcIndex + 1];</span>
+<span class="fc" id="L453">            dst[dst2Offset + i] = src[srcIndex + 2];</span>
+<span class="fc" id="L454">            dst[dst3Offset + i] = src[srcIndex + 3];</span>
+        }
+<span class="fc" id="L456">    }</span>
+
+    /// Unpacks interleaved bytes, looks each byte up in the provided table, stores the
+    /// looked-up values into separate lane arrays, and returns the bitwise OR of all
+    /// written values.
+    public int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst0, byte[] dst1, byte[] dst2, byte[] dst3, int length) {
+<span class="fc" id="L462">        int or = 0;</span>
+<span class="fc" id="L463">        int tableLength = table.length;</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L465">            int srcIndex = srcOffset + i * 4;</span>
+<span class="fc" id="L466">            int idx0 = src[srcIndex] &amp; 0xff;</span>
+<span class="fc" id="L467">            int idx1 = src[srcIndex + 1] &amp; 0xff;</span>
+<span class="fc" id="L468">            int idx2 = src[srcIndex + 2] &amp; 0xff;</span>
+<span class="fc" id="L469">            int idx3 = src[srcIndex + 3] &amp; 0xff;</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            byte v0 = idx0 &lt; tableLength ? table[idx0] : 0;</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">            byte v1 = idx1 &lt; tableLength ? table[idx1] : 0;</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">            byte v2 = idx2 &lt; tableLength ? table[idx2] : 0;</span>
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">            byte v3 = idx3 &lt; tableLength ? table[idx3] : 0;</span>
+<span class="fc" id="L474">            dst0[i] = v0;</span>
+<span class="fc" id="L475">            dst1[i] = v1;</span>
+<span class="fc" id="L476">            dst2[i] = v2;</span>
+<span class="fc" id="L477">            dst3[i] = v3;</span>
+<span class="fc" id="L478">            or |= v0 | v1 | v2 | v3;</span>
+        }
+<span class="fc" id="L480">        return or;</span>
+    }
+
+    /// Unpacks interleaved bytes, looks each byte up in the provided table, stores the
+    /// looked-up values into virtual lane ranges in a destination array, and returns
+    /// the bitwise OR of all written values.
+    public int unpackLookupBytesInterleaved4(byte[] table, byte[] src, int srcOffset, byte[] dst, int dst0Offset, int dst1Offset, int dst2Offset, int dst3Offset, int length) {
+<span class="nc" id="L487">        int or = 0;</span>
+<span class="nc" id="L488">        int tableLength = table.length;</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L490">            int srcIndex = srcOffset + i * 4;</span>
+<span class="nc" id="L491">            int idx0 = src[srcIndex] &amp; 0xff;</span>
+<span class="nc" id="L492">            int idx1 = src[srcIndex + 1] &amp; 0xff;</span>
+<span class="nc" id="L493">            int idx2 = src[srcIndex + 2] &amp; 0xff;</span>
+<span class="nc" id="L494">            int idx3 = src[srcIndex + 3] &amp; 0xff;</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            byte v0 = idx0 &lt; tableLength ? table[idx0] : 0;</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">            byte v1 = idx1 &lt; tableLength ? table[idx1] : 0;</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">            byte v2 = idx2 &lt; tableLength ? table[idx2] : 0;</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">            byte v3 = idx3 &lt; tableLength ? table[idx3] : 0;</span>
+<span class="nc" id="L499">            dst[dst0Offset + i] = v0;</span>
+<span class="nc" id="L500">            dst[dst1Offset + i] = v1;</span>
+<span class="nc" id="L501">            dst[dst2Offset + i] = v2;</span>
+<span class="nc" id="L502">            dst[dst3Offset + i] = v3;</span>
+<span class="nc" id="L503">            or |= v0 | v1 | v2 | v3;</span>
+        }
+<span class="nc" id="L505">        return or;</span>
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packIntToByteSaturating(int[] src, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L511">            dst[i] = clampByte(src[i]);</span>
+        }
+<span class="fc" id="L513">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packIntToByteTruncate(int[] src, byte[] dst, int offset, int length) {
+<span class="nc bnc" id="L517" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L518">            dst[i] = (byte) src[i];</span>
+        }
+<span class="nc" id="L520">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packIntToByteTruncate(int[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L524" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L525">            dst[dstOffset + i] = (byte) src[srcOffset + i];</span>
+        }
+<span class="fc" id="L527">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packIntToByteTruncateInterleaved4(int[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L532">            int dstIndex = dstOffset + i * 4;</span>
+<span class="fc" id="L533">            dst[dstIndex] = (byte) src[src0Offset + i];</span>
+<span class="fc" id="L534">            dst[dstIndex + 1] = (byte) src[src1Offset + i];</span>
+<span class="fc" id="L535">            dst[dstIndex + 2] = (byte) src[src2Offset + i];</span>
+<span class="fc" id="L536">            dst[dstIndex + 3] = (byte) src[src3Offset + i];</span>
+        }
+<span class="fc" id="L538">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved3(byte[] src0, byte[] src1, byte[] src2, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L543">            int dstIndex = dstOffset + i * 3;</span>
+<span class="fc" id="L544">            dst[dstIndex] = src0[i];</span>
+<span class="fc" id="L545">            dst[dstIndex + 1] = src1[i];</span>
+<span class="fc" id="L546">            dst[dstIndex + 2] = src2[i];</span>
+        }
+<span class="fc" id="L548">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved3(byte[] src, int src0Offset, int src1Offset, int src2Offset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L552" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L553">            int dstIndex = dstOffset + i * 3;</span>
+<span class="fc" id="L554">            dst[dstIndex] = src[src0Offset + i];</span>
+<span class="fc" id="L555">            dst[dstIndex + 1] = src[src1Offset + i];</span>
+<span class="fc" id="L556">            dst[dstIndex + 2] = src[src2Offset + i];</span>
+        }
+<span class="fc" id="L558">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved4(byte[] src0, byte[] src1, byte[] src2, byte[] src3, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L562" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L563">            int dstIndex = dstOffset + i * 4;</span>
+<span class="fc" id="L564">            dst[dstIndex] = src0[i];</span>
+<span class="fc" id="L565">            dst[dstIndex + 1] = src1[i];</span>
+<span class="fc" id="L566">            dst[dstIndex + 2] = src2[i];</span>
+<span class="fc" id="L567">            dst[dstIndex + 3] = src3[i];</span>
+        }
+<span class="fc" id="L569">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void packBytesInterleaved4(byte[] src, int src0Offset, int src1Offset, int src2Offset, int src3Offset, byte[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L574">            int dstIndex = dstOffset + i * 4;</span>
+<span class="fc" id="L575">            dst[dstIndex] = src[src0Offset + i];</span>
+<span class="fc" id="L576">            dst[dstIndex + 1] = src[src1Offset + i];</span>
+<span class="fc" id="L577">            dst[dstIndex + 2] = src[src2Offset + i];</span>
+<span class="fc" id="L578">            dst[dstIndex + 3] = src[src3Offset + i];</span>
+        }
+<span class="fc" id="L580">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void permuteBytes(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L585">            int idx = indices[i];</span>
+<span class="pc bpc" id="L586" title="1 of 4 branches missed.">            dst[i] = idx &gt;= 0 &amp;&amp; idx &lt; src.length ? src[idx] : 0;</span>
+        }
+<span class="fc" id="L588">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void add(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L593">            dst[i] = srcA[i] + srcB[i];</span>
+        }
+<span class="fc" id="L595">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void add(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L599" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L600">            dst[dstOffset + i] = srcA[srcAOffset + i] + srcB[srcBOffset + i];</span>
+        }
+<span class="fc" id="L602">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void sub(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L606" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L607">            dst[i] = srcA[i] - srcB[i];</span>
+        }
+<span class="nc" id="L609">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void mul(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L613" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L614">            dst[i] = srcA[i] * srcB[i];</span>
+        }
+<span class="nc" id="L616">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void min(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L620" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">            dst[i] = srcA[i] &lt; srcB[i] ? srcA[i] : srcB[i];</span>
+        }
+<span class="nc" id="L623">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void max(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L627" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L628" title="All 2 branches missed.">            dst[i] = srcA[i] &gt; srcB[i] ? srcA[i] : srcB[i];</span>
+        }
+<span class="nc" id="L630">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void abs(int[] src, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L634" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L635">            int v = src[i];</span>
+<span class="nc bnc" id="L636" title="All 2 branches missed.">            dst[i] = v == Integer.MIN_VALUE ? Integer.MAX_VALUE : Math.abs(v);</span>
+        }
+<span class="nc" id="L638">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void clamp(int[] src, int[] dst, int minValue, int maxValue, int offset, int length) {
+<span class="nc bnc" id="L642" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L643">            int v = src[i];</span>
+<span class="nc bnc" id="L644" title="All 2 branches missed.">            if (v &lt; minValue) {</span>
+<span class="nc" id="L645">                dst[i] = minValue;</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">            } else if (v &gt; maxValue) {</span>
+<span class="nc" id="L647">                dst[i] = maxValue;</span>
+            } else {
+<span class="nc" id="L649">                dst[i] = v;</span>
+            }
+        }
+<span class="nc" id="L652">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="fc bfc" id="L656" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L657">            dst[i] = srcA[i] &amp; srcB[i];</span>
+        }
+<span class="fc" id="L659">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L663" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L664">            dst[dstOffset + i] = srcA[srcAOffset + i] &amp; srcB[srcBOffset + i];</span>
+        }
+<span class="nc" id="L666">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L670" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L671">            dst[i] = srcA[i] | srcB[i];</span>
+        }
+<span class="nc" id="L673">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L677" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L678">            dst[dstOffset + i] = srcA[srcAOffset + i] | srcB[srcBOffset + i];</span>
+        }
+<span class="nc" id="L680">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void xor(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L684" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L685">            dst[i] = srcA[i] ^ srcB[i];</span>
+        }
+<span class="nc" id="L687">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void not(int[] src, int[] dst, int offset, int length) {
+<span class="nc bnc" id="L691" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L692">            dst[i] = ~src[i];</span>
+        }
+<span class="nc" id="L694">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shl(int[] src, int bits, int[] dst, int offset, int length) {
+<span class="nc" id="L698">        int shift = bits &amp; 31;</span>
+<span class="nc bnc" id="L699" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L700">            dst[i] = src[i] &lt;&lt; shift;</span>
+        }
+<span class="nc" id="L702">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shl(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
+<span class="nc" id="L706">        int shift = bits &amp; 31;</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L708">            dst[dstOffset + i] = src[srcOffset + i] &lt;&lt; shift;</span>
+        }
+<span class="nc" id="L710">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shrLogical(int[] src, int bits, int[] dst, int offset, int length) {
+<span class="fc" id="L714">        int shift = bits &amp; 31;</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L716">            dst[i] = src[i] &gt;&gt;&gt; shift;</span>
+        }
+<span class="fc" id="L718">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shrLogical(int[] src, int srcOffset, int bits, int[] dst, int dstOffset, int length) {
+<span class="nc" id="L722">        int shift = bits &amp; 31;</span>
+<span class="nc bnc" id="L723" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L724">            dst[dstOffset + i] = src[srcOffset + i] &gt;&gt;&gt; shift;</span>
+        }
+<span class="nc" id="L726">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void shrArithmetic(int[] src, int bits, int[] dst, int offset, int length) {
+<span class="fc" id="L730">        int shift = bits &amp; 31;</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L732">            dst[i] = src[i] &gt;&gt; shift;</span>
+        }
+<span class="fc" id="L734">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+<span class="nc bnc" id="L738" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">            dstMask[i] = srcA[i] == srcB[i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L741">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+<span class="fc bfc" id="L745" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">            dstMask[dstOffset + i] = srcA[srcAOffset + i] == srcB[srcBOffset + i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="fc" id="L748">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+<span class="fc bfc" id="L752" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">            dstMask[i] = srcA[i] &lt; srcB[i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="fc" id="L755">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(int[] srcA, int srcAOffset, int[] srcB, int srcBOffset, byte[] dstMask, int dstOffset, int length) {
+<span class="fc bfc" id="L759" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">            dstMask[dstOffset + i] = srcA[srcAOffset + i] &lt; srcB[srcBOffset + i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="fc" id="L762">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpGt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+<span class="nc bnc" id="L766" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc bnc" id="L767" title="All 2 branches missed.">            dstMask[i] = srcA[i] &gt; srcB[i] ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L769">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
+<span class="fc bfc" id="L773" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L774" title="All 2 branches covered.">            dst[i] = mask[i] != 0 ? trueValues[i] : falseValues[i];</span>
+        }
+<span class="fc" id="L776">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L780" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc bfc" id="L781" title="All 2 branches covered.">            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseValues[falseOffset + i];</span>
+        }
+<span class="fc" id="L783">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public int sum(int[] src, int offset, int length) {
+<span class="nc" id="L787">        int out = 0;</span>
+<span class="nc bnc" id="L788" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L789">            out += src[i];</span>
+        }
+<span class="nc" id="L791">        return out;</span>
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public int dot(int[] srcA, int[] srcB, int offset, int length) {
+<span class="nc" id="L796">        int out = 0;</span>
+<span class="nc bnc" id="L797" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L798">            out += srcA[i] * srcB[i];</span>
+        }
+<span class="nc" id="L800">        return out;</span>
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void add(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
+<span class="nc bnc" id="L805" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L806">            dst[i] = srcA[i] + srcB[i];</span>
+        }
+<span class="nc" id="L808">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void sub(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
+<span class="nc bnc" id="L812" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L813">            dst[i] = srcA[i] - srcB[i];</span>
+        }
+<span class="nc" id="L815">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void mul(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
+<span class="fc bfc" id="L819" title="All 2 branches covered.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="fc" id="L820">            dst[i] = srcA[i] * srcB[i];</span>
+        }
+<span class="fc" id="L822">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void min(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
+<span class="nc bnc" id="L826" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L827">            dst[i] = Math.min(srcA[i], srcB[i]);</span>
+        }
+<span class="nc" id="L829">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void max(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
+<span class="nc bnc" id="L833" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L834">            dst[i] = Math.max(srcA[i], srcB[i]);</span>
+        }
+<span class="nc" id="L836">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void abs(float[] src, float[] dst, int offset, int length) {
+<span class="nc bnc" id="L840" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L841">            dst[i] = Math.abs(src[i]);</span>
+        }
+<span class="nc" id="L843">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void clamp(float[] src, float[] dst, float minValue, float maxValue, int offset, int length) {
+<span class="nc bnc" id="L847" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L848">            float v = src[i];</span>
+<span class="nc bnc" id="L849" title="All 2 branches missed.">            if (v &lt; minValue) {</span>
+<span class="nc" id="L850">                dst[i] = minValue;</span>
+<span class="nc bnc" id="L851" title="All 2 branches missed.">            } else if (v &gt; maxValue) {</span>
+<span class="nc" id="L852">                dst[i] = maxValue;</span>
+            } else {
+<span class="nc" id="L854">                dst[i] = v;</span>
+            }
+        }
+<span class="nc" id="L857">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public float sum(float[] src, int offset, int length) {
+<span class="nc" id="L861">        float out = 0f;</span>
+<span class="nc bnc" id="L862" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L863">            out += src[i];</span>
+        }
+<span class="nc" id="L865">        return out;</span>
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public float dot(float[] srcA, float[] srcB, int offset, int length) {
+<span class="nc" id="L870">        float out = 0f;</span>
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        for (int i = offset, end = offset + length; i &lt; end; i++) {</span>
+<span class="nc" id="L872">            out += srcA[i] * srcB[i];</span>
+        }
+<span class="nc" id="L874">        return out;</span>
+    }
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void and(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L879" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L880">            dst[dstOffset + i] = src[srcOffset + i] &amp; constant;</span>
+        }
+<span class="nc" id="L882">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void or(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L886" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L887">            dst[dstOffset + i] = src[srcOffset + i] | constant;</span>
+        }
+<span class="nc" id="L889">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void xor(int[] src, int srcOffset, int constant, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L893" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L894">            dst[dstOffset + i] = src[srcOffset + i] ^ constant;</span>
+        }
+<span class="nc" id="L896">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpEq(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+<span class="nc bnc" id="L900" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L901" title="All 2 branches missed.">            dstMask[dstOffset + i] = src[srcOffset + i] == constant ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L903">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpLt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+<span class="nc bnc" id="L907" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L908" title="All 2 branches missed.">            dstMask[dstOffset + i] = src[srcOffset + i] &lt; constant ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L910">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void cmpGt(int[] src, int srcOffset, int constant, byte[] dstMask, int dstOffset, int length) {
+<span class="nc bnc" id="L914" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L915" title="All 2 branches missed.">            dstMask[dstOffset + i] = src[srcOffset + i] &gt; constant ? (byte) -1 : (byte) 0;</span>
+        }
+<span class="nc" id="L917">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void not(byte[] src, int srcOffset, byte[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L921" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L922">            dst[dstOffset + i] = (byte) (~src[srcOffset + i]);</span>
+        }
+<span class="nc" id="L924">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int trueConstant, int falseConstant, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L928" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueConstant : falseConstant;</span>
+        }
+<span class="nc" id="L931">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int[] trueValues, int trueOffset, int falseConstant, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L935" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L936" title="All 2 branches missed.">            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueValues[trueOffset + i] : falseConstant;</span>
+        }
+<span class="nc" id="L938">    }</span>
+
+    /// Exposes SIMD APIs directly **all arrays MUST be aligned arrays**
+    public void select(byte[] mask, int maskOffset, int trueConstant, int[] falseValues, int falseOffset, int[] dst, int dstOffset, int length) {
+<span class="nc bnc" id="L942" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L943" title="All 2 branches missed.">            dst[dstOffset + i] = mask[maskOffset + i] != 0 ? trueConstant : falseValues[falseOffset + i];</span>
+        }
+<span class="nc" id="L945">    }</span>
+
+    /// Fused single-pass conditional bit-blend driven by a masked-non-zero test of `src` against
+    /// `testMask`. For every element:
+    ///
+    /// `dst[i] = (src[i] &amp; testMask) != 0 ? (src[i] &amp; trueKeepMask) | trueOrValue : src[i]`
+    ///
+    /// This collapses a &quot;test-then-modify-or-keep-source&quot; pattern that would otherwise require
+    /// three or more separate primitive calls (and three or more passes over `src`) into a single
+    /// pass. It maps directly to one NEON / SSE vector loop on platforms that ship a vectorized
+    /// implementation. **All arrays MUST be aligned/registered arrays.**
+    public void blendByMaskTestNonzero(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L957" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L958">            int v = src[srcOffset + i];</span>
+<span class="fc bfc" id="L959" title="All 2 branches covered.">            dst[dstOffset + i] = (v &amp; testMask) != 0 ? (v &amp; trueKeepMask) | trueOrValue : v;</span>
+        }
+<span class="fc" id="L961">    }</span>
+
+    /// Fused single-pass extension of `blendByMaskTestNonzero` that additionally substitutes
+    /// `removeValue` whenever the post-mask result would equal `removeMatch`. For every element:
+    ///
+    /// ```
+    /// v = src[i]
+    /// if ((v &amp; testMask) == 0)            dst[i] = v
+    /// else if ((v &amp; trueKeepMask) == removeMatch) dst[i] = removeValue
+    /// else                                dst[i] = (v &amp; trueKeepMask) | trueOrValue
+    /// ```
+    ///
+    /// This collapses a `blendByMaskTestNonzero` + `cmpEq` + `select` chain (three passes over the
+    /// buffer plus two scratch allocations) into a single vector pass. It maps to one NEON / SSE
+    /// loop on platforms that ship a vectorized implementation. **All arrays MUST be aligned /
+    /// registered arrays.**
+    public void blendByMaskTestNonzeroSubstituteOnKeepEq(int[] src, int srcOffset, int testMask, int trueKeepMask, int trueOrValue, int removeMatch, int removeValue, int[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L978" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L979">            int v = src[srcOffset + i];</span>
+<span class="fc bfc" id="L980" title="All 2 branches covered.">            if ((v &amp; testMask) == 0) {</span>
+<span class="fc" id="L981">                dst[dstOffset + i] = v;</span>
+            } else {
+<span class="fc" id="L983">                int kept = v &amp; trueKeepMask;</span>
+<span class="fc bfc" id="L984" title="All 2 branches covered.">                dst[dstOffset + i] = (kept == removeMatch) ? removeValue : kept | trueOrValue;</span>
+            }
+        }
+<span class="fc" id="L987">    }</span>
+
+    /// Fused single-pass replacement of the top byte of every int in `rgbSrc` with the
+    /// corresponding unsigned byte from `alphaSrc`. For every element:
+    ///
+    /// `dst[i] = (rgbSrc[i] &amp; 0x00ffffff) | ((alphaSrc[i] &amp; 0xff) &lt;&lt; 24)`
+    ///
+    /// Designed for the `Image.applyMask` hot path, which previously required four separate
+    /// primitive calls (`unpackUnsignedByteToInt`, `shl`, `and`, `or`) and two scratch
+    /// allocations. Maps to a single NEON / SSE vector loop (`vmovl_u8` =&amp;gt; `vshlq_n_u32(24)`
+    /// =&amp;gt; `vorrq(vandq, ...)`) on platforms that ship a vectorized implementation.
+    /// **All arrays MUST be aligned / registered arrays.**
+    public void replaceTopByteFromUnsignedBytes(int[] rgbSrc, int rgbSrcOffset, byte[] alphaSrc, int alphaSrcOffset, int[] dst, int dstOffset, int length) {
+<span class="fc bfc" id="L1000" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L1001">            int rgb = rgbSrc[rgbSrcOffset + i] &amp; 0x00ffffff;</span>
+<span class="fc" id="L1002">            int alpha = (alphaSrc[alphaSrcOffset + i] &amp; 0xff) &lt;&lt; 24;</span>
+<span class="fc" id="L1003">            dst[dstOffset + i] = rgb | alpha;</span>
+        }
+<span class="fc" id="L1005">    }</span>
+
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateBinaryByte(byte[] srcA, byte[] srcB, byte[] dst, int offset, int length) {
+<span class="nc" id="L1011">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1012">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1013">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1014">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1015">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1016">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1017">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateMaskBinaryByte(byte[] srcA, byte[] srcB, byte[] dstMask, int offset, int length) {
+<span class="nc" id="L1022">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1023">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1024">        validateNotNull(dstMask, &quot;dstMask&quot;);</span>
+<span class="nc" id="L1025">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1026">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1027">        validateRange(dstMask.length, offset, length, &quot;dstMask&quot;);</span>
+<span class="nc" id="L1028">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateRangeMaskByte(byte[] src, byte[] dstMask, int offset, int length) {
+<span class="nc" id="L1033">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1034">        validateNotNull(dstMask, &quot;dstMask&quot;);</span>
+<span class="nc" id="L1035">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1036">        validateRange(dstMask.length, offset, length, &quot;dstMask&quot;);</span>
+<span class="nc" id="L1037">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateSelectByte(byte[] mask, byte[] trueValues, byte[] falseValues, byte[] dst, int offset, int length) {
+<span class="nc" id="L1042">        validateNotNull(mask, &quot;mask&quot;);</span>
+<span class="nc" id="L1043">        validateNotNull(trueValues, &quot;trueValues&quot;);</span>
+<span class="nc" id="L1044">        validateNotNull(falseValues, &quot;falseValues&quot;);</span>
+<span class="nc" id="L1045">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1046">        validateRange(mask.length, offset, length, &quot;mask&quot;);</span>
+<span class="nc" id="L1047">        validateRange(trueValues.length, offset, length, &quot;trueValues&quot;);</span>
+<span class="nc" id="L1048">        validateRange(falseValues.length, offset, length, &quot;falseValues&quot;);</span>
+<span class="nc" id="L1049">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1050">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateByteToInt(byte[] src, int[] dst, int offset, int length) {
+<span class="nc" id="L1055">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1056">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1057">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1058">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1059">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateIntToByte(int[] src, byte[] dst, int offset, int length) {
+<span class="nc" id="L1064">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1065">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1066">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1067">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1068">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validatePermuteByte(byte[] src, byte[] indices, byte[] dst, int offset, int length) {
+<span class="nc" id="L1073">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1074">        validateNotNull(indices, &quot;indices&quot;);</span>
+<span class="nc" id="L1075">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1076">        validateRange(indices.length, offset, length, &quot;indices&quot;);</span>
+<span class="nc" id="L1077">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1078">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateUnaryByte(byte[] src, byte[] dst, int offset, int length) {
+<span class="nc" id="L1083">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1084">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1085">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1086">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1087">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateBinaryInt(int[] srcA, int[] srcB, int[] dst, int offset, int length) {
+<span class="nc" id="L1092">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1093">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1094">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1095">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1096">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1097">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1098">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateUnaryInt(int[] src, int[] dst, int offset, int length) {
+<span class="nc" id="L1103">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1104">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1105">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1106">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1107">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateMaskBinaryInt(int[] srcA, int[] srcB, byte[] dstMask, int offset, int length) {
+<span class="nc" id="L1112">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1113">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1114">        validateNotNull(dstMask, &quot;dstMask&quot;);</span>
+<span class="nc" id="L1115">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1116">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1117">        validateRange(dstMask.length, offset, length, &quot;dstMask&quot;);</span>
+<span class="nc" id="L1118">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateSelectInt(byte[] mask, int[] trueValues, int[] falseValues, int[] dst, int offset, int length) {
+<span class="nc" id="L1123">        validateNotNull(mask, &quot;mask&quot;);</span>
+<span class="nc" id="L1124">        validateNotNull(trueValues, &quot;trueValues&quot;);</span>
+<span class="nc" id="L1125">        validateNotNull(falseValues, &quot;falseValues&quot;);</span>
+<span class="nc" id="L1126">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1127">        validateRange(mask.length, offset, length, &quot;mask&quot;);</span>
+<span class="nc" id="L1128">        validateRange(trueValues.length, offset, length, &quot;trueValues&quot;);</span>
+<span class="nc" id="L1129">        validateRange(falseValues.length, offset, length, &quot;falseValues&quot;);</span>
+<span class="nc" id="L1130">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1131">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateReductionInt(int[] src, int offset, int length) {
+<span class="nc" id="L1136">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1137">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1138">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateDotInt(int[] srcA, int[] srcB, int offset, int length) {
+<span class="nc" id="L1143">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1144">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1145">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1146">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1147">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateBinaryFloat(float[] srcA, float[] srcB, float[] dst, int offset, int length) {
+<span class="nc" id="L1152">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1153">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1154">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1155">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1156">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1157">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1158">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateUnaryFloat(float[] src, float[] dst, int offset, int length) {
+<span class="nc" id="L1163">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1164">        validateNotNull(dst, &quot;dst&quot;);</span>
+<span class="nc" id="L1165">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1166">        validateRange(dst.length, offset, length, &quot;dst&quot;);</span>
+<span class="nc" id="L1167">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateReductionFloat(float[] src, int offset, int length) {
+<span class="nc" id="L1172">        validateNotNull(src, &quot;src&quot;);</span>
+<span class="nc" id="L1173">        validateRange(src.length, offset, length, &quot;src&quot;);</span>
+<span class="nc" id="L1174">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateDotFloat(float[] srcA, float[] srcB, int offset, int length) {
+<span class="nc" id="L1179">        validateNotNull(srcA, &quot;srcA&quot;);</span>
+<span class="nc" id="L1180">        validateNotNull(srcB, &quot;srcB&quot;);</span>
+<span class="nc" id="L1181">        validateRange(srcA.length, offset, length, &quot;srcA&quot;);</span>
+<span class="nc" id="L1182">        validateRange(srcB.length, offset, length, &quot;srcB&quot;);</span>
+<span class="nc" id="L1183">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateNotNull(Object o, String name) {
+<span class="nc bnc" id="L1188" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L1189">            throw new NullPointerException(name + &quot; is null&quot;);</span>
+        }
+<span class="nc" id="L1191">    }</span>
+
+    /// This API is used internally to verify valid array arguments in the simulator
+    /// notice that no validation occurs on the devices.
+    protected final void validateRange(int arrayLength, int offset, int length, String name) {
+<span class="nc bnc" id="L1196" title="All 8 branches missed.">        if (offset &lt; 0 || length &lt; 0 || offset &gt; arrayLength || arrayLength - offset &lt; length) {</span>
+<span class="nc" id="L1197">            throw new ArrayIndexOutOfBoundsException(name + &quot; invalid range offset=&quot; + offset + &quot; length=&quot; + length + &quot; size=&quot; + arrayLength);</span>
+        }
+<span class="nc" id="L1199">    }</span>
+
+    private byte clampByte(int value) {
+<span class="fc bfc" id="L1202" title="All 2 branches covered.">        if (value &gt; Byte.MAX_VALUE) {</span>
+<span class="fc" id="L1203">            return Byte.MAX_VALUE;</span>
+        }
+<span class="fc bfc" id="L1205" title="All 2 branches covered.">        if (value &lt; Byte.MIN_VALUE) {</span>
+<span class="fc" id="L1206">            return Byte.MIN_VALUE;</span>
+        }
+<span class="fc" id="L1208">        return (byte) value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

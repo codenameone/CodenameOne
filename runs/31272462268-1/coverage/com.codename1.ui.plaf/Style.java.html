@@ -1,0 +1,3383 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Style.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">Style.java</span></div><h1>Style.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.plaf;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Gradient;
+import com.codename1.ui.Image;
+import com.codename1.ui.Painter;
+import com.codename1.ui.events.StyleListener;
+import com.codename1.ui.util.EventDispatcher;
+
+/// Represents the look of a given component: colors, fonts, transparency, margin and padding &amp; images.
+///
+/// Each Component contains a Style Object and allows Style modification in Runtime
+/// by Using `cmp.getStyle()`
+/// The style is also used in Themeing, when a Theme is Changed the Styles Objects are been
+/// updated automatically.
+///
+/// When changing a theme the elements changed manually in a style will not be updated
+/// by the theme change by default. There are two ways to change that behavior:
+///
+/// - Use the set method that accepts a second boolean argument and set it to true.
+///
+/// - Create a new style object and pass all the options in the constructor (without invoking setters manually).
+///
+/// The Margin and Padding is inspired by [W3 Box Model](http://www.w3.org/TR/REC-CSS2/box.html)
+///
+/// ```text
+///       **************************
+///       *         Margin         *
+///       *  ********************  *
+///       *  *      Padding     *  *
+///       *  *    ***********   *  *
+///       *  *    * Content *   *  *
+///       *  *    ***********   *  *
+///       *  *      Padding     *  *
+///       *  ********************  *
+///       *         Margin         *
+///       **************************
+/// ```
+///
+/// Change Events
+///
+/// Styles fire a change event for each style change that occurs.  `Component` listens to all changes events
+/// of its styles, and adjusts some of its properties accordingly.  Currently (as of 6.0) each style change will trigger
+/// a `Container#revalidate()` call on the Style's Component's parent container, which is expensive.  You can disable this
+/// `Container#revalidate()` call by calling CN.setProperty(&quot;Component.revalidateOnStyleChange&quot;, &quot;false&quot;).  This will
+/// likely be the default behavior in a future version, so we recommend you disable this explicitly for both performance reasons, and
+/// to avoid regressions when the default is changed.
+///
+/// @author Chen Fishbein
+public class Style {
+
+    /// Background color attribute name for the theme hashtable
+    public static final String BG_COLOR = &quot;bgColor&quot;;
+    /// Foreground color attribute name for the theme hashtable
+    public static final String FG_COLOR = &quot;fgColor&quot;;
+    /// Foreground alpha attribute name for the theme hashtable
+    public static final String FG_ALPHA = &quot;fgAlpha&quot;;
+    /// Background image attribute name for the theme hashtable
+    public static final String BG_IMAGE = &quot;bgImage&quot;;
+    /// Background attribute name for the theme hashtable
+    public static final String BACKGROUND_TYPE = &quot;bgType&quot;;
+    /// Background attribute name for the theme hashtable
+    public static final String BACKGROUND_ALIGNMENT = &quot;bgAlign&quot;;
+    /// Background attribute name for the theme hashtable
+    public static final String BACKGROUND_GRADIENT = &quot;bgGradient&quot;;
+    /// Extended gradient attribute (multi-stop, angled, conic, repeating).
+    public static final String GRADIENT = &quot;bgGradientEx&quot;;
+    /// CSS filter:blur() radius in pixels.
+    public static final String FILTER_BLUR = &quot;filterBlur&quot;;
+    /// CSS backdrop-filter:blur() radius in pixels.
+    public static final String BACKDROP_FILTER_BLUR = &quot;backdropFilterBlur&quot;;
+    /// CSS filter: 4x5 color matrix (composed from `brightness`,
+    /// `contrast`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate`,
+    /// `sepia`). Stored as row-major float[20] - [R,G,B,A] x [R,G,B,A,offset].
+    /// Offset column is in 0-255 RGB space.
+    public static final String FILTER_COLOR_MATRIX = &quot;filterColorMatrix&quot;;
+    /// CSS backdrop-filter color matrix (same layout as FILTER_COLOR_MATRIX).
+    public static final String BACKDROP_FILTER_COLOR_MATRIX = &quot;backdropFilterColorMatrix&quot;;
+    /// Font attribute name for the theme hashtable
+    public static final String FONT = &quot;font&quot;;
+    /// Transparency attribute name for the theme hashtable
+    public static final String TRANSPARENCY = &quot;transparency&quot;;
+    /// Opacity attribute name for the theme hashtable
+    public static final String OPACITY = &quot;opacity&quot;;
+    /// Elevation attribute name for the theme hashtable.
+    public static final String ELEVATION = &quot;elevation&quot;;
+    /// Letter spacing attribute name for the theme hashtable.
+    public static final String LETTER_SPACING = &quot;letterSpacing&quot;;
+    /// Icon gap attribute name for the theme hashtable.
+    public static final String ICON_GAP = &quot;iconGap&quot;;
+    /// Icon gap unit attribute.
+    ///
+    public static final String ICON_GAP_UNIT = &quot;iconGapUnit&quot;;
+    /// Surface attribute name for the theme hashtable.
+    public static final String SURFACE = &quot;surface&quot;;
+    /// Margin attribute name for the theme hashtable
+    public static final String MARGIN = &quot;margin&quot;;
+    /// Border attribute name for the theme hashtable
+    public static final String BORDER = &quot;border&quot;;
+    /// Padding attribute name for the theme hashtable
+    public static final String PADDING = &quot;padding&quot;;
+    /// Painter attribute name for the style event
+    public static final String PAINTER = &quot;painter&quot;;
+    /// Alignment attribute for the style event
+    public static final String ALIGNMENT = &quot;align&quot;;
+    /// Text decoration attribute for the style event
+    public static final String TEXT_DECORATION = &quot;textDecoration&quot;;
+    /// The units of the padding
+    public static final String PADDING_UNIT = &quot;padUnit&quot;;
+    /// The units of the margin
+    public static final String MARGIN_UNIT = &quot;marUnit&quot;;
+    /// Indicates the background for the style would use a scaled image
+    public static final byte BACKGROUND_NONE = (byte) 0;
+    /// Indicates the background for the style would use a scaled image
+    public static final byte BACKGROUND_IMAGE_SCALED = (byte) 1;
+    /// Indicates the background for the style would use a tiled image on both axis
+    public static final byte BACKGROUND_IMAGE_TILE_BOTH = (byte) 2;
+    /// Indicates the background for the style would use a vertical tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_VERTICAL = (byte) 3;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL = (byte) 4;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_TOP = (byte) 20;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_BOTTOM = (byte) 21;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_LEFT = (byte) 22;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_RIGHT = (byte) 23;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_CENTER = (byte) 24;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_TOP_LEFT = (byte) 25;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT = (byte) 26;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT = (byte) 27;
+    /// Indicates the background for the style would use an unscaled image with an alignment
+    public static final byte BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT = (byte) 28;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP = (byte) 4;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER = (byte) 29;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM = (byte) 30;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT = BACKGROUND_IMAGE_TILE_VERTICAL;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER = (byte) 31;
+    /// Indicates the background for the style would use a horizontal tiled image
+    public static final byte BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT = (byte) 32;
+    /// Indicates the background for the style would use a scaled image that fills all available space while
+    /// maintaining aspect ratio
+    public static final byte BACKGROUND_IMAGE_SCALED_FILL = (byte) 33;
+    /// Indicates the background for the style would use a scaled image that fits to available space while
+    /// maintaining aspect ratio
+    public static final byte BACKGROUND_IMAGE_SCALED_FIT = (byte) 34;
+    /// Indicates the background for the style would use a linear gradient
+    public static final byte BACKGROUND_GRADIENT_LINEAR_VERTICAL = (byte) 6;
+    /// Indicates the background for the style would use a linear gradient
+    public static final byte BACKGROUND_GRADIENT_LINEAR_HORIZONTAL = (byte) 7;
+    /// Indicates the background for the style would use a radial gradient
+    public static final byte BACKGROUND_GRADIENT_RADIAL = (byte) 8;
+    /// Multi-stop linear gradient at an arbitrary angle. Driven by the gradient
+    /// gradient attached via setGradient(); legacy
+    /// setBackgroundGradientStartColor/EndColor are ignored for this type.
+    public static final byte BACKGROUND_GRADIENT_LINEAR = (byte) 35;
+    /// Multi-stop radial gradient with full CSS shape/extent control. Driven by
+    /// the gradient descriptor.
+    public static final byte BACKGROUND_GRADIENT_RADIAL_FULL = (byte) 36;
+    /// Conic / sweep gradient. Driven by the gradient descriptor.
+    public static final byte BACKGROUND_GRADIENT_CONIC = (byte) 37;
+    /// Repeating multi-stop linear gradient (CSS repeating-linear-gradient).
+    public static final byte BACKGROUND_GRADIENT_REPEATING_LINEAR = (byte) 38;
+    /// Repeating multi-stop radial gradient (CSS repeating-radial-gradient).
+    public static final byte BACKGROUND_GRADIENT_REPEATING_RADIAL = (byte) 39;
+    /// Indicates no text decoration
+    public static final byte TEXT_DECORATION_NONE = (byte) 0;
+    /// Indicates underline
+    public static final byte TEXT_DECORATION_UNDERLINE = (byte) 1;
+    /// Indicates a strike-through line (usually used to denote deleted text)
+    public static final byte TEXT_DECORATION_STRIKETHRU = (byte) 2;
+    /// Indicates overline
+    public static final byte TEXT_DECORATION_OVERLINE = (byte) 4;
+    /// 3D text effect using a font shadow
+    public static final byte TEXT_DECORATION_3D = (byte) 8;
+    /// 3D sunken text effect using a light font shadow
+    public static final byte TEXT_DECORATION_3D_LOWERED = (byte) 16;
+    /// 3D text effect using a font shadow
+    public static final byte TEXT_DECORATION_3D_SHADOW_NORTH = (byte) 32;
+    /// Indicates the unit type for padding/margin, the default is in device specific pixels
+    public static final byte UNIT_TYPE_PIXELS = 0;
+    /// Indicates the unit type for padding/margin in percentage of the size of the screen
+    public static final byte UNIT_TYPE_SCREEN_PERCENTAGE = 1;
+    /// Indicates the unit type for padding/margin in device independent pixels. Device independent pixels try to aim
+    /// at roughly 1 millimeter of the screen per DIP but make no guarantee for accuracy.
+    public static final byte UNIT_TYPE_DIPS = 2;
+    /// Indicates the unit type for padding/margin as a percentage of the screen width.
+    ///
+    public static final byte UNIT_TYPE_VW = 3;
+    /// Indicates the unit type for padding/margin as a percentage of the screen height.
+    ///
+    public static final byte UNIT_TYPE_VH = 4;
+    /// Indicates the unit type for padding/margin as a percentage the minimum of screen width and height.
+    ///
+    public static final byte UNIT_TYPE_VMIN = 5;
+    /// Indicates the unit type for padding/margin as a percentage the maximum of screen width and height.
+    ///
+    public static final byte UNIT_TYPE_VMAX = 6;
+    /// Indicates the unit type for padding/margin relative to the font size of the default font.
+    /// 1rem == Font.getDefaultFont().getHeight()
+    ///
+    public static final byte UNIT_TYPE_REM = 7;
+    /// Indicates the background alignment for use in tiling or aligned images.
+    private static final byte BACKGROUND_IMAGE_ALIGN_TOP = (byte) 0xa1;
+    /// Used for modified flag
+    private static final int FG_COLOR_MODIFIED = 1;
+    /// Used for modified flag
+    private static final int BG_COLOR_MODIFIED = 2;
+    /// Used for modified flag
+    private static final int FONT_MODIFIED = 16;
+    /// Used for modified flag
+    private static final int BG_IMAGE_MODIFIED = 32;
+    private static final int TEXT_DECORATION_MODIFIED = 64;
+    /// Used for modified flag
+    private static final int TRANSPARENCY_MODIFIED = 128;
+    /// Used for modified flag
+    private static final int PADDING_MODIFIED = 256;
+    /// Used for modified flag
+    private static final int MARGIN_MODIFIED = 512;
+    /// Used for modified flag
+    private static final int BORDER_MODIFIED = 1024;
+    private static final int BACKGROUND_TYPE_MODIFIED = 2048;
+    private static final int BACKGROUND_ALIGNMENT_MODIFIED = 4096;
+    private static final int BACKGROUND_GRADIENT_MODIFIED = 8192;
+    private static final int ALIGNMENT_MODIFIED = 16384;
+    private static final int OPACITY_MODIFIED = 32768;
+    private static final int ELEVATION_MODIFIED = 65536;
+    private static final int SURFACE_MODIFIED = 131072;
+    private static final int FG_ALPHA_MODIFIED = 262144;
+    private static final int ICON_GAP_MODIFIED = 524288;
+    private static final int GRADIENT_MODIFIED = 1048576;
+    private static final int FILTER_BLUR_MODIFIED = 2097152;
+    private static final int BACKDROP_FILTER_BLUR_MODIFIED = 4194304;
+    private static final int FILTER_COLOR_MATRIX_MODIFIED = 8388608;
+    private static final int BACKDROP_FILTER_COLOR_MATRIX_MODIFIED = 16777216;
+    private static final int LETTER_SPACING_MODIFIED = 33554432;
+<span class="fc" id="L275">    float[] padding = new float[4];</span>
+<span class="fc" id="L276">    float[] margin = new float[4];</span>
+    /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    byte[] paddingUnit;
+    /// Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    byte[] marginUnit;
+    Object roundRectCache;
+    // used by the Android port, do not remove!
+    Object nativeOSCache;
+    boolean renderer;
+    /// Flag to suppress change events
+    private boolean suppressChangeEvents;
+    private Style[] proxyTo;
+<span class="fc" id="L292">    private int fgColor = 0x000000;</span>
+<span class="fc" id="L293">    private int fgAlpha = 0xff;</span>
+<span class="fc" id="L294">    private int bgColor = 0xFFFFFF;</span>
+<span class="fc" id="L295">    private Font font = Font.getDefaultFont();</span>
+    private Image bgImage;
+<span class="fc" id="L297">    private float[] cached_margin = null; //used to cache margin values when hidding a component</span>
+<span class="fc" id="L298">    private byte transparency = (byte) 0xFF; //no transparency</span>
+<span class="fc" id="L299">    private byte opacity = (byte) 0xFF; //full opacity</span>
+    private Painter bgPainter;
+    private int elevation; // the elevation.
+<span class="fc" id="L302">    private float iconGap = -1;</span>
+    private byte iconGapUnit;
+    private float letterSpacing; // EM units, 0 = default (no extra spacing)
+    private boolean surface; // whether this should be treated as a surface
+<span class="fc" id="L306">    private byte backgroundType = BACKGROUND_IMAGE_SCALED;</span>
+<span class="fc" id="L307">    private byte backgroundAlignment = BACKGROUND_IMAGE_ALIGN_TOP;</span>
+    private Object[] backgroundGradient;
+    private Gradient gradient;
+    private float filterBlurRadius;
+    private float backdropFilterBlurRadius;
+    private float[] filterColorMatrix;
+    private float[] backdropFilterColorMatrix;
+<span class="fc" id="L314">    private Border border = null;</span>
+<span class="fc" id="L315">    private int align = Component.LEFT;</span>
+    private int textDecoration; // Used for underline, strikethru etc. (See TEXT_DECORATION_* constants)
+    /// The modified flag indicates which portions of the style have changed using
+    /// bitmask values
+    private long modifiedFlag;
+    private EventDispatcher listeners;
+
+    /// Each component when it draw itself uses this Object
+    /// to determine in what colors it should use.
+    /// When a Component is generated it construct a default Style Object.
+    /// The Default values for each Component can be changed by using the UIManager class
+<span class="fc" id="L326">    public Style() {</span>
+<span class="fc" id="L327">        setPadding(3, 3, 3, 3);</span>
+<span class="fc" id="L328">        setMargin(2, 2, 2, 2);</span>
+<span class="fc" id="L329">        modifiedFlag = 0;</span>
+<span class="fc" id="L330">    }</span>
+
+    /// Creates a full copy of the given style. Notice that if the original style was modified
+    /// manually (by invoking setters on it) it would not chnage when changing a theme/look and feel,
+    /// however this newly created style would change in such a case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: the style to copy
+    public Style(Style style) {
+<span class="fc" id="L340">        this(style.getFgColor(), style.getBgColor(), style.getFont(), style.getBgTransparency(),</span>
+<span class="fc" id="L341">                style.getBgImage());</span>
+<span class="fc" id="L342">        setPadding(style.padding[Component.TOP],</span>
+                style.padding[Component.BOTTOM],
+                style.padding[Component.LEFT],
+                style.padding[Component.RIGHT]);
+<span class="fc" id="L346">        setMargin(style.margin[Component.TOP],</span>
+                style.margin[Component.BOTTOM],
+                style.margin[Component.LEFT],
+                style.margin[Component.RIGHT]);
+<span class="fc" id="L350">        setPaddingUnit(style.paddingUnit);</span>
+<span class="fc" id="L351">        setMarginUnit(style.marginUnit);</span>
+<span class="fc" id="L352">        setBorder(style.getBorder());</span>
+<span class="fc" id="L353">        fgAlpha = style.fgAlpha;</span>
+<span class="fc" id="L354">        elevation = style.elevation;</span>
+<span class="fc" id="L355">        iconGap = style.iconGap;</span>
+<span class="fc" id="L356">        iconGapUnit = style.iconGapUnit;</span>
+<span class="fc" id="L357">        letterSpacing = style.letterSpacing;</span>
+<span class="fc" id="L358">        surface = style.surface;</span>
+<span class="fc" id="L359">        opacity = style.opacity;</span>
+<span class="fc" id="L360">        modifiedFlag = 0;</span>
+<span class="fc" id="L361">        align = style.align;</span>
+<span class="fc" id="L362">        backgroundType = style.backgroundType;</span>
+<span class="fc" id="L363">        backgroundAlignment = style.backgroundAlignment;</span>
+<span class="fc" id="L364">        textDecoration = style.textDecoration;</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if (style.backgroundGradient != null) {</span>
+<span class="nc" id="L366">            backgroundGradient = new Object[style.backgroundGradient.length];</span>
+<span class="nc" id="L367">            System.arraycopy(style.backgroundGradient, 0, backgroundGradient, 0, backgroundGradient.length);</span>
+        }
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (style.gradient != null) {</span>
+<span class="nc" id="L370">            gradient = style.gradient.copy();</span>
+        }
+<span class="fc" id="L372">        filterBlurRadius = style.filterBlurRadius;</span>
+<span class="fc" id="L373">        backdropFilterBlurRadius = style.backdropFilterBlurRadius;</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (style.filterColorMatrix != null) {</span>
+<span class="nc" id="L375">            filterColorMatrix = new float[style.filterColorMatrix.length];</span>
+<span class="nc" id="L376">            System.arraycopy(style.filterColorMatrix, 0, filterColorMatrix, 0, filterColorMatrix.length);</span>
+        }
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (style.backdropFilterColorMatrix != null) {</span>
+<span class="nc" id="L379">            backdropFilterColorMatrix = new float[style.backdropFilterColorMatrix.length];</span>
+<span class="nc" id="L380">            System.arraycopy(style.backdropFilterColorMatrix, 0, backdropFilterColorMatrix, 0, backdropFilterColorMatrix.length);</span>
+        }
+<span class="fc" id="L382">    }</span>
+
+    /// Creates a new style with the given attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `bgColor`: background color
+    ///
+    /// - `f`: font
+    ///
+    /// - `transparency`: transparency value
+    public Style(int fgColor, int bgColor, Font f, byte transparency) {
+<span class="nc" id="L396">        this(fgColor, bgColor, f, transparency, null, BACKGROUND_IMAGE_SCALED);</span>
+<span class="nc" id="L397">    }</span>
+
+    /// Creates a new style with the given attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `bgColor`: background color
+    ///
+    /// - `f`: font
+    ///
+    /// - `transparency`: transparency value
+    ///
+    /// - `im`: background image
+    private Style(int fgColor, int bgColor, Font f, byte transparency, Image im) {
+<span class="fc" id="L413">        this();</span>
+<span class="fc" id="L414">        this.fgColor = fgColor;</span>
+<span class="fc" id="L415">        this.bgColor = bgColor;</span>
+<span class="fc" id="L416">        this.font = f;</span>
+<span class="fc" id="L417">        this.transparency = transparency;</span>
+<span class="fc" id="L418">        this.bgImage = im;</span>
+<span class="fc" id="L419">    }</span>
+
+    /// Creates a new style with the given attributes
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `bgColor`: background color
+    ///
+    /// - `f`: font
+    ///
+    /// - `transparency`: transparency value
+    ///
+    /// - `im`: background image
+    ///
+    /// - `backgroundType`: @param backgroundType one of:
+    /// BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    public Style(int fgColor, int bgColor, Font f, byte transparency, Image im, byte backgroundType) {
+<span class="nc" id="L441">        this();</span>
+<span class="nc" id="L442">        this.fgColor = fgColor;</span>
+<span class="nc" id="L443">        this.bgColor = bgColor;</span>
+<span class="nc" id="L444">        this.font = f;</span>
+<span class="nc" id="L445">        this.transparency = transparency;</span>
+<span class="nc" id="L446">        this.backgroundType = backgroundType;</span>
+<span class="nc" id="L447">        this.bgImage = im;</span>
+<span class="nc" id="L448">    }</span>
+
+    /// Creates a &quot;proxy&quot; style whose setter methods map to the methods in the given styles passed and whose
+    /// getter methods are meaningless
+    ///
+    /// #### Parameters
+    ///
+    /// - `styles`: the styles to which we will proxy
+    ///
+    /// #### Returns
+    ///
+    /// a proxy style object
+    public static Style createProxyStyle(Style... styles) {
+<span class="fc" id="L461">        Style s = new Style();</span>
+<span class="fc" id="L462">        s.proxyTo = styles;</span>
+<span class="fc" id="L463">        return s;</span>
+    }
+
+    Object getNativeOSCache() {
+<span class="nc" id="L467">        return nativeOSCache;</span>
+    }
+
+    void setNativeOSCache(Object nativeOSCache) {
+<span class="nc" id="L471">        this.nativeOSCache = nativeOSCache;</span>
+<span class="nc" id="L472">    }</span>
+
+    /// Disables native OS optimizations that might collide with cell renderers which do things like sharing style
+    /// objects
+    public void markAsRendererStyle() {
+<span class="fc" id="L477">        renderer = true;</span>
+<span class="fc" id="L478">    }</span>
+
+    /// Indicates whether this style has been marked for use with renderers.
+    ///
+    /// #### Returns
+    ///
+    /// `true` if `#markAsRendererStyle()` was invoked.
+    public boolean isRendererStyle() {
+<span class="nc" id="L486">        return renderer;</span>
+    }
+
+    /// Merges the new style with the current style without changing the elements that
+    /// were modified.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: new values of styles from the current theme
+    public void merge(Style style) {
+<span class="fc" id="L496">        long tmp = modifiedFlag;</span>
+
+<span class="fc bfc" id="L498" title="All 2 branches covered.">        if ((modifiedFlag &amp; FG_COLOR_MODIFIED) == 0) {</span>
+<span class="fc" id="L499">            setFgColor(style.getFgColor());</span>
+        }
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; FG_ALPHA_MODIFIED) == 0) {</span>
+<span class="fc" id="L502">            setFgAlpha(style.getFgAlpha());</span>
+        }
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        if ((modifiedFlag &amp; BG_COLOR_MODIFIED) == 0) {</span>
+<span class="fc" id="L505">            setBgColor(style.getBgColor());</span>
+        }
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if ((modifiedFlag &amp; BG_IMAGE_MODIFIED) == 0) {</span>
+<span class="fc" id="L508">            setBgImage(style.getBgImage());</span>
+        }
+<span class="fc bfc" id="L510" title="All 2 branches covered.">        if ((modifiedFlag &amp; BACKGROUND_TYPE_MODIFIED) == 0) {</span>
+<span class="fc" id="L511">            setBackgroundType(style.getBackgroundType());</span>
+        }
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; BACKGROUND_ALIGNMENT_MODIFIED) == 0) {</span>
+<span class="fc" id="L514">            setBackgroundAlignment(style.getBackgroundAlignment());</span>
+        }
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; BACKGROUND_GRADIENT_MODIFIED) == 0) {</span>
+<span class="fc" id="L517">            setBackgroundGradientStartColor(style.getBackgroundGradientStartColor());</span>
+<span class="fc" id="L518">            setBackgroundGradientEndColor(style.getBackgroundGradientEndColor());</span>
+<span class="fc" id="L519">            setBackgroundGradientRelativeX(style.getBackgroundGradientRelativeX());</span>
+<span class="fc" id="L520">            setBackgroundGradientRelativeY(style.getBackgroundGradientRelativeY());</span>
+<span class="fc" id="L521">            setBackgroundGradientRelativeSize(style.getBackgroundGradientRelativeSize());</span>
+        }
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; FONT_MODIFIED) == 0) {</span>
+<span class="fc" id="L524">            setFont(style.getFont());</span>
+        }
+
+<span class="fc bfc" id="L527" title="All 2 branches covered.">        if ((modifiedFlag &amp; TRANSPARENCY_MODIFIED) == 0) {</span>
+<span class="fc" id="L528">            setBgTransparency(style.getBgTransparency());</span>
+        }
+
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; OPACITY_MODIFIED) == 0) {</span>
+<span class="fc" id="L532">            setOpacity(style.getOpacity());</span>
+        }
+
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if ((modifiedFlag &amp; PADDING_MODIFIED) == 0) {</span>
+<span class="fc" id="L536">            setPadding(style.padding[Component.TOP],</span>
+                    style.padding[Component.BOTTOM],
+                    style.padding[Component.LEFT],
+                    style.padding[Component.RIGHT]);
+<span class="fc" id="L540">            setPaddingUnit(paddingUnit);</span>
+        }
+
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        if ((modifiedFlag &amp; MARGIN_MODIFIED) == 0) {</span>
+<span class="fc" id="L544">            setMargin(style.margin[Component.TOP],</span>
+                    style.margin[Component.BOTTOM],
+                    style.margin[Component.LEFT],
+                    style.margin[Component.RIGHT]);
+<span class="fc" id="L548">            setMarginUnit(style.marginUnit);</span>
+        }
+
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; BORDER_MODIFIED) == 0) {</span>
+<span class="fc" id="L552">            setBorder(style.getBorder());</span>
+        }
+
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; TEXT_DECORATION_MODIFIED) == 0) {</span>
+<span class="fc" id="L556">            setTextDecoration(style.getTextDecoration());</span>
+        }
+
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; ALIGNMENT_MODIFIED) == 0) {</span>
+<span class="fc" id="L560">            setAlignment(style.getAlignment());</span>
+        }
+
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; ELEVATION_MODIFIED) == 0) {</span>
+<span class="fc" id="L564">            setElevation(style.getElevation());</span>
+        }
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; ICON_GAP_MODIFIED) == 0) {</span>
+<span class="fc" id="L567">            setIconGap(style.iconGap, style.iconGapUnit);</span>
+        }
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; LETTER_SPACING_MODIFIED) == 0) {</span>
+<span class="fc" id="L570">            setLetterSpacing(style.letterSpacing);</span>
+        }
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        if ((modifiedFlag &amp; SURFACE_MODIFIED) == 0) {</span>
+<span class="fc" id="L573">            setSurface(style.isSurface());</span>
+        }
+
+<span class="fc" id="L576">        this.bgPainter = style.bgPainter;</span>
+<span class="fc" id="L577">        modifiedFlag = tmp;</span>
+<span class="fc" id="L578">    }</span>
+
+    /// Gets the elevation value of this style.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+    ///
+    /// #### Returns
+    ///
+    /// The elevation value.  Default is 0.
+    ///
+    public int getElevation() {
+<span class="fc" id="L587">        return elevation;</span>
+    }
+
+    /// Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elevation`: The elevation value.
+    ///
+    public void setElevation(int elevation) {
+<span class="fc" id="L597">        setElevation(elevation, false);</span>
+<span class="fc" id="L598">    }</span>
+
+    /// Returns the icon gap in pixels.
+    ///
+    public int getIconGap() {
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">        if (iconGap &lt; 0) {</span>
+<span class="fc" id="L604">            return -1;</span>
+        }
+<span class="nc" id="L606">        return CN.convertToPixels(iconGap, iconGapUnit);</span>
+    }
+
+    /// Returns the letter spacing (in EM units, font-size relative) applied to text
+    /// drawn with this style. 0 means the platform default (no extra spacing).
+    public float getLetterSpacing() {
+<span class="nc" id="L612">        return letterSpacing;</span>
+    }
+
+    /// Sets the letter spacing in EM units (font-size relative). A native theme uses
+    /// this to match a Material/iOS text appearance's tracking per component. The
+    /// spacing is carried by the style's font so it affects both layout measurement
+    /// and rendering.
+    public void setLetterSpacing(float letterSpacing) {
+<span class="fc" id="L620">        setLetterSpacing(letterSpacing, false);</span>
+<span class="fc" id="L621">    }</span>
+
+    /// Sets the letter spacing in EM units. See [#setLetterSpacing(float)].
+    public void setLetterSpacing(float spacing, boolean override) {
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L626" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L627">                s.setLetterSpacing(spacing, override);</span>
+            }
+<span class="nc" id="L629">            return;</span>
+        }
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        if (Math.abs(spacing - letterSpacing) &gt; 0.00001) {</span>
+<span class="fc" id="L632">            letterSpacing = spacing;</span>
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L634">                modifiedFlag |= LETTER_SPACING_MODIFIED;</span>
+            }
+<span class="fc" id="L636">            firePropertyChanged(LETTER_SPACING);</span>
+        }
+<span class="fc" id="L638">    }</span>
+
+    /// Sets the icon gap in the current units.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: The icon gap.
+    ///
+    /// #### See also
+    ///
+    /// - #getIconGapUnit()
+    public void setIconGap(float gap) {
+<span class="fc" id="L650">        setIconGap(gap, false);</span>
+<span class="fc" id="L651">    }</span>
+
+    /// Returns the icon gap unit.  One of `#UNIT_TYPE_REM`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_VMIN`,
+    /// `#UNIT_TYPE_VH`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_DIPS`,
+    /// `#UNIT_TYPE_PIXELS`
+    ///
+    /// #### Returns
+    ///
+    /// The icon gap unit
+    ///
+    public int getIconGapUnit() {
+<span class="nc" id="L662">        return iconGapUnit;</span>
+    }
+
+    /// Sets the icon gap unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: The icon gap unit.  One of the standard style units of measurement.
+    ///
+    public void setIconGapUnit(byte unit) {
+<span class="fc" id="L672">        setIconGapUnit(unit, false);</span>
+<span class="fc" id="L673">    }</span>
+
+    /// Checks whether the component is a surface.  Surface containers support a sort of z-index of descendants
+    /// via the elevation attribute.  Surfaces will render the shadows of elevated descendants to convey depth.
+    ///
+    /// #### Returns
+    ///
+    /// True if container should be rendered as a surface.
+    ///
+    public boolean isSurface() {
+<span class="fc" id="L683">        return surface;</span>
+    }
+
+    /// Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+    /// z-indexing of its descendants via their elevation properties.  The surface will render
+    /// the shadows of elevated descendants to convey depth.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: True to enable surface rendering mode.
+    ///
+    public void setSurface(boolean surface) {
+<span class="fc" id="L695">        setSurface(surface, false);</span>
+<span class="fc" id="L696">    }</span>
+
+    /// Returns true if the style was modified manually after it was created by the
+    /// look and feel. If the style was modified manually (by one of the set methods)
+    /// then it should be merged rather than overwritten.
+    ///
+    /// #### Returns
+    ///
+    /// true if the style was modified
+    public boolean isModified() {
+<span class="fc bfc" id="L706" title="All 2 branches covered.">        return modifiedFlag != 0;</span>
+    }
+
+    /// Background color for the component
+    ///
+    /// #### Returns
+    ///
+    /// the background color for the component
+    public int getBgColor() {
+<span class="fc" id="L715">        return bgColor;</span>
+    }
+
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: RRGGBB color that ignors the alpha component
+    public void setBgColor(int bgColor) {
+<span class="fc" id="L724">        setBgColor(bgColor, false);</span>
+<span class="fc" id="L725">    }</span>
+
+    /// Background image for the component
+    ///
+    /// #### Returns
+    ///
+    /// the background image for the component
+    public Image getBgImage() {
+<span class="fc" id="L733">        return bgImage;</span>
+    }
+
+    /// Sets the background image for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgImage`: background image
+    public void setBgImage(Image bgImage) {
+<span class="fc" id="L742">        setBgImage(bgImage, false);</span>
+<span class="fc" id="L743">    }</span>
+
+    /// The type of the background defaults to BACKGROUND_IMAGE_SCALED
+    ///
+    /// #### Returns
+    ///
+    /// @return one of:
+    /// BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    public byte getBackgroundType() {
+<span class="fc" id="L755">        return backgroundType;</span>
+    }
+
+    /// Sets the background type for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundType`: @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    public void setBackgroundType(byte backgroundType) {
+<span class="fc" id="L767">        setBackgroundType(backgroundType, false);</span>
+<span class="fc" id="L768">    }</span>
+
+    /// Return the alignment for the image or tiled image
+    ///
+    /// #### Returns
+    ///
+    /// @return one of:
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
+    ///
+    /// #### Deprecated
+    ///
+    /// the functionality of this method is now covered by background type
+    private byte getBackgroundAlignment() {
+<span class="fc" id="L783">        return backgroundAlignment;</span>
+    }
+
+    /// Sets the background alignment for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundAlignment`: @param backgroundAlignment one of:
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
+    ///
+    /// #### Deprecated
+    ///
+    /// the functionality of this method is now covered by background type
+    private void setBackgroundAlignment(byte backgroundAlignment) {
+<span class="fc" id="L799">        setBackgroundAlignment(backgroundAlignment, false);</span>
+<span class="fc" id="L800">    }</span>
+
+    /// Start color for the radial/linear gradient
+    ///
+    /// #### Returns
+    ///
+    /// the start color for the radial/linear gradient
+    public int getBackgroundGradientStartColor() {
+<span class="pc bpc" id="L808" title="1 of 4 branches missed.">        if (backgroundGradient != null &amp;&amp; backgroundGradient.length &gt; 1) {</span>
+<span class="fc" id="L809">            return ((Integer) backgroundGradient[0]).intValue();</span>
+        }
+<span class="fc" id="L811">        return 0xffffff;</span>
+    }
+
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientStartColor`: start color for the linear/radial gradient
+    public void setBackgroundGradientStartColor(int backgroundGradientStartColor) {
+<span class="fc" id="L820">        setBackgroundGradientStartColor(backgroundGradientStartColor, false);</span>
+<span class="fc" id="L821">    }</span>
+
+    /// End color for the radial/linear gradient
+    ///
+    /// #### Returns
+    ///
+    /// the end color for the radial/linear gradient
+    public int getBackgroundGradientEndColor() {
+<span class="pc bpc" id="L829" title="1 of 4 branches missed.">        if (backgroundGradient != null &amp;&amp; backgroundGradient.length &gt; 1) {</span>
+<span class="fc" id="L830">            return ((Integer) backgroundGradient[1]).intValue();</span>
+        }
+<span class="fc" id="L832">        return 0;</span>
+    }
+
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientEndColor`: end color for the linear/radial gradient
+    public void setBackgroundGradientEndColor(int backgroundGradientEndColor) {
+<span class="fc" id="L841">        setBackgroundGradientEndColor(backgroundGradientEndColor, false);</span>
+<span class="fc" id="L842">    }</span>
+
+    /// Background radial gradient relative center position X
+    ///
+    /// #### Returns
+    ///
+    /// value between 0 and 1 with 0.5 representing the center of the component
+    public float getBackgroundGradientRelativeX() {
+<span class="pc bpc" id="L850" title="1 of 4 branches missed.">        if (backgroundGradient != null &amp;&amp; backgroundGradient.length &gt; 2) {</span>
+<span class="fc" id="L851">            return ((Float) backgroundGradient[2]).floatValue();</span>
+        }
+<span class="fc" id="L853">        return 0.5f;</span>
+    }
+
+    /// Background radial gradient relative center position X
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeX`: x position of the radial gradient center
+    public void setBackgroundGradientRelativeX(float backgroundGradientRelativeX) {
+<span class="fc" id="L862">        setBackgroundGradientRelativeX(backgroundGradientRelativeX, false);</span>
+<span class="fc" id="L863">    }</span>
+
+    /// Background radial gradient relative center position Y
+    ///
+    /// #### Returns
+    ///
+    /// value between 0 and 1 with 0.5 representing the center of the component
+    public float getBackgroundGradientRelativeY() {
+<span class="pc bpc" id="L871" title="1 of 4 branches missed.">        if (backgroundGradient != null &amp;&amp; backgroundGradient.length &gt; 3) {</span>
+<span class="fc" id="L872">            return ((Float) backgroundGradient[3]).floatValue();</span>
+        }
+<span class="fc" id="L874">        return 0.5f;</span>
+    }
+
+    /// Background radial gradient relative center position Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeY`: y position of the radial gradient center
+    public void setBackgroundGradientRelativeY(float backgroundGradientRelativeY) {
+<span class="fc" id="L883">        setBackgroundGradientRelativeY(backgroundGradientRelativeY, false);</span>
+<span class="fc" id="L884">    }</span>
+
+    /// Background radial gradient relative size
+    ///
+    /// #### Returns
+    ///
+    /// value representing the relative size of the gradient
+    public float getBackgroundGradientRelativeSize() {
+<span class="pc bpc" id="L892" title="1 of 4 branches missed.">        if (backgroundGradient != null &amp;&amp; backgroundGradient.length &gt; 4) {</span>
+<span class="fc" id="L893">            return ((Float) backgroundGradient[4]).floatValue();</span>
+        }
+<span class="fc" id="L895">        return 1f;</span>
+    }
+
+    /// Background radial gradient relative size
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeSize`: the size of the radial gradient
+    public void setBackgroundGradientRelativeSize(float backgroundGradientRelativeSize) {
+<span class="fc" id="L904">        setBackgroundGradientRelativeSize(backgroundGradientRelativeSize, false);</span>
+<span class="fc" id="L905">    }</span>
+
+    /// Foreground color for the component
+    ///
+    /// #### Returns
+    ///
+    /// the foreground color for the component
+    public int getFgColor() {
+<span class="fc" id="L913">        return fgColor;</span>
+    }
+
+    /// Sets the foreground color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    public final void setFgColor(int fgColor) {
+<span class="fc" id="L922">        setFgColor(fgColor, false);</span>
+<span class="fc" id="L923">    }</span>
+
+    /// Foreground alpha for the component
+    ///
+    /// #### Returns
+    ///
+    /// the foreground alpha for the component
+    ///
+    public int getFgAlpha() {
+<span class="fc" id="L932">        return fgAlpha;</span>
+    }
+
+    /// Sets the foreground alpha for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgAlpha`: foreground alpha
+    public void setFgAlpha(int fgAlpha) {
+<span class="fc" id="L941">        setFgAlpha(fgAlpha, false);</span>
+<span class="fc" id="L942">    }</span>
+
+    /// Font for the component
+    ///
+    /// #### Returns
+    ///
+    /// the font for the component
+    public Font getFont() {
+<span class="fc" id="L950">        return font;</span>
+    }
+
+    /// Sets the font for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: the font
+    public void setFont(Font font) {
+<span class="fc" id="L959">        setFont(font, false);</span>
+<span class="fc" id="L960">    }</span>
+
+    /// Sets the elevation value.  Valid values include 0, 1, 2, 3, 4, 6, 8, 9, 12, 16, and 24.
+    ///
+    /// #### Parameters
+    ///
+    /// - `elevation`: The elevation value.
+    ///
+    /// - `override`: @param override  If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    public void setElevation(int elevation, boolean override) {
+<span class="fc bfc" id="L972" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L973" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L974">                s.setElevation(elevation, override);</span>
+            }
+<span class="fc" id="L976">            return;</span>
+        }
+<span class="fc bfc" id="L978" title="All 2 branches covered.">        if (this.elevation != elevation) {</span>
+<span class="fc" id="L979">            this.elevation = elevation;</span>
+<span class="pc bpc" id="L980" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L981">                modifiedFlag |= ELEVATION_MODIFIED;</span>
+            }
+<span class="fc" id="L983">            firePropertyChanged(ELEVATION);</span>
+        }
+
+<span class="fc" id="L986">    }</span>
+
+    /// Sets the icon gap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: The gap.
+    ///
+    /// - `units`: The units of the gap.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### See also
+    ///
+    /// - #setIconGapUnit(byte, boolean)
+    public void setIconGap(float gap, byte units, boolean override) {
+<span class="pc bpc" id="L1003" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1004" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1005">                s.setIconGap(gap, units, override);</span>
+            }
+<span class="nc" id="L1007">            return;</span>
+        }
+<span class="pc bpc" id="L1009" title="1 of 4 branches missed.">        if (units != iconGapUnit || Math.abs(gap - iconGap) &gt; 0.0001) {</span>
+<span class="fc" id="L1010">            iconGap = gap;</span>
+<span class="fc" id="L1011">            iconGapUnit = units;</span>
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L1013">                modifiedFlag |= ICON_GAP_MODIFIED;</span>
+            }
+<span class="fc" id="L1015">            firePropertyChanged(ICON_GAP);</span>
+        }
+
+<span class="fc" id="L1018">    }</span>
+
+    /// Sets the icon gap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: the icon gap.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### See also
+    ///
+    /// - #setIconGapUnit(byte, boolean)
+    public void setIconGap(float gap, boolean override) {
+<span class="fc" id="L1033">        setIconGap(gap, iconGapUnit, override);</span>
+<span class="fc" id="L1034">    }</span>
+
+    /// Sets the icon gap.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: The icon gap.
+    ///
+    /// - `unit`: The unit. One of the standard style units of measurement.
+    ///
+    public void setIconGap(float gap, byte unit) {
+<span class="fc" id="L1045">        setIconGap(gap, unit, false);</span>
+<span class="fc" id="L1046">    }</span>
+
+    /// Sets the icon gap unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: The icon gap unit.  One of the standard style units of measurement.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    public void setIconGapUnit(byte unit, boolean override) {
+<span class="pc bpc" id="L1058" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1059" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1060">                s.setIconGapUnit(unit);</span>
+            }
+<span class="nc" id="L1062">            return;</span>
+        }
+<span class="fc bfc" id="L1064" title="All 2 branches covered.">        if (unit != iconGapUnit) {</span>
+<span class="fc" id="L1065">            this.iconGapUnit = unit;</span>
+<span class="pc bpc" id="L1066" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L1067">                modifiedFlag |= ICON_GAP_MODIFIED;</span>
+            }
+<span class="fc" id="L1069">            firePropertyChanged(ICON_GAP);</span>
+        }
+<span class="fc" id="L1071">    }</span>
+
+    /// Enables or disables surface rendering mode for component.  Surfaces can support a sort of
+    /// z-indexing of its descendants via their elevation properties.  The surface will render
+    /// the shadows of elevated descendants to convey depth.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: True to enable surface rendering mode.
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    public void setSurface(boolean surface, boolean override) {
+<span class="pc bpc" id="L1085" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1086" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1087">                s.setSurface(surface, override);</span>
+            }
+<span class="nc" id="L1089">            return;</span>
+        }
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">        if (this.surface != surface) {</span>
+<span class="nc" id="L1092">            this.surface = surface;</span>
+<span class="nc bnc" id="L1093" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L1094">                modifiedFlag |= SURFACE_MODIFIED;</span>
+            }
+<span class="nc" id="L1096">            firePropertyChanged(SURFACE);</span>
+        }
+<span class="fc" id="L1098">    }</span>
+
+    /// Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Component#CENTER
+    ///
+    /// - com.codename1.ui.Component#LEFT
+    ///
+    /// - com.codename1.ui.Component#RIGHT
+    public void setAlignment(int align, boolean override) {
+<span class="fc bfc" id="L1117" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1119">                s.setAlignment(align, override);</span>
+            }
+<span class="fc" id="L1121">            return;</span>
+        }
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">        if (this.align != align) {</span>
+<span class="fc" id="L1124">            this.align = align;</span>
+<span class="pc bpc" id="L1125" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L1126">                modifiedFlag |= ALIGNMENT_MODIFIED;</span>
+            }
+<span class="fc" id="L1128">            firePropertyChanged(ALIGNMENT);</span>
+        }
+<span class="fc" id="L1130">    }</span>
+
+    /// Returns the alignment of the Label
+    ///
+    /// #### Returns
+    ///
+    /// the alignment of the Label one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Component#CENTER
+    ///
+    /// - com.codename1.ui.Component#LEFT
+    ///
+    /// - com.codename1.ui.Component#RIGHT
+    public int getAlignment() {
+<span class="fc" id="L1146">        return align;</span>
+    }
+
+    /// Sets the Alignment of the Label to one of: CENTER, LEFT, RIGHT
+    ///
+    /// #### Parameters
+    ///
+    /// - `align`: alignment value
+    ///
+    /// #### See also
+    ///
+    /// - com.codename1.ui.Component#CENTER
+    ///
+    /// - com.codename1.ui.Component#LEFT
+    ///
+    /// - com.codename1.ui.Component#RIGHT
+    public void setAlignment(int align) {
+<span class="fc" id="L1163">        setAlignment(align, false);</span>
+<span class="fc" id="L1164">    }</span>
+
+    /// Returns true if the underline text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the underline text decoration is on, false otherwise
+    public boolean isUnderline() {
+<span class="nc bnc" id="L1172" title="All 2 branches missed.">        return ((textDecoration &amp; TEXT_DECORATION_UNDERLINE) != 0);</span>
+    }
+
+    /// Sets the underline text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `underline`: true to turn underline on, false to turn it off
+    public void setUnderline(boolean underline) {
+<span class="nc bnc" id="L1181" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1183">                s.setUnderline(underline);</span>
+            }
+<span class="nc" id="L1185">            return;</span>
+        }
+<span class="nc bnc" id="L1187" title="All 2 branches missed.">        if (underline != isUnderline()) {</span>
+<span class="nc bnc" id="L1188" title="All 2 branches missed.">            if (underline) {</span>
+<span class="nc" id="L1189">                textDecoration |= TEXT_DECORATION_UNDERLINE;</span>
+            } else {
+<span class="nc" id="L1191">                textDecoration -= TEXT_DECORATION_UNDERLINE;</span>
+            }
+        }
+<span class="nc" id="L1194">    }</span>
+
+    /// Sets the 3D text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: true to turn 3d shadow effect on, false to turn it off
+    ///
+    /// - `raised`: indicates a raised or lowered effect
+    public void set3DText(boolean t, boolean raised) {
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1205" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1206">                s.set3DText(t, raised);</span>
+            }
+<span class="nc" id="L1208">            return;</span>
+        }
+<span class="nc bnc" id="L1210" title="All 2 branches missed.">        if (raised) {</span>
+<span class="nc bnc" id="L1211" title="All 2 branches missed.">            if (t != isRaised3DText()) {</span>
+<span class="nc" id="L1212">                textDecoration = textDecoration &amp; (~TEXT_DECORATION_3D_LOWERED);</span>
+<span class="nc bnc" id="L1213" title="All 2 branches missed.">                if (t) {</span>
+<span class="nc" id="L1214">                    textDecoration |= TEXT_DECORATION_3D;</span>
+                } else {
+<span class="nc" id="L1216">                    textDecoration -= TEXT_DECORATION_3D;</span>
+                }
+            }
+        } else {
+<span class="nc bnc" id="L1220" title="All 2 branches missed.">            if (t != isLowered3DText()) {</span>
+<span class="nc" id="L1221">                textDecoration = textDecoration &amp; (~TEXT_DECORATION_3D);</span>
+<span class="nc bnc" id="L1222" title="All 2 branches missed.">                if (t) {</span>
+<span class="nc" id="L1223">                    textDecoration |= TEXT_DECORATION_3D_LOWERED;</span>
+                } else {
+<span class="nc" id="L1225">                    textDecoration -= TEXT_DECORATION_3D_LOWERED;</span>
+                }
+            }
+        }
+<span class="nc" id="L1229">    }</span>
+
+    /// Returns the text decoration state for the north
+    ///
+    /// #### Returns
+    ///
+    /// true if that is used
+    public boolean is3DTextNorth() {
+<span class="nc bnc" id="L1237" title="All 2 branches missed.">        return (textDecoration &amp; TEXT_DECORATION_3D_SHADOW_NORTH) == TEXT_DECORATION_3D_SHADOW_NORTH;</span>
+    }
+
+    /// Sets the text decoration to 3D text
+    ///
+    /// #### Parameters
+    ///
+    /// - `north`: true to enable 3d text with the shadow on top false otherwise
+    public void set3DTextNorth(boolean north) {
+<span class="nc bnc" id="L1246" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1247" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1248">                s.set3DTextNorth(north);</span>
+            }
+<span class="nc" id="L1250">            return;</span>
+        }
+<span class="nc" id="L1252">        textDecoration = TEXT_DECORATION_3D_SHADOW_NORTH;</span>
+<span class="nc" id="L1253">    }</span>
+
+    /// Returns true if the 3D text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the 3D text decoration is on, false otherwise
+    public boolean isRaised3DText() {
+<span class="nc bnc" id="L1261" title="All 2 branches missed.">        return ((textDecoration &amp; TEXT_DECORATION_3D) != 0);</span>
+    }
+
+    /// Returns true if the 3D text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the 3D text decoration is on, false otherwise
+    public boolean isLowered3DText() {
+<span class="nc bnc" id="L1270" title="All 2 branches missed.">        return ((textDecoration &amp; TEXT_DECORATION_3D_LOWERED) != 0);</span>
+    }
+
+    /// Returns true if the overline text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the overline text decoration is on, false otherwise
+    public boolean isOverline() {
+<span class="nc bnc" id="L1279" title="All 2 branches missed.">        return ((textDecoration &amp; TEXT_DECORATION_OVERLINE) != 0);</span>
+    }
+
+    /// Sets the overline text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `overline`: true to turn overline on, false to turn it off
+    public void setOverline(boolean overline) {
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1289" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1290">                s.setOverline(overline);</span>
+            }
+<span class="nc" id="L1292">            return;</span>
+        }
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">        if (overline != isOverline()) {</span>
+<span class="nc bnc" id="L1295" title="All 2 branches missed.">            if (overline) {</span>
+<span class="nc" id="L1296">                textDecoration |= TEXT_DECORATION_OVERLINE;</span>
+            } else {
+<span class="nc" id="L1298">                textDecoration -= TEXT_DECORATION_OVERLINE;</span>
+            }
+        }
+<span class="nc" id="L1301">    }</span>
+
+    /// Returns true if the strike through text decoration is on, false otherwise
+    ///
+    /// #### Returns
+    ///
+    /// true if the strike through  text decoration is on, false otherwise
+    public boolean isStrikeThru() {
+<span class="nc bnc" id="L1309" title="All 2 branches missed.">        return ((textDecoration &amp; TEXT_DECORATION_STRIKETHRU) != 0);</span>
+    }
+
+    /// Sets the strike through text decoration for this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `strikethru`: true to turn strike through on, false to turn it off
+    public void setStrikeThru(boolean strikethru) {
+<span class="nc bnc" id="L1318" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1319" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1320">                s.setStrikeThru(strikethru);</span>
+            }
+<span class="nc" id="L1322">            return;</span>
+        }
+<span class="nc bnc" id="L1324" title="All 2 branches missed.">        if (strikethru != isStrikeThru()) {</span>
+<span class="nc bnc" id="L1325" title="All 2 branches missed.">            if (strikethru) {</span>
+<span class="nc" id="L1326">                textDecoration |= TEXT_DECORATION_STRIKETHRU;</span>
+            } else {
+<span class="nc" id="L1328">                textDecoration -= TEXT_DECORATION_STRIKETHRU;</span>
+            }
+        }
+<span class="nc" id="L1331">    }</span>
+
+    /// Returns the text decoration of this style
+    ///
+    /// #### Returns
+    ///
+    /// the text decoration of this style (bitmask of the TEXT_DECORATION_* constants)
+    public int getTextDecoration() {
+<span class="fc" id="L1339">        return textDecoration;</span>
+    }
+
+    /// Sets the text decoration of this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `textDecoration`: the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
+    public void setTextDecoration(int textDecoration) {
+<span class="fc" id="L1348">        setTextDecoration(textDecoration, false);</span>
+<span class="fc" id="L1349">    }</span>
+
+    /// Sets the text decoration of this style
+    ///
+    /// #### Parameters
+    ///
+    /// - `textDecoration`: the textDecoration to set (bitmask of the TEXT_DECORATION_* constants)
+    ///
+    /// - `override`: @param override       If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setTextDecoration(int textDecoration, boolean override) {
+<span class="pc bpc" id="L1360" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1362">                s.setTextDecoration(textDecoration, override);</span>
+            }
+<span class="nc" id="L1364">            return;</span>
+        }
+<span class="fc" id="L1366">        this.textDecoration = textDecoration;</span>
+<span class="pc bpc" id="L1367" title="1 of 2 branches missed.">        if (this.textDecoration != textDecoration) {</span>
+<span class="nc" id="L1368">            this.textDecoration = textDecoration;</span>
+<span class="nc bnc" id="L1369" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L1370">                modifiedFlag |= TEXT_DECORATION_MODIFIED;</span>
+            }
+<span class="nc" id="L1372">            firePropertyChanged(TEXT_DECORATION);</span>
+        }
+<span class="fc" id="L1374">    }</span>
+
+    /// Returns the transparency (opacity) level of the Component, zero indicates fully
+    /// transparent and FF indicates fully opaque.
+    ///
+    /// #### Returns
+    ///
+    /// the transparency level of the Component
+    public byte getBgTransparency() {
+<span class="pc bpc" id="L1383" title="7 of 10 branches missed.">        if (bgImage != null &amp;&amp; backgroundType &lt;= BACKGROUND_IMAGE_TILE_BOTH &amp;&amp; backgroundType != BACKGROUND_NONE &amp;&amp; (bgImage.isAnimation() || bgImage.isOpaque())) {</span>
+<span class="nc" id="L1384">            return (byte) 0xff;</span>
+        }
+<span class="fc" id="L1386">        return transparency;</span>
+    }
+
+    /// Sets the Component transparency (opacity) level of the Component, zero indicates fully
+    /// transparent and FF indicates fully opaque.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: transparency level as byte
+    public void setBgTransparency(byte transparency) {
+<span class="fc" id="L1396">        setBgTransparency(transparency &amp; 0xFF, false);</span>
+<span class="fc" id="L1397">    }</span>
+
+    /// Sets the Component transparency level. Valid values should be a
+    /// number between 0-255
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: int value between 0-255
+    public void setBgTransparency(int transparency) {
+<span class="fc" id="L1406">        setBgTransparency(transparency, false);</span>
+<span class="fc" id="L1407">    }</span>
+
+    /// Returns the opacity value for the component
+    ///
+    /// #### Returns
+    ///
+    /// the opacity value
+    public int getOpacity() {
+<span class="fc" id="L1415">        return opacity &amp; 0xff;</span>
+    }
+
+    /// Set the opacity value
+    ///
+    /// #### Parameters
+    ///
+    /// - `opacity`: the opacity value
+    public final void setOpacity(int opacity) {
+<span class="fc" id="L1424">        setOpacity(opacity, false);</span>
+<span class="fc" id="L1425">    }</span>
+
+    /// Sets the Component transparency level. Valid values should be a
+    /// number between 0-255
+    ///
+    /// #### Parameters
+    ///
+    /// - `opacity`: int value between 0-255
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public final void setOpacity(int opacity, boolean override) {
+<span class="fc bfc" id="L1437" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1438" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1439">                s.setOpacity(opacity, override);</span>
+            }
+<span class="fc" id="L1441">            return;</span>
+        }
+<span class="pc bpc" id="L1443" title="2 of 4 branches missed.">        if (opacity &lt; 0 || opacity &gt; 255) {</span>
+<span class="nc" id="L1444">            throw new IllegalArgumentException(&quot;valid values are between 0-255: &quot; + opacity);</span>
+        }
+<span class="fc bfc" id="L1446" title="All 2 branches covered.">        if (this.opacity != (byte) opacity) {</span>
+<span class="fc" id="L1447">            this.opacity = (byte) opacity;</span>
+
+<span class="pc bpc" id="L1449" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L1450">                modifiedFlag |= OPACITY_MODIFIED;</span>
+            }
+<span class="fc" id="L1452">            firePropertyChanged(OPACITY);</span>
+        }
+<span class="fc" id="L1454">    }</span>
+
+    /// Strips all margin and padding from this style.
+    ///
+    public void stripMarginAndPadding() {
+<span class="fc" id="L1459">        setPadding(0, 0, 0, 0);</span>
+<span class="fc" id="L1460">        setMargin(0, 0, 0, 0);</span>
+<span class="fc" id="L1461">        setBorder(Border.createEmpty());</span>
+<span class="fc" id="L1462">    }</span>
+
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of units to pad the top
+    ///
+    /// - `bottom`: number of units to pad the bottom
+    ///
+    /// - `left`: number of units to pad the left
+    ///
+    /// - `right`: number of units to pad the right
+    ///
+    /// #### See also
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPadding(int top, int bottom, int left, int right) {
+<span class="fc" id="L1480">        this.setPadding((float) top, (float) bottom, (float) left, (float) right);</span>
+<span class="fc" id="L1481">    }</span>
+
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of units to pad the top
+    ///
+    /// - `bottom`: number of units to pad the bottom
+    ///
+    /// - `left`: number of units to pad the left
+    ///
+    /// - `right`: number of units to pad the right
+    ///
+    /// #### See also
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPadding(float top, float bottom, float left, float right) {
+<span class="fc bfc" id="L1499" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1500" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1501">                s.setPadding(top, bottom, left, right);</span>
+            }
+<span class="fc" id="L1503">            return;</span>
+        }
+<span class="pc bpc" id="L1505" title="4 of 8 branches missed.">        if (top &lt; 0 || left &lt; 0 || right &lt; 0 || bottom &lt; 0) {</span>
+<span class="nc" id="L1506">            throw new IllegalArgumentException(&quot;padding cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L1508" title="All 8 branches covered.">        if (padding[Component.TOP] != top ||</span>
+                padding[Component.BOTTOM] != bottom ||
+                padding[Component.LEFT] != left ||
+                padding[Component.RIGHT] != right) {
+<span class="fc" id="L1512">            padding[Component.TOP] = top;</span>
+<span class="fc" id="L1513">            padding[Component.BOTTOM] = bottom;</span>
+<span class="fc" id="L1514">            padding[Component.LEFT] = left;</span>
+<span class="fc" id="L1515">            padding[Component.RIGHT] = right;</span>
+
+<span class="fc" id="L1517">            modifiedFlag |= PADDING_MODIFIED;</span>
+<span class="fc" id="L1518">            firePropertyChanged(PADDING);</span>
+        }
+<span class="fc" id="L1520">    }</span>
+
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of units to pad the orientation
+    public void setPadding(int orientation, int gap) {
+<span class="fc" id="L1530">        setPadding(orientation, gap, false);</span>
+<span class="fc" id="L1531">    }</span>
+
+    /// Sets the Style Padding. Units are specified by `#setPaddingUnit(byte...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of units to pad the orientation
+    public void setPadding(int orientation, float gap) {
+<span class="fc" id="L1541">        setPadding(orientation, gap, false);</span>
+<span class="fc" id="L1542">    }</span>
+
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of margin using the current unit
+    ///
+    /// - `bottom`: number of margin using the current unit
+    ///
+    /// - `left`: number of margin using the current unit
+    ///
+    /// - `right`: number of margin using the current unit
+    public void setMargin(int top, int bottom, int left, int right) {
+<span class="fc" id="L1556">        setMargin((float) top, (float) bottom, (float) left, (float) right);</span>
+<span class="fc" id="L1557">    }</span>
+
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: number of margin using the current unit
+    ///
+    /// - `bottom`: number of margin using the current unit
+    ///
+    /// - `left`: number of margin using the current unit
+    ///
+    /// - `right`: number of margin using the current unit
+    public void setMargin(float top, float bottom, float left, float right) {
+<span class="fc bfc" id="L1571" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1572" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1573">                s.setMargin(top, bottom, left, right);</span>
+            }
+<span class="fc" id="L1575">            return;</span>
+        }
+<span class="pc bpc" id="L1577" title="4 of 8 branches missed.">        if (top &lt; 0 || left &lt; 0 || right &lt; 0 || bottom &lt; 0) {</span>
+<span class="nc" id="L1578">            throw new IllegalArgumentException(&quot;margin cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L1580" title="All 8 branches covered.">        if (margin[Component.TOP] != top ||</span>
+                margin[Component.BOTTOM] != bottom ||
+                margin[Component.LEFT] != left ||
+                margin[Component.RIGHT] != right) {
+<span class="fc" id="L1584">            margin[Component.TOP] = top;</span>
+<span class="fc" id="L1585">            margin[Component.BOTTOM] = bottom;</span>
+<span class="fc" id="L1586">            margin[Component.LEFT] = left;</span>
+<span class="fc" id="L1587">            margin[Component.RIGHT] = right;</span>
+
+<span class="fc" id="L1589">            modifiedFlag |= MARGIN_MODIFIED;</span>
+<span class="fc" id="L1590">            firePropertyChanged(MARGIN);</span>
+        }
+<span class="fc" id="L1592">    }</span>
+
+    /// Store current margin values into a cache that could be restored with restoreCachedMargins()
+    ///
+    /// #### Parameters
+    ///
+    /// - `override`: if true, margins are cached even if a previous cache already exists. If false, margins are cached only if no cache already exists.
+    /// Warning: This method is used internally when hidding a component with the Component.setHidden(true) method and expect a component with no previous margins cache.
+    /// So do not use this method on a component that would be hidden or flush its margins cache by calling flushMarginsCache() before hidding the component.
+    /// And do not use on an hidden component either or unhidding this component might result in unexpected results
+    public void cacheMargins(boolean override) {
+<span class="fc bfc" id="L1603" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1604" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1605">                s.cacheMargins(override);</span>
+            }
+<span class="fc" id="L1607">            return;</span>
+        }
+        //else
+<span class="pc bpc" id="L1610" title="2 of 4 branches missed.">        if (override || cached_margin == null) {</span>
+<span class="fc" id="L1611">            cached_margin = new float[4];</span>
+<span class="fc" id="L1612">            System.arraycopy(margin, 0, cached_margin, 0, margin.length);</span>
+        }
+<span class="fc" id="L1614">    }</span>
+
+    /// Restore cached margins and flush the margins cache
+    /// Warning: this method is used internally when unhidding a component with the Component.setHidden(false) method
+    /// Do not use it on an hidden component or it would result into unexpected results when unhidding this component
+    public void restoreCachedMargins() {
+<span class="fc bfc" id="L1620" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1621" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1622">                s.restoreCachedMargins();</span>
+            }
+<span class="fc" id="L1624">            return;</span>
+        }
+        //else
+<span class="fc bfc" id="L1627" title="All 2 branches covered.">        if (cached_margin != null) {</span>
+<span class="fc" id="L1628">            setMargin(cached_margin[0], cached_margin[1], cached_margin[2], cached_margin[3]);</span>
+<span class="fc" id="L1629">            cached_margin = null;</span>
+        }
+<span class="fc" id="L1631">    }</span>
+
+    /// Flush the margins cache if one exists
+    public void flushMarginsCache() {
+<span class="nc bnc" id="L1635" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L1636" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L1637">                s.flushMarginsCache();</span>
+            }
+<span class="nc" id="L1639">            return;</span>
+        }
+<span class="nc" id="L1641">        cached_margin = null;</span>
+<span class="nc" id="L1642">    }</span>
+
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
+    public void setMargin(int orientation, int gap) {
+<span class="fc" id="L1652">        setMargin(orientation, gap, false);</span>
+<span class="fc" id="L1653">    }</span>
+
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
+    public void setMargin(int orientation, float gap) {
+<span class="nc" id="L1663">        setMargin(orientation, gap, false);</span>
+<span class="nc" id="L1664">    }</span>
+
+    /// Returns the Padding in the internal value regardless of the unit
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// amount of padding in the given orientation using current units.
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `int)`
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    public int getPaddingValue(boolean rtl, int orientation) {
+<span class="nc" id="L1686">        return (int) getPaddingFloatValue(rtl, orientation);</span>
+    }
+
+    /// Returns the Padding in the internal value regardless of the unit
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// amount of padding in the given orientation using current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    public float getPaddingFloatValue(boolean rtl, int orientation) {
+<span class="pc bpc" id="L1705" title="2 of 4 branches missed.">        if (orientation &lt; Component.TOP || orientation &gt; Component.RIGHT) {</span>
+<span class="nc" id="L1706">            throw new IllegalArgumentException(&quot;wrong orientation &quot; + orientation);</span>
+        }
+
+<span class="pc bpc" id="L1709" title="1 of 2 branches missed.">        if (rtl) {</span>
+<span class="nc bnc" id="L1710" title="All 3 branches missed.">            switch (orientation) {</span>
+                case Component.LEFT:
+<span class="nc" id="L1712">                    orientation = Component.RIGHT;</span>
+<span class="nc" id="L1713">                    break;</span>
+                case Component.RIGHT:
+<span class="nc" id="L1715">                    orientation = Component.LEFT;</span>
+<span class="nc" id="L1716">                    break;</span>
+                default:
+                    break;
+            }
+        }
+
+<span class="fc" id="L1722">        return padding[orientation];</span>
+    }
+
+    /// Returns the left padding in pixel or right padding in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
+    public int getPaddingLeft(boolean rtl) {
+<span class="fc bfc" id="L1735" title="All 2 branches covered.">        if (rtl) {</span>
+<span class="fc" id="L1736">            return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);</span>
+        }
+<span class="fc" id="L1738">        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);</span>
+    }
+
+    private void initPaddingUnits() {
+<span class="fc bfc" id="L1742" title="All 2 branches covered.">        if (paddingUnit == null) {</span>
+<span class="fc" id="L1743">            paddingUnit = new byte[]{UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS};</span>
+        }
+<span class="fc" id="L1745">    }</span>
+
+    /// Sets left padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setPaddingUnitLeft(byte unit) {
+<span class="fc bfc" id="L1755" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1756" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1757">                s.setPaddingUnitLeft(unit);</span>
+            }
+<span class="fc" id="L1759">            return;</span>
+        }
+<span class="fc" id="L1761">        initPaddingUnits();</span>
+<span class="fc" id="L1762">        paddingUnit[Component.LEFT] = unit;</span>
+<span class="fc" id="L1763">    }</span>
+
+    /// Sets right padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setPaddingUnitRight(byte unit) {
+<span class="fc bfc" id="L1773" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1774" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1775">                s.setPaddingUnitRight(unit);</span>
+            }
+<span class="fc" id="L1777">            return;</span>
+        }
+<span class="fc" id="L1779">        initPaddingUnits();</span>
+<span class="fc" id="L1780">        paddingUnit[Component.RIGHT] = unit;</span>
+<span class="fc" id="L1781">    }</span>
+
+    /// Sets top padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setPaddingUnitTop(byte unit) {
+<span class="fc bfc" id="L1791" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1792" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1793">                s.setPaddingUnitTop(unit);</span>
+            }
+<span class="fc" id="L1795">            return;</span>
+        }
+<span class="fc" id="L1797">        initPaddingUnits();</span>
+<span class="fc" id="L1798">        paddingUnit[Component.TOP] = unit;</span>
+<span class="fc" id="L1799">    }</span>
+
+    /// Sets bottom padding unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setPaddingUnitBottom(byte unit) {
+<span class="fc bfc" id="L1809" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1810" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1811">                s.setPaddingUnitBottom(unit);</span>
+            }
+<span class="fc" id="L1813">            return;</span>
+        }
+<span class="fc" id="L1815">        initPaddingUnits();</span>
+<span class="fc" id="L1816">        paddingUnit[Component.BOTTOM] = unit;</span>
+<span class="fc" id="L1817">    }</span>
+
+    /// Returns the right padding in pixel or left padding in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
+    public int getPaddingRight(boolean rtl) {
+<span class="fc bfc" id="L1829" title="All 2 branches covered.">        if (rtl) {</span>
+<span class="fc" id="L1830">            return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);</span>
+        }
+<span class="fc" id="L1832">        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);</span>
+    }
+
+    /// Returns the top padding in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
+    public int getPaddingTop() {
+<span class="fc" id="L1841">        return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP);</span>
+    }
+
+    /// Sets the Style Padding on the top, this is equivalent to calling `setPadding(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: amount to pad the top in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    public void setPaddingTop(int gap) {
+<span class="fc" id="L1854">        this.setPaddingTop((float) gap);</span>
+<span class="fc" id="L1855">    }</span>
+
+    /// Sets the Style Padding on the top, this is equivalent to calling `setPadding(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the top in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingTop(float gap) {
+<span class="fc bfc" id="L1869" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1870" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1871">                s.setPaddingTop(gap);</span>
+            }
+<span class="fc" id="L1873">            return;</span>
+        }
+<span class="pc bpc" id="L1875" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L1876">            throw new IllegalArgumentException(&quot;padding cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L1878" title="All 2 branches covered.">        if (padding[Component.TOP] != gap) {</span>
+<span class="fc" id="L1879">            padding[Component.TOP] = gap;</span>
+<span class="fc" id="L1880">            modifiedFlag |= PADDING_MODIFIED;</span>
+<span class="fc" id="L1881">            firePropertyChanged(PADDING);</span>
+        }
+<span class="fc" id="L1883">    }</span>
+
+    /// Sets the Style Padding on the left, this is equivalent to calling `setPadding(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the left in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingLeft(int gap) {
+<span class="fc" id="L1897">        this.setPaddingLeft((float) gap);</span>
+<span class="fc" id="L1898">    }</span>
+
+    /// Sets the Style Padding on the left, this is equivalent to calling `setPadding(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the left in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingLeft(float gap) {
+<span class="fc bfc" id="L1912" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1913" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1914">                s.setPaddingLeft(gap);</span>
+            }
+<span class="fc" id="L1916">            return;</span>
+        }
+<span class="pc bpc" id="L1918" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L1919">            throw new IllegalArgumentException(&quot;padding cannot be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L1921" title="1 of 2 branches missed.">        if (padding[Component.LEFT] != gap) {</span>
+<span class="fc" id="L1922">            padding[Component.LEFT] = gap;</span>
+<span class="fc" id="L1923">            modifiedFlag |= PADDING_MODIFIED;</span>
+<span class="fc" id="L1924">            firePropertyChanged(PADDING);</span>
+        }
+<span class="fc" id="L1926">    }</span>
+
+    /// Sets the Style Padding on the right, this is equivalent to calling `setPadding(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the right in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingRight(int gap) {
+<span class="fc" id="L1940">        this.setPaddingRight((float) gap);</span>
+<span class="fc" id="L1941">    }</span>
+
+    /// Sets the Style Padding on the right, this is equivalent to calling `setPadding(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the right in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingRight(float gap) {
+<span class="fc bfc" id="L1955" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1956" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1957">                s.setPaddingRight(gap);</span>
+            }
+<span class="fc" id="L1959">            return;</span>
+        }
+<span class="pc bpc" id="L1961" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L1962">            throw new IllegalArgumentException(&quot;padding cannot be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L1964" title="1 of 2 branches missed.">        if (padding[Component.RIGHT] != gap) {</span>
+<span class="fc" id="L1965">            padding[Component.RIGHT] = gap;</span>
+<span class="fc" id="L1966">            modifiedFlag |= PADDING_MODIFIED;</span>
+<span class="fc" id="L1967">            firePropertyChanged(PADDING);</span>
+        }
+<span class="fc" id="L1969">    }</span>
+
+    /// Sets the Style Margin on the left, this is equivalent to calling `setMargin(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of left margin using the current unit
+    public void setMarginLeft(int gap) {
+<span class="fc" id="L1977">        this.setMarginLeft((float) gap);</span>
+<span class="fc" id="L1978">    }</span>
+
+    /// Sets the Style Margin on the left, this is equivalent to calling `setMargin(Component.LEFT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of left margin using the current unit
+    public void setMarginLeft(float gap) {
+<span class="fc bfc" id="L1986" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L1987" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L1988">                s.setMarginLeft(gap);</span>
+            }
+<span class="fc" id="L1990">            return;</span>
+        }
+<span class="pc bpc" id="L1992" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L1993">            throw new IllegalArgumentException(&quot;Margin cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L1995" title="All 2 branches covered.">        if (margin[Component.LEFT] != gap) {</span>
+<span class="fc" id="L1996">            margin[Component.LEFT] = gap;</span>
+<span class="fc" id="L1997">            modifiedFlag |= MARGIN_MODIFIED;</span>
+<span class="fc" id="L1998">            firePropertyChanged(MARGIN);</span>
+        }
+<span class="fc" id="L2000">    }</span>
+
+    /// Sets the Style Margin on the right, this is equivalent to calling `setMargin(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of right margin using the current unit
+    public void setMarginRight(int gap) {
+<span class="fc" id="L2008">        this.setMarginRight((float) gap);</span>
+<span class="fc" id="L2009">    }</span>
+
+    /// Sets the Style Margin on the right, this is equivalent to calling `setMargin(Component.RIGHT, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of right margin using the current unit
+    public void setMarginRight(float gap) {
+<span class="pc bpc" id="L2017" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2018" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2019">                s.setMarginRight(gap);</span>
+            }
+<span class="nc" id="L2021">            return;</span>
+        }
+<span class="pc bpc" id="L2023" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L2024">            throw new IllegalArgumentException(&quot;Margin cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L2026" title="All 2 branches covered.">        if (margin[Component.RIGHT] != gap) {</span>
+<span class="fc" id="L2027">            margin[Component.RIGHT] = gap;</span>
+<span class="fc" id="L2028">            modifiedFlag |= MARGIN_MODIFIED;</span>
+<span class="fc" id="L2029">            firePropertyChanged(MARGIN);</span>
+        }
+<span class="fc" id="L2031">    }</span>
+
+    /// Returns the bottom padding in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
+    public int getPaddingBottom() {
+<span class="fc" id="L2039">        return convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);</span>
+    }
+
+    /// Sets the Style Padding on the bottom, this is equivalent to calling `setPadding(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the bottom in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingBottom(int gap) {
+<span class="fc" id="L2054">        this.setPaddingBottom((float) gap);</span>
+<span class="fc" id="L2055">    }</span>
+
+    /// Sets the Style Padding on the bottom, this is equivalent to calling `setPadding(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: Amount to pad the bottom in current units.
+    ///
+    /// #### See also
+    ///
+    /// - #getPaddingUnit()
+    ///
+    /// - #setPaddingUnit(byte...)
+    public void setPaddingBottom(float gap) {
+<span class="fc bfc" id="L2069" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2070" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2071">                s.setPaddingBottom(gap);</span>
+            }
+<span class="fc" id="L2073">            return;</span>
+        }
+<span class="pc bpc" id="L2075" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L2076">            throw new IllegalArgumentException(&quot;padding cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L2078" title="All 2 branches covered.">        if (padding[Component.BOTTOM] != gap) {</span>
+<span class="fc" id="L2079">            padding[Component.BOTTOM] = gap;</span>
+<span class="fc" id="L2080">            modifiedFlag |= PADDING_MODIFIED;</span>
+<span class="fc" id="L2081">            firePropertyChanged(PADDING);</span>
+        }
+<span class="fc" id="L2083">    }</span>
+
+    /// The equivalent of getMarginLeft + getMarginRight
+    ///
+    /// #### Returns
+    ///
+    /// the side margin
+    public int getHorizontalMargins() {
+<span class="fc" id="L2091">        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT) +</span>
+<span class="fc" id="L2092">                convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);</span>
+    }
+
+    /// The equivalent of getMarginTop + getMarginBottom
+    ///
+    /// #### Returns
+    ///
+    /// the vertical margin
+    public int getVerticalMargins() {
+<span class="fc" id="L2101">        return convertUnit(marginUnit, margin[Component.TOP], Component.TOP) +</span>
+<span class="fc" id="L2102">                convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);</span>
+    }
+
+    /// The equivalent of getPaddingLeft + getPaddingRight
+    ///
+    /// #### Returns
+    ///
+    /// the side padding
+    public int getHorizontalPadding() {
+<span class="fc" id="L2111">        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT) +</span>
+<span class="fc" id="L2112">                convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);</span>
+    }
+
+    /// The equivalent of getPaddingTop + getPaddingBottom
+    ///
+    /// #### Returns
+    ///
+    /// the vertical padding
+    public int getVerticalPadding() {
+<span class="fc" id="L2121">        return convertUnit(paddingUnit, padding[Component.TOP], Component.TOP) +</span>
+<span class="fc" id="L2122">                convertUnit(paddingUnit, padding[Component.BOTTOM], Component.BOTTOM);</span>
+    }
+
+    /// Returns the right margin in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
+    public int getMarginRightNoRTL() {
+<span class="fc" id="L2131">        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);</span>
+    }
+
+    /// Returns the left margin in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
+    public int getMarginLeftNoRTL() {
+<span class="fc" id="L2140">        return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);</span>
+    }
+
+    /// Returns the right padding in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
+    public int getPaddingRightNoRTL() {
+<span class="fc" id="L2149">        return convertUnit(paddingUnit, padding[Component.RIGHT], Component.RIGHT);</span>
+    }
+
+    /// Returns the left padding in pixels ignoring RTL
+    ///
+    /// #### Returns
+    ///
+    /// the padding in pixels
+    public int getPaddingLeftNoRTL() {
+<span class="fc" id="L2158">        return convertUnit(paddingUnit, padding[Component.LEFT], Component.LEFT);</span>
+    }
+
+    /// Returns the right margin in pixel or left margin in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
+    public int getMarginRight(boolean rtl) {
+<span class="fc bfc" id="L2171" title="All 2 branches covered.">        if (rtl) {</span>
+<span class="fc" id="L2172">            return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);</span>
+        }
+<span class="fc" id="L2174">        return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);</span>
+    }
+
+    /// Returns the left margin in pixel or right margin in an RTL situation
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: indicates a right to left language
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
+    public int getMarginLeft(boolean rtl) {
+<span class="fc bfc" id="L2187" title="All 2 branches covered.">        if (rtl) {</span>
+<span class="fc" id="L2188">            return convertUnit(marginUnit, margin[Component.RIGHT], Component.RIGHT);</span>
+        }
+<span class="fc" id="L2190">        return convertUnit(marginUnit, margin[Component.LEFT], Component.LEFT);</span>
+    }
+
+    /// Returns the top margin in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
+    public int getMarginTop() {
+<span class="fc" id="L2199">        return convertUnit(marginUnit, margin[Component.TOP], Component.TOP);</span>
+    }
+
+    /// Sets the Style margin on the top, this is equivalent to calling `setMargin(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of top margin using the current unit
+    public void setMarginTop(int gap) {
+<span class="nc" id="L2208">        this.setMarginTop((float) gap);</span>
+<span class="nc" id="L2209">    }</span>
+
+    /// Sets the Style margin on the top, this is equivalent to calling `setMargin(Component.TOP, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of top margin using the current unit
+    public void setMarginTop(float gap) {
+<span class="nc bnc" id="L2217" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2218" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2219">                s.setMarginTop(gap);</span>
+            }
+<span class="nc" id="L2221">            return;</span>
+        }
+<span class="nc bnc" id="L2223" title="All 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L2224">            throw new IllegalArgumentException(&quot;Margin cannot be negative&quot;);</span>
+        }
+<span class="nc bnc" id="L2226" title="All 2 branches missed.">        if (margin[Component.TOP] != gap) {</span>
+<span class="nc" id="L2227">            margin[Component.TOP] = gap;</span>
+<span class="nc" id="L2228">            modifiedFlag |= MARGIN_MODIFIED;</span>
+<span class="nc" id="L2229">            firePropertyChanged(MARGIN);</span>
+        }
+<span class="nc" id="L2231">    }</span>
+
+    /// Returns the bottom margin in pixel
+    ///
+    /// #### Returns
+    ///
+    /// the margin in pixels
+    public int getMarginBottom() {
+<span class="fc" id="L2239">        return convertUnit(marginUnit, margin[Component.BOTTOM], Component.BOTTOM);</span>
+    }
+
+    /// Sets the Style Margin on the bottom, this is equivalent to calling `setMargin(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of bottom margin using the current unit
+    public void setMarginBottom(int gap) {
+<span class="fc" id="L2248">        this.setMarginBottom((float) gap);</span>
+<span class="fc" id="L2249">    }</span>
+
+    /// Sets the Style Margin on the bottom, this is equivalent to calling `setMargin(Component.BOTTOM, gap, false);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `gap`: number of bottom margin using the current unit
+    public void setMarginBottom(float gap) {
+<span class="pc bpc" id="L2257" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2258" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2259">                s.setMarginBottom(gap);</span>
+            }
+<span class="nc" id="L2261">            return;</span>
+        }
+<span class="pc bpc" id="L2263" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L2264">            throw new IllegalArgumentException(&quot;Margin cannot be negative&quot;);</span>
+        }
+<span class="pc bpc" id="L2266" title="1 of 2 branches missed.">        if (margin[Component.BOTTOM] != gap) {</span>
+<span class="fc" id="L2267">            margin[Component.BOTTOM] = gap;</span>
+<span class="fc" id="L2268">            modifiedFlag |= MARGIN_MODIFIED;</span>
+<span class="fc" id="L2269">            firePropertyChanged(MARGIN);</span>
+        }
+<span class="fc" id="L2271">    }</span>
+
+    /// Returns the Padding in using the current unit
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of padding pixels in the given orientation
+    public int getPadding(boolean rtl, int orientation) {
+<span class="fc" id="L2285">        return convertUnit(paddingUnit, getPaddingFloatValue(rtl, orientation), orientation);</span>
+    }
+
+    private int convertUnit(byte[] unitType, float v, int orientation) {
+<span class="fc bfc" id="L2289" title="All 2 branches covered.">        if (unitType != null) {</span>
+<span class="pc bpc" id="L2290" title="6 of 8 branches missed.">            switch (unitType[orientation]) {</span>
+                case UNIT_TYPE_REM:
+<span class="nc" id="L2292">                    return Math.round(v * Font.getDefaultFont().getHeight());</span>
+                case UNIT_TYPE_VH:
+<span class="nc" id="L2294">                    return Math.round(v / 100f * CN.getDisplayHeight());</span>
+                case UNIT_TYPE_VW:
+<span class="nc" id="L2296">                    return Math.round(v / 100f * CN.getDisplayWidth());</span>
+                case UNIT_TYPE_VMIN:
+<span class="nc" id="L2298">                    return Math.round(v / 100f * Math.min(CN.getDisplayWidth(), CN.getDisplayHeight()));</span>
+                case UNIT_TYPE_VMAX:
+<span class="nc" id="L2300">                    return Math.round(v / 100f * Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()));</span>
+                case UNIT_TYPE_DIPS:
+<span class="fc" id="L2302">                    return Display.getInstance().convertToPixels(v);</span>
+                case UNIT_TYPE_SCREEN_PERCENTAGE:
+<span class="nc bnc" id="L2304" title="All 4 branches missed.">                    if (orientation == Component.TOP || orientation == Component.BOTTOM) {</span>
+<span class="nc" id="L2305">                        float h = Display.getInstance().getDisplayHeight();</span>
+<span class="nc" id="L2306">                        h = h / 100.0f * v;</span>
+<span class="nc" id="L2307">                        return (int) h;</span>
+                    } else {
+<span class="nc" id="L2309">                        float w = Display.getInstance().getDisplayWidth();</span>
+<span class="nc" id="L2310">                        w = w / 100.0f * v;</span>
+<span class="nc" id="L2311">                        return (int) w;</span>
+                    }
+                default:
+<span class="fc" id="L2314">                    return (int) v;</span>
+            }
+        }
+<span class="fc" id="L2317">        return (int) v;</span>
+    }
+
+    /// Returns the Padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of padding pixels in the given orientation
+    public int getPadding(int orientation) {
+<span class="fc" id="L2330">        return getPadding(UIManager.getInstance().getLookAndFeel().isRTL(), orientation);</span>
+    }
+
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
+    public int getMargin(int orientation) {
+<span class="fc" id="L2343">        return getMargin(UIManager.getInstance().getLookAndFeel().isRTL(), orientation);</span>
+    }
+
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
+    public int getMargin(boolean rtl, int orientation) {
+<span class="fc" id="L2358">        return convertUnit(marginUnit, getMarginFloatValue(rtl, orientation), orientation);</span>
+    }
+
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
+    ///
+    /// #### Deprecated
+    ///
+    /// Use `int)`
+    public int getMarginValue(boolean rtl, int orientation) {
+<span class="nc" id="L2377">        return (int) getMarginFloatValue(rtl, orientation);</span>
+    }
+
+    /// Returns the Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `rtl`: flag indicating whether the padding is for an RTL bidi component
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// #### Returns
+    ///
+    /// number of margin using the current unit in the given orientation
+    ///
+    public float getMarginFloatValue(boolean rtl, int orientation) {
+<span class="pc bpc" id="L2393" title="2 of 4 branches missed.">        if (orientation &lt; Component.TOP || orientation &gt; Component.RIGHT) {</span>
+<span class="nc" id="L2394">            throw new IllegalArgumentException(&quot;wrong orientation &quot; + orientation);</span>
+        }
+<span class="pc bpc" id="L2396" title="1 of 2 branches missed.">        if (rtl) {</span>
+<span class="nc bnc" id="L2397" title="All 3 branches missed.">            switch (orientation) {</span>
+                case Component.LEFT:
+<span class="nc" id="L2399">                    orientation = Component.RIGHT;</span>
+<span class="nc" id="L2400">                    break;</span>
+                case Component.RIGHT:
+<span class="nc" id="L2402">                    orientation = Component.LEFT;</span>
+<span class="nc" id="L2403">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc" id="L2408">        return margin[orientation];</span>
+    }
+
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgColor`: RRGGBB color that ignores the alpha component
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBgColor(int bgColor, boolean override) {
+<span class="fc bfc" id="L2420" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2421" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2422">                s.setBgColor(bgColor, override);</span>
+            }
+<span class="fc" id="L2424">            return;</span>
+        }
+<span class="fc bfc" id="L2426" title="All 2 branches covered.">        if (this.bgColor != bgColor) {</span>
+<span class="fc" id="L2427">            this.bgColor = bgColor;</span>
+<span class="pc bpc" id="L2428" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2429">                modifiedFlag |= BG_COLOR_MODIFIED;</span>
+            }
+<span class="fc" id="L2431">            firePropertyChanged(BG_COLOR);</span>
+        }
+<span class="fc" id="L2433">    }</span>
+
+    /// Sets the background image for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgImage`: background image
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBgImage(Image bgImage, boolean override) {
+<span class="fc bfc" id="L2444" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2445" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2446">                s.setBgImage(bgImage, override);</span>
+            }
+<span class="fc" id="L2448">            return;</span>
+        }
+<span class="fc bfc" id="L2450" title="All 2 branches covered.">        if (this.bgImage != bgImage) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L2451">            this.bgImage = bgImage;</span>
+<span class="fc bfc" id="L2452" title="All 2 branches covered.">            if (!override) {</span>
+<span class="fc" id="L2453">                modifiedFlag |= BG_IMAGE_MODIFIED;</span>
+            }
+<span class="fc" id="L2455">            firePropertyChanged(BG_IMAGE);</span>
+        }
+<span class="fc" id="L2457">    }</span>
+
+    /// Sets the background type for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundType`: @param backgroundType one of BACKGROUND_IMAGE_SCALED, BACKGROUND_IMAGE_TILE_BOTH,
+    /// BACKGROUND_IMAGE_TILE_VERTICAL, BACKGROUND_IMAGE_TILE_HORIZONTAL,
+    /// BACKGROUND_IMAGE_ALIGNED, BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+    /// BACKGROUND_GRADIENT_LINEAR_VERTICAL, BACKGROUND_GRADIENT_RADIAL
+    ///
+    /// - `override`: @param override       If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBackgroundType(byte backgroundType, boolean override) {
+<span class="fc bfc" id="L2471" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2472" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2473">                s.setBackgroundType(backgroundType, override);</span>
+            }
+<span class="fc" id="L2475">            return;</span>
+        }
+<span class="fc bfc" id="L2477" title="All 2 branches covered.">        if (this.backgroundType != backgroundType) {</span>
+<span class="fc" id="L2478">            this.backgroundType = backgroundType;</span>
+<span class="pc bpc" id="L2479" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2480">                modifiedFlag |= BACKGROUND_TYPE_MODIFIED;</span>
+            }
+<span class="fc" id="L2482">            firePropertyChanged(BACKGROUND_TYPE);</span>
+        }
+<span class="fc" id="L2484">    }</span>
+
+    /// Sets the background alignment for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundAlignment`: @param backgroundAlignment one of:
+    /// BACKGROUND_IMAGE_ALIGN_TOP, BACKGROUND_IMAGE_ALIGN_BOTTOM,
+    /// BACKGROUND_IMAGE_ALIGN_LEFT, BACKGROUND_IMAGE_ALIGN_RIGHT,
+    /// BACKGROUND_IMAGE_ALIGN_CENTER
+    ///
+    /// - `override`: @param override            If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    ///
+    /// #### Deprecated
+    ///
+    /// the functionality of this method is now covered by background type
+    private void setBackgroundAlignment(byte backgroundAlignment, boolean override) {
+<span class="pc bpc" id="L2502" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2503" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2504">                s.setBackgroundAlignment(backgroundAlignment, override);</span>
+            }
+<span class="nc" id="L2506">            return;</span>
+        }
+<span class="pc bpc" id="L2508" title="1 of 2 branches missed.">        if (this.backgroundAlignment != backgroundAlignment) {</span>
+<span class="nc" id="L2509">            this.backgroundAlignment = backgroundAlignment;</span>
+<span class="nc bnc" id="L2510" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L2511">                modifiedFlag |= BACKGROUND_ALIGNMENT_MODIFIED;</span>
+            }
+<span class="nc" id="L2513">            firePropertyChanged(BACKGROUND_ALIGNMENT);</span>
+        }
+<span class="fc" id="L2515">    }</span>
+
+    /// Returns the background gradient array which includes the start/end color
+    /// and optionally the x/y relative anchor for the radial gradient
+    ///
+    /// #### Returns
+    ///
+    /// @return the background gradient array which includes the start/end color
+    /// and optionally the x/y relative anchor for the radial gradient
+    Object[] getBackgroundGradient() {
+<span class="fc bfc" id="L2525" title="All 2 branches covered.">        if (backgroundGradient == null) {</span>
+<span class="fc" id="L2526">            Float c = Float.valueOf(0.5f);</span>
+<span class="fc" id="L2527">            backgroundGradient = new Object[]{Integer.valueOf(0xffffff), Integer.valueOf(0), c, c, Float.valueOf(1)};</span>
+        }
+<span class="fc" id="L2529">        return backgroundGradient;</span>
+    }
+
+    /// Internal use background gradient setter
+    void setBackgroundGradient(Object[] backgroundGradient) {
+<span class="nc" id="L2534">        this.backgroundGradient = backgroundGradient;</span>
+<span class="nc" id="L2535">    }</span>
+
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientStartColor`: start color for the linear/radial gradient
+    ///
+    /// - `override`: @param override                     If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBackgroundGradientStartColor(int backgroundGradientStartColor, boolean override) {
+<span class="fc bfc" id="L2546" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2547" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2548">                s.setBackgroundGradientStartColor(backgroundGradientStartColor, override);</span>
+            }
+<span class="fc" id="L2550">            return;</span>
+        }
+<span class="fc bfc" id="L2552" title="All 2 branches covered.">        if (((Integer) getBackgroundGradient()[0]).intValue() != backgroundGradientStartColor) {</span>
+<span class="fc" id="L2553">            getBackgroundGradient()[0] = Integer.valueOf(backgroundGradientStartColor);</span>
+<span class="pc bpc" id="L2554" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2555">                modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;</span>
+            }
+<span class="fc" id="L2557">            firePropertyChanged(BACKGROUND_GRADIENT);</span>
+        }
+<span class="fc" id="L2559">    }</span>
+
+    /// Sets the background color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientEndColor`: end color for the linear/radial gradient
+    ///
+    /// - `override`: @param override                   If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBackgroundGradientEndColor(int backgroundGradientEndColor, boolean override) {
+<span class="fc bfc" id="L2570" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2571" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2572">                s.setBackgroundGradientEndColor(backgroundGradientEndColor, override);</span>
+            }
+<span class="fc" id="L2574">            return;</span>
+        }
+<span class="fc bfc" id="L2576" title="All 2 branches covered.">        if (((Integer) getBackgroundGradient()[1]).intValue() != backgroundGradientEndColor) {</span>
+<span class="fc" id="L2577">            getBackgroundGradient()[1] = Integer.valueOf(backgroundGradientEndColor);</span>
+<span class="pc bpc" id="L2578" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2579">                modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;</span>
+            }
+<span class="fc" id="L2581">            firePropertyChanged(BACKGROUND_GRADIENT);</span>
+        }
+<span class="fc" id="L2583">    }</span>
+
+    /// Background radial gradient relative center position X
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeX`: x position of the radial gradient center
+    ///
+    /// - `override`: @param override                    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBackgroundGradientRelativeX(float backgroundGradientRelativeX, boolean override) {
+<span class="pc bpc" id="L2594" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2595" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2596">                s.setBackgroundGradientRelativeX(backgroundGradientRelativeX, override);</span>
+            }
+<span class="nc" id="L2598">            return;</span>
+        }
+<span class="pc bpc" id="L2600" title="1 of 2 branches missed.">        if (((Float) getBackgroundGradient()[2]).floatValue() != backgroundGradientRelativeX) {</span>
+<span class="nc" id="L2601">            getBackgroundGradient()[2] = Float.valueOf(backgroundGradientRelativeX);</span>
+<span class="nc bnc" id="L2602" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L2603">                modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;</span>
+            }
+<span class="nc" id="L2605">            firePropertyChanged(BACKGROUND_GRADIENT);</span>
+        }
+<span class="fc" id="L2607">    }</span>
+
+    /// Background radial gradient relative center position Y
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeY`: y position of the radial gradient center
+    ///
+    /// - `override`: @param override                    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBackgroundGradientRelativeY(float backgroundGradientRelativeY, boolean override) {
+<span class="fc bfc" id="L2618" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2619" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2620">                s.setBackgroundGradientRelativeY(backgroundGradientRelativeY, override);</span>
+            }
+<span class="fc" id="L2622">            return;</span>
+        }
+<span class="pc bpc" id="L2624" title="1 of 2 branches missed.">        if (((Float) getBackgroundGradient()[3]).floatValue() != backgroundGradientRelativeY) {</span>
+<span class="nc" id="L2625">            getBackgroundGradient()[3] = Float.valueOf(backgroundGradientRelativeY);</span>
+<span class="nc bnc" id="L2626" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L2627">                modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;</span>
+            }
+<span class="nc" id="L2629">            firePropertyChanged(BACKGROUND_GRADIENT);</span>
+        }
+<span class="fc" id="L2631">    }</span>
+
+    /// Background radial gradient relative size
+    ///
+    /// #### Parameters
+    ///
+    /// - `backgroundGradientRelativeSize`: @param backgroundGradientRelativeSize the size of the radial gradient relative to the screens
+    /// larger dimension
+    ///
+    /// - `override`: @param override                       If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBackgroundGradientRelativeSize(float backgroundGradientRelativeSize, boolean override) {
+<span class="fc bfc" id="L2643" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2644" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2645">                s.setBackgroundGradientRelativeSize(backgroundGradientRelativeSize, override);</span>
+            }
+<span class="fc" id="L2647">            return;</span>
+        }
+<span class="fc bfc" id="L2649" title="All 2 branches covered.">        if (((Float) getBackgroundGradient()[4]).floatValue() != backgroundGradientRelativeSize) {</span>
+<span class="fc" id="L2650">            getBackgroundGradient()[4] = Float.valueOf(backgroundGradientRelativeSize);</span>
+<span class="pc bpc" id="L2651" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2652">                modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;</span>
+            }
+<span class="fc" id="L2654">            firePropertyChanged(BACKGROUND_GRADIENT);</span>
+        }
+<span class="fc" id="L2656">    }</span>
+
+    /// Extended (multi-stop / angled / conic / repeating) gradient backing
+    /// `BACKGROUND_GRADIENT_LINEAR` / `BACKGROUND_GRADIENT_RADIAL_FULL` /
+    /// `BACKGROUND_GRADIENT_CONIC` / `BACKGROUND_GRADIENT_REPEATING_*`. May
+    /// be null if this Style uses no extended gradient.
+    public Gradient getGradient() {
+<span class="nc" id="L2663">        return gradient;</span>
+    }
+
+    /// Sets the extended gradient. Pass null to clear it.
+    public void setGradient(Gradient gradient) {
+<span class="nc" id="L2668">        setGradient(gradient, false);</span>
+<span class="nc" id="L2669">    }</span>
+
+    /// Internal setter variant honoring the override flag.
+    public void setGradient(Gradient gradient, boolean override) {
+<span class="nc bnc" id="L2673" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2674" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2675">                s.setGradient(gradient, override);</span>
+            }
+<span class="nc" id="L2677">            return;</span>
+        }
+<span class="nc" id="L2679">        this.gradient = gradient;</span>
+<span class="nc bnc" id="L2680" title="All 2 branches missed.">        if (!override) {</span>
+<span class="nc" id="L2681">            modifiedFlag |= GRADIENT_MODIFIED;</span>
+        }
+<span class="nc" id="L2683">        firePropertyChanged(GRADIENT);</span>
+<span class="nc" id="L2684">    }</span>
+
+    /// CSS filter:blur() radius applied to the component's foreground (the
+    /// component itself, after it has been painted). 0 disables the filter.
+    public float getFilterBlurRadius() {
+<span class="nc" id="L2689">        return filterBlurRadius;</span>
+    }
+
+    public void setFilterBlurRadius(float radius) {
+<span class="nc" id="L2693">        setFilterBlurRadius(radius, false);</span>
+<span class="nc" id="L2694">    }</span>
+
+    public void setFilterBlurRadius(float radius, boolean override) {
+<span class="nc bnc" id="L2697" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2698" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2699">                s.setFilterBlurRadius(radius, override);</span>
+            }
+<span class="nc" id="L2701">            return;</span>
+        }
+<span class="nc bnc" id="L2703" title="All 2 branches missed.">        if (Float.compare(this.filterBlurRadius, radius) != 0) {</span>
+<span class="nc" id="L2704">            this.filterBlurRadius = radius;</span>
+<span class="nc bnc" id="L2705" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L2706">                modifiedFlag |= FILTER_BLUR_MODIFIED;</span>
+            }
+<span class="nc" id="L2708">            firePropertyChanged(FILTER_BLUR);</span>
+        }
+<span class="nc" id="L2710">    }</span>
+
+    /// CSS backdrop-filter:blur() radius applied to whatever is painted behind
+    /// the component before this component is drawn. 0 disables the filter.
+    public float getBackdropFilterBlurRadius() {
+<span class="fc" id="L2715">        return backdropFilterBlurRadius;</span>
+    }
+
+    public void setBackdropFilterBlurRadius(float radius) {
+<span class="nc" id="L2719">        setBackdropFilterBlurRadius(radius, false);</span>
+<span class="nc" id="L2720">    }</span>
+
+    public void setBackdropFilterBlurRadius(float radius, boolean override) {
+<span class="nc bnc" id="L2723" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2724" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2725">                s.setBackdropFilterBlurRadius(radius, override);</span>
+            }
+<span class="nc" id="L2727">            return;</span>
+        }
+<span class="nc bnc" id="L2729" title="All 2 branches missed.">        if (Float.compare(this.backdropFilterBlurRadius, radius) != 0) {</span>
+<span class="nc" id="L2730">            this.backdropFilterBlurRadius = radius;</span>
+<span class="nc bnc" id="L2731" title="All 2 branches missed.">            if (!override) {</span>
+<span class="nc" id="L2732">                modifiedFlag |= BACKDROP_FILTER_BLUR_MODIFIED;</span>
+            }
+<span class="nc" id="L2734">            firePropertyChanged(BACKDROP_FILTER_BLUR);</span>
+        }
+<span class="nc" id="L2736">    }</span>
+
+    /// CSS filter color-matrix: 4x5 row-major float[20] composed from
+    /// `brightness` / `contrast` / `grayscale` / `hue-rotate` / `invert` /
+    /// `opacity` / `saturate` / `sepia`. Returns null when no color filter
+    /// is active (treat as identity).
+    public float[] getFilterColorMatrix() {
+<span class="nc" id="L2743">        return filterColorMatrix;</span>
+    }
+
+    public void setFilterColorMatrix(float[] matrix) {
+<span class="nc" id="L2747">        setFilterColorMatrix(matrix, false);</span>
+<span class="nc" id="L2748">    }</span>
+
+    public void setFilterColorMatrix(float[] matrix, boolean override) {
+<span class="nc bnc" id="L2751" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2752" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2753">                s.setFilterColorMatrix(matrix, override);</span>
+            }
+<span class="nc" id="L2755">            return;</span>
+        }
+<span class="nc" id="L2757">        this.filterColorMatrix = matrix;</span>
+<span class="nc bnc" id="L2758" title="All 2 branches missed.">        if (!override) {</span>
+<span class="nc" id="L2759">            modifiedFlag |= FILTER_COLOR_MATRIX_MODIFIED;</span>
+        }
+<span class="nc" id="L2761">        firePropertyChanged(FILTER_COLOR_MATRIX);</span>
+<span class="nc" id="L2762">    }</span>
+
+    /// CSS backdrop-filter color-matrix; same layout as `filterColorMatrix`
+    /// but applied to whatever is painted behind the component.
+    public float[] getBackdropFilterColorMatrix() {
+<span class="nc" id="L2767">        return backdropFilterColorMatrix;</span>
+    }
+
+    public void setBackdropFilterColorMatrix(float[] matrix) {
+<span class="nc" id="L2771">        setBackdropFilterColorMatrix(matrix, false);</span>
+<span class="nc" id="L2772">    }</span>
+
+    public void setBackdropFilterColorMatrix(float[] matrix, boolean override) {
+<span class="nc bnc" id="L2775" title="All 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2776" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2777">                s.setBackdropFilterColorMatrix(matrix, override);</span>
+            }
+<span class="nc" id="L2779">            return;</span>
+        }
+<span class="nc" id="L2781">        this.backdropFilterColorMatrix = matrix;</span>
+<span class="nc bnc" id="L2782" title="All 2 branches missed.">        if (!override) {</span>
+<span class="nc" id="L2783">            modifiedFlag |= BACKDROP_FILTER_COLOR_MATRIX_MODIFIED;</span>
+        }
+<span class="nc" id="L2785">        firePropertyChanged(BACKDROP_FILTER_COLOR_MATRIX);</span>
+<span class="nc" id="L2786">    }</span>
+
+    /// Returns true when the backgroundType requires the extended gradient
+    /// descriptor (i.e. legacy 2-color start/end accessors are not sufficient).
+    public boolean isExtendedGradientBackground() {
+<span class="nc bnc" id="L2791" title="All 2 branches missed.">        switch (backgroundType) {</span>
+            case BACKGROUND_GRADIENT_LINEAR:
+            case BACKGROUND_GRADIENT_RADIAL_FULL:
+            case BACKGROUND_GRADIENT_CONIC:
+            case BACKGROUND_GRADIENT_REPEATING_LINEAR:
+            case BACKGROUND_GRADIENT_REPEATING_RADIAL:
+<span class="nc" id="L2797">                return true;</span>
+            default:
+<span class="nc" id="L2799">                return false;</span>
+        }
+    }
+
+    /// Sets the foreground color for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgColor`: foreground color
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public final void setFgColor(int fgColor, boolean override) {
+<span class="fc bfc" id="L2812" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2813" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2814">                s.setFgColor(fgColor, override);</span>
+            }
+<span class="fc" id="L2816">            return;</span>
+        }
+<span class="fc bfc" id="L2818" title="All 2 branches covered.">        if (this.fgColor != fgColor) {</span>
+<span class="fc" id="L2819">            this.fgColor = fgColor;</span>
+<span class="pc bpc" id="L2820" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2821">                modifiedFlag |= FG_COLOR_MODIFIED;</span>
+            }
+<span class="fc" id="L2823">            firePropertyChanged(FG_COLOR);</span>
+        }
+<span class="fc" id="L2825">    }</span>
+
+    /// Sets the foreground alpha for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `fgAlpha`: foreground alpha
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setFgAlpha(int fgAlpha, boolean override) {
+<span class="pc bpc" id="L2836" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L2837" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L2838">                s.setFgAlpha(fgAlpha, override);</span>
+            }
+<span class="nc" id="L2840">            return;</span>
+        }
+<span class="fc bfc" id="L2842" title="All 2 branches covered.">        if (this.fgAlpha != fgAlpha) {</span>
+<span class="fc" id="L2843">            this.fgAlpha = fgAlpha;</span>
+<span class="pc bpc" id="L2844" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2845">                modifiedFlag |= FG_ALPHA_MODIFIED;</span>
+            }
+<span class="fc" id="L2847">            firePropertyChanged(FG_ALPHA);</span>
+        }
+<span class="fc" id="L2849">    }</span>
+
+    /// Sets the font for the component
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: the font
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setFont(Font font, boolean override) {
+<span class="fc bfc" id="L2860" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2861" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2862">                s.setFont(font, override);</span>
+            }
+<span class="fc" id="L2864">            return;</span>
+        }
+<span class="pc bpc" id="L2866" title="4 of 6 branches missed.">        if (this.font == null &amp;&amp; font != null ||</span>
+<span class="fc bfc" id="L2867" title="All 2 branches covered.">                (this.font != null &amp;&amp; !this.font.equals(font))) {</span>
+<span class="fc" id="L2868">            this.font = font;</span>
+<span class="pc bpc" id="L2869" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2870">                modifiedFlag |= FONT_MODIFIED;</span>
+            }
+<span class="fc" id="L2872">            firePropertyChanged(FONT);</span>
+        }
+<span class="fc" id="L2874">    }</span>
+
+    /// Sets the Component transparency level. Valid values should be a
+    /// number between 0-255
+    ///
+    /// #### Parameters
+    ///
+    /// - `transparency`: int value between 0-255
+    ///
+    /// - `override`: @param override     If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBgTransparency(int transparency, boolean override) {
+<span class="fc bfc" id="L2886" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2887" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2888">                s.setBgTransparency(transparency, override);</span>
+            }
+<span class="fc" id="L2890">            return;</span>
+        }
+<span class="pc bpc" id="L2892" title="2 of 4 branches missed.">        if (transparency &lt; 0 || transparency &gt; 255) {</span>
+<span class="nc" id="L2893">            throw new IllegalArgumentException(&quot;valid values are between 0-255&quot;);</span>
+        }
+<span class="fc bfc" id="L2895" title="All 2 branches covered.">        if (this.transparency != (byte) transparency) {</span>
+<span class="fc" id="L2896">            this.transparency = (byte) transparency;</span>
+
+<span class="pc bpc" id="L2898" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2899">                modifiedFlag |= TRANSPARENCY_MODIFIED;</span>
+            }
+<span class="fc" id="L2901">            firePropertyChanged(TRANSPARENCY);</span>
+        }
+<span class="fc" id="L2903">    }</span>
+
+    /// Sets the Style Padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of pixels to pad the orientation
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setPadding(int orientation, int gap, boolean override) {
+<span class="fc" id="L2916">        setPadding(orientation, (float) gap, override);</span>
+<span class="fc" id="L2917">    }</span>
+
+    /// Sets the Style Padding
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of pixels to pad the orientation
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setPadding(int orientation, float gap, boolean override) {
+<span class="fc bfc" id="L2930" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2931" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2932">                s.setPadding(orientation, gap, override);</span>
+            }
+<span class="fc" id="L2934">            return;</span>
+        }
+<span class="pc bpc" id="L2936" title="2 of 4 branches missed.">        if (orientation &lt; Component.TOP || orientation &gt; Component.RIGHT) {</span>
+<span class="nc" id="L2937">            throw new IllegalArgumentException(&quot;wrong orientation &quot; + orientation);</span>
+        }
+<span class="pc bpc" id="L2939" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L2940">            throw new IllegalArgumentException(&quot;padding cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L2942" title="All 2 branches covered.">        if (padding[orientation] != gap) {</span>
+<span class="fc" id="L2943">            padding[orientation] = gap;</span>
+
+<span class="pc bpc" id="L2945" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2946">                modifiedFlag |= PADDING_MODIFIED;</span>
+            }
+<span class="fc" id="L2948">            firePropertyChanged(PADDING);</span>
+        }
+<span class="fc" id="L2950">    }</span>
+
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setMargin(int orientation, int gap, boolean override) {
+<span class="fc" id="L2963">        setMargin(orientation, (float) gap, override);</span>
+<span class="fc" id="L2964">    }</span>
+
+    /// Sets the Style Margin
+    ///
+    /// #### Parameters
+    ///
+    /// - `orientation`: one of: Component.TOP, Component.BOTTOM, Component.LEFT, Component.RIGHT
+    ///
+    /// - `gap`: number of margin using the current unit
+    ///
+    /// - `override`: @param override    If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setMargin(int orientation, float gap, boolean override) {
+<span class="fc bfc" id="L2977" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L2978" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L2979">                s.setMargin(orientation, gap, override);</span>
+            }
+<span class="fc" id="L2981">            return;</span>
+        }
+<span class="pc bpc" id="L2983" title="2 of 4 branches missed.">        if (orientation &lt; Component.TOP || orientation &gt; Component.RIGHT) {</span>
+<span class="nc" id="L2984">            throw new IllegalArgumentException(&quot;wrong orientation &quot; + orientation);</span>
+        }
+<span class="pc bpc" id="L2986" title="1 of 2 branches missed.">        if (gap &lt; 0) {</span>
+<span class="nc" id="L2987">            throw new IllegalArgumentException(&quot;margin cannot be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L2989" title="All 2 branches covered.">        if (margin[orientation] != gap) {</span>
+<span class="fc" id="L2990">            margin[orientation] = gap;</span>
+<span class="pc bpc" id="L2991" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L2992">                modifiedFlag |= MARGIN_MODIFIED;</span>
+            }
+<span class="fc" id="L2994">            firePropertyChanged(MARGIN);</span>
+        }
+<span class="fc" id="L2996">    }</span>
+
+    /// Checks to see if change events are currently suppressed.
+    ///
+    /// #### Returns
+    ///
+    /// True if change events are suppressed.
+    ///
+    public boolean isSuppressChangeEvents() {
+<span class="nc" id="L3005">        return suppressChangeEvents;</span>
+    }
+
+    /// Enables or disables events.  Use this to temporarily suppress change events.
+    ///
+    /// #### Parameters
+    ///
+    /// - `suppress`: True to suppress change events.
+    ///
+    public void setSuppressChangeEvents(boolean suppress) {
+<span class="nc" id="L3015">        this.suppressChangeEvents = suppress;</span>
+<span class="nc" id="L3016">    }</span>
+
+    private void firePropertyChanged(String propertName) {
+<span class="fc" id="L3019">        roundRectCache = null;</span>
+<span class="pc bpc" id="L3020" title="1 of 4 branches missed.">        if (listeners == null || suppressChangeEvents) {</span>
+<span class="fc" id="L3021">            return;</span>
+        }
+<span class="fc" id="L3023">        listeners.fireStyleChangeEvent(propertName, this);</span>
+<span class="fc" id="L3024">    }</span>
+
+    /// Adds a Style Listener to the Style Object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: a style listener
+    public void addStyleListener(StyleListener l) {
+<span class="pc bpc" id="L3032" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L3033" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L3034">                s.addStyleListener(l);</span>
+            }
+<span class="nc" id="L3036">            return;</span>
+        }
+<span class="fc bfc" id="L3038" title="All 2 branches covered.">        if (listeners == null) {</span>
+<span class="fc" id="L3039">            listeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L3041">        listeners.addListener(l);</span>
+<span class="fc" id="L3042">    }</span>
+
+    /// Removes a Style Listener from the Style Object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: a style listener
+    public void removeStyleListener(StyleListener l) {
+<span class="pc bpc" id="L3050" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L3051" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L3052">                s.removeStyleListener(l);</span>
+            }
+<span class="nc" id="L3054">            return;</span>
+        }
+<span class="pc bpc" id="L3056" title="1 of 2 branches missed.">        if (listeners != null) {</span>
+<span class="fc" id="L3057">            listeners.removeListener(l);</span>
+        }
+<span class="fc" id="L3059">    }</span>
+
+    /// This method removes all Listeners from the Style
+    public void removeListeners() {
+<span class="pc bpc" id="L3063" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L3064" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L3065">                s.removeListeners();</span>
+            }
+<span class="nc" id="L3067">            return;</span>
+        }
+<span class="pc bpc" id="L3069" title="1 of 2 branches missed.">        if (listeners != null) {</span>
+<span class="fc" id="L3070">            listeners = null;</span>
+        }
+<span class="fc" id="L3072">    }</span>
+
+    void resetModifiedFlag() {
+<span class="fc" id="L3075">        modifiedFlag = 0;</span>
+<span class="fc" id="L3076">    }</span>
+
+    /// Sets the border for the style
+    ///
+    /// #### Parameters
+    ///
+    /// - `border`: new border object for the component
+    ///
+    /// - `override`: @param override If set to true allows the look and feel/theme to override
+    /// the value in this attribute when changing a theme/look and feel
+    public void setBorder(Border border, boolean override) {
+<span class="fc bfc" id="L3087" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L3088" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3089">                s.setBorder(border, override);</span>
+            }
+<span class="fc" id="L3091">            return;</span>
+        }
+<span class="fc bfc" id="L3093" title="All 6 branches covered.">        if ((this.border == null &amp;&amp; border != null) ||</span>
+<span class="pc bpc" id="L3094" title="1 of 2 branches missed.">                (this.border != null &amp;&amp; !this.border.equals(border))) {</span>
+<span class="fc" id="L3095">            this.border = border;</span>
+<span class="pc bpc" id="L3096" title="1 of 2 branches missed.">            if (!override) {</span>
+<span class="fc" id="L3097">                modifiedFlag |= BORDER_MODIFIED;</span>
+            }
+<span class="fc" id="L3099">            firePropertyChanged(BORDER);</span>
+        }
+<span class="fc" id="L3101">    }</span>
+
+    /// Returns the border for the style
+    ///
+    /// #### Returns
+    ///
+    /// the border
+    public Border getBorder() {
+<span class="fc" id="L3109">        return border;</span>
+    }
+
+    /// Sets the border for the style
+    ///
+    /// #### Parameters
+    ///
+    /// - `border`: new border object for the component
+    public void setBorder(Border border) {
+<span class="fc" id="L3118">        setBorder(border, false);</span>
+<span class="fc" id="L3119">    }</span>
+
+    /// Return the background painter for this style, normally this would be
+    /// the internal image/color painter but can be user defined
+    ///
+    /// #### Returns
+    ///
+    /// the background painter
+    public Painter getBgPainter() {
+<span class="fc" id="L3128">        return bgPainter;</span>
+    }
+
+    /// Defines the background painter for this style, normally this would be
+    /// the internal image/color painter but can be user defined
+    ///
+    /// #### Parameters
+    ///
+    /// - `bgPainter`: new painter to install into the style
+    public void setBgPainter(Painter bgPainter) {
+<span class="pc bpc" id="L3138" title="1 of 2 branches missed.">        if (proxyTo != null) {</span>
+<span class="nc bnc" id="L3139" title="All 2 branches missed.">            for (Style s : proxyTo) {</span>
+<span class="nc" id="L3140">                s.setBgPainter(bgPainter);</span>
+            }
+<span class="nc" id="L3142">            return;</span>
+        }
+<span class="fc" id="L3144">        this.bgPainter = bgPainter;</span>
+<span class="fc" id="L3145">        firePropertyChanged(PAINTER);</span>
+<span class="fc" id="L3146">    }</span>
+
+    /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Returns
+    ///
+    /// the paddingUnit
+    public byte[] getPaddingUnit() {
+<span class="fc" id="L3156">        return paddingUnit;</span>
+    }
+
+    /// Indicates the units used for padding elements, if null pixels are used if not this is a 4 element array containing values
+    /// of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paddingUnit`: the paddingUnit to set
+    public void setPaddingUnit(byte... paddingUnit) {
+<span class="fc bfc" id="L3167" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="pc bpc" id="L3168" title="1 of 4 branches missed.">            if (paddingUnit != null &amp;&amp; paddingUnit.length &lt; 4) {</span>
+<span class="fc" id="L3169">                paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};</span>
+            }
+<span class="fc bfc" id="L3171" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3172">                s.setPaddingUnit(paddingUnit);</span>
+            }
+<span class="fc" id="L3174">            return;</span>
+        }
+<span class="fc bfc" id="L3176" title="All 4 branches covered.">        if (paddingUnit != null &amp;&amp; paddingUnit.length &lt; 4) {</span>
+<span class="fc" id="L3177">            this.paddingUnit = new byte[]{paddingUnit[0], paddingUnit[0], paddingUnit[0], paddingUnit[0]};</span>
+        } else {
+<span class="fc bfc" id="L3179" title="All 2 branches covered.">            if (paddingUnit == null) {</span>
+<span class="fc" id="L3180">                this.paddingUnit = null;</span>
+            } else {
+<span class="fc bfc" id="L3182" title="All 2 branches covered.">                if (this.paddingUnit == null) {</span>
+<span class="fc" id="L3183">                    this.paddingUnit = new byte[4];</span>
+                }
+<span class="fc" id="L3185">                System.arraycopy(paddingUnit, 0, this.paddingUnit, 0, 4);</span>
+            }
+        }
+<span class="fc" id="L3188">    }</span>
+
+    /// Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Returns
+    ///
+    /// the marginUnit
+    public byte[] getMarginUnit() {
+<span class="fc" id="L3198">        return marginUnit;</span>
+    }
+
+    /// Indicates the units used for margin elements, if null pixels are used if not this is a 4 element array containing values
+    /// of of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// * `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `marginUnit`: the marginUnit to set
+    public void setMarginUnit(byte... marginUnit) {
+<span class="fc bfc" id="L3209" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="pc bpc" id="L3210" title="1 of 4 branches missed.">            if (marginUnit != null &amp;&amp; marginUnit.length &lt; 4) {</span>
+<span class="fc" id="L3211">                marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};</span>
+            }
+<span class="fc bfc" id="L3213" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3214">                s.setMarginUnit(marginUnit);</span>
+            }
+<span class="fc" id="L3216">            return;</span>
+        }
+<span class="pc bpc" id="L3218" title="1 of 4 branches missed.">        if (marginUnit != null &amp;&amp; marginUnit.length &lt; 4) {</span>
+<span class="nc" id="L3219">            this.marginUnit = new byte[]{marginUnit[0], marginUnit[0], marginUnit[0], marginUnit[0]};</span>
+        } else {
+<span class="fc bfc" id="L3221" title="All 2 branches covered.">            if (marginUnit == null) {</span>
+<span class="fc" id="L3222">                this.marginUnit = null;</span>
+            } else {
+<span class="fc bfc" id="L3224" title="All 2 branches covered.">                if (this.marginUnit == null) {</span>
+<span class="fc" id="L3225">                    this.marginUnit = new byte[4];</span>
+                }
+<span class="fc" id="L3227">                System.arraycopy(marginUnit, 0, this.marginUnit, 0, 4);</span>
+            }
+        }
+<span class="fc" id="L3230">    }</span>
+
+    private void initMarginUnits() {
+<span class="fc bfc" id="L3233" title="All 2 branches covered.">        if (marginUnit == null) {</span>
+<span class="fc" id="L3234">            marginUnit = new byte[]{UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS, UNIT_TYPE_PIXELS};</span>
+        }
+<span class="fc" id="L3236">    }</span>
+
+    /// Sets left margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setMarginUnitLeft(byte unit) {
+<span class="fc bfc" id="L3246" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L3247" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3248">                s.setMarginUnitLeft(unit);</span>
+            }
+<span class="fc" id="L3250">            return;</span>
+        }
+<span class="fc" id="L3252">        initMarginUnits();</span>
+<span class="fc" id="L3253">        marginUnit[Component.LEFT] = unit;</span>
+<span class="fc" id="L3254">    }</span>
+
+    /// Sets right margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setMarginUnitRight(byte unit) {
+<span class="fc bfc" id="L3264" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L3265" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3266">                s.setMarginUnitRight(unit);</span>
+            }
+<span class="fc" id="L3268">            return;</span>
+        }
+<span class="fc" id="L3270">        initMarginUnits();</span>
+<span class="fc" id="L3271">        marginUnit[Component.RIGHT] = unit;</span>
+<span class="fc" id="L3272">    }</span>
+
+    /// Sets top margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setMarginUnitTop(byte unit) {
+<span class="fc bfc" id="L3282" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L3283" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3284">                s.setMarginUnitTop(unit);</span>
+            }
+<span class="fc" id="L3286">            return;</span>
+        }
+<span class="fc" id="L3288">        initMarginUnits();</span>
+<span class="fc" id="L3289">        marginUnit[Component.TOP] = unit;</span>
+<span class="fc" id="L3290">    }</span>
+
+    /// Sets bottom margin unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: @param unit One of `#UNIT_TYPE_PIXELS`, `#UNIT_TYPE_DIPS`, `#UNIT_TYPE_SCREEN_PERCENTAGE`, `#UNIT_TYPE_VW`, `#UNIT_TYPE_VH`,
+    /// `#UNIT_TYPE_VMIN`, `#UNIT_TYPE_VMAX`, `#UNIT_TYPE_REM`.
+    ///
+    public void setMarginUnitBottom(byte unit) {
+<span class="fc bfc" id="L3300" title="All 2 branches covered.">        if (proxyTo != null) {</span>
+<span class="fc bfc" id="L3301" title="All 2 branches covered.">            for (Style s : proxyTo) {</span>
+<span class="fc" id="L3302">                s.setMarginUnitBottom(unit);</span>
+            }
+<span class="fc" id="L3304">            return;</span>
+        }
+<span class="fc" id="L3306">        initMarginUnits();</span>
+<span class="fc" id="L3307">        marginUnit[Component.BOTTOM] = unit;</span>
+<span class="fc" id="L3308">    }</span>
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L3312" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L3313">            return false;</span>
+        }
+<span class="nc bnc" id="L3315" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L3316">            return false;</span>
+        }
+<span class="nc" id="L3318">        final Style other = (Style) obj;</span>
+<span class="nc bnc" id="L3319" title="All 2 branches missed.">        if (this.fgColor != other.fgColor) {</span>
+<span class="nc" id="L3320">            return false;</span>
+        }
+<span class="nc bnc" id="L3322" title="All 2 branches missed.">        if (this.fgAlpha != other.fgAlpha) {</span>
+<span class="nc" id="L3323">            return false;</span>
+        }
+<span class="nc bnc" id="L3325" title="All 2 branches missed.">        if (this.bgColor != other.bgColor) {</span>
+<span class="nc" id="L3326">            return false;</span>
+        }
+<span class="nc bnc" id="L3328" title="All 2 branches missed.">        if (!Objects.equals(this.font, other.font)) {</span>
+<span class="nc" id="L3329">            return false;</span>
+        }
+<span class="nc bnc" id="L3331" title="All 2 branches missed.">        if (!Objects.equals(this.bgImage, other.bgImage)) {</span>
+<span class="nc" id="L3332">            return false;</span>
+        }
+<span class="nc bnc" id="L3334" title="All 2 branches missed.">        if (!Objects.deepEquals(this.padding, other.padding)) {</span>
+<span class="nc" id="L3335">            return false;</span>
+        }
+<span class="nc bnc" id="L3337" title="All 2 branches missed.">        if (!Objects.deepEquals(this.margin, other.margin)) {</span>
+<span class="nc" id="L3338">            return false;</span>
+        }
+<span class="nc bnc" id="L3340" title="All 2 branches missed.">        if (!Objects.deepEquals(this.paddingUnit, other.paddingUnit)) {</span>
+<span class="nc" id="L3341">            return false;</span>
+        }
+<span class="nc bnc" id="L3343" title="All 2 branches missed.">        if (!Objects.deepEquals(this.marginUnit, other.marginUnit)) {</span>
+<span class="nc" id="L3344">            return false;</span>
+        }
+<span class="nc bnc" id="L3346" title="All 2 branches missed.">        if (this.transparency != other.transparency) {</span>
+<span class="nc" id="L3347">            return false;</span>
+        }
+<span class="nc bnc" id="L3349" title="All 2 branches missed.">        if (this.opacity != other.opacity) {</span>
+<span class="nc" id="L3350">            return false;</span>
+        }
+<span class="nc bnc" id="L3352" title="All 2 branches missed.">        if (this.backgroundType != other.backgroundType) {</span>
+<span class="nc" id="L3353">            return false;</span>
+        }
+<span class="nc bnc" id="L3355" title="All 2 branches missed.">        if (this.backgroundAlignment != other.backgroundAlignment) {</span>
+<span class="nc" id="L3356">            return false;</span>
+        }
+<span class="nc bnc" id="L3358" title="All 2 branches missed.">        if (!Objects.deepEquals(this.backgroundGradient,</span>
+                other.backgroundGradient)) {
+<span class="nc" id="L3360">            return false;</span>
+        }
+<span class="nc bnc" id="L3362" title="All 2 branches missed.">        if (!Objects.equals(this.border, other.border)) {</span>
+<span class="nc" id="L3363">            return false;</span>
+        }
+<span class="nc bnc" id="L3365" title="All 2 branches missed.">        if (this.align != other.align) {</span>
+<span class="nc" id="L3366">            return false;</span>
+        }
+<span class="nc bnc" id="L3368" title="All 2 branches missed.">        if (this.textDecoration != other.textDecoration) {</span>
+<span class="nc" id="L3369">            return false;</span>
+        }
+<span class="nc bnc" id="L3371" title="All 2 branches missed.">        if (this.elevation != other.elevation) {</span>
+<span class="nc" id="L3372">            return false;</span>
+        }
+<span class="nc bnc" id="L3374" title="All 2 branches missed.">        return this.surface == other.surface;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L3379">        return System.identityHashCode(this);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

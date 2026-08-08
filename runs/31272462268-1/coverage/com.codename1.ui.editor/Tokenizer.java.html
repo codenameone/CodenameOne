@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tokenizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">Tokenizer.java</span></div><h1>Tokenizer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A small, allocation light, stateful lexer for the pure code editor. It tokenizes a single line at a
+/// time given the lexer state carried over from the previous line, and returns the state to carry into
+/// the next line. This makes rehighlighting incremental: after an edit only the changed line and any
+/// following lines whose entry state changed need to be retokenized.
+///
+/// Only the spans that carry color (keyword, string, comment, number) are emitted; the gaps between them
+/// are drawn in the default text color.
+public class Tokenizer implements SyntaxHighlighter {
+    /// Token kind: a language keyword.
+    public static final int KEYWORD = SyntaxToken.KEYWORD;
+    /// Token kind: a string or character literal.
+    public static final int STRING = SyntaxToken.STRING;
+    /// Token kind: a comment.
+    public static final int COMMENT = SyntaxToken.COMMENT;
+    /// Token kind: a numeric literal.
+    public static final int NUMBER = SyntaxToken.NUMBER;
+    /// Token kind: an XML/HTML tag or a declared type.
+    public static final int TYPE = SyntaxToken.TYPE;
+    /// Token kind: an attribute name or object property.
+    public static final int PROPERTY = SyntaxToken.PROPERTY;
+
+    /// Lexer state: normal code.
+    public static final int STATE_NORMAL = 0;
+    /// Lexer state: inside a block comment that opened on a previous line.
+    public static final int STATE_BLOCK_COMMENT = 1;
+    /// Lexer state: inside a backtick template string that opened on a previous line.
+    public static final int STATE_TEMPLATE = 2;
+    /// Lexer state: inside an XML/HTML comment.
+    public static final int STATE_XML_COMMENT = 3;
+    /// Lexer state: inside a Python triple-single-quoted string.
+    public static final int STATE_TRIPLE_SINGLE = 4;
+    /// Lexer state: inside a Python triple-double-quoted string.
+    public static final int STATE_TRIPLE_DOUBLE = 5;
+    /// Lexer state: inside a CSS declaration block.
+    public static final int STATE_CSS_DECLARATION = 6;
+    /// Lexer state: inside a CSS comment opened from a declaration block.
+    public static final int STATE_CSS_COMMENT_DECLARATION = 7;
+
+    private final LanguageDef def;
+
+    /// Creates a tokenizer for the given language.
+<span class="fc" id="L70">    public Tokenizer(LanguageDef def) {</span>
+<span class="fc" id="L71">        this.def = def;</span>
+<span class="fc" id="L72">    }</span>
+
+    private static boolean isIdentStart(char c) {
+<span class="pc bpc" id="L75" title="2 of 12 branches missed.">        return (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || c == '_' || c == '$';</span>
+    }
+
+    private static boolean isIdentPart(char c) {
+<span class="fc bfc" id="L79" title="All 6 branches covered.">        return isIdentStart(c) || (c &gt;= '0' &amp;&amp; c &lt;= '9');</span>
+    }
+
+    private static boolean isDigit(char c) {
+<span class="fc bfc" id="L83" title="All 4 branches covered.">        return c &gt;= '0' &amp;&amp; c &lt;= '9';</span>
+    }
+
+    /// Tokenizes one line.
+    ///
+    /// #### Parameters
+    ///
+    /// - `line`: the line text (without its trailing newline)
+    ///
+    /// - `startState`: the lexer state carried from the previous line
+    ///
+    /// #### Returns
+    ///
+    /// the colored spans and exit state
+    @Override
+    public SyntaxHighlightResult tokenize(String line, int startState) {
+<span class="fc" id="L99">        List&lt;SyntaxToken&gt; tokens = new ArrayList&lt;SyntaxToken&gt;();</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (def.isPlain()) {</span>
+<span class="nc" id="L101">            return new SyntaxHighlightResult(tokens, STATE_NORMAL);</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (def.getGrammar() == LanguageDef.XML_GRAMMAR) {</span>
+<span class="fc" id="L104">            return tokenizeXml(line, startState);</span>
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (def.getGrammar() == LanguageDef.CSS_GRAMMAR) {</span>
+<span class="fc" id="L107">            return tokenizeCss(line, startState);</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (def.getGrammar() == LanguageDef.JSON_GRAMMAR) {</span>
+<span class="fc" id="L110">            return tokenizeJson(line);</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (def.getGrammar() == LanguageDef.PYTHON_GRAMMAR) {</span>
+<span class="fc" id="L113">            return tokenizePython(line, startState);</span>
+        }
+<span class="fc" id="L115">        int n = line.length();</span>
+<span class="fc" id="L116">        int i = 0;</span>
+<span class="fc" id="L117">        int state = startState;</span>
+
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (state == STATE_BLOCK_COMMENT) {</span>
+<span class="nc" id="L120">            int end = indexOfClose(line, 0, &quot;*/&quot;);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                if (n &gt; 0) {</span>
+<span class="nc" id="L123">                    tokens.add(new SyntaxToken(0, n, COMMENT));</span>
+                }
+<span class="nc" id="L125">                return new SyntaxHighlightResult(tokens, STATE_BLOCK_COMMENT);</span>
+            }
+<span class="nc" id="L127">            tokens.add(new SyntaxToken(0, end + 2, COMMENT));</span>
+<span class="nc" id="L128">            i = end + 2;</span>
+<span class="nc" id="L129">            state = STATE_NORMAL;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        } else if (state == STATE_TEMPLATE) {</span>
+<span class="nc" id="L131">            int end = scanTemplate(line, 0);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                if (n &gt; 0) {</span>
+<span class="nc" id="L134">                    tokens.add(new SyntaxToken(0, n, STRING));</span>
+                }
+<span class="nc" id="L136">                return new SyntaxHighlightResult(tokens, STATE_TEMPLATE);</span>
+            }
+<span class="nc" id="L138">            tokens.add(new SyntaxToken(0, end + 1, STRING));</span>
+<span class="nc" id="L139">            i = end + 1;</span>
+<span class="nc" id="L140">            state = STATE_NORMAL;</span>
+        }
+
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L144">            char c = line.charAt(i);</span>
+            // line comment
+<span class="pc bpc" id="L146" title="6 of 8 branches missed.">            if (def.hasLineCommentSlash() &amp;&amp; c == '/' &amp;&amp; i + 1 &lt; n &amp;&amp; line.charAt(i + 1) == '/') {</span>
+<span class="nc" id="L147">                tokens.add(new SyntaxToken(i, n - i, COMMENT));</span>
+<span class="nc" id="L148">                break;</span>
+            }
+<span class="pc bpc" id="L150" title="3 of 4 branches missed.">            if (def.hasLineCommentHash() &amp;&amp; c == '#') {</span>
+<span class="nc" id="L151">                tokens.add(new SyntaxToken(i, n - i, COMMENT));</span>
+<span class="nc" id="L152">                break;</span>
+            }
+            // block comment
+<span class="pc bpc" id="L155" title="6 of 8 branches missed.">            if (def.hasBlockComment() &amp;&amp; c == '/' &amp;&amp; i + 1 &lt; n &amp;&amp; line.charAt(i + 1) == '*') {</span>
+<span class="nc" id="L156">                int end = indexOfClose(line, i + 2, &quot;*/&quot;);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="nc" id="L158">                    tokens.add(new SyntaxToken(i, n - i, COMMENT));</span>
+<span class="nc" id="L159">                    return new SyntaxHighlightResult(tokens, STATE_BLOCK_COMMENT);</span>
+                }
+<span class="nc" id="L161">                tokens.add(new SyntaxToken(i, end + 2 - i, COMMENT));</span>
+<span class="nc" id="L162">                i = end + 2;</span>
+<span class="nc" id="L163">                continue;</span>
+            }
+            // template string
+<span class="pc bpc" id="L166" title="3 of 4 branches missed.">            if (def.hasTemplateString() &amp;&amp; c == '`') {</span>
+<span class="nc" id="L167">                int end = scanTemplate(line, i + 1);</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="nc" id="L169">                    tokens.add(new SyntaxToken(i, n - i, STRING));</span>
+<span class="nc" id="L170">                    return new SyntaxHighlightResult(tokens, STATE_TEMPLATE);</span>
+                }
+<span class="nc" id="L172">                tokens.add(new SyntaxToken(i, end + 1 - i, STRING));</span>
+<span class="nc" id="L173">                i = end + 1;</span>
+<span class="nc" id="L174">                continue;</span>
+            }
+            // string / char literal
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">            if (c == '&quot;' || c == '\'') {</span>
+<span class="nc" id="L178">                int end = scanString(line, i + 1, c);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                int stop = end &lt; 0 ? n : end + 1;</span>
+<span class="nc" id="L180">                tokens.add(new SyntaxToken(i, stop - i, STRING));</span>
+<span class="nc" id="L181">                i = stop;</span>
+<span class="nc" id="L182">                continue;</span>
+            }
+            // number
+<span class="pc bpc" id="L185" title="3 of 8 branches missed.">            if (isDigit(c) || (c == '.' &amp;&amp; i + 1 &lt; n &amp;&amp; isDigit(line.charAt(i + 1)))) {</span>
+<span class="fc" id="L186">                int j = scanNumber(line, i);</span>
+<span class="fc" id="L187">                tokens.add(new SyntaxToken(i, j - i, NUMBER));</span>
+<span class="fc" id="L188">                i = j;</span>
+<span class="fc" id="L189">                continue;</span>
+            }
+            // identifier / keyword
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (isIdentStart(c)) {</span>
+<span class="fc" id="L193">                int j = i + 1;</span>
+<span class="fc bfc" id="L194" title="All 4 branches covered.">                while (j &lt; n &amp;&amp; isIdentPart(line.charAt(j))) {</span>
+<span class="fc" id="L195">                    j++;</span>
+                }
+<span class="fc" id="L197">                String word = line.substring(i, j);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                if (def.isKeyword(word)) {</span>
+<span class="fc" id="L199">                    tokens.add(new SyntaxToken(i, j - i, KEYWORD));</span>
+                }
+<span class="fc" id="L201">                i = j;</span>
+<span class="fc" id="L202">                continue;</span>
+            }
+<span class="fc" id="L204">            i++;</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">        return new SyntaxHighlightResult(tokens, state);</span>
+    }
+
+    private static int scanNumber(String line, int start) {
+<span class="fc" id="L210">        int n = line.length();</span>
+<span class="fc" id="L211">        int i = start;</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (line.charAt(i) == '.') {</span>
+<span class="nc" id="L213">            i++;</span>
+<span class="nc bnc" id="L214" title="All 6 branches missed.">            while (i &lt; n &amp;&amp; (isDigit(line.charAt(i)) || line.charAt(i) == '_')) {</span>
+<span class="nc" id="L215">                i++;</span>
+            }
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        } else if (i + 1 &lt; n &amp;&amp; line.charAt(i) == '0'</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">                &amp;&amp; (line.charAt(i + 1) == 'x' || line.charAt(i + 1) == 'X'</span>
+<span class="pc bpc" id="L219" title="3 of 4 branches missed.">                || line.charAt(i + 1) == 'b' || line.charAt(i + 1) == 'B')) {</span>
+<span class="pc bpc" id="L220" title="3 of 4 branches missed.">            boolean binary = line.charAt(i + 1) == 'b' || line.charAt(i + 1) == 'B';</span>
+<span class="fc" id="L221">            i += 2;</span>
+<span class="pc bpc" id="L222" title="2 of 8 branches missed.">            while (i &lt; n &amp;&amp; ((binary ? line.charAt(i) == '0' || line.charAt(i) == '1'</span>
+<span class="pc bpc" id="L223" title="3 of 4 branches missed.">                    : Character.digit(line.charAt(i), 16) &gt;= 0) || line.charAt(i) == '_')) {</span>
+<span class="fc" id="L224">                i++;</span>
+            }
+<span class="fc" id="L226">        } else {</span>
+<span class="pc bpc" id="L227" title="2 of 6 branches missed.">            while (i &lt; n &amp;&amp; (isDigit(line.charAt(i)) || line.charAt(i) == '_')) {</span>
+<span class="fc" id="L228">                i++;</span>
+            }
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">            if (i &lt; n &amp;&amp; line.charAt(i) == '.') {</span>
+<span class="nc" id="L231">                i++;</span>
+<span class="nc bnc" id="L232" title="All 6 branches missed.">                while (i &lt; n &amp;&amp; (isDigit(line.charAt(i)) || line.charAt(i) == '_')) {</span>
+<span class="nc" id="L233">                    i++;</span>
+                }
+            }
+<span class="pc bpc" id="L236" title="3 of 6 branches missed.">            if (i &lt; n &amp;&amp; (line.charAt(i) == 'e' || line.charAt(i) == 'E')) {</span>
+<span class="nc" id="L237">                int exponent = i++;</span>
+<span class="nc bnc" id="L238" title="All 6 branches missed.">                if (i &lt; n &amp;&amp; (line.charAt(i) == '+' || line.charAt(i) == '-')) {</span>
+<span class="nc" id="L239">                    i++;</span>
+                }
+<span class="nc" id="L241">                int digits = i;</span>
+<span class="nc bnc" id="L242" title="All 6 branches missed.">                while (i &lt; n &amp;&amp; (isDigit(line.charAt(i)) || line.charAt(i) == '_')) {</span>
+<span class="nc" id="L243">                    i++;</span>
+                }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                if (digits == i) {</span>
+<span class="nc" id="L246">                    i = exponent;</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L250" title="2 of 4 branches missed.">        while (i &lt; n &amp;&amp; &quot;fFdDlLuU&quot;.indexOf(line.charAt(i)) &gt;= 0) {</span>
+<span class="nc" id="L251">            i++;</span>
+        }
+<span class="fc" id="L253">        return i;</span>
+    }
+
+    private SyntaxHighlightResult tokenizeJson(String line) {
+<span class="fc" id="L257">        List&lt;SyntaxToken&gt; tokens = new ArrayList&lt;SyntaxToken&gt;();</span>
+<span class="fc" id="L258">        int i = 0;</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        while (i &lt; line.length()) {</span>
+<span class="fc" id="L260">            char c = line.charAt(i);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L262">                int end = scanString(line, i + 1, '&quot;');</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                int stop = end &lt; 0 ? line.length() : end + 1;</span>
+<span class="fc" id="L264">                int j = stop;</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">                while (j &lt; line.length() &amp;&amp; Character.isWhitespace(line.charAt(j))) {</span>
+<span class="nc" id="L266">                    j++;</span>
+                }
+<span class="pc bpc" id="L268" title="2 of 4 branches missed.">                tokens.add(new SyntaxToken(i, stop - i, j &lt; line.length() &amp;&amp; line.charAt(j) == ':' ? PROPERTY : STRING));</span>
+<span class="fc" id="L269">                i = stop;</span>
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">            } else if (c == '-' || isDigit(c)) {</span>
+<span class="fc" id="L271">                int start = i++;</span>
+<span class="pc bpc" id="L272" title="2 of 6 branches missed.">                if (c == '-' &amp;&amp; (i &gt;= line.length() || !isDigit(line.charAt(i)))) {</span>
+<span class="fc" id="L273">                    continue;</span>
+                }
+<span class="fc" id="L275">                i = scanJsonNumber(line, start);</span>
+<span class="fc" id="L276">                tokens.add(new SyntaxToken(start, i - start, NUMBER));</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            } else if (isIdentStart(c)) {</span>
+<span class="fc" id="L278">                int start = i++;</span>
+<span class="pc bpc" id="L279" title="1 of 4 branches missed.">                while (i &lt; line.length() &amp;&amp; isIdentPart(line.charAt(i))) {</span>
+<span class="fc" id="L280">                    i++;</span>
+                }
+<span class="fc bfc" id="L282" title="All 2 branches covered.">                if (def.isKeyword(line.substring(start, i))) {</span>
+<span class="fc" id="L283">                    tokens.add(new SyntaxToken(start, i - start, KEYWORD));</span>
+                }
+<span class="fc" id="L285">            } else {</span>
+<span class="fc" id="L286">                i++;</span>
+            }
+<span class="fc" id="L288">        }</span>
+<span class="fc" id="L289">        return new SyntaxHighlightResult(tokens, STATE_NORMAL);</span>
+    }
+
+    private static int scanJsonNumber(String line, int start) {
+<span class="fc" id="L293">        int i = start;</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        if (i &lt; line.length() &amp;&amp; line.charAt(i) == '-') {</span>
+<span class="fc" id="L295">            i++;</span>
+        }
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">        while (i &lt; line.length() &amp;&amp; isDigit(line.charAt(i))) {</span>
+<span class="fc" id="L298">            i++;</span>
+        }
+<span class="pc bpc" id="L300" title="2 of 4 branches missed.">        if (i &lt; line.length() &amp;&amp; line.charAt(i) == '.') {</span>
+<span class="fc" id="L301">            i++;</span>
+<span class="pc bpc" id="L302" title="1 of 4 branches missed.">            while (i &lt; line.length() &amp;&amp; isDigit(line.charAt(i))) {</span>
+<span class="fc" id="L303">                i++;</span>
+            }
+        }
+<span class="pc bpc" id="L306" title="4 of 6 branches missed.">        if (i &lt; line.length() &amp;&amp; (line.charAt(i) == 'e' || line.charAt(i) == 'E')) {</span>
+<span class="fc" id="L307">            int exponent = i++;</span>
+<span class="pc bpc" id="L308" title="3 of 6 branches missed.">            if (i &lt; line.length() &amp;&amp; (line.charAt(i) == '+' || line.charAt(i) == '-')) {</span>
+<span class="nc" id="L309">                i++;</span>
+            }
+<span class="fc" id="L311">            int digits = i;</span>
+<span class="pc bpc" id="L312" title="1 of 4 branches missed.">            while (i &lt; line.length() &amp;&amp; isDigit(line.charAt(i))) {</span>
+<span class="fc" id="L313">                i++;</span>
+            }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">            if (digits == i) {</span>
+<span class="nc" id="L316">                i = exponent;</span>
+            }
+        }
+<span class="fc" id="L319">        return i;</span>
+    }
+
+    private SyntaxHighlightResult tokenizeXml(String line, int startState) {
+<span class="fc" id="L323">        List&lt;SyntaxToken&gt; tokens = new ArrayList&lt;SyntaxToken&gt;();</span>
+<span class="fc" id="L324">        int i = 0;</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (startState == STATE_XML_COMMENT) {</span>
+<span class="nc" id="L326">            int end = line.indexOf(&quot;--&gt;&quot;);</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">                if (line.length() &gt; 0) {</span>
+<span class="nc" id="L329">                    tokens.add(new SyntaxToken(0, line.length(), COMMENT));</span>
+                }
+<span class="nc" id="L331">                return new SyntaxHighlightResult(tokens, STATE_XML_COMMENT);</span>
+            }
+<span class="nc" id="L333">            tokens.add(new SyntaxToken(0, end + 3, COMMENT));</span>
+<span class="nc" id="L334">            i = end + 3;</span>
+        }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        while (i &lt; line.length()) {</span>
+<span class="fc" id="L337">            int open = line.indexOf('&lt;', i);</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            if (open &lt; 0) {</span>
+<span class="nc" id="L339">                break;</span>
+            }
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (line.startsWith(&quot;&lt;!--&quot;, open)) {</span>
+<span class="nc" id="L342">                int end = line.indexOf(&quot;--&gt;&quot;, open + 4);</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="nc" id="L344">                    tokens.add(new SyntaxToken(open, line.length() - open, COMMENT));</span>
+<span class="nc" id="L345">                    return new SyntaxHighlightResult(tokens, STATE_XML_COMMENT);</span>
+                }
+<span class="nc" id="L347">                tokens.add(new SyntaxToken(open, end + 3 - open, COMMENT));</span>
+<span class="nc" id="L348">                i = end + 3;</span>
+<span class="nc" id="L349">                continue;</span>
+            }
+<span class="fc" id="L351">            int p = open + 1;</span>
+<span class="pc bpc" id="L352" title="4 of 8 branches missed.">            if (p &lt; line.length() &amp;&amp; (line.charAt(p) == '/' || line.charAt(p) == '?' || line.charAt(p) == '!')) {</span>
+<span class="nc" id="L353">                p++;</span>
+            }
+<span class="fc" id="L355">            int name = p;</span>
+<span class="pc bpc" id="L356" title="1 of 4 branches missed.">            while (p &lt; line.length() &amp;&amp; isXmlName(line.charAt(p))) {</span>
+<span class="fc" id="L357">                p++;</span>
+            }
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            if (p &gt; name) {</span>
+<span class="fc" id="L360">                tokens.add(new SyntaxToken(name, p - name, TYPE));</span>
+            }
+<span class="pc bpc" id="L362" title="1 of 4 branches missed.">            while (p &lt; line.length() &amp;&amp; line.charAt(p) != '&gt;') {</span>
+<span class="pc bpc" id="L363" title="1 of 4 branches missed.">                if (line.charAt(p) == '&quot;' || line.charAt(p) == '\'') {</span>
+<span class="fc" id="L364">                    char quote = line.charAt(p);</span>
+<span class="fc" id="L365">                    int end = scanString(line, p + 1, quote);</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                    int stop = end &lt; 0 ? line.length() : end + 1;</span>
+<span class="fc" id="L367">                    tokens.add(new SyntaxToken(p, stop - p, STRING));</span>
+<span class="fc" id="L368">                    p = stop;</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                } else if (isXmlName(line.charAt(p))) {</span>
+<span class="fc" id="L370">                    int attr = p++;</span>
+<span class="pc bpc" id="L371" title="1 of 4 branches missed.">                    while (p &lt; line.length() &amp;&amp; isXmlName(line.charAt(p))) {</span>
+<span class="fc" id="L372">                        p++;</span>
+                    }
+<span class="fc" id="L374">                    tokens.add(new SyntaxToken(attr, p - attr, PROPERTY));</span>
+<span class="fc" id="L375">                } else {</span>
+<span class="fc" id="L376">                    p++;</span>
+                }
+            }
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">            i = p &lt; line.length() ? p + 1 : p;</span>
+<span class="fc" id="L380">        }</span>
+<span class="fc" id="L381">        return new SyntaxHighlightResult(tokens, STATE_NORMAL);</span>
+    }
+
+    private static boolean isXmlName(char c) {
+<span class="pc bpc" id="L385" title="3 of 8 branches missed.">        return isIdentPart(c) || c == '-' || c == ':' || c == '.';</span>
+    }
+
+    private SyntaxHighlightResult tokenizeCss(String line, int startState) {
+<span class="fc" id="L389">        List&lt;SyntaxToken&gt; tokens = new ArrayList&lt;SyntaxToken&gt;();</span>
+<span class="fc" id="L390">        int i = 0;</span>
+<span class="pc bpc" id="L391" title="2 of 4 branches missed.">        if (startState == STATE_BLOCK_COMMENT || startState == STATE_CSS_COMMENT_DECLARATION) {</span>
+<span class="nc" id="L392">            int end = line.indexOf(&quot;*/&quot;);</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">                if (line.length() &gt; 0) {</span>
+<span class="nc" id="L395">                    tokens.add(new SyntaxToken(0, line.length(), COMMENT));</span>
+                }
+<span class="nc" id="L397">                return new SyntaxHighlightResult(tokens, startState);</span>
+            }
+<span class="nc" id="L399">            tokens.add(new SyntaxToken(0, end + 2, COMMENT));</span>
+<span class="nc" id="L400">            i = end + 2;</span>
+        }
+<span class="pc bpc" id="L402" title="2 of 4 branches missed.">        boolean declaration = startState == STATE_CSS_DECLARATION</span>
+                || startState == STATE_CSS_COMMENT_DECLARATION;
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        while (i &lt; line.length()) {</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            if (line.startsWith(&quot;/*&quot;, i)) {</span>
+<span class="nc" id="L406">                int end = line.indexOf(&quot;*/&quot;, i + 2);</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="nc" id="L408">                    tokens.add(new SyntaxToken(i, line.length() - i, COMMENT));</span>
+<span class="nc bnc" id="L409" title="All 2 branches missed.">                    return new SyntaxHighlightResult(tokens, declaration ? STATE_CSS_COMMENT_DECLARATION : STATE_BLOCK_COMMENT);</span>
+                }
+<span class="nc" id="L411">                tokens.add(new SyntaxToken(i, end + 2 - i, COMMENT));</span>
+<span class="nc" id="L412">                i = end + 2;</span>
+<span class="nc" id="L413">                continue;</span>
+            }
+<span class="fc" id="L415">            char c = line.charAt(i);</span>
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">            if (c == '&quot;' || c == '\'') {</span>
+<span class="nc" id="L417">                int end = scanString(line, i + 1, c);</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                int stop = end &lt; 0 ? line.length() : end + 1;</span>
+<span class="nc" id="L419">                tokens.add(new SyntaxToken(i, stop - i, STRING));</span>
+<span class="nc" id="L420">                i = stop;</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            } else if (c == '{') {</span>
+<span class="nc" id="L422">                declaration = true; i++;</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            } else if (c == '}') {</span>
+<span class="nc" id="L424">                declaration = false; i++;</span>
+<span class="pc bpc" id="L425" title="6 of 8 branches missed.">            } else if (isDigit(c) || (c == '.' &amp;&amp; i + 1 &lt; line.length() &amp;&amp; isDigit(line.charAt(i + 1)))) {</span>
+<span class="nc" id="L426">                int end = scanNumber(line, i);</span>
+<span class="nc" id="L427">                tokens.add(new SyntaxToken(i, end - i, NUMBER));</span>
+<span class="nc" id="L428">                i = end;</span>
+<span class="pc bpc" id="L429" title="2 of 6 branches missed.">            } else if (isIdentStart(c) || c == '-' || c == '@') {</span>
+<span class="fc" id="L430">                int start = i++;</span>
+<span class="pc bpc" id="L431" title="1 of 6 branches missed.">                while (i &lt; line.length() &amp;&amp; (isIdentPart(line.charAt(i)) || line.charAt(i) == '-')) {</span>
+<span class="fc" id="L432">                    i++;</span>
+                }
+<span class="fc" id="L434">                int p = i;</span>
+<span class="fc bfc" id="L435" title="All 4 branches covered.">                while (p &lt; line.length() &amp;&amp; Character.isWhitespace(line.charAt(p))) {</span>
+<span class="fc" id="L436">                    p++;</span>
+                }
+<span class="pc bpc" id="L438" title="2 of 8 branches missed.">                if (c != '@' &amp;&amp; p &lt; line.length() &amp;&amp; line.charAt(p) == ':'</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                        &amp;&amp; (declaration || line.indexOf('{', p) &lt; 0)) {</span>
+<span class="fc" id="L440">                    tokens.add(new SyntaxToken(start, i - start, PROPERTY));</span>
+<span class="pc bpc" id="L441" title="3 of 4 branches missed.">                } else if (!declaration || c == '@') {</span>
+<span class="fc" id="L442">                    tokens.add(new SyntaxToken(start, i - start, TYPE));</span>
+                }
+<span class="fc" id="L444">            } else {</span>
+<span class="fc" id="L445">                i++;</span>
+            }
+<span class="fc" id="L447">        }</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        return new SyntaxHighlightResult(tokens, declaration ? STATE_CSS_DECLARATION : STATE_NORMAL);</span>
+    }
+
+    private SyntaxHighlightResult tokenizePython(String line, int startState) {
+<span class="fc" id="L452">        List&lt;SyntaxToken&gt; tokens = new ArrayList&lt;SyntaxToken&gt;();</span>
+<span class="fc" id="L453">        int i = 0;</span>
+<span class="pc bpc" id="L454" title="1 of 4 branches missed.">        if (startState == STATE_TRIPLE_SINGLE || startState == STATE_TRIPLE_DOUBLE) {</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">            String quote = startState == STATE_TRIPLE_SINGLE ? &quot;'''&quot; : &quot;\&quot;\&quot;\&quot;&quot;;</span>
+<span class="fc" id="L456">            int end = line.indexOf(quote);</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">                if (line.length() &gt; 0) {</span>
+<span class="nc" id="L459">                    tokens.add(new SyntaxToken(0, line.length(), STRING));</span>
+                }
+<span class="nc" id="L461">                return new SyntaxHighlightResult(tokens, startState);</span>
+            }
+<span class="fc" id="L463">            tokens.add(new SyntaxToken(0, end + 3, STRING));</span>
+<span class="fc" id="L464">            i = end + 3;</span>
+        }
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        while (i &lt; line.length()) {</span>
+<span class="fc" id="L467">            char c = line.charAt(i);</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            if (c == '#') {</span>
+<span class="nc" id="L469">                tokens.add(new SyntaxToken(i, line.length() - i, COMMENT));</span>
+<span class="nc" id="L470">                break;</span>
+            }
+<span class="pc bpc" id="L472" title="1 of 4 branches missed.">            if (line.startsWith(&quot;'''&quot;, i) || line.startsWith(&quot;\&quot;\&quot;\&quot;&quot;, i)) {</span>
+<span class="fc" id="L473">                String quote = line.substring(i, i + 3);</span>
+<span class="fc" id="L474">                int end = line.indexOf(quote, i + 3);</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">                if (end &lt; 0) {</span>
+<span class="fc" id="L476">                    tokens.add(new SyntaxToken(i, line.length() - i, STRING));</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">                    return new SyntaxHighlightResult(tokens, quote.charAt(0) == '\'' ? STATE_TRIPLE_SINGLE : STATE_TRIPLE_DOUBLE);</span>
+                }
+<span class="nc" id="L479">                tokens.add(new SyntaxToken(i, end + 3 - i, STRING));</span>
+<span class="nc" id="L480">                i = end + 3;</span>
+<span class="pc bpc" id="L481" title="2 of 4 branches missed.">            } else if (c == '&quot;' || c == '\'') {</span>
+<span class="nc" id="L482">                int end = scanString(line, i + 1, c);</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">                int stop = end &lt; 0 ? line.length() : end + 1;</span>
+<span class="nc" id="L484">                tokens.add(new SyntaxToken(i, stop - i, STRING));</span>
+<span class="nc" id="L485">                i = stop;</span>
+<span class="pc bpc" id="L486" title="6 of 8 branches missed.">            } else if (isDigit(c) || (c == '.' &amp;&amp; i + 1 &lt; line.length() &amp;&amp; isDigit(line.charAt(i + 1)))) {</span>
+<span class="nc" id="L487">                int end = scanNumber(line, i);</span>
+<span class="nc" id="L488">                tokens.add(new SyntaxToken(i, end - i, NUMBER));</span>
+<span class="nc" id="L489">                i = end;</span>
+<span class="pc bfc" id="L490" title="All 2 branches covered.">            } else if (isIdentStart(c)) {</span>
+<span class="fc" id="L491">                int start = i++;</span>
+<span class="pc bpc" id="L492" title="1 of 4 branches missed.">                while (i &lt; line.length() &amp;&amp; isIdentPart(line.charAt(i))) {</span>
+<span class="fc" id="L493">                    i++;</span>
+                }
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">                if (def.isKeyword(line.substring(start, i))) {</span>
+<span class="nc" id="L496">                    tokens.add(new SyntaxToken(start, i - start, KEYWORD));</span>
+                }
+<span class="fc" id="L498">            } else {</span>
+<span class="fc" id="L499">                i++;</span>
+            }
+<span class="fc" id="L501">        }</span>
+<span class="fc" id="L502">        return new SyntaxHighlightResult(tokens, STATE_NORMAL);</span>
+    }
+
+    private static int indexOfClose(String line, int from, String close) {
+<span class="nc" id="L506">        return line.indexOf(close, from);</span>
+    }
+
+    // scans a single or double quoted string starting after the opening quote; returns the index of the
+    // closing quote, or -1 if the line ends first (single line strings do not span lines)
+    private static int scanString(String line, int from, char quote) {
+<span class="fc" id="L512">        int n = line.length();</span>
+<span class="fc" id="L513">        int i = from;</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        while (i &lt; n) {</span>
+<span class="fc" id="L515">            char c = line.charAt(i);</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L517">                i += 2;</span>
+<span class="nc" id="L518">                continue;</span>
+            }
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            if (c == quote) {</span>
+<span class="fc" id="L521">                return i;</span>
+            }
+<span class="fc" id="L523">            i++;</span>
+<span class="fc" id="L524">        }</span>
+<span class="nc" id="L525">        return -1;</span>
+    }
+
+    // scans a backtick template string; returns index of the closing backtick or -1 if it spans lines
+    private static int scanTemplate(String line, int from) {
+<span class="nc" id="L530">        int n = line.length();</span>
+<span class="nc" id="L531">        int i = from;</span>
+<span class="nc bnc" id="L532" title="All 2 branches missed.">        while (i &lt; n) {</span>
+<span class="nc" id="L533">            char c = line.charAt(i);</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L535">                i += 2;</span>
+<span class="nc" id="L536">                continue;</span>
+            }
+<span class="nc bnc" id="L538" title="All 2 branches missed.">            if (c == '`') {</span>
+<span class="nc" id="L539">                return i;</span>
+            }
+<span class="nc" id="L541">            i++;</span>
+<span class="nc" id="L542">        }</span>
+<span class="nc" id="L543">        return -1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VertexBuffer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">VertexBuffer.java</span></div><h1>VertexBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+import com.codename1.ui.CN;
+
+/// Holds interleaved vertex data for a `Mesh`. The backing store is allocated
+/// through the platform SIMD allocator (`Simd.allocFloat(int)`) so that on
+/// ParparVM the array lives at a fixed, aligned native address and can be handed
+/// to the GPU with no intermediate copy. On other platforms the same array is an
+/// ordinary `float[]`.
+///
+/// Mutate the data through `setData` or by writing into `getData()` and then
+/// calling `setDirty()`; the bound `GraphicsDevice` re-uploads dirty buffers
+/// before the next draw.
+public final class VertexBuffer {
+    private final VertexFormat format;
+    private final int vertexCount;
+    private final float[] data;
+    private final int floatCount;
+    private Object handle;
+<span class="fc" id="L29">    private boolean dirty = true;</span>
+
+    /// Allocates a vertex buffer for the supplied format and vertex count. The
+    /// backing array is SIMD aligned. Prefer creating buffers through
+    /// `GraphicsDevice.createVertexBuffer(VertexFormat, int)` so the GPU handle
+    /// is tracked by the device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `format`: the interleaved vertex layout
+    ///
+    /// - `vertexCount`: the number of vertices the buffer can hold
+<span class="fc" id="L41">    public VertexBuffer(VertexFormat format, int vertexCount) {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (format == null) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;format is required&quot;);</span>
+        }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (vertexCount &lt;= 0) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;vertexCount must be positive&quot;);</span>
+        }
+<span class="fc" id="L48">        this.format = format;</span>
+<span class="fc" id="L49">        this.vertexCount = vertexCount;</span>
+<span class="fc" id="L50">        this.floatCount = vertexCount * format.getFloatsPerVertex();</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        int allocSize = floatCount &lt; 16 ? 16 : floatCount;</span>
+<span class="fc" id="L52">        this.data = allocAligned(allocSize);</span>
+<span class="fc" id="L53">    }</span>
+
+    private static float[] allocAligned(int size) {
+        try {
+<span class="fc" id="L57">            return CN.getSimd().allocFloat(size);</span>
+<span class="nc" id="L58">        } catch (Throwable t) {</span>
+            // The platform may not be initialized yet (for example a buffer
+            // created before Display starts); fall back to a plain array.
+<span class="nc" id="L61">            return new float[size];</span>
+        }
+    }
+
+    /// Returns the vertex layout of this buffer.
+    public VertexFormat getFormat() {
+<span class="fc" id="L67">        return format;</span>
+    }
+
+    /// Returns the number of vertices this buffer holds.
+    public int getVertexCount() {
+<span class="fc" id="L72">        return vertexCount;</span>
+    }
+
+    /// Returns the number of meaningful floats in the backing array
+    /// (`vertexCount * format.getFloatsPerVertex()`). The array itself may be
+    /// padded to a larger SIMD friendly size.
+    public int getFloatCount() {
+<span class="nc" id="L79">        return floatCount;</span>
+    }
+
+    /// Returns the SIMD aligned backing array. Write vertex floats directly here
+    /// for maximum throughput, then call `setDirty()`.
+    public float[] getData() {
+<span class="fc" id="L85">        return data;</span>
+    }
+
+    /// Copies `src` into the backing array starting at float index 0 and marks
+    /// the buffer dirty.
+    ///
+    /// #### Parameters
+    ///
+    /// - `src`: the interleaved float data; length must not exceed the buffer
+    public void setData(float[] src) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (src.length &gt; data.length) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(&quot;source data exceeds buffer capacity&quot;);</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (int i = 0; i &lt; src.length; i++) {</span>
+<span class="fc" id="L99">            data[i] = src[i];</span>
+        }
+<span class="fc" id="L101">        dirty = true;</span>
+<span class="fc" id="L102">    }</span>
+
+    /// Marks the buffer as needing re-upload to the GPU before the next draw.
+    public void setDirty() {
+<span class="nc" id="L106">        dirty = true;</span>
+<span class="nc" id="L107">    }</span>
+
+    /// Returns true if the buffer has pending changes that must be uploaded.
+    /// Intended for backend use.
+    public boolean isDirty() {
+<span class="nc" id="L112">        return dirty;</span>
+    }
+
+    /// Clears the dirty flag. Intended for backend use after an upload.
+    public void clearDirty() {
+<span class="nc" id="L117">        dirty = false;</span>
+<span class="nc" id="L118">    }</span>
+
+    /// Returns the opaque backend GPU handle, or null if not yet uploaded.
+    /// Intended for backend use.
+    public Object getHandle() {
+<span class="nc" id="L123">        return handle;</span>
+    }
+
+    /// Stores the opaque backend GPU handle. Intended for backend use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: the backend specific GPU resource handle
+    public void setHandle(Object handle) {
+<span class="nc" id="L132">        this.handle = handle;</span>
+<span class="nc" id="L133">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

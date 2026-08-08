@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActionEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.events</a> &gt; <span class="el_source">ActionEvent.java</span></div><h1>ActionEvent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.events;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+
+/// Event object delivered when an `ActionListener` callback is invoked
+///
+/// @author Chen Fishbein
+public class ActionEvent {
+
+    private final Type trigger;
+    private final Object source;
+    private boolean consumed;
+    private Object sourceComponent;
+<span class="pc" id="L39">    private int keyEvent = -1;</span>
+<span class="pc" id="L40">    private int y = -1;</span>
+<span class="pc" id="L41">    private boolean longEvent = false;</span>
+    /// A flag to ease the pain caused by fix for https://github.com/codenameone/CodenameOne/issues/2352 which prevents
+    /// us from receiving new pointer pressed events while a drag is in progress.  This flag may be added to a pointer dragged
+    /// event to indicate that the pointer was pressed again - in case your listener wants to monitor for this.
+    ///
+    private boolean pointerPressedDuringDrag;
+
+    /// The rich pointer detail attached to this event, populated for pointer events.
+    private PointerEvent pointerEvent;
+
+    /// Creates a new instance of ActionEvent.  This is unused locally, but provided so existing customer code
+    /// with still work.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the action event
+<span class="fc" id="L57">    public ActionEvent(Object source) {</span>
+<span class="fc" id="L58">        this.source = source;</span>
+<span class="fc" id="L59">        this.trigger = Type.Other;</span>
+<span class="fc" id="L60">    }</span>
+
+    /// Creates a new instance of ActionEvent
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the action event
+    ///
+    /// - `type`: the `Type` of the event
+<span class="fc" id="L69">    public ActionEvent(Object source, Type type) {</span>
+<span class="fc" id="L70">        this.source = source;</span>
+<span class="fc" id="L71">        this.trigger = type;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (type == Type.LongPointerPress) {</span>
+<span class="nc" id="L73">            longEvent = true;</span>
+        }
+<span class="fc" id="L75">    }</span>
+
+    /// Creates a new instance of ActionEvent as a pointer event
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the pointer event
+    ///
+    /// - `type`: the `Type` of the event
+    ///
+    /// - `x`: (or sometimes width) associated with the event
+    ///
+    /// - `y`: (or sometimes height)associated with the event
+<span class="fc" id="L88">    public ActionEvent(Object source, Type type, int x, int y) {</span>
+<span class="fc" id="L89">        this.source = source;</span>
+<span class="fc" id="L90">        this.keyEvent = x;</span>
+<span class="fc" id="L91">        this.y = y;</span>
+<span class="fc" id="L92">        this.trigger = type;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (type == Type.LongPointerPress) {</span>
+<span class="fc" id="L94">            longEvent = true;</span>
+        }
+<span class="fc" id="L96">    }</span>
+
+    /// Creates a new instance of ActionEvent for a command
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element command
+    ///
+    /// - `type`: the `Type` of the event
+    ///
+    /// - `sourceComponent`: the triggering component
+    ///
+    /// - `x`: the x position of the pointer event
+    ///
+    /// - `y`: the y position of the pointer event
+<span class="fc" id="L111">    public ActionEvent(Command source, Type type, Component sourceComponent, int x, int y) {</span>
+<span class="fc" id="L112">        this.source = source;</span>
+<span class="fc" id="L113">        this.sourceComponent = sourceComponent;</span>
+<span class="fc" id="L114">        this.keyEvent = x;</span>
+<span class="fc" id="L115">        this.y = y;</span>
+<span class="fc" id="L116">        this.trigger = type;</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (type == Type.LongPointerPress) {</span>
+<span class="nc" id="L118">            longEvent = true;</span>
+        }
+<span class="fc" id="L120">    }</span>
+
+    /// Creates a new instance of ActionEvent for a drop operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `dragged`: the dragged component
+    ///
+    /// - `type`: the `Type` of the event
+    ///
+    /// - `drop`: the drop target component
+    ///
+    /// - `x`: the x position of the pointer event
+    ///
+    /// - `y`: the y position of the pointer event
+<span class="fc" id="L135">    public ActionEvent(Component dragged, Type type, Component drop, int x, int y) {</span>
+<span class="fc" id="L136">        this.source = dragged;</span>
+<span class="fc" id="L137">        this.sourceComponent = drop;</span>
+<span class="fc" id="L138">        this.keyEvent = x;</span>
+<span class="fc" id="L139">        this.y = y;</span>
+<span class="fc" id="L140">        this.trigger = type;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (type == Type.LongPointerPress) {</span>
+<span class="nc" id="L142">            longEvent = true;</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    /// Creates a new instance of ActionEvent.  The key event is really just
+    /// a numeric code, not indicative of a key press
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the action event
+    ///
+    /// - `type`: the `Type` of the event
+    ///
+    /// - `keyEvent`: the key that triggered the event
+<span class="nc" id="L156">    public ActionEvent(Object source, Type type, int keyEvent) {</span>
+<span class="nc" id="L157">        this.source = source;</span>
+<span class="nc" id="L158">        this.keyEvent = keyEvent;</span>
+<span class="nc" id="L159">        this.trigger = type;</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (type == Type.LongPointerPress) {</span>
+<span class="nc" id="L161">            longEvent = true;</span>
+        }
+<span class="nc" id="L163">    }</span>
+
+    /// Creates a new instance of ActionEvent
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the action event
+    ///
+    /// - `keyEvent`: the key that triggered the event
+<span class="fc" id="L172">    public ActionEvent(Object source, int keyEvent) {</span>
+<span class="fc" id="L173">        this.source = source;</span>
+<span class="fc" id="L174">        this.keyEvent = keyEvent;</span>
+<span class="fc" id="L175">        this.trigger = Type.KeyRelease;</span>
+<span class="fc" id="L176">    }</span>
+
+
+    /// Creates a new instance of ActionEvent
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the action event
+    ///
+    /// - `keyEvent`: the key that triggered the event
+    ///
+    /// - `longClick`: true if the event is triggered from long pressed
+<span class="nc" id="L188">    public ActionEvent(Object source, int keyEvent, boolean longClick) {</span>
+<span class="nc" id="L189">        this.source = source;</span>
+<span class="nc" id="L190">        this.keyEvent = keyEvent;</span>
+<span class="nc" id="L191">        this.longEvent = longClick;</span>
+<span class="nc" id="L192">        this.trigger = Type.KeyPress;</span>
+<span class="nc" id="L193">    }</span>
+
+
+    /// Creates a new instance of ActionEvent as a pointer event
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the pointer event
+    ///
+    /// - `x`: the x position of the pointer event
+    ///
+    /// - `y`: the y position of the pointer event
+    ///
+    /// - `longPointer`: true if the event is triggered from long pressed
+<span class="fc" id="L207">    public ActionEvent(Object source, int x, int y, boolean longPointer) {</span>
+<span class="fc" id="L208">        this.source = source;</span>
+<span class="fc" id="L209">        this.keyEvent = x;</span>
+<span class="fc" id="L210">        this.y = y;</span>
+<span class="fc" id="L211">        this.longEvent = longPointer;</span>
+<span class="fc" id="L212">        this.trigger = Type.PointerReleased;</span>
+<span class="fc" id="L213">    }</span>
+
+    /// Creates a new instance of ActionEvent as a generic pointer event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element for the pointer event
+    ///
+    /// - `x`: the x position of the pointer event
+    ///
+    /// - `y`: the y position of the pointer event
+<span class="fc" id="L224">    public ActionEvent(Object source, int x, int y) {</span>
+<span class="fc" id="L225">        this.source = source;</span>
+<span class="fc" id="L226">        this.keyEvent = x;</span>
+<span class="fc" id="L227">        this.y = y;</span>
+<span class="fc" id="L228">        this.trigger = Type.Pointer;</span>
+<span class="fc" id="L229">    }</span>
+
+    /// Creates a new instance of ActionEvent for a command
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: element command
+    ///
+    /// - `sourceComponent`: the triggering component
+    ///
+    /// - `x`: the x position of the pointer event
+    ///
+    /// - `y`: the y position of the pointer event
+<span class="fc" id="L242">    public ActionEvent(Command source, Component sourceComponent, int x, int y) {</span>
+<span class="fc" id="L243">        this.source = source;</span>
+<span class="fc" id="L244">        this.sourceComponent = sourceComponent;</span>
+<span class="fc" id="L245">        this.keyEvent = x;</span>
+<span class="fc" id="L246">        this.y = y;</span>
+<span class="fc" id="L247">        this.trigger = Type.Command;</span>
+<span class="fc" id="L248">    }</span>
+
+    /// Creates a new instance of ActionEvent for a drop operation
+    ///
+    /// #### Parameters
+    ///
+    /// - `dragged`: the dragged component
+    ///
+    /// - `drop`: the drop target component
+    ///
+    /// - `x`: the x position of the pointer event
+    ///
+    /// - `y`: the y position of the pointer event
+<span class="nc" id="L261">    public ActionEvent(Component dragged, Component drop, int x, int y) {</span>
+<span class="nc" id="L262">        this.source = dragged;</span>
+<span class="nc" id="L263">        this.sourceComponent = drop;</span>
+<span class="nc" id="L264">        this.keyEvent = x;</span>
+<span class="nc" id="L265">        this.y = y;</span>
+<span class="nc" id="L266">        this.trigger = Type.PointerDrag;</span>
+<span class="nc" id="L267">    }</span>
+
+    /// Returns the type of the given event allowing us to have more generic event handling code and useful
+    /// for debugging
+    ///
+    /// #### Returns
+    ///
+    /// the Type enum
+    public Type getEventType() {
+<span class="fc" id="L276">        return (trigger);</span>
+    }
+
+    /// The element that triggered the action event, useful for decoupling event
+    /// handling code
+    ///
+    /// #### Returns
+    ///
+    /// the element that triggered the action event
+    public Object getSource() {
+<span class="fc" id="L286">        return source;</span>
+    }
+
+    /// If this event was triggered by a key press this method will return the
+    /// appropriate keycode
+    ///
+    /// #### Returns
+    ///
+    /// the key that triggered the event
+    public int getKeyEvent() {
+<span class="nc" id="L296">        return keyEvent;</span>
+    }
+
+    /// Returns the numeric progress of native browser loading on Android
+    ///
+    /// #### Returns
+    ///
+    /// the progress value
+    public int getProgress() {
+<span class="nc" id="L305">        return keyEvent;</span>
+    }
+
+    /// If this event was sent as a result of a command action this method returns
+    /// that command
+    ///
+    /// #### Returns
+    ///
+    /// the command action that triggered the action event
+    public Command getCommand() {
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (source instanceof Command) {</span>
+<span class="fc" id="L316">            return (Command) source;</span>
+        }
+<span class="nc" id="L318">        return null;</span>
+    }
+
+    /// Identical to `ActionEvent#getComponent()` except for the fact that a lead component will be returned
+    /// if such a lead component is available. This is important for components such as `com.codename1.components.MultiButton`
+    /// which will return the underlying button instead.
+    ///
+    /// #### Returns
+    ///
+    /// the component that sent the event
+    public Component getActualComponent() {
+<span class="fc" id="L329">        Component c = getComponent();</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (c != null) {</span>
+            Container lead;
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L333">                lead = ((Container) c).getLeadParent();</span>
+            } else {
+<span class="fc" id="L335">                lead = c.getParent().getLeadParent();</span>
+            }
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (lead != null) {</span>
+<span class="nc" id="L338">                return lead;</span>
+            }
+        }
+<span class="fc" id="L341">        return c;</span>
+    }
+
+    /// Returns the component that generated the event. **important** this might not be the actual component.
+    /// In case of a lead component such as `com.codename1.components.MultiButton` the underlying
+    /// `com.codename1.ui.Button` will be returned and not the `com.codename1.components.MultiButton`
+    /// itself. To get the component that you would logically think of as the source component use the `#getActualComponent`
+    /// method.
+    ///
+    /// If you are in doubt use the `getActualComponent` method.
+    ///
+    /// #### Returns
+    ///
+    /// a component
+    ///
+    /// #### See also
+    ///
+    /// - ActionEvent#getActualComponent() - you should probably use `getActualComponent` instead of this method
+    public Component getComponent() {
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (sourceComponent != null) {</span>
+<span class="fc" id="L361">            return (Component) sourceComponent;</span>
+        }
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (source instanceof Component) {</span>
+<span class="fc" id="L364">            return (Component) source;</span>
+        }
+<span class="nc" id="L366">        return null;</span>
+    }
+
+    /// Consume the event indicating that it was handled thus preventing other action
+    /// listeners from handling/receiving the event
+    public void consume() {
+<span class="fc" id="L372">        consumed = true;</span>
+<span class="fc" id="L373">    }</span>
+
+    /// Returns true if the event was consumed thus indicating that it was handled.
+    /// This prevents other action listeners from handling/receiving the event
+    ///
+    /// #### Returns
+    ///
+    /// true if the event was consumed
+    public boolean isConsumed() {
+<span class="fc" id="L382">        return consumed;</span>
+    }
+
+    /// The X position if this is a pointer event otherwise undefined
+    ///
+    /// #### Returns
+    ///
+    /// x position
+    public int getX() {
+<span class="fc" id="L391">        return keyEvent;</span>
+    }
+
+    /// The Y position if this is a pointer event otherwise undefined
+    ///
+    /// #### Returns
+    ///
+    /// y position
+    public int getY() {
+<span class="fc" id="L400">        return y;</span>
+    }
+
+    /// Returns true for long click or long pointer event
+    public boolean isLongEvent() {
+<span class="nc" id="L405">        return longEvent;</span>
+    }
+
+    /// Returns the rich pointer detail for this event such as the triggering mouse button, the
+    /// pointing device type (finger, mouse, stylus or eraser), the pressure applied and the stylus
+    /// tilt. For pointer events that did not have an explicit snapshot attached this falls back to
+    /// the pointer event currently being dispatched, so the detail is available from any pointer
+    /// listener. Returns null for non pointer events.
+    ///
+    /// #### Returns
+    ///
+    /// the `PointerEvent` detail or null when this is not a pointer event
+    public PointerEvent getPointerEvent() {
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (pointerEvent != null) {</span>
+<span class="fc" id="L419">            return pointerEvent;</span>
+        }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        switch (trigger) {</span>
+            case Pointer:
+            case PointerPressed:
+            case PointerReleased:
+            case PointerDrag:
+            case PointerWheel:
+            case LongPointerPress:
+            case Swipe:
+<span class="fc" id="L429">                return com.codename1.ui.Display.getInstance().getCurrentPointerEvent();</span>
+            default:
+<span class="fc" id="L431">                return null;</span>
+        }
+    }
+
+    /// Attaches an explicit rich pointer detail snapshot to this event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointerEvent`: the snapshot to attach
+    public void setPointerEvent(PointerEvent pointerEvent) {
+<span class="fc" id="L441">        this.pointerEvent = pointerEvent;</span>
+<span class="fc" id="L442">    }</span>
+
+    /// Set in the case of a drop listener, returns the component being dragged
+    ///
+    /// #### Returns
+    ///
+    /// the component being dragged
+    public Component getDraggedComponent() {
+<span class="nc" id="L450">        return (Component) source;</span>
+    }
+
+    /// Set in the case of a drop listener, returns the component on which the drop occurs
+    ///
+    /// #### Returns
+    ///
+    /// the component on which the drop occurs
+    public Component getDropTarget() {
+<span class="nc" id="L459">        return (Component) sourceComponent;</span>
+    }
+
+    /// Only used for pointer dragged events.  This flag is set to true if a pointer press event
+    /// was silently swallowed by a drag in progress.  While dragging and scrolling is in progress,
+    /// pointer pressed events are not delivered.  This allows you to detect if a pointer press occurred
+    /// during a scroll or drag.
+    ///
+    public boolean isPointerPressedDuringDrag() {
+<span class="nc" id="L468">        return pointerPressedDuringDrag;</span>
+    }
+
+    /// Only used for pointer dragged events.  This flag is set to true if a pointer press event
+    /// was silently swallowed by a drag in progress.  While dragging and scrolling is in progress,
+    /// pointer pressed events are not delivered.  This allows you to detect if a pointer press occurred
+    /// during a scroll or drag.
+    ///
+    public void setPointerPressedDuringDrag(boolean pressed) {
+<span class="fc" id="L477">        this.pointerPressedDuringDrag = pressed;</span>
+<span class="fc" id="L478">    }</span>
+
+    /// The event type, as declared when the event is created.
+    ///
+    /// @author Ddyer
+<span class="fc" id="L483">    public enum Type {</span>
+        /// Unspecified command type, this occurs when one of the old undifferentiated constructors was invoked
+<span class="fc" id="L485">        Other,</span>
+
+        /// Triggered by a command
+<span class="fc" id="L488">        Command,</span>
+
+        /// Pointer event that doesn't necessarily fall into one of the other pointer event values
+<span class="fc" id="L491">        Pointer,</span>
+
+        /// Pointer event
+<span class="fc" id="L494">        PointerPressed,</span>
+
+        /// Pointer event
+<span class="fc" id="L497">        PointerReleased,</span>
+
+
+        /// Pointer event
+<span class="fc" id="L501">        PointerDrag,</span>
+
+
+        /// Mouse wheel or trackpad scroll event delivered as a `com.codename1.ui.events.WheelEvent`
+<span class="fc" id="L505">        PointerWheel,</span>
+
+        /// Device fold posture change delivered when a foldable device is folded or unfolded
+<span class="fc" id="L508">        PostureChange,</span>
+
+
+        /// Pointer swipe event currently fired by `com.codename1.ui.SwipeableContainer#addSwipeOpenListener(com.codename1.ui.events.ActionListener)`
+<span class="fc" id="L512">        Swipe,</span>
+
+        /// Fired by key events
+<span class="fc" id="L515">        KeyPress,</span>
+
+
+        /// Fired by key events
+<span class="fc" id="L519">        KeyRelease,</span>
+
+        /// Network event fired in case of a network error
+<span class="fc" id="L522">        Exception,</span>
+
+        /// Network event fired in case of a network response code event
+<span class="fc" id="L525">        Response,</span>
+
+        /// Network event fired in case of progress update
+<span class="fc" id="L528">        Progress,</span>
+
+        /// Network event fired in case of a network response containing data
+<span class="fc" id="L531">        Data,</span>
+
+        /// Event from `com.codename1.ui.Calendar`
+<span class="fc" id="L534">        Calendar,</span>
+
+        /// Fired on a `com.codename1.ui.TextArea` action event
+<span class="fc" id="L537">        Edit,</span>
+
+        /// Fired on a `com.codename1.ui.TextField#setDoneListener(com.codename1.ui.events.ActionListener)` action event
+<span class="fc" id="L540">        Done,</span>
+
+        /// Fired by the `com.codename1.javascript.JavascriptContext`
+<span class="fc" id="L543">        JavaScript,</span>
+
+        /// Logging event to used for log/filesystem decoupling
+<span class="fc" id="L546">        Log,</span>
+
+        /// Fired when the theme changes
+<span class="fc" id="L549">        Theme,</span>
+
+        /// Fired when a `com.codename1.ui.Form` is shown
+<span class="fc" id="L552">        Show,</span>
+
+
+        /// Fired when a `int)` occurs
+<span class="fc" id="L556">        SizeChange,</span>
+
+        /// Fired when a `com.codename1.ui.Form` is rotated
+<span class="fc" id="L559">        OrientationChange,</span>
+
+
+        /// Fired when a component drag is finished
+<span class="fc" id="L563">        DragFinished,</span>
+
+<span class="fc" id="L565">        Change,</span>
+
+<span class="fc" id="L567">        LongPointerPress,</span>
+
+<span class="fc" id="L569">        OpenGallery,</span>
+
+<span class="fc" id="L571">        IsGalleryTypeSupported,</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

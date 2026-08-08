@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthSensors.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health.sensors</a> &gt; <span class="el_source">HealthSensors.java</span></div><h1>HealthSensors.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health.sensors;
+
+import com.codename1.bluetooth.Bluetooth;
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.le.BlePeripheral;
+import com.codename1.bluetooth.le.BleScan;
+import com.codename1.util.AsyncResult;
+import com.codename1.bluetooth.le.ScanFilter;
+import com.codename1.bluetooth.le.ScanListener;
+import com.codename1.bluetooth.le.ScanResult;
+import com.codename1.bluetooth.le.ScanSettings;
+import com.codename1.health.HealthError;
+import com.codename1.health.HealthException;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import com.codename1.impl.health.EdtResult;
+
+/// Discovers and streams from standard Bluetooth SIG health sensors --
+/// heart-rate straps, power meters, speed and cadence sensors, foot pods,
+/// thermometers, scales, blood-pressure cuffs and glucose meters.
+///
+/// Obtain one from [com.codename1.health.Health#getSensors()].
+///
+/// #### This works everywhere Bluetooth LE does
+///
+/// Unlike the rest of the health API, this layer needs no platform health
+/// store and no per-port implementation: it is built entirely on
+/// `com.codename1.bluetooth.le`, so it behaves identically on iOS,
+/// Android, the simulator, the desktop ports and -- where the browser
+/// exposes Web Bluetooth -- JavaScript. A desktop app that reports
+/// [com.codename1.health.HealthAvailability#LOCAL_ONLY] for the store can
+/// still stream a chest strap.
+///
+/// #### Quick start
+///
+/// ```java
+/// HealthSensors sensors = Health.getInstance().getSensors();
+/// SensorScanSettings settings = new SensorScanSettings()
+///         .addProfile(HealthSensorProfile.HEART_RATE)
+///         .setTimeoutMillis(15000);
+/// SensorScan scan = sensors.startScan(settings, new SensorDiscoveryListener() {
+///     public void sensorDiscovered(HealthSensor sensor) {
+///         scan.stop();
+///         sensors.connect(sensor, HealthSensorProfile.HEART_RATE,
+///                 new SensorSessionOptions())
+///               .onResult((session, err) -&gt; { ... });
+///     }
+///     public void scanFailed(HealthException e) { Log.e(e); }
+/// });
+/// ```
+///
+/// #### Permissions
+///
+/// These are Bluetooth operations, not health-store operations, so they
+/// need Bluetooth permission -- `BluetoothPermission.SCAN` and
+/// `CONNECT` -- and **not** a HealthKit entitlement or a Health Connect
+/// declaration. The build server makes the same distinction: an app that
+/// only uses this package is not treated as a health-data app.
+<span class="fc" id="L84">public class HealthSensors {</span>
+
+<span class="fc" id="L86">    private final List&lt;SensorSession&gt; active = new ArrayList&lt;SensorSession&gt;();</span>
+
+    /// `true` when this device can talk to BLE sensors at all -- that is,
+    /// when Bluetooth LE is supported by the port and the hardware.
+    public boolean isSupported() {
+<span class="fc" id="L91">        return Bluetooth.getInstance().isLeSupported();</span>
+    }
+
+    /// Scans for sensors matching `settings`, reporting each discovery to
+    /// `listener`.
+    ///
+    /// Returns a handle even when scanning cannot start; the failure
+    /// arrives through [SensorDiscoveryListener#scanFailed(HealthException)]
+    /// rather than as a null return, so callers never need a null check.
+    public final SensorScan startScan(SensorScanSettings settings,
+            final SensorDiscoveryListener listener) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;startScan needs a listener&quot;);</span>
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!isSupported()) {</span>
+<span class="nc" id="L106">            notifyScanFailed(listener, new HealthException(</span>
+                    HealthError.NOT_SUPPORTED,
+                    &quot;Bluetooth LE is not available on this device&quot;));
+<span class="nc" id="L109">            return new SensorScan(null);</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        SensorScanSettings s = settings == null</span>
+                ? new SensorScanSettings() : settings;
+        // A copy, taken once. getProfiles() answers with an unmodifiable
+        // view of the caller's own list, so keeping it left this scan
+        // reading a list the caller could still change -- and the listener
+        // walks it on the platform's callback thread, where a concurrent
+        // addProfile() throws ConcurrentModificationException and the
+        // discovery it was decoding is lost.
+<span class="fc" id="L119">        final List&lt;HealthSensorProfile&gt; wanted =</span>
+                new ArrayList&lt;HealthSensorProfile&gt;(
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                        s.getProfiles().isEmpty()</span>
+<span class="pc" id="L122">                                ? HealthSensorProfile.values()</span>
+<span class="pc" id="L123">                                : s.getProfiles());</span>
+
+<span class="fc" id="L125">        ScanSettings bleSettings = new ScanSettings();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (s.isLowPower()) {</span>
+            // The setting was accepted and then ignored, so a scan asking
+            // to be gentle on the battery ran at the balanced duty cycle
+            // anyway -- and a background or long-running scan is exactly
+            // where the caller meant it.
+<span class="fc" id="L131">            bleSettings.setScanMode(com.codename1.bluetooth.le.ScanMode</span>
+                    .LOW_POWER);
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (HealthSensorProfile wantedItem : wanted) {</span>
+<span class="fc" id="L135">            bleSettings.addFilter(new ScanFilter()</span>
+<span class="fc" id="L136">                    .setServiceUuid(wantedItem.getServiceUuid()));</span>
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        BleScan scan = Bluetooth.getInstance().getLE().startScan(bleSettings,</span>
+<span class="fc" id="L139">                makeScanListener(wanted, listener));</span>
+        // A scan can fail without anything being thrown -- a missing
+        // BLUETOOTH_SCAN grant, a platform abort -- and that failure
+        // reaches the caller only through the BleScan. Callers here are
+        // handed a SensorScan, which deliberately does not expose the
+        // delegate, so without this the documented scanFailed() callback
+        // never fired and the scan just quietly was not running.
+<span class="fc" id="L146">        scan.onResult(new ScanFailure(listener));</span>
+<span class="fc" id="L147">        SensorScan out = new SensorScan(scan);</span>
+<span class="fc" id="L148">        out.scheduleTimeout(s.getTimeoutMillis());</span>
+<span class="fc" id="L149">        return out;</span>
+    }
+
+    /// Translates a failed BLE scan into the health listener's own
+    /// callback.
+    ///
+    /// Named rather than anonymous so it carries no synthetic reference
+    /// to the enclosing object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class ScanFailure
+            implements AsyncResult&lt;Boolean&gt; {
+
+        private final SensorDiscoveryListener listener;
+
+<span class="fc" id="L163">        ScanFailure(SensorDiscoveryListener listener) {</span>
+<span class="fc" id="L164">            this.listener = listener;</span>
+<span class="fc" id="L165">        }</span>
+
+        @Override
+        public void onReady(Boolean value, Throwable error) {
+<span class="pc bpc" id="L169" title="1 of 4 branches missed.">            if (error == null || listener == null) {</span>
+<span class="fc" id="L170">                return;</span>
+            }
+            // Through the same hop the unsupported-BLE path uses. This
+            // callback runs wherever the scan failed -- the caller's
+            // thread for a synchronous start failure, the platform's for
+            // a later onScanFailed -- and SensorDiscoveryListener
+            // promises the EDT, so a listener that touched the UI here
+            // would have raced.
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            notifyScanFailed(listener, error instanceof HealthException</span>
+                    ? (HealthException) error
+                    : new HealthException(HealthError.SENSOR_DISCONNECTED,
+                            &quot;the Bluetooth scan could not be started&quot;,
+                            error));
+<span class="fc" id="L183">        }</span>
+    }
+
+    /// Built in a static method so the listener carries no synthetic
+    /// reference to this object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static ScanListener makeScanListener(
+            final List&lt;HealthSensorProfile&gt; wanted,
+            final SensorDiscoveryListener listener) {
+<span class="fc" id="L192">        return new ScanListener() {</span>
+            @Override
+            public void peripheralDiscovered(ScanResult result) {
+<span class="nc" id="L195">                HealthSensor sensor = toSensor(result, wanted);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (sensor != null) {</span>
+<span class="nc" id="L197">                    listener.sensorDiscovered(sensor);</span>
+                }
+<span class="nc" id="L199">            }</span>
+        };
+    }
+
+    /// Which of the wanted profiles a discovered device actually
+    /// advertises. Returns null when it advertises none of them, which
+    /// happens when a platform scan filter is coarser than requested.
+    private static HealthSensor toSensor(ScanResult result,
+            List&lt;HealthSensorProfile&gt; wanted) {
+<span class="nc bnc" id="L208" title="All 4 branches missed.">        if (result == null || result.getPeripheral() == null) {</span>
+<span class="nc" id="L209">            return null;</span>
+        }
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        List&lt;BluetoothUuid&gt; advertised = result.getAdvertisementData() == null</span>
+<span class="nc" id="L212">                ? Collections.&lt;BluetoothUuid&gt;emptyList()</span>
+<span class="nc" id="L213">                : result.getAdvertisementData().getServiceUuids();</span>
+<span class="nc" id="L214">        List&lt;HealthSensorProfile&gt; matched =</span>
+                new ArrayList&lt;HealthSensorProfile&gt;();
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        for (HealthSensorProfile p : wanted) {</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            if (advertised.contains(p.getServiceUuid())) {</span>
+<span class="nc" id="L218">                matched.add(p);</span>
+            }
+<span class="nc" id="L220">        }</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (matched.isEmpty()) {</span>
+<span class="nc" id="L222">            return null;</span>
+        }
+<span class="nc" id="L224">        BlePeripheral peripheral = result.getPeripheral();</span>
+<span class="nc" id="L225">        return new HealthSensor(peripheral.getAddress(), peripheral.getName(),</span>
+<span class="nc" id="L226">                matched, result.getRssi());</span>
+    }
+
+    /// Connects to a discovered sensor and starts streaming.
+    public final AsyncResource&lt;SensorSession&gt; connect(HealthSensor sensor,
+            HealthSensorProfile profile, SensorSessionOptions options) {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (sensor == null) {</span>
+<span class="nc" id="L233">            AsyncResource&lt;SensorSession&gt; out =</span>
+                    new EdtResult&lt;SensorSession&gt;();
+<span class="nc" id="L235">            out.error(new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;connect needs a sensor&quot;));
+<span class="nc" id="L237">            return out;</span>
+        }
+<span class="nc" id="L239">        return connect(sensor.getId(), profile, options);</span>
+    }
+
+    /// Reconnects to a sensor by the identifier persisted from an earlier
+    /// session, without scanning first.
+    ///
+    /// This is how a fitness app should reconnect to the user's own strap:
+    /// remember [HealthSensor#getId()] the first time and go straight to
+    /// it afterwards, rather than making them pick from a list every
+    /// session.
+    public final AsyncResource&lt;SensorSession&gt; connect(final String sensorId,
+            final HealthSensorProfile profile,
+            final SensorSessionOptions options) {
+<span class="nc" id="L252">        final AsyncResource&lt;SensorSession&gt; out =</span>
+                new EdtResult&lt;SensorSession&gt;();
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        if (sensorId == null || profile == null) {</span>
+<span class="nc" id="L255">            out.error(new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;connect needs a sensor id and a profile&quot;));
+<span class="nc" id="L257">            return out;</span>
+        }
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (!isSupported()) {</span>
+<span class="nc" id="L260">            out.error(new HealthException(HealthError.NOT_SUPPORTED,</span>
+                    &quot;Bluetooth LE is not available on this device&quot;));
+<span class="nc" id="L262">            return out;</span>
+        }
+        BlePeripheral peripheral =
+<span class="nc" id="L265">                Bluetooth.getInstance().getLE().getPeripheral(sensorId);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (peripheral == null) {</span>
+<span class="nc" id="L267">            out.error(new HealthException(HealthError.SENSOR_DISCONNECTED,</span>
+                    &quot;no sensor known with id &quot; + sensorId));
+<span class="nc" id="L269">            return out;</span>
+        }
+<span class="nc" id="L271">        BleSensorSession session = new BleSensorSession(sensorId, profile,</span>
+                options, peripheral);
+<span class="nc" id="L273">        synchronized (active) {</span>
+<span class="nc" id="L274">            active.add(session);</span>
+<span class="nc" id="L275">        }</span>
+<span class="nc" id="L276">        session.start(out);</span>
+<span class="nc" id="L277">        return out;</span>
+    }
+
+    /// Every session currently connected or reconnecting.
+    public final List&lt;SensorSession&gt; getActiveSessions() {
+<span class="nc" id="L282">        synchronized (active) {</span>
+<span class="nc" id="L283">            return new ArrayList&lt;SensorSession&gt;(active);</span>
+        }
+    }
+
+    /// Forgets a session that has stopped. Called by the session itself.
+    final void sessionEnded(SensorSession session) {
+<span class="fc" id="L289">        synchronized (active) {</span>
+<span class="fc" id="L290">            active.remove(session);</span>
+<span class="fc" id="L291">        }</span>
+<span class="fc" id="L292">    }</span>
+
+    /// Built in a static method so the `Runnable` carries no synthetic
+    /// reference to this object (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static void notifyScanFailed(
+            final SensorDiscoveryListener listener,
+            final HealthException error) {
+<span class="fc" id="L300">        com.codename1.ui.Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L303">                listener.scanFailed(error);</span>
+<span class="fc" id="L304">            }</span>
+        });
+<span class="fc" id="L306">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

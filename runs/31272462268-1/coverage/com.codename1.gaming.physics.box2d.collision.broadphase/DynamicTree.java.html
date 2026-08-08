@@ -1,0 +1,896 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicTree.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.collision.broadphase</a> &gt; <span class="el_source">DynamicTree.java</span></div><h1>DynamicTree.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.collision.broadphase;
+
+import com.codename1.gaming.physics.box2d.callbacks.DebugDraw;
+import com.codename1.gaming.physics.box2d.callbacks.TreeCallback;
+import com.codename1.gaming.physics.box2d.callbacks.TreeRayCastCallback;
+import com.codename1.gaming.physics.box2d.collision.AABB;
+import com.codename1.gaming.physics.box2d.collision.RayCastInput;
+import com.codename1.gaming.physics.box2d.common.Color3f;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+
+/// A dynamic tree arranges data in a binary tree to accelerate queries such as volume queries and
+/// ray casts. Leafs are proxies with an AABB. In the tree we expand the proxy AABB by _fatAABBFactor
+/// so that the proxy AABB is bigger than the client object. This allows the client object to move by
+/// small amounts without triggering a tree update.
+///
+/// @author daniel
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">public class DynamicTree implements BroadPhaseStrategy {</span>
+  public static final int MAX_STACK_SIZE = 64;
+  public static final int NULL_NODE = -1;
+
+  private DynamicTreeNode m_root;
+  private DynamicTreeNode[] m_nodes;
+  private int m_nodeCount;
+  private int m_nodeCapacity;
+
+  private int m_freeList;
+
+  private int m_insertionCount;
+
+<span class="fc" id="L55">  private final Vec2[] drawVecs = new Vec2[4];</span>
+<span class="fc" id="L56">  private final TreeNodeStack nodeStack = new TreeNodeStack(10);</span>
+
+<span class="fc" id="L58">  public DynamicTree() {</span>
+<span class="fc" id="L59">    m_root = null;</span>
+<span class="fc" id="L60">    m_nodeCount = 0;</span>
+<span class="fc" id="L61">    m_nodeCapacity = 16;</span>
+<span class="fc" id="L62">    m_nodes = new DynamicTreeNode[16];</span>
+
+    // Build a linked list for the free list.
+<span class="fc bfc" id="L65" title="All 2 branches covered.">    for (int i = m_nodeCapacity - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L66">      m_nodes[i] = new DynamicTreeNode(i);</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">      m_nodes[i].parent = (i == m_nodeCapacity - 1) ? null : m_nodes[i + 1];</span>
+<span class="fc" id="L68">      m_nodes[i].height = -1;</span>
+    }
+<span class="fc" id="L70">    m_freeList = 0;</span>
+
+<span class="fc" id="L72">    m_insertionCount = 0;</span>
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    for (int i = 0; i &lt; drawVecs.length; i++) {</span>
+<span class="fc" id="L75">      drawVecs[i] = new Vec2();</span>
+    }
+<span class="fc" id="L77">  }</span>
+
+  public final int createProxy(final AABB aabb, Object userData) {
+<span class="fc" id="L80">    final DynamicTreeNode node = allocateNode();</span>
+<span class="fc" id="L81">    int proxyId = node.id;</span>
+    // Fatten the aabb
+<span class="fc" id="L83">    final AABB nodeAABB = node.aabb;</span>
+<span class="fc" id="L84">    nodeAABB.lowerBound.x = aabb.lowerBound.x - Settings.aabbExtension;</span>
+<span class="fc" id="L85">    nodeAABB.lowerBound.y = aabb.lowerBound.y - Settings.aabbExtension;</span>
+<span class="fc" id="L86">    nodeAABB.upperBound.x = aabb.upperBound.x + Settings.aabbExtension;</span>
+<span class="fc" id="L87">    nodeAABB.upperBound.y = aabb.upperBound.y + Settings.aabbExtension;</span>
+<span class="fc" id="L88">    node.userData = userData;</span>
+
+<span class="fc" id="L90">    insertLeaf(proxyId);</span>
+
+<span class="fc" id="L92">    return proxyId;</span>
+  }
+
+  public final void destroyProxy(int proxyId) {
+<span class="pc bpc" id="L96" title="3 of 6 branches missed.">    assert (0 &lt;= proxyId &amp;&amp; proxyId &lt; m_nodeCapacity);</span>
+<span class="fc" id="L97">    DynamicTreeNode node = m_nodes[proxyId];</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">    assert (node.isLeaf());</span>
+
+<span class="fc" id="L100">    removeLeaf(node);</span>
+<span class="fc" id="L101">    freeNode(node);</span>
+<span class="fc" id="L102">  }</span>
+
+  public final boolean moveProxy(int proxyId, final AABB aabb, Vec2 displacement) {
+<span class="pc bpc" id="L105" title="3 of 6 branches missed.">    assert (0 &lt;= proxyId &amp;&amp; proxyId &lt; m_nodeCapacity);</span>
+<span class="fc" id="L106">    final DynamicTreeNode node = m_nodes[proxyId];</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">    assert (node.isLeaf());</span>
+
+<span class="fc" id="L109">    final AABB nodeAABB = node.aabb;</span>
+    // if (nodeAABB.contains(aabb)) {
+<span class="pc bpc" id="L111" title="3 of 8 branches missed.">    if (nodeAABB.lowerBound.x &gt; aabb.lowerBound.x &amp;&amp; nodeAABB.lowerBound.y &gt; aabb.lowerBound.y</span>
+        &amp;&amp; aabb.upperBound.x &gt; nodeAABB.upperBound.x &amp;&amp; aabb.upperBound.y &gt; nodeAABB.upperBound.y) {
+<span class="nc" id="L113">      return false;</span>
+    }
+
+<span class="fc" id="L116">    removeLeaf(node);</span>
+
+    // Extend AABB
+<span class="fc" id="L119">    final Vec2 lowerBound = nodeAABB.lowerBound;</span>
+<span class="fc" id="L120">    final Vec2 upperBound = nodeAABB.upperBound;</span>
+<span class="fc" id="L121">    lowerBound.x = aabb.lowerBound.x - Settings.aabbExtension;</span>
+<span class="fc" id="L122">    lowerBound.y = aabb.lowerBound.y - Settings.aabbExtension;</span>
+<span class="fc" id="L123">    upperBound.x = aabb.upperBound.x + Settings.aabbExtension;</span>
+<span class="fc" id="L124">    upperBound.y = aabb.upperBound.y + Settings.aabbExtension;</span>
+
+    // Predict AABB displacement.
+<span class="fc" id="L127">    final float dx = displacement.x * Settings.aabbMultiplier;</span>
+<span class="fc" id="L128">    final float dy = displacement.y * Settings.aabbMultiplier;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">    if (dx &lt; 0.0f) {</span>
+<span class="fc" id="L130">      lowerBound.x += dx;</span>
+    } else {
+<span class="fc" id="L132">      upperBound.x += dx;</span>
+    }
+
+<span class="fc bfc" id="L135" title="All 2 branches covered.">    if (dy &lt; 0.0f) {</span>
+<span class="fc" id="L136">      lowerBound.y += dy;</span>
+    } else {
+<span class="fc" id="L138">      upperBound.y += dy;</span>
+    }
+
+<span class="fc" id="L141">    insertLeaf(proxyId);</span>
+<span class="fc" id="L142">    return true;</span>
+  }
+
+  public final Object getUserData(int proxyId) {
+<span class="pc bpc" id="L146" title="3 of 6 branches missed.">    assert (0 &lt;= proxyId &amp;&amp; proxyId &lt; m_nodeCapacity);</span>
+<span class="fc" id="L147">    return m_nodes[proxyId].userData;</span>
+  }
+
+  public final AABB getFatAABB(int proxyId) {
+<span class="pc bpc" id="L151" title="3 of 6 branches missed.">    assert (0 &lt;= proxyId &amp;&amp; proxyId &lt; m_nodeCapacity);</span>
+<span class="fc" id="L152">    return m_nodes[proxyId].aabb;</span>
+  }
+
+  public final void query(TreeCallback callback, AABB aabb) {
+<span class="fc" id="L156">    nodeStack.reset();</span>
+<span class="fc" id="L157">    nodeStack.push(m_root);</span>
+
+<span class="fc bfc" id="L159" title="All 2 branches covered.">    while (nodeStack.getCount() &gt; 0) {</span>
+<span class="fc" id="L160">      DynamicTreeNode node = nodeStack.pop();</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">      if (node == null) {</span>
+<span class="nc" id="L162">        continue;</span>
+      }
+
+<span class="fc bfc" id="L165" title="All 2 branches covered.">      if (AABB.testOverlap(node.aabb, aabb)) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (node.child1 == null) {</span>
+<span class="fc" id="L167">          boolean proceed = callback.treeCallback(node.id);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">          if (!proceed) {</span>
+<span class="nc" id="L169">            return;</span>
+          }
+<span class="fc" id="L171">        } else {</span>
+<span class="fc" id="L172">          nodeStack.push(node.child1);</span>
+<span class="fc" id="L173">          nodeStack.push(node.child2);</span>
+        }
+      }
+<span class="fc" id="L176">    }</span>
+<span class="fc" id="L177">  }</span>
+
+<span class="fc" id="L179">  private final Vec2 r = new Vec2();</span>
+<span class="fc" id="L180">  private final AABB aabb = new AABB();</span>
+<span class="fc" id="L181">  private final RayCastInput subInput = new RayCastInput();</span>
+
+  public void raycast(TreeRayCastCallback callback, RayCastInput input) {
+<span class="fc" id="L184">    final Vec2 p1 = input.p1;</span>
+<span class="fc" id="L185">    final Vec2 p2 = input.p2;</span>
+<span class="fc" id="L186">    float p1x = p1.x, p2x = p2.x, p1y = p1.y, p2y = p2.y;</span>
+    float vx, vy;
+    float rx, ry;
+    float absVx, absVy;
+    float cx, cy;
+    float hx, hy;
+    float tempx, tempy;
+<span class="fc" id="L193">    r.x = p2x - p1x;</span>
+<span class="fc" id="L194">    r.y = p2y - p1y;</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">    assert ((r.x * r.x + r.y * r.y) &gt; 0f);</span>
+<span class="fc" id="L196">    r.normalize();</span>
+<span class="fc" id="L197">    rx = r.x;</span>
+<span class="fc" id="L198">    ry = r.y;</span>
+
+    // v is perpendicular to the segment.
+<span class="fc" id="L201">    vx = -1f * ry;</span>
+<span class="fc" id="L202">    vy = 1f * rx;</span>
+<span class="fc" id="L203">    absVx = MathUtils.abs(vx);</span>
+<span class="fc" id="L204">    absVy = MathUtils.abs(vy);</span>
+
+    // Separating axis for segment (Gino, p80).
+    // |dot(v, p1 - c)| &gt; dot(|v|, h)
+
+<span class="fc" id="L209">    float maxFraction = input.maxFraction;</span>
+
+    // Build a bounding box for the segment.
+<span class="fc" id="L212">    final AABB segAABB = aabb;</span>
+    // Vec2 t = p1 + maxFraction * (p2 - p1);
+    // before inline
+    // temp.set(p2).subLocal(p1).mulLocal(maxFraction).addLocal(p1);
+    // Vec2.minToOut(p1, temp, segAABB.lowerBound);
+    // Vec2.maxToOut(p1, temp, segAABB.upperBound);
+<span class="fc" id="L218">    tempx = (p2x - p1x) * maxFraction + p1x;</span>
+<span class="fc" id="L219">    tempy = (p2y - p1y) * maxFraction + p1y;</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">    segAABB.lowerBound.x = p1x &lt; tempx ? p1x : tempx;</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">    segAABB.lowerBound.y = p1y &lt; tempy ? p1y : tempy;</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">    segAABB.upperBound.x = p1x &gt; tempx ? p1x : tempx;</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">    segAABB.upperBound.y = p1y &gt; tempy ? p1y : tempy;</span>
+    // end inline
+
+<span class="fc" id="L226">    nodeStack.reset();</span>
+<span class="fc" id="L227">    nodeStack.push(m_root);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">    while (nodeStack.getCount() &gt; 0) {</span>
+<span class="fc" id="L229">      final DynamicTreeNode node = nodeStack.pop();</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">      if (node == null) {</span>
+<span class="nc" id="L231">        continue;</span>
+      }
+
+<span class="fc" id="L234">      final AABB nodeAABB = node.aabb;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">      if (!AABB.testOverlap(nodeAABB, segAABB)) {</span>
+<span class="fc" id="L236">        continue;</span>
+      }
+
+      // Separating axis for segment (Gino, p80).
+      // |dot(v, p1 - c)| &gt; dot(|v|, h)
+      // node.aabb.getCenterToOut(c);
+      // node.aabb.getExtentsToOut(h);
+<span class="fc" id="L243">      cx = (nodeAABB.lowerBound.x + nodeAABB.upperBound.x) * .5f;</span>
+<span class="fc" id="L244">      cy = (nodeAABB.lowerBound.y + nodeAABB.upperBound.y) * .5f;</span>
+<span class="fc" id="L245">      hx = (nodeAABB.upperBound.x - nodeAABB.lowerBound.x) * .5f;</span>
+<span class="fc" id="L246">      hy = (nodeAABB.upperBound.y - nodeAABB.lowerBound.y) * .5f;</span>
+<span class="fc" id="L247">      tempx = p1x - cx;</span>
+<span class="fc" id="L248">      tempy = p1y - cy;</span>
+<span class="fc" id="L249">      float separation = MathUtils.abs(vx * tempx + vy * tempy) - (absVx * hx + absVy * hy);</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">      if (separation &gt; 0.0f) {</span>
+<span class="nc" id="L251">        continue;</span>
+      }
+
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">      if (node.isLeaf()) {</span>
+<span class="fc" id="L255">        subInput.p1.x = p1x;</span>
+<span class="fc" id="L256">        subInput.p1.y = p1y;</span>
+<span class="fc" id="L257">        subInput.p2.x = p2x;</span>
+<span class="fc" id="L258">        subInput.p2.y = p2y;</span>
+<span class="fc" id="L259">        subInput.maxFraction = maxFraction;</span>
+
+<span class="fc" id="L261">        float value = callback.raycastCallback(subInput, node.id);</span>
+
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (value == 0.0f) {</span>
+          // The client has terminated the ray cast.
+<span class="nc" id="L265">          return;</span>
+        }
+
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (value &gt; 0.0f) {</span>
+          // Update segment bounding box.
+<span class="fc" id="L270">          maxFraction = value;</span>
+          // temp.set(p2).subLocal(p1).mulLocal(maxFraction).addLocal(p1);
+          // Vec2.minToOut(p1, temp, segAABB.lowerBound);
+          // Vec2.maxToOut(p1, temp, segAABB.upperBound);
+<span class="fc" id="L274">          tempx = (p2x - p1x) * maxFraction + p1x;</span>
+<span class="fc" id="L275">          tempy = (p2y - p1y) * maxFraction + p1y;</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">          segAABB.lowerBound.x = p1x &lt; tempx ? p1x : tempx;</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">          segAABB.lowerBound.y = p1y &lt; tempy ? p1y : tempy;</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">          segAABB.upperBound.x = p1x &gt; tempx ? p1x : tempx;</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">          segAABB.upperBound.y = p1y &gt; tempy ? p1y : tempy;</span>
+        }
+<span class="fc" id="L281">      } else {</span>
+<span class="nc" id="L282">        nodeStack.push(node.child1);</span>
+<span class="nc" id="L283">        nodeStack.push(node.child2);</span>
+      }
+<span class="fc" id="L285">    }</span>
+<span class="fc" id="L286">  }</span>
+
+  public final int computeHeight() {
+<span class="fc" id="L289">    return computeHeight(m_root);</span>
+  }
+
+  private final int computeHeight(DynamicTreeNode node) {
+<span class="pc bpc" id="L293" title="3 of 6 branches missed.">    assert (0 &lt;= node.id &amp;&amp; node.id &lt; m_nodeCapacity);</span>
+
+<span class="fc bfc" id="L295" title="All 2 branches covered.">    if (node.isLeaf()) {</span>
+<span class="fc" id="L296">      return 0;</span>
+    }
+<span class="fc" id="L298">    int height1 = computeHeight(node.child1);</span>
+<span class="fc" id="L299">    int height2 = computeHeight(node.child2);</span>
+<span class="fc" id="L300">    return 1 + MathUtils.max(height1, height2);</span>
+  }
+
+  /// Validate this tree. For testing.
+  public void validate() {
+<span class="nc" id="L305">    validateStructure(m_root);</span>
+<span class="nc" id="L306">    validateMetrics(m_root);</span>
+
+<span class="nc" id="L308">    int freeCount = 0;</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">    DynamicTreeNode freeNode = m_freeList != NULL_NODE ? m_nodes[m_freeList] : null;</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">    while (freeNode != null) {</span>
+<span class="nc bnc" id="L311" title="All 6 branches missed.">      assert (0 &lt;= freeNode.id &amp;&amp; freeNode.id &lt; m_nodeCapacity);</span>
+<span class="nc bnc" id="L312" title="All 4 branches missed.">      assert (freeNode == m_nodes[freeNode.id]);</span>
+<span class="nc" id="L313">      freeNode = freeNode.parent;</span>
+<span class="nc" id="L314">      ++freeCount;</span>
+    }
+
+<span class="nc bnc" id="L317" title="All 4 branches missed.">    assert (getHeight() == computeHeight());</span>
+
+<span class="nc bnc" id="L319" title="All 4 branches missed.">    assert (m_nodeCount + freeCount == m_nodeCapacity);</span>
+<span class="nc" id="L320">  }</span>
+
+  public int getHeight() {
+<span class="nc bnc" id="L323" title="All 2 branches missed.">    if (m_root == null) {</span>
+<span class="nc" id="L324">      return 0;</span>
+    }
+<span class="nc" id="L326">    return m_root.height;</span>
+  }
+
+  public int getMaxBalance() {
+<span class="fc" id="L330">    int maxBalance = 0;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">    for (int i = 0; i &lt; m_nodeCapacity; ++i) {</span>
+<span class="fc" id="L332">      final DynamicTreeNode node = m_nodes[i];</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">      if (node.height &lt;= 1) {</span>
+<span class="fc" id="L334">        continue;</span>
+      }
+
+<span class="nc bnc" id="L337" title="All 4 branches missed.">      assert (node.isLeaf() == false);</span>
+
+<span class="nc" id="L339">      DynamicTreeNode child1 = node.child1;</span>
+<span class="nc" id="L340">      DynamicTreeNode child2 = node.child2;</span>
+<span class="nc" id="L341">      int balance = MathUtils.abs(child2.height - child1.height);</span>
+<span class="nc" id="L342">      maxBalance = MathUtils.max(maxBalance, balance);</span>
+    }
+
+<span class="fc" id="L345">    return maxBalance;</span>
+  }
+
+  public float getAreaRatio() {
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">    if (m_root == null) {</span>
+<span class="nc" id="L350">      return 0.0f;</span>
+    }
+
+<span class="fc" id="L353">    final DynamicTreeNode root = m_root;</span>
+<span class="fc" id="L354">    float rootArea = root.aabb.getPerimeter();</span>
+
+<span class="fc" id="L356">    float totalArea = 0.0f;</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">    for (int i = 0; i &lt; m_nodeCapacity; ++i) {</span>
+<span class="fc" id="L358">      final DynamicTreeNode node = m_nodes[i];</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">      if (node.height &lt; 0) {</span>
+        // Free node in pool
+<span class="fc" id="L361">        continue;</span>
+      }
+
+<span class="fc" id="L364">      totalArea += node.aabb.getPerimeter();</span>
+    }
+
+<span class="fc" id="L367">    return totalArea / rootArea;</span>
+  }
+
+  /// Build an optimal tree. Very expensive. For testing.
+  public void rebuildBottomUp() {
+<span class="nc" id="L372">    int[] nodes = new int[m_nodeCount];</span>
+<span class="nc" id="L373">    int count = 0;</span>
+
+    // Build array of leaves. Free the rest.
+<span class="nc bnc" id="L376" title="All 2 branches missed.">    for (int i = 0; i &lt; m_nodeCapacity; ++i) {</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">      if (m_nodes[i].height &lt; 0) {</span>
+        // free node in pool
+<span class="nc" id="L379">        continue;</span>
+      }
+
+<span class="nc" id="L382">      DynamicTreeNode node = m_nodes[i];</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">      if (node.isLeaf()) {</span>
+<span class="nc" id="L384">        node.parent = null;</span>
+<span class="nc" id="L385">        nodes[count] = i;</span>
+<span class="nc" id="L386">        ++count;</span>
+      } else {
+<span class="nc" id="L388">        freeNode(node);</span>
+      }
+    }
+
+<span class="nc" id="L392">    AABB b = new AABB();</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">    while (count &gt; 1) {</span>
+<span class="nc" id="L394">      float minCost = Float.MAX_VALUE;</span>
+<span class="nc" id="L395">      int iMin = -1, jMin = -1;</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">      for (int i = 0; i &lt; count; ++i) {</span>
+<span class="nc" id="L397">        AABB aabbi = m_nodes[nodes[i]].aabb;</span>
+
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        for (int j = i + 1; j &lt; count; ++j) {</span>
+<span class="nc" id="L400">          AABB aabbj = m_nodes[nodes[j]].aabb;</span>
+<span class="nc" id="L401">          b.combine(aabbi, aabbj);</span>
+<span class="nc" id="L402">          float cost = b.getPerimeter();</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">          if (cost &lt; minCost) {</span>
+<span class="nc" id="L404">            iMin = i;</span>
+<span class="nc" id="L405">            jMin = j;</span>
+<span class="nc" id="L406">            minCost = cost;</span>
+          }
+        }
+      }
+
+<span class="nc" id="L411">      int index1 = nodes[iMin];</span>
+<span class="nc" id="L412">      int index2 = nodes[jMin];</span>
+<span class="nc" id="L413">      DynamicTreeNode child1 = m_nodes[index1];</span>
+<span class="nc" id="L414">      DynamicTreeNode child2 = m_nodes[index2];</span>
+
+<span class="nc" id="L416">      DynamicTreeNode parent = allocateNode();</span>
+<span class="nc" id="L417">      parent.child1 = child1;</span>
+<span class="nc" id="L418">      parent.child2 = child2;</span>
+<span class="nc" id="L419">      parent.height = 1 + MathUtils.max(child1.height, child2.height);</span>
+<span class="nc" id="L420">      parent.aabb.combine(child1.aabb, child2.aabb);</span>
+<span class="nc" id="L421">      parent.parent = null;</span>
+
+<span class="nc" id="L423">      child1.parent = parent;</span>
+<span class="nc" id="L424">      child2.parent = parent;</span>
+
+<span class="nc" id="L426">      nodes[jMin] = nodes[count - 1];</span>
+<span class="nc" id="L427">      nodes[iMin] = parent.id;</span>
+<span class="nc" id="L428">      --count;</span>
+<span class="nc" id="L429">    }</span>
+
+<span class="nc" id="L431">    m_root = m_nodes[nodes[0]];</span>
+
+<span class="nc" id="L433">    validate();</span>
+<span class="nc" id="L434">  }</span>
+
+  private final DynamicTreeNode allocateNode() {
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">    if (m_freeList == NULL_NODE) {</span>
+<span class="nc bnc" id="L438" title="All 4 branches missed.">      assert (m_nodeCount == m_nodeCapacity);</span>
+
+<span class="nc" id="L440">      DynamicTreeNode[] old = m_nodes;</span>
+<span class="nc" id="L441">      m_nodeCapacity *= 2;</span>
+<span class="nc" id="L442">      m_nodes = new DynamicTreeNode[m_nodeCapacity];</span>
+<span class="nc" id="L443">      System.arraycopy(old, 0, m_nodes, 0, old.length);</span>
+
+      // Build a linked list for the free list.
+<span class="nc bnc" id="L446" title="All 2 branches missed.">      for (int i = m_nodeCapacity - 1; i &gt;= m_nodeCount; i--) {</span>
+<span class="nc" id="L447">        m_nodes[i] = new DynamicTreeNode(i);</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        m_nodes[i].parent = (i == m_nodeCapacity - 1) ? null : m_nodes[i + 1];</span>
+<span class="nc" id="L449">        m_nodes[i].height = -1;</span>
+      }
+<span class="nc" id="L451">      m_freeList = m_nodeCount;</span>
+    }
+<span class="fc" id="L453">    int nodeId = m_freeList;</span>
+<span class="fc" id="L454">    final DynamicTreeNode treeNode = m_nodes[nodeId];</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">    m_freeList = treeNode.parent != null ? treeNode.parent.id : NULL_NODE;</span>
+
+<span class="fc" id="L457">    treeNode.parent = null;</span>
+<span class="fc" id="L458">    treeNode.child1 = null;</span>
+<span class="fc" id="L459">    treeNode.child2 = null;</span>
+<span class="fc" id="L460">    treeNode.height = 0;</span>
+<span class="fc" id="L461">    treeNode.userData = null;</span>
+<span class="fc" id="L462">    ++m_nodeCount;</span>
+<span class="fc" id="L463">    return treeNode;</span>
+  }
+
+  /// returns a node to the pool
+  private final void freeNode(DynamicTreeNode node) {
+<span class="pc bpc" id="L468" title="2 of 4 branches missed.">    assert (node != null);</span>
+<span class="pc bpc" id="L469" title="2 of 4 branches missed.">    assert (0 &lt; m_nodeCount);</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">    node.parent = m_freeList != NULL_NODE ? m_nodes[m_freeList] : null;</span>
+<span class="fc" id="L471">    node.height = -1;</span>
+<span class="fc" id="L472">    m_freeList = node.id;</span>
+<span class="fc" id="L473">    m_nodeCount--;</span>
+<span class="fc" id="L474">  }</span>
+
+  public int getInsertionCount() {
+<span class="nc" id="L477">    return m_insertionCount;</span>
+  }
+
+<span class="fc" id="L480">  private final AABB combinedAABB = new AABB();</span>
+
+  private final void insertLeaf(int leaf_index) {
+<span class="fc" id="L483">    m_insertionCount++;</span>
+
+<span class="fc" id="L485">    DynamicTreeNode leaf = m_nodes[leaf_index];</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">    if (m_root == null) {</span>
+<span class="fc" id="L487">      m_root = leaf;</span>
+<span class="fc" id="L488">      m_root.parent = null;</span>
+<span class="fc" id="L489">      return;</span>
+    }
+
+    // find the best sibling
+<span class="fc" id="L493">    AABB leafAABB = leaf.aabb;</span>
+<span class="fc" id="L494">    DynamicTreeNode index = m_root;</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">    while (index.child1 != null) {</span>
+<span class="fc" id="L496">      final DynamicTreeNode node = index;</span>
+<span class="fc" id="L497">      DynamicTreeNode child1 = node.child1;</span>
+<span class="fc" id="L498">      DynamicTreeNode child2 = node.child2;</span>
+
+<span class="fc" id="L500">      float area = node.aabb.getPerimeter();</span>
+
+<span class="fc" id="L502">      combinedAABB.combine(node.aabb, leafAABB);</span>
+<span class="fc" id="L503">      float combinedArea = combinedAABB.getPerimeter();</span>
+
+      // Cost of creating a new parent for this node and the new leaf
+<span class="fc" id="L506">      float cost = 2.0f * combinedArea;</span>
+
+      // Minimum cost of pushing the leaf further down the tree
+<span class="fc" id="L509">      float inheritanceCost = 2.0f * (combinedArea - area);</span>
+
+      // Cost of descending into child1
+      float cost1;
+<span class="fc bfc" id="L513" title="All 2 branches covered.">      if (child1.isLeaf()) {</span>
+<span class="fc" id="L514">        combinedAABB.combine(leafAABB, child1.aabb);</span>
+<span class="fc" id="L515">        cost1 = combinedAABB.getPerimeter() + inheritanceCost;</span>
+      } else {
+<span class="fc" id="L517">        combinedAABB.combine(leafAABB, child1.aabb);</span>
+<span class="fc" id="L518">        float oldArea = child1.aabb.getPerimeter();</span>
+<span class="fc" id="L519">        float newArea = combinedAABB.getPerimeter();</span>
+<span class="fc" id="L520">        cost1 = (newArea - oldArea) + inheritanceCost;</span>
+      }
+
+      // Cost of descending into child2
+      float cost2;
+<span class="fc bfc" id="L525" title="All 2 branches covered.">      if (child2.isLeaf()) {</span>
+<span class="fc" id="L526">        combinedAABB.combine(leafAABB, child2.aabb);</span>
+<span class="fc" id="L527">        cost2 = combinedAABB.getPerimeter() + inheritanceCost;</span>
+      } else {
+<span class="fc" id="L529">        combinedAABB.combine(leafAABB, child2.aabb);</span>
+<span class="fc" id="L530">        float oldArea = child2.aabb.getPerimeter();</span>
+<span class="fc" id="L531">        float newArea = combinedAABB.getPerimeter();</span>
+<span class="fc" id="L532">        cost2 = newArea - oldArea + inheritanceCost;</span>
+      }
+
+      // Descend according to the minimum cost.
+<span class="pc bpc" id="L536" title="1 of 4 branches missed.">      if (cost &lt; cost1 &amp;&amp; cost &lt; cost2) {</span>
+<span class="fc" id="L537">        break;</span>
+      }
+
+      // Descend
+<span class="fc bfc" id="L541" title="All 2 branches covered.">      if (cost1 &lt; cost2) {</span>
+<span class="fc" id="L542">        index = child1;</span>
+      } else {
+<span class="fc" id="L544">        index = child2;</span>
+      }
+<span class="fc" id="L546">    }</span>
+
+<span class="fc" id="L548">    DynamicTreeNode sibling = index;</span>
+<span class="fc" id="L549">    DynamicTreeNode oldParent = m_nodes[sibling.id].parent;</span>
+<span class="fc" id="L550">    final DynamicTreeNode newParent = allocateNode();</span>
+<span class="fc" id="L551">    newParent.parent = oldParent;</span>
+<span class="fc" id="L552">    newParent.userData = null;</span>
+<span class="fc" id="L553">    newParent.aabb.combine(leafAABB, sibling.aabb);</span>
+<span class="fc" id="L554">    newParent.height = sibling.height + 1;</span>
+
+<span class="fc bfc" id="L556" title="All 2 branches covered.">    if (oldParent != null) {</span>
+      // The sibling was not the root.
+<span class="fc bfc" id="L558" title="All 2 branches covered.">      if (oldParent.child1 == sibling) {</span>
+<span class="fc" id="L559">        oldParent.child1 = newParent;</span>
+      } else {
+<span class="fc" id="L561">        oldParent.child2 = newParent;</span>
+      }
+
+<span class="fc" id="L564">      newParent.child1 = sibling;</span>
+<span class="fc" id="L565">      newParent.child2 = leaf;</span>
+<span class="fc" id="L566">      sibling.parent = newParent;</span>
+<span class="fc" id="L567">      leaf.parent = newParent;</span>
+    } else {
+      // The sibling was the root.
+<span class="fc" id="L570">      newParent.child1 = sibling;</span>
+<span class="fc" id="L571">      newParent.child2 = leaf;</span>
+<span class="fc" id="L572">      sibling.parent = newParent;</span>
+<span class="fc" id="L573">      leaf.parent = newParent;</span>
+<span class="fc" id="L574">      m_root = newParent;</span>
+    }
+
+    // Walk back up the tree fixing heights and AABBs
+<span class="fc" id="L578">    index = leaf.parent;</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">    while (index != null) {</span>
+<span class="fc" id="L580">      index = balance(index);</span>
+
+<span class="fc" id="L582">      DynamicTreeNode child1 = index.child1;</span>
+<span class="fc" id="L583">      DynamicTreeNode child2 = index.child2;</span>
+
+<span class="pc bpc" id="L585" title="2 of 4 branches missed.">      assert (child1 != null);</span>
+<span class="pc bpc" id="L586" title="2 of 4 branches missed.">      assert (child2 != null);</span>
+
+<span class="fc" id="L588">      index.height = 1 + MathUtils.max(child1.height, child2.height);</span>
+<span class="fc" id="L589">      index.aabb.combine(child1.aabb, child2.aabb);</span>
+
+<span class="fc" id="L591">      index = index.parent;</span>
+<span class="fc" id="L592">    }</span>
+
+    // validate();
+<span class="fc" id="L595">  }</span>
+
+  private final void removeLeaf(DynamicTreeNode leaf) {
+<span class="fc bfc" id="L598" title="All 2 branches covered.">    if (leaf == m_root) {</span>
+<span class="fc" id="L599">      m_root = null;</span>
+<span class="fc" id="L600">      return;</span>
+    }
+
+<span class="fc" id="L603">    DynamicTreeNode parent = leaf.parent;</span>
+<span class="fc" id="L604">    DynamicTreeNode grandParent = parent.parent;</span>
+    DynamicTreeNode sibling;
+<span class="fc bfc" id="L606" title="All 2 branches covered.">    if (parent.child1 == leaf) {</span>
+<span class="fc" id="L607">      sibling = parent.child2;</span>
+    } else {
+<span class="fc" id="L609">      sibling = parent.child1;</span>
+    }
+
+<span class="fc bfc" id="L612" title="All 2 branches covered.">    if (grandParent != null) {</span>
+      // Destroy parent and connect sibling to grandParent.
+<span class="fc bfc" id="L614" title="All 2 branches covered.">      if (grandParent.child1 == parent) {</span>
+<span class="fc" id="L615">        grandParent.child1 = sibling;</span>
+      } else {
+<span class="fc" id="L617">        grandParent.child2 = sibling;</span>
+      }
+<span class="fc" id="L619">      sibling.parent = grandParent;</span>
+<span class="fc" id="L620">      freeNode(parent);</span>
+
+      // Adjust ancestor bounds.
+<span class="fc" id="L623">      DynamicTreeNode index = grandParent;</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">      while (index != null) {</span>
+<span class="fc" id="L625">        index = balance(index);</span>
+
+<span class="fc" id="L627">        DynamicTreeNode child1 = index.child1;</span>
+<span class="fc" id="L628">        DynamicTreeNode child2 = index.child2;</span>
+
+<span class="fc" id="L630">        index.aabb.combine(child1.aabb, child2.aabb);</span>
+<span class="fc" id="L631">        index.height = 1 + MathUtils.max(child1.height, child2.height);</span>
+
+<span class="fc" id="L633">        index = index.parent;</span>
+<span class="fc" id="L634">      }</span>
+<span class="fc" id="L635">    } else {</span>
+<span class="fc" id="L636">      m_root = sibling;</span>
+<span class="fc" id="L637">      sibling.parent = null;</span>
+<span class="fc" id="L638">      freeNode(parent);</span>
+    }
+
+    // validate();
+<span class="fc" id="L642">  }</span>
+
+  // Perform a left or right rotation if node A is imbalanced.
+  // Returns the new root index.
+  private DynamicTreeNode balance(DynamicTreeNode iA) {
+<span class="pc bpc" id="L647" title="2 of 4 branches missed.">    assert (iA != null);</span>
+
+<span class="fc" id="L649">    DynamicTreeNode A = iA;</span>
+<span class="pc bpc" id="L650" title="1 of 4 branches missed.">    if (A.isLeaf() || A.height &lt; 2) {</span>
+<span class="fc" id="L651">      return iA;</span>
+    }
+
+<span class="fc" id="L654">    DynamicTreeNode iB = A.child1;</span>
+<span class="fc" id="L655">    DynamicTreeNode iC = A.child2;</span>
+<span class="pc bpc" id="L656" title="3 of 6 branches missed.">    assert (0 &lt;= iB.id &amp;&amp; iB.id &lt; m_nodeCapacity);</span>
+<span class="pc bpc" id="L657" title="3 of 6 branches missed.">    assert (0 &lt;= iC.id &amp;&amp; iC.id &lt; m_nodeCapacity);</span>
+
+<span class="fc" id="L659">    DynamicTreeNode B = iB;</span>
+<span class="fc" id="L660">    DynamicTreeNode C = iC;</span>
+
+<span class="fc" id="L662">    int balance = C.height - B.height;</span>
+
+    // Rotate C up
+<span class="fc bfc" id="L665" title="All 2 branches covered.">    if (balance &gt; 1) {</span>
+<span class="fc" id="L666">      DynamicTreeNode iF = C.child1;</span>
+<span class="fc" id="L667">      DynamicTreeNode iG = C.child2;</span>
+<span class="fc" id="L668">      DynamicTreeNode F = iF;</span>
+<span class="fc" id="L669">      DynamicTreeNode G = iG;</span>
+<span class="pc bpc" id="L670" title="2 of 4 branches missed.">      assert (F != null);</span>
+<span class="pc bpc" id="L671" title="2 of 4 branches missed.">      assert (G != null);</span>
+<span class="pc bpc" id="L672" title="3 of 6 branches missed.">      assert (0 &lt;= iF.id &amp;&amp; iF.id &lt; m_nodeCapacity);</span>
+<span class="pc bpc" id="L673" title="3 of 6 branches missed.">      assert (0 &lt;= iG.id &amp;&amp; iG.id &lt; m_nodeCapacity);</span>
+
+      // Swap A and C
+<span class="fc" id="L676">      C.child1 = iA;</span>
+<span class="fc" id="L677">      C.parent = A.parent;</span>
+<span class="fc" id="L678">      A.parent = iC;</span>
+
+      // A's old parent should point to C
+<span class="fc bfc" id="L681" title="All 2 branches covered.">      if (C.parent != null) {</span>
+<span class="fc bfc" id="L682" title="All 2 branches covered.">        if (C.parent.child1 == iA) {</span>
+<span class="fc" id="L683">          C.parent.child1 = iC;</span>
+        } else {
+<span class="pc bpc" id="L685" title="2 of 4 branches missed.">          assert (C.parent.child2 == iA);</span>
+<span class="fc" id="L686">          C.parent.child2 = iC;</span>
+        }
+      } else {
+<span class="fc" id="L689">        m_root = iC;</span>
+      }
+
+      // Rotate
+<span class="fc bfc" id="L693" title="All 2 branches covered.">      if (F.height &gt; G.height) {</span>
+<span class="fc" id="L694">        C.child2 = iF;</span>
+<span class="fc" id="L695">        A.child2 = iG;</span>
+<span class="fc" id="L696">        G.parent = iA;</span>
+<span class="fc" id="L697">        A.aabb.combine(B.aabb, G.aabb);</span>
+<span class="fc" id="L698">        C.aabb.combine(A.aabb, F.aabb);</span>
+
+<span class="fc" id="L700">        A.height = 1 + MathUtils.max(B.height, G.height);</span>
+<span class="fc" id="L701">        C.height = 1 + MathUtils.max(A.height, F.height);</span>
+      } else {
+<span class="fc" id="L703">        C.child2 = iG;</span>
+<span class="fc" id="L704">        A.child2 = iF;</span>
+<span class="fc" id="L705">        F.parent = iA;</span>
+<span class="fc" id="L706">        A.aabb.combine(B.aabb, F.aabb);</span>
+<span class="fc" id="L707">        C.aabb.combine(A.aabb, G.aabb);</span>
+
+<span class="fc" id="L709">        A.height = 1 + MathUtils.max(B.height, F.height);</span>
+<span class="fc" id="L710">        C.height = 1 + MathUtils.max(A.height, G.height);</span>
+      }
+
+<span class="fc" id="L713">      return iC;</span>
+    }
+
+    // Rotate B up
+<span class="fc bfc" id="L717" title="All 2 branches covered.">    if (balance &lt; -1) {</span>
+<span class="fc" id="L718">      DynamicTreeNode iD = B.child1;</span>
+<span class="fc" id="L719">      DynamicTreeNode iE = B.child2;</span>
+<span class="fc" id="L720">      DynamicTreeNode D = iD;</span>
+<span class="fc" id="L721">      DynamicTreeNode E = iE;</span>
+<span class="pc bpc" id="L722" title="3 of 6 branches missed.">      assert (0 &lt;= iD.id &amp;&amp; iD.id &lt; m_nodeCapacity);</span>
+<span class="pc bpc" id="L723" title="3 of 6 branches missed.">      assert (0 &lt;= iE.id &amp;&amp; iE.id &lt; m_nodeCapacity);</span>
+
+      // Swap A and B
+<span class="fc" id="L726">      B.child1 = iA;</span>
+<span class="fc" id="L727">      B.parent = A.parent;</span>
+<span class="fc" id="L728">      A.parent = iB;</span>
+
+      // A's old parent should point to B
+<span class="fc bfc" id="L731" title="All 2 branches covered.">      if (B.parent != null) {</span>
+<span class="fc bfc" id="L732" title="All 2 branches covered.">        if (B.parent.child1 == iA) {</span>
+<span class="fc" id="L733">          B.parent.child1 = iB;</span>
+        } else {
+<span class="pc bpc" id="L735" title="2 of 4 branches missed.">          assert (B.parent.child2 == iA);</span>
+<span class="fc" id="L736">          B.parent.child2 = iB;</span>
+        }
+      } else {
+<span class="fc" id="L739">        m_root = iB;</span>
+      }
+
+      // Rotate
+<span class="fc bfc" id="L743" title="All 2 branches covered.">      if (D.height &gt; E.height) {</span>
+<span class="fc" id="L744">        B.child2 = iD;</span>
+<span class="fc" id="L745">        A.child1 = iE;</span>
+<span class="fc" id="L746">        E.parent = iA;</span>
+<span class="fc" id="L747">        A.aabb.combine(C.aabb, E.aabb);</span>
+<span class="fc" id="L748">        B.aabb.combine(A.aabb, D.aabb);</span>
+
+<span class="fc" id="L750">        A.height = 1 + MathUtils.max(C.height, E.height);</span>
+<span class="fc" id="L751">        B.height = 1 + MathUtils.max(A.height, D.height);</span>
+      } else {
+<span class="fc" id="L753">        B.child2 = iE;</span>
+<span class="fc" id="L754">        A.child1 = iD;</span>
+<span class="fc" id="L755">        D.parent = iA;</span>
+<span class="fc" id="L756">        A.aabb.combine(C.aabb, D.aabb);</span>
+<span class="fc" id="L757">        B.aabb.combine(A.aabb, E.aabb);</span>
+
+<span class="fc" id="L759">        A.height = 1 + MathUtils.max(C.height, D.height);</span>
+<span class="fc" id="L760">        B.height = 1 + MathUtils.max(A.height, E.height);</span>
+      }
+
+<span class="fc" id="L763">      return iB;</span>
+    }
+
+<span class="fc" id="L766">    return iA;</span>
+  }
+
+  private void validateStructure(DynamicTreeNode node) {
+<span class="nc bnc" id="L770" title="All 2 branches missed.">    if (node == null) {</span>
+<span class="nc" id="L771">      return;</span>
+    }
+<span class="nc bnc" id="L773" title="All 4 branches missed.">    assert (node == m_nodes[node.id]);</span>
+
+<span class="nc bnc" id="L775" title="All 2 branches missed.">    if (node == m_root) {</span>
+<span class="nc bnc" id="L776" title="All 4 branches missed.">      assert (node.parent == null);</span>
+    }
+
+<span class="nc" id="L779">    DynamicTreeNode child1 = node.child1;</span>
+<span class="nc" id="L780">    DynamicTreeNode child2 = node.child2;</span>
+
+<span class="nc bnc" id="L782" title="All 2 branches missed.">    if (node.isLeaf()) {</span>
+<span class="nc bnc" id="L783" title="All 4 branches missed.">      assert (child1 == null);</span>
+<span class="nc bnc" id="L784" title="All 4 branches missed.">      assert (child2 == null);</span>
+<span class="nc bnc" id="L785" title="All 4 branches missed.">      assert (node.height == 0);</span>
+<span class="nc" id="L786">      return;</span>
+    }
+
+<span class="nc bnc" id="L789" title="All 8 branches missed.">    assert (child1 != null &amp;&amp; 0 &lt;= child1.id &amp;&amp; child1.id &lt; m_nodeCapacity);</span>
+<span class="nc bnc" id="L790" title="All 8 branches missed.">    assert (child2 != null &amp;&amp; 0 &lt;= child2.id &amp;&amp; child2.id &lt; m_nodeCapacity);</span>
+
+<span class="nc bnc" id="L792" title="All 4 branches missed.">    assert (child1.parent == node);</span>
+<span class="nc bnc" id="L793" title="All 4 branches missed.">    assert (child2.parent == node);</span>
+
+<span class="nc" id="L795">    validateStructure(child1);</span>
+<span class="nc" id="L796">    validateStructure(child2);</span>
+<span class="nc" id="L797">  }</span>
+
+  private void validateMetrics(DynamicTreeNode node) {
+<span class="nc bnc" id="L800" title="All 2 branches missed.">    if (node == null) {</span>
+<span class="nc" id="L801">      return;</span>
+    }
+
+<span class="nc" id="L804">    DynamicTreeNode child1 = node.child1;</span>
+<span class="nc" id="L805">    DynamicTreeNode child2 = node.child2;</span>
+
+<span class="nc bnc" id="L807" title="All 2 branches missed.">    if (node.isLeaf()) {</span>
+<span class="nc bnc" id="L808" title="All 4 branches missed.">      assert (child1 == null);</span>
+<span class="nc bnc" id="L809" title="All 4 branches missed.">      assert (child2 == null);</span>
+<span class="nc bnc" id="L810" title="All 4 branches missed.">      assert (node.height == 0);</span>
+<span class="nc" id="L811">      return;</span>
+    }
+
+<span class="nc bnc" id="L814" title="All 8 branches missed.">    assert (child1 != null &amp;&amp; 0 &lt;= child1.id &amp;&amp; child1.id &lt; m_nodeCapacity);</span>
+<span class="nc bnc" id="L815" title="All 8 branches missed.">    assert (child2 != null &amp;&amp; 0 &lt;= child2.id &amp;&amp; child2.id &lt; m_nodeCapacity);</span>
+
+<span class="nc" id="L817">    int height1 = child1.height;</span>
+<span class="nc" id="L818">    int height2 = child2.height;</span>
+    int height;
+<span class="nc" id="L820">    height = 1 + MathUtils.max(height1, height2);</span>
+<span class="nc bnc" id="L821" title="All 4 branches missed.">    assert (node.height == height);</span>
+
+<span class="nc" id="L823">    AABB aabb = new AABB();</span>
+<span class="nc" id="L824">    aabb.combine(child1.aabb, child2.aabb);</span>
+
+<span class="nc bnc" id="L826" title="All 4 branches missed.">    assert (aabb.lowerBound.equals(node.aabb.lowerBound));</span>
+<span class="nc bnc" id="L827" title="All 4 branches missed.">    assert (aabb.upperBound.equals(node.aabb.upperBound));</span>
+
+<span class="nc" id="L829">    validateMetrics(child1);</span>
+<span class="nc" id="L830">    validateMetrics(child2);</span>
+<span class="nc" id="L831">  }</span>
+
+  public void drawTree(DebugDraw argDraw) {
+<span class="nc bnc" id="L834" title="All 2 branches missed.">    if (m_root == null) {</span>
+<span class="nc" id="L835">      return;</span>
+    }
+<span class="nc" id="L837">    int height = computeHeight();</span>
+<span class="nc" id="L838">    drawTree(argDraw, m_root, 0, height);</span>
+<span class="nc" id="L839">  }</span>
+
+<span class="fc" id="L841">  private final Color3f color = new Color3f();</span>
+<span class="fc" id="L842">  private final Vec2 textVec = new Vec2();</span>
+
+  public void drawTree(DebugDraw argDraw, DynamicTreeNode node, int spot, int height) {
+<span class="nc" id="L845">    node.aabb.getVertices(drawVecs);</span>
+
+<span class="nc" id="L847">    color.set(1, (height - spot) * 1f / height, (height - spot) * 1f / height);</span>
+<span class="nc" id="L848">    argDraw.drawPolygon(drawVecs, 4, color);</span>
+
+<span class="nc" id="L850">    argDraw.getViewportTranform().getWorldToScreen(node.aabb.upperBound, textVec);</span>
+<span class="nc" id="L851">    argDraw.drawString(textVec.x, textVec.y, node.id + &quot;-&quot; + (spot + 1) + &quot;/&quot; + height, color);</span>
+
+<span class="nc bnc" id="L853" title="All 2 branches missed.">    if (node.child1 != null) {</span>
+<span class="nc" id="L854">      drawTree(argDraw, node.child1, spot + 1, height);</span>
+    }
+<span class="nc bnc" id="L856" title="All 2 branches missed.">    if (node.child2 != null) {</span>
+<span class="nc" id="L857">      drawTree(argDraw, node.child2, spot + 1, height);</span>
+    }
+<span class="nc" id="L859">  }</span>
+  
+<span class="pc bpc" id="L861" title="1 of 2 branches missed.">  public class TreeNodeStack {</span>
+    private DynamicTreeNode[] stack;
+    private int size;
+    private int position;
+
+<span class="fc" id="L866">    public TreeNodeStack(int initialSize) {</span>
+<span class="fc" id="L867">      stack = new DynamicTreeNode[initialSize];</span>
+<span class="fc" id="L868">      position = 0;</span>
+<span class="fc" id="L869">      size = initialSize;</span>
+<span class="fc" id="L870">    }</span>
+
+    public void reset() {
+<span class="fc" id="L873">      position = 0;</span>
+<span class="fc" id="L874">    }</span>
+
+    public DynamicTreeNode pop() {
+<span class="pc bpc" id="L877" title="2 of 4 branches missed.">      assert (position &gt; 0);</span>
+<span class="fc" id="L878">      return stack[--position];</span>
+    }
+
+    public void push(DynamicTreeNode i) {
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">      if (position == size) {</span>
+<span class="nc" id="L883">        DynamicTreeNode[] old = stack;</span>
+<span class="nc" id="L884">        stack = new DynamicTreeNode[size * 2];</span>
+<span class="nc" id="L885">        size = stack.length;</span>
+<span class="nc" id="L886">        System.arraycopy(old, 0, stack, 0, old.length);</span>
+      }
+<span class="fc" id="L888">      stack[position++] = i;</span>
+<span class="fc" id="L889">    }</span>
+
+    public int getCount() {
+<span class="fc" id="L892">      return position;</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

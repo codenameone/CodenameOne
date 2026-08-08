@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShieldToken.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.shield</a> &gt; <span class="el_source">ShieldToken.java</span></div><h1>ShieldToken.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.shield;
+
+/// A short-lived attestation token, ready to be attached to a request.
+///
+/// The value is opaque to the app. It is meaningful only to the backend that verifies it against
+/// the published Codename One signing keys -- do not parse it, and do not make a security decision
+/// on the device based on its contents, because a device the attacker controls can be made to say
+/// anything.
+///
+/// #### Expiry is measured locally, on purpose
+///
+/// Validity is tracked as &quot;fetched at + time to live&quot; using local elapsed time, never by reading an
+/// expiry field out of the token and comparing it against the device clock. On a rooted device the
+/// clock is attacker-controlled, so a token-embedded expiry can be made to look valid forever. The
+/// verifying backend does its own absolute-time check regardless; [#isValid()] exists so the client
+/// knows when to refresh, not to enforce anything.
+public final class ShieldToken {
+
+    private final String value;
+    private final ShieldStatus status;
+    private final long fetchedAt;
+    private final long ttlMillis;
+    private final String binding;
+
+    /// Monotonic reference captured at construction. `System.currentTimeMillis()`
+    /// is the wall clock: it can be stepped backwards or forwards, by the user or
+    /// by NTP, which would keep a lapsed token looking valid or expire a good one
+    /// early. Elapsed time is measured from here instead; `fetchedAt` is retained
+    /// only because it is meaningful to a human reading a log.
+    private final long fetchedNanos;
+
+    public ShieldToken(String value, ShieldStatus status, long fetchedAt,
+            long ttlMillis, String binding) {
+<span class="fc" id="L56">        this(value, status, fetchedAt, ttlMillis, binding, System.nanoTime());</span>
+<span class="fc" id="L57">    }</span>
+
+    /// Test seam: lets a test place the token at a chosen point in its lifetime.
+    /// Not public, because an app supplying its own reference could only make a
+    /// lapsed token look fresh.
+    ShieldToken(String value, ShieldStatus status, long fetchedAt,
+<span class="fc" id="L63">            long ttlMillis, String binding, long fetchedNanos) {</span>
+<span class="fc" id="L64">        this.value = value;</span>
+        // A missing status is an engine bug, not a success. Defaulting to OK
+        // would make isValid() true and attach a token nobody vouched for.
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        this.status = status == null ? ShieldStatus.NOT_INITIALIZED : status;</span>
+<span class="fc" id="L68">        this.fetchedAt = fetchedAt;</span>
+<span class="fc" id="L69">        this.ttlMillis = ttlMillis;</span>
+<span class="fc" id="L70">        this.binding = binding;</span>
+<span class="fc" id="L71">        this.fetchedNanos = fetchedNanos;</span>
+<span class="fc" id="L72">    }</span>
+
+    /// The opaque token to place in the request header. May be null when [#getStatus()] is not
+    /// [ShieldStatus#OK].
+    public String getValue() {
+<span class="fc" id="L77">        return value;</span>
+    }
+
+    /// Outcome of the fetch that produced this token.
+    public ShieldStatus getStatus() {
+<span class="fc" id="L82">        return status;</span>
+    }
+
+    /// Milliseconds until this token stops being worth sending, or 0 once it has lapsed.
+    public long getMillisUntilExpiry() {
+<span class="fc" id="L87">        long elapsed = (System.nanoTime() - fetchedNanos) / 1000000L;</span>
+<span class="fc" id="L88">        long remaining = ttlMillis - elapsed;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        return remaining &gt; 0 ? remaining : 0;</span>
+    }
+
+    /// True when the token has a value, was fetched successfully, and has not lapsed.
+    public boolean isValid() {
+<span class="fc bfc" id="L94" title="All 6 branches covered.">        return value != null &amp;&amp; status.isSuccess() &amp;&amp; getMillisUntilExpiry() &gt; 0;</span>
+    }
+
+    /// True once the token is far enough through its lifetime to be worth refreshing in the
+    /// background. Refreshing before expiry is what keeps a request from ever having to block.
+    public boolean shouldRefresh(int thresholdPercent) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (ttlMillis &lt;= 0) {</span>
+<span class="nc" id="L101">            return true;</span>
+        }
+<span class="fc" id="L103">        long used = (System.nanoTime() - fetchedNanos) / 1000000L;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        return used * 100 &gt;= ttlMillis * thresholdPercent;</span>
+    }
+
+    /// The request-binding data this token was minted for, or null when it is a plain
+    /// time-limited token not tied to a specific request.
+    public String getBinding() {
+<span class="nc" id="L110">        return binding;</span>
+    }
+
+    /// True when this token was minted for exactly the supplied binding data. A token bound to one
+    /// request must not be reused for another; that is the whole point of binding.
+    public boolean isBoundTo(String data) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (binding == null) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            return data == null;</span>
+        }
+<span class="fc" id="L119">        return binding.equals(data);</span>
+    }
+
+    /// When this token was fetched, in wall-clock time.
+    ///
+    /// For correlating a client log with a server log, and nothing else --
+    /// lifetime decisions use the monotonic reference instead, for the reasons
+    /// in the class documentation.
+    public long getFetchedAt() {
+<span class="nc" id="L128">        return fetchedAt;</span>
+    }
+
+    /// Never renders the token value -- these strings end up in logs.
+    @Override
+    public String toString() {
+<span class="fc" id="L134">        return &quot;ShieldToken[status=&quot; + status.getId()</span>
+                + &quot;, fetchedAt=&quot; + fetchedAt
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                + &quot;, validMs=&quot; + getMillisUntilExpiry()</span>
+                + &quot;, bound=&quot; + (binding != null) + &quot;]&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

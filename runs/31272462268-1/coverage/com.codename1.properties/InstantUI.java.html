@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstantUI.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">InstantUI.java</span></div><h1>InstantUI.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.io.Log;
+import com.codename1.ui.ButtonGroup;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.table.TableLayout;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Instant UI generates a user interface for editing a property business object based on common
+/// conventions and settings within the properties. UI's are automatically bound and work seamlessly.
+/// **Important**: These UI's are subject to change, e.g. a generated UI might not have
+/// validation for a specific property in one build and might introduce it in an update. We try to generate
+/// great UI's seamlessly and some improvements might break functionality.
+///
+/// @author Shai Almog
+<span class="fc" id="L52">public class InstantUI {</span>
+    private PropertyBase[] order;
+
+    /// Excludes the property from the generated UI
+    ///
+    /// #### Parameters
+    ///
+    /// - `exclude`: the property to exclude
+    public void excludeProperty(PropertyBase exclude) {
+<span class="nc" id="L61">        exclude.putClientProperty(&quot;cn1$excludeFromUI&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L62">    }</span>
+
+    /// Excludes the properties from the generated UI
+    ///
+    /// #### Parameters
+    ///
+    /// - `exclude`: the properties to exclude
+    public void excludeProperties(PropertyBase... exclude) {
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        for (PropertyBase p : exclude) {</span>
+<span class="nc" id="L71">            p.putClientProperty(&quot;cn1$excludeFromUI&quot;, Boolean.TRUE);</span>
+        }
+<span class="nc" id="L73">    }</span>
+
+    /// Returns true if the property was excluded from the GUI
+    ///
+    /// #### Parameters
+    ///
+    /// - `exclude`: the property
+    ///
+    /// #### Returns
+    ///
+    /// true if the property was excluded from the GUI
+    public boolean isExcludedProperty(PropertyBase exclude) {
+<span class="fc" id="L85">        return Boolean.TRUE.equals(exclude.getClientProperty(&quot;cn1$excludeFromUI&quot;));</span>
+    }
+
+    /// A property that's a multi-choice can use this API to define the options used e.g.:
+    /// `iui.setMultiChoiceLabels(c.gender, &quot;Male&quot;, &quot;Female&quot;, &quot;Undefined&quot;);
+    /// iui.setMultiChoiceValues(c.gender, &quot;M&quot;, &quot;F&quot;, &quot;U&quot;);`
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `labels`: label for each option
+    public void setMultiChoiceLabels(PropertyBase p, String... labels) {
+<span class="nc" id="L98">        p.putClientProperty(&quot;cn1$multiChceLbl&quot;, labels);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (p.getClientProperty(&quot;cn1$multiChceVal&quot;) == null) {</span>
+<span class="nc" id="L100">            p.putClientProperty(&quot;cn1$multiChceVal&quot;, labels);</span>
+        }
+<span class="nc" id="L102">    }</span>
+
+    /// A property that's a multi-choice can use this API to define the options used, notice that
+    /// this API won't work correctly without `java.lang.String...)`
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `values`: actual values used for each label
+    public void setMultiChoiceValues(PropertyBase p, Object... values) {
+<span class="nc" id="L113">        p.putClientProperty(&quot;cn1$multiChceVal&quot;, values);</span>
+<span class="nc" id="L114">    }</span>
+
+    /// The component class used to map this property
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `cmpCls`: class of the component e.g. `Button.class`
+    public void setComponentClass(PropertyBase p, Class cmpCls) {
+<span class="nc" id="L124">        p.putClientProperty(&quot;cn1$cmpCls&quot;, cmpCls);</span>
+<span class="nc" id="L125">    }</span>
+
+    /// Sets the text field constraint for the property explicitly, notice that some constraints
+    /// are implicit unless set manually e.g. numeric for numbers or password for fields with password
+    /// in the name
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// - `cons`: the text field constraint
+    public void setTextFieldConstraint(PropertyBase p, int cons) {
+<span class="nc" id="L137">        p.putClientProperty(&quot;cn1$tconstraint&quot;, cons);</span>
+<span class="nc" id="L138">    }</span>
+
+    /// The text field constraint for the property. notice that some constraints
+    /// are implicit unless set manually e.g. numeric for numbers or password for fields with password
+    /// in the name
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the property
+    ///
+    /// #### Returns
+    ///
+    /// the constraint matching this property
+    public int getTextFieldConstraint(PropertyBase p) {
+<span class="fc" id="L152">        Integer v = (Integer) p.getClientProperty(&quot;cn1$tconstraint&quot;);</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (v != null) {</span>
+<span class="nc" id="L154">            return v;</span>
+        }
+
+<span class="fc" id="L157">        Class t = p.getGenericType();</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (t != null) {</span>
+<span class="pc bpc" id="L159" title="4 of 8 branches missed.">            if (t == Integer.class || t == Long.class || t == Short.class || t == Byte.class) {</span>
+<span class="nc" id="L160">                return TextArea.NUMERIC;</span>
+            }
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">            if (t == Double.class || t == Float.class) {</span>
+<span class="nc" id="L163">                return TextArea.DECIMAL;</span>
+            }
+        }
+<span class="fc" id="L166">        String n = p.getName().toLowerCase();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (n.indexOf(&quot;password&quot;) &gt; -1) {</span>
+<span class="nc" id="L168">            return TextArea.PASSWORD;</span>
+        }
+<span class="pc bpc" id="L170" title="3 of 6 branches missed.">        if (n.indexOf(&quot;url&quot;) &gt; -1 || n.indexOf(&quot;website&quot;) &gt; -1 || n.indexOf(&quot;blog&quot;) &gt; -1) {</span>
+<span class="nc" id="L171">            return TextArea.URL;</span>
+        }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (n.indexOf(&quot;email&quot;) &gt; -1) {</span>
+<span class="nc" id="L174">            return TextArea.EMAILADDR;</span>
+        }
+<span class="pc bpc" id="L176" title="2 of 4 branches missed.">        if (n.indexOf(&quot;phone&quot;) &gt; -1 || n.indexOf(&quot;mobile&quot;) &gt; -1) {</span>
+<span class="nc" id="L177">            return TextArea.PHONENUMBER;</span>
+        }
+<span class="fc" id="L179">        return TextArea.ANY;</span>
+    }
+
+    /// Returns the order of the properties or null if they should use their
+    /// natural order as they were submitted to the index object
+    ///
+    /// #### Returns
+    ///
+    /// the property order
+    public PropertyBase[] getOrder() {
+<span class="nc" id="L189">        return order;</span>
+    }
+
+    /// Sets the order of the properties, notice that this can also replace exclude
+    ///
+    /// #### Parameters
+    ///
+    /// - `order`: the order of the properties
+    public void setOrder(PropertyBase... order) {
+<span class="nc" id="L198">        this.order = order;</span>
+<span class="nc" id="L199">    }</span>
+
+    /// Creates editing UI for the given business object
+    ///
+    /// #### Parameters
+    ///
+    /// - `bo`: the business object
+    ///
+    /// - `autoCommit`: true if the bindings used should be auto-committed
+    ///
+    /// #### Returns
+    ///
+    /// a UI container that can be used to edit the business object
+    public Container createEditUI(PropertyBusinessObject bo, boolean autoCommit) {
+        Container cnt;
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L215">            TableLayout tl = new TableLayout(1, 2);</span>
+<span class="nc" id="L216">            tl.setGrowHorizontally(true);</span>
+<span class="nc" id="L217">            cnt = new Container(tl);</span>
+<span class="nc" id="L218">        } else {</span>
+<span class="fc" id="L219">            cnt = new Container(BoxLayout.y());</span>
+        }
+<span class="fc" id="L221">        UiBinding uib = new UiBinding();</span>
+<span class="fc" id="L222">        ArrayList&lt;UiBinding.Binding&gt; allBindings = new ArrayList&lt;UiBinding.Binding&gt;();</span>
+<span class="pc bpc" id="L223" title="3 of 4 branches missed.">        if (order != null &amp;&amp; order.length &gt; 0) {</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            for (PropertyBase b : order) {</span>
+<span class="nc" id="L225">                createEntryForProperty(b, cnt, allBindings, uib);</span>
+            }
+        } else {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            for (PropertyBase b : bo.getPropertyIndex()) {</span>
+<span class="fc" id="L229">                createEntryForProperty(b, cnt, allBindings, uib);</span>
+<span class="fc" id="L230">            }</span>
+        }
+
+<span class="fc" id="L233">        cnt.putClientProperty(&quot;cn1$iui-binding&quot;, uib.createGroupBinding(allBindings));</span>
+<span class="fc" id="L234">        return cnt;</span>
+    }
+
+    private void createEntryForProperty(PropertyBase b, Container cnt,
+                                        ArrayList&lt;UiBinding.Binding&gt; allBindings, UiBinding uib) throws
+            RuntimeException {
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (isExcludedProperty(b)) {</span>
+<span class="nc" id="L241">            return;</span>
+        }
+<span class="fc" id="L243">        Class cls = (Class) b.getClientProperty(&quot;cn1$cmpCls&quot;);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (cls != null) {</span>
+            try {
+<span class="nc" id="L246">                Component cmp = (Component) cls.newInstance();</span>
+<span class="nc" id="L247">                cmp.setName(b.getName());</span>
+<span class="nc" id="L248">                cnt.add(b.getLabel()).</span>
+<span class="nc" id="L249">                        add(cmp);</span>
+<span class="nc" id="L250">                allBindings.add(uib.bind(b, cmp));</span>
+<span class="nc" id="L251">            } catch (InstantiationException err) {</span>
+<span class="nc" id="L252">                Log.e(err);</span>
+<span class="nc" id="L253">                throw new RuntimeException(&quot;Custom property instant UI failed for &quot; + b.getName() + &quot; &quot; + err, err);</span>
+<span class="nc" id="L254">            } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L255">                Log.e(err);</span>
+<span class="nc" id="L256">                throw new RuntimeException(&quot;Custom property instant UI failed for &quot; + b.getName() + &quot; &quot; + err, err);</span>
+<span class="nc" id="L257">            } catch (RuntimeException err) {</span>
+<span class="nc" id="L258">                Log.e(err);</span>
+<span class="nc" id="L259">                throw new RuntimeException(&quot;Custom property instant UI failed for &quot; + b.getName() + &quot; &quot; + err, err);</span>
+<span class="nc" id="L260">            }</span>
+<span class="nc" id="L261">            return;</span>
+        }
+<span class="fc" id="L263">        String[] multiLabels = (String[]) b.getClientProperty(&quot;cn1$multiChceLbl&quot;);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (multiLabels != null) {</span>
+            // multi choice component
+<span class="nc" id="L266">            final Object[] multiValues = (Object[]) b.getClientProperty(&quot;cn1$multiChceVal&quot;);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            if (multiLabels.length &lt; 5) {</span>
+                // toggle buttons
+<span class="nc" id="L269">                ButtonGroup bg = new ButtonGroup();</span>
+<span class="nc" id="L270">                RadioButton[] rbs = new RadioButton[multiLabels.length];</span>
+<span class="nc" id="L271">                cnt.add(b.getLabel());</span>
+<span class="nc" id="L272">                Container radioBox = new Container(new GridLayout(multiLabels.length));</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                for (int iter = 0; iter &lt; multiLabels.length; iter++) {</span>
+<span class="nc" id="L274">                    rbs[iter] = RadioButton.createToggle(multiLabels[iter], bg);</span>
+<span class="nc" id="L275">                    radioBox.add(rbs[iter]);</span>
+                }
+<span class="nc" id="L277">                cnt.add(radioBox);</span>
+<span class="nc" id="L278">                allBindings.add(uib.bindGroup(b, multiValues, rbs));</span>
+<span class="nc" id="L279">            } else {</span>
+<span class="nc" id="L280">                Picker stringPicker = new Picker();</span>
+<span class="nc" id="L281">                stringPicker.setStrings(multiLabels);</span>
+<span class="nc" id="L282">                Map&lt;Object, Object&gt; m1 = new HashMap&lt;Object, Object&gt;();</span>
+<span class="nc" id="L283">                Map&lt;Object, Object&gt; m2 = new HashMap&lt;Object, Object&gt;();</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                for (int iter = 0; iter &lt; multiLabels.length; iter++) {</span>
+<span class="nc" id="L285">                    m1.put(multiLabels[iter], multiValues[iter]);</span>
+<span class="nc" id="L286">                    m2.put(multiValues[iter], multiLabels[iter]);</span>
+                }
+<span class="nc" id="L288">                cnt.add(b.getLabel()).</span>
+<span class="nc" id="L289">                        add(stringPicker);</span>
+<span class="nc" id="L290">                allBindings.add(uib.bind(b, stringPicker,</span>
+                        new UiBinding.PickerAdapter&lt;Object&gt;(
+                                new UiBinding.MappingConverter(m1), new UiBinding.MappingConverter(m2))));
+            }
+<span class="nc" id="L294">            return;</span>
+        }
+<span class="fc" id="L296">        Class t = b.getGenericType();</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (t != null) {</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (t == Boolean.class) {</span>
+<span class="fc" id="L299">                CheckBox cb = new CheckBox();</span>
+<span class="fc" id="L300">                uib.bind(b, cb);</span>
+<span class="fc" id="L301">                cnt.add(b.getLabel()).</span>
+<span class="fc" id="L302">                        add(cb);</span>
+<span class="fc" id="L303">                return;</span>
+            }
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (t == Date.class) {</span>
+<span class="nc" id="L306">                Picker dp = new Picker();</span>
+<span class="nc" id="L307">                dp.setType(Display.PICKER_TYPE_DATE);</span>
+<span class="nc" id="L308">                uib.bind(b, dp);</span>
+<span class="nc" id="L309">                cnt.add(b.getLabel()).</span>
+<span class="nc" id="L310">                        add(dp);</span>
+<span class="nc" id="L311">                return;</span>
+            }
+        }
+<span class="fc" id="L314">        TextField tf = new TextField();</span>
+<span class="fc" id="L315">        tf.setConstraint(getTextFieldConstraint(b));</span>
+<span class="fc" id="L316">        uib.bind(b, tf);</span>
+<span class="fc" id="L317">        cnt.add(b.getLabel()).</span>
+<span class="fc" id="L318">                add(tf);</span>
+<span class="fc" id="L319">    }</span>
+
+    /// Returns the Binding object for the given container which allows us control over the widgets
+    /// and their commit status
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container returned by the `#createUI(boolean)` method
+    ///
+    /// #### Returns
+    ///
+    /// a binding object
+    public UiBinding.Binding getBindings(Container cnt) {
+<span class="fc" id="L332">        return (UiBinding.Binding) cnt.getClientProperty(&quot;cn1$iui-binding&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

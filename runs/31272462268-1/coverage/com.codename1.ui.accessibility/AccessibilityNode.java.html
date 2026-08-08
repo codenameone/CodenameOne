@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityNode.java</span></div><h1>AccessibilityNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.geom.Rectangle;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Mutable semantic configuration for a lightweight component or virtual child.
+///
+/// Component-owned nodes are obtained with {@link Component#getSemantics()}.
+/// Applications can create standalone nodes for an {@link AccessibilityChildProvider};
+/// virtual nodes must have a stable {@link #setVirtualKey(java.lang.String) virtual key}.
+public class AccessibilityNode {
+    private Component owner;
+    // Stable runtime IDs belong to the component-owned semantic node. Keeping
+    // them here gives them exactly the component's lifetime without relying on
+    // the weak-value UI cache, whose boxed Long values may be collected while
+    // the component is still alive.
+    private long internalId;
+    private Map&lt;String, Long&gt; internalVirtualIds;
+    private String virtualKey;
+    private String identifier;
+    private String label;
+    private String hint;
+    private String description;
+    private String value;
+    private String validationError;
+    private String paneTitle;
+    private String roleDescription;
+<span class="pc" id="L55">    private AccessibilityRole role = AccessibilityRole.NONE;</span>
+<span class="pc" id="L56">    private AccessibilityCheckedState checked = AccessibilityCheckedState.UNSPECIFIED;</span>
+<span class="pc" id="L57">    private AccessibilityLiveRegion liveRegion = AccessibilityLiveRegion.OFF;</span>
+<span class="pc" id="L58">    private AccessibilityGrouping grouping = AccessibilityGrouping.AUTO;</span>
+    private AccessibilityRange range;
+    private AccessibilityCollectionInfo collectionInfo;
+    private AccessibilityCollectionItemInfo collectionItemInfo;
+    private AccessibilityChildProvider childProvider;
+    private Rectangle bounds;
+    private Boolean selected;
+    private Boolean expanded;
+    private Boolean enabled;
+    private Boolean invalid;
+    private Boolean busy;
+    private Boolean readOnly;
+    private Boolean required;
+    private Boolean multiline;
+    private Boolean obscured;
+    private Boolean pressed;
+    private Boolean current;
+    private boolean modal;
+<span class="pc" id="L76">    private int headingLevel = -1;</span>
+<span class="pc" id="L77">    private double sortKey = Double.NaN;</span>
+    private Component traversalBefore;
+    private Component traversalAfter;
+<span class="pc" id="L80">    private final List&lt;AccessibilityAction&gt; actions = new ArrayList&lt;AccessibilityAction&gt;();</span>
+<span class="pc" id="L81">    private final List&lt;AccessibilityNode&gt; children = new ArrayList&lt;AccessibilityNode&gt;();</span>
+
+<span class="nc" id="L83">    public AccessibilityNode() {</span>
+<span class="nc" id="L84">    }</span>
+
+<span class="fc" id="L86">    public AccessibilityNode(String virtualKey) {</span>
+<span class="fc" id="L87">        setVirtualKey(virtualKey);</span>
+<span class="fc" id="L88">    }</span>
+
+    /// Internal constructor used by {@link Component}.
+<span class="fc" id="L91">    public AccessibilityNode(Component owner) {</span>
+<span class="fc" id="L92">        this.owner = owner;</span>
+<span class="fc" id="L93">    }</span>
+
+    private AccessibilityNode changed(int type) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (owner != null) {</span>
+<span class="fc" id="L97">            AccessibilityManager.getInstance().invalidate(owner, type);</span>
+        }
+<span class="fc" id="L99">        return this;</span>
+    }
+
+    public Component getOwner() {
+<span class="nc" id="L103">        return owner;</span>
+    }
+
+    long getInternalId() {
+<span class="fc" id="L107">        return internalId;</span>
+    }
+
+    void setInternalId(long internalId) {
+<span class="fc" id="L111">        this.internalId = internalId;</span>
+<span class="fc" id="L112">    }</span>
+
+    Long getInternalVirtualId(String path) {
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        return internalVirtualIds == null ? null : internalVirtualIds.get(path);</span>
+    }
+
+    void putInternalVirtualId(String path, long id) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (internalVirtualIds == null) {</span>
+<span class="fc" id="L120">            internalVirtualIds = new LinkedHashMap&lt;String, Long&gt;();</span>
+        }
+<span class="fc" id="L122">        internalVirtualIds.put(path, Long.valueOf(id));</span>
+<span class="fc" id="L123">    }</span>
+    public String getVirtualKey() {
+<span class="fc" id="L125">        return virtualKey;</span>
+    }
+    public AccessibilityNode setVirtualKey(String virtualKey) {
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">        if (virtualKey == null || virtualKey.length() == 0) {</span>
+<span class="nc" id="L129">            throw new IllegalArgumentException(&quot;Virtual accessibility nodes require a non-empty stable key&quot;);</span>
+        }
+<span class="fc" id="L131">        this.virtualKey = virtualKey;</span>
+<span class="fc" id="L132">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public String getIdentifier() {
+<span class="fc" id="L135">        return identifier;</span>
+    }
+    public AccessibilityNode setIdentifier(String identifier) {
+<span class="fc" id="L138">        this.identifier = identifier;</span>
+<span class="fc" id="L139">        return changed(AccessibilityManager.CHANGE_CONTENT);</span>
+    }
+    public String getLabel() {
+<span class="fc" id="L142">        return label;</span>
+    }
+    public AccessibilityNode setLabel(String label) {
+<span class="fc" id="L145">        this.label = label;</span>
+<span class="fc" id="L146">        return changed(AccessibilityManager.CHANGE_CONTENT);</span>
+    }
+    public String getHint() {
+<span class="fc" id="L149">        return hint;</span>
+    }
+    public AccessibilityNode setHint(String hint) {
+<span class="fc" id="L152">        this.hint = hint;</span>
+<span class="fc" id="L153">        return changed(AccessibilityManager.CHANGE_CONTENT);</span>
+    }
+    public String getDescription() {
+<span class="fc" id="L156">        return description;</span>
+    }
+    public AccessibilityNode setDescription(String description) {
+<span class="nc" id="L159">        this.description = description;</span>
+<span class="nc" id="L160">        return changed(AccessibilityManager.CHANGE_CONTENT);</span>
+    }
+    public String getValue() {
+<span class="fc" id="L163">        return value;</span>
+    }
+    public AccessibilityNode setValue(String value) {
+<span class="nc" id="L166">        this.value = value;</span>
+<span class="nc" id="L167">        return changed(AccessibilityManager.CHANGE_VALUE);</span>
+    }
+    public String getValidationError() {
+<span class="fc" id="L170">        return validationError;</span>
+    }
+    public AccessibilityNode setValidationError(String error) {
+<span class="fc" id="L173">        this.validationError = error;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        this.invalid = error == null ? null : Boolean.TRUE;</span>
+<span class="fc" id="L175">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public String getPaneTitle() {
+<span class="fc" id="L178">        return paneTitle;</span>
+    }
+    public AccessibilityNode setPaneTitle(String paneTitle) {
+<span class="nc" id="L181">        this.paneTitle = paneTitle;</span>
+<span class="nc" id="L182">        return changed(AccessibilityManager.CHANGE_PANE);</span>
+    }
+    public String getRoleDescription() {
+<span class="fc" id="L185">        return roleDescription;</span>
+    }
+    public AccessibilityNode setRoleDescription(String roleDescription) {
+<span class="nc" id="L188">        this.roleDescription = roleDescription;</span>
+<span class="nc" id="L189">        return changed(AccessibilityManager.CHANGE_CONTENT);</span>
+    }
+    public AccessibilityRole getRole() {
+<span class="fc" id="L192">        return role;</span>
+    }
+    public AccessibilityNode setRole(AccessibilityRole role) {
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        this.role = role == null ? AccessibilityRole.NONE : role;</span>
+<span class="fc" id="L196">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public AccessibilityCheckedState getChecked() {
+<span class="fc" id="L199">        return checked;</span>
+    }
+    public AccessibilityNode setChecked(AccessibilityCheckedState checked) {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        this.checked = checked == null ? AccessibilityCheckedState.UNSPECIFIED : checked;</span>
+<span class="fc" id="L203">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public AccessibilityLiveRegion getLiveRegion() {
+<span class="fc" id="L206">        return liveRegion;</span>
+    }
+    public AccessibilityNode setLiveRegion(AccessibilityLiveRegion liveRegion) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        this.liveRegion = liveRegion == null ? AccessibilityLiveRegion.OFF : liveRegion;</span>
+<span class="nc" id="L210">        return changed(AccessibilityManager.CHANGE_LIVE_REGION);</span>
+    }
+    public AccessibilityGrouping getGrouping() {
+<span class="fc" id="L213">        return grouping;</span>
+    }
+    public AccessibilityNode setGrouping(AccessibilityGrouping grouping) {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        this.grouping = grouping == null ? AccessibilityGrouping.AUTO : grouping;</span>
+<span class="fc" id="L217">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public AccessibilityRange getRange() {
+<span class="fc" id="L220">        return range;</span>
+    }
+    public AccessibilityNode setRange(AccessibilityRange range) {
+<span class="fc" id="L223">        this.range = range;</span>
+<span class="fc" id="L224">        return changed(AccessibilityManager.CHANGE_VALUE);</span>
+    }
+    public AccessibilityCollectionInfo getCollectionInfo() {
+<span class="fc" id="L227">        return collectionInfo;</span>
+    }
+    public AccessibilityNode setCollectionInfo(AccessibilityCollectionInfo info) {
+<span class="nc" id="L230">        this.collectionInfo = info;</span>
+<span class="nc" id="L231">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public AccessibilityCollectionItemInfo getCollectionItemInfo() {
+<span class="fc" id="L234">        return collectionItemInfo;</span>
+    }
+    public AccessibilityNode setCollectionItemInfo(AccessibilityCollectionItemInfo info) {
+<span class="fc" id="L237">        this.collectionItemInfo = info;</span>
+<span class="fc" id="L238">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public AccessibilityChildProvider getChildProvider() {
+<span class="fc" id="L241">        return childProvider;</span>
+    }
+    public AccessibilityNode setChildProvider(AccessibilityChildProvider provider) {
+<span class="nc" id="L244">        this.childProvider = provider;</span>
+<span class="nc" id="L245">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public Rectangle getBounds() {
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        return bounds == null ? null : new Rectangle(bounds);</span>
+    }
+    public AccessibilityNode setBounds(Rectangle bounds) {
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        this.bounds = bounds == null ? null : new Rectangle(bounds);</span>
+<span class="fc" id="L252">        return changed(AccessibilityManager.CHANGE_BOUNDS);</span>
+    }
+    public Boolean getSelected() {
+<span class="fc" id="L255">        return selected;</span>
+    }
+    public AccessibilityNode setSelected(Boolean selected) {
+<span class="fc" id="L258">        this.selected = selected;</span>
+<span class="fc" id="L259">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getExpanded() {
+<span class="fc" id="L262">        return expanded;</span>
+    }
+    public AccessibilityNode setExpanded(Boolean expanded) {
+<span class="nc" id="L265">        this.expanded = expanded;</span>
+<span class="nc" id="L266">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getEnabled() {
+<span class="fc" id="L269">        return enabled;</span>
+    }
+    public AccessibilityNode setEnabled(Boolean enabled) {
+<span class="nc" id="L272">        this.enabled = enabled;</span>
+<span class="nc" id="L273">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getInvalid() {
+<span class="fc" id="L276">        return invalid;</span>
+    }
+    public AccessibilityNode setInvalid(Boolean invalid) {
+<span class="nc" id="L279">        this.invalid = invalid;</span>
+<span class="nc" id="L280">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getBusy() {
+<span class="fc" id="L283">        return busy;</span>
+    }
+    public AccessibilityNode setBusy(Boolean busy) {
+<span class="nc" id="L286">        this.busy = busy;</span>
+<span class="nc" id="L287">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getReadOnly() {
+<span class="fc" id="L290">        return readOnly;</span>
+    }
+    public AccessibilityNode setReadOnly(Boolean readOnly) {
+<span class="nc" id="L293">        this.readOnly = readOnly;</span>
+<span class="nc" id="L294">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getRequired() {
+<span class="fc" id="L297">        return required;</span>
+    }
+    public AccessibilityNode setRequired(Boolean required) {
+<span class="nc" id="L300">        this.required = required;</span>
+<span class="nc" id="L301">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getMultiline() {
+<span class="fc" id="L304">        return multiline;</span>
+    }
+    public AccessibilityNode setMultiline(Boolean multiline) {
+<span class="nc" id="L307">        this.multiline = multiline;</span>
+<span class="nc" id="L308">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getObscured() {
+<span class="fc" id="L311">        return obscured;</span>
+    }
+    public AccessibilityNode setObscured(Boolean obscured) {
+<span class="nc" id="L314">        this.obscured = obscured;</span>
+<span class="nc" id="L315">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getPressed() {
+<span class="fc" id="L318">        return pressed;</span>
+    }
+    public AccessibilityNode setPressed(Boolean pressed) {
+<span class="nc" id="L321">        this.pressed = pressed;</span>
+<span class="nc" id="L322">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public Boolean getCurrent() {
+<span class="fc" id="L325">        return current;</span>
+    }
+    public AccessibilityNode setCurrent(Boolean current) {
+<span class="nc" id="L328">        this.current = current;</span>
+<span class="nc" id="L329">        return changed(AccessibilityManager.CHANGE_STATE);</span>
+    }
+    public boolean isModal() {
+<span class="fc" id="L332">        return modal;</span>
+    }
+    public AccessibilityNode setModal(boolean modal) {
+<span class="nc" id="L335">        this.modal = modal;</span>
+<span class="nc" id="L336">        return changed(AccessibilityManager.CHANGE_PANE);</span>
+    }
+    public int getHeadingLevel() {
+<span class="fc" id="L339">        return headingLevel;</span>
+    }
+    public AccessibilityNode setHeadingLevel(int level) {
+<span class="nc" id="L342">        this.headingLevel = level;</span>
+<span class="nc bnc" id="L343" title="All 4 branches missed.">        if (level &gt; 0 &amp;&amp; role == AccessibilityRole.NONE) {</span>
+<span class="nc" id="L344">            role = AccessibilityRole.HEADING;</span>
+        }
+<span class="nc" id="L346">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public double getSortKey() {
+<span class="fc" id="L349">        return sortKey;</span>
+    }
+    public AccessibilityNode setSortKey(double sortKey) {
+<span class="fc" id="L352">        this.sortKey = sortKey;</span>
+<span class="fc" id="L353">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public Component getTraversalBefore() {
+<span class="fc" id="L356">        return traversalBefore;</span>
+    }
+    public AccessibilityNode setTraversalBefore(Component component) {
+<span class="nc" id="L359">        this.traversalBefore = component;</span>
+<span class="nc" id="L360">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+    public Component getTraversalAfter() {
+<span class="fc" id="L363">        return traversalAfter;</span>
+    }
+    public AccessibilityNode setTraversalAfter(Component component) {
+<span class="nc" id="L366">        this.traversalAfter = component;</span>
+<span class="nc" id="L367">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+
+    public AccessibilityNode addAction(AccessibilityAction action) {
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        if (action == null) {</span>
+<span class="nc" id="L372">            throw new NullPointerException(&quot;action&quot;);</span>
+        }
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        for (int i = actions.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (actions.get(i).getId().equals(action.getId())) {</span>
+<span class="nc" id="L376">                actions.remove(i);</span>
+            }
+        }
+<span class="fc" id="L379">        actions.add(action);</span>
+<span class="fc" id="L380">        return changed(AccessibilityManager.CHANGE_ACTIONS);</span>
+    }
+
+    public AccessibilityNode removeAction(String id) {
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        for (int i = actions.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            if (actions.get(i).getId().equals(id)) {</span>
+<span class="nc" id="L386">                actions.remove(i);</span>
+            }
+        }
+<span class="nc" id="L389">        return changed(AccessibilityManager.CHANGE_ACTIONS);</span>
+    }
+
+    public List&lt;AccessibilityAction&gt; getActions() {
+<span class="fc" id="L393">        return Collections.unmodifiableList(actions);</span>
+    }
+
+    public AccessibilityNode addChild(AccessibilityNode child) {
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        if (child == null) {</span>
+<span class="nc" id="L398">            throw new NullPointerException(&quot;child&quot;);</span>
+        }
+<span class="nc" id="L400">        children.add(child);</span>
+<span class="nc" id="L401">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+
+    public AccessibilityNode clearChildren() {
+<span class="nc" id="L405">        children.clear();</span>
+<span class="nc" id="L406">        return changed(AccessibilityManager.CHANGE_STRUCTURE);</span>
+    }
+
+    public List&lt;AccessibilityNode&gt; getChildren() {
+<span class="fc" id="L410">        return Collections.unmodifiableList(children);</span>
+    }
+
+    public boolean hasExplicitConfiguration() {
+<span class="pc bpc" id="L414" title="27 of 58 branches missed.">        return role != AccessibilityRole.NONE || label != null || hint != null || description != null ||</span>
+                value != null || validationError != null || paneTitle != null || roleDescription != null ||
+                checked != AccessibilityCheckedState.UNSPECIFIED || liveRegion != AccessibilityLiveRegion.OFF ||
+                grouping != AccessibilityGrouping.AUTO || range != null || collectionInfo != null ||
+                collectionItemInfo != null || childProvider != null || bounds != null || selected != null ||
+                expanded != null || enabled != null || invalid != null || busy != null || readOnly != null ||
+                required != null || multiline != null || obscured != null || pressed != null || current != null ||
+<span class="pc bpc" id="L421" title="2 of 6 branches missed.">                modal || headingLevel &gt; 0 || !Double.isNaN(sortKey) || traversalBefore != null ||</span>
+<span class="pc bpc" id="L422" title="2 of 4 branches missed.">                traversalAfter != null || !actions.isEmpty() || !children.isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

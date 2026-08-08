@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BidiUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">BidiUtil.java</span></div><h1>BidiUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+/// A compact implementation of the core Unicode Bidirectional Algorithm (UAX #9) used by the pure text
+/// editor to lay out, hit test and render a single line of mixed left-to-right / right-to-left text.
+///
+/// The editor renders each directional run as a substring so the platform font engine performs the actual
+/// glyph shaping (Arabic joining, ligatures); this class only resolves the *embedding levels* of the
+/// characters on a line and the *visual order* those characters appear in. That division keeps the editor
+/// correct on every platform while remaining self contained and unit testable with no UI dependency.
+///
+/// A single paragraph line is assumed (no explicit embedding/override controls beyond the paragraph base
+/// direction, and no line wrapping inside the algorithm). This covers the editor's model where each
+/// document line is one paragraph. The implementation follows the resolution phases of UAX #9: character
+/// typing, the weak type rules W1-W7, the neutral rules N1-N2, the implicit level rules I1-I2 and the
+/// reordering rule L2.
+final class BidiUtil {
+    // Bidirectional character types (a subset of UAX #9 sufficient for the editor).
+    static final byte L = 0;    // Left-to-Right (strong)
+    static final byte R = 1;    // Right-to-Left (strong)
+    static final byte AL = 2;   // Right-to-Left Arabic (strong)
+    static final byte EN = 3;   // European Number
+    static final byte ES = 4;   // European Number Separator
+    static final byte ET = 5;   // European Number Terminator
+    static final byte AN = 6;   // Arabic Number
+    static final byte CS = 7;   // Common Number Separator
+    static final byte NSM = 8;  // Nonspacing Mark
+    static final byte BN = 9;   // Boundary Neutral
+    static final byte ON = 10;  // Other Neutral
+    static final byte WS = 11;  // Whitespace
+
+    private BidiUtil() {
+    }
+
+    /// Returns the bidirectional character type of a single UTF-16 code unit. Uses coarse Unicode ranges
+    /// that cover the scripts an editor realistically handles (Latin, Arabic, Hebrew, Syriac, Thaana,
+    /// common digits, punctuation and whitespace).
+    static byte typeOf(char c) {
+<span class="pc bpc" id="L61" title="4 of 10 branches missed.">        if (c == '\t' || c == ' ' || c == 0x00A0 || c == 0x2007 || c == 0x202F) {</span>
+<span class="fc" id="L62">            return WS;</span>
+        }
+<span class="pc bpc" id="L64" title="5 of 10 branches missed.">        if (c == '\n' || c == '\r' || c == 0x0085 || c == 0x2028 || c == 0x2029) {</span>
+<span class="nc" id="L65">            return WS;</span>
+        }
+        // European digits
+<span class="fc bfc" id="L68" title="All 4 branches covered.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L69">            return EN;</span>
+        }
+        // Arabic-Indic and Extended Arabic-Indic digits
+<span class="pc bpc" id="L72" title="1 of 8 branches missed.">        if ((c &gt;= 0x0660 &amp;&amp; c &lt;= 0x0669) || (c &gt;= 0x06F0 &amp;&amp; c &lt;= 0x06F9)) {</span>
+<span class="fc" id="L73">            return AN;</span>
+        }
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">        if (c == '+' || c == '-') {</span>
+<span class="nc" id="L76">            return ES;</span>
+        }
+<span class="pc bpc" id="L78" title="8 of 18 branches missed.">        if (c == '#' || c == '$' || c == '%' || c == 0x00A2 || c == 0x00A3 || c == 0x00A5</span>
+                || c == 0x00B0 || c == 0x00B1 || c == 0x066A) {
+<span class="fc" id="L80">            return ET;</span>
+        }
+<span class="pc bpc" id="L82" title="3 of 8 branches missed.">        if (c == ',' || c == '.' || c == ':' || c == '/') {</span>
+<span class="fc" id="L83">            return CS;</span>
+        }
+        // Combining marks
+<span class="pc bpc" id="L86" title="8 of 30 branches missed.">        if ((c &gt;= 0x0300 &amp;&amp; c &lt;= 0x036F) || (c &gt;= 0x0483 &amp;&amp; c &lt;= 0x0489)</span>
+                || (c &gt;= 0x0591 &amp;&amp; c &lt;= 0x05BD) || (c &gt;= 0x0610 &amp;&amp; c &lt;= 0x061A)
+                || (c &gt;= 0x064B &amp;&amp; c &lt;= 0x065F) || c == 0x0670
+                || (c &gt;= 0x06D6 &amp;&amp; c &lt;= 0x06DC) || (c &gt;= 0x06DF &amp;&amp; c &lt;= 0x06E4)) {
+<span class="nc" id="L90">            return NSM;</span>
+        }
+        // Hebrew and Hebrew presentation forms (strong R)
+<span class="pc bpc" id="L93" title="1 of 8 branches missed.">        if ((c &gt;= 0x0590 &amp;&amp; c &lt;= 0x05FF) || (c &gt;= 0xFB1D &amp;&amp; c &lt;= 0xFB4F)) {</span>
+<span class="fc" id="L94">            return R;</span>
+        }
+        // Arabic, Arabic Supplement/Extended, Syriac, Thaana, and Arabic presentation forms (strong AL)
+<span class="pc bpc" id="L97" title="6 of 28 branches missed.">        if ((c &gt;= 0x0600 &amp;&amp; c &lt;= 0x06FF) || (c &gt;= 0x0700 &amp;&amp; c &lt;= 0x074F)</span>
+                || (c &gt;= 0x0750 &amp;&amp; c &lt;= 0x077F) || (c &gt;= 0x0780 &amp;&amp; c &lt;= 0x07BF)
+                || (c &gt;= 0x08A0 &amp;&amp; c &lt;= 0x08FF)
+                || (c &gt;= 0xFB50 &amp;&amp; c &lt;= 0xFDFF) || (c &gt;= 0xFE70 &amp;&amp; c &lt;= 0xFEFF)) {
+<span class="fc" id="L101">            return AL;</span>
+        }
+        // Latin letters and the vast majority of the BMP letters an editor sees are strong L.
+<span class="fc bfc" id="L104" title="All 8 branches covered.">        if ((c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || (c &gt;= 'a' &amp;&amp; c &lt;= 'z')) {</span>
+<span class="fc" id="L105">            return L;</span>
+        }
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">        if (c &gt;= 0x00C0 &amp;&amp; c &lt;= 0x024F) {</span>
+<span class="nc" id="L108">            return L;</span>
+        }
+        // CJK, Kana, Hangul and the like are strong L for bidi purposes.
+<span class="fc bfc" id="L111" title="All 4 branches covered.">        if (c &gt;= 0x2E80 &amp;&amp; c &lt;= 0xD7FF) {</span>
+<span class="fc" id="L112">            return L;</span>
+        }
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (c &gt;= 0xF900 &amp;&amp; c &lt;= 0xFAFF) {</span>
+<span class="nc" id="L115">            return L;</span>
+        }
+        // Everything else (ASCII punctuation, symbols) is a neutral.
+<span class="fc" id="L118">        return ON;</span>
+    }
+
+    /// Returns true if the paragraph's automatically detected base direction is right-to-left, per rules
+    /// P2/P3: the direction of the first strong (L, R or AL) character, defaulting to left-to-right.
+    static boolean autoBaseRtl(String text) {
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L125">            byte t = typeOf(text.charAt(i));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (t == L) {</span>
+<span class="fc" id="L127">                return false;</span>
+            }
+<span class="fc bfc" id="L129" title="All 4 branches covered.">            if (t == R || t == AL) {</span>
+<span class="fc" id="L130">                return true;</span>
+            }
+        }
+<span class="nc" id="L133">        return false;</span>
+    }
+
+    /// Resolves the bidi embedding level of every character on a line. `baseRtl` is the paragraph base
+    /// direction (embedding level 1 when true, 0 when false).
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the line text (a single paragraph, no line breaks)
+    ///
+    /// - `baseRtl`: true for a right-to-left base direction
+    ///
+    /// #### Returns
+    ///
+    /// a `byte[]` the same length as `text`, holding the resolved level of each character
+    static byte[] resolveLevels(String text, boolean baseRtl) {
+<span class="fc" id="L149">        int n = text.length();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        byte baseLevel = (byte) (baseRtl ? 1 : 0);</span>
+<span class="fc" id="L151">        byte[] levels = new byte[n];</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L153">            return levels;</span>
+        }
+<span class="fc" id="L155">        byte[] types = new byte[n];</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L157">            types[i] = typeOf(text.charAt(i));</span>
+        }
+        // W1: NSM takes the type of the previous character, or the base type (treated as ON) at the start.
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (types[i] == NSM) {</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                types[i] = (i == 0) ? ON : types[i - 1];</span>
+            }
+        }
+        // W2: EN becomes AN if the previous strong type is AL.
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        byte prevStrong = baseRtl ? R : L;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L168">            byte t = types[i];</span>
+<span class="fc bfc" id="L169" title="All 6 branches covered.">            if (t == L || t == R || t == AL) {</span>
+<span class="fc" id="L170">                prevStrong = t;</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">            } else if (t == EN &amp;&amp; prevStrong == AL) {</span>
+<span class="fc" id="L172">                types[i] = AN;</span>
+            }
+        }
+        // W3: AL becomes R.
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (types[i] == AL) {</span>
+<span class="fc" id="L178">                types[i] = R;</span>
+            }
+        }
+        // W4: a single ES between two EN becomes EN; a single CS between two numbers of the same type
+        // becomes that type.
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (int i = 1; i &lt; n - 1; i++) {</span>
+<span class="pc bpc" id="L184" title="5 of 6 branches missed.">            if (types[i] == ES &amp;&amp; types[i - 1] == EN &amp;&amp; types[i + 1] == EN) {</span>
+<span class="nc" id="L185">                types[i] = EN;</span>
+<span class="pc bpc" id="L186" title="7 of 8 branches missed.">            } else if (types[i] == CS &amp;&amp; types[i - 1] == types[i + 1]</span>
+                    &amp;&amp; (types[i - 1] == EN || types[i - 1] == AN)) {
+<span class="nc" id="L188">                types[i] = types[i - 1];</span>
+            }
+        }
+        // W5: a sequence of ET adjacent to EN becomes EN.
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (types[i] == ET) {</span>
+<span class="nc" id="L194">                int start = i;</span>
+<span class="nc bnc" id="L195" title="All 4 branches missed.">                while (i &lt; n &amp;&amp; types[i] == ET) {</span>
+<span class="nc" id="L196">                    i++;</span>
+                }
+<span class="nc bnc" id="L198" title="All 8 branches missed.">                boolean en = (start &gt; 0 &amp;&amp; types[start - 1] == EN) || (i &lt; n &amp;&amp; types[i] == EN);</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                if (en) {</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                    for (int j = start; j &lt; i; j++) {</span>
+<span class="nc" id="L201">                        types[j] = EN;</span>
+                    }
+                }
+<span class="nc" id="L204">                i--;</span>
+            }
+        }
+        // W6: remaining ES, ET, CS become ON.
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L209" title="3 of 6 branches missed.">            if (types[i] == ES || types[i] == ET || types[i] == CS) {</span>
+<span class="nc" id="L210">                types[i] = ON;</span>
+            }
+        }
+        // W7: EN becomes L if the previous strong type is L.
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        prevStrong = baseRtl ? R : L;</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L216">            byte t = types[i];</span>
+<span class="fc bfc" id="L217" title="All 4 branches covered.">            if (t == L || t == R) {</span>
+<span class="fc" id="L218">                prevStrong = t;</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">            } else if (t == EN &amp;&amp; prevStrong == L) {</span>
+<span class="nc" id="L220">                types[i] = L;</span>
+            }
+        }
+        // N1/N2: resolve neutrals. A neutral run between two strongs of the same direction takes that
+        // direction (numbers count as R); otherwise it takes the base direction. Whitespace and boundary
+        // neutrals are treated as neutrals here.
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        byte baseDir = baseRtl ? R : L;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (isNeutral(types[i])) {</span>
+<span class="fc" id="L229">                int start = i;</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">                while (i &lt; n &amp;&amp; isNeutral(types[i])) {</span>
+<span class="fc" id="L231">                    i++;</span>
+                }
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                byte before = start == 0 ? baseDir : dirOf(types[start - 1]);</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                byte after = i &gt;= n ? baseDir : dirOf(types[i]);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                byte resolved = (before == after) ? before : baseDir;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                for (int j = start; j &lt; i; j++) {</span>
+<span class="fc" id="L237">                    types[j] = resolved;</span>
+                }
+<span class="fc" id="L239">                i--;</span>
+            }
+        }
+        // I1/I2: implicit levels.
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L244">            byte t = types[i];</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            if (baseLevel % 2 == 0) {</span>
+                // even (LTR) embedding level
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                if (t == R) {</span>
+<span class="fc" id="L248">                    levels[i] = (byte) (baseLevel + 1);</span>
+<span class="pc bpc" id="L249" title="1 of 4 branches missed.">                } else if (t == AN || t == EN) {</span>
+<span class="fc" id="L250">                    levels[i] = (byte) (baseLevel + 2);</span>
+                } else {
+<span class="fc" id="L252">                    levels[i] = baseLevel;</span>
+                }
+            } else {
+                // odd (RTL) embedding level
+<span class="fc bfc" id="L256" title="All 6 branches covered.">                if (t == L || t == EN || t == AN) {</span>
+<span class="fc" id="L257">                    levels[i] = (byte) (baseLevel + 1);</span>
+                } else {
+<span class="fc" id="L259">                    levels[i] = baseLevel;</span>
+                }
+            }
+        }
+<span class="fc" id="L263">        return levels;</span>
+    }
+
+    private static boolean isNeutral(byte t) {
+<span class="pc bpc" id="L267" title="2 of 6 branches missed.">        return t == ON || t == WS || t == BN;</span>
+    }
+
+    // Maps a resolved type to its directional class for neutral resolution (numbers behave as R).
+    private static byte dirOf(byte t) {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (t == L) {</span>
+<span class="fc" id="L273">            return L;</span>
+        }
+<span class="fc" id="L275">        return R;</span>
+    }
+
+    /// Applies reordering rule L2 to produce the visual order of the characters. Returns an array
+    /// `visualToLogical` where element `v` is the logical index of the character drawn at visual position
+    /// `v` (left to right on screen).
+    static int[] reorderVisual(byte[] levels) {
+<span class="fc" id="L282">        int n = levels.length;</span>
+<span class="fc" id="L283">        int[] order = new int[n];</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L285">            order[i] = i;</span>
+        }
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L288">            return order;</span>
+        }
+<span class="fc" id="L290">        byte highest = 0;</span>
+<span class="fc" id="L291">        byte lowestOdd = Byte.MAX_VALUE;</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L293">            byte lv = levels[i];</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            if (lv &gt; highest) {</span>
+<span class="fc" id="L295">                highest = lv;</span>
+            }
+<span class="fc bfc" id="L297" title="All 4 branches covered.">            if ((lv &amp; 1) != 0 &amp;&amp; lv &lt; lowestOdd) {</span>
+<span class="fc" id="L298">                lowestOdd = lv;</span>
+            }
+        }
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (lowestOdd == Byte.MAX_VALUE) {</span>
+            // all even levels: already in logical == visual order
+<span class="fc" id="L303">            return order;</span>
+        }
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (int level = highest; level &gt;= lowestOdd; level--) {</span>
+<span class="fc" id="L306">            int i = 0;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            while (i &lt; n) {</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">                if (levels[order[i]] &gt;= level) {</span>
+<span class="fc" id="L309">                    int start = i;</span>
+<span class="fc bfc" id="L310" title="All 4 branches covered.">                    while (i &lt; n &amp;&amp; levels[order[i]] &gt;= level) {</span>
+<span class="fc" id="L311">                        i++;</span>
+                    }
+<span class="fc" id="L313">                    reverse(order, start, i - 1);</span>
+<span class="fc" id="L314">                } else {</span>
+<span class="fc" id="L315">                    i++;</span>
+                }
+            }
+        }
+<span class="fc" id="L319">        return order;</span>
+    }
+
+    private static void reverse(int[] a, int from, int to) {
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        while (from &lt; to) {</span>
+<span class="fc" id="L324">            int t = a[from];</span>
+<span class="fc" id="L325">            a[from] = a[to];</span>
+<span class="fc" id="L326">            a[to] = t;</span>
+<span class="fc" id="L327">            from++;</span>
+<span class="fc" id="L328">            to--;</span>
+<span class="fc" id="L329">        }</span>
+<span class="fc" id="L330">    }</span>
+
+    /// True if the line, laid out with the given base direction, is purely left-to-right (no reordering
+    /// needed). This lets the editor keep its fast LTR path for the common case.
+    static boolean isTrivialLtr(String text, boolean baseRtl) {
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        if (baseRtl) {</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            return text.length() == 0;</span>
+        }
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L339">            byte t = typeOf(text.charAt(i));</span>
+<span class="pc bpc" id="L340" title="2 of 6 branches missed.">            if (t == R || t == AL || t == AN) {</span>
+<span class="fc" id="L341">                return false;</span>
+            }
+        }
+<span class="fc" id="L344">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

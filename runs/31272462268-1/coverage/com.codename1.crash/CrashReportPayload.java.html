@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrashReportPayload.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crash</a> &gt; <span class="el_source">CrashReportPayload.java</span></div><h1>CrashReportPayload.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crash;
+
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/// Package-private DTO for a single crash report. Carries the structured
+/// payload sent to the cloud and is serialised to JSON via
+/// {@link #toJson()} (a hand-rolled writer avoids a Jackson / parser
+/// dependency on the device).
+final class CrashReportPayload {
+
+    static final int MAX_FRAMES = 32;
+    static final int MAX_MESSAGE_LEN = 8192;
+    /// Hard cap on the attached native-log snapshot. Logcat dumps on
+    /// Android and stderr ring buffers on iOS can be huge; the server
+    /// rejects anything larger and we'd rather truncate client-side
+    /// than have the upload silently dropped.
+    static final int MAX_NATIVE_LOG_LEN = 32 * 1024;
+    /// Hard cap on the native-stack string. Native backtraces from
+    /// signal handlers are usually compact (~64 frames * ~120 chars),
+    /// but a corrupt stack can produce arbitrarily long output.
+    static final int MAX_NATIVE_STACK_LEN = 16 * 1024;
+
+    final String eventId;
+    final String buildKey;
+    final String packageName;
+    final String appName;
+    final String appVersion;
+    final String platform;
+    final String osVersion;
+    final String exceptionClass;
+    final String messageScrubbed;
+    final List&lt;Frame&gt; frames;
+    /// Recent platform-log output captured at crash time. Provides
+    /// context the Java stack frame alone can't (NSLog/os_log on iOS,
+    /// logcat on Android). `null` if the platform has no readable log
+    /// or the snapshot failed.
+    final String nativeLog;
+    /// Raw native backtrace string for crashes captured by the
+    /// platform native crash handler (signal/Mach exception/uncaught
+    /// Objective-C). `null` for pure-Java crashes -- their stack lives
+    /// in {@link #frames}.
+    final String nativeStack;
+    final String locale;
+    final long clientTs;
+
+    CrashReportPayload(String eventId, String exceptionClass,
+            String messageScrubbed, List&lt;Frame&gt; frames,
+<span class="nc" id="L74">            String nativeLog, String nativeStack) {</span>
+<span class="nc" id="L75">        this.eventId = eventId;</span>
+<span class="nc" id="L76">        this.exceptionClass = exceptionClass;</span>
+<span class="nc" id="L77">        this.messageScrubbed = trim(messageScrubbed, MAX_MESSAGE_LEN);</span>
+<span class="nc" id="L78">        this.frames = capFrames(frames);</span>
+<span class="nc" id="L79">        this.nativeLog = trim(nativeLog, MAX_NATIVE_LOG_LEN);</span>
+<span class="nc" id="L80">        this.nativeStack = trim(nativeStack, MAX_NATIVE_STACK_LEN);</span>
+<span class="nc" id="L81">        Display d = Display.getInstance();</span>
+<span class="nc" id="L82">        this.buildKey = d.getProperty(&quot;build_key&quot;, &quot;&quot;);</span>
+<span class="nc" id="L83">        this.packageName = d.getProperty(&quot;package_name&quot;, &quot;&quot;);</span>
+<span class="nc" id="L84">        this.appName = d.getProperty(&quot;AppName&quot;, &quot;&quot;);</span>
+<span class="nc" id="L85">        this.appVersion = d.getProperty(&quot;AppVersion&quot;, &quot;&quot;);</span>
+<span class="nc" id="L86">        this.platform = d.getPlatformName();</span>
+<span class="nc" id="L87">        this.osVersion = d.getProperty(&quot;OSVer&quot;, &quot;&quot;);</span>
+<span class="nc" id="L88">        Locale loc = Locale.getDefault();</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        this.locale = loc == null ? &quot;&quot; : loc.toString();</span>
+<span class="nc" id="L90">        this.clientTs = System.currentTimeMillis();</span>
+<span class="nc" id="L91">    }</span>
+
+    static final class Frame {
+        final String className;
+        final String methodName;
+        final String fileName;
+        final int lineNumber;
+        final boolean nativeFrame;
+
+        Frame(String className, String methodName, String fileName,
+<span class="nc" id="L101">                int lineNumber, boolean nativeFrame) {</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            this.className = className == null ? &quot;&quot; : className;</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            this.methodName = methodName == null ? &quot;&quot; : methodName;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            this.fileName = fileName == null ? &quot;&quot; : fileName;</span>
+<span class="nc" id="L105">            this.lineNumber = lineNumber;</span>
+<span class="nc" id="L106">            this.nativeFrame = nativeFrame;</span>
+<span class="nc" id="L107">        }</span>
+    }
+
+    /// Renders the payload as a JSON object string suitable for posting
+    /// in the HTTP request body. Conforms to RFC 8259.
+    String toJson() {
+<span class="nc" id="L113">        StringBuilder b = new StringBuilder(1024);</span>
+<span class="nc" id="L114">        b.append('{');</span>
+<span class="nc" id="L115">        appendString(b, &quot;eventId&quot;, eventId, true);</span>
+<span class="nc" id="L116">        appendString(b, &quot;buildKey&quot;, buildKey, false);</span>
+<span class="nc" id="L117">        appendString(b, &quot;packageName&quot;, packageName, false);</span>
+<span class="nc" id="L118">        appendString(b, &quot;appName&quot;, appName, false);</span>
+<span class="nc" id="L119">        appendString(b, &quot;appVersion&quot;, appVersion, false);</span>
+<span class="nc" id="L120">        appendString(b, &quot;platform&quot;, platform, false);</span>
+<span class="nc" id="L121">        appendString(b, &quot;osVersion&quot;, osVersion, false);</span>
+<span class="nc" id="L122">        appendString(b, &quot;exceptionClass&quot;, exceptionClass, false);</span>
+<span class="nc" id="L123">        appendString(b, &quot;message&quot;, messageScrubbed, false);</span>
+<span class="nc" id="L124">        appendString(b, &quot;locale&quot;, locale, false);</span>
+<span class="nc" id="L125">        appendString(b, &quot;nativeLog&quot;, nativeLog, false);</span>
+<span class="nc" id="L126">        appendString(b, &quot;nativeStack&quot;, nativeStack, false);</span>
+<span class="nc" id="L127">        b.append(&quot;,\&quot;clientTs\&quot;:&quot;).append(clientTs);</span>
+<span class="nc" id="L128">        b.append(&quot;,\&quot;frames\&quot;:[&quot;);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        for (int i = 0; i &lt; frames.size(); i++) {</span>
+<span class="nc" id="L130">            Frame f = frames.get(i);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L132">                b.append(',');</span>
+            }
+<span class="nc" id="L134">            b.append('{');</span>
+<span class="nc" id="L135">            appendString(b, &quot;cls&quot;, f.className, true);</span>
+<span class="nc" id="L136">            appendString(b, &quot;method&quot;, f.methodName, false);</span>
+<span class="nc" id="L137">            appendString(b, &quot;file&quot;, f.fileName, false);</span>
+<span class="nc" id="L138">            b.append(&quot;,\&quot;line\&quot;:&quot;).append(f.lineNumber);</span>
+<span class="nc" id="L139">            b.append(&quot;,\&quot;native\&quot;:&quot;).append(f.nativeFrame);</span>
+<span class="nc" id="L140">            b.append('}');</span>
+        }
+<span class="nc" id="L142">        b.append(&quot;]}&quot;);</span>
+<span class="nc" id="L143">        return b.toString();</span>
+    }
+
+    private static void appendString(StringBuilder b, String key, String value, boolean first) {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (!first) {</span>
+<span class="nc" id="L148">            b.append(',');</span>
+        }
+<span class="nc" id="L150">        b.append('&quot;').append(key).append(&quot;\&quot;:&quot;);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L152">            b.append(&quot;null&quot;);</span>
+<span class="nc" id="L153">            return;</span>
+        }
+<span class="nc" id="L155">        b.append('&quot;');</span>
+<span class="nc" id="L156">        int len = value.length();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L158">            char c = value.charAt(i);</span>
+<span class="nc bnc" id="L159" title="All 8 branches missed.">            switch (c) {</span>
+<span class="nc" id="L160">                case '&quot;': b.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L161">                case '\\': b.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L162">                case '\b': b.append(&quot;\\b&quot;); break;</span>
+<span class="nc" id="L163">                case '\f': b.append(&quot;\\f&quot;); break;</span>
+<span class="nc" id="L164">                case '\n': b.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L165">                case '\r': b.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L166">                case '\t': b.append(&quot;\\t&quot;); break;</span>
+                default:
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L169">                        b.append(&quot;\\u&quot;);</span>
+<span class="nc" id="L170">                        String hex = Integer.toHexString(c);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L172">                            b.append('0');</span>
+                        }
+<span class="nc" id="L174">                        b.append(hex);</span>
+<span class="nc" id="L175">                    } else {</span>
+<span class="nc" id="L176">                        b.append(c);</span>
+                    }
+            }
+        }
+<span class="nc" id="L180">        b.append('&quot;');</span>
+<span class="nc" id="L181">    }</span>
+
+    private static String trim(String s, int max) {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L185">            return null;</span>
+        }
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (s.length() &lt;= max) {</span>
+<span class="nc" id="L188">            return s;</span>
+        }
+<span class="nc" id="L190">        return s.substring(0, max);</span>
+    }
+
+    private static List&lt;Frame&gt; capFrames(List&lt;Frame&gt; in) {
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (in == null) {</span>
+<span class="nc" id="L195">            return new ArrayList&lt;Frame&gt;(0);</span>
+        }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (in.size() &lt;= MAX_FRAMES) {</span>
+<span class="nc" id="L198">            return in;</span>
+        }
+<span class="nc" id="L200">        return new ArrayList&lt;Frame&gt;(in.subList(0, MAX_FRAMES));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

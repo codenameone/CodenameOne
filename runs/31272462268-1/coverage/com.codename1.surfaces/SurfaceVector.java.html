@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceVector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceVector.java</span></div><h1>SurfaceVector.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A retained vector drawing node: a small catalog of fill/stroke/text operations recorded in
+/// paint order and replayed natively by every platform renderer (SwiftUI `Canvas` on iOS, an
+/// in-process bitmap on Android, Codename One `Graphics` on desktop). It exists for the widgets
+/// the sealed template catalog cannot express -- clocks, gauges, dials and similar custom art --
+/// without shipping pre-rendered images for every state.
+///
+/// Operations use a logical coordinate space (the *view box* passed to the constructor) that is
+/// scaled to the node's laid-out bounds preserving aspect ratio and centered, so the same op list
+/// renders correctly at every widget size.
+///
+/// #### Angles: the clock convention
+///
+/// All angles in this class are degrees where **0 points up (12 o'clock) and positive angles
+/// advance clockwise** -- the natural convention for clock hands and gauge needles. Renderers
+/// convert internally to each platform's native arc convention.
+///
+/// #### Rotation groups
+///
+/// Operations added between `beginRotation(...)` and `endRotation()` rotate together around a
+/// pivot. The angle is either fixed or read from the entry state map by key, which is what makes
+/// an analog clock cheap: publish the face layout once and drive the hands with per-entry state:
+///
+/// ```java
+/// SurfaceVector face = new SurfaceVector(200, 200)
+///         .fillEllipse(100, 100, 96, 96, SurfaceColor.BACKGROUND)
+///         .strokeEllipse(100, 100, 96, 96, 4, SurfaceColor.LABEL)
+///         .beginRotation(&quot;hourAngle&quot;, 100, 100)
+///             .line(100, 100, 100, 52, 8, SurfaceColor.LABEL)
+///         .endRotation()
+///         .beginRotation(&quot;minuteAngle&quot;, 100, 100)
+///             .line(100, 100, 100, 24, 5, SurfaceColor.ACCENT)
+///         .endRotation()
+///         .fillEllipse(100, 100, 6, 6, SurfaceColor.ACCENT);
+/// // one timeline entry per minute; the OS flips entries on schedule without waking the app
+/// WidgetTimeline t = new WidgetTimeline().setContent(face);
+/// for (int m = 0; m &lt; 60; m++) {
+///     int totalMinutes = hourOfDay * 60 + minute + m;
+///     Map&lt;String, Object&gt; state = new HashMap&lt;String, Object&gt;();
+///     state.put(&quot;minuteAngle&quot;, Float.valueOf(totalMinutes % 60 * 6f));
+///     state.put(&quot;hourAngle&quot;, Float.valueOf(totalMinutes % 720 * 0.5f));
+///     t.addEntry(new Date(startOfMinute + m * 60000L), state);
+/// }
+/// ```
+///
+/// A state-driven angle does **not** tick by itself -- state is per timeline entry, so a clock
+/// publishes one entry per minute (as above) and the OS flips them on its own schedule.
+///
+/// Descriptors cap the total operation count at 512 per vector node; exceeding it fails at
+/// serialization time. Unbalanced `beginRotation`/`endRotation` pairs also fail at serialization
+/// time with `IllegalStateException`.
+public class SurfaceVector extends SurfaceNode {
+    /// The maximum number of drawing operations (rotation groups included) in one vector node.
+    static final int MAX_OPS = 512;
+
+    private final int viewBoxWidth;
+    private final int viewBoxHeight;
+<span class="fc" id="L86">    private final List&lt;Map&lt;String, Object&gt;&gt; ops = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+    /// Stack of op-list targets; index 0 is the root list, deeper entries are open rotation
+    /// groups. Ops append to the deepest entry.
+<span class="fc" id="L89">    private final List&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt; targets =</span>
+            new ArrayList&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt;();
+    private int opCount;
+
+    /// Creates a vector node with a logical coordinate space. The view box is scaled to the
+    /// node's laid-out bounds preserving aspect ratio (centered); it also provides the node's
+    /// natural size in dips when no fixed size or weight applies.
+    ///
+    /// #### Parameters
+    ///
+    /// - `viewBoxWidth`: the logical width of the drawing coordinate space
+    /// - `viewBoxHeight`: the logical height of the drawing coordinate space
+<span class="fc" id="L101">    public SurfaceVector(int viewBoxWidth, int viewBoxHeight) {</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (viewBoxWidth &lt;= 0 || viewBoxHeight &lt;= 0) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;The view box dimensions must be positive&quot;);</span>
+        }
+<span class="fc" id="L105">        this.viewBoxWidth = viewBoxWidth;</span>
+<span class="fc" id="L106">        this.viewBoxHeight = viewBoxHeight;</span>
+<span class="fc" id="L107">        targets.add(ops);</span>
+<span class="fc" id="L108">    }</span>
+
+    /// Fills an axis-aligned rectangle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: left edge in view-box units
+    /// - `y`: top edge in view-box units
+    /// - `w`: width in view-box units
+    /// - `h`: height in view-box units
+    /// - `c`: the fill color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector fillRect(float x, float y, float w, float h, SurfaceColor c) {
+<span class="nc" id="L124">        Map&lt;String, Object&gt; op = op(&quot;fillRect&quot;, c);</span>
+<span class="nc" id="L125">        op.put(&quot;x&quot;, Float.valueOf(x));</span>
+<span class="nc" id="L126">        op.put(&quot;y&quot;, Float.valueOf(y));</span>
+<span class="nc" id="L127">        op.put(&quot;w&quot;, Float.valueOf(w));</span>
+<span class="nc" id="L128">        op.put(&quot;h&quot;, Float.valueOf(h));</span>
+<span class="nc" id="L129">        return add(op);</span>
+    }
+
+    /// Fills a rectangle with rounded corners.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: left edge in view-box units
+    /// - `y`: top edge in view-box units
+    /// - `w`: width in view-box units
+    /// - `h`: height in view-box units
+    /// - `corner`: the corner radius in view-box units
+    /// - `c`: the fill color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector fillRoundRect(float x, float y, float w, float h, float corner,
+            SurfaceColor c) {
+<span class="fc" id="L148">        Map&lt;String, Object&gt; op = op(&quot;fillRoundRect&quot;, c);</span>
+<span class="fc" id="L149">        op.put(&quot;x&quot;, Float.valueOf(x));</span>
+<span class="fc" id="L150">        op.put(&quot;y&quot;, Float.valueOf(y));</span>
+<span class="fc" id="L151">        op.put(&quot;w&quot;, Float.valueOf(w));</span>
+<span class="fc" id="L152">        op.put(&quot;h&quot;, Float.valueOf(h));</span>
+<span class="fc" id="L153">        op.put(&quot;corner&quot;, Float.valueOf(corner));</span>
+<span class="fc" id="L154">        return add(op);</span>
+    }
+
+    /// Fills an ellipse.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cx`: center x in view-box units
+    /// - `cy`: center y in view-box units
+    /// - `rx`: horizontal radius in view-box units
+    /// - `ry`: vertical radius in view-box units
+    /// - `c`: the fill color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector fillEllipse(float cx, float cy, float rx, float ry, SurfaceColor c) {
+<span class="fc" id="L171">        Map&lt;String, Object&gt; op = op(&quot;fillEllipse&quot;, c);</span>
+<span class="fc" id="L172">        putEllipse(op, cx, cy, rx, ry);</span>
+<span class="fc" id="L173">        return add(op);</span>
+    }
+
+    /// Fills a pie slice: the elliptical arc between the two angles joined to the center. Angles
+    /// use the clock convention (degrees, 0 = 12 o'clock, clockwise positive).
+    ///
+    /// #### Parameters
+    ///
+    /// - `cx`: center x in view-box units
+    /// - `cy`: center y in view-box units
+    /// - `rx`: horizontal radius in view-box units
+    /// - `ry`: vertical radius in view-box units
+    /// - `startDeg`: the start angle in clock degrees
+    /// - `sweepDeg`: the sweep in degrees, clockwise positive
+    /// - `c`: the fill color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector fillArc(float cx, float cy, float rx, float ry, float startDeg,
+            float sweepDeg, SurfaceColor c) {
+<span class="fc" id="L194">        Map&lt;String, Object&gt; op = op(&quot;fillArc&quot;, c);</span>
+<span class="fc" id="L195">        putEllipse(op, cx, cy, rx, ry);</span>
+<span class="fc" id="L196">        op.put(&quot;start&quot;, Float.valueOf(startDeg));</span>
+<span class="fc" id="L197">        op.put(&quot;sweep&quot;, Float.valueOf(sweepDeg));</span>
+<span class="fc" id="L198">        return add(op);</span>
+    }
+
+    /// Strokes the outline of an ellipse.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cx`: center x in view-box units
+    /// - `cy`: center y in view-box units
+    /// - `rx`: horizontal radius in view-box units
+    /// - `ry`: vertical radius in view-box units
+    /// - `strokeWidth`: the stroke width in view-box units
+    /// - `c`: the stroke color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector strokeEllipse(float cx, float cy, float rx, float ry, float strokeWidth,
+            SurfaceColor c) {
+<span class="nc" id="L217">        Map&lt;String, Object&gt; op = op(&quot;strokeEllipse&quot;, c);</span>
+<span class="nc" id="L218">        putEllipse(op, cx, cy, rx, ry);</span>
+<span class="nc" id="L219">        op.put(&quot;sw&quot;, Float.valueOf(strokeWidth));</span>
+<span class="nc" id="L220">        return add(op);</span>
+    }
+
+    /// Strokes an open elliptical arc with round caps -- the primitive for gauge tracks and
+    /// progress rings. Angles use the clock convention (degrees, 0 = 12 o'clock, clockwise
+    /// positive).
+    ///
+    /// #### Parameters
+    ///
+    /// - `cx`: center x in view-box units
+    /// - `cy`: center y in view-box units
+    /// - `rx`: horizontal radius in view-box units
+    /// - `ry`: vertical radius in view-box units
+    /// - `startDeg`: the start angle in clock degrees
+    /// - `sweepDeg`: the sweep in degrees, clockwise positive
+    /// - `strokeWidth`: the stroke width in view-box units
+    /// - `c`: the stroke color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector strokeArc(float cx, float cy, float rx, float ry, float startDeg,
+            float sweepDeg, float strokeWidth, SurfaceColor c) {
+<span class="fc" id="L243">        Map&lt;String, Object&gt; op = op(&quot;strokeArc&quot;, c);</span>
+<span class="fc" id="L244">        putEllipse(op, cx, cy, rx, ry);</span>
+<span class="fc" id="L245">        op.put(&quot;start&quot;, Float.valueOf(startDeg));</span>
+<span class="fc" id="L246">        op.put(&quot;sweep&quot;, Float.valueOf(sweepDeg));</span>
+<span class="fc" id="L247">        op.put(&quot;sw&quot;, Float.valueOf(strokeWidth));</span>
+<span class="fc" id="L248">        return add(op);</span>
+    }
+
+    /// Draws a line with round caps.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x1`: start x in view-box units
+    /// - `y1`: start y in view-box units
+    /// - `x2`: end x in view-box units
+    /// - `y2`: end y in view-box units
+    /// - `strokeWidth`: the stroke width in view-box units
+    /// - `c`: the stroke color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector line(float x1, float y1, float x2, float y2, float strokeWidth,
+            SurfaceColor c) {
+<span class="fc" id="L267">        Map&lt;String, Object&gt; op = op(&quot;line&quot;, c);</span>
+<span class="fc" id="L268">        op.put(&quot;x1&quot;, Float.valueOf(x1));</span>
+<span class="fc" id="L269">        op.put(&quot;y1&quot;, Float.valueOf(y1));</span>
+<span class="fc" id="L270">        op.put(&quot;x2&quot;, Float.valueOf(x2));</span>
+<span class="fc" id="L271">        op.put(&quot;y2&quot;, Float.valueOf(y2));</span>
+<span class="fc" id="L272">        op.put(&quot;sw&quot;, Float.valueOf(strokeWidth));</span>
+<span class="fc" id="L273">        return add(op);</span>
+    }
+
+    /// Fills a polygon built from x,y coordinate pairs. The path is implicitly closed for
+    /// filling regardless of `close`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xy`: coordinate pairs `x0, y0, x1, y1, ...` in view-box units, at least three points
+    /// - `close`: whether the serialized path is marked closed (kept for renderer symmetry with
+    ///   `strokePath`)
+    /// - `c`: the fill color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector fillPath(float[] xy, boolean close, SurfaceColor c) {
+<span class="fc" id="L290">        Map&lt;String, Object&gt; op = op(&quot;fillPath&quot;, c);</span>
+<span class="fc" id="L291">        op.put(&quot;pts&quot;, copyPoints(xy));</span>
+<span class="fc" id="L292">        op.put(&quot;close&quot;, Boolean.valueOf(close));</span>
+<span class="fc" id="L293">        return add(op);</span>
+    }
+
+    /// Strokes a poly-line built from x,y coordinate pairs, with round caps and joins.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xy`: coordinate pairs `x0, y0, x1, y1, ...` in view-box units, at least two points
+    /// - `close`: whether the last point connects back to the first
+    /// - `strokeWidth`: the stroke width in view-box units
+    /// - `c`: the stroke color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector strokePath(float[] xy, boolean close, float strokeWidth, SurfaceColor c) {
+<span class="fc" id="L309">        Map&lt;String, Object&gt; op = op(&quot;strokePath&quot;, c);</span>
+<span class="fc" id="L310">        op.put(&quot;pts&quot;, copyPoints(xy));</span>
+<span class="fc" id="L311">        op.put(&quot;close&quot;, Boolean.valueOf(close));</span>
+<span class="fc" id="L312">        op.put(&quot;sw&quot;, Float.valueOf(strokeWidth));</span>
+<span class="fc" id="L313">        return add(op);</span>
+    }
+
+    /// Draws text anchored at the middle of `x` with its baseline at `y`. The text supports
+    /// `${key}` interpolation from the entry state map, like `SurfaceText`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text, may embed `${key}` placeholders
+    /// - `x`: the horizontal anchor (text centers on it) in view-box units
+    /// - `y`: the text baseline in view-box units
+    /// - `fontSize`: the font size in view-box units
+    /// - `w`: the font weight
+    /// - `c`: the text color
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector text(String text, float x, float y, float fontSize, SurfaceFontWeight w,
+            SurfaceColor c) {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L334">            throw new IllegalArgumentException(&quot;Vector text must not be null&quot;);</span>
+        }
+<span class="fc" id="L336">        Map&lt;String, Object&gt; op = op(&quot;text&quot;, c);</span>
+<span class="fc" id="L337">        op.put(&quot;text&quot;, text);</span>
+<span class="fc" id="L338">        op.put(&quot;x&quot;, Float.valueOf(x));</span>
+<span class="fc" id="L339">        op.put(&quot;y&quot;, Float.valueOf(y));</span>
+<span class="fc" id="L340">        op.put(&quot;size&quot;, Float.valueOf(fontSize));</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        op.put(&quot;fw&quot;, w == null ? SurfaceFontWeight.REGULAR.getJsonName() : w.getJsonName());</span>
+<span class="fc" id="L342">        return add(op);</span>
+    }
+
+    /// Opens a rotation group with a fixed angle: every op added until the matching
+    /// `endRotation()` rotates by `degrees` (clock convention: clockwise positive) around the
+    /// pivot. Groups nest.
+    ///
+    /// #### Parameters
+    ///
+    /// - `degrees`: the rotation in degrees, clockwise positive
+    /// - `pivotX`: the pivot x in view-box units
+    /// - `pivotY`: the pivot y in view-box units
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector beginRotation(float degrees, float pivotX, float pivotY) {
+<span class="fc" id="L359">        Map&lt;String, Object&gt; op = rotationOp(pivotX, pivotY);</span>
+<span class="fc" id="L360">        op.put(&quot;deg&quot;, Float.valueOf(degrees));</span>
+<span class="fc" id="L361">        return openRotation(op);</span>
+    }
+
+    /// Opens a rotation group whose angle is read from the entry state map: the state value is a
+    /// `Number` in degrees, clockwise positive. This is how clock hands and gauge needles animate
+    /// -- a per-entry timeline updates the angle without republishing the layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `degreesStateKey`: the state-map key holding the angle in degrees
+    /// - `pivotX`: the pivot x in view-box units
+    /// - `pivotY`: the pivot y in view-box units
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector beginRotation(String degreesStateKey, float pivotX, float pivotY) {
+<span class="pc bpc" id="L378" title="2 of 4 branches missed.">        if (degreesStateKey == null || degreesStateKey.length() == 0) {</span>
+<span class="nc" id="L379">            throw new IllegalArgumentException(&quot;The rotation state key must not be empty&quot;);</span>
+        }
+<span class="fc" id="L381">        Map&lt;String, Object&gt; op = rotationOp(pivotX, pivotY);</span>
+<span class="fc" id="L382">        op.put(&quot;degKey&quot;, degreesStateKey);</span>
+<span class="fc" id="L383">        return openRotation(op);</span>
+    }
+
+    /// Closes the most recently opened rotation group.
+    ///
+    /// #### Returns
+    ///
+    /// this vector node, for chaining
+    public SurfaceVector endRotation() {
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (targets.size() == 1) {</span>
+<span class="fc" id="L393">            throw new IllegalStateException(&quot;endRotation() without a matching beginRotation(); &quot;</span>
+                    + &quot;rotation groups must be balanced&quot;);
+        }
+<span class="fc" id="L396">        targets.remove(targets.size() - 1);</span>
+<span class="fc" id="L397">        return this;</span>
+    }
+
+    /// Returns the logical view-box width.
+    public int getViewBoxWidth() {
+<span class="nc" id="L402">        return viewBoxWidth;</span>
+    }
+
+    /// Returns the logical view-box height.
+    public int getViewBoxHeight() {
+<span class="nc" id="L407">        return viewBoxHeight;</span>
+    }
+
+    /// Returns the number of recorded operations, rotation groups included.
+    public int getOpCount() {
+<span class="nc" id="L412">        return opCount;</span>
+    }
+
+    @Override
+    public SurfaceVector setPadding(int all) {
+<span class="nc" id="L417">        super.setPadding(all);</span>
+<span class="nc" id="L418">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setPadding(int top, int right, int bottom, int left) {
+<span class="nc" id="L423">        super.setPadding(top, right, bottom, left);</span>
+<span class="nc" id="L424">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setBackground(SurfaceColor background) {
+<span class="nc" id="L429">        super.setBackground(background);</span>
+<span class="nc" id="L430">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setCornerRadius(int radius) {
+<span class="nc" id="L435">        super.setCornerRadius(radius);</span>
+<span class="nc" id="L436">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setAlignment(SurfaceAlignment alignment) {
+<span class="nc" id="L441">        super.setAlignment(alignment);</span>
+<span class="nc" id="L442">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setWeight(int weight) {
+<span class="nc" id="L447">        super.setWeight(weight);</span>
+<span class="nc" id="L448">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setSize(int widthDips, int heightDips) {
+<span class="nc" id="L453">        super.setSize(widthDips, heightDips);</span>
+<span class="nc" id="L454">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setAction(String actionId) {
+<span class="nc" id="L459">        super.setAction(actionId);</span>
+<span class="nc" id="L460">        return this;</span>
+    }
+
+    @Override
+    public SurfaceVector setAction(String actionId, Map&lt;String, Object&gt; params) {
+<span class="nc" id="L465">        super.setAction(actionId, params);</span>
+<span class="nc" id="L466">        return this;</span>
+    }
+
+    @Override
+    String getType() {
+<span class="fc" id="L471">        return &quot;vec&quot;;</span>
+    }
+
+    @Override
+    void serializeContent(Map&lt;String, Object&gt; out, Map&lt;String, byte[]&gt; images, int depth) {
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        if (targets.size() != 1) {</span>
+<span class="fc" id="L477">            throw new IllegalStateException(&quot;A SurfaceVector has &quot; + (targets.size() - 1)</span>
+                    + &quot; unclosed rotation group(s); every beginRotation() needs a matching &quot;
+                    + &quot;endRotation() before the descriptor serializes&quot;);
+        }
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (opCount &gt; MAX_OPS) {</span>
+<span class="fc" id="L482">            throw new IllegalArgumentException(&quot;A SurfaceVector is limited to &quot; + MAX_OPS</span>
+                    + &quot; drawing operations so widget renderers stay within their budgets; this &quot;
+                    + &quot;node has &quot; + opCount);
+        }
+<span class="fc" id="L486">        out.put(&quot;vw&quot;, Integer.valueOf(viewBoxWidth));</span>
+<span class="fc" id="L487">        out.put(&quot;vh&quot;, Integer.valueOf(viewBoxHeight));</span>
+<span class="fc" id="L488">        out.put(&quot;ops&quot;, serializeOps(ops));</span>
+<span class="fc" id="L489">    }</span>
+
+    // --- internals --------------------------------------------------------------
+
+    private static List&lt;Object&gt; serializeOps(List&lt;Map&lt;String, Object&gt;&gt; src) {
+<span class="fc" id="L494">        List&lt;Object&gt; out = new ArrayList&lt;Object&gt;(src.size());</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; op : src) {</span>
+<span class="fc" id="L496">            Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L497" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : op.entrySet()) {</span>
+<span class="fc" id="L498">                Object v = e.getValue();</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">                if (v instanceof Float) {</span>
+<span class="fc" id="L500">                    m.put(e.getKey(), Double.valueOf(((Float) v).doubleValue()));</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">                } else if (v instanceof SurfaceColor) {</span>
+<span class="fc" id="L502">                    m.put(e.getKey(), SurfaceSerializer.colorMap((SurfaceColor) v));</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">                } else if (v instanceof float[]) {</span>
+<span class="fc" id="L504">                    float[] pts = (float[]) v;</span>
+<span class="fc" id="L505">                    List&lt;Object&gt; list = new ArrayList&lt;Object&gt;(pts.length);</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">                    for (float pt : pts) {</span>
+<span class="fc" id="L507">                        list.add(Double.valueOf(pt));</span>
+                    }
+<span class="fc" id="L509">                    m.put(e.getKey(), list);</span>
+<span class="fc bfc" id="L510" title="All 2 branches covered.">                } else if (v instanceof List) {</span>
+                    // the nested op list of a rotation group
+<span class="fc" id="L512">                    m.put(e.getKey(), serializeOps(castOps(v)));</span>
+                } else {
+<span class="fc" id="L514">                    m.put(e.getKey(), v);</span>
+                }
+<span class="fc" id="L516">            }</span>
+<span class="fc" id="L517">            out.add(m);</span>
+<span class="fc" id="L518">        }</span>
+<span class="fc" id="L519">        return out;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static List&lt;Map&lt;String, Object&gt;&gt; castOps(Object v) {
+<span class="fc" id="L524">        return (List&lt;Map&lt;String, Object&gt;&gt;) v;</span>
+    }
+
+    private static Map&lt;String, Object&gt; op(String name, SurfaceColor c) {
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L529">            throw new IllegalArgumentException(&quot;Every vector op needs a color&quot;);</span>
+        }
+<span class="fc" id="L531">        Map&lt;String, Object&gt; op = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L532">        op.put(&quot;o&quot;, name);</span>
+<span class="fc" id="L533">        op.put(&quot;c&quot;, c);</span>
+<span class="fc" id="L534">        return op;</span>
+    }
+
+    private static void putEllipse(Map&lt;String, Object&gt; op, float cx, float cy, float rx,
+            float ry) {
+<span class="fc" id="L539">        op.put(&quot;cx&quot;, Float.valueOf(cx));</span>
+<span class="fc" id="L540">        op.put(&quot;cy&quot;, Float.valueOf(cy));</span>
+<span class="fc" id="L541">        op.put(&quot;rx&quot;, Float.valueOf(rx));</span>
+<span class="fc" id="L542">        op.put(&quot;ry&quot;, Float.valueOf(ry));</span>
+<span class="fc" id="L543">    }</span>
+
+    private static float[] copyPoints(float[] xy) {
+<span class="pc bpc" id="L546" title="3 of 6 branches missed.">        if (xy == null || xy.length &lt; 4 || xy.length % 2 != 0) {</span>
+<span class="nc" id="L547">            throw new IllegalArgumentException(&quot;Path points must be x,y pairs with at least &quot;</span>
+                    + &quot;two points&quot;);
+        }
+<span class="fc" id="L550">        float[] copy = new float[xy.length];</span>
+<span class="fc" id="L551">        System.arraycopy(xy, 0, copy, 0, xy.length);</span>
+<span class="fc" id="L552">        return copy;</span>
+    }
+
+    private static Map&lt;String, Object&gt; rotationOp(float pivotX, float pivotY) {
+<span class="fc" id="L556">        Map&lt;String, Object&gt; op = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L557">        op.put(&quot;o&quot;, &quot;rot&quot;);</span>
+<span class="fc" id="L558">        op.put(&quot;px&quot;, Float.valueOf(pivotX));</span>
+<span class="fc" id="L559">        op.put(&quot;py&quot;, Float.valueOf(pivotY));</span>
+<span class="fc" id="L560">        return op;</span>
+    }
+
+    private SurfaceVector openRotation(Map&lt;String, Object&gt; op) {
+<span class="fc" id="L564">        List&lt;Map&lt;String, Object&gt;&gt; nested = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L565">        op.put(&quot;ops&quot;, nested);</span>
+<span class="fc" id="L566">        add(op);</span>
+<span class="fc" id="L567">        targets.add(nested);</span>
+<span class="fc" id="L568">        return this;</span>
+    }
+
+    private SurfaceVector add(Map&lt;String, Object&gt; op) {
+<span class="fc" id="L572">        targets.get(targets.size() - 1).add(op);</span>
+<span class="fc" id="L573">        opCount++;</span>
+<span class="fc" id="L574">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

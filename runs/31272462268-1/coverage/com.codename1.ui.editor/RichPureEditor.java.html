@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RichPureEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">RichPureEditor.java</span></div><h1>RichPureEditor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.ui.RichTextFormat;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The pure rich text editor backend. It maps the `RichTextArea` command / query vocabulary onto a
+/// `RichView`, converting the HTML exchanged with the application to and from the editor's inline / block
+/// model.
+public class RichPureEditor extends PureEditor {
+    private RichView rich;
+
+    /// Creates a rich text editor backend.
+    public RichPureEditor(EditorHost host, String editorType) {
+<span class="fc" id="L39">        super(host, editorType);</span>
+<span class="fc" id="L40">        rich = (RichView) view();</span>
+<span class="fc" id="L41">    }</span>
+
+    @Override
+    protected EditorView createView(EditorHost host, boolean codeMode) {
+<span class="fc" id="L45">        return new RichView(host);</span>
+    }
+
+    @Override
+    public void cmd(String name, String arg) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (&quot;setHtml&quot;.equals(name)) {</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            HtmlImporter.Result r = HtmlImporter.parse(arg == null ? &quot;&quot; : arg);</span>
+<span class="fc" id="L52">            rich.importContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),</span>
+<span class="fc" id="L53">                    loadImages(r.getImageSources()), r.getImageSources());</span>
+<span class="fc" id="L54">            return;</span>
+        }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (&quot;insertHtml&quot;.equals(name)) {</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            HtmlImporter.Result r = HtmlImporter.parse(arg == null ? &quot;&quot; : arg);</span>
+<span class="fc" id="L58">            rich.insertContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),</span>
+<span class="fc" id="L59">                    loadImages(r.getImageSources()), r.getImageSources(), r.hasBlockContent());</span>
+<span class="fc" id="L60">            return;</span>
+        }
+<span class="fc" id="L62">        RichTextFormat format = formatForCommand(name);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (format != null) {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            HtmlImporter.Result r = RichTextImporter.parse(arg == null ? &quot;&quot; : arg, format);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (name.startsWith(&quot;set&quot;)) {</span>
+<span class="fc" id="L66">                rich.importContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),</span>
+<span class="fc" id="L67">                        loadImages(r.getImageSources()), r.getImageSources());</span>
+            } else {
+<span class="nc" id="L69">                rich.insertContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),</span>
+<span class="nc" id="L70">                        loadImages(r.getImageSources()), r.getImageSources(), r.hasBlockContent());</span>
+            }
+<span class="fc" id="L72">            return;</span>
+        }
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (&quot;insertImage&quot;.equals(name)) {</span>
+<span class="fc" id="L75">            com.codename1.ui.Image img = loadImage(arg);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (img != null) {</span>
+<span class="fc" id="L77">                rich.insertImageObject(img, arg);</span>
+            }
+<span class="fc" id="L79">            return;</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (&quot;setPlaceholder&quot;.equals(name)) {</span>
+<span class="nc" id="L82">            rich.setPlaceholder(arg);</span>
+<span class="nc" id="L83">            return;</span>
+        }
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (&quot;bold&quot;.equals(name)) {</span>
+<span class="nc" id="L86">            rich.toggleBold();</span>
+<span class="nc" id="L87">            return;</span>
+        }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (&quot;italic&quot;.equals(name)) {</span>
+<span class="nc" id="L90">            rich.toggleItalic();</span>
+<span class="nc" id="L91">            return;</span>
+        }
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (&quot;underline&quot;.equals(name)) {</span>
+<span class="nc" id="L94">            rich.toggleUnderline();</span>
+<span class="nc" id="L95">            return;</span>
+        }
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (&quot;strikeThrough&quot;.equals(name)) {</span>
+<span class="nc" id="L98">            rich.toggleStrike();</span>
+<span class="nc" id="L99">            return;</span>
+        }
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (&quot;insertOrderedList&quot;.equals(name)) {</span>
+<span class="nc" id="L102">            rich.setList(RichBlocks.LIST_ORDERED);</span>
+<span class="nc" id="L103">            return;</span>
+        }
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (&quot;insertUnorderedList&quot;.equals(name)) {</span>
+<span class="nc" id="L106">            rich.setList(RichBlocks.LIST_UNORDERED);</span>
+<span class="nc" id="L107">            return;</span>
+        }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (&quot;indent&quot;.equals(name)) {</span>
+<span class="nc" id="L110">            rich.indentBlocks();</span>
+<span class="nc" id="L111">            return;</span>
+        }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (&quot;outdent&quot;.equals(name)) {</span>
+<span class="nc" id="L114">            rich.outdentBlocks();</span>
+<span class="nc" id="L115">            return;</span>
+        }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (&quot;justifyLeft&quot;.equals(name)) {</span>
+<span class="nc" id="L118">            rich.setAlign(RichBlocks.ALIGN_LEFT);</span>
+<span class="nc" id="L119">            return;</span>
+        }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (&quot;justifyCenter&quot;.equals(name)) {</span>
+<span class="nc" id="L122">            rich.setAlign(RichBlocks.ALIGN_CENTER);</span>
+<span class="nc" id="L123">            return;</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (&quot;justifyRight&quot;.equals(name)) {</span>
+<span class="nc" id="L126">            rich.setAlign(RichBlocks.ALIGN_RIGHT);</span>
+<span class="nc" id="L127">            return;</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (&quot;createLink&quot;.equals(name)) {</span>
+<span class="fc" id="L130">            rich.applyLink(arg);</span>
+<span class="fc" id="L131">            return;</span>
+        }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (&quot;unlink&quot;.equals(name)) {</span>
+<span class="nc" id="L134">            rich.removeLinkStyle();</span>
+<span class="nc" id="L135">            return;</span>
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (&quot;foreColor&quot;.equals(name)) {</span>
+<span class="nc" id="L138">            rich.setForeColor(parseCss(arg));</span>
+<span class="nc" id="L139">            return;</span>
+        }
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (&quot;hiliteColor&quot;.equals(name)) {</span>
+<span class="nc" id="L142">            rich.setHighlight(parseCss(arg));</span>
+<span class="nc" id="L143">            return;</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (&quot;formatBlock&quot;.equals(name)) {</span>
+<span class="nc" id="L146">            rich.setBlockFormat(arg);</span>
+<span class="nc" id="L147">            return;</span>
+        }
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (&quot;fontSize&quot;.equals(name)) {</span>
+<span class="nc" id="L150">            rich.setFontSizeLevel(parseInt(arg));</span>
+<span class="nc" id="L151">            return;</span>
+        }
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (&quot;removeFormat&quot;.equals(name)) {</span>
+<span class="nc" id="L154">            rich.removeFormat();</span>
+<span class="nc" id="L155">            return;</span>
+        }
+<span class="fc" id="L157">        super.cmd(name, arg);</span>
+<span class="fc" id="L158">    }</span>
+
+    @Override
+    public String query(String name, String arg) {
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (&quot;getHtml&quot;.equals(name)) {</span>
+<span class="fc" id="L163">            return HtmlSerializer.serialize(rich.getDocument(), rich.getInlineStyles(), rich.getBlocks(),</span>
+<span class="fc" id="L164">                    rich.getLinkRuns(), rich.getImageSources());</span>
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (&quot;getText&quot;.equals(name)) {</span>
+<span class="fc" id="L167">            return rich.getText();</span>
+        }
+<span class="fc" id="L169">        RichTextFormat outputFormat = formatForQuery(name);</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (outputFormat != null) {</span>
+<span class="fc" id="L171">            return RichTextSerializer.serialize(rich.getDocument(), rich.getInlineStyles(), rich.getBlocks(),</span>
+<span class="fc" id="L172">                    rich.getLinkRuns(), rich.getImageSources(), outputFormat);</span>
+        }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (&quot;state&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            return rich.queryState(arg) ? &quot;1&quot; : &quot;0&quot;;</span>
+        }
+<span class="nc" id="L177">        return super.query(name, arg);</span>
+    }
+
+    private static RichTextFormat formatForCommand(String name) {
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">        if (&quot;setMarkdown&quot;.equals(name) || &quot;insertMarkdown&quot;.equals(name)) {</span>
+<span class="fc" id="L182">            return RichTextFormat.MARKDOWN;</span>
+        }
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (&quot;setAsciiDoc&quot;.equals(name) || &quot;insertAsciiDoc&quot;.equals(name)) {</span>
+<span class="nc" id="L185">            return RichTextFormat.ASCIIDOC;</span>
+        }
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">        if (&quot;setRtf&quot;.equals(name) || &quot;insertRtf&quot;.equals(name)) {</span>
+<span class="nc" id="L188">            return RichTextFormat.RTF;</span>
+        }
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        if (&quot;setPlainText&quot;.equals(name) || &quot;insertPlainText&quot;.equals(name)) {</span>
+<span class="nc" id="L191">            return RichTextFormat.PLAIN_TEXT;</span>
+        }
+<span class="fc" id="L193">        return null;</span>
+    }
+
+    private static RichTextFormat formatForQuery(String name) {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (&quot;getMarkdown&quot;.equals(name)) {</span>
+<span class="fc" id="L198">            return RichTextFormat.MARKDOWN;</span>
+        }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (&quot;getAsciiDoc&quot;.equals(name)) {</span>
+<span class="nc" id="L201">            return RichTextFormat.ASCIIDOC;</span>
+        }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (&quot;getRtf&quot;.equals(name)) {</span>
+<span class="nc" id="L204">            return RichTextFormat.RTF;</span>
+        }
+<span class="nc" id="L206">        return null;</span>
+    }
+
+    private static int parseCss(String v) {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L211">            return 0;</span>
+        }
+<span class="nc" id="L213">        v = v.trim();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (v.startsWith(&quot;#&quot;)) {</span>
+<span class="nc" id="L215">            v = v.substring(1);</span>
+        }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (v.length() == 3) {</span>
+<span class="nc" id="L218">            char r = v.charAt(0);</span>
+<span class="nc" id="L219">            char g = v.charAt(1);</span>
+<span class="nc" id="L220">            char b = v.charAt(2);</span>
+<span class="nc" id="L221">            v = &quot;&quot; + r + r + g + g + b + b;</span>
+        }
+        try {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            return Integer.parseInt(v.length() &gt;= 6 ? v.substring(0, 6) : v, 16);</span>
+<span class="nc" id="L225">        } catch (NumberFormatException err) {</span>
+<span class="nc" id="L226">            return 0;</span>
+        }
+    }
+
+    static com.codename1.ui.Image loadImage(String url) {
+<span class="pc bpc" id="L231" title="2 of 4 branches missed.">        if (url == null || url.length() == 0) {</span>
+<span class="nc" id="L232">            return null;</span>
+        }
+        try {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (url.startsWith(&quot;gen:&quot;)) {</span>
+                // gen:WxH:RRGGBB - a generated solid color image (handy for demos / placeholders)
+<span class="fc" id="L237">                String s = url.substring(4);</span>
+<span class="fc" id="L238">                int xi = s.indexOf('x');</span>
+<span class="fc" id="L239">                int ci = s.indexOf(':', xi);</span>
+<span class="fc" id="L240">                int w = Integer.parseInt(s.substring(0, xi));</span>
+<span class="fc" id="L241">                int h = Integer.parseInt(s.substring(xi + 1, ci));</span>
+<span class="fc" id="L242">                int color = Integer.parseInt(s.substring(ci + 1), 16);</span>
+<span class="fc" id="L243">                return com.codename1.ui.Image.createImage(w, h, 0xff000000 | color);</span>
+            }
+<span class="nc" id="L245">            int comma = url.indexOf(',');</span>
+<span class="nc bnc" id="L246" title="All 6 branches missed.">            if (url.startsWith(&quot;data:&quot;) &amp;&amp; url.indexOf(&quot;;base64,&quot;) &gt;= 0 &amp;&amp; comma &gt;= 0) {</span>
+                // the base64 payload is pure ASCII; convert to bytes without relying on the default charset
+<span class="nc" id="L248">                String b64 = url.substring(comma + 1);</span>
+<span class="nc" id="L249">                byte[] enc = new byte[b64.length()];</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">                for (int i = 0; i &lt; enc.length; i++) {</span>
+<span class="nc" id="L251">                    enc[i] = (byte) b64.charAt(i);</span>
+                }
+<span class="nc" id="L253">                byte[] data = com.codename1.util.Base64.decode(enc);</span>
+<span class="nc" id="L254">                return com.codename1.ui.Image.createImage(data, 0, data.length);</span>
+            }
+<span class="nc" id="L256">            return com.codename1.ui.Image.createImage(url);</span>
+<span class="nc" id="L257">        } catch (Throwable t) {</span>
+<span class="nc" id="L258">            return null;</span>
+        }
+    }
+
+    static List&lt;com.codename1.ui.Image&gt; loadImages(List&lt;String&gt; sources) {
+<span class="fc" id="L263">        List&lt;com.codename1.ui.Image&gt; out = new ArrayList&lt;com.codename1.ui.Image&gt;(sources.size());</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (String source : sources) {</span>
+<span class="pc bpc" id="L265" title="3 of 4 branches missed.">            out.add(source == null || source.length() == 0 ? null : loadImage(source));</span>
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">        return out;</span>
+    }
+
+    private static int parseInt(String s) {
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L272">            return 0;</span>
+        }
+        try {
+<span class="nc" id="L275">            return Integer.parseInt(s.trim());</span>
+<span class="nc" id="L276">        } catch (NumberFormatException err) {</span>
+<span class="nc" id="L277">            return 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

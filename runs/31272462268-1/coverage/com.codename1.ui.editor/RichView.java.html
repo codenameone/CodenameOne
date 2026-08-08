@@ -1,0 +1,1284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RichView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">RichView.java</span></div><h1>RichView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.ui.Font;
+import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.util.Base64;
+import com.codename1.ui.Display;
+import com.codename1.ui.RichTextClipboardData;
+import com.codename1.ui.RichTextFormat;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The pure rich text editor surface. It renders styled text (bold / italic / underline / strike,
+/// foreground and highlight color, relative font size) organized into paragraphs with block attributes
+/// (headings, preformatted, block quotes, alignment, ordered / unordered lists and indentation) on top
+/// of the shared `EditorView` engine, keeping a parallel `InlineStyles` and `RichBlocks` model in lockstep
+/// with the text.
+public class RichView extends EditorView {
+<span class="fc" id="L48">    private InlineStyles inline = new InlineStyles(0);</span>
+<span class="fc" id="L49">    private RichBlocks blocks = new RichBlocks(1);</span>
+    private TextStyle pendingStyle;
+    private String pendingLink;
+<span class="fc" id="L52">    private String placeholder = &quot;&quot;;</span>
+
+    // parallel to the document characters: an inline image for each object-replacement char, else null
+    private static final char OBJ = '\uFFFC';
+<span class="fc" id="L56">    private final List&lt;Image&gt; imageRuns = new ArrayList&lt;Image&gt;();</span>
+<span class="fc" id="L57">    private final List&lt;String&gt; imageSources = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L58">    private final List&lt;String&gt; linkRuns = new ArrayList&lt;String&gt;();</span>
+
+    private Font baseTtf;
+<span class="fc" id="L61">    private final Map&lt;Long, Font&gt; fontCache = new HashMap&lt;Long, Font&gt;();</span>
+
+    /// Creates a rich text view.
+    public RichView(EditorHost host) {
+<span class="fc" id="L65">        super(host, false);</span>
+<span class="fc" id="L66">        setBackgroundColor(0xffffff);</span>
+<span class="fc" id="L67">        setTextColor(0x24292e);</span>
+<span class="fc" id="L68">        setSelectionColor(0xb3d4fc);</span>
+<span class="fc" id="L69">    }</span>
+
+    // ---- model access for the backend ----
+
+    /// Returns the inline style model.
+    public InlineStyles getInlineStyles() {
+<span class="fc" id="L75">        return inline;</span>
+    }
+
+    /// Returns the block attribute model.
+    public RichBlocks getBlocks() {
+<span class="fc" id="L80">        return blocks;</span>
+    }
+
+    /// Returns the hyperlink target parallel model.
+    public List&lt;String&gt; getLinkRuns() {
+<span class="fc" id="L85">        return linkRuns;</span>
+    }
+
+    /// Returns the image source parallel model.
+    public List&lt;String&gt; getImageSources() {
+<span class="fc" id="L90">        return imageSources;</span>
+    }
+
+    /// Replaces the document with imported content: text plus per character styles and per paragraph
+    /// block attributes. Used by the HTML importer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the plain text
+    ///
+    /// - `perChar`: one style per character (may be shorter; missing entries default)
+    ///
+    /// - `blockList`: one block attribute per paragraph (may be shorter; missing entries default)
+    public void importContent(String text, List&lt;TextStyle&gt; perChar, List&lt;RichBlocks.BlockAttr&gt; blockList,
+                              List&lt;String&gt; links, List&lt;Image&gt; images, List&lt;String&gt; sources) {
+<span class="fc" id="L105">        setText(text);</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">        for (int i = 0; i &lt; perChar.size() &amp;&amp; i &lt; inline.length(); i++) {</span>
+<span class="fc" id="L107">            inline.setAt(i, perChar.get(i));</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (int i = 0; i &lt; inline.length(); i++) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (i &lt; links.size()) {</span>
+<span class="fc" id="L111">                linkRuns.set(i, links.get(i));</span>
+            }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (i &lt; images.size()) {</span>
+<span class="fc" id="L114">                imageRuns.set(i, images.get(i));</span>
+            }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (i &lt; sources.size()) {</span>
+<span class="fc" id="L117">                imageSources.set(i, sources.get(i));</span>
+            }
+        }
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">        for (int i = 0; i &lt; blockList.size() &amp;&amp; i &lt; blocks.count(); i++) {</span>
+<span class="fc" id="L121">            RichBlocks.BlockAttr dst = blocks.get(i);</span>
+<span class="fc" id="L122">            RichBlocks.BlockAttr src = blockList.get(i);</span>
+<span class="fc" id="L123">            dst.type = src.type;</span>
+<span class="fc" id="L124">            dst.align = src.align;</span>
+<span class="fc" id="L125">            dst.listType = src.listType;</span>
+<span class="fc" id="L126">            dst.indent = src.indent;</span>
+        }
+<span class="fc" id="L128">        invalidateLayout();</span>
+<span class="fc" id="L129">        repaint();</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Inserts imported rich content at the selection while preserving its inline and block metadata.
+    public void insertContent(String text, List&lt;TextStyle&gt; perChar, List&lt;RichBlocks.BlockAttr&gt; blockList,
+                              List&lt;String&gt; links, List&lt;Image&gt; images, List&lt;String&gt; sources,
+                              boolean blockContent) {
+<span class="fc" id="L136">        int at = getSelectionStart();</span>
+<span class="fc" id="L137">        getUndoManager().breakRun();</span>
+<span class="fc" id="L138">        replaceRange(getSelectionStart(), getSelectionEnd(), text, true);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        int insertedLength = EditorDocument.normalizeText(text == null ? &quot;&quot; : text).length();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int i = 0; i &lt; insertedLength; i++) {</span>
+<span class="fc" id="L141">            int offset = at + i;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (i &lt; perChar.size()) {</span>
+<span class="fc" id="L143">                inline.setAt(offset, perChar.get(i));</span>
+            }
+<span class="pc bpc" id="L145" title="2 of 4 branches missed.">            if (offset &lt; linkRuns.size() &amp;&amp; i &lt; links.size()) {</span>
+<span class="fc" id="L146">                linkRuns.set(offset, links.get(i));</span>
+            }
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">            if (offset &lt; imageRuns.size() &amp;&amp; i &lt; images.size()) {</span>
+<span class="fc" id="L149">                imageRuns.set(offset, images.get(i));</span>
+            }
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            if (offset &lt; imageSources.size() &amp;&amp; i &lt; sources.size()) {</span>
+<span class="fc" id="L152">                imageSources.set(offset, sources.get(i));</span>
+            }
+        }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (blockContent) {</span>
+<span class="fc" id="L156">            int firstLine = getDocument().lineOfOffset(at);</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            for (int i = 0; i &lt; blockList.size() &amp;&amp; firstLine + i &lt; blocks.count(); i++) {</span>
+<span class="fc" id="L158">                copyBlock(blocks.get(firstLine + i), blockList.get(i));</span>
+            }
+        }
+<span class="fc" id="L161">        refreshUndoAfterState();</span>
+<span class="fc" id="L162">        getUndoManager().breakRun();</span>
+<span class="fc" id="L163">        invalidateLayout();</span>
+<span class="fc" id="L164">        repaint();</span>
+<span class="fc" id="L165">    }</span>
+
+    @Override
+    protected void pasteClipboardData(Object data) {
+        // an image on the clipboard is inserted inline
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (data instanceof Image) {</span>
+<span class="nc" id="L171">            insertImageObject((Image) data, &quot;&quot;);</span>
+<span class="nc" id="L172">            return;</span>
+        }
+<span class="fc" id="L174">        RichTextFormat format = null;</span>
+<span class="fc" id="L175">        String content = null;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (data instanceof ClipboardContent) {</span>
+<span class="fc" id="L177">            ClipboardContent clipboard = (ClipboardContent) data;</span>
+<span class="fc" id="L178">            String imageMime = clipboard.findPreferredMimeType(new String[] {</span>
+                    ClipboardContent.MIME_PNG, ClipboardContent.MIME_JPEG, ClipboardContent.MIME_GIF
+            });
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (imageMime != null) {</span>
+<span class="fc" id="L182">                byte[] bytes = clipboard.getBytes(imageMime);</span>
+<span class="pc bpc" id="L183" title="2 of 4 branches missed.">                if (bytes != null &amp;&amp; bytes.length &gt; 0) {</span>
+<span class="fc" id="L184">                    Image img = decodeImage(bytes);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                    if (img != null) {</span>
+<span class="fc" id="L186">                        insertImageObject(img, &quot;data:&quot; + imageMime + &quot;;base64,&quot; + Base64.encodeNoNewline(bytes));</span>
+<span class="fc" id="L187">                        return;</span>
+                    }
+                }
+            }
+<span class="fc" id="L191">            String mimeType = clipboard.findPreferredMimeType(new String[] {</span>
+                    ClipboardContent.MIME_HTML, ClipboardContent.MIME_RTF,
+                    ClipboardContent.MIME_MARKDOWN, ClipboardContent.MIME_ASCIIDOC,
+                    ClipboardContent.MIME_TEXT
+            });
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            if (ClipboardContent.MIME_HTML.equals(mimeType)) {</span>
+<span class="fc" id="L197">                format = RichTextFormat.HTML;</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            } else if (ClipboardContent.MIME_RTF.equals(mimeType)) {</span>
+<span class="nc" id="L199">                format = RichTextFormat.RTF;</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            } else if (ClipboardContent.MIME_MARKDOWN.equals(mimeType)) {</span>
+<span class="nc" id="L201">                format = RichTextFormat.MARKDOWN;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            } else if (ClipboardContent.MIME_ASCIIDOC.equals(mimeType)) {</span>
+<span class="nc" id="L203">                format = RichTextFormat.ASCIIDOC;</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            } else if (ClipboardContent.MIME_TEXT.equals(mimeType)) {</span>
+<span class="nc" id="L205">                format = RichTextFormat.PLAIN_TEXT;</span>
+            }
+<span class="fc" id="L207">            content = clipboard.getText(mimeType);</span>
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        } else if (data instanceof String &amp;&amp; ((String) data).trim().startsWith(&quot;{\\rtf&quot;)) {</span>
+<span class="fc" id="L209">            format = RichTextFormat.RTF;</span>
+<span class="fc" id="L210">            content = (String) data;</span>
+        }
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">        if (format == null || format == RichTextFormat.PLAIN_TEXT) {</span>
+<span class="nc" id="L213">            super.pasteClipboardData(data);</span>
+<span class="nc" id="L214">            return;</span>
+        }
+<span class="fc" id="L216">        HtmlImporter.Result imported = RichTextImporter.parse(content, format);</span>
+<span class="fc" id="L217">        insertContent(imported.getText(), imported.getStyles(), imported.getBlocks(), imported.getLinks(),</span>
+<span class="fc" id="L218">                RichPureEditor.loadImages(imported.getImageSources()), imported.getImageSources(),</span>
+<span class="fc" id="L219">                imported.hasBlockContent());</span>
+<span class="fc" id="L220">    }</span>
+
+    @Override
+    protected void copySelection() {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!hasSelection()) {</span>
+<span class="nc" id="L225">            return;</span>
+        }
+<span class="fc" id="L227">        int start = getSelectionStart();</span>
+<span class="fc" id="L228">        int end = getSelectionEnd();</span>
+<span class="fc" id="L229">        String plain = getDocument().substring(start, end);</span>
+<span class="fc" id="L230">        EditorDocument fragment = new EditorDocument();</span>
+<span class="fc" id="L231">        fragment.setText(plain);</span>
+<span class="fc" id="L232">        InlineStyles fragmentStyles = new InlineStyles(fragment.length());</span>
+<span class="fc" id="L233">        List&lt;String&gt; fragmentLinks = new ArrayList&lt;String&gt;(fragment.length());</span>
+<span class="fc" id="L234">        List&lt;String&gt; fragmentSources = new ArrayList&lt;String&gt;(fragment.length());</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        for (int i = 0; i &lt; fragment.length(); i++) {</span>
+<span class="fc" id="L236">            fragmentStyles.setAt(i, inline.styleAt(start + i));</span>
+<span class="fc" id="L237">            fragmentLinks.add(valueAt(linkRuns, start + i));</span>
+<span class="fc" id="L238">            fragmentSources.add(valueAt(imageSources, start + i));</span>
+        }
+<span class="fc" id="L240">        RichBlocks fragmentBlocks = new RichBlocks(fragment.getLineCount());</span>
+<span class="fc" id="L241">        int firstLine = getDocument().lineOfOffset(start);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (int i = 0; i &lt; fragmentBlocks.count(); i++) {</span>
+<span class="fc" id="L243">            copyBlock(fragmentBlocks.get(i), blocks.get(firstLine + i));</span>
+        }
+<span class="fc" id="L245">        String html = HtmlSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,</span>
+                fragmentLinks, fragmentSources);
+<span class="fc" id="L247">        RichTextClipboardData clipboard = new RichTextClipboardData(plain).setHtml(html);</span>
+<span class="fc" id="L248">        clipboard.setRtf(RichTextSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,</span>
+                fragmentLinks, fragmentSources, RichTextFormat.RTF));
+<span class="fc" id="L250">        clipboard.setMarkdown(RichTextSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,</span>
+                fragmentLinks, fragmentSources, RichTextFormat.MARKDOWN));
+<span class="fc" id="L252">        clipboard.setAsciiDoc(RichTextSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,</span>
+                fragmentLinks, fragmentSources, RichTextFormat.ASCIIDOC));
+<span class="fc" id="L254">        Display.getInstance().copyToClipboard(clipboard);</span>
+<span class="fc" id="L255">    }</span>
+
+    private static String valueAt(List&lt;String&gt; values, int index) {
+<span class="pc bpc" id="L258" title="2 of 4 branches missed.">        return index &gt;= 0 &amp;&amp; index &lt; values.size() ? values.get(index) : null;</span>
+    }
+
+    private static void copyBlock(RichBlocks.BlockAttr destination, RichBlocks.BlockAttr source) {
+<span class="fc" id="L262">        destination.type = source.type;</span>
+<span class="fc" id="L263">        destination.align = source.align;</span>
+<span class="fc" id="L264">        destination.listType = source.listType;</span>
+<span class="fc" id="L265">        destination.indent = source.indent;</span>
+<span class="fc" id="L266">    }</span>
+
+    /// Sets the placeholder text shown when the document is empty.
+    public void setPlaceholder(String text) {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        this.placeholder = text == null ? &quot;&quot; : text;</span>
+<span class="nc" id="L271">        repaint();</span>
+<span class="nc" id="L272">    }</span>
+
+    // ---- fonts ----
+
+    private int baseSize() {
+<span class="fc" id="L277">        return super.getEditorFont().getHeight();</span>
+    }
+
+    private Font fontFor(boolean bold, boolean italic, int px) {
+<span class="fc" id="L281">        Font base = super.getEditorFont();</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (base != baseTtf) { // NOPMD - intentional identity comparison</span>
+            // the style font changed (skin / theme reload) - drop stale derived fonts
+<span class="fc" id="L284">            baseTtf = base;</span>
+<span class="fc" id="L285">            fontCache.clear();</span>
+        }
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (!base.isTTFNativeFont()) {</span>
+            // cannot derive size / weight from a non TTF font; use it as-is (correct size, no squares)
+<span class="fc" id="L289">            return base;</span>
+        }
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (px &lt; 6) {</span>
+<span class="nc" id="L292">            px = 6;</span>
+        }
+<span class="nc bnc" id="L294" title="All 4 branches missed.">        long key = ((long) px &lt;&lt; 2) | (bold ? 2 : 0) | (italic ? 1 : 0);</span>
+<span class="nc" id="L295">        Font f = fontCache.get(Long.valueOf(key));</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L297">            return f;</span>
+        }
+<span class="nc bnc" id="L299" title="All 4 branches missed.">        int style = (bold ? Font.STYLE_BOLD : 0) | (italic ? Font.STYLE_ITALIC : 0);</span>
+        try {
+<span class="nc" id="L301">            f = base.derive(px, style);</span>
+<span class="nc" id="L302">        } catch (Throwable t) {</span>
+<span class="nc" id="L303">            f = base;</span>
+<span class="nc" id="L304">        }</span>
+<span class="nc" id="L305">        fontCache.put(Long.valueOf(key), f);</span>
+<span class="nc" id="L306">        return f;</span>
+    }
+
+    private static float headingScale(int type) {
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (type == RichBlocks.H1) {</span>
+<span class="fc" id="L311">            return 2.0f;</span>
+        }
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (type == RichBlocks.H1 + 1) {</span>
+<span class="nc" id="L314">            return 1.5f;</span>
+        }
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (type == RichBlocks.H1 + 2) {</span>
+<span class="nc" id="L317">            return 1.25f;</span>
+        }
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (type == RichBlocks.H1 + 3) {</span>
+<span class="nc" id="L320">            return 1.1f;</span>
+        }
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (type == RichBlocks.H1 + 4) {</span>
+<span class="nc" id="L323">            return 0.9f;</span>
+        }
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (type == RichBlocks.H1 + 5) {</span>
+<span class="nc" id="L326">            return 0.8f;</span>
+        }
+<span class="fc" id="L328">        return 1.0f;</span>
+    }
+
+    private static boolean isHeading(int type) {
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">        return type &gt;= RichBlocks.H1 &amp;&amp; type &lt;= RichBlocks.H1 + 5;</span>
+    }
+
+    private static float sizeLevelScale(int level) {
+<span class="pc bpc" id="L336" title="6 of 7 branches missed.">        switch (level) {</span>
+            case 1:
+<span class="nc" id="L338">                return 0.7f;</span>
+            case 2:
+<span class="nc" id="L340">                return 0.85f;</span>
+            case 4:
+<span class="nc" id="L342">                return 1.15f;</span>
+            case 5:
+<span class="nc" id="L344">                return 1.5f;</span>
+            case 6:
+<span class="nc" id="L346">                return 2.0f;</span>
+            case 7:
+<span class="nc" id="L348">                return 2.5f;</span>
+            default:
+<span class="fc" id="L350">                return 1.0f;</span>
+        }
+    }
+
+    private int runPx(int blockType, int level) {
+<span class="fc" id="L355">        return runPx(blockType, level, -1);</span>
+    }
+
+    /// Pixel size for a run: an absolute {@code fontSizePx} (&amp;gt; 0) wins over the relative
+    /// level, and heading scale still applies on top so an H1 absolute-sized run stays larger.
+    private int runPx(int blockType, int level, int fontSizePx) {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (fontSizePx &gt; 0) {</span>
+<span class="nc" id="L362">            return Math.round(fontSizePx * headingScale(blockType));</span>
+        }
+<span class="fc" id="L364">        return Math.round(baseSize() * headingScale(blockType) * sizeLevelScale(level));</span>
+    }
+
+    @Override
+    protected boolean uniformLineHeight() {
+<span class="fc" id="L369">        return false;</span>
+    }
+
+    @Override
+    protected int lineHeightAt(int line) {
+<span class="fc" id="L374">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc" id="L375">        int lineStart = getDocument().getLineStart(line);</span>
+<span class="fc" id="L376">        String text = getDocument().getLineText(line);</span>
+<span class="fc" id="L377">        int maxLevel = 0;</span>
+<span class="fc" id="L378">        int maxPx = 0;</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L380">            TextStyle stl = inline.styleAt(lineStart + i);</span>
+<span class="fc" id="L381">            int lv = stl.getFontSizeLevel();</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            if (lv &gt; maxLevel) {</span>
+<span class="nc" id="L383">                maxLevel = lv;</span>
+            }
+<span class="fc" id="L385">            int stPx = runPx(b.type, lv, stl.getFontSizePx());</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            if (stPx &gt; maxPx) {</span>
+<span class="fc" id="L387">                maxPx = stPx;</span>
+            }
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        int px = maxPx &gt; 0 ? maxPx : runPx(b.type, maxLevel);</span>
+<span class="fc" id="L391">        int h = fontFor(isHeading(b.type), false, px).getHeight();</span>
+<span class="fc" id="L392">        int textH = h + Math.max(2, h / 6);</span>
+<span class="fc" id="L393">        int imgH = 0;</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (text.charAt(i) == OBJ) {</span>
+<span class="fc" id="L396">                Image im = imageAt(lineStart + i);</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">                if (im != null) {</span>
+<span class="fc" id="L398">                    imgH = Math.max(imgH, imageDisplayHeight(im));</span>
+                }
+            }
+        }
+<span class="fc" id="L402">        return Math.max(textH, imgH + 4);</span>
+    }
+
+    // ---- model sync ----
+
+    @Override
+    protected void documentReset() {
+<span class="fc" id="L409">        inline.reset(getDocument().length());</span>
+<span class="fc" id="L410">        blocks.reset(getDocument().getLineCount());</span>
+<span class="fc" id="L411">        imageRuns.clear();</span>
+<span class="fc" id="L412">        imageSources.clear();</span>
+<span class="fc" id="L413">        linkRuns.clear();</span>
+<span class="fc" id="L414">        int len = getDocument().length();</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L416">            imageRuns.add(null);</span>
+<span class="fc" id="L417">            imageSources.add(null);</span>
+<span class="fc" id="L418">            linkRuns.add(null);</span>
+        }
+<span class="fc" id="L420">        pendingStyle = null;</span>
+<span class="fc" id="L421">        pendingLink = null;</span>
+<span class="fc" id="L422">        invalidateLayout();</span>
+<span class="fc" id="L423">    }</span>
+
+    @Override
+    protected void documentReplaced(int start, String removed, String inserted) {
+<span class="pc bpc" id="L427" title="1 of 4 branches missed.">        TextStyle ins = pendingStyle != null ? pendingStyle</span>
+<span class="fc" id="L428">                : (start &gt; 0 ? inline.styleAt(start - 1) : TextStyle.DEFAULT);</span>
+<span class="fc" id="L429">        inline.applyEdit(start, removed.length(), inserted.length(), ins);</span>
+<span class="fc" id="L430">        int rem = removed.length();</span>
+<span class="pc bpc" id="L431" title="1 of 4 branches missed.">        for (int i = 0; i &lt; rem &amp;&amp; start &lt; imageRuns.size(); i++) {</span>
+<span class="fc" id="L432">            imageRuns.remove(start);</span>
+<span class="fc" id="L433">            imageSources.remove(start);</span>
+<span class="fc" id="L434">            linkRuns.remove(start);</span>
+        }
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        for (int i = 0; i &lt; inserted.length(); i++) {</span>
+<span class="fc" id="L437">            imageRuns.add(Math.min(start + i, imageRuns.size()), null);</span>
+<span class="fc" id="L438">            imageSources.add(Math.min(start + i, imageSources.size()), null);</span>
+<span class="fc" id="L439">            linkRuns.add(Math.min(start + i, linkRuns.size()), pendingLink);</span>
+        }
+<span class="fc" id="L441">        int para = getDocument().lineOfOffset(start);</span>
+<span class="fc" id="L442">        blocks.applyEdit(para, countNewlines(removed), countNewlines(inserted));</span>
+<span class="fc" id="L443">        invalidateLayout();</span>
+<span class="fc" id="L444">    }</span>
+
+<span class="fc" id="L446">    private static final class RichState {</span>
+<span class="fc" id="L447">        final List&lt;TextStyle&gt; styles = new ArrayList&lt;TextStyle&gt;();</span>
+<span class="fc" id="L448">        final List&lt;RichBlocks.BlockAttr&gt; blockAttrs = new ArrayList&lt;RichBlocks.BlockAttr&gt;();</span>
+<span class="fc" id="L449">        final List&lt;Image&gt; images = new ArrayList&lt;Image&gt;();</span>
+<span class="fc" id="L450">        final List&lt;String&gt; sources = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L451">        final List&lt;String&gt; links = new ArrayList&lt;String&gt;();</span>
+        TextStyle pendingStyle;
+        String pendingLink;
+    }
+
+    @Override
+    protected Object captureDocumentState() {
+<span class="fc" id="L458">        RichState state = new RichState();</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        for (int i = 0; i &lt; inline.length(); i++) {</span>
+<span class="fc" id="L460">            state.styles.add(inline.styleAt(i));</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            state.images.add(i &lt; imageRuns.size() ? imageRuns.get(i) : null);</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">            state.sources.add(i &lt; imageSources.size() ? imageSources.get(i) : null);</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            state.links.add(i &lt; linkRuns.size() ? linkRuns.get(i) : null);</span>
+        }
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        for (int i = 0; i &lt; blocks.count(); i++) {</span>
+<span class="fc" id="L466">            state.blockAttrs.add(blocks.get(i).copy());</span>
+        }
+<span class="fc" id="L468">        state.pendingStyle = pendingStyle;</span>
+<span class="fc" id="L469">        state.pendingLink = pendingLink;</span>
+<span class="fc" id="L470">        return state;</span>
+    }
+
+    @Override
+    protected void restoreDocumentState(Object snapshot) {
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        if (!(snapshot instanceof RichState)) {</span>
+<span class="nc" id="L476">            return;</span>
+        }
+<span class="fc" id="L478">        RichState state = (RichState) snapshot;</span>
+<span class="fc" id="L479">        inline.reset(getDocument().length());</span>
+<span class="fc" id="L480">        imageRuns.clear();</span>
+<span class="fc" id="L481">        imageSources.clear();</span>
+<span class="fc" id="L482">        linkRuns.clear();</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        for (int i = 0; i &lt; getDocument().length(); i++) {</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">            if (i &lt; state.styles.size()) {</span>
+<span class="fc" id="L485">                inline.setAt(i, state.styles.get(i));</span>
+            }
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">            imageRuns.add(i &lt; state.images.size() ? state.images.get(i) : null);</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">            imageSources.add(i &lt; state.sources.size() ? state.sources.get(i) : null);</span>
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">            linkRuns.add(i &lt; state.links.size() ? state.links.get(i) : null);</span>
+        }
+<span class="fc" id="L491">        blocks.reset(getDocument().getLineCount());</span>
+<span class="pc bpc" id="L492" title="1 of 4 branches missed.">        for (int i = 0; i &lt; state.blockAttrs.size() &amp;&amp; i &lt; blocks.count(); i++) {</span>
+<span class="fc" id="L493">            copyBlock(blocks.get(i), state.blockAttrs.get(i));</span>
+        }
+<span class="fc" id="L495">        pendingStyle = state.pendingStyle;</span>
+<span class="fc" id="L496">        pendingLink = state.pendingLink;</span>
+<span class="fc" id="L497">        invalidateLayout();</span>
+<span class="fc" id="L498">    }</span>
+
+    private Image imageAt(int offset) {
+<span class="pc bpc" id="L501" title="2 of 4 branches missed.">        return offset &gt;= 0 &amp;&amp; offset &lt; imageRuns.size() ? imageRuns.get(offset) : null;</span>
+    }
+
+    private int imageDisplayWidth(Image img) {
+<span class="fc" id="L505">        int maxW = Math.max(16, contentWidth() - baseSize());</span>
+<span class="fc" id="L506">        int w = img.getWidth();</span>
+<span class="fc" id="L507">        return Math.min(w, maxW);</span>
+    }
+
+    private int imageDisplayHeight(Image img) {
+<span class="fc" id="L511">        int w = img.getWidth();</span>
+<span class="fc" id="L512">        int h = img.getHeight();</span>
+<span class="fc" id="L513">        int dw = imageDisplayWidth(img);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        return w &gt; 0 ? h * dw / w : h;</span>
+    }
+
+    /// Inserts an inline image at the caret (replacing any selection).
+    public void insertImageObject(Image img, String source) {
+<span class="pc bpc" id="L519" title="2 of 4 branches missed.">        if (!isEditableState() || img == null) {</span>
+<span class="nc" id="L520">            return;</span>
+        }
+<span class="fc" id="L522">        int at = getSelectionStart();</span>
+<span class="fc" id="L523">        getUndoManager().breakRun();</span>
+<span class="fc" id="L524">        replaceRange(getSelectionStart(), getSelectionEnd(), String.valueOf(OBJ), true);</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        if (at &lt; imageRuns.size()) {</span>
+<span class="fc" id="L526">            imageRuns.set(at, img);</span>
+<span class="fc" id="L527">            imageSources.set(at, source);</span>
+        }
+<span class="fc" id="L529">        refreshUndoAfterState();</span>
+<span class="fc" id="L530">        getUndoManager().breakRun();</span>
+<span class="fc" id="L531">        invalidateLayout();</span>
+<span class="fc" id="L532">        repaint();</span>
+<span class="fc" id="L533">    }</span>
+
+    /// Decodes encoded image bytes (PNG / JPEG / GIF) into an image, or null when they can't be decoded.
+    private static Image decodeImage(byte[] bytes) {
+        try {
+<span class="fc" id="L538">            return EncodedImage.create(bytes);</span>
+<span class="nc" id="L539">        } catch (Throwable t) { // NOPMD - unsupported / corrupt bytes are simply not pasted as an image</span>
+<span class="nc" id="L540">            return null;</span>
+        }
+    }
+
+    private static int countNewlines(String s) {
+<span class="fc" id="L545">        int n = 0;</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            if (s.charAt(i) == '\n') {</span>
+<span class="fc" id="L548">                n++;</span>
+            }
+        }
+<span class="fc" id="L551">        return n;</span>
+    }
+
+    @Override
+    public void moveCaret(int newCaret, boolean extend) {
+<span class="nc" id="L556">        pendingStyle = null;</span>
+<span class="nc" id="L557">        pendingLink = null;</span>
+<span class="nc" id="L558">        super.moveCaret(newCaret, extend);</span>
+<span class="nc" id="L559">    }</span>
+
+    private TextStyle styleAtCaret() {
+<span class="nc" id="L562">        int c = getCaretOffset();</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">        return inline.styleAt(c &gt; 0 ? c - 1 : 0);</span>
+    }
+
+    // ---- rendering ----
+
+    private String listPrefix(int line, RichBlocks.BlockAttr b) {
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">        if (b.listType == RichBlocks.LIST_UNORDERED) {</span>
+<span class="nc" id="L570">            return &quot;\u2022  &quot;;</span>
+        }
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        if (b.listType == RichBlocks.LIST_ORDERED) {</span>
+<span class="nc" id="L573">            return ordinal(line) + &quot;.  &quot;;</span>
+        }
+<span class="fc" id="L575">        return null;</span>
+    }
+
+    private int prefixWidth(int line, RichBlocks.BlockAttr b) {
+<span class="fc" id="L579">        String p = listPrefix(line, b);</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">        if (p == null) {</span>
+<span class="fc" id="L581">            return 0;</span>
+        }
+<span class="nc" id="L583">        return fontFor(false, false, runPx(b.type, 0)).stringWidth(p);</span>
+    }
+
+    // ---- bidi atom layout: a line is split into atoms that are single bidi level + single inline style
+    // (an inline image is one atom); the atoms are reordered into visual order so mixed LTR/RTL styled
+    // text lays out, hit tests and paints correctly while each atom keeps its own font. ----
+
+    /// Splits a line into atoms in logical order. Each atom is `{logStart, logEnd, level, isImage}`.
+    private List&lt;int[]&gt; richAtomsLogical(String text, int lineStart, byte[] levels) {
+<span class="fc" id="L592">        List&lt;int[]&gt; atoms = new ArrayList&lt;int[]&gt;();</span>
+<span class="fc" id="L593">        int c = 0;</span>
+<span class="fc" id="L594">        int n = text.length();</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">        while (c &lt; n) {</span>
+<span class="pc bpc" id="L596" title="3 of 4 branches missed.">            if (text.charAt(c) == OBJ &amp;&amp; imageAt(lineStart + c) != null) {</span>
+<span class="nc" id="L597">                atoms.add(new int[]{c, c + 1, levels[c], 1});</span>
+<span class="nc" id="L598">                c++;</span>
+<span class="nc" id="L599">                continue;</span>
+            }
+<span class="fc" id="L601">            TextStyle st = inline.styleAt(lineStart + c);</span>
+<span class="fc" id="L602">            int lvl = levels[c];</span>
+<span class="fc" id="L603">            int e = c + 1;</span>
+<span class="pc bpc" id="L604" title="1 of 6 branches missed.">            while (e &lt; n &amp;&amp; text.charAt(e) != OBJ &amp;&amp; levels[e] == lvl</span>
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">                    &amp;&amp; inline.styleAt(lineStart + e).equals(st)) {</span>
+<span class="fc" id="L606">                e++;</span>
+            }
+<span class="fc" id="L608">            atoms.add(new int[]{c, e, lvl, 0});</span>
+<span class="fc" id="L609">            c = e;</span>
+<span class="fc" id="L610">        }</span>
+<span class="fc" id="L611">        return atoms;</span>
+    }
+
+    /// Pixel width of `text[from, to)` measured with the inline style at `from` (the atom is single style).
+    private int styledWidth(String text, int lineStart, int from, int to, RichBlocks.BlockAttr b) {
+<span class="fc bfc" id="L616" title="All 2 branches covered.">        if (to &lt;= from) {</span>
+<span class="fc" id="L617">            return 0;</span>
+        }
+<span class="fc" id="L619">        TextStyle st = inline.styleAt(lineStart + from);</span>
+<span class="pc bpc" id="L620" title="2 of 4 branches missed.">        Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));</span>
+<span class="fc" id="L621">        return rf.stringWidth(text.substring(from, to));</span>
+    }
+
+    private int atomWidth(String text, int lineStart, int[] atom, RichBlocks.BlockAttr b) {
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">        if (atom[3] == 1) {</span>
+<span class="nc" id="L626">            Image img = imageAt(lineStart + atom[0]);</span>
+<span class="nc bnc" id="L627" title="All 2 branches missed.">            return img != null ? imageDisplayWidth(img) : 0;</span>
+        }
+<span class="fc" id="L629">        return styledWidth(text, lineStart, atom[0], atom[1], b);</span>
+    }
+
+    /// Visual (left to right) atom layout: each entry is `{logStart, logEnd, level, isImage, xLeft, width}`.
+    private int[][] richVisualAtoms(int line, String text, int lineStart) {
+<span class="fc" id="L634">        byte[] levels = BidiUtil.resolveLevels(text, isRTL());</span>
+<span class="fc" id="L635">        List&lt;int[]&gt; logical = richAtomsLogical(text, lineStart, levels);</span>
+<span class="fc" id="L636">        byte[] al = new byte[logical.size()];</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        for (int i = 0; i &lt; al.length; i++) {</span>
+<span class="fc" id="L638">            al[i] = (byte) logical.get(i)[2];</span>
+        }
+<span class="fc" id="L640">        int[] vis = BidiUtil.reorderVisual(al);</span>
+<span class="fc" id="L641">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc" id="L642">        int[][] out = new int[vis.length][6];</span>
+<span class="fc" id="L643">        int x = 0;</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">        for (int vi = 0; vi &lt; vis.length; vi++) {</span>
+<span class="fc" id="L645">            int[] a = logical.get(vis[vi]);</span>
+<span class="fc" id="L646">            int w = atomWidth(text, lineStart, a, b);</span>
+<span class="fc" id="L647">            out[vi] = new int[]{a[0], a[1], a[2], a[3], x, w};</span>
+<span class="fc" id="L648">            x += w;</span>
+        }
+<span class="fc" id="L650">        return out;</span>
+    }
+
+    @Override
+    protected int measureColumnX(int line, String text, int col, Font f) {
+<span class="fc" id="L655">        int lineStart = getDocument().getLineStart(line);</span>
+<span class="fc" id="L656">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">        if (!BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L658">            int[][] atoms = richVisualAtoms(line, text, lineStart);</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">            for (int[] atom : atoms) {</span>
+<span class="fc" id="L660">                int as = atom[0];</span>
+<span class="fc" id="L661">                int ae = atom[1];</span>
+<span class="fc" id="L662">                int lvl = atom[2];</span>
+<span class="fc" id="L663">                int img = atom[3];</span>
+<span class="fc" id="L664">                int ax = atom[4];</span>
+<span class="pc bpc" id="L665" title="1 of 4 branches missed.">                if (col &gt;= as &amp;&amp; col &lt;= ae) {</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">                    if (img == 1) {</span>
+<span class="nc bnc" id="L667" title="All 6 branches missed.">                        boolean before = (lvl &amp; 1) == 0 ? col == as : col == ae;</span>
+<span class="nc bnc" id="L668" title="All 2 branches missed.">                        return before ? ax : ax + atom[5];</span>
+                    }
+<span class="fc bfc" id="L670" title="All 2 branches covered.">                    if ((lvl &amp; 1) == 0) {</span>
+<span class="fc" id="L671">                        return ax + styledWidth(text, lineStart, as, col, b);</span>
+                    }
+<span class="fc" id="L673">                    return ax + styledWidth(text, lineStart, col, ae, b);</span>
+                }
+            }
+<span class="nc bnc" id="L676" title="All 2 branches missed.">            return atoms.length &gt; 0 ? atoms[atoms.length - 1][4] + atoms[atoms.length - 1][5] : 0;</span>
+        }
+<span class="fc" id="L678">        int x = 0;</span>
+<span class="fc" id="L679">        int c = 0;</span>
+<span class="pc bpc" id="L680" title="1 of 4 branches missed.">        while (c &lt; col &amp;&amp; c &lt; text.length()) {</span>
+<span class="fc bfc" id="L681" title="All 2 branches covered.">            Image img = text.charAt(c) == OBJ ? imageAt(lineStart + c) : null;</span>
+<span class="fc bfc" id="L682" title="All 2 branches covered.">            if (img != null) {</span>
+<span class="fc" id="L683">                x += imageDisplayWidth(img);</span>
+<span class="fc" id="L684">                c++;</span>
+<span class="fc" id="L685">                continue;</span>
+            }
+<span class="fc" id="L687">            TextStyle st = inline.styleAt(lineStart + c);</span>
+<span class="fc" id="L688">            int runEnd = c + 1;</span>
+<span class="pc bpc" id="L689" title="1 of 6 branches missed.">            while (runEnd &lt; col &amp;&amp; runEnd &lt; text.length() &amp;&amp; text.charAt(runEnd) != OBJ</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">                    &amp;&amp; inline.styleAt(lineStart + runEnd).equals(st)) {</span>
+<span class="fc" id="L691">                runEnd++;</span>
+            }
+<span class="fc bfc" id="L693" title="All 4 branches covered.">            Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));</span>
+<span class="fc" id="L694">            x += rf.stringWidth(text.substring(c, runEnd));</span>
+<span class="fc" id="L695">            c = runEnd;</span>
+<span class="fc" id="L696">        }</span>
+<span class="fc" id="L697">        return x;</span>
+    }
+
+    @Override
+    protected int columnAtX(int line, String text, int localX, Font f) {
+<span class="fc bfc" id="L702" title="All 2 branches covered.">        if (BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L703">            return super.columnAtX(line, text, localX, f);</span>
+        }
+<span class="fc" id="L705">        int lineStart = getDocument().getLineStart(line);</span>
+<span class="fc" id="L706">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc" id="L707">        int[][] atoms = richVisualAtoms(line, text, lineStart);</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        for (int i = 0; i &lt; atoms.length; i++) {</span>
+<span class="fc" id="L709">            int as = atoms[i][0];</span>
+<span class="fc" id="L710">            int ae = atoms[i][1];</span>
+<span class="fc" id="L711">            int lvl = atoms[i][2];</span>
+<span class="fc" id="L712">            int img = atoms[i][3];</span>
+<span class="fc" id="L713">            int ax = atoms[i][4];</span>
+<span class="fc" id="L714">            int aw = atoms[i][5];</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">            boolean last = i == atoms.length - 1;</span>
+<span class="fc bfc" id="L716" title="All 4 branches covered.">            if (localX &lt; ax + aw || last) {</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">                if (img == 1) {</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                    boolean rightHalf = localX &gt; ax + aw / 2;</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">                    if ((lvl &amp; 1) == 0) {</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">                        return rightHalf ? ae : as;</span>
+                    }
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                    return rightHalf ? as : ae;</span>
+                }
+<span class="fc bfc" id="L724" title="All 2 branches covered.">                if ((lvl &amp; 1) == 0) {</span>
+<span class="fc" id="L725">                    int c = as;</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">                    while (c &lt; ae) {</span>
+<span class="fc" id="L727">                        int wa = ax + styledWidth(text, lineStart, as, c, b);</span>
+<span class="fc" id="L728">                        int wb = ax + styledWidth(text, lineStart, as, c + 1, b);</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">                        if (localX &lt; (wa + wb) / 2) {</span>
+<span class="fc" id="L730">                            break;</span>
+                        }
+<span class="fc" id="L732">                        c++;</span>
+<span class="fc" id="L733">                    }</span>
+<span class="fc" id="L734">                    return c;</span>
+                }
+<span class="fc" id="L736">                int c = ae;</span>
+<span class="fc bfc" id="L737" title="All 2 branches covered.">                while (c &gt; as) {</span>
+<span class="fc" id="L738">                    int wa = ax + styledWidth(text, lineStart, c, ae, b);</span>
+<span class="fc" id="L739">                    int wb = ax + styledWidth(text, lineStart, c - 1, ae, b);</span>
+<span class="fc bfc" id="L740" title="All 2 branches covered.">                    if (localX &lt; (wa + wb) / 2) {</span>
+<span class="fc" id="L741">                        break;</span>
+                    }
+<span class="fc" id="L743">                    c--;</span>
+<span class="fc" id="L744">                }</span>
+<span class="fc" id="L745">                return c;</span>
+            }
+        }
+<span class="nc" id="L748">        return text.length();</span>
+    }
+
+    @Override
+    protected int[] lineVisualSegments(int line, String text, int from, int to, Font f) {
+<span class="fc bfc" id="L753" title="All 2 branches covered.">        if (BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L754">            return super.lineVisualSegments(line, text, from, to, f);</span>
+        }
+<span class="fc" id="L756">        int lineStart = getDocument().getLineStart(line);</span>
+<span class="fc" id="L757">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc" id="L758">        int[][] atoms = richVisualAtoms(line, text, lineStart);</span>
+<span class="fc" id="L759">        List&lt;int[]&gt; segs = new ArrayList&lt;int[]&gt;();</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">        for (int[] atom : atoms) {</span>
+<span class="fc" id="L761">            int as = atom[0];</span>
+<span class="fc" id="L762">            int ae = atom[1];</span>
+<span class="fc" id="L763">            int lvl = atom[2];</span>
+<span class="fc" id="L764">            int img = atom[3];</span>
+<span class="fc" id="L765">            int ax = atom[4];</span>
+<span class="fc" id="L766">            int aw = atom[5];</span>
+<span class="fc" id="L767">            int a = Math.max(from, as);</span>
+<span class="fc" id="L768">            int e = Math.min(to, ae);</span>
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">            if (a &gt;= e) {</span>
+<span class="nc" id="L770">                continue;</span>
+            }
+            int xl;
+            int xr;
+<span class="pc bpc" id="L774" title="1 of 2 branches missed.">            if (img == 1) {</span>
+<span class="nc" id="L775">                xl = ax;</span>
+<span class="nc" id="L776">                xr = ax + aw;</span>
+<span class="fc bfc" id="L777" title="All 2 branches covered.">            } else if ((lvl &amp; 1) == 0) {</span>
+<span class="fc" id="L778">                xl = ax + styledWidth(text, lineStart, as, a, b);</span>
+<span class="fc" id="L779">                xr = ax + styledWidth(text, lineStart, as, e, b);</span>
+            } else {
+<span class="fc" id="L781">                xl = ax + styledWidth(text, lineStart, e, ae, b);</span>
+<span class="fc" id="L782">                xr = ax + styledWidth(text, lineStart, a, ae, b);</span>
+            }
+<span class="fc" id="L784">            segs.add(new int[]{Math.min(xl, xr), Math.abs(xr - xl)});</span>
+        }
+<span class="fc" id="L786">        int[] flat = new int[segs.size() * 2];</span>
+<span class="fc bfc" id="L787" title="All 2 branches covered.">        for (int k = 0; k &lt; segs.size(); k++) {</span>
+<span class="fc" id="L788">            flat[k * 2] = segs.get(k)[0];</span>
+<span class="fc" id="L789">            flat[k * 2 + 1] = segs.get(k)[1];</span>
+        }
+<span class="fc" id="L791">        return flat;</span>
+    }
+
+    @Override
+    protected int lineContentOffsetX(int line) {
+<span class="fc" id="L796">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc" id="L797">        int off = b.indent * baseSize();</span>
+<span class="pc bpc" id="L798" title="1 of 2 branches missed.">        if (b.type == RichBlocks.BLOCKQUOTE) {</span>
+<span class="nc" id="L799">            off += baseSize() / 2;</span>
+        }
+<span class="fc" id="L801">        int prefixW = prefixWidth(line, b);</span>
+<span class="fc" id="L802">        String text = getDocument().getLineText(line);</span>
+<span class="fc" id="L803">        int totalW = prefixW + measureLine(line, text);</span>
+<span class="fc" id="L804">        int avail = contentWidth() - off;</span>
+<span class="pc bpc" id="L805" title="3 of 4 branches missed.">        if (b.align == RichBlocks.ALIGN_CENTER &amp;&amp; totalW &lt; avail) {</span>
+<span class="nc" id="L806">            off += (avail - totalW) / 2;</span>
+<span class="pc bpc" id="L807" title="3 of 4 branches missed.">        } else if (b.align == RichBlocks.ALIGN_RIGHT &amp;&amp; totalW &lt; avail) {</span>
+<span class="nc" id="L808">            off += avail - totalW;</span>
+        }
+<span class="fc" id="L810">        return off + prefixW;</span>
+    }
+
+    @Override
+    protected void paintLine(Graphics g, int line, String text, int x, int y, int lineHeight, Font f) {
+<span class="fc" id="L815">        RichBlocks.BlockAttr b = blocks.get(line);</span>
+<span class="fc" id="L816">        int lineStart = getDocument().getLineStart(line);</span>
+<span class="fc" id="L817">        int indentPx = b.indent * baseSize();</span>
+
+        // block quote bar sits at the indented left edge
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">        if (b.type == RichBlocks.BLOCKQUOTE) {</span>
+<span class="nc" id="L821">            g.setColor(0xcccccc);</span>
+<span class="nc" id="L822">            g.fillRect(x + indentPx, y, Math.max(2, baseSize() / 8), lineHeight);</span>
+        }
+
+        // text starts at the shared content offset so the caret / selection line up
+<span class="fc" id="L826">        int textStart = x + lineContentOffsetX(line);</span>
+
+<span class="fc" id="L828">        String prefix = listPrefix(line, b);</span>
+<span class="pc bpc" id="L829" title="1 of 2 branches missed.">        if (prefix != null) {</span>
+<span class="nc" id="L830">            Font prefixFont = fontFor(false, false, runPx(b.type, 0));</span>
+<span class="nc" id="L831">            int prefixW = prefixFont.stringWidth(prefix);</span>
+<span class="nc" id="L832">            g.setColor(getTextColor());</span>
+<span class="nc" id="L833">            g.setFont(prefixFont);</span>
+<span class="nc" id="L834">            g.drawString(prefix, textStart - prefixW, y + baseline(lineHeight, prefixFont));</span>
+        }
+
+        // styled runs. On lines with right-to-left content paint the bidi-reordered visual
+        // atoms (the same layout measureColumnX / columnAtX use) so glyphs, caret, selection
+        // and hit testing all agree; each atom is single-style and single-direction so the
+        // platform font engine shapes the glyphs within it.
+<span class="fc bfc" id="L841" title="All 2 branches covered.">        if (!BidiUtil.isTrivialLtr(text, isRTL())) {</span>
+<span class="fc" id="L842">            int[][] atoms = richVisualAtoms(line, text, lineStart);</span>
+<span class="fc bfc" id="L843" title="All 2 branches covered.">            for (int[] atom : atoms) {</span>
+<span class="fc" id="L844">                int ax = textStart + atom[4];</span>
+<span class="pc bpc" id="L845" title="1 of 2 branches missed.">                if (atom[3] == 1) {</span>
+<span class="nc" id="L846">                    Image img = imageAt(lineStart + atom[0]);</span>
+<span class="nc bnc" id="L847" title="All 2 branches missed.">                    if (img != null) {</span>
+<span class="nc" id="L848">                        int iw = imageDisplayWidth(img);</span>
+<span class="nc" id="L849">                        int ih = imageDisplayHeight(img);</span>
+<span class="nc" id="L850">                        g.drawImage(img, ax, y + Math.max(0, lineHeight - ih), iw, ih);</span>
+<span class="nc" id="L851">                    }</span>
+                    continue;
+                }
+<span class="fc" id="L854">                paintStyledRun(g, b, text, lineStart, atom[0], atom[1], ax, y, lineHeight);</span>
+            }
+<span class="fc" id="L856">        } else {</span>
+<span class="fc" id="L857">            int col = 0;</span>
+<span class="fc" id="L858">            int cx = textStart;</span>
+<span class="fc bfc" id="L859" title="All 2 branches covered.">            while (col &lt; text.length()) {</span>
+<span class="fc bfc" id="L860" title="All 2 branches covered.">                Image img = text.charAt(col) == OBJ ? imageAt(lineStart + col) : null;</span>
+<span class="fc bfc" id="L861" title="All 2 branches covered.">                if (img != null) {</span>
+<span class="fc" id="L862">                    int iw = imageDisplayWidth(img);</span>
+<span class="fc" id="L863">                    int ih = imageDisplayHeight(img);</span>
+<span class="fc" id="L864">                    g.drawImage(img, cx, y + Math.max(0, lineHeight - ih), iw, ih);</span>
+<span class="fc" id="L865">                    cx += iw;</span>
+<span class="fc" id="L866">                    col++;</span>
+<span class="fc" id="L867">                    continue;</span>
+                }
+<span class="fc" id="L869">                TextStyle st = inline.styleAt(lineStart + col);</span>
+<span class="fc" id="L870">                int runEnd = col + 1;</span>
+<span class="fc bfc" id="L871" title="All 4 branches covered.">                while (runEnd &lt; text.length() &amp;&amp; text.charAt(runEnd) != OBJ</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">                        &amp;&amp; inline.styleAt(lineStart + runEnd).equals(st)) {</span>
+<span class="fc" id="L873">                    runEnd++;</span>
+                }
+<span class="fc" id="L875">                cx += paintStyledRun(g, b, text, lineStart, col, runEnd, cx, y, lineHeight);</span>
+<span class="fc" id="L876">                col = runEnd;</span>
+<span class="fc" id="L877">            }</span>
+        }
+
+        // placeholder
+<span class="pc bpc" id="L881" title="3 of 8 branches missed.">        if (line == 0 &amp;&amp; getDocument().length() == 0 &amp;&amp; placeholder.length() &gt; 0 &amp;&amp; !hasFocus()) {</span>
+<span class="nc" id="L882">            g.setColor(0x9aa0a6);</span>
+<span class="nc" id="L883">            g.setFont(fontFor(false, false, baseSize()));</span>
+<span class="nc" id="L884">            g.drawString(placeholder, x, y + baseline(lineHeight, fontFor(false, false, baseSize())));</span>
+        }
+<span class="fc" id="L886">    }</span>
+
+    /// Paints one single-style text run at `cx` and returns its pixel width.
+    private int paintStyledRun(Graphics g, RichBlocks.BlockAttr b, String text, int lineStart,
+            int from, int to, int cx, int y, int lineHeight) {
+<span class="fc" id="L891">        TextStyle st = inline.styleAt(lineStart + from);</span>
+<span class="fc" id="L892">        String run = text.substring(from, to);</span>
+<span class="fc bfc" id="L893" title="All 4 branches covered.">        boolean bold = st.isBold() || isHeading(b.type);</span>
+<span class="fc" id="L894">        Font rf = fontFor(bold, st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));</span>
+<span class="fc" id="L895">        int w = rf.stringWidth(run);</span>
+<span class="fc" id="L896">        int ry = y + baseline(lineHeight, rf);</span>
+<span class="pc bpc" id="L897" title="1 of 2 branches missed.">        if (st.getHighlight() &gt;= 0) {</span>
+<span class="nc" id="L898">            g.setColor(st.getHighlight());</span>
+<span class="nc" id="L899">            g.fillRect(cx, y, w, lineHeight);</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">        } else if (st.isMonospace()) {</span>
+            // no monospace family ships with the framework fonts, so inline code runs get a
+            // subtle text-color tint instead; the style still round-trips through the
+            // serializers so consumers with a real code font keep the semantic
+<span class="fc" id="L904">            int alpha = g.getAlpha();</span>
+<span class="fc" id="L905">            g.setColor(getTextColor());</span>
+<span class="fc" id="L906">            g.setAlpha(24);</span>
+<span class="fc" id="L907">            g.fillRect(cx, y, w, lineHeight);</span>
+<span class="fc" id="L908">            g.setAlpha(alpha);</span>
+        }
+<span class="fc" id="L910">        int decoration = 0;</span>
+<span class="fc bfc" id="L911" title="All 2 branches covered.">        if (st.isUnderline()) {</span>
+<span class="fc" id="L912">            decoration |= Style.TEXT_DECORATION_UNDERLINE;</span>
+        }
+<span class="pc bpc" id="L914" title="1 of 2 branches missed.">        if (st.isStrike()) {</span>
+<span class="nc" id="L915">            decoration |= Style.TEXT_DECORATION_STRIKETHRU;</span>
+        }
+<span class="fc bfc" id="L917" title="All 2 branches covered.">        g.setColor(st.getForeColor() &gt;= 0 ? st.getForeColor() : getTextColor());</span>
+<span class="fc" id="L918">        g.setFont(rf);</span>
+<span class="fc" id="L919">        g.drawString(run, cx, ry, decoration);</span>
+<span class="fc" id="L920">        return w;</span>
+    }
+
+    private int measureLine(int line, String text) {
+<span class="fc" id="L924">        return measureColumnX(line, text, text.length(), getEditorFont());</span>
+    }
+
+    private int baseline(int lineHeight, Font f) {
+<span class="fc" id="L928">        return lineHeight - f.getHeight();</span>
+    }
+
+    private int ordinal(int line) {
+<span class="nc" id="L932">        int n = 1;</span>
+<span class="nc bnc" id="L933" title="All 2 branches missed.">        for (int i = line - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L934">            RichBlocks.BlockAttr pb = blocks.get(i);</span>
+<span class="nc bnc" id="L935" title="All 2 branches missed.">            if (pb.listType == RichBlocks.LIST_ORDERED) {</span>
+<span class="nc" id="L936">                n++;</span>
+            } else {
+                break;
+            }
+        }
+<span class="nc" id="L941">        return n;</span>
+    }
+
+    @Override
+    protected Font getEditorFont() {
+<span class="fc" id="L946">        return fontFor(false, false, baseSize());</span>
+    }
+
+    // ---- inline formatting commands ----
+
+    private void applyToggle(int which) {
+<span class="fc" id="L952">        int s = getSelectionStart();</span>
+<span class="fc" id="L953">        int e = getSelectionEnd();</span>
+<span class="fc" id="L954">        boolean current = isSetInRange(s, e, which);</span>
+<span class="pc bpc" id="L955" title="1 of 2 branches missed.">        final boolean value = !current;</span>
+<span class="fc" id="L956">        final int w = which;</span>
+<span class="pc bpc" id="L957" title="1 of 2 branches missed.">        if (s == e) {</span>
+<span class="nc bnc" id="L958" title="All 2 branches missed.">            TextStyle base = pendingStyle != null ? pendingStyle : styleAtCaret();</span>
+<span class="nc" id="L959">            pendingStyle = withFlag(base, w, value);</span>
+<span class="nc" id="L960">            return;</span>
+        }
+<span class="fc" id="L962">        Object before = beginFormatEdit();</span>
+<span class="fc" id="L963">        inline.transformRange(s, e, new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="fc" id="L966">                return withFlag(st, w, value);</span>
+            }
+        });
+<span class="fc" id="L969">        commitFormatEdit(s, before);</span>
+<span class="fc" id="L970">        afterStyleChange();</span>
+<span class="fc" id="L971">    }</span>
+
+    private static TextStyle withFlag(TextStyle st, int which, boolean value) {
+<span class="pc bpc" id="L974" title="2 of 4 branches missed.">        switch (which) {</span>
+            case 0:
+<span class="fc" id="L976">                return st.withBold(value);</span>
+            case 1:
+<span class="fc" id="L978">                return st.withItalic(value);</span>
+            case 2:
+<span class="nc" id="L980">                return st.withUnderline(value);</span>
+            default:
+<span class="nc" id="L982">                return st.withStrike(value);</span>
+        }
+    }
+
+    private boolean isSetInRange(int s, int e, final int which) {
+<span class="fc" id="L987">        return inline.allInRange(s, e, new InlineStyles.StylePredicate() {</span>
+            @Override
+            public boolean test(TextStyle st) {
+<span class="pc bpc" id="L990" title="1 of 4 branches missed.">                switch (which) {</span>
+                    case 0:
+<span class="fc" id="L992">                        return st.isBold();</span>
+                    case 1:
+<span class="fc" id="L994">                        return st.isItalic();</span>
+                    case 2:
+<span class="fc" id="L996">                        return st.isUnderline();</span>
+                    default:
+<span class="nc" id="L998">                        return st.isStrike();</span>
+                }
+            }
+        });
+    }
+
+    /// Toggles bold on the selection (or the pending typing style when the selection is empty).
+    public void toggleBold() {
+<span class="fc" id="L1006">        applyToggle(0);</span>
+<span class="fc" id="L1007">    }</span>
+
+    /// Toggles italic.
+    public void toggleItalic() {
+<span class="fc" id="L1011">        applyToggle(1);</span>
+<span class="fc" id="L1012">    }</span>
+
+    /// Toggles underline.
+    public void toggleUnderline() {
+<span class="nc" id="L1016">        applyToggle(2);</span>
+<span class="nc" id="L1017">    }</span>
+
+    /// Toggles strike-through.
+    public void toggleStrike() {
+<span class="nc" id="L1021">        applyToggle(3);</span>
+<span class="nc" id="L1022">    }</span>
+
+    /// Sets the foreground color on the selection.
+    public void setForeColor(final int rgb) {
+<span class="nc" id="L1026">        applyStyle(new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="nc" id="L1029">                return st.withForeColor(rgb);</span>
+            }
+        });
+<span class="nc" id="L1032">    }</span>
+
+    /// Sets the highlight color on the selection.
+    public void setHighlight(final int rgb) {
+<span class="nc" id="L1036">        applyStyle(new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="nc" id="L1039">                return st.withHighlight(rgb);</span>
+            }
+        });
+<span class="nc" id="L1042">    }</span>
+
+    /// Sets the relative font size level (1..7) on the selection.
+    public void setFontSizeLevel(final int level) {
+<span class="nc" id="L1046">        applyStyle(new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="nc" id="L1049">                return st.withFontSizeLevel(level);</span>
+            }
+        });
+<span class="nc" id="L1052">    }</span>
+
+    /// Removes all inline formatting from the selection.
+    public void removeFormat() {
+<span class="nc" id="L1056">        int s = getSelectionStart();</span>
+<span class="nc" id="L1057">        int e = getSelectionEnd();</span>
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">        if (s == e) {</span>
+<span class="nc" id="L1059">            pendingStyle = TextStyle.DEFAULT;</span>
+<span class="nc" id="L1060">            return;</span>
+        }
+<span class="nc" id="L1062">        Object before = beginFormatEdit();</span>
+<span class="nc" id="L1063">        inline.transformRange(s, e, new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="nc" id="L1066">                return TextStyle.DEFAULT;</span>
+            }
+        });
+<span class="nc" id="L1069">        commitFormatEdit(s, before);</span>
+<span class="nc" id="L1070">        afterStyleChange();</span>
+<span class="nc" id="L1071">    }</span>
+
+    private void applyStyle(InlineStyles.StyleTransform t) {
+<span class="fc" id="L1074">        int s = getSelectionStart();</span>
+<span class="fc" id="L1075">        int e = getSelectionEnd();</span>
+<span class="pc bpc" id="L1076" title="1 of 2 branches missed.">        if (s == e) {</span>
+<span class="nc bnc" id="L1077" title="All 2 branches missed.">            TextStyle base = pendingStyle != null ? pendingStyle : styleAtCaret();</span>
+<span class="nc" id="L1078">            pendingStyle = t.apply(base);</span>
+<span class="nc" id="L1079">            return;</span>
+        }
+<span class="fc" id="L1081">        Object before = beginFormatEdit();</span>
+<span class="fc" id="L1082">        inline.transformRange(s, e, t);</span>
+<span class="fc" id="L1083">        commitFormatEdit(s, before);</span>
+<span class="fc" id="L1084">        afterStyleChange();</span>
+<span class="fc" id="L1085">    }</span>
+
+    private void afterStyleChange() {
+<span class="fc" id="L1088">        invalidateLayout();</span>
+<span class="pc bpc" id="L1089" title="1 of 2 branches missed.">        if (host() != null) {</span>
+<span class="fc" id="L1090">            host().editorChanged();</span>
+        }
+<span class="fc" id="L1092">        repaint();</span>
+<span class="fc" id="L1093">    }</span>
+
+    // ---- formatting undo: a formatting command replaces no text, so its undo unit carries only
+    // the before/after rich-model snapshots; undo/redo swap the styling in place. The depth guard
+    // keeps compound commands (applyLink mutates linkRuns then styles through applyStyle) as ONE
+    // undo unit. ----
+
+    private int formatEditDepth;
+
+    /// Starts a formatting undo unit; returns the pre-change snapshot, or null when nested inside
+    /// an outer formatting edit (which owns the unit).
+    private Object beginFormatEdit() {
+<span class="fc" id="L1105">        formatEditDepth++;</span>
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">        return formatEditDepth &gt; 1 ? null : captureDocumentState();</span>
+    }
+
+    /// Closes a formatting undo unit opened by `#beginFormatEdit()`, recording it when this is the
+    /// outermost edit.
+    private void commitFormatEdit(int anchor, Object before) {
+<span class="fc" id="L1112">        formatEditDepth--;</span>
+<span class="fc bfc" id="L1113" title="All 2 branches covered.">        if (before == null) {</span>
+<span class="fc" id="L1114">            return;</span>
+        }
+<span class="fc" id="L1116">        UndoManager u = getUndoManager();</span>
+<span class="fc" id="L1117">        u.breakRun();</span>
+<span class="fc" id="L1118">        u.record(anchor, &quot;&quot;, &quot;&quot;, before, captureDocumentState());</span>
+<span class="fc" id="L1119">        u.breakRun();</span>
+<span class="fc" id="L1120">    }</span>
+
+    // ---- block formatting commands ----
+
+    private void forEachSelectedBlock(BlockOp op) {
+<span class="fc" id="L1125">        int s = getSelectionStart();</span>
+<span class="fc" id="L1126">        int e = getSelectionEnd();</span>
+<span class="fc" id="L1127">        int firstLine = getDocument().lineOfOffset(s);</span>
+<span class="fc" id="L1128">        int lastLine = getDocument().lineOfOffset(e);</span>
+<span class="fc" id="L1129">        Object before = beginFormatEdit();</span>
+<span class="fc bfc" id="L1130" title="All 2 branches covered.">        for (int ln = firstLine; ln &lt;= lastLine; ln++) {</span>
+<span class="fc" id="L1131">            op.apply(blocks.get(ln));</span>
+        }
+<span class="fc" id="L1133">        commitFormatEdit(s, before);</span>
+<span class="fc" id="L1134">        afterStyleChange();</span>
+<span class="fc" id="L1135">    }</span>
+
+    private interface BlockOp {
+        void apply(RichBlocks.BlockAttr b);
+    }
+
+    /// Sets the block type (`p`, `h1`..`h6`, `pre`, `blockquote`) on the selected paragraphs.
+    public void setBlockFormat(String tag) {
+<span class="fc" id="L1143">        final int type = blockTypeForTag(tag);</span>
+<span class="fc" id="L1144">        forEachSelectedBlock(new BlockOp() {</span>
+            @Override
+            public void apply(RichBlocks.BlockAttr b) {
+<span class="fc" id="L1147">                b.type = type;</span>
+<span class="fc" id="L1148">                b.listType = RichBlocks.LIST_NONE;</span>
+<span class="fc" id="L1149">            }</span>
+        });
+<span class="fc" id="L1151">    }</span>
+
+    private static int blockTypeForTag(String tag) {
+<span class="pc bpc" id="L1154" title="1 of 2 branches missed.">        if (tag == null) {</span>
+<span class="nc" id="L1155">            return RichBlocks.PARAGRAPH;</span>
+        }
+<span class="pc bpc" id="L1157" title="3 of 6 branches missed.">        if (tag.length() == 2 &amp;&amp; (tag.charAt(0) == 'h' || tag.charAt(0) == 'H')) {</span>
+<span class="fc" id="L1158">            int n = tag.charAt(1) - '0';</span>
+<span class="pc bpc" id="L1159" title="2 of 4 branches missed.">            if (n &gt;= 1 &amp;&amp; n &lt;= 6) {</span>
+<span class="fc" id="L1160">                return RichBlocks.H1 + (n - 1);</span>
+            }
+        }
+<span class="pc bpc" id="L1163" title="1 of 2 branches missed.">        if (&quot;pre&quot;.equalsIgnoreCase(tag)) {</span>
+<span class="nc" id="L1164">            return RichBlocks.PRE;</span>
+        }
+<span class="pc bpc" id="L1166" title="1 of 2 branches missed.">        if (&quot;blockquote&quot;.equalsIgnoreCase(tag)) {</span>
+<span class="fc" id="L1167">            return RichBlocks.BLOCKQUOTE;</span>
+        }
+<span class="nc" id="L1169">        return RichBlocks.PARAGRAPH;</span>
+    }
+
+    /// Sets the alignment on the selected paragraphs.
+    public void setAlign(final int align) {
+<span class="nc" id="L1174">        forEachSelectedBlock(new BlockOp() {</span>
+            @Override
+            public void apply(RichBlocks.BlockAttr b) {
+<span class="nc" id="L1177">                b.align = align;</span>
+<span class="nc" id="L1178">            }</span>
+        });
+<span class="nc" id="L1180">    }</span>
+
+    /// Applies (or toggles off) an ordered / unordered list on the selected paragraphs.
+    public void setList(final int listType) {
+<span class="nc" id="L1184">        int s = getSelectionStart();</span>
+<span class="nc" id="L1185">        int firstLine = getDocument().lineOfOffset(s);</span>
+<span class="nc bnc" id="L1186" title="All 2 branches missed.">        boolean allSame = blocks.get(firstLine).listType == listType;</span>
+<span class="nc bnc" id="L1187" title="All 2 branches missed.">        final int target = allSame ? RichBlocks.LIST_NONE : listType;</span>
+<span class="nc" id="L1188">        forEachSelectedBlock(new BlockOp() {</span>
+            @Override
+            public void apply(RichBlocks.BlockAttr b) {
+<span class="nc" id="L1191">                b.listType = target;</span>
+<span class="nc" id="L1192">            }</span>
+        });
+<span class="nc" id="L1194">    }</span>
+
+    /// Increases the indentation of the selected paragraphs.
+    public void indentBlocks() {
+<span class="nc" id="L1198">        forEachSelectedBlock(new BlockOp() {</span>
+            @Override
+            public void apply(RichBlocks.BlockAttr b) {
+<span class="nc" id="L1201">                b.indent++;</span>
+<span class="nc" id="L1202">            }</span>
+        });
+<span class="nc" id="L1204">    }</span>
+
+    /// Decreases the indentation of the selected paragraphs.
+    public void outdentBlocks() {
+<span class="nc" id="L1208">        forEachSelectedBlock(new BlockOp() {</span>
+            @Override
+            public void apply(RichBlocks.BlockAttr b) {
+<span class="nc bnc" id="L1211" title="All 2 branches missed.">                if (b.indent &gt; 0) {</span>
+<span class="nc" id="L1212">                    b.indent--;</span>
+                }
+<span class="nc" id="L1214">            }</span>
+        });
+<span class="nc" id="L1216">    }</span>
+
+    /// Applies a hyperlink target and its default appearance to the selection.
+    public void applyLink(String url) {
+<span class="fc" id="L1220">        int start = getSelectionStart();</span>
+<span class="fc" id="L1221">        int end = getSelectionEnd();</span>
+<span class="pc bpc" id="L1222" title="1 of 2 branches missed.">        if (start == end) {</span>
+<span class="nc" id="L1223">            pendingLink = url;</span>
+        }
+        // one undo unit for the link target AND its appearance; the nested applyStyle
+        // sees formatEditDepth &gt; 1 and leaves the recording to this outer edit
+<span class="fc" id="L1227">        Object before = beginFormatEdit();</span>
+<span class="pc bpc" id="L1228" title="1 of 2 branches missed.">        if (start != end) {</span>
+<span class="pc bpc" id="L1229" title="1 of 4 branches missed.">            for (int i = start; i &lt; end &amp;&amp; i &lt; linkRuns.size(); i++) {</span>
+<span class="fc" id="L1230">                linkRuns.set(i, url);</span>
+            }
+        }
+<span class="fc" id="L1233">        applyStyle(new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="fc" id="L1236">                return st.withUnderline(true).withForeColor(0x1a73e8);</span>
+            }
+        });
+<span class="pc bpc" id="L1239" title="1 of 2 branches missed.">        commitFormatEdit(start, start == end ? null : before);</span>
+<span class="fc" id="L1240">    }</span>
+
+    /// Removes the link appearance from the selection.
+    public void removeLinkStyle() {
+<span class="nc" id="L1244">        int start = getSelectionStart();</span>
+<span class="nc" id="L1245">        int end = getSelectionEnd();</span>
+<span class="nc bnc" id="L1246" title="All 2 branches missed.">        if (start == end) {</span>
+<span class="nc" id="L1247">            pendingLink = null;</span>
+        }
+<span class="nc" id="L1249">        Object before = beginFormatEdit();</span>
+<span class="nc bnc" id="L1250" title="All 2 branches missed.">        if (start != end) {</span>
+<span class="nc bnc" id="L1251" title="All 4 branches missed.">            for (int i = start; i &lt; end &amp;&amp; i &lt; linkRuns.size(); i++) {</span>
+<span class="nc" id="L1252">                linkRuns.set(i, null);</span>
+            }
+        }
+<span class="nc" id="L1255">        applyStyle(new InlineStyles.StyleTransform() {</span>
+            @Override
+            public TextStyle apply(TextStyle st) {
+<span class="nc" id="L1258">                return st.withUnderline(false).withForeColor(-1);</span>
+            }
+        });
+<span class="nc bnc" id="L1261" title="All 2 branches missed.">        commitFormatEdit(start, start == end ? null : before);</span>
+<span class="nc" id="L1262">    }</span>
+
+    /// Returns whether an inline command (`bold`, `italic`, `underline`, `strikeThrough`) is active for
+    /// the current selection.
+    public boolean queryState(String command) {
+<span class="fc" id="L1267">        int s = getSelectionStart();</span>
+<span class="fc" id="L1268">        int e = getSelectionEnd();</span>
+<span class="fc bfc" id="L1269" title="All 2 branches covered.">        if (&quot;bold&quot;.equals(command)) {</span>
+<span class="fc" id="L1270">            return isSetInRange(s, e, 0);</span>
+        }
+<span class="fc bfc" id="L1272" title="All 2 branches covered.">        if (&quot;italic&quot;.equals(command)) {</span>
+<span class="fc" id="L1273">            return isSetInRange(s, e, 1);</span>
+        }
+<span class="pc bpc" id="L1275" title="1 of 2 branches missed.">        if (&quot;underline&quot;.equals(command)) {</span>
+<span class="fc" id="L1276">            return isSetInRange(s, e, 2);</span>
+        }
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">        if (&quot;strikeThrough&quot;.equals(command)) {</span>
+<span class="nc" id="L1279">            return isSetInRange(s, e, 3);</span>
+        }
+<span class="nc" id="L1281">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

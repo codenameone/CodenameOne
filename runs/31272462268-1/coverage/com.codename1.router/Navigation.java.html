@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Navigation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.router</a> &gt; <span class="el_source">Navigation.java</span></div><h1>Navigation.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.router;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// In-app navigation API on top of the declarative `@Route` table.
+///
+/// `Navigation` is the imperative counterpart to the `Route` annotation:
+/// declare your forms with `@Route(&quot;/users/:id&quot;)` once, then trigger
+/// navigation from anywhere with `Navigation.navigate(&quot;/users/42&quot;)`. The same
+/// route table that handles deep links is reused, so there is exactly one
+/// place that knows how `/users/:id` maps to a form.
+///
+/// The class also exposes the navigation stack so applications can render
+/// breadcrumb UIs without maintaining a parallel history:
+///
+/// ```java
+/// Container breadcrumbs = new Container(BoxLayout.x());
+/// for (final NavigationEntry e : Navigation.getStack()) {
+///     Button crumb = new Button(e.getTitle());
+///     crumb.addActionListener(evt -&gt; Navigation.popTo(e));
+///     breadcrumbs.add(crumb);
+/// }
+/// ```
+///
+/// The surface is intentionally tiny -- five static methods and one value
+/// type. Applications that prefer raw `Form#show` / `Form#showBack` keep
+/// working unchanged; the `Navigation` stack only records URL-driven
+/// navigations.
+///
+/// All methods must be called on the EDT.
+public final class Navigation {
+
+    private static RouteDispatcher dispatcher;
+<span class="fc" id="L61">    private static final List&lt;NavigationEntry&gt; stack = new ArrayList&lt;NavigationEntry&gt;();</span>
+
+    private Navigation() {
+    }
+
+    // ------------------------------------------------------------------------
+    // Internal: dispatcher installation
+    // ------------------------------------------------------------------------
+
+    /// Installs the build-time-generated route dispatcher. Invoked once by
+    /// `com.codename1.router.generated.Routes#bootstrap` during framework
+    /// initialization. Application code should not call this.
+    public static void setDispatcher(RouteDispatcher d) {
+<span class="fc" id="L74">        dispatcher = d;</span>
+<span class="fc" id="L75">    }</span>
+
+    // ------------------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------------------
+
+    /// Navigate to a path. Looks the URL up in the route table generated from
+    /// `@Route` annotations, builds the matching `Form`, pushes it onto the
+    /// navigation stack, and shows it.
+    ///
+    /// Accepts either a bare path (`/users/42`), a full URL with scheme +
+    /// host (`https://example.com/users/42`), or a custom-scheme URL. Scheme
+    /// and host are ignored -- only the path + query are matched.
+    ///
+    /// Returns `true` when a route matched and the form was shown, `false`
+    /// when no route matched.
+    public static boolean navigate(String path) {
+<span class="fc" id="L92">        RouteDispatcher d = dispatcher;</span>
+<span class="fc bfc" id="L93" title="All 4 branches covered.">        if (d == null || path == null) {</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+        Form f;
+        try {
+<span class="fc" id="L98">            f = d.dispatch(path);</span>
+<span class="fc" id="L99">        } catch (Throwable t) {</span>
+<span class="fc" id="L100">            com.codename1.io.Log.e(t);</span>
+<span class="fc" id="L101">            return false;</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (f == null) {</span>
+<span class="fc" id="L104">            return false;</span>
+        }
+<span class="fc" id="L106">        stack.add(new NavigationEntry(path, f));</span>
+<span class="fc" id="L107">        f.show();</span>
+<span class="fc" id="L108">        return true;</span>
+    }
+
+    /// Pop the top entry off the navigation stack and return to the previous
+    /// one. Uses `Form#showBack` so the transition runs in reverse. Returns
+    /// `true` when a frame was popped, `false` when the stack had at most one
+    /// entry (already at the root, nothing to go back to).
+    public static boolean back() {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (stack.size() &lt;= 1) {</span>
+<span class="fc" id="L117">            return false;</span>
+        }
+<span class="fc" id="L119">        stack.remove(stack.size() - 1);</span>
+<span class="fc" id="L120">        NavigationEntry now = stack.get(stack.size() - 1);</span>
+<span class="fc" id="L121">        now.getForm().showBack();</span>
+<span class="fc" id="L122">        return true;</span>
+    }
+
+    /// The current entry (top of stack), or null when the stack is empty.
+    public static NavigationEntry getCurrent() {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        return stack.isEmpty() ? null : stack.get(stack.size() - 1);</span>
+    }
+
+    /// Unmodifiable snapshot of the navigation stack, oldest entry first
+    /// (breadcrumb order). The list is a copy: mutating navigations after
+    /// the call do not affect it.
+    public static List&lt;NavigationEntry&gt; getStack() {
+<span class="fc" id="L134">        return Collections.unmodifiableList(new ArrayList&lt;NavigationEntry&gt;(stack));</span>
+    }
+
+    /// Pop entries until `entry` is on top, then show its form via
+    /// `Form#showBack`. Returns `true` when the entry was on the stack and
+    /// we navigated back to it, `false` when the entry is not on the stack.
+    /// Calling with the current entry is a no-op that returns `true`.
+    public static boolean popTo(NavigationEntry entry) {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (entry == null) {</span>
+<span class="fc" id="L143">            return false;</span>
+        }
+        // NavigationEntry doesn't override equals, so entry.equals(other) is
+        // reference equality -- which is what we want here. Two navigations to
+        // the same path are independent stack frames.
+<span class="fc" id="L148">        int idx = -1;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = 0; i &lt; stack.size(); i++) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (entry.equals(stack.get(i))) {</span>
+<span class="fc" id="L151">                idx = i;</span>
+<span class="fc" id="L152">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (idx &lt; 0) {</span>
+<span class="fc" id="L156">            return false;</span>
+        }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (idx == stack.size() - 1) {</span>
+<span class="fc" id="L159">            return true;</span>
+        }
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        while (stack.size() &gt; idx + 1) {</span>
+<span class="fc" id="L162">            stack.remove(stack.size() - 1);</span>
+        }
+<span class="fc" id="L164">        entry.getForm().showBack();</span>
+<span class="fc" id="L165">        return true;</span>
+    }
+
+    // ------------------------------------------------------------------------
+    // Internal: framework-side entry point invoked by Display when the
+    // platform delivers a deep link through `AppArg`.
+    // ------------------------------------------------------------------------
+
+    /// Dispatch a URL delivered by the platform. Invoked by
+    /// `com.codename1.ui.Display#setProperty(String, String)` for URL-shaped
+    /// `AppArg` values; applications should call `#navigate(String)` instead.
+    public static boolean dispatchExternalUrl(String url) {
+<span class="fc bfc" id="L177" title="All 4 branches covered.">        if (url == null || url.length() == 0) {</span>
+<span class="fc" id="L178">            return false;</span>
+        }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L181">            return navigate(url);</span>
+        }
+<span class="nc" id="L183">        final String captured = url;</span>
+<span class="nc" id="L184">        final boolean[] holder = new boolean[1];</span>
+<span class="nc" id="L185">        Display.getInstance().callSeriallyAndWait(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L188">                holder[0] = navigate(captured);</span>
+<span class="nc" id="L189">            }</span>
+        });
+<span class="nc" id="L191">        return holder[0];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

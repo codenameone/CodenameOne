@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ModelCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai.inference</a> &gt; <span class="el_source">ModelCache.java</span></div><h1>ModelCache.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai.inference;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.security.Hash;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Hashtable;
+
+/// Downloads a large model into app-private storage and exposes it as a
+/// file-backed {@link ModelSource}. The initial request requires HTTPS.
+/// Ports that expose redirect responses reject any redirect to HTTP. Because
+/// iOS follows redirects below the portable network layer, iOS downloads
+/// require a SHA-256 digest so an unseen redirect cannot substitute the
+/// executable model payload. Downloads use a temporary file and are promoted
+/// only after optional digest verification.
+///
+/// Supply a SHA-256 digest for third-party or remotely mutable models. Without
+/// a digest HTTPS authenticates the connection but does not pin the executable
+/// model payload. Small first-party models can instead be packaged with
+/// {@link ModelSource#resource(String)}.
+public final class ModelCache {
+    private static final int MAX_READABLE_CACHE_KEY_LENGTH = 160;
+<span class="fc" id="L54">    private static final Hashtable&lt;String, ActiveFetch&gt; ACTIVE_FETCHES =</span>
+            new Hashtable&lt;String, ActiveFetch&gt;();
+
+    private ModelCache() {
+    }
+
+    /// Fetches a model into the app-private {@code ai-models} directory.
+    /// A stale {@code .download} file is deleted and restarted rather than
+    /// resumed because the portable network layer cannot prove that a server's
+    /// partial response still represents the pinned model.
+    /// Concurrent requests for the same cache entry and content identity share
+    /// one underlying operation, but each caller receives an independent
+    /// resource. Canceling one caller's resource suppresses only that caller's
+    /// notification and does not cancel the shared download or other callers.
+    /// A different URL or digest using that cache key while the first operation
+    /// is active fails instead of racing on the temporary file.
+    ///
+    /// @param url initial HTTPS URL of the model; observable redirects must
+    /// also use HTTPS
+    /// @param cacheKey stable cache name, independent of the URL
+    /// @param sha256 lowercase or uppercase SHA-256 hex digest; optional on
+    /// ports that expose redirects and required on iOS
+    /// @return asynchronous cached model source
+    /// @throws IllegalArgumentException if the URL, cache key, or digest is
+    /// invalid, or if the digest is omitted on iOS
+    public static AsyncResource&lt;ModelSource&gt; fetch(
+            final String url, final String cacheKey, final String sha256) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (!isHttpsUrl(url)) {</span>
+<span class="fc" id="L82">            throw new IllegalArgumentException(&quot;Model URL must use HTTPS&quot;);</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (cacheKey == null || cacheKey.length() == 0) {</span>
+<span class="fc" id="L85">            throw new IllegalArgumentException(&quot;cacheKey must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">        if (sha256 != null &amp;&amp; !isSha256(sha256)) {</span>
+<span class="fc" id="L88">            throw new IllegalArgumentException(&quot;SHA-256 must contain 64 hex characters&quot;);</span>
+        }
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">        if (sha256 == null &amp;&amp; requiresPinnedModelDigest()) {</span>
+<span class="fc" id="L91">            throw new IllegalArgumentException(</span>
+                    &quot;iOS model downloads require a SHA-256 digest because &quot;
+                    + &quot;redirects are followed below the portable network layer&quot;);
+        }
+
+<span class="nc" id="L96">        final String fileName = safeName(cacheKey) + &quot;.tflite&quot;;</span>
+<span class="nc" id="L97">        final FetchRegistration registration =</span>
+<span class="nc" id="L98">                registerFetch(fileName, url, sha256);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (!registration.owner) {</span>
+<span class="nc" id="L100">            return registration.resource;</span>
+        }
+<span class="nc" id="L102">        final AsyncResource&lt;ModelSource&gt; out = registration.resource;</span>
+<span class="nc" id="L103">        final Completion&lt;ModelSource&gt; completion = registration.completion;</span>
+<span class="nc" id="L104">        Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L107">                final FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L108">                final String directory = fs.getAppHomePath() + &quot;ai-models/&quot;;</span>
+<span class="nc" id="L109">                fs.mkdir(directory);</span>
+<span class="nc" id="L110">                final String target = directory + fileName;</span>
+                try {
+<span class="nc bnc" id="L112" title="All 4 branches missed.">                    if (fs.exists(target) &amp;&amp; verify(target, sha256)) {</span>
+<span class="nc" id="L113">                        completion.complete(ModelSource.file(target));</span>
+<span class="nc" id="L114">                        return;</span>
+                    }
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                    if (fs.exists(target)) {</span>
+<span class="nc" id="L117">                        fs.delete(target);</span>
+                    }
+<span class="nc" id="L119">                } catch (IOException error) {</span>
+<span class="nc" id="L120">                    completion.fail(error);</span>
+<span class="nc" id="L121">                    return;</span>
+<span class="nc" id="L122">                }</span>
+<span class="nc" id="L123">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+<span class="nc" id="L126">                        download(completion, url, sha256, target, fileName);</span>
+<span class="nc" id="L127">                    }</span>
+                });
+<span class="nc" id="L129">            }</span>
+        });
+<span class="nc" id="L131">        return out;</span>
+    }
+
+    /// Fetches a model without content pinning on ports that expose redirect
+    /// responses to the portable network layer. Prefer the three-argument
+    /// overload for any model that is not versioned by the app itself. iOS
+    /// rejects this overload because its native network stack follows
+    /// redirects before Codename One can validate their schemes.
+    /// Concurrent unpinned calls share an operation only when their URL and
+    /// cache key are identical.
+    ///
+    /// @param url HTTPS model URL
+    /// @param cacheKey stable cache name
+    /// @return asynchronous cached file source
+    /// @throws IllegalArgumentException if the URL or cache key is invalid,
+    /// or when called on iOS, where a digest is required
+    public static AsyncResource&lt;ModelSource&gt; fetch(String url, String cacheKey) {
+<span class="nc" id="L148">        return fetch(url, cacheKey, null);</span>
+    }
+
+    private static void download(final Completion&lt;ModelSource&gt; completion,
+                                 String url, final String sha256,
+                                 final String target, final String fileName) {
+<span class="nc" id="L154">        final FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L155">        final String temporary = target + &quot;.download&quot;;</span>
+<span class="nc" id="L156">        prepareTemporary(fs, temporary);</span>
+<span class="nc" id="L157">        final ConnectionRequest request = new ModelDownloadRequest(</span>
+                completion, fs, temporary);
+<span class="nc" id="L159">        request.setPost(false);</span>
+<span class="nc" id="L160">        request.setFailSilently(true);</span>
+<span class="nc" id="L161">        request.setReadResponseForErrors(false);</span>
+<span class="nc" id="L162">        request.setDuplicateSupported(true);</span>
+<span class="nc" id="L163">        request.setUrl(url);</span>
+<span class="nc" id="L164">        request.setDestinationFile(temporary);</span>
+<span class="nc" id="L165">        request.addResponseListener(new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent event) {
+<span class="nc" id="L168">                Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                    @Override
+                    public void run() {
+                        try {
+<span class="nc" id="L172">                            verifyDownloaded(fs, temporary, sha256);</span>
+<span class="nc" id="L173">                            promoteDownloaded(fs, temporary, target,</span>
+                                    fileName, sha256);
+<span class="nc" id="L175">                            completion.complete(ModelSource.file(target));</span>
+<span class="nc" id="L176">                        } catch (IOException error) {</span>
+<span class="nc" id="L177">                            completion.fail(error);</span>
+<span class="nc" id="L178">                        }</span>
+<span class="nc" id="L179">                    }</span>
+                });
+<span class="nc" id="L181">            }</span>
+        });
+<span class="nc" id="L183">        ActionListener&lt;NetworkEvent&gt; failure = new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent event) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                if (fs.exists(temporary)) {</span>
+<span class="nc" id="L187">                    fs.delete(temporary);</span>
+                }
+<span class="nc" id="L189">                Throwable error = event.getError();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                completion.fail(error == null</span>
+                        ? new IOException(&quot;Model download failed with HTTP &quot;
+<span class="nc" id="L192">                                + event.getResponseCode())</span>
+                        : error);
+<span class="nc" id="L194">            }</span>
+        };
+<span class="nc" id="L196">        request.addExceptionListener(failure);</span>
+<span class="nc" id="L197">        request.addResponseCodeListener(failure);</span>
+<span class="nc" id="L198">        NetworkManager.getInstance().addToQueue(request);</span>
+<span class="nc" id="L199">    }</span>
+
+    private static boolean verify(String path, String expected) throws IOException {
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        if (expected == null || expected.length() == 0) {</span>
+<span class="nc" id="L203">            return true;</span>
+        }
+<span class="fc" id="L205">        InputStream input = FileSystemStorage.getInstance().openInputStream(path);</span>
+        try {
+<span class="fc" id="L207">            Hash hash = Hash.create(Hash.SHA256);</span>
+<span class="fc" id="L208">            byte[] buffer = new byte[16384];</span>
+            int read;
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            while ((read = input.read(buffer)) &gt;= 0) {</span>
+<span class="fc" id="L211">                hash.update(buffer, 0, read);</span>
+            }
+<span class="fc" id="L213">            return expected.equalsIgnoreCase(Hash.toHex(hash.digest()));</span>
+        } finally {
+<span class="fc" id="L215">            input.close();</span>
+        }
+    }
+
+    static void prepareTemporary(FileSystemStorage fs, String temporary) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (fs.exists(temporary)) {</span>
+<span class="fc" id="L221">            fs.delete(temporary);</span>
+        }
+<span class="fc" id="L223">    }</span>
+
+    static void verifyDownloaded(FileSystemStorage fs, String temporary,
+                                 String expected) throws IOException {
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (!verify(temporary, expected)) {</span>
+<span class="fc" id="L228">            fs.delete(temporary);</span>
+<span class="fc" id="L229">            throw new IOException(&quot;Downloaded model SHA-256 does not match&quot;);</span>
+        }
+<span class="nc" id="L231">    }</span>
+
+    static void promoteDownloaded(FileSystemStorage fs, String temporary,
+                                  String target, String fileName,
+                                  String expected) throws IOException {
+        try {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (fs.exists(target)) {</span>
+<span class="nc" id="L238">                fs.delete(target);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                if (fs.exists(target)) {</span>
+<span class="nc" id="L240">                    throw new IOException(</span>
+                            &quot;Could not replace existing cached model&quot;);
+                }
+            }
+<span class="fc" id="L244">            fs.rename(temporary, fileName);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            if (!fs.exists(target)) {</span>
+<span class="fc" id="L246">                throw new IOException(</span>
+                        &quot;Downloaded model could not be promoted to the cache&quot;);
+            }
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            if (!verify(target, expected)) {</span>
+<span class="fc" id="L250">                fs.delete(target);</span>
+<span class="fc" id="L251">                throw new IOException(</span>
+                        &quot;Promoted model SHA-256 does not match&quot;);
+            }
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (fs.exists(temporary)) {</span>
+<span class="nc" id="L255">                fs.delete(temporary);</span>
+            }
+<span class="fc" id="L257">        } catch (IOException error) {</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (fs.exists(temporary)) {</span>
+<span class="nc" id="L259">                fs.delete(temporary);</span>
+            }
+<span class="fc" id="L261">            throw error;</span>
+<span class="fc" id="L262">        }</span>
+<span class="fc" id="L263">    }</span>
+
+    static String safeName(String value) {
+<span class="fc" id="L266">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L268">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L269" title="2 of 16 branches missed.">            boolean safe = (c &gt;= 'a' &amp;&amp; c &lt;= 'z')</span>
+                    || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')
+                    || (c &gt;= '0' &amp;&amp; c &lt;= '9')
+                    || c == '-' || c == '_';
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            out.append(safe ? c : '_');</span>
+        }
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (out.length() &gt; MAX_READABLE_CACHE_KEY_LENGTH) {</span>
+<span class="fc" id="L276">            out.setLength(MAX_READABLE_CACHE_KEY_LENGTH);</span>
+        }
+<span class="fc" id="L278">        Hash hash = Hash.create(Hash.SHA256);</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L280">            char c = value.charAt(i);</span>
+<span class="fc" id="L281">            hash.update((byte) (c &gt;&gt;&gt; 8));</span>
+<span class="fc" id="L282">            hash.update((byte) c);</span>
+        }
+<span class="fc" id="L284">        out.append('-').append(Hash.toHex(hash.digest()).substring(0, 32));</span>
+<span class="fc" id="L285">        return out.toString();</span>
+    }
+
+    private static boolean isSha256(String value) {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (value.length() != 64) {</span>
+<span class="fc" id="L290">            return false;</span>
+        }
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L293">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L294" title="6 of 12 branches missed.">            if (!((c &gt;= '0' &amp;&amp; c &lt;= '9') || (c &gt;= 'a' &amp;&amp; c &lt;= 'f')</span>
+                    || (c &gt;= 'A' &amp;&amp; c &lt;= 'F'))) {
+<span class="fc" id="L296">                return false;</span>
+            }
+        }
+<span class="nc" id="L299">        return true;</span>
+    }
+
+    static boolean isHttpsUrl(String url) {
+<span class="pc bpc" id="L303" title="1 of 4 branches missed.">        return url != null &amp;&amp; url.regionMatches(true, 0,</span>
+<span class="fc" id="L304">                &quot;https://&quot;, 0, &quot;https://&quot;.length());</span>
+    }
+
+    static boolean requiresPinnedModelDigest() {
+<span class="fc" id="L308">        return &quot;ios&quot;.equals(Display.getInstance().getPlatformName());</span>
+    }
+
+    static FetchRegistration registerFetch(
+            String fileName, String url, String sha256) {
+<span class="fc" id="L313">        synchronized (ACTIVE_FETCHES) {</span>
+<span class="fc" id="L314">            ActiveFetch active = ACTIVE_FETCHES.get(fileName);</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (active != null) {</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                if (active.matches(url, sha256)) {</span>
+<span class="fc" id="L317">                    return new FetchRegistration(</span>
+<span class="fc" id="L318">                            subscribe(active.resource), null, false);</span>
+                }
+<span class="fc" id="L320">                AsyncResource&lt;ModelSource&gt; conflict =</span>
+                        new AsyncResource&lt;ModelSource&gt;();
+<span class="fc" id="L322">                new Completion&lt;ModelSource&gt;(conflict).fail(</span>
+                        new IOException(&quot;A different model download is &quot;
+                                + &quot;already using cache key &quot; + fileName));
+<span class="fc" id="L325">                return new FetchRegistration(conflict, null, false);</span>
+            }
+<span class="fc" id="L327">            AsyncResource&lt;ModelSource&gt; resource =</span>
+                    new AsyncResource&lt;ModelSource&gt;();
+<span class="fc" id="L329">            Completion&lt;ModelSource&gt; completion =</span>
+                    new Completion&lt;ModelSource&gt;(resource, fileName);
+<span class="fc" id="L331">            ACTIVE_FETCHES.put(fileName,</span>
+                    new ActiveFetch(url, sha256, resource));
+<span class="fc" id="L333">            return new FetchRegistration(</span>
+<span class="fc" id="L334">                    subscribe(resource), completion, true);</span>
+        }
+    }
+
+    private static &lt;T&gt; AsyncResource&lt;T&gt; subscribe(
+            AsyncResource&lt;T&gt; operation) {
+<span class="fc" id="L340">        final SubscriberResource&lt;T&gt; subscriber =</span>
+                new SubscriberResource&lt;T&gt;();
+<span class="fc" id="L342">        operation.ready(new SuccessCallback&lt;T&gt;() {</span>
+            @Override
+            public void onSucess(T value) {
+                try {
+<span class="fc" id="L346">                    subscriber.publish(value);</span>
+<span class="fc" id="L347">                } catch (Throwable callbackFailure) {</span>
+<span class="fc" id="L348">                    Log.e(callbackFailure);</span>
+<span class="fc" id="L349">                }</span>
+<span class="fc" id="L350">            }</span>
+<span class="fc" id="L351">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable error) {
+                try {
+<span class="fc" id="L355">                    subscriber.fail(error);</span>
+<span class="fc" id="L356">                } catch (Throwable callbackFailure) {</span>
+<span class="fc" id="L357">                    Log.e(callbackFailure);</span>
+<span class="fc" id="L358">                }</span>
+<span class="fc" id="L359">            }</span>
+        });
+<span class="fc" id="L361">        return subscriber;</span>
+    }
+
+    private static void releaseFetch(
+            String fileName, AsyncResource&lt;?&gt; resource) {
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (fileName == null) {</span>
+<span class="fc" id="L367">            return;</span>
+        }
+<span class="fc" id="L369">        synchronized (ACTIVE_FETCHES) {</span>
+<span class="fc" id="L370">            ActiveFetch active = ACTIVE_FETCHES.get(fileName);</span>
+<span class="pc bpc" id="L371" title="2 of 4 branches missed.">            if (active != null &amp;&amp; active.resource == resource) {</span>
+<span class="fc" id="L372">                ACTIVE_FETCHES.remove(fileName);</span>
+            }
+<span class="fc" id="L374">        }</span>
+<span class="fc" id="L375">    }</span>
+
+    static final class ActiveFetch {
+        private final String url;
+        private final String sha256;
+        private final AsyncResource&lt;ModelSource&gt; resource;
+
+        ActiveFetch(String url, String sha256,
+<span class="fc" id="L383">                    AsyncResource&lt;ModelSource&gt; resource) {</span>
+<span class="fc" id="L384">            this.url = url;</span>
+<span class="fc" id="L385">            this.sha256 = sha256;</span>
+<span class="fc" id="L386">            this.resource = resource;</span>
+<span class="fc" id="L387">        }</span>
+
+        boolean matches(String otherUrl, String otherSha256) {
+<span class="pc bpc" id="L390" title="2 of 4 branches missed.">            if (sha256 != null || otherSha256 != null) {</span>
+<span class="nc bnc" id="L391" title="All 4 branches missed.">                return sha256 != null &amp;&amp; otherSha256 != null</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                        &amp;&amp; sha256.equalsIgnoreCase(otherSha256);</span>
+            }
+<span class="fc" id="L394">            return url.equals(otherUrl);</span>
+        }
+    }
+
+    private static final class SubscriberResource&lt;T&gt;
+            extends AsyncResource&lt;T&gt; {
+        @Override
+        public synchronized boolean cancel(boolean mayInterruptIfRunning) {
+<span class="fc" id="L402">            return super.cancel(mayInterruptIfRunning);</span>
+        }
+
+        synchronized void publish(T value) {
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            if (!isCancelled()) {</span>
+<span class="fc" id="L407">                complete(value);</span>
+            }
+<span class="fc" id="L409">        }</span>
+
+        synchronized void fail(Throwable error) {
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            if (!isCancelled()) {</span>
+<span class="fc" id="L413">                error(error);</span>
+            }
+<span class="fc" id="L415">        }</span>
+    }
+
+    static final class FetchRegistration {
+        final AsyncResource&lt;ModelSource&gt; resource;
+        final Completion&lt;ModelSource&gt; completion;
+        final boolean owner;
+
+        FetchRegistration(AsyncResource&lt;ModelSource&gt; resource,
+                          Completion&lt;ModelSource&gt; completion,
+<span class="fc" id="L425">                          boolean owner) {</span>
+<span class="fc" id="L426">            this.resource = resource;</span>
+<span class="fc" id="L427">            this.completion = completion;</span>
+<span class="fc" id="L428">            this.owner = owner;</span>
+<span class="fc" id="L429">        }</span>
+    }
+
+    static final class ModelDownloadRequest extends ConnectionRequest {
+        private final Completion&lt;ModelSource&gt; completion;
+        private final FileSystemStorage fs;
+        private final String temporary;
+
+        ModelDownloadRequest(Completion&lt;ModelSource&gt; completion,
+<span class="fc" id="L438">                             FileSystemStorage fs, String temporary) {</span>
+<span class="fc" id="L439">            this.completion = completion;</span>
+<span class="fc" id="L440">            this.fs = fs;</span>
+<span class="fc" id="L441">            this.temporary = temporary;</span>
+<span class="fc" id="L442">        }</span>
+
+        /// Compares the inherited URL and request arguments together with the
+        /// temporary destination path. Callback and storage-service instances
+        /// do not change the logical identity of a download.
+        ///
+        /// @param other request to compare
+        /// @return {@code true} when both requests download the same URL and
+        ///         arguments to the same temporary path
+        @Override
+        public boolean equals(Object other) {
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            if (!super.equals(other)) {</span>
+<span class="nc" id="L454">                return false;</span>
+            }
+<span class="fc" id="L456">            ModelDownloadRequest request = (ModelDownloadRequest) other;</span>
+<span class="pc bpc" id="L457" title="3 of 4 branches missed.">            return temporary == null ? request.temporary == null</span>
+<span class="fc" id="L458">                    : temporary.equals(request.temporary);</span>
+        }
+
+        /// Produces a hash consistent with {@link #equals(Object)} from the
+        /// inherited request identity and temporary destination.
+        ///
+        /// @return hash of the logical download identity
+        @Override
+        public int hashCode() {
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            return 31 * super.hashCode()</span>
+<span class="fc" id="L468">                    + (temporary == null ? 0 : temporary.hashCode());</span>
+        }
+
+        @Override
+        public boolean onRedirect(String url) {
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            if (isHttpsUrl(url)) {</span>
+<span class="fc" id="L474">                return false;</span>
+            }
+<span class="fc" id="L476">            setKilled(true);</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">            if (fs.exists(temporary)) {</span>
+<span class="fc" id="L478">                fs.delete(temporary);</span>
+            }
+<span class="fc" id="L480">            completion.fail(new IOException(</span>
+                    &quot;Model download redirect must use HTTPS&quot;));
+<span class="fc" id="L482">            return true;</span>
+        }
+    }
+
+    static final class Completion&lt;T&gt; {
+        private final AsyncResource&lt;T&gt; resource;
+        private final String activeFileName;
+        private boolean done;
+
+        Completion(AsyncResource&lt;T&gt; resource) {
+<span class="fc" id="L492">            this(resource, null);</span>
+<span class="fc" id="L493">        }</span>
+
+<span class="fc" id="L495">        Completion(AsyncResource&lt;T&gt; resource, String activeFileName) {</span>
+<span class="fc" id="L496">            this.resource = resource;</span>
+<span class="fc" id="L497">            this.activeFileName = activeFileName;</span>
+<span class="fc" id="L498">        }</span>
+
+        synchronized void complete(final T value) {
+<span class="fc bfc" id="L501" title="All 2 branches covered.">            if (done) {</span>
+<span class="fc" id="L502">                return;</span>
+            }
+<span class="fc" id="L504">            done = true;</span>
+<span class="fc" id="L505">            releaseFetch(activeFileName, resource);</span>
+<span class="fc" id="L506">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L509">                    resource.complete(value);</span>
+<span class="fc" id="L510">                }</span>
+            });
+<span class="fc" id="L512">        }</span>
+
+        synchronized void fail(final Throwable error) {
+<span class="fc bfc" id="L515" title="All 2 branches covered.">            if (done) {</span>
+<span class="fc" id="L516">                return;</span>
+            }
+<span class="fc" id="L518">            done = true;</span>
+<span class="fc" id="L519">            releaseFetch(activeFileName, resource);</span>
+<span class="fc" id="L520">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L523">                    resource.error(new InferenceException(</span>
+                            &quot;Could not cache LiteRT model&quot;, error));
+<span class="fc" id="L525">                }</span>
+            });
+<span class="fc" id="L527">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
