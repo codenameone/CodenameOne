@@ -181,26 +181,26 @@ JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
 
 
 /* --------------------------------------------------------------------- */
-/* Object ids the debugger has handed out during the current suspension.  */
+/* Object ids the debugger has handed out, and the GC roots that keep     */
+/* them valid.                                                            */
 /*                                                                        */
 /* A registered class word proves a pointer LOOKS like an object of a     */
-/* known class. It does not prove the allocation is still live: full-page */
-/* BiBOP reclamation resets the page cursor without clearing class words, */
-/* and a legacy object goes to free() with its header intact. An IDE that */
-/* holds an objectID across a resume and asks about it after a collection */
-/* would therefore pass validation and be read anyway.                    */
+/* known class. It does not prove the allocation is live: full-page BiBOP */
+/* reclamation resets the page cursor without clearing class words, and a */
+/* legacy object goes to free() with its header intact. Validation alone  */
+/* would therefore accept a collected object and the IDE's next field or  */
+/* array read would touch freed memory.                                   */
 /*                                                                        */
-/* Every reference handed to the proxy is recorded here, and the set is   */
-/* cleared whenever a thread resumes. A wire id that is not in it is one  */
-/* the debugger did not issue this time round, so it is refused rather    */
-/* than dereferenced.                                                     */
+/* So this table is not only a record of what was issued, it is a root    */
+/* set: cn1_debugger_mark_issued_roots is called from the collector's     */
+/* root pass and marks every entry. An object stays alive for exactly as  */
+/* long as an id for it can come back from the IDE, which turns the       */
+/* membership check below from a heuristic into a guarantee.              */
 /*                                                                        */
-/* This bounds the reported window; it is not a liveness proof. Objects   */
-/* the IDE is shown come from live frames, fields and arrays and so are   */
-/* reachable, but the concurrent collector can still run while a thread   */
-/* is parked. Closing that completely means rooting debugger-issued ids   */
-/* until the IDE disposes them, which is a change to the collector rather */
-/* than to this file.                                                     */
+/* The roots are released, not permanent. Each entry records the          */
+/* suspended threads it was obtained for, and resuming a thread drops the */
+/* entries only it held -- so the objects a debugging session displays    */
+/* are retained for the stop that displayed them and no longer.           */
 /* --------------------------------------------------------------------- */
 
 #define CN1_ISSUED_INITIAL_CAP 4096u   /* power of two; open addressing */
@@ -408,6 +408,51 @@ void cn1_debugger_forget_issued_for(int64_t owner) {
         }
     }
     pthread_mutex_unlock(&g_issuedMutex);
+}
+
+/**
+ * Marks every issued reference as a GC root.
+ *
+ * The references are copied out under the lock and marked after releasing it.
+ * gcMarkObject takes no lock the debugger also takes, so marking in place
+ * would work today -- but a command handler can hold ParparVM's critical
+ * section while recording an id (the thread list does), so holding this mutex
+ * across collector code is one collector change away from a lock-order
+ * inversion, and it would present as a device hanging mid-session. The copy
+ * costs one allocation per collection while a debugger is attached.
+ *
+ * Marking under the lock is the fallback when that allocation fails: missing
+ * a root would free an object the IDE still holds an id for, which is the
+ * failure this whole mechanism exists to prevent.
+ */
+void cn1_debugger_mark_issued_roots(struct ThreadLocalData* threadStateData) {
+    pthread_mutex_lock(&g_issuedMutex);
+    if (g_issued == NULL || g_issuedCount == 0) {
+        pthread_mutex_unlock(&g_issuedMutex);
+        return;
+    }
+    JAVA_OBJECT* batch = (JAVA_OBJECT*)malloc(g_issuedCount * sizeof(JAVA_OBJECT));
+    unsigned n = 0;
+    for (unsigned i = 0; i < g_issuedCap; i++) {
+        uintptr_t key = g_issued[i].key;
+        if (key == 0) continue;
+        JAVA_OBJECT obj = (JAVA_OBJECT)key;
+        /* A tagged int is a value, not an allocation; there is nothing to
+         * mark and gcMarkObject would read a header that does not exist. */
+        if (CN1_IS_TAGGED(obj)) continue;
+        if (batch != NULL) {
+            if (n < g_issuedCount) batch[n++] = obj;
+        } else {
+            gcMarkObject(threadStateData, obj, JAVA_FALSE);
+        }
+    }
+    pthread_mutex_unlock(&g_issuedMutex);
+    if (batch != NULL) {
+        for (unsigned i = 0; i < n; i++) {
+            gcMarkObject(threadStateData, batch[i], JAVA_FALSE);
+        }
+        free(batch);
+    }
 }
 
 /**

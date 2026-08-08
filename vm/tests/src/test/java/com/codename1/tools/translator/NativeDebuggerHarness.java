@@ -111,6 +111,18 @@ final class NativeDebuggerHarness {
     private static final String GENERATED_SYMBOLS =
             "#include \"cn1_globals.h\"\n"
           + "struct clazz class__java_lang_Integer = { 0 };\n"
+          // The collector's mark entry point. Records whether a nominated
+          // reference was reached, rather than buffering every mark -- the
+          // table can hold thousands, so a fixed buffer would answer "was it
+          // in the first N" instead of "was it marked".
+          + "JAVA_OBJECT cn1MarkRootTarget = 0;\n"
+          + "int cn1MarkRootTargetSeen = 0;\n"
+          + "int cn1MarkedRootCount = 0;\n"
+          + "void gcMarkObject(struct ThreadLocalData* t, JAVA_OBJECT o, JAVA_BOOLEAN force) {\n"
+          + "    (void)t; (void)force;\n"
+          + "    cn1MarkedRootCount++;\n"
+          + "    if (o == cn1MarkRootTarget) cn1MarkRootTargetSeen = 1;\n"
+          + "}\n"
           + "#if CN1_TAGGED_ACTIVE\n"
           + "struct JavaObjectPrototype cn1TaggedProxy = { 0 };\n"
           + "#endif\n";

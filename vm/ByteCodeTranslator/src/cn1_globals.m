@@ -1239,6 +1239,15 @@ void codenameOneGCMark() {
     }
     unlockCriticalSection();
 
+#ifdef CN1_ON_DEVICE_DEBUG
+    // Objects the debugger has handed to the IDE as objectIDs. Rooted for as
+    // long as the id can come back, so an id the IDE still holds always names
+    // a live object -- otherwise validating it proves only its shape, since a
+    // class word survives reclamation. Released when the owning thread
+    // resumes, so this is bounded by the suspension rather than permanent.
+    cn1_debugger_mark_issued_roots(d);
+#endif
+
     for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
         lockCriticalSection();
         struct ThreadLocalData* t = allThreads[iter];
@@ -7012,5 +7021,10 @@ __attribute__((weak)) volatile int cn1DebuggerActive = 0;
 __attribute__((weak)) void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line) {
     (void)threadStateData;
     (void)line;
+}
+
+// Same arrangement: no debugger linked in means no issued ids to root.
+__attribute__((weak)) void cn1_debugger_mark_issued_roots(struct ThreadLocalData* threadStateData) {
+    (void)threadStateData;
 }
 #endif

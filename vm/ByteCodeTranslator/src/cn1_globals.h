@@ -1231,6 +1231,21 @@ extern volatile int cn1DebuggerActive;
 // Defined in cn1_debugger.m (iOS port) / a no-op shim in release builds.
 extern void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line);
 
+// Marks every object reference the debugger has handed to the IDE, so the
+// collector cannot reclaim one while an objectID for it is outstanding.
+//
+// Without this, validating an id proves only that it is shaped like an object
+// of a registered class -- a class word survives reclamation, so a collected
+// object still passes -- and the IDE's next field or array read touches freed
+// memory. Rooting makes the issued set a liveness guarantee rather than a
+// heuristic: an object stays alive exactly as long as an id for it is
+// outstanding, and the debugger releases it when the owning thread resumes.
+//
+// Called from the GC's root pass next to the immortal roots. The strong
+// definition is in Ports/iOSPort/nativeSources/cn1_debugger_objects.c; the
+// weak stub in cn1_globals.m keeps release builds linking.
+extern void cn1_debugger_mark_issued_roots(struct ThreadLocalData* threadStateData);
+
 #define __CN1_DEBUG_INFO(line) \
     do { \
         threadStateData->callStackLine[threadStateData->callStackOffset - 1] = (line); \

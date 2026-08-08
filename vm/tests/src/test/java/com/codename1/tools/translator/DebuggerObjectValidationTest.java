@@ -226,6 +226,39 @@ class DebuggerObjectValidationTest {
         assertEquals("gone", probe("SHARED_DROPPED_BY_LAST_RESUME"));
     }
 
+    /**
+     * Every outstanding id is a GC root, so its object cannot be collected.
+     *
+     * <p>Membership in the issued set only decides which ids are <em>accepted</em>.
+     * Whether the object behind an accepted id is still allocated is a separate
+     * question, and a class word survives reclamation — so without rooting, an
+     * accepted id could still name freed memory and the IDE's next field read
+     * would touch it. Marking the set from the collector's root pass is what
+     * turns the membership check into a guarantee.</p>
+     */
+    @Test
+    void everyOutstandingIdIsMarkedAsAGcRoot() throws Exception {
+        assertEquals("marked", probe("ROOTS_MARK_ISSUED"));
+    }
+
+    /** Including references the table only holds after it has grown. */
+    @Test
+    void rootsSurviveTableGrowth() throws Exception {
+        assertEquals("marked", probe("ROOTS_MARK_AFTER_GROWTH"));
+    }
+
+    /** A released id stops being a root, so the object can be collected again. */
+    @Test
+    void aReleasedIdIsNoLongerARoot() throws Exception {
+        assertEquals("not-marked", probe("ROOTS_RELEASED_NOT_MARKED"));
+    }
+
+    /** A tagged int is a value, not an allocation, so it is never marked. */
+    @Test
+    void taggedIntsAreNotMarkedAsRoots() throws Exception {
+        assertEquals("not-marked", probe("ROOTS_TAGGED_NOT_MARKED"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -247,7 +280,9 @@ class DebuggerObjectValidationTest {
                 "OWNER_PARKED_IS_KEPT", "OWNER_INHERITED_IS_DROPPED",
                 "OWNER_UNOWNED_SURVIVES_THREAD_RESUME",
                 "OWNER_UNOWNED_DROPPED_BY_FULL_RESUME",
-                "SHARED_SURVIVES_FIRST_RESUME", "SHARED_DROPPED_BY_LAST_RESUME");
+                "SHARED_SURVIVES_FIRST_RESUME", "SHARED_DROPPED_BY_LAST_RESUME",
+                "ROOTS_MARK_ISSUED", "ROOTS_MARK_AFTER_GROWTH",
+                "ROOTS_RELEASED_NOT_MARKED", "ROOTS_TAGGED_NOT_MARKED");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -321,6 +356,32 @@ class DebuggerObjectValidationTest {
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0xDEADBEEFDEAD0000ULL;\n" +
+            "    } else if (strncmp(which, \"ROOTS_\", 6) == 0) {\n" +
+            "        extern JAVA_OBJECT cn1MarkRootTarget;\n" +
+            "        extern int cn1MarkRootTargetSeen;\n" +
+            "        extern int cn1MarkedRootCount;\n" +
+            "        JAVA_OBJECT tracked = (JAVA_OBJECT)(uintptr_t)0xD000;\n" +
+            "        if (strcmp(which, \"ROOTS_TAGGED_NOT_MARKED\") == 0) {\n" +
+            "            tracked = CN1_TAG_INT(42);\n" +
+            "            cn1_debugger_note_issued_for(tracked, 7);\n" +
+            "        } else if (strcmp(which, \"ROOTS_MARK_AFTER_GROWTH\") == 0) {\n" +
+            "            /* Force the table past its initial capacity first. */\n" +
+            "            for (int i = 1; i <= 9000; i++) {\n" +
+            "                cn1_debugger_note_issued_for((JAVA_OBJECT)(uintptr_t)(i * 8), 7);\n" +
+            "            }\n" +
+            "            cn1_debugger_note_issued_for(tracked, 7);\n" +
+            "        } else {\n" +
+            "            cn1_debugger_note_issued_for(tracked, 7);\n" +
+            "            if (strcmp(which, \"ROOTS_RELEASED_NOT_MARKED\") == 0) {\n" +
+            "                cn1_debugger_forget_issued_for(7);   /* thread resumes */\n" +
+            "            }\n" +
+            "        }\n" +
+            "        cn1MarkRootTarget = tracked;\n" +
+            "        cn1MarkRootTargetSeen = 0;\n" +
+            "        cn1MarkedRootCount = 0;\n" +
+            "        cn1_debugger_mark_issued_roots(NULL);\n" +
+            "        printf(\"%s\\n\", cn1MarkRootTargetSeen ? \"marked\" : \"not-marked\");\n" +
+            "        return 0;\n" +
             "    } else if (strncmp(which, \"SHARED_\", 7) == 0) {\n" +
             "        /* One reference exposed by both parked threads. */\n" +
             "        JAVA_OBJECT shared = (JAVA_OBJECT)(uintptr_t)0xC000;\n" +
