@@ -163,7 +163,6 @@ class LinuxDatabase extends Database {
         if (peer == 0) {
             return;
         }
-        releaseOpenDatabase(openKey);
         if (inTransaction) {
             inTransaction = false;
             try {
@@ -180,6 +179,8 @@ class LinuxDatabase extends Database {
         long closing = peer;
         peer = 0;
         LinuxNative.sqlDbClose(closing);
+        // Last, not first: see the iOS port. The claim covers the handle, not the intent to close.
+        releaseOpenDatabase(openKey);
     }
 
     @Override

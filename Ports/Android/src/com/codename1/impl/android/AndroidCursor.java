@@ -250,8 +250,24 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     /// Guards a value read and records which column it was, for wasNull().
     private void beginRead(int index) throws IOException {
         checkOpen();
+        checkOnARow();
         checkColumn(index);
         last_read_column_index = index;
+    }
+
+    /// Rejects a read taken while the cursor sits off a row.
+    ///
+    /// A Row handed out at a valid position stays usable after the cursor moves, and moving before
+    /// the first row or past the last leaves the underlying cursor with no row to read. It answers
+    /// that with an unchecked CursorIndexOutOfBoundsException, where the portable contract promises
+    /// an IOException and every other port raises one.
+    private void checkOnARow() throws IOException {
+        int position = c.getPosition();
+        int count = c.getCount();
+        if (position < 0 || position >= count) {
+            throw new IOException("This cursor is not on a row. Its position is " + position
+                    + " and it has " + count + (count == 1 ? " row" : " rows"));
+        }
     }
 
     /// Rejects a column index the result set does not have.

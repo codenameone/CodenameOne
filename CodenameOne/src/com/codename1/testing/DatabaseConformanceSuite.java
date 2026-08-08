@@ -1396,11 +1396,12 @@ public final class DatabaseConformanceSuite {
             return HEADER_UNREADABLE;
         }
         try {
-            InputStream in = FileSystemStorage.getInstance().openInputStream(path);
-            if (in == null) {
-                return HEADER_UNREADABLE;
-            }
+            InputStream in = null;
             try {
+                in = FileSystemStorage.getInstance().openInputStream(path);
+                if (in == null) {
+                    return HEADER_UNREADABLE;
+                }
                 byte[] header = new byte[15];
                 int offset = 0;
                 while (offset < header.length) {
@@ -1421,7 +1422,9 @@ public final class DatabaseConformanceSuite {
                 }
                 return HEADER_PLAINTEXT;
             } finally {
-                in.close();
+                if (in != null) {
+                    in.close();
+                }
             }
         } catch (IOException err) {
             return HEADER_UNREADABLE;

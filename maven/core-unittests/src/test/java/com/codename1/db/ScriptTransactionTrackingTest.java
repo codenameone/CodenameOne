@@ -257,6 +257,21 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void aNonAsciiSavepointNameIsReadWhole() {
+        // SQLite takes anything above ASCII as part of an identifier. Reading only the ASCII prefix
+        // makes two savepoints that share one look like the same savepoint, so releasing the inner
+        // one ends the outer while SQLite still holds the transaction.
+        String outer = "caf\u00e9";
+        String inner = "caf\u540d";
+        db.ran("SAVEPOINT " + outer);
+        db.ran("SAVEPOINT " + inner);
+        db.ran("RELEASE " + inner);
+        assertTrue(db.isInTransaction(), "releasing the inner savepoint left the outer one open");
+        db.ran("RELEASE " + outer);
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
     void releasingSomethingElseLeavesTheTransactionOpen() {
         db.ran("SAVEPOINT outer");
         db.ran("RELEASE unrelated");

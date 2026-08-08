@@ -298,7 +298,6 @@ public class SEDatabase extends Database {
         if (conn == null) {
             return;
         }
-        releaseOpenDatabase(openKey);
         java.sql.Connection closing = conn;
         conn = null;
         if (inTransaction) {
@@ -318,6 +317,11 @@ public class SEDatabase extends Database {
             closing.close();
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
+        } finally {
+            // Last, not first: until the driver has let the file go this connection still holds
+            // and locks it, and giving the claim back sooner lets another connection start
+            // rewriting it underneath a rollback that has not finished.
+            releaseOpenDatabase(openKey);
         }
     }
 
@@ -456,13 +460,19 @@ public class SEDatabase extends Database {
         }
         checkOpen();
         requireSingleStatement(sql);
-        if (runAsTransactionControl(sql)) {
-            return;
-        }
         PreparedStatement s = null;
         try {
+            // Prepared before the transaction-control branch, not after it, because preparing is
+            // what rejects "BEGIN ?" as the syntax error it is on every other port, and because a
+            // parameterized call is held to its parameter count whatever the statement says.
             s = conn.prepareStatement(sql);
             checkParameterCount(s, params.length);
+            if (transactionControlKeyword(sql) != null) {
+                cleanup(s);
+                s = null;
+                runAsTransactionControl(sql);
+                return;
+            }
             bind(s, params);
             s.execute();
         } catch (SQLException ex) {

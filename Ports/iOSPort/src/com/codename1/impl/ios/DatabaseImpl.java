@@ -188,7 +188,6 @@ class DatabaseImpl extends Database {
         if (peer == 0) {
             return;
         }
-        releaseOpenDatabase(openKey);
         if (inTransaction) {
             inTransaction = false;
             try {
@@ -207,6 +206,10 @@ class DatabaseImpl extends Database {
         long closing = peer;
         peer = 0;
         IOSImplementation.nativeInstance.sqlDbClose(closing);
+        // Last, not first: until the native handle is gone this connection still holds and locks
+        // the file, and giving the claim back sooner lets another connection start rewriting it
+        // underneath a rollback that has not finished.
+        releaseOpenDatabase(openKey);
     }
 
     @Override

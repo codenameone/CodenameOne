@@ -758,9 +758,7 @@ public abstract class Database {
             return name.toString().toUpperCase();
         }
         int end = at;
-        while (end < length && (isKeywordChar(statement.charAt(end))
-                || (statement.charAt(end) >= '0' && statement.charAt(end) <= '9')
-                || statement.charAt(end) == '_' || statement.charAt(end) == '$')) {
+        while (end < length && isIdentifierChar(statement.charAt(end))) {
             end++;
         }
         return end > at ? statement.substring(at, end).toUpperCase() : null;
@@ -856,6 +854,16 @@ public abstract class Database {
             end++;
         }
         return statement.substring(start, end).toUpperCase();
+    }
+
+    /// Whether a character continues an unquoted identifier.
+    ///
+    /// SQLite takes anything above ASCII as part of one. Stopping at the first such character
+    /// would read two savepoints whose names share an ASCII prefix as one name, so releasing the
+    /// inner one would end the outer -- clearing the flag while SQLite still holds the
+    /// transaction, which is what lets a key change run underneath uncommitted work.
+    private static boolean isIdentifierChar(char c) {
+        return isKeywordChar(c) || (c >= '0' && c <= '9') || c == '_' || c == '$' || c >= 128;
     }
 
     private static boolean isKeywordChar(char c) {

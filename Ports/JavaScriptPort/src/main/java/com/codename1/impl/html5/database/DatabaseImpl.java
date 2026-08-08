@@ -172,7 +172,6 @@ public class DatabaseImpl extends Database {
         if (peer == 0) {
             return;
         }
-        releaseOpenDatabase(databaseName);
         if (inTransaction) {
             inTransaction = false;
             try {
@@ -188,9 +187,16 @@ public class DatabaseImpl extends Database {
         }
         long closing = peer;
         peer = 0;
-        // Reported, not swallowed. The peer is already cleared so there is no retry, which makes
-        // this the only chance to say the data may not have reached storage.
-        checkNative(SQLiteNative.close(closing));
+        try {
+            // Reported, not swallowed. The peer is already cleared so there is no retry, which
+            // makes this the only chance to say the data may not have reached storage.
+            checkNative(SQLiteNative.close(closing));
+        } finally {
+            // Last, not first: until the engine has let the database go this connection still
+            // holds it, and giving the claim back sooner lets another connection start rewriting
+            // it underneath a rollback that has not finished.
+            releaseOpenDatabase(databaseName);
+        }
     }
 
     @Override
