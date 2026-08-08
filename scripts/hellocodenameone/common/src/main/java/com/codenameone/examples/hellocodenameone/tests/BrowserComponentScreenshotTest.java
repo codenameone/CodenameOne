@@ -50,14 +50,36 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             done();
             return true;
         }
+        // Every attempt starts from nothing. resetForRetry() clears the harness
+        // flags only, on the documented assumption that a subclass builds a
+        // fresh Form in runTest() and therefore carries no state across a retry
+        // -- and this test broke that assumption. It kept loaded and jsReady,
+        // so the retry saw a page that the PREVIOUS BrowserComponent had
+        // loaded, skipped waiting for the new peer entirely, and went straight
+        // into a twelve-second visual poll against a web view that had not
+        // rendered anything yet. The retry that exists to survive a slow
+        // engine start could therefore never survive one: the second attempt
+        // timed out exactly like the first.
+        loaded = false;
+        jsReady = false;
+        jsCheckPending = false;
+        readyRunnable = null;
+        visualBand = null;
         form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
-        browser = new BrowserComponent();
-        browser.addWebEventListener(BrowserComponent.onLoad, evt -> {
+        final BrowserComponent attempt = new BrowserComponent();
+        browser = attempt;
+        attempt.addWebEventListener(BrowserComponent.onLoad, evt -> {
+            // A superseded attempt's web view can still finish loading and fire
+            // here. Answering for it would mark this attempt loaded against a
+            // component that is no longer on screen.
+            if (browser != attempt) {
+                return;
+            }
             loaded = true;
             checkReady();
         });
-        browser.setPage(buildHtml(), null);
-        form.add(BorderLayout.CENTER, browser);
+        attempt.setPage(buildHtml(), null);
+        form.add(BorderLayout.CENTER, attempt);
         form.show();
         return true;
     }

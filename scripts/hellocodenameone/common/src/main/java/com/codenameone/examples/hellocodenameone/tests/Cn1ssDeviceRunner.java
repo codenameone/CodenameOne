@@ -123,6 +123,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             return 45000;
         }
         if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof BrowserComponentScreenshotTest) {
+            // This is the first BrowserComponent in the process, so it pays a
+            // one-time native web-engine start -- WebView2 on Windows, WebKitGTK
+            // on Linux, WKWebView on Apple -- before the page can even begin to
+            // load. On top of that the test waits up to twelve seconds for the
+            // peer to be composited into the screen capture, and then needs a
+            // JS round trip through execute(). Thirty seconds covers all of that
+            // on a warm runner and not on a cold one, which showed up as a
+            // "timed out waiting for DONE" with no diagnosis attached.
+            return TEST_TIMEOUT_MS_NATIVE * 2;
+        }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
                 && testClass instanceof VisionOnDeviceApiTest) {
             // The first Apple Vision request may compile its detector model on
             // a cold simulator. Keep the EDT free and allow that one-time
