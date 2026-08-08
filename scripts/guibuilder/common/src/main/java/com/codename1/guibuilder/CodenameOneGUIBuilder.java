@@ -4426,7 +4426,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             editor.onReady(editor::focusEditor);
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
             Container editorPane = editorPane("Binding model: " + relativeFormName(document.path()) + "Model",
-                    editor, () -> editor.getText(value -> saveSource(modelPath, value)), this::closeEditorPane);
+                    editor, () -> editor.getText(value -> saveModelSource(modelPath, value)), this::closeEditorPane);
             activeEditorReopen = this::openBindingModel;
             canvasHost.removeComponent(stage);
             canvasHost.removeAll();
@@ -4633,6 +4633,27 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Source save failed: " + ex.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Writes the binding model exactly as typed.
+     *
+     * <p>It must not go through {@link #saveSource(String, String)}: that regenerates the companion
+     * from the .gui document and appends a stub for every configured event handler, which in a
+     * model file means methods referring to an ActionEvent it does not import. An ordinary model
+     * edit then left the project uncompilable.
+     *
+     * @param path the model source path
+     * @param source the editor buffer to write
+     */
+    private void saveModelSource(String path, String source) {
+        try {
+            ProjectIO.write(path, source);
+            editorBufferOnDisk = source;
+            setStatus("Saved the binding model");
+        } catch (IOException ex) {
+            ToastBar.showErrorMessage("Model save failed: " + ex.getMessage());
         }
     }
 
