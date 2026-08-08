@@ -64,6 +64,40 @@ class LinuxVideoIO extends VideoIO {
     private static final String HEVC_CAPS = "video/x-h265";
     private static final String AAC_CAPS = "audio/mpeg, mpegversion=(int)4";
 
+    /// The elements every one of this port's pipelines names, whatever the codec.
+    /// A codec is only usable if these exist too, and their presence cannot be
+    /// assumed: dlopen()ing libgstapp-1.0 resolves the appsrc/appsink C entry
+    /// points but says nothing about whether the "app" PLUGIN is registered, and
+    /// a cut-down or hardware-only install can carry a decoder while missing the
+    /// muxer, the demuxer or the converters around it. Without this a
+    /// decoder-only host advertised H.264 and then failed inside
+    /// videoReaderOpen(), which is the failure this class exists to stop
+    /// reporting as availability.
+    ///
+    /// filesrc ! decodebin ! videoconvert ! appsink, with qtdemux for the MP4
+    /// container this port declares -- decodebin auto-plugs it, and nothing else
+    /// demuxes MP4 in practice.
+    private static final String[] DECODE_PIPELINE = {
+        "filesrc", "decodebin", "videoconvert", "appsink", "qtdemux"
+    };
+    /// appsrc ! videoconvert ! <encoder> ! <parser> ! mp4mux ! filesink
+    private static final String[] ENCODE_PIPELINE = {
+        "appsrc", "videoconvert", "filesink", "mp4mux"
+    };
+    /// The audio legs add these; only AAC needs them, so a host missing them
+    /// still reports its video codecs rather than nothing at all.
+    private static final String[] AUDIO_DECODE_PIPELINE = {"audioconvert", "audioresample"};
+    private static final String[] AUDIO_ENCODE_PIPELINE = {"audioconvert"};
+
+    private static boolean allFactories(String[] names) {
+        for (int i = 0; i < names.length; i++) {
+            if (!LinuxNative.videoFactoryAvailable(names[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// The codecs this host can really handle. Reporting H.264, HEVC and AAC
     /// unconditionally described the pipelines this port *would like* to build rather
     /// than the plugins that are installed: a distribution carrying only
@@ -76,19 +110,22 @@ class LinuxVideoIO extends VideoIO {
         if (!LinuxNative.videoBackendAvailable()) {
             return new VideoCodec[0];
         }
-        // Every encoder pipeline muxes into MP4 through a parser, so a missing muxer
-        // or parser disqualifies the codec just as surely as a missing encoder.
-        boolean mux = LinuxNative.videoFactoryAvailable("mp4mux");
-        if (encoder ? (mux && LinuxNative.videoFactoryAvailable("x264enc") && LinuxNative.videoFactoryAvailable("h264parse"))
+        // A codec without the rest of its pipeline is not a codec this port can
+        // use, so the shared elements gate everything.
+        if (!allFactories(encoder ? ENCODE_PIPELINE : DECODE_PIPELINE)) {
+            return new VideoCodec[0];
+        }
+        boolean audio = allFactories(encoder ? AUDIO_ENCODE_PIPELINE : AUDIO_DECODE_PIPELINE);
+        if (encoder ? (LinuxNative.videoFactoryAvailable("x264enc") && LinuxNative.videoFactoryAvailable("h264parse"))
                 : LinuxNative.videoDecoderAvailable(H264_CAPS)) {
             out.add(new VideoCodec(CODEC_H264, "H.264 (GStreamer)", "video/avc", true, encoder, !encoder, false, -1, -1, mp4));
         }
-        if (encoder ? (mux && LinuxNative.videoFactoryAvailable("x265enc") && LinuxNative.videoFactoryAvailable("h265parse"))
+        if (encoder ? (LinuxNative.videoFactoryAvailable("x265enc") && LinuxNative.videoFactoryAvailable("h265parse"))
                 : LinuxNative.videoDecoderAvailable(HEVC_CAPS)) {
             out.add(new VideoCodec(CODEC_HEVC, "HEVC (GStreamer)", "video/hevc", true, encoder, !encoder, false, -1, -1, mp4));
         }
-        if (encoder ? (mux && LinuxNative.videoFactoryAvailable("avenc_aac") && LinuxNative.videoFactoryAvailable("aacparse"))
-                : LinuxNative.videoDecoderAvailable(AAC_CAPS)) {
+        if (audio && (encoder ? (LinuxNative.videoFactoryAvailable("avenc_aac") && LinuxNative.videoFactoryAvailable("aacparse"))
+                : LinuxNative.videoDecoderAvailable(AAC_CAPS))) {
             out.add(new VideoCodec(CODEC_AAC, "AAC (GStreamer)", "audio/mp4a-latm", false, encoder, !encoder, false, -1, -1, mp4));
         }
         return out.toArray(new VideoCodec[out.size()]);
