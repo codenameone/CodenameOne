@@ -7027,4 +7027,13 @@ __attribute__((weak)) void cn1_debugger_check(struct ThreadLocalData* threadStat
 __attribute__((weak)) void cn1_debugger_mark_issued_roots(struct ThreadLocalData* threadStateData) {
     (void)threadStateData;
 }
+
+// And again for the per-class registration the translator emits. Generated code
+// calls this from every class's constructor, including in targets that do not
+// link the debugger runtime (the watchOS slice), where it must simply do
+// nothing.
+__attribute__((weak)) void cn1_debugger_register_class(int classId, struct clazz* cls) {
+    (void)classId;
+    (void)cls;
+}
 #endif

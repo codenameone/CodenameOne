@@ -109,6 +109,34 @@ class DebugFramePushCoverageTest {
                 "the release build must define it as a no-op, so push sites need no #ifdef");
     }
 
+    /**
+     * Every debugger hook the translator emits calls has a weak no-op.
+     *
+     * <p>Generated code calls these from each class's constructor, and it is
+     * compiled in targets that do not link the debugger runtime — the watchOS
+     * slice does not get {@code cn1_debugger_objects.c} at all. Without a weak
+     * default in {@code cn1_globals.m}, which every target does compile, those
+     * targets fail to link. The compile failure that surfaced this named
+     * {@code cn1_debugger_register_class} in the watch sources.</p>
+     */
+    @Test
+    void everyGeneratedDebuggerHookHasAWeakDefault() throws Exception {
+        String globalsHeader = readAll(runtimeSource("cn1_globals.h"));
+        String globalsImpl = readAll(runtimeSource("cn1_globals.m"));
+
+        for (String hook : new String[] {
+                "cn1_debugger_check",
+                "cn1_debugger_register_class",
+                "cn1_debugger_mark_issued_roots" }) {
+            assertTrue(globalsHeader.contains("extern void " + hook),
+                    hook + " must be declared where generated code can see it,"
+                            + " not only in the iOS port's own header");
+            assertTrue(globalsImpl.contains("__attribute__((weak)) void " + hook),
+                    hook + " must have a weak no-op so a target without the"
+                            + " debugger runtime still links");
+        }
+    }
+
     /** The clear only makes sense before the increment it protects. */
     @Test
     void theClearTargetsTheFrameBeingPushedNotTheOneBelow() throws Exception {

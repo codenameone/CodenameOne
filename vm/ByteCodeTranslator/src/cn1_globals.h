@@ -1246,6 +1246,17 @@ extern void cn1_debugger_check(struct ThreadLocalData* threadStateData, int line
 // weak stub in cn1_globals.m keeps release builds linking.
 extern void cn1_debugger_mark_issued_roots(struct ThreadLocalData* threadStateData);
 
+// Publishes a class's clazz address under its classId, from the constructor the
+// translator emits per class.
+//
+// Declared here rather than only in cn1_debugger.h because the caller is
+// generated code, which is compiled in more contexts than the iOS port's own
+// headers reach -- the watchOS slice among them, where cn1_debugger.h can be an
+// older copy and cn1_debugger_objects.c is not linked at all. Paired with a weak
+// no-op in cn1_globals.m for exactly that case, so a target without the debugger
+// runtime still compiles and links.
+extern void cn1_debugger_register_class(int classId, struct clazz* cls);
+
 #define __CN1_DEBUG_INFO(line) \
     do { \
         threadStateData->callStackLine[threadStateData->callStackOffset - 1] = (line); \
