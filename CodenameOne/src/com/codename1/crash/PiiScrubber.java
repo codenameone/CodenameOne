@@ -154,17 +154,26 @@ public class PiiScrubber {
     /// A frame requires the full grammar, not just the leading token and some digits: a
     /// message can wrap onto a line that begins with `at ` (`printStackTrace` puts
     /// `at account 123456 failed:789` on its own line) and its id must still be scrubbed.
-    /// The `at ` form must be a single whitespace-free identity (`<class>.<method>`, a JS
-    /// function ref, or a URL) followed by a real location -- a parenthesized
-    /// `(File.java:42)`/`(url:line:col)`/`(Native Method)`/`(Unknown Source)`, or a bare
-    /// trailing `:<line>` (ParparVM). The `@` form must carry an `@` and a terminal
-    /// `:<line>:<column>`.
+    /// A real `at ...` frame is additionally always INDENTED -- `printStackTrace` emits a
+    /// leading tab, V8 four spaces -- while a wrapped message sits at column 0; requiring
+    /// the indentation rejects a continuation that otherwise matches the frame grammar
+    /// exactly (`at account.failed(File.java:123456)`), whose numeric tail must stay
+    /// scrubbable. The `at ` form must then be a single whitespace-free identity
+    /// (`<class>.<method>`, a JS function ref, or a URL) followed by a real location -- a
+    /// parenthesized `(File.java:42)`/`(url:line:col)`/`(Native Method)`/`(Unknown Source)`,
+    /// or a bare trailing `:<line>` (ParparVM). The `@` form (Firefox/Safari, unindented by
+    /// that engine) must carry an `@`, a URL/file source, and a terminal `:<line>:<column>`.
     private static boolean isFrameLine(String line) {
         String t = line.trim();
         if (t.startsWith("at ")) {
-            return atFrame(t.substring(3).trim());
+            return startsWithWhitespace(line) && atFrame(t.substring(3).trim());
         }
         return atSignFrame(t);
+    }
+
+    /// True when a line begins with the tab or space indentation that a real `at ...` frame carries.
+    private static boolean startsWithWhitespace(String line) {
+        return line.length() > 0 && (line.charAt(0) == ' ' || line.charAt(0) == '\t');
     }
 
     /// The body of a Firefox/Safari `fn@source:line:column` frame: a whitespace-free function

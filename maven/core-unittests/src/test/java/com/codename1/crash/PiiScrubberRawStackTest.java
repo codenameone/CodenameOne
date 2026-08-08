@@ -215,6 +215,20 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void unindentedFrameShapedMessageContinuationIsScrubbed() {
+        // A message that wraps onto a line matching the frame grammar EXACTLY -- a dotted identity and a
+        // (File.java:line) location -- is still a message, not a frame: printStackTrace emits it at column
+        // 0 while real frames are indented. Its six-digit tail must be scrubbed, not preserved as a line
+        // number. The genuine indented frame below keeps its coordinate.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account.failed(File.java:123456)\n"
+                + "    at com.foo.Bar.baz(Bar.java:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:42") >= 0, scrubbed);
+    }
+
+    @Test
     void atSignMessageWithoutUrlSourceIsScrubbed() {
         // A wrapped message that merely contains an '@' and ends in two numeric groups
         // (status@host:1:123456) is NOT a Firefox/Safari frame: its source `host` is neither a URL nor
