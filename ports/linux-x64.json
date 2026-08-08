@@ -1,48 +1,48 @@
 {
-  "commit": "0e57ebe1cfbf770ee621f4c17e8d017e3c545196",
-  "generated_at": "2026-08-08T03:37:14Z",
+  "commit": "30fef6d5620d26fd89b296a2a84de43be11da44a",
+  "generated_at": "2026-08-08T10:41:06Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 274681476
+        "duration_ns": 250427461
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 30274922
+        "duration_ns": 30385837
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 48525083
+        "duration_ns": 49051793
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 79321722
+        "duration_ns": 79342354
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 60741515
+        "duration_ns": 60706512
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 255313694
+        "duration_ns": 255480687
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3193026922
+        "duration_ns": 3534336698
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 137767656
+        "duration_ns": 138173434
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 181391272
+        "duration_ns": 181709812
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 39196158
+        "duration_ns": 42682577
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,14 +52,14 @@
     "suite_checksum": 0
   },
   "port": "linux-x64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31236698791",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31252409266",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 169,
-    "skip": 2
+    "pass": 168,
+    "skip": 3
   },
   "tests": {
     "ARApiTest": {
@@ -367,7 +367,10 @@
     },
     "GoogleWebMapScreenshotTest": {
       "feature": "native-web-maps",
-      "status": "pass"
+      "reasons": [
+        "no-api-key"
+      ],
+      "status": "skip"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -639,7 +642,10 @@
     },
     "SurfacesRemoteViewsScreenshotTest": {
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "android-only-remoteviews-lowering"
+      ],
+      "status": "skip"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -743,10 +749,7 @@
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
-      "reasons": [
-        "encode-write-failed-on-linux"
-      ],
-      "status": "skip"
+      "status": "pass"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
