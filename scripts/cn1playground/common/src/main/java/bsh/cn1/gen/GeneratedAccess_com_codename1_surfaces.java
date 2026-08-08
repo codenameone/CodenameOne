@@ -237,10 +237,17 @@ public final class GeneratedAccess_com_codename1_surfaces {
         if (type == com.codename1.surfaces.SurfaceRasterizer.class) return invokeStatic2(name, safeArgs);
         if (type == com.codename1.surfaces.SurfaceSerializer.class) return invokeStatic3(name, safeArgs);
         if (type == com.codename1.surfaces.Surfaces.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.surfaces.WidgetSize.class) return invokeStatic5(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("endRemote".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class}, false);
+                com.codename1.surfaces.LiveActivity.endRemote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue()); return null;
+            }
+        }
         if ("isSupported".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.surfaces.LiveActivity.isSupported();
@@ -250,6 +257,12 @@ public final class GeneratedAccess_com_codename1_surfaces {
             if (matches(safeArgs, new Class<?>[]{com.codename1.surfaces.LiveActivityDescriptor.class, java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.surfaces.LiveActivityDescriptor.class, java.util.Map.class}, false);
                 return com.codename1.surfaces.LiveActivity.start((com.codename1.surfaces.LiveActivityDescriptor) adaptedArgs[0], (java.util.Map) adaptedArgs[1]);
+            }
+        }
+        if ("updateRemote".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                com.codename1.surfaces.LiveActivity.updateRemote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         throw unsupportedStatic(com.codename1.surfaces.LiveActivity.class, name, safeArgs);
@@ -348,10 +361,21 @@ public final class GeneratedAccess_com_codename1_surfaces {
                 return com.codename1.surfaces.Surfaces.getRegisteredKinds();
             }
         }
+        if ("isDiagnosticsEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.surfaces.Surfaces.isDiagnosticsEnabled();
+            }
+        }
         if ("publish".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.surfaces.WidgetTimeline.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.surfaces.WidgetTimeline.class}, false);
                 com.codename1.surfaces.Surfaces.publish((java.lang.String) adaptedArgs[0], (com.codename1.surfaces.WidgetTimeline) adaptedArgs[1]); return null;
+            }
+        }
+        if ("publishRemote".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                com.codename1.surfaces.Surfaces.publishRemote((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]); return null;
             }
         }
         if ("registerWidgetKind".equals(name)) {
@@ -378,7 +402,23 @@ public final class GeneratedAccess_com_codename1_surfaces {
                 com.codename1.surfaces.Surfaces.setBridge((com.codename1.surfaces.spi.SurfaceBridge) adaptedArgs[0]); return null;
             }
         }
+        if ("setDiagnosticsEnabled".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.surfaces.Surfaces.setDiagnosticsEnabled(Boolean.valueOf(((Boolean) adaptedArgs[0]).booleanValue())); return null;
+            }
+        }
         throw unsupportedStatic(com.codename1.surfaces.Surfaces.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+        if ("fromJsonName".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.surfaces.WidgetSize.fromJsonName((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.surfaces.WidgetSize.class, name, safeArgs);
     }
 
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
@@ -2472,6 +2512,11 @@ public final class GeneratedAccess_com_codename1_surfaces {
                 return typedTarget.getJsonName();
             }
         }
+        if ("isWatchFamily".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isWatchFamily();
+            }
+        }
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
@@ -2615,6 +2660,10 @@ public final class GeneratedAccess_com_codename1_surfaces {
         if ("LOCKSCREEN".equals(name)) return com.codename1.surfaces.WidgetSize.LOCKSCREEN;
         if ("MEDIUM".equals(name)) return com.codename1.surfaces.WidgetSize.MEDIUM;
         if ("SMALL".equals(name)) return com.codename1.surfaces.WidgetSize.SMALL;
+        if ("WATCH_CIRCULAR".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_CIRCULAR;
+        if ("WATCH_CORNER".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_CORNER;
+        if ("WATCH_INLINE".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_INLINE;
+        if ("WATCH_RECTANGULAR".equals(name)) return com.codename1.surfaces.WidgetSize.WATCH_RECTANGULAR;
         throw unsupportedStaticField(com.codename1.surfaces.WidgetSize.class, name);
     }
 

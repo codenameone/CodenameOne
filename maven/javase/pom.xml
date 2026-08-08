@@ -263,6 +263,36 @@
                                     <property name="cn1.path" location="${project.basedir}/../.."/>
                                 </ant>
                                 <copy file="${project.build.directory}/skins/codenameone-skins/OTA/iPhoneX.skin" todir="${project.build.outputDirectory}"/>
+                                <!-- Watch skins (Apple Watch 41/45mm, Wear round and
+                                     square). Generated rather than committed: *.skin
+                                     is gitignored repository-wide, so a checked-in
+                                     binary would silently not exist for anyone else.
+                                     GenerateWatchSkins draws the bezel art and lifts
+                                     the theme .res out of the iPhoneX skin fetched
+                                     just above, so this must run after that copy. -->
+                                <echo>Generating watch skins</echo>
+                                <mkdir dir="${project.build.directory}/watch-skins-classes"/>
+                                <javac srcdir="${project.basedir}/../../tools/watch-skins"
+                                       destdir="${project.build.directory}/watch-skins-classes"
+                                       includeantruntime="false"
+                                       fork="true"
+                                       nowarn="true"/>
+                                <java classname="GenerateWatchSkins" fork="true" failonerror="true">
+                                    <classpath>
+                                        <pathelement location="${project.build.directory}/watch-skins-classes"/>
+                                    </classpath>
+                                    <arg value="${project.build.directory}/skins/codenameone-skins/OTA/iPhoneX.skin"/>
+                                    <arg value="${project.build.outputDirectory}"/>
+                                    <!-- The Wear skins embed Android's theme, not the one lifted
+                                         out of iPhoneX.skin: the simulator's "Embedded" native
+                                         theme option falls back to whatever a skin carries, so an
+                                         iOS theme there would style the Wear preview as iOS at
+                                         exactly the moment the platform look was asked for.
+                                         Passed from Themes/ rather than read out of the output
+                                         directory, because the themes below are copied there
+                                         after this task runs. -->
+                                    <arg value="${project.basedir}/../../Themes/AndroidMaterialTheme.res"/>
+                                </java>
                                 <!-- Bundle every shipped native theme into the
                                      simulator fat jar so JavaSEPort.loadSkinFile can
                                      load the right .res based on the current skin's

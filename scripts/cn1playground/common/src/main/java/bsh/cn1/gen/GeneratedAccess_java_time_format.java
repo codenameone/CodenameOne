@@ -67,6 +67,10 @@ public final class GeneratedAccess_java_time_format {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class}, false);
                 return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]));
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.CharSequence.class, java.lang.Integer.class, java.lang.Throwable.class}, false);
+                return new java.time.format.DateTimeParseException((java.lang.String) adaptedArgs[0], (java.lang.CharSequence) adaptedArgs[1], toIntValue(adaptedArgs[2]), (java.lang.Throwable) adaptedArgs[3]);
+            }
         }
         throw unsupportedConstruct(type, safeArgs);
     }

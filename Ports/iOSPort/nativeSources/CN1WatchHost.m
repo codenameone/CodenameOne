@@ -33,6 +33,8 @@ extern void cn1_watch_pointerPressed(int x, int y);
 extern void cn1_watch_pointerDragged(int x, int y);
 extern void cn1_watch_pointerReleased(int x, int y);
 extern void pointerWheelMovedCallback(int x, int y, int scrollX, int scrollY);
+extern void cn1_watch_didEnterBackground(void);  // forward the CN1 app lifecycle
+extern void cn1_watch_willEnterForeground(void);
 
 static CN1WatchHost *sharedHostInstance = nil;
 
@@ -114,6 +116,20 @@ static CN1WatchHost *sharedHostInstance = nil;
 - (void)applicationWillResignActive {
     active = NO;
     [self stopPump];
+}
+
+- (void)applicationDidEnterBackground {
+    // The pump is already stopped by applicationWillResignActive, which watchOS sends first. What
+    // this adds is the CN1 lifecycle itself: without it the application's stop() never ran on the
+    // watch, so timers and resources it releases there stayed live through a normal suspension.
+    cn1_watch_didEnterBackground();
+}
+
+- (void)applicationWillEnterForeground {
+    // Before applicationDidBecomeActive restarts the pump, so the application's start() -- and any
+    // refresh-on-foreground work it does, which the same lifecycle class gets on the phone -- is
+    // queued before the first frame of the resumed session is drawn.
+    cn1_watch_willEnterForeground();
 }
 
 #pragma mark - Input

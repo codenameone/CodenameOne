@@ -151,8 +151,28 @@ xcrun simctl spawn "$WATCH_UDID" log stream --style compact \
   --predicate 'processImagePath CONTAINS "'"$WATCH_TARGET"'"' \
   > "$ARTIFACTS_DIR/app-console.log" 2>&1 &
 APP_CONSOLE_PID=$!
+# simctl opens these in APPEND mode, so a previous run's output survives here.
+# That matters because the completion/crash checks below grep these files: a
+# stale "CN1SS:SUITE:FINISHED" makes the very first poll believe the suite is
+# already done, and the WebSocket sink is torn down mid-suite. Truncate first,
+# as run-ios-ui-tests.sh and run-tv-ui-tests.sh already do for their logs.
+: > "$ARTIFACTS_DIR/app-stdout.log"
+: > "$ARTIFACTS_DIR/app-stderr.log"
+# Pin locale and timezone. Several goldens render locale-formatted dates -- the time
+# chart's axis labels, and the date picker's spinner column ORDER (month-first vs
+# day-first) -- so the whole set implicitly assumes en_US/UTC, which is what the CI
+# runners happen to be. A contributor whose Mac is set to any other region or zone
+# gets spurious mismatches that look exactly like a rendering regression.
+#
+# Locale rides NSUserDefaults' argument domain, which outranks the device's, so no
+# device restart is needed. The timezone is not a default: it comes from the TZ
+# environment variable, which simctl forwards into the app process via SIMCTL_CHILD_.
+# ChartTimeChartScreenshotTest anchors its series with Calendar.getInstance(), so a
+# non-UTC zone shifts every x value by the offset even though the date is hardcoded.
+LOCALE_ARGS=(-AppleLocale en_US -AppleLanguages "(en-US)")
+SIMCTL_CHILD_TZ=UTC \
 xcrun simctl launch --stdout="$ARTIFACTS_DIR/app-stdout.log" --stderr="$ARTIFACTS_DIR/app-stderr.log" \
-  "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
+  "$WATCH_UDID" "$BUNDLE_ID" "${LOCALE_ARGS[@]}" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."
 
 # Wait until every expected screenshot has streamed (preferred), or the suite

@@ -70,6 +70,12 @@ public final class GeneratedAccess_com_codename1_mcp {
         if ("MCPClient".equals(simpleName)) {
             return com.codename1.mcp.MCPClientRegistrar.MCPClient.class;
         }
+        if ("MCPLoopbackSocketTransport".equals(simpleName)) {
+            return com.codename1.mcp.MCPLoopbackSocketTransport.class;
+        }
+        if ("Connection".equals(simpleName)) {
+            return com.codename1.mcp.MCPLoopbackSocketTransport.Connection.class;
+        }
         if ("MCPServer".equals(simpleName)) {
             return com.codename1.mcp.MCPServer.class;
         }
@@ -91,6 +97,12 @@ public final class GeneratedAccess_com_codename1_mcp {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.util.List.class, java.util.Map.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.util.List.class, java.util.Map.class}, false);
                 return new com.codename1.mcp.MCPClientDescriptor((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.util.List) adaptedArgs[2], (java.util.Map) adaptedArgs[3]);
+            }
+        }
+        if (type == com.codename1.mcp.MCPLoopbackSocketTransport.Connection.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.mcp.MCPLoopbackSocketTransport.Connection();
             }
         }
         if (type == com.codename1.mcp.MCPServer.class) {
@@ -126,9 +138,19 @@ public final class GeneratedAccess_com_codename1_mcp {
                 return com.codename1.mcp.MCP.getVerbosity();
             }
         }
+        if ("isAllowedOnReleaseBuilds".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.mcp.MCP.isAllowedOnReleaseBuilds();
+            }
+        }
         if ("isRunning".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.mcp.MCP.isRunning();
+            }
+        }
+        if ("isSocketServerAllowedOnThisBuild".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.mcp.MCP.isSocketServerAllowedOnThisBuild();
             }
         }
         if ("isSocketSupported".equals(name)) {
@@ -139,6 +161,12 @@ public final class GeneratedAccess_com_codename1_mcp {
         if ("isStdioSupported".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.mcp.MCP.isStdioSupported();
+            }
+        }
+        if ("setAllowOnReleaseBuilds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.mcp.MCP.setAllowOnReleaseBuilds(((Boolean) adaptedArgs[0]).booleanValue()); return null;
             }
         }
         if ("setSocketTransportFactory".equals(name)) {
@@ -211,37 +239,51 @@ public final class GeneratedAccess_com_codename1_mcp {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.mcp.MCPLoopbackSocketTransport) {
+            try {
+                return invoke3((com.codename1.mcp.MCPLoopbackSocketTransport) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.mcp.MCPLoopbackSocketTransport.Connection) {
+            try {
+                return invoke4((com.codename1.mcp.MCPLoopbackSocketTransport.Connection) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.mcp.MCPServer) {
             try {
-                return invoke3((com.codename1.mcp.MCPServer) target, name, safeArgs);
+                return invoke5((com.codename1.mcp.MCPServer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.mcp.MCPVerbosity) {
             try {
-                return invoke4((com.codename1.mcp.MCPVerbosity) target, name, safeArgs);
+                return invoke6((com.codename1.mcp.MCPVerbosity) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.mcp.MCP.SocketTransportFactory) {
             try {
-                return invoke5((com.codename1.mcp.MCP.SocketTransportFactory) target, name, safeArgs);
+                return invoke7((com.codename1.mcp.MCP.SocketTransportFactory) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.mcp.MCP.StdioTransportFactory) {
             try {
-                return invoke6((com.codename1.mcp.MCP.StdioTransportFactory) target, name, safeArgs);
+                return invoke8((com.codename1.mcp.MCP.StdioTransportFactory) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.mcp.MCPTransport) {
             try {
-                return invoke7((com.codename1.mcp.MCPTransport) target, name, safeArgs);
+                return invoke9((com.codename1.mcp.MCPTransport) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -330,7 +372,63 @@ public final class GeneratedAccess_com_codename1_mcp {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.mcp.MCPServer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.mcp.MCPLoopbackSocketTransport typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("getPort".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPort();
+            }
+        }
+        if ("open".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.open(); return null;
+            }
+        }
+        if ("readMessage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.readMessage();
+            }
+        }
+        if ("writeMessage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.writeMessage((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke4(com.codename1.mcp.MCPLoopbackSocketTransport.Connection typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("connectionError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.String.class}, false);
+                typedTarget.connectionError(toIntValue(adaptedArgs[0]), (java.lang.String) adaptedArgs[1]); return null;
+            }
+        }
+        if ("getConnectTimeout".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getConnectTimeout();
+            }
+        }
+        if ("isConnected".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isConnected();
+            }
+        }
+        if ("setConnectTimeout".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setConnectTimeout(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.mcp.MCPServer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addTool".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ai.Tool.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ai.Tool.class}, false);
@@ -391,7 +489,7 @@ public final class GeneratedAccess_com_codename1_mcp {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.mcp.MCPVerbosity typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.mcp.MCPVerbosity typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("includes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.mcp.MCPVerbosity.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.mcp.MCPVerbosity.class}, false);
@@ -401,7 +499,7 @@ public final class GeneratedAccess_com_codename1_mcp {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.mcp.MCP.SocketTransportFactory typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.mcp.MCP.SocketTransportFactory typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createSocketTransport".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -411,7 +509,7 @@ public final class GeneratedAccess_com_codename1_mcp {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.mcp.MCP.StdioTransportFactory typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.mcp.MCP.StdioTransportFactory typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createStdioTransport".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.createStdioTransport();
@@ -420,7 +518,7 @@ public final class GeneratedAccess_com_codename1_mcp {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.mcp.MCPTransport typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.mcp.MCPTransport typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.close(); return null;

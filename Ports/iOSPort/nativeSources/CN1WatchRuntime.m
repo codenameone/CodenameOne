@@ -49,6 +49,15 @@
 // (the EDT unwinds to its run loop) instead of taking the whole app down.
 extern void throwException(struct ThreadLocalData* threadStateData, JAVA_OBJECT exception);
 
+// The translated lifecycle entry points, the same two CodenameOne_GLAppDelegate calls on iOS.
+extern void com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
+        CN1_THREAD_STATE_SINGLE_ARG);
+extern void com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
+        CN1_THREAD_STATE_SINGLE_ARG);
+
+// Defined at the bottom of this file, where the rest of the watch-excluded iOS symbols live.
+extern BOOL isAppSuspended;
+
 static void cn1WatchSignalHandler(int sig) {
     if (sig == SIGSEGV || sig == SIGBUS) {
         throwException(getThreadLocalData(), __NEW_INSTANCE_java_lang_NullPointerException(getThreadLocalData()));
@@ -102,8 +111,134 @@ void cn1_watch_runtime_start(const char *watchMainClass) {
     }
 }
 
+/// Defined below, next to the phase-forwarding it belongs to.
+static void cn1WatchReplayPendingPhase(void);
+
 void cn1_watch_runtime_paint(void) {
+    // Before the frame: a phase that arrived during launch is delivered as soon as the Java side
+    // exists, rather than waiting for the next real transition that may never come.
+    cn1WatchReplayPendingPhase();
     [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+}
+
+// The watch equivalents of CodenameOne_GLAppDelegate's cn1ApplicationDidEnterBackground /
+// cn1ApplicationWillEnterForeground, which are in a file the watch slice excludes.
+//
+// Stopping the paint pump is not the same thing as suspending the app: it only means no frames
+// are produced. Without these the generated stub never received a lifecycle callback, so the
+// application's stop() was never called on suspension and its start() was never called again on
+// resume -- timers and resources stayed live in the background, and refresh-on-foreground logic
+// that the same lifecycle class runs on the phone never ran on the watch.
+//
+// Guarded on the runtime being up: watchOS can send a transition before the VM thread has
+// initialised the constant pool, and calling into a translated method then would fault.
+/// Phases seen before the Java side could take them, in the order they happened: 1 background,
+/// 2 foreground.
+///
+/// A QUEUE, not a single slot. Keeping only the last one looked equivalent -- surely all the app
+/// needs is where it ended up -- and it is not, because readiness can change while the queue is
+/// stalled. The watch backgrounds before the VM is up, applicationWillResignActive stops the paint
+/// pump (the thing that drains this), the VM then finishes initialising and the stub's run() calls
+/// start() while the app is in the background. On return, overwriting the queued background with
+/// foreground meant the app was never told to stop and its foreground arrived unbalanced: the
+/// resources start() acquired kept running through the whole suspension.
+///
+/// Four entries is more than the runtime can actually accumulate -- transitions alternate, and the
+/// queue is drained on the next one -- but it is bounded rather than assumed.
+#define CN1_WATCH_MAX_PENDING_PHASES 4
+static int cn1WatchPendingPhases[CN1_WATCH_MAX_PENDING_PHASES];
+static int cn1WatchPendingPhaseCount = 0;
+
+/// Records a phase for later delivery, collapsing a repeat of the one already at the tail.
+///
+/// watchOS can send the same transition twice; delivering it twice would hand the stub a second
+/// stop() or a second start() that its `stopped` guard would swallow anyway, so the queue stays
+/// the shortest faithful description of what happened.
+static void cn1WatchQueuePhase(int phase) {
+    if (cn1WatchPendingPhaseCount > 0
+            && cn1WatchPendingPhases[cn1WatchPendingPhaseCount - 1] == phase) {
+        return;
+    }
+    if (cn1WatchPendingPhaseCount >= CN1_WATCH_MAX_PENDING_PHASES) {
+        // Cannot happen with alternating transitions. If it ever does, the OLDEST goes: the app's
+        // current state is described by the newest entries, and losing the tail would strand it in
+        // the wrong one.
+        for (int i = 1; i < CN1_WATCH_MAX_PENDING_PHASES; i++) {
+            cn1WatchPendingPhases[i - 1] = cn1WatchPendingPhases[i];
+        }
+        cn1WatchPendingPhaseCount = CN1_WATCH_MAX_PENDING_PHASES - 1;
+    }
+    cn1WatchPendingPhases[cn1WatchPendingPhaseCount++] = phase;
+}
+
+/// Whether the Java lifecycle is installed, which is a different question from whether the runtime
+/// was started.
+///
+/// cn1_watch_runtime_start sets its flag and then hands off to a THREAD that has yet to reach
+/// Display.init, so the flag is true for a window in which IOSImplementation.instance is still
+/// null. Forwarding a phase into that window dereferences null inside translated code, on a thread
+/// with no Java frame to unwind to. The view controller is created during Display.init by the
+/// implementation itself, so its existence is evidence the implementation exists.
+static BOOL cn1WatchJavaReady(void) {
+    return cn1WatchRuntimeStarted && [CodenameOne_GLViewController instance] != nil;
+}
+
+static void cn1WatchDeliverPhase(int phase) {
+    if (phase == 1) {
+        com_codename1_impl_ios_IOSImplementation_applicationDidEnterBackground__(
+                CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    } else if (phase == 2) {
+        com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
+                CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+    }
+}
+
+/// Hands over, in order, every phase the app could not be told about yet.
+///
+/// Called from the paint pump AND from each incoming transition. The pump alone is not enough: it
+/// is stopped while the watch is in the background, which is exactly when a queued background
+/// transition is waiting, so a foreground arriving next has to flush the backlog itself before
+/// recording anything of its own.
+static void cn1WatchReplayPendingPhase(void) {
+    if (cn1WatchPendingPhaseCount == 0 || !cn1WatchJavaReady()) {
+        return;
+    }
+    int pending[CN1_WATCH_MAX_PENDING_PHASES];
+    int count = cn1WatchPendingPhaseCount;
+    for (int i = 0; i < count; i++) {
+        pending[i] = cn1WatchPendingPhases[i];
+    }
+    // Cleared BEFORE delivering: a delivery runs translated code, and re-entering this from it must
+    // not replay what is already on its way.
+    cn1WatchPendingPhaseCount = 0;
+    for (int i = 0; i < count; i++) {
+        cn1WatchDeliverPhase(pending[i]);
+    }
+}
+
+/// Records or delivers one transition, preserving order against anything still queued.
+///
+/// A transition is never delivered ahead of an earlier one that is still waiting -- that is what
+/// turned a background/foreground pair across the readiness boundary into a foreground the stub
+/// could not balance.
+static void cn1WatchHandlePhase(int phase) {
+    cn1WatchReplayPendingPhase();
+    if (!cn1WatchJavaReady() || cn1WatchPendingPhaseCount > 0) {
+        cn1WatchQueuePhase(phase);
+        return;
+    }
+    cn1WatchDeliverPhase(phase);
+}
+
+void cn1_watch_runtime_didEnterBackground(void) {
+    // Native bookkeeping is unconditional -- it is this file's own state, not the VM's.
+    isAppSuspended = YES;
+    cn1WatchHandlePhase(1);
+}
+
+void cn1_watch_runtime_willEnterForeground(void) {
+    isAppSuspended = NO;
+    cn1WatchHandlePhase(2);
 }
 
 void cn1_watch_runtime_pointerPressed(int x, int y) {

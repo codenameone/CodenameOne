@@ -179,4 +179,5 @@ public final class EdtResult<T> extends OneShot<T> {
     void superError(Throwable t) {
         super.error(t);
     }
+
 }

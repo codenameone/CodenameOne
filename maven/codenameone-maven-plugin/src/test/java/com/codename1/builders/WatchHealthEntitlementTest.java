@@ -159,9 +159,9 @@ public class WatchHealthEntitlementTest {
     @Test
     void sharedMainInheritsPhoneHealthUsage() {
         assertTrue(builder(null, "com.acme.MyApp", null, null)
-                .watchUsesHealth(true));
+                .watchUsesHealth(true, false));
         assertFalse(builder(null, "com.acme.MyApp", null, null)
-                .watchUsesHealth(false));
+                .watchUsesHealth(false, true));
     }
 
     /**
@@ -170,9 +170,17 @@ public class WatchHealthEntitlementTest {
      * broke codesigning for an ordinary non-health watch app.
      */
     @Test
-    void aDistinctWatchMainIsNotEntitledFromThePhone() {
+    void aDistinctWatchMainIsEntitledFromItsOwnRoot() {
+        // Inheriting the phone's "yes" entitled an ordinary non-health watch app and broke its
+        // codesigning. Refusing outright, which replaced it, was wrong the other way: a watch whose
+        // OWN code calls HealthKit went unentitled and had its authorization refused. The watch
+        // root's own reachability is what decides.
         assertFalse(builder("com.acme.WatchApp", "com.acme.MyApp", null, null)
-                .watchUsesHealth(true));
+                .watchUsesHealth(true, false),
+                "the phone's usage is not evidence about the watch");
+        assertTrue(builder("com.acme.WatchApp", "com.acme.MyApp", null, null)
+                .watchUsesHealth(false, true),
+                "and the watch's own usage is");
     }
 
     /**
@@ -202,16 +210,17 @@ public class WatchHealthEntitlementTest {
     @Test
     void theExplicitHintWins() {
         assertTrue(builder("com.acme.WatchApp", "com.acme.MyApp", "true", null)
-                .watchUsesHealth(false));
+                .watchUsesHealth(false, false));
         assertFalse(builder(null, "com.acme.MyApp", "false", null)
-                .watchUsesHealth(true));
+                .watchUsesHealth(true, true),
+                "an explicit false wins over any reachability answer");
     }
 
     /** A workout session is HealthKit, so it implies the entitlement. */
     @Test
     void workoutProcessingImpliesHealth() {
         assertTrue(builder("com.acme.WatchApp", "com.acme.MyApp", null, "true")
-                .watchUsesHealth(false));
+                .watchUsesHealth(false, false));
     }
 
     /**

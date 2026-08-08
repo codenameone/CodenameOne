@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.settings;
 
 import com.codename1.components.InteractionDialog;
@@ -489,7 +512,7 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void renderBasic() {
         page.add(pageTitle("Basic", "Core application settings - title, version, package and icon."));
-        Container grid = new Container(new GridLayout(3, 2));
+        Container grid = new Container(new GridLayout(4, 2));
         grid.setUIID(uiid("SettingsFieldGrid"));
         grid.add(textFieldGroup("Title", "codename1.displayName", false));
         grid.add(textFieldGroup("Description", "codename1.description", false));
@@ -497,6 +520,18 @@ public class CodenameOneSettings extends Lifecycle {
         grid.add(textFieldGroup("Vendor", "codename1.vendor", false));
         grid.add(textFieldGroup("Package Name", "codename1.packageName", false));
         grid.add(textFieldGroup("Main Class", "codename1.mainName", false));
+        // Secondary entry points. Declaring a watch lifecycle class is the whole
+        // opt-in for the Apple Watch and Wear OS apps -- there are no wearable
+        // build hints. Both take a fully-qualified class name, unlike the phone
+        // main class which is a simple name resolved against the package.
+        grid.add(textFieldGroup("Watch Main Class", "codename1.watchMain", false));
+        // The one thing about the watch build that cannot be derived from the project, so it needs
+        // a control. Without it this page could only ever produce the companion configuration --
+        // and since this change also retired the old wearable distribution/standalone hints, the
+        // standalone Wear product and standalone Apple distribution were unreachable from the UI
+        // and had to be set by hand in the properties file.
+        grid.add(switchGroup("Standalone Watch App", "codename1.watchStandalone"));
+        grid.add(textFieldGroup("TV Main Class", "codename1.tvMain", false));
         page.add(grid);
         page.add(iconDrop());
         page.add(divider());
@@ -1727,6 +1762,23 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void textRow(Container parent, String label, String key, boolean secret) {
         parent.add(textFieldGroup(label, key, secret));
+    }
+
+    /**
+     * A boolean setting, stored as the string {@code "true"}/{@code "false"} the build hints use.
+     *
+     * <p>Shaped like {@link #textFieldGroup} so it sits in the same grid: label above, control
+     * below. Anything other than {@code "true"} reads as off, which matches how the builders parse
+     * these -- they compare against {@code "true"} rather than parsing a boolean.</p>
+     */
+    private Component switchGroup(String label, String key) {
+        Container fieldGroup = new Container(BoxLayout.y());
+        fieldGroup.setUIID(uiid("SettingsFieldGroup"));
+        Switch sw = new Switch(uiid("SettingsSwitch"));
+        sw.setValue("true".equals(settings.get(key)));
+        sw.addActionListener(e -> settings.set(key, sw.isValue() ? "true" : "false"));
+        fieldGroup.add(new Label(label, uiid("SettingsFieldLabel"))).add(sw);
+        return fieldGroup;
     }
 
     private Component textFieldGroup(String label, String key, boolean secret) {

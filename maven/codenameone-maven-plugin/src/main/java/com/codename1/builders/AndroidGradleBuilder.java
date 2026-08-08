@@ -310,6 +310,43 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+    // Set when the app references com.codename1.wearable.* (the phone-to-watch link). Gates the
+    // play-services-wearable dependency, the WearableListenerService manifest entry and the
+    // injected Data Layer glue.
+    private boolean usesWearable;
+
+    /**
+     * The lifecycle class the generated stub instantiates.
+     *
+     * <p>Normally the phone main class. In a standalone Wear OS build the watch app is the product
+     * -- there is no phone app beside it -- so the single APK is rooted at {@code
+     * codename1.watchMain} instead; without this the watch declaration only reached the manifest
+     * and the app still started the phone UI.
+     *
+     * @param request the build being generated
+     * @return the class name the stub should instantiate
+     */
+    /** The declared watch lifecycle class, or an empty string when the project declares none. */
+    private static String watchMainClass(BuildRequest request) {
+        return request.getArg("watchMain", "").trim();
+    }
+
+    private String appLifecycleClass(BuildRequest request) {
+        // Unit-test mode wins. generateUnitTestFiles has already replaced the main class with
+        // CodenameOneUnitTestExecutor, and rooting the APK at the watch lifecycle instead started
+        // the watch application rather than DeviceRunner -- so the tests never ran and the build
+        // reported no results rather than failing, which is the worse of the two.
+        if (isUnitTestMode()) {
+            return request.getMainClass();
+        }
+        String watchMain = request.getArg("watchMain", "").trim();
+        boolean standalone = "true".equals(request.getArg("watchStandalone", "false"));
+        if (watchMain.length() > 0 && standalone) {
+            return watchMain;
+        }
+        return request.getMainClass();
+    }
+
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -1386,24 +1423,53 @@ public class AndroidGradleBuilder extends Executor {
         String googlePlayAdViewCode = "";
         String userXapplication = request.getArg("android.xapplication", "");
 
-        // Wear OS support. android.wear=true marks this as an Android Wear
-        // (Wear OS) app. A Wear app is a regular Android app that declares the
-        // watch hardware feature; the Codename One UI renders through the same
-        // Android pipeline (no separate render backend is needed, unlike the
-        // Apple Watch port), and CN.isWatch() returns true at runtime via
-        // PackageManager.FEATURE_WATCH. Standalone Wear apps (the default since
-        // Wear OS 2.0) install and run directly on the watch without a paired
-        // phone app. With the hint off the manifest is unchanged.
+        // Wear OS support, driven by the same entry point as the Apple Watch
+        // build: a project declares a watch lifecycle class with
+        // codename1.watchMain and gets a watch app on both platforms. A Wear app
+        // is a regular Android app that declares the watch hardware feature; the
+        // Codename One UI renders through the same Android pipeline (no separate
+        // render backend is needed, unlike the Apple Watch port), and
+        // CN.isWatch() returns true at runtime via PackageManager.FEATURE_WATCH.
+        //
+        // codename1.watchStandalone=true means the watch app IS the product: it
+        // installs and runs directly on the watch with no paired phone app, so
+        // this single APK becomes the watch app. Without it the watch app is a
+        // companion to the phone app and ships as its own artifact, which leaves
+        // this (phone) manifest untouched.
         String wearApplicationMetaData = "";
-        if ("true".equals(request.getArg("android.wear", "false"))) {
+        String watchMain = request.getArg("watchMain", "").trim();
+        boolean watchStandalone = "true".equals(request.getArg("watchStandalone", "false"));
+        // The retired android.wear / android.wear.standalone hints still have to work. A project
+        // configured against them predates codename1.watchMain and declares neither of the new
+        // settings, so keying only on those would silently drop the watch hardware feature, the API
+        // 23 floor and the standalone marker from a manifest that used to have them -- turning a
+        // working Wear app into a phone APK with no error. android.wear alone implied standalone,
+        // which is why it maps to the standalone branch.
+        //
+        // Keyed on android.wear ALONE. android.wear.standalone is a sub-hint that only ever
+        // applied inside android.wear=true, so treating it as an independent trigger inverts the
+        // relationship: android.wear implied standalone, standalone never implied wear. A legacy
+        // phone project carrying a stray android.wear.standalone=true would otherwise be given the
+        // API 23 floor and a REQUIRED android.hardware.type.watch feature, and Play would filter
+        // that APK off every phone -- a working phone app made undeliverable, with no error.
+        boolean legacyWear = legacyWearMode(request.getArg("android.wear", "false"));
+        boolean legacyStandaloneStillOn = legacyWearStandalone(
+                request.getArg("android.wear", "false"),
+                request.getArg("android.wear.standalone", ""));
+        if (legacyWear) {
+            log("[wearable] android.wear is superseded by codename1.watchMain plus "
+                    + "codename1.watchStandalone; still honoured, but the new settings also build "
+                    + "the Apple Watch app from the same declaration.");
+        }
+        boolean standaloneWatchBuild =
+                (watchMain.length() > 0 && watchStandalone) || legacyStandaloneStillOn;
+        if ((watchMain.length() > 0 && watchStandalone) || legacyWear) {
             // Wear OS 2.0 (the standalone-app baseline) is API 23.
             minSDK = maxInt("23", minSDK);
             if (!xPermissions.contains("android.hardware.type.watch")) {
                 xPermissions += "    <uses-feature android:name=\"android.hardware.type.watch\" android:required=\"true\" />\n";
             }
-            // Declare the app standalone (runs without a companion phone app)
-            // unless the developer opts out or already declared the meta-data.
-            if (!"false".equals(request.getArg("android.wear.standalone", "true"))
+            if (standaloneWatchBuild
                     && !userXapplication.contains("com.google.android.wearable.standalone")) {
                 wearApplicationMetaData = "        <meta-data android:name=\"com.google.android.wearable.standalone\" android:value=\"true\" />\n";
             }
@@ -1636,6 +1702,13 @@ public class AndroidGradleBuilder extends Executor {
                     // pre-baked layout resources are only added for apps that publish surfaces.
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
+                    }
+
+                    // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage so the
+                    // play-services-wearable dependency, the listener service and the injected Data
+                    // Layer glue are only added for apps that talk to their watch app.
+                    if (!usesWearable && cls.indexOf("com/codename1/wearable/") == 0) {
+                        usesWearable = true;
                     }
 
                     if (cls.equals("com/codename1/background/ForegroundService")) {
@@ -2696,7 +2769,20 @@ public class AndroidGradleBuilder extends Executor {
 
         String headphonesVars = "";
         String headphonesOnResume = "";
-        if (request.getArg("android.headphoneCallback", "false").equals("true")) {
+        // The generated glue calls headphonesConnected()/headphonesDisconnected() on the lifecycle
+        // instance, so it only compiles when that class declares them -- which the phone main class
+        // does because the developer added them to enable the hint. In a standalone watch build the
+        // lifecycle is the watch class instead, and there is no phone app whose author agreed to
+        // implement a headphone callback, so emitting the glue would simply fail to compile.
+        // ACTION_HEADSET_PLUG on a watch is not a meaningful event either.
+        boolean headphonesApplicable = appLifecycleClass(request).equals(request.getMainClass());
+        if (request.getArg("android.headphoneCallback", "false").equals("true")
+                && !headphonesApplicable) {
+            debug("Ignoring android.headphoneCallback: this is a standalone watch build, whose "
+                    + "lifecycle class is " + appLifecycleClass(request));
+        }
+        if (request.getArg("android.headphoneCallback", "false").equals("true")
+                && headphonesApplicable) {
             headphonesVars = "    HeadSetReceiver myHeadphoneReceiver;\n\n"
                     + "    public static void headphonesConnected() {\n"
                     + "        i.headphonesConnected();"
@@ -2955,6 +3041,58 @@ public class AndroidGradleBuilder extends Executor {
                                 + "\n" + compile + "(\"androidx.car.app:app:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n"
                                 + compile + "(\"androidx.car.app:app-projected:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n");
             }
+        }
+
+        // Wearable Data Layer glue: when the app references com.codename1.wearable, copy the
+        // injected WearableBridge + WearableListenerService (typed against play-services-wearable)
+        // into the generated project and add the dependency. The Android port itself cannot
+        // reference play-services-wearable, which is why these ship as .java resources here and are
+        // only added for apps that talk to a watch.
+        if (usesWearable) {
+            File wearImpl = new File(srcDir, "com/codename1/impl/android");
+            wearImpl.mkdirs();
+            String[] glue = {"CN1WearableBridge.java", "CN1WearableListenerService.java"};
+            for (String g : glue) {
+                InputStream gin = getResourceAsStream("/com/codename1/builders/wearable/" + g);
+                if (gin == null) {
+                    throw new BuildException("Missing wearable glue resource " + g);
+                }
+                try {
+                    copy(gin, new FileOutputStream(new File(wearImpl, g)));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write wearable glue " + g, ex);
+                }
+            }
+            playServicesWear = true;
+            // The capability the peer half advertises, so isCompanionAppInstalled() can tell a
+            // watch running this app from a watch that merely exists.
+            // resDir, NOT projectDir + "app/...". projectDir already IS the generated app module,
+            // so the extra segment put this at <app>/app/src/main/res/values -- a directory Gradle
+            // never packages. The failure is silent and total: the capability is never advertised,
+            // so after the first query isCompanionAppInstalled() and isReachable() answer false and
+            // message fan-out filters out every valid peer as "not running the app".
+            File wearValues = new File(resDir, "values");
+            wearValues.mkdirs();
+            try {
+                createFile(new File(wearValues, "cn1_wearable.xml"),
+                        ("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<resources>\n"
+                        + "    <string-array name=\"android_wear_capabilities\">\n"
+                        + "        <item>cn1_wearable</item>\n"
+                        + "    </string-array>\n"
+                        + "</resources>\n").getBytes("UTF-8"));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the wearable capability declaration", ex);
+            }
+        }
+        if (watchMainClass(request).length() > 0
+                && !"true".equals(request.getArg("watchStandalone", "false"))) {
+            // Say so rather than quietly producing one artifact: a companion Wear APK is not
+            // generated yet (see the wearables chapter of the developer guide).
+            log("[wearable] codename1.watchMain is set without codename1.watchStandalone. The "
+                    + "Apple Watch companion is built, but a companion Wear OS APK is not produced "
+                    + "yet -- set codename1.watchStandalone=true to build the watch app as the "
+                    + "Android product.");
         }
 
         // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
@@ -3865,6 +4003,34 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // The Data Layer starts this service to deliver a message or a data change even when the
+        // app is not running -- which is the whole point, and why com.codename1.wearable queues
+        // callbacks across a cold start. Both the message and data-changed actions are needed: the
+        // system dispatches them separately.
+        String wearableListenerService = "";
+        if (usesWearable) {
+            wearableListenerService =
+                    // Exported because Play services binds it -- that is not optional for a
+                    // WearableListenerService. There is no binding permission Play services holds
+                    // that would narrow it, so the service validates the source node of every event
+                    // instead (see CN1WearableListenerService).
+                    "        <service android:name=\"com.codename1.impl.android.CN1WearableListenerService\" android:exported=\"true\">\n"
+                    // BIND_LISTENER is how Play services binds the service, and its intent carries
+                    // no wear: URI -- so it needs a filter of its own. Putting it alongside the
+                    // event actions would apply the <data> constraint to it too and nothing would
+                    // ever bind.
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.BIND_LISTENER\" />\n"
+                    + "            </intent-filter>\n"
+                    + "            <intent-filter>\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.MESSAGE_RECEIVED\" />\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.DATA_CHANGED\" />\n"
+                    + "                <action android:name=\"com.google.android.gms.wearable.CAPABILITY_CHANGED\" />\n"
+                    + "                <data android:scheme=\"wear\" android:host=\"*\" android:pathPrefix=\"/cn1\" />\n"
+                    + "            </intent-filter>\n"
+                    + "        </service>\n";
+        }
+
         if (foregroundServicePermission) {
             permissions += permissionAdd(request, "\"android.permission.FOREGROUND_SERVICE\"",
                     "    <uses-permission android:name=\"android.permission.FOREGROUND_SERVICE\" />\n");
@@ -4259,6 +4425,7 @@ public class AndroidGradleBuilder extends Executor {
                 + remoteControlService
                 + hceService
                 + carAppService
+                + wearableListenerService
                 + surfacesManifestEntries
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
@@ -4736,14 +4903,14 @@ public class AndroidGradleBuilder extends Executor {
                     + "    public static final String LICENSE_KEY = \"" + xorEncode(licenseKey) + "\";\n"
                     + "    String [] consumable = new String[]{" + consumable + "};\n"
                     + "    private static " + request.getMainClass() + "Stub stubInstance;\n"
-                    + "    private static " + request.getMainClass() + " i;\n"
+                    + "    private static " + appLifecycleClass(request) + " i;\n"
                     + "    private boolean running;\n"
                     + "    private" + firstTimeStatic + " boolean firstTime = true;\n"
                     + "    private Form currentForm;\n"
                     + "    private static final Object LOCK = new Object();\n"
                     + additionalMembers
                     + headphonesVars
-                    + "    public static " + request.getMainClass() + " getAppInstance() {\n"
+                    + "    public static " + appLifecycleClass(request) + " getAppInstance() {\n"
                     + "        return i;\n"
                     + "    }\n\n"
                     + activityBillingSource
@@ -4803,7 +4970,7 @@ public class AndroidGradleBuilder extends Executor {
                     + reinitCode
                     + "        }\n"
                     + "        if (i == null) {\n"
-                    + "          i = new " + request.getMainClass() + "();\n"
+                    + "          i = new " + appLifecycleClass(request) + "();\n"
                     + "          if(i instanceof PushCallback) {\n"
                     + "                com.codename1.impl.CodenameOneImplementation.setPushCallback((PushCallback)i);\n"
                     + "          }\n";
@@ -5025,7 +5192,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "    public PushCallback getPushCallbackInstance() {\n"
                     + "         if(" + handlePushImmediatelyCheck + ") {\n"
                     + "             " + request.getMainClass() + "Stub stub = " + request.getMainClass() + "Stub.getInstance();\n"
-                    + "             final " + request.getMainClass() + " main = stub.getAppInstance();\n"
+                    + "             final " + appLifecycleClass(request) + " main = stub.getAppInstance();\n"
                             + "             if(main instanceof PushCallback) {\n"
                             + "                 return (PushCallback)main;\n"
                             + "             }\n"
@@ -5144,7 +5311,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "         if (intent.getStringExtra(\"error\") != null) {\n"
                     + "             final String error = intent.getStringExtra(\"error\");\n"
                     + "             System.out.println(\"Push handleRegistration() error: \" + error);\n"
-                    + "             final " + request.getMainClass() + " main = stub.getAppInstance();\n"
+                    + "             final " + appLifecycleClass(request) + " main = stub.getAppInstance();\n"
                     + "             if(main instanceof PushCallback) {\n"
                     + "                 Display.getInstance().callSerially(new Runnable() {\n"
                     + "                     public void run() {\n"
@@ -5161,7 +5328,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "             Preferences.set(\"push_key\", registration);\n"
                     + "             editor.commit();\n"
                     + "             com.codename1.impl.android.AndroidImplementation.registerPushOnServer(registration, d(BUILT_BY_USER) + '/' + PACKAGE_NAME, (byte)1, \"\", \"" + request.getPackageName() + "\");\n"
-                    + "             final " + request.getMainClass() + " main = stub.getAppInstance();\n"
+                    + "             final " + appLifecycleClass(request) + " main = stub.getAppInstance();\n"
                     + "             if(main instanceof PushCallback) {\n"
                     + "                 Display.getInstance().callSerially(new Runnable() {\n"
                     + "                     public void run() {\n"
@@ -5198,7 +5365,7 @@ public class AndroidGradleBuilder extends Executor {
                     + "         System.out.println(\"Is running: \" + " + request.getMainClass() + "Stub.isRunning());\n"
                     + "         if(" + handlePushImmediatelyCheck +") {\n"
                     + "             " + request.getMainClass() + "Stub stub = " + request.getMainClass() + "Stub.getInstance();\n"
-                    + "             final " + request.getMainClass() + " main = stub.getAppInstance();\n"
+                    + "             final " + appLifecycleClass(request) + " main = stub.getAppInstance();\n"
                     + "             if(main instanceof PushCallback) {\n"
                     + "                 Display.getInstance().setProperty(\"pushType\", messageType);\n";
 
@@ -5560,6 +5727,18 @@ public class AndroidGradleBuilder extends Executor {
 
         if (legacyGplayServicesMode) {
             additionalDependencies += " "+compile+" 'com.google.android.gms:play-services:6.5.87'\n";
+            if (playServicesWear) {
+                // The 6.5.87 monolith predates the Wearable Data Layer split, so it carries no
+                // MessageClient/DataClient -- but it DOES carry older copies of the shared wearable
+                // classes, so adding the modern artifact beside it produces duplicate classes at
+                // dex time rather than a working build. There is no combination of the two that
+                // works, so say which setting to drop instead of failing later and obscurely.
+                throw new BuildException("android.includeGPlayServices=true pins the legacy "
+                        + "play-services 6.5.87 bundle, which predates the Wearable Data Layer and "
+                        + "conflicts with the modern play-services-wearable that "
+                        + "com.codename1.wearable needs. Remove android.includeGPlayServices to "
+                        + "build the wearable API, or remove the com.codename1.wearable usage.");
+            }
         } else {
             if(playServicesPlus){
                 additionalDependencies += " "+compile+" 'com.google.android.gms:play-services-plus:"+getDefaultPlayServiceVersion("plus")+"'\n";
@@ -7252,6 +7431,36 @@ public class AndroidGradleBuilder extends Executor {
                 playServiceVersions.put(playServiceKey, playServiceValue);
             }
         }
+    }
+
+    /**
+     * Whether the legacy {@code android.wear} hints put this build in Wear mode.
+     *
+     * <p>Package-private for direct unit testing; not part of the builder API. Extracted because
+     * the relationship between the two hints is directional and easy to invert:
+     * {@code android.wear} implied standalone, but {@code android.wear.standalone} is a SUB-hint
+     * that only ever applied inside {@code android.wear=true} and never implied Wear on its own.
+     * Getting that backwards gives a legacy phone project the API 23 floor and a required
+     * {@code android.hardware.type.watch} feature, and Play filters the APK off every phone.</p>
+     */
+    static boolean legacyWearMode(String androidWear) {
+        return "true".equals(androidWear);
+    }
+
+    /**
+     * Whether the legacy hints ask for a standalone (phone-less) Wear app.
+     *
+     * <p>Only meaningful in Wear mode. {@code android.wear=true} implied standalone, so the
+     * sub-hint reads as an explicit opt-OUT: an empty or absent value keeps the historical
+     * standalone behaviour, and only {@code false} turns it off, which is what lets a project that
+     * deliberately configured a companion app stay a companion.</p>
+     */
+    static boolean legacyWearStandalone(String androidWear, String androidWearStandalone) {
+        if (!legacyWearMode(androidWear)) {
+            return false;
+        }
+        String optOut = androidWearStandalone == null ? "" : androidWearStandalone.trim();
+        return !"false".equals(optOut);
     }
 
     // Package-private for direct unit testing; this is not part of the builder API.

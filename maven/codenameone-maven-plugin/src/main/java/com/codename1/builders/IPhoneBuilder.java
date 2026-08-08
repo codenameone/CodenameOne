@@ -61,10 +61,16 @@ public class IPhoneBuilder extends Executor {
     // that is an implementation detail -- never surfaced in hint names.
     private final MacNativeBuilder macNativeBuilder = new MacNativeBuilder(this);
 
-    // watchNative.* delegate: adds an Apple Watch (watchOS) target rendered via
-    // the Core Graphics backend. Like macNativeBuilder this is inert unless the
-    // watchNative.enabled hint is set, keeping the iOS build unchanged.
+    // Watch delegate: adds an Apple Watch (watchOS) target rendered via the Core
+    // Graphics backend. Like macNativeBuilder this is inert unless the project
+    // declares a codename1.watchMain, keeping the iOS build unchanged.
     private final WatchNativeBuilder watchNativeBuilder = new WatchNativeBuilder(this);
+
+    /// Where each entry-point stub lives once they have been separated, or null when there is one
+    /// translation and the classpath is untouched. See WatchNativeBuilder.isolateStub.
+    private File phoneStubDir;
+
+    private File watchStubDir;
 
     // tvNative.* delegate: adds an Apple TV (tvOS) target. tvOS is handled like
     // the Mac Catalyst slice (Metal + GL stub headers + GL-only sources excluded)
@@ -135,6 +141,249 @@ public class IPhoneBuilder extends Executor {
     /// them the generated factory can actually construct.
     private final HealthListenerScan healthScan = new HealthListenerScan();
 
+    /// Whether this project uses HealthKit -- scanner-detected calls, or a capability the project
+    /// asked for explicitly.
+    ///
+    /// The privacy strings are deliberately NOT evidence: a project can retain an
+    /// `ios.NSHealth*UsageDescription` hint long after the code that needed it is gone, and
+    /// entitling on that basis fails codesigning against an App ID with no HealthKit capability.
+    /// The capability hints ARE evidence, because asking for background delivery or recalibrated
+    /// estimates is asking for HealthKit -- and they are how a project whose health access lives in
+    /// native code declares it at all, where the bytecode scan sees nothing.
+    ///
+    /// This is what both the phone entitlement decision and the watch target's
+    /// CODE_SIGN_ENTITLEMENTS read, so the two slices of one app cannot disagree about whether the
+    /// app uses HealthKit.
+    /// Whether each translation root reaches com.codename1.health.
+    ///
+    /// Both default to true so a project with one translation behaves exactly as before: the
+    /// question only has two different answers when the watch is translated from its own root.
+    private boolean phoneRootReachesHealth = true;
+
+    private boolean watchRootReachesHealth = true;
+
+    /// Internal names of every class reachable from a root, following constant-pool class
+    /// references.
+    ///
+    /// Deliberately an OVER-approximation: it follows references, not calls, so a type named only
+    /// in a signature counts as reached. That is the safe direction for what this is used for --
+    /// it can only leave a target entitled that might not have needed it, never strip the
+    /// entitlement from one that does.
+    ///
+    /// Roots are searched in order, which is how the isolated stubs are found: after the two entry
+    /// points are separated each stub lives in a directory of its own and no longer in classesDir.
+    java.util.Set<String> reachableClasses(java.util.List<File> roots, String rootInternal) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        if (rootInternal == null || rootInternal.length() == 0) {
+            return seen;
+        }
+        java.util.LinkedList<String> pending = new java.util.LinkedList<String>();
+        seen.add(rootInternal);
+        pending.add(rootInternal);
+        while (!pending.isEmpty()) {
+            String name = pending.removeFirst();
+            File classFile = null;
+            for (File root : roots) {
+                if (root == null) {
+                    continue;
+                }
+                File candidate = new File(root, name.replace('/', File.separatorChar) + ".class");
+                if (candidate.isFile()) {
+                    classFile = candidate;
+                    break;
+                }
+            }
+            if (classFile == null) {
+                // A JDK class, or something the app references without shipping. Neither is on the
+                // path to com.codename1.health and neither is ours to walk.
+                continue;
+            }
+            for (String referenced : classReferences(classFile)) {
+                if (seen.add(referenced)) {
+                    pending.add(referenced);
+                }
+            }
+        }
+        return seen;
+    }
+
+    /// The class names a single class file names, read straight out of its constant pool.
+    ///
+    /// Reads only as far as the pool, which is all this needs, and answers an empty set for
+    /// anything it cannot parse -- an unreadable class must not silently narrow reachability, and
+    /// the callers treat "not reached" as the less-entitled answer.
+    private java.util.List<String> classReferences(File classFile) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        DataInputStream in = null;
+        try {
+            in = new DataInputStream(new java.io.BufferedInputStream(
+                    new FileInputStream(classFile)));
+            if (in.readInt() != 0xCAFEBABE) {
+                return out;
+            }
+            in.readUnsignedShort();
+            in.readUnsignedShort();
+            int cpCount = in.readUnsignedShort();
+            String[] utf8 = new String[cpCount];
+            int[] classRefs = new int[cpCount];
+            for (int i = 1; i < cpCount; i++) {
+                int tag = in.readUnsignedByte();
+                switch (tag) {
+                    case 1:
+                        utf8[i] = in.readUTF();
+                        break;
+                    case 7:
+                    case 8:
+                    case 16:
+                    case 19:
+                    case 20:
+                        int index = in.readUnsignedShort();
+                        if (tag == 7) {
+                            classRefs[i] = index;
+                        }
+                        break;
+                    case 15:
+                        in.readUnsignedByte();
+                        in.readUnsignedShort();
+                        break;
+                    case 3:
+                    case 4:
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 12:
+                    case 17:
+                    case 18:
+                        in.readInt();
+                        break;
+                    case 5:
+                    case 6:
+                        in.readLong();
+                        // A long or double takes two pool slots; the second is unusable.
+                        i++;
+                        break;
+                    default:
+                        // An unknown tag makes every following offset meaningless, so stop rather
+                        // than read garbage as class names.
+                        return out;
+                }
+            }
+            for (int i = 1; i < cpCount; i++) {
+                if (classRefs[i] == 0) {
+                    continue;
+                }
+                String name = classRefs[i] < cpCount ? utf8[classRefs[i]] : null;
+                if (name == null || name.length() == 0 || name.charAt(0) == '[') {
+                    // An array type names its component elsewhere in the pool; there is no
+                    // "[Lcom/foo/Bar;.class" on disk to walk.
+                    continue;
+                }
+                out.add(name);
+            }
+        } catch (Throwable unreadable) {
+            return out;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Nothing to do; the pool is already read or already lost.
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Whether the class graph rooted here reaches the health API at all.
+    private boolean reachesHealth(java.util.List<File> roots, String rootInternal) {
+        for (String name : reachableClasses(roots, rootInternal)) {
+            // The SAME distinction the scanner draws, and for the same reason. The umbrella
+            // package is not evidence of HealthKit: com.codename1.health.sensors is pure BLE, and
+            // the shared model types (a HealthSample, a QuantitySample) are named by sensor code
+            // that never touches the store. Counting those here marked a BLE-only phone root as
+            // health-reaching and re-entitled it -- the exact release-signing failure this
+            // attribution exists to prevent.
+            if (name.startsWith("com/codename1/health/")
+                    && !name.startsWith("com/codename1/health/sensors/")
+                    && !"com/codename1/health/Health".equals(name)
+                    && !isSharedHealthModel(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Decides, once the stubs are separated, which target actually reaches the health API.
+    ///
+    /// The permission scan walks all of classesDir, so it answers "this app uses HealthKit"
+    /// and not "this TARGET does". With one translation that is the same question. With a distinct
+    /// watchMain it is not, and reading the flat answer entitled the phone for health code only the
+    /// watch contains -- release signing then fails against an App ID without the capability --
+    /// while the watch, which explicitly ignored those flags for a distinct root, went unentitled
+    /// and its authorization request was refused at runtime.
+    void resolveHealthUsagePerRoot(BuildRequest request, File classesDir) {
+        if (!watchNativeBuilder.needsOwnTranslation()) {
+            return;
+        }
+        String pkg = request.getPackageName() == null ? "" : request.getPackageName().replace('.', '/');
+        String prefix = pkg.length() == 0 ? "" : pkg + "/";
+        java.util.List<File> phoneRoots = java.util.Arrays.asList(phoneStubDir, classesDir);
+        java.util.List<File> watchRoots = java.util.Arrays.asList(watchStubDir, classesDir);
+        phoneRootReachesHealth = reachesHealth(phoneRoots, prefix + request.getMainClass() + "Stub");
+        watchRootReachesHealth = reachesHealth(watchRoots,
+                prefix + WatchNativeBuilder.translationRoot(request.getMainClass()) + "Stub");
+        log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
+                + ", watch=" + watchRootReachesHealth);
+    }
+
+    boolean phoneUsesHealthData(BuildRequest request) {
+        // The scan is app-wide; the entitlement is per target. A distinct watchMain means the flags
+        // can describe code only the WATCH contains, and entitling the phone for it fails release
+        // signing against an App ID with no HealthKit capability.
+        return ((usesHealthRead || usesHealthWrite || usesHealthWorkout) && phoneRootReachesHealth)
+                || healthCapabilityDeclared(request);
+    }
+
+    /// The same question for the watch bundle, answered against the watch translation root.
+    ///
+    /// SCANNED evidence only, deliberately. The ios.health.* capabilities and the
+    /// com.apple.developer.healthkit entitlement are statements about the iOS app -- they say
+    /// nothing about which lifecycle uses HealthKit -- and entitling a watch bundle on their
+    /// strength fails codesigning for an ordinary watch app whose App ID has no HealthKit
+    /// capability. A watch whose health access lives in native code, where the scan sees nothing,
+    /// declares it with watchNative.health, which settles the question before this is consulted.
+    boolean watchRootUsesHealthData(BuildRequest request) {
+        return (usesHealthRead || usesHealthWrite || usesHealthWorkout) && watchRootReachesHealth;
+    }
+
+    /// HealthKit asked for explicitly, by any of its spellings.
+    private boolean healthCapabilityDeclared(BuildRequest request) {
+        return
+                // The parent entitlement asked for outright. Enumerating only the two
+                // sub-capabilities missed the plainest declaration of all: a project with native
+                // health code that says com.apple.developer.healthkit=true and supplies its purpose
+                // string. The phone kept the entitlement it was handed and the watch, signed
+                // independently, went without it.
+                "true".equalsIgnoreCase(request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit", "false"))
+                || healthCapabilityRequested(request, "ios.health.backgroundDelivery",
+                        "background-delivery")
+                || healthCapabilityRequested(request, "ios.health.recalibrateEstimates",
+                        "recalibrate-estimates");
+    }
+
+    /// A HealthKit sub-capability requested under either spelling: the short alias, or the
+    /// canonical entitlement key written out in full. The generic renderer emits whatever is in the
+    /// `ios.entitlements.*` namespace, so a project that used the long spelling got its
+    /// sub-capability emitted while a gate reading only the aliases left the parent entitlement
+    /// off -- the unsignable set the aliases exist to avoid, reached by the other spelling.
+    private static boolean healthCapabilityRequested(BuildRequest request, String alias,
+            String suffix) {
+        return "true".equalsIgnoreCase(request.getArg(alias, "false"))
+                || "true".equalsIgnoreCase(request.getArg(
+                        "ios.entitlements.com.apple.developer.healthkit." + suffix, "false"));
+    }
+
     private boolean usesHealthRead;
     private boolean usesHealthWrite;
     private boolean usesHealthWorkout;
@@ -161,6 +410,23 @@ public class IPhoneBuilder extends Executor {
     private boolean surfacesLiveActivities;
     private final List<IOSWidgetExtensionBuilder.Kind> surfacesKinds =
             new ArrayList<IOSWidgetExtensionBuilder.Kind>();
+    // Set when the app references com.codename1.wearable.* (the phone-to-watch link). Gates the
+    // CN1_USE_WATCHCONNECTIVITY native define and WatchConnectivity.framework linkage on both the
+    // phone target and the watch target -- WCSession is symmetric, so both halves of a pair need
+    // it. Apps that never touch the API see no change.
+    private boolean usesWearable;
+
+    /**
+     * Whether the API scan saw {@code com.codename1.wearable}.
+     *
+     * <p>Package-private for {@link WatchNativeBuilder}, which links WatchConnectivity onto the
+     * watch target it generates. The phone target gets the framework through {@code addLibs}, but
+     * that list is consumed before the watch target exists, so the watch half has to ask.</p>
+     */
+    boolean usesWearable() {
+        return usesWearable;
+    }
+
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -1106,6 +1372,12 @@ public class IPhoneBuilder extends Executor {
                     // apps that publish external surfaces.
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
+                    }
+                    // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage
+                    // so WatchConnectivity.framework and the CN1_USE_WATCHCONNECTIVITY
+                    // natives are only added for apps that talk to their watch app.
+                    if (!usesWearable && cls.indexOf("com/codename1/wearable/") == 0) {
+                        usesWearable = true;
                     }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
@@ -2085,6 +2357,20 @@ public class IPhoneBuilder extends Executor {
                     + "}\n";
 
             stubSourceStream.write(stubSourceCode.getBytes(StandardCharsets.UTF_8));
+            // The watch gets a stub of its OWN when it boots a different class, written into the
+            // same source folder so the one javac pass below compiles both. Its translation is
+            // rooted here rather than at the phone stub, which is what finally makes watchMain the
+            // watch's entry point and lets the watch binary be shaken down to what that entry
+            // point actually reaches.
+            if (watchNativeBuilder.needsOwnTranslation()) {
+                watchNativeBuilder.writeWatchStubSource(request, stubSource, buildVersion,
+                        registerNativeImplementationsAndCreateStubs(
+                                new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
+                                stubSource, classesDir),
+                        iosMode, svgRegistryInstall, healthBindingsInstall,
+                        routeDispatcherInstallSource(sourceZip, "        "),
+                        annotationFrameworksInstallSource(sourceZip, "        "));
+            }
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source", ex);
         }
@@ -2358,6 +2644,22 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failure occurred while compiling native interface stubs", ex);
         }
+        // Two entry points cannot share one classpath: the translator parses everything it is
+        // given and refuses two mains. Each stub moves into a directory of its own so each pass
+        // can be handed exactly one; the application classes stay shared.
+        if (watchNativeBuilder.needsOwnTranslation()) {
+            try {
+                phoneStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, false);
+                watchStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, true);
+                // Now that each root has a stub of its own, ask which of them actually reaches the
+                // health API. Must happen here: the entitlement decision runs long before the
+                // translator, whose trees would answer the same question, because the capability it
+                // injects has to be in the request by the time the Info.plist is generated.
+                resolveHealthUsagePerRoot(request, classesDir);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to separate the phone and watch entry points", ex);
+            }
+        }
         stopwatch.split("Compile Stubs");
 
         
@@ -2508,6 +2810,15 @@ public class IPhoneBuilder extends Executor {
             // CN1_USE_CARPLAY. Skipped when ios.surfaces.extension=false.
             if (surfacesExtensionEnabled) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
+            }
+
+            // com.codename1.wearable usage compiles the WatchConnectivity glue (gated by
+            // CN1_USE_WATCHCONNECTIVITY so other builds carry no WCSession symbols). The define
+            // lives in the shared CodenameOne_GLViewController.h so it reaches every wearable
+            // translation unit, and unlike the widgets define it deliberately survives on the watch
+            // slice: both halves of a pair run the same symmetric code.
+            if (usesWearable) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WATCHCONNECTIVITY", "#define CN1_USE_WATCHCONNECTIVITY");
             }
 
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
@@ -2958,20 +3269,11 @@ public class IPhoneBuilder extends Executor {
                 // com.apple.developer.healthkit off. That is the same
                 // unsignable entitlement set the aliases were fixed to
                 // avoid, reachable by the other spelling.
-                boolean entitleHealthKit = usesHealthRead || usesHealthWrite
-                        || usesHealthWorkout
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.health.backgroundDelivery", "false"))
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.health.recalibrateEstimates", "false"))
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.entitlements.com.apple.developer"
-                                        + ".healthkit.background-delivery",
-                                "false"))
-                        || "true".equalsIgnoreCase(request.getArg(
-                                "ios.entitlements.com.apple.developer"
-                                        + ".healthkit.recalibrate-estimates",
-                                "false"));
+                // The one expression, shared with the watch builder. Two copies of it came apart
+                // once already: the watch read the scanner flags alone, so a project whose health
+                // access is in native code -- declared only through the capability hints -- got an
+                // entitled phone and an unentitled watch.
+                boolean entitleHealthKit = phoneUsesHealthData(request);
                 String healthKitEntitlement = request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit",
                         null);
@@ -3134,6 +3436,19 @@ public class IPhoneBuilder extends Executor {
             // Apple per app category, so we only inject the ones the project opts into via the
             // ios.carplay.<category> build hints; the binary references CarPlay symbols (gated by
             // CN1_USE_CARPLAY) which is why the framework is linked here in lockstep with the scan.
+            // The phone-to-watch link references WCSession (gated by CN1_USE_WATCHCONNECTIVITY), so
+            // link WatchConnectivity.framework in lockstep with the scan. It exists on both iOS and
+            // watchOS, which is why it is a plain link rather than one of the watch slice's
+            // weak-linked frameworks.
+            if (usesWearable) {
+                String wearableLib = "WatchConnectivity.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = wearableLib;
+                } else if (!addLibs.toLowerCase().contains("watchconnectivity.framework")) {
+                    addLibs = addLibs + ";" + wearableLib;
+                }
+            }
+
             if (usesCar) {
                 String carPlayLibs = "CarPlay.framework;MediaPlayer.framework";
                 if (addLibs == null || addLibs.length() == 0) {
@@ -3491,18 +3806,40 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);
                 parparCmd.add("-DbundleVersionNumber=" + bundleVersionNumber);
+                // The UNION of every enabled product's list, in ONE argument. These used to be
+                // mutually exclusive branches on the claim that the Mac list already covered the
+                // others; it does not -- the watch additionally needs Metal, MapKit, WebKit,
+                // StoreKit, CarPlay and SceneKit weak-linked. With macNative and a companion watch
+                // both enabled, the phone archive builds the watch target as a dependency and its
+                // link failed on symbols nobody had marked optional. Only one
+                // -Doptional.frameworks can take effect, so the lists are merged rather than added
+                // twice. Weak-linking a framework a slice does not need costs that slice nothing,
+                // which is why the union is safe.
+                java.util.LinkedHashSet<String> optionalFrameworks =
+                        new java.util.LinkedHashSet<String>();
                 if (macNativeBuilder.isEnabled()) {
-                    parparCmd.add(macNativeBuilder.parparvmOptionalFrameworksArg());
-                } else if (watchNativeBuilder.isEnabled()) {
-                    // Weak-link the watch-incompatible frameworks so the shared
-                    // sources link on both the iOS app target and the watch
-                    // target. (macNative already widens the set when both apply.)
-                    parparCmd.add(watchNativeBuilder.parparvmOptionalFrameworksArg());
-                } else if (tvNativeBuilder.isEnabled()) {
-                    // Weak-link the tvOS-incompatible frameworks (OpenGL ES, GLKit,
-                    // WebKit, MessageUI, AddressBook) so the shared sources link on
-                    // both the iOS app target and the tvOS target.
-                    parparCmd.add(tvNativeBuilder.parparvmOptionalFrameworksArg());
+                    collectOptionalFrameworks(optionalFrameworks,
+                            macNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (watchNativeBuilder.isEnabled()) {
+                    collectOptionalFrameworks(optionalFrameworks,
+                            watchNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (tvNativeBuilder.isEnabled()) {
+                    collectOptionalFrameworks(optionalFrameworks,
+                            tvNativeBuilder.parparvmOptionalFrameworksArg());
+                }
+                if (!optionalFrameworks.isEmpty()) {
+                    StringBuilder frameworksArg = new StringBuilder("-Doptional.frameworks=");
+                    boolean firstFramework = true;
+                    for (String framework : optionalFrameworks) {
+                        if (!firstFramework) {
+                            frameworksArg.append(';');
+                        }
+                        frameworksArg.append(framework);
+                        firstFramework = false;
+                    }
+                    parparCmd.add(frameworksArg.toString());
                 }
                 // Pass through extra translator JVM options (notably a larger
                 // -Xmx) from the CN1_TRANSLATOR_OPTS environment variable. The
@@ -3527,7 +3864,11 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-jar");
                 parparCmd.add(parparVMCompilerJar);
                 parparCmd.add("ios");
-                parparCmd.add(classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";"
+                // The phone stub's directory joins the classpath only when the stubs were
+                // separated; without a watch translation the classpath is exactly what it was.
+                parparCmd.add(classesDir.getAbsolutePath()
+                        + (phoneStubDir != null ? ";" + phoneStubDir.getAbsolutePath() : "")
+                        + ";" + resDir.getAbsolutePath() + ";"
                         + buildinRes.getAbsolutePath());
                 parparCmd.add(tmpFile.getAbsolutePath());
                 parparCmd.add(request.getMainClass());
@@ -3550,6 +3891,41 @@ public class IPhoneBuilder extends Executor {
                         error(TranslatorHeap.outOfMemoryAdvice(heapMB, true), null);
                     }
                     return false;
+                }
+                // A SECOND pass for the watch, rooted at its own stub.
+                //
+                // Same classes, different root: the translator walks out from the entry point it is
+                // given, so the watch tree contains what the watch lifecycle class reaches and
+                // nothing else. Sharing the phone's translation -- what this used to do -- meant
+                // the watch binary carried the phone's entire graph with its main defined away.
+                //
+                // Skipped when the two entry points are the same class, because then the two passes
+                // would produce the same tree twice.
+                if (watchNativeBuilder.needsOwnTranslation()) {
+                    File watchOut = WatchNativeBuilder.translationDir(tmpFile);
+                    watchOut.mkdirs();
+                    List<String> watchCmd = new ArrayList<String>(parparCmd);
+                    // The tail of the command is positional: <classpath> <out> <main> <package>
+                    // <display> <version> <projectType> <addLibs>. Replace the output root and the
+                    // main class; everything before them -- the JVM flags, the jar, the "ios" mode
+                    // and the classpath -- is shared with the phone pass by construction.
+                    int outIndex = watchCmd.size() - 7;
+                    // Same application classes, but the WATCH stub in place of the phone's -- the
+                    // only difference that makes this a different program.
+                    watchCmd.set(outIndex - 1, classesDir.getAbsolutePath() + ";"
+                            + watchStubDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";"
+                            + buildinRes.getAbsolutePath());
+                    watchCmd.set(outIndex, watchOut.getAbsolutePath());
+                    watchCmd.set(outIndex + 1,
+                            WatchNativeBuilder.translationRoot(request.getMainClass()));
+                    log("[watchNative] Translating the watch slice from "
+                            + watchNativeBuilder.getWatchMain());
+                    // The same 600s the phone pass above gets, and for the same reason: the watch
+                    // root can reach a graph of comparable size, so a lower cap here would kill an
+                    // otherwise valid companion build on its SECOND translation only.
+                    if (!exec(userDir, env, 600000, watchCmd.toArray(new String[0]))) {
+                        return false;
+                    }
                 }
             } catch (Exception ex) {
                 throw new BuildException("Failure while trying to run ByteCodeTranslator of ParparVM", ex);
@@ -3908,6 +4284,13 @@ public class IPhoneBuilder extends Executor {
                             + "  targets_to_fix.each do |main_target|\n"
                             + "    project_root = File.dirname(project_file)\n"
                             + "    swift_paths = Dir.glob(File.join(project_root, main_class_name + '-src', '**', '*.swift'))\n"
+                            // The staged WATCH translation lives under <Main>-src/watch-src and is
+                            // compiled by the watch target, from the file list stageWatchTranslation
+                            // returns. This glob would otherwise hand the watch slice's Swift to the
+                            // PHONE target -- a second copy of a class the phone already has, from a
+                            // translation describing a different program.
+                            + "    swift_paths = swift_paths.reject{|p| p.include?('/"
+                            + WatchNativeBuilder.WATCH_SRC_DIR + "/')}\n"
                             + "    swift_paths.each do |swift_path|\n"
                             + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
                             + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
@@ -3926,7 +4309,8 @@ public class IPhoneBuilder extends Executor {
                             + "    swift_refs = xcproj.files.select do |f|\n"
                             + "      file_name = f.path || f.name || f.display_name\n"
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
-                            + SURFACES_EXTENSION_NAME + "/')\n"
+                            + SURFACES_EXTENSION_NAME + "/') && !file_name.include?('/"
+                            + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
                             + "    swift_refs.each do |ref|\n"
                             + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
@@ -4256,7 +4640,11 @@ public class IPhoneBuilder extends Executor {
                     watchNativeBuilder.writeWatchInfoPlist(request, appSrcDir);
                     watchNativeBuilder.writeWatchEntry(request, appSrcDir);
                     watchNativeBuilder.writeStubHeaders(appSrcDir);
-                    watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion);
+                    // Empty when the watch shares the phone's translation, which is what tells
+                    // applyXcodeSettings to reuse the app target's sources and neutralise the
+                    // phone stub's main instead.
+                    watchNativeBuilder.applyXcodeSettings(request, tmpFile, buildVersion,
+                            watchNativeBuilder.stageWatchTranslation(request, tmpFile, appSrcDir));
                 }
 
                 if (tvNativeBuilder.isEnabled()) {
@@ -4826,11 +5214,11 @@ public class IPhoneBuilder extends Executor {
                 ? manifestAppGroup
                 : (hintAppGroup != null && hintAppGroup.length() > 0
                         ? hintAppGroup : "group." + request.getPackageName());
-        if (!surfacesAppGroup.startsWith("group.")) {
-            throw new BuildException("The surfaces app group must start with 'group.' (Apple "
-                    + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
-                    + "appGroup or the ios.surfaces.appGroup build hint)");
-        }
+        // Validated further down, AFTER the kinds are parsed and it is known whether anything in
+        // this manifest reaches iOS at all. A watch-only manifest produces no iOS extension and no
+        // application-groups entitlement, so nothing consumes this value -- and failing the whole
+        // build on a stale or non-Apple app group that is never used would reject a project that
+        // is entirely valid.
         Object liveActivities = parsed.get("liveActivities");
         surfacesLiveActivities = Boolean.TRUE.equals(liveActivities)
                 || "true".equals(liveActivities);
@@ -4874,6 +5262,35 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("surfaces.json declares neither widget kinds nor "
                     + "\"liveActivities\": true; there is nothing to build");
         }
+        // Whether anything in this manifest can appear on iOS, decided HERE -- before the app
+        // group, CN1_USE_WIDGETS and the app-target Swift glue are gated on
+        // surfacesExtensionEnabled. Turning the flag off later, at the point the extension target
+        // would have been generated, was too late: the host app had already been given an
+        // application-groups entitlement and compiled widget support for an extension that is
+        // never produced, and a release profile without that group then fails code signing.
+        boolean anyIosSurface = surfacesLiveActivities;
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            if (!IOSWidgetExtensionBuilder.isWatchOnly(kind)) {
+                anyIosSurface = true;
+                break;
+            }
+        }
+        if (!anyIosSurface) {
+            log("[surfaces] Every declared kind is a watch complication family, so no iOS "
+                    + "extension is generated and the iOS surface lowering is skipped entirely "
+                    + "-- no app group, no widget support compiled into the app.");
+            surfacesExtensionEnabled = false;
+            // Nothing further to prepare, and in particular no xcodeproj gem to require: that
+            // check exists for wiring an extension into the project, and there is no extension.
+            return;
+        }
+        // Only now, with an iOS surface confirmed, is the app group something this build actually
+        // uses -- and only now is rejecting a malformed one the right answer.
+        if (!surfacesAppGroup.startsWith("group.")) {
+            throw new BuildException("The surfaces app group must start with 'group.' (Apple "
+                    + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
+                    + "appGroup or the ios.surfaces.appGroup build hint)");
+        }
         // The extension is wired into the Xcode project through the ruby xcodeproj gem;
         // fail early with a friendly message when it is missing.
         ensureXcodeprojInstalled();
@@ -4897,6 +5314,36 @@ public class IPhoneBuilder extends Executor {
                 .setLiveActivitiesEnabled(surfacesLiveActivities);
         for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
             widgetBuilder.addKind(kind);
+        }
+        // Named out loud, every time, whether or not the extension is generated. A watch-only kind
+        // is silently dropped from the iOS bundle and NOTHING else emits it -- there is no watchOS
+        // widget extension target and no Wear complication data source yet -- so a developer who
+        // declares one and says nothing about it gets no surface on any platform and no clue why.
+        // The limitation is documented in the Wearables guide; this is the build-time half of it.
+        StringBuilder watchOnly = new StringBuilder();
+        for (IOSWidgetExtensionBuilder.Kind watchKind : surfacesKinds) {
+            if (IOSWidgetExtensionBuilder.isWatchOnly(watchKind)) {
+                if (watchOnly.length() > 0) {
+                    watchOnly.append(", ");
+                }
+                watchOnly.append(watchKind.getId());
+            }
+        }
+        if (watchOnly.length() > 0) {
+            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
+                    + "NOT appear on any device in this build: " + watchOnly + ". The watchOS "
+                    + "widget extension target and the Wear OS complication data source are not "
+                    + "generated yet. Declare a phone family alongside them if you need a surface "
+                    + "today.");
+        }
+        if (!widgetBuilder.hasIosSurface()) {
+            // Every declared kind is a watch complication and there is no live activity, so the iOS
+            // extension would host nothing -- and a WidgetBundle with an empty body does not compile.
+            // Declaring only complications is legitimate; it simply produces no iOS surface until the
+            // watchOS extension target exists, so skip the extension instead of failing the build.
+            log("Skipping the WidgetKit extension target: surfaces.json declares only watch "
+                    + "complication families, which the iOS extension cannot host");
+            return;
         }
         String extensionName = widgetBuilder.getExtensionName();
         File extensionDir = new File(distDir, extensionName);
@@ -6226,4 +6673,21 @@ public class IPhoneBuilder extends Executor {
         }
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
+
+    /// Splits a {@code -Doptional.frameworks=a;b;c} argument into {@code set}, so several products'
+    /// lists can be merged into the single argument the translator honours.
+    static void collectOptionalFrameworks(java.util.Set<String> set, String arg) {
+        if (arg == null) {
+            return;
+        }
+        int eq = arg.indexOf('=');
+        String list = eq < 0 ? arg : arg.substring(eq + 1);
+        for (String framework : list.split(";")) {
+            String trimmed = framework.trim();
+            if (trimmed.length() > 0) {
+                set.add(trimmed);
+            }
+        }
+    }
+
 }

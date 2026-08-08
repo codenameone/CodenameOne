@@ -20,6 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+#include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
+
 #import "CN1ES2compat.h"
 #ifndef USE_ES2
 void glEnableCN1StateES1(enum CN1GLenum state){
@@ -33,3 +36,10 @@ void glAlphaMaskTexCoordPointerES1( GLint size , GLenum type, GLsizei stride, co
     
 }
 #endif
+
+#else
+// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// slice renders through the Core Graphics backend instead. The typedef keeps the
+// translation unit non-empty, which ISO C requires.
+typedef int cn1_cn1es1compat_unused_on_watch;
+#endif // !TARGET_OS_WATCH
