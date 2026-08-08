@@ -22,3 +22,4 @@ Ports/JavaScriptPort/src/main/webapp/js/videojs/video.min.js | Video.js 7.4.1 an
 Ports/JavaScriptPort/src/main/webapp/js/videojs/videojs.record.min.css | videojs-record 3.5.0 third-party stylesheet
 Ports/JavaScriptPort/src/main/webapp/js/videojs/videojs.record.min.js | videojs-record 3.5.0 third-party bundle
 Ports/JavaScriptPort/src/main/webapp/sw.js | Codename One service-worker adapter containing the UpUp 1.0.0 MIT-licensed service worker
+vm/JavaAPI/src/java/util/TimeZone.java | Apache Harmony source retaining its original Apache-2.0 notice

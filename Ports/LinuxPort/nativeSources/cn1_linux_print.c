@@ -123,24 +123,36 @@ static int cn1PrintViaLp(const char* path, const char* job) {
 
 JAVA_INT com_codename1_impl_linux_LinuxNative_printDocument___java_lang_String_java_lang_String_java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT mimeType, JAVA_OBJECT jobName) {
     CN1PrintReq req;
+    /* Each conversion overwrites stringToUTF8's per-thread buffer, so all
+     * three have to be copied before any of them is read. */
+    char* pathCopy = cn1LinuxJStrDup(threadStateData, path);
+    char* mimeCopy = cn1LinuxJStrDup(threadStateData, mimeType);
+    char* jobCopy = cn1LinuxJStrDup(threadStateData, jobName);
+    int result;
     cn1PrintError[0] = 0;
-    req.path = path == JAVA_NULL ? 0 : stringToUTF8(threadStateData, path);
-    req.mime = mimeType == JAVA_NULL ? "" : stringToUTF8(threadStateData, mimeType);
-    req.job = jobName == JAVA_NULL ? 0 : stringToUTF8(threadStateData, jobName);
+    req.path = pathCopy;
+    req.mime = mimeCopy == 0 ? "" : mimeCopy;
+    req.job = jobCopy;
     req.result = 2;
     if (!req.path) {
         snprintf(cn1PrintError, sizeof(cn1PrintError), "null path");
+        free(pathCopy);
+        free(mimeCopy);
+        free(jobCopy);
         return 2;
     }
-    if (strncmp(req.mime, "image", 5) == 0) {
-        if (cn1LinuxWindowWidget() == 0) {
-            return cn1PrintViaLp(req.path, req.job); /* headless: no dialog */
-        }
+    if (strncmp(req.mime, "image", 5) == 0 && cn1LinuxWindowWidget() != 0) {
         cn1LinuxRunOnMainAndWait(cn1PrintImageOnMain, &req);
-        return req.result;
+        result = req.result;
+    } else {
+        /* Headless images and everything else: hand to CUPS, which
+         * rasterizes natively. */
+        result = cn1PrintViaLp(req.path, req.job);
     }
-    /* PDF and everything else: hand to CUPS, which rasterizes natively. */
-    return cn1PrintViaLp(req.path, req.job);
+    free(pathCopy);
+    free(mimeCopy);
+    free(jobCopy);
+    return result;
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_printLastError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {

@@ -55,6 +55,32 @@ public class BrowserComponentScreenshotTest extends BaseTest {
     private boolean jsReady;
     private boolean jsCheckPending;
     private RGBImage visualBand;
+    /// Which attempt the state below belongs to. Advanced by resetForRetry() and
+    /// by every runTest(), and captured by every asynchronous callback so a
+    /// superseded attempt can never answer for the current one. A page load, a
+    /// pending execute() and an in-flight screenshot all outlive the attempt
+    /// that started them, and the state they write -- loaded, jsReady, the
+    /// emitted capture, a fail() -- is shared. Guarding one of the three would
+    /// just move the bug.
+    ///
+    /// EDT-confined: the harness finalizes on the EDT and all three callbacks
+    /// are delivered there, so a plain int needs no further publication.
+    private int attempt;
+
+    /// Retire the current generation the moment the harness decides to retry,
+    /// not when the queued runTest() eventually runs.
+    ///
+    /// finalizeTest() calls this and then queues the next runTest() through
+    /// CN.callSerially, so incrementing only in runTest() left a window in
+    /// between where a callback from the timed-out attempt still matched the
+    /// current generation -- and resetForRetry() has just cleared done, failed
+    /// and captureStarted, so an emitImage() or fail() arriving in that window
+    /// is honoured, completing or poisoning a retry that has not begun.
+    @Override
+    public synchronized void resetForRetry() {
+        attempt++;
+        super.resetForRetry();
+    }
 
     @Override
     public boolean runTest() throws Exception {
@@ -62,11 +88,30 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             done();
             return true;
         }
+        // Every attempt starts from nothing. resetForRetry() clears the harness
+        // flags only, on the documented assumption that a subclass builds a
+        // fresh Form in runTest() and therefore carries no state across a retry
+        // -- and this test broke that assumption. It kept loaded and jsReady,
+        // so the retry saw a page that the PREVIOUS BrowserComponent had
+        // loaded, skipped waiting for the new peer entirely, and went straight
+        // into a twelve-second visual poll against a web view that had not
+        // rendered anything yet. The retry that exists to survive a slow
+        // engine start could therefore never survive one: the second attempt
+        // timed out exactly like the first.
+        loaded = false;
+        jsReady = false;
+        jsCheckPending = false;
+        readyRunnable = null;
+        visualBand = null;
+        final int generation = ++attempt;
         form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
         browser = new BrowserComponent();
         browser.addWebEventListener(BrowserComponent.onLoad, evt -> {
+            if (generation != attempt) {
+                return;
+            }
             loaded = true;
-            checkReady();
+            checkReady(generation);
         });
         browser.setPage(buildHtml(), null);
         form.add(BorderLayout.CENTER, browser);
@@ -81,7 +126,7 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         // path there, but finish as an assertion test instead of recording a
         // misleading black canvas rectangle as a visual baseline.
         this.readyRunnable = isHtml5() ? this::done : run;
-        checkReady();
+        checkReady(attempt);
     }
 
     @Override
@@ -93,8 +138,12 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         return "HTML5".equals(Display.getInstance().getPlatformName());
     }
 
-    private void checkReady() {
-        if (!loaded || readyRunnable == null) {
+    private static boolean isLinux() {
+        return "linux".equals(Display.getInstance().getPlatformName());
+    }
+
+    private void checkReady(final int generation) {
+        if (generation != attempt || !loaded || readyRunnable == null) {
             return;
         }
         if (!jsReady) {
@@ -103,6 +152,17 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                 // Verify content is actually present in the DOM
                 browser.execute("callback.onSuccess(document.body.innerText)", new SuccessCallback<BrowserComponent.JSRef>() {
                     public void onSucess(BrowserComponent.JSRef result) {
+                        // A retry replaces the component while this execute() is
+                        // still outstanding, and the answer describes the DOM of
+                        // the page the PREVIOUS web view had loaded. Letting it
+                        // set jsReady would hand the retry a result that says
+                        // nothing about the component now on screen -- and on the
+                        // desktop and HTML5 paths, where the contents are never
+                        // checked visually, that is enough to pass the test over
+                        // a replacement page that never became usable.
+                        if (generation != attempt) {
+                            return;
+                        }
                         String text = result == null ? null : result.getValue();
                         if (text == null
                                 || text.indexOf("Codename One") < 0
@@ -111,30 +171,38 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                             return;
                         }
                         jsReady = true;
-                        checkReady();
+                        checkReady(generation);
                     }
                 });
             }
             return;
         }
 
-        if (isHtml5() || CN.isDesktop()) {
+        if (isHtml5() || CN.isDesktop() || isLinux()) {
             // Desktop screenshots intentionally cannot include the native web
             // peer (the committed Mac/JavaSE baselines contain its black
-            // placeholder). The execute() assertion above validates the real
-            // DOM; use the normal harness capture for the surrounding form.
+            // placeholder), and the Linux port cannot either: its
+            // browserCapturePng is a documented stub pending the async WebKit
+            // snapshot bridge, so generatePeerImage always answers null and the
+            // peer never reaches the capture. The execute() assertion above
+            // validates the real DOM; use the normal harness capture for the
+            // surrounding form.
             UITimer.timer(2000, false, form, readyRunnable);
         } else {
             // DOM readiness and even WebKit's first meaningful paint do not
             // guarantee that the native peer has reached the Metal surface.
             // Verify the exact screen image that will be emitted instead of
             // relying on a fixed delay and then taking an unrelated capture.
-            awaitRenderedBrowserFrame(System.currentTimeMillis() + VISUAL_TIMEOUT_MS);
+            awaitRenderedBrowserFrame(generation, System.currentTimeMillis() + VISUAL_TIMEOUT_MS);
         }
         readyRunnable = null;
     }
 
     /**
+     * @param generation the retry attempt this poll belongs to. A retry replaces the
+     *      component while a timer from the previous attempt is still scheduled, and
+     *      letting that timer keep polling would capture -- and pass or fail -- against
+     *      a component that is no longer on screen.
      * @param deadline wall-clock instant to give up at, rather than a count of
      *      the retry delays. Each attempt also performs a full
      *      {@code Display.screenshot()}, and on a loaded runner that capture
@@ -143,11 +211,24 @@ public class BrowserComponentScreenshotTest extends BaseTest {
      *      nominal 12s budget gave up after 24s of wall clock. Timing out
      *      against the clock makes the number mean what it says.
      */
-    private void awaitRenderedBrowserFrame(final long deadline) {
+    private void awaitRenderedBrowserFrame(final int generation, final long deadline) {
+        if (generation != attempt) {
+            return;
+        }
         browser.repaint();
         form.repaint();
         markCaptureStarted();
         Display.getInstance().screenshot(screen -> {
+            // The capture is asynchronous, so it too can land after a retry has
+            // replaced the component. Emitting it would baseline the superseded
+            // attempt's screen, and fail() would report the old attempt's verdict
+            // against the new one.
+            if (generation != attempt) {
+                if (screen != null) {
+                    screen.dispose();
+                }
+                return;
+            }
             if (screen == null) {
                 fail("BrowserComponent screen capture returned null");
                 return;
@@ -163,7 +244,7 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                 return;
             }
             UITimer.timer(VISUAL_RETRY_MS, false, form,
-                    () -> awaitRenderedBrowserFrame(deadline));
+                    () -> awaitRenderedBrowserFrame(generation, deadline));
         });
     }
 
@@ -232,6 +313,13 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                         || (g > 120 && b > 160 && b > r + 30)) {
                     brightPixels++;
                 } else if (r < 48 && g < 48 && b < 48) {
+                    // The fixture's #0e1116 backdrop. Requiring it as well as
+                    // the text is what stops a blank frame from passing: a peer
+                    // that never composited leaves the form's plain white
+                    // background, which is bright everywhere and would satisfy
+                    // the text test on its own -- which is exactly how the
+                    // Linux port, whose peer capture is still a stub, recorded
+                    // an empty rectangle as a rendered page.
                     darkPixels++;
                 }
                 if (brightPixels >= requiredBrightPixels && darkPixels >= requiredDarkPixels) {

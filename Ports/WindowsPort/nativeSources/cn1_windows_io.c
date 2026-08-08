@@ -82,17 +82,54 @@ static JAVA_OBJECT cn1WinWideToJavaString(CODENAME_ONE_THREAD_STATE, const WCHAR
 
 /* ------------------------------------------------------------------- files */
 
+/* Reason the last open failed. The port reports "could not open X" from Java,
+ * where the thread's last-error value is long gone; without this the only way
+ * to tell a missing directory from a sharing violation was another CI run. */
+/* Per-thread: two threads failing an open at once would otherwise overwrite
+ * each other and lastIoError() could report the wrong reason. */
+static __declspec(thread) DWORD cn1WinLastIoError;
+/* Set when the open failed before CreateFileW was ever reached, so the thread's
+ * last-error value belongs to some earlier unrelated call. Reporting that value
+ * would name a plausible but wrong reason, which is worse than saying nothing:
+ * the whole point of this record is to explain a failure without another run. */
+static __declspec(thread) int cn1WinLastIoHadNoPath;
+
+static void cn1WinRecordIoError(DWORD error) {
+    cn1WinLastIoHadNoPath = 0;
+    cn1WinLastIoError = error;
+}
+
+static void cn1WinRecordMissingPath(void) {
+    cn1WinLastIoHadNoPath = 1;
+    cn1WinLastIoError = 0;
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    char buffer[256];
+    if (cn1WinLastIoHadNoPath) {
+        return newStringFromCString(threadStateData, "no path supplied");
+    }
+    _snprintf(buffer, sizeof(buffer), "Windows error %lu", (unsigned long) cn1WinLastIoError);
+    buffer[sizeof(buffer) - 1] = 0;
+    return newStringFromCString(threadStateData, buffer);
+}
+
 JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenRead___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
     HANDLE h;
+    DWORD error;
     if (path == NULL) {
+        cn1WinRecordMissingPath();
         return 0;
     }
     h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL,
                     OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    /* Captured before free(), which is free to clobber the thread's last error. */
+    error = GetLastError();
     free(path);
     if (h == INVALID_HANDLE_VALUE) {
+        cn1WinRecordIoError(error);
         return 0;
     }
     return (JAVA_LONG)(intptr_t)h;
@@ -102,7 +139,9 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenWrite___java_lang_Str
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
     HANDLE h;
+    DWORD error;
     if (path == NULL) {
+        cn1WinRecordMissingPath();
         return 0;
     }
     if (__cn1Arg2) {
@@ -117,8 +156,10 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_fileOpenWrite___java_lang_Str
         h = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     }
+    error = GetLastError();
     free(path);
     if (h == INVALID_HANDLE_VALUE) {
+        cn1WinRecordIoError(error);
         return 0;
     }
     return (JAVA_LONG)(intptr_t)h;
@@ -239,14 +280,61 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fileRename___java_lang_String
     UINT32 len1 = 0, len2 = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len1);
     /*
-     * Per the CN1 FileSystemStorage contract newName is the full target path,
-     * so it is passed directly to MoveFileExW. If a caller ever passes a bare
-     * leaf name the move would land in the process working directory; that
-     * would be a contract violation on the Java side.
+     * FileSystemStorage.rename documents newName as "relative to the current
+     * folder" -- a leaf name -- and the Linux port resolves it that way. This
+     * passed it straight to MoveFileExW as a full target, so a leaf name moved
+     * the file into the process working directory instead of renaming it in
+     * place. WAVWriter.close() does exactly that (it renames the recording to
+     * <name>.pcm via new File(...).getName()) and then reopens the .pcm, which
+     * was not where it expected: AudioMixerApiTest failed on Windows with
+     * "No such file" for a file the port had quietly moved elsewhere.
+     *
+     * A leaf name is now joined to the source's parent directory. An absolute
+     * target -- one carrying a drive letter, a UNC prefix or a leading
+     * separator -- is still honoured as-is, so any caller relying on the old
+     * behaviour keeps working.
      */
     WCHAR* newName = cn1WinJavaStringToWide(threadStateData, __cn1Arg2, &len2);
+    WCHAR* target = NULL;
     if (path != NULL && newName != NULL) {
-        MoveFileExW(path, newName, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+        int absolute = (newName[0] == L'\\' || newName[0] == L'/'
+                        || (newName[0] != 0 && newName[1] == L':'));
+        if (absolute) {
+            MoveFileExW(path, newName, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+        } else {
+            WCHAR* lastBack = wcsrchr(path, L'\\');
+            WCHAR* lastFwd = wcsrchr(path, L'/');
+            WCHAR* sep;
+            /* Resolve the absent cases before comparing. An ordinary Windows
+             * path has no forward slash and a normalized one has no backslash,
+             * so one of these is NULL almost every time -- and relational
+             * comparison of a null pointer against a pointer into `path` is
+             * undefined behaviour, not merely unusual. An optimizing build is
+             * free to decide it either way, and picking NULL would drop the
+             * parent directory and put the rename back in the working
+             * directory, which is the bug this join exists to fix. Both
+             * operands below point into `path`, where `>` is well defined. */
+            if (lastBack == NULL) {
+                sep = lastFwd;
+            } else if (lastFwd == NULL) {
+                sep = lastBack;
+            } else {
+                sep = lastBack > lastFwd ? lastBack : lastFwd;
+            }
+            size_t dirLen = sep != NULL ? (size_t) (sep - path) + 1 : 0;
+            size_t nameLen = wcslen(newName);
+            target = (WCHAR*) malloc((dirLen + nameLen + 1) * sizeof(WCHAR));
+            if (target != NULL) {
+                if (dirLen > 0) {
+                    memcpy(target, path, dirLen * sizeof(WCHAR));
+                }
+                memcpy(target + dirLen, newName, (nameLen + 1) * sizeof(WCHAR));
+                MoveFileExW(path, target, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED);
+            }
+        }
+    }
+    if (target != NULL) {
+        free(target);
     }
     if (path != NULL) {
         free(path);

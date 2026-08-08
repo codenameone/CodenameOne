@@ -284,6 +284,11 @@ static int cn1_seckey_op(SecKeyRef key, SecKeyAlgorithm alg, int forEncrypt,
     return (int) len;
 }
 
+/* OAEPSHA256 uses SHA-256 for the label hash and for MGF1 alike, which is the
+ * pairing the portable RSA_OAEP_SHA256 constant means. The JCE transformation
+ * name it borrows leaves MGF1 on SHA-1 by default, but neither SecKey nor Web
+ * Crypto can express that split, so the JavaSE and Android ports name SHA-256
+ * for both explicitly and every port agrees. */
 static SecKeyAlgorithm rsa_padding_alg(int paddingKind) {
     return paddingKind == 2
         ? kSecKeyAlgorithmRSAEncryptionOAEPSHA256

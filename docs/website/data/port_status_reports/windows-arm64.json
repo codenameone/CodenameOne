@@ -1,48 +1,48 @@
 {
-  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
-  "generated_at": "2026-08-04T07:52:19Z",
+  "commit": "159c7e3cc8a0eb161ba96891b6912f1d06cd03c4",
+  "generated_at": "2026-08-07T14:52:29Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 176947000
+        "duration_ns": 172284000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 24785000
+        "duration_ns": 24919000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 55124000
+        "duration_ns": 56041000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 62893000
+        "duration_ns": 62812000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 39348000
+        "duration_ns": 39404000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 219428000
+        "duration_ns": 223089000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 2802109000
+        "duration_ns": 3369821000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 94220000
+        "duration_ns": 93848000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 132962000
+        "duration_ns": 131816000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 53663000
+        "duration_ns": 56642000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,14 +52,14 @@
     "suite_checksum": 0
   },
   "port": "windows-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242168",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31186472523",
   "schema_version": 1,
-  "suite_finished": false,
+  "suite_finished": true,
   "summary": {
-    "fail": 7,
-    "not-run": 3,
-    "pass": 160,
-    "skip": 1
+    "pass": 168,
+    "fail": 0,
+    "skip": 3,
+    "not-run": 0
   },
   "tests": {
     "ARApiTest": {
@@ -96,10 +96,7 @@
     },
     "AudioMixerApiTest": {
       "feature": "audio-media-playback",
-      "reasons": [
-        "failed: AudioMixer API test failed: java.lang.IllegalStateException: mixed WAV file was not created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "BackgroundThreadUiAccessTest": {
       "feature": "threading",
@@ -127,7 +124,7 @@
     },
     "CalendarApiTest": {
       "feature": "calendar-integration",
-      "status": "not-run"
+      "status": "pass"
     },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
@@ -136,7 +133,7 @@
     "CameraApiTest": {
       "feature": "camera-access",
       "reasons": [
-        "needs-runtime-permission-on-win"
+        "no-host-webcam-capture-on-win"
       ],
       "status": "skip"
     },
@@ -250,10 +247,7 @@
     },
     "CryptoApiTest": {
       "feature": "secure-storage-crypto",
-      "reasons": [
-        "failed: Crypto API test failed: com.codename1.security.CryptoException: Crypto operation secureRandomBytes is not supported on this platform. If you are running in a fresh CodenameOneImplementation subclass, override the matching method."
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CssFilterBlurScreenshotTest": {
       "feature": "theme-palette-css",
@@ -329,10 +323,7 @@
     },
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
-      "reasons": [
-        "failed: openInputStream returned a stream (com.codename1.impl.windows.WindowsInputStream@17F4CD27BD0) for a missing path C:\\null\\this-file-must-not-exist-1502-1785829731900.bin instead of throwing. Platform=win"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "FillArc": {
       "feature": "graphics-primitives",
@@ -375,8 +366,11 @@
       "status": "pass"
     },
     "GoogleWebMapScreenshotTest": {
+      "status": "skip",
       "feature": "native-web-maps",
-      "status": "pass"
+      "reasons": [
+        "no-api-key"
+      ]
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -416,11 +410,7 @@
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
-      "reasons": [
-        "failed=java.lang.NullPointerException",
-        "failed: java.lang.NullPointerException"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "LanguageOnDeviceApiTest": {
       "feature": "on-device-language",
@@ -492,7 +482,7 @@
     },
     "MutableImageClipReadbackTest": {
       "feature": "mutable-images",
-      "status": "not-run"
+      "status": "pass"
     },
     "MutableImageReadbackTest": {
       "feature": "mutable-images",
@@ -644,18 +634,18 @@
     },
     "SurfacesPublishTest": {
       "feature": "surfaces",
-      "reasons": [
-        "failed: Surfaces publish contract failed: java.lang.UnsupportedOperationException: UnicodeHelper.getClasses() not supported"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
       "status": "pass"
     },
     "SurfacesRemoteViewsScreenshotTest": {
+      "status": "skip",
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "android-only-remoteviews-lowering"
+      ]
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -667,11 +657,7 @@
     },
     "SwitchThemeScreenshotTest": {
       "feature": "native-theme-controls",
-      "reasons": [
-        "failed=java.lang.NullPointerException",
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "TabsAnimatedIndicatorScreenshotTest": {
       "feature": "tabs-animation",
@@ -703,10 +689,7 @@
     },
     "TimeApiTest": {
       "feature": "java-standard-apis",
-      "reasons": [
-        "failed: Time API test failed: java.lang.RuntimeException: Expected [2020-03-08T01:30:00-05:00[America/New_York]], Actual [2020-03-08T06:30:00+01:00[America/New_York]]"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ToastBarTopPositionScreenshotTest": {
       "feature": "toast-notifications",
@@ -766,7 +749,7 @@
     },
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
-      "status": "not-run"
+      "status": "pass"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",

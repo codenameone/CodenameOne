@@ -373,6 +373,23 @@ class CleanTargetLinuxIntegrationTest {
             appPb.redirectErrorStream(true);
             app = appPb.start();
             final AtomicBoolean finished = new AtomicBoolean(false);
+            // Set by the suite watchdog when a test blocks the event dispatch thread;
+            // the run cannot progress past that point, so stop instead of waiting.
+            final java.util.concurrent.atomic.AtomicReference<String> wedged = new java.util.concurrent.atomic.AtomicReference<>();
+            // The last test the suite announced. The in-app watchdog names a wedging
+            // test itself, but it cannot always get the message out: a test that blocks
+            // the event dispatch thread in a tight loop also blocks the collector, so
+            // the watchdog's own log call can be stuck waiting to allocate. Reading the
+            // announcement from outside the process always works, and "stopped in X" is
+            // the difference between a diagnosable failure and a silent one.
+            final java.util.concurrent.atomic.AtomicReference<String> lastStarted = new java.util.concurrent.atomic.AtomicReference<>();
+            // When the app last said anything at all. A stall is only diagnosable
+            // from the state it stalls IN: by the time the 40-minute cap expires
+            // the picture has settled and every thread looks idle. Sampling while
+            // it is stuck is what distinguishes "waiting for a callback that never
+            // came" from "still working".
+            final java.util.concurrent.atomic.AtomicLong lastOutputAt =
+                    new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
             final Process appF = app;
             Thread areader = new Thread(() -> {
                 // Tee the app's merged stdout/stderr to CN1_APP_LOG_TEE when
@@ -395,6 +412,13 @@ class CleanTargetLinuxIntegrationTest {
                     while ((line = r.readLine()) != null) {
                         if (tee != null) { tee.println(line); }
                         if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
+                        if (line.contains("CN1SS:SUITE:WEDGED")) { wedged.set(line); }
+                        lastOutputAt.set(System.currentTimeMillis());
+                        int startedAt = line.indexOf("CN1SS:INFO:suite starting test=");
+                        if (startedAt >= 0) {
+                            lastStarted.set(line.substring(
+                                    startedAt + "CN1SS:INFO:suite starting test=".length()).trim());
+                        }
                     }
                 } catch (IOException ignore) {
                 }
@@ -417,10 +441,23 @@ class CleanTargetLinuxIntegrationTest {
             // 40-minute hard cap either way.
             long stableMs = 300_000L;
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
+            // Screenshot stabilization is a weak completion signal: DesktopMode,
+            // the VideoIO grid, the VR scene and the 360 panorama all capture
+            // AFTER the non-rendering API tail, so a slow tail trips the window
+            // while real screenshot tests are still queued -- the suite is then
+            // force-killed and every trailing test is reported as never run.
+            // CN1_REQUIRE_SUITE (as on the Windows arm64 pipeline) demands the
+            // suite's own completion marker instead.
+            boolean requireSuite = Boolean.parseBoolean(System.getenv("CN1_REQUIRE_SUITE"));
             int pngs = 0, lastPngs = -1;
+            int stallSamples = 0;
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
                 if (finished.get()) { break; }
+                if (wedged.get() != null) {
+                    System.out.println("CN1SS:HARNESS: " + wedged.get());
+                    break;
+                }
                 if (!app.isAlive()) {
                     // The suite intermittently DIES mid-run with no output (the
                     // tee cuts mid-line): surface the exit status -- 128+N means
@@ -432,13 +469,43 @@ class CleanTargetLinuxIntegrationTest {
                 }
                 pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
+                long silentMs = System.currentTimeMillis() - lastOutputAt.get();
+                if (silentMs >= STALL_SAMPLE_AFTER_MS && stallSamples < MAX_STALL_SAMPLES) {
+                    stallSamples++;
+                    System.out.println("CN1SS:HARNESS: no output for " + (silentMs / 1000)
+                            + "s after " + lastStarted.get() + "; sampling thread stacks ("
+                            + stallSamples + "/" + MAX_STALL_SAMPLES + ")");
+                    dumpLiveThreadStacks();
+                    // Re-arm so the next sample needs another quiet stretch rather
+                    // than firing on every poll.
+                    lastOutputAt.set(System.currentTimeMillis());
+                }
+                if (!requireSuite && pngs >= minPngs
+                        && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
                 Thread.sleep(3000);
             }
             pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
-            assertTrue(finished.get() || pngs >= minPngs,
-                    "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")\n" + serverLog);
-
+            if (!finished.get() && app.isAlive()) {
+                // The suite is still running and has stopped saying anything. The
+                // post-mortem in the workflow only fires on a core file, so a HANG --
+                // as opposed to the crash that comment describes -- has so far produced
+                // no evidence at all. Attach to the live process and take every thread's
+                // stack before killing it; that is the difference between knowing which
+                // call is stuck and guessing at it.
+                dumpLiveThreadStacks();
+            }
+            if (!finished.get()) {
+                String stoppedIn = lastStarted.get();
+                System.out.println("CN1SS:HARNESS: suite never emitted CN1SS:SUITE:FINISHED; pngs=" + pngs
+                        + "; stopped in " + (stoppedIn == null ? "<no test announced>" : stoppedIn)
+                        + " -- that test and every one after it is reported as never run.");
+            }
+            // Copy the capture out BEFORE asserting on it, for the same reason as
+            // the Windows harness: these assertions fire precisely when the suite
+            // came up short, and throwing first left whatever screenshots it did
+            // manage stranded in the temporary directory. The partial capture is
+            // what normalization reads to report which tests ran and which never
+            // did, so losing it is how a failed run ends up with no report at all.
             String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
             if (outEnv != null) {
                 Path dest = Paths.get(outEnv);
@@ -451,6 +518,16 @@ class CleanTargetLinuxIntegrationTest {
                     }
                 }
             }
+
+            assertTrue(wedged.get() == null,
+                    "the suite stopped because a test blocked the event dispatch thread: "
+                    + wedged.get());
+            assertTrue(finished.get() || (!requireSuite && pngs >= minPngs),
+                    "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
+                    + " suiteFinished=" + finished.get()
+                    + " stoppedIn=" + (lastStarted.get() == null ? "<none>" : lastStarted.get())
+                    + "\n" + serverLog);
+
             System.out.println("CN1_HELLO_SUITE_PNGS=" + pngs);
         } finally {
             if (app != null) { app.destroyForcibly(); }
@@ -539,4 +616,75 @@ class CleanTargetLinuxIntegrationTest {
         s = s.substring(0, start) + body + s.substring(end);
         Files.write(launcherC, s.getBytes(StandardCharsets.UTF_8));
     }
+    /// How long the suite may say nothing before it is worth photographing, and
+    /// how many photographs to take. Two minutes is far longer than the gap
+    /// between any two tests in a healthy run, and a handful of samples spread
+    /// across the stall shows whether it is stuck or merely crawling.
+    private static final long STALL_SAMPLE_AFTER_MS = 120_000L;
+    private static final int MAX_STALL_SAMPLES = 6;
+
+    private static int runGdbAttach(java.io.File out, String pid, boolean viaSudo) throws Exception {
+        java.util.List<String> cmd = new java.util.ArrayList<>();
+        if (viaSudo) {
+            cmd.add("sudo");
+            cmd.add("-n");
+        }
+        cmd.add("gdb");
+        cmd.add("-p");
+        cmd.add(pid);
+        cmd.add("-batch");
+        cmd.add("-ex");
+        cmd.add("set pagination off");
+        cmd.add("-ex");
+        cmd.add("thread apply all bt");
+        Process gdb = new ProcessBuilder(cmd)
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.appendTo(out))
+                .start();
+        return gdb.waitFor();
+    }
+
+    /// Dumps every thread's native stack from the still-running suite process.
+    ///
+    /// Best effort by design: gdb may be absent and ptrace may be restricted, and
+    /// neither should turn a diagnostic into a second failure. Output goes next to
+    /// the app log so it is uploaded with the screenshot artifact.
+    private static void dumpLiveThreadStacks() {
+        try {
+            String teePath = System.getenv("CN1_APP_LOG_TEE");
+            if (teePath == null) {
+                return;
+            }
+            Process pgrep = new ProcessBuilder("pgrep", "-f", "LinuxHelloMain")
+                    .redirectErrorStream(true).start();
+            String pid;
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(pgrep.getInputStream(), StandardCharsets.UTF_8))) {
+                pid = r.readLine();
+            }
+            pgrep.waitFor();
+            if (pid == null || pid.trim().isEmpty()) {
+                return;
+            }
+            java.io.File out = new java.io.File(
+                    new java.io.File(teePath).getParentFile(), "hang-stacks.txt");
+            try (java.io.PrintWriter header = new java.io.PrintWriter(
+                    new java.io.FileWriter(out, true), true)) {
+                header.println("===== sample at " + new java.util.Date()
+                        + " (pid " + pid.trim() + ") =====");
+            }
+            // Plain gdb first; if yama still refuses the attach, retry through sudo,
+            // which the runner allows passwordless. Either way a refusal must not
+            // become a second failure.
+            int rc = runGdbAttach(out, pid.trim(), false);
+            if (rc != 0) {
+                runGdbAttach(out, pid.trim(), true);
+            }
+            System.out.println("CN1SS:HARNESS: wrote live thread stacks for pid " + pid.trim()
+                    + " to " + out);
+        } catch (Exception ignore) {
+            // A missing gdb or a denied ptrace must not mask the real failure.
+        }
+    }
+
 }

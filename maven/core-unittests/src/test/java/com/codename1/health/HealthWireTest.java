@@ -599,15 +599,9 @@ class HealthWireTest {
                 HealthDataType.SLEEP));
     }
 
-    private static Throwable errorOf(
-            com.codename1.util.AsyncResource<?> r) {
-        final Throwable[] err = new Throwable[1];
-        r.except(new com.codename1.util.SuccessCallback<Throwable>() {
-            public void onSucess(Throwable t) {
-                err[0] = t;
-            }
-        });
-        return err[0];
+    /** Settles the resource and reads its failure; see {@link HealthAwait#errorOf}. */
+    private static Throwable errorOf(com.codename1.util.AsyncResource<?> r) {
+        return HealthAwait.errorOf(r);
     }
 
     /**

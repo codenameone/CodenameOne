@@ -45,6 +45,17 @@ public final class LinuxNative {
     /* ------------------------------------------------------------- VideoIO */
     /** True when the GStreamer runtime backing VideoIO is available (libgstreamer-1.0 loadable). */
     public static native boolean videoBackendAvailable();
+    /// True when the host's GStreamer registry contains this element factory. The codec
+    /// lists this port reports have to describe what the installed plugins can actually
+    /// do: a distribution that ships only plugins-base and plugins-good has no x264enc,
+    /// and claiming H.264 anyway sent callers down a pipeline that cannot be built.
+    public static native boolean videoFactoryAvailable(String factoryName);
+    /// True when the registry holds a decoder that accepts these caps on its sink pad --
+    /// the same question `decodebin` asks when it auto-plugs. Decoding must be answered
+    /// by capability rather than by factory name: a hardware-only install spells its
+    /// H.264 decoder `vah264dec` or `v4l2slh264dec` and its AAC decoder `fdkaacdec`, and
+    /// any list of names is a list of the installs someone happened to think of.
+    public static native boolean videoDecoderAvailable(String caps);
     // Reader (filesrc ! decodebin ! videoconvert ! appsink). The peer owns the pipeline.
     public static native long videoReaderOpen(String path);
     public static native int videoReaderWidth(long peer);
@@ -387,6 +398,44 @@ public final class LinuxNative {
     public static native long fileOpenRead(String path);
 
     public static native long fileOpenWrite(String path, boolean append);
+
+    /** Why the most recent open failed, for the exception the port raises. */
+    public static native String lastIoError();
+
+    /* ---------------------------------------------------------- crypto */
+
+    /** Fills {@code out} with fresh entropy; false when the platform RNG failed. */
+    public static native boolean secureRandomBytes(byte[] out);
+
+    /**
+     * AES in the mode named by {@code transformation}. For GCM the
+     * authentication tag is appended to the ciphertext, which is the
+     * convention the portable API documents.
+     */
+    public static native byte[] aesCrypt(String transformation, boolean encrypt,
+            byte[] key, byte[] iv, byte[] aad, byte[] data);
+
+    /** RSA with an X.509 public key when encrypting, PKCS#8 when decrypting. */
+    public static native byte[] rsaCrypt(String transformation, boolean encrypt,
+            byte[] key, byte[] data);
+
+    public static native byte[] signData(String algorithm, byte[] privateKeyPkcs8, byte[] data);
+
+    public static native boolean verifyData(String algorithm, byte[] publicKeyX509,
+            byte[] data, byte[] signature);
+
+    /**
+     * A fresh RSA pair as one array: a four-byte big-endian public-key length,
+     * the X.509 public key, then the PKCS#8 private key.
+     */
+    public static native byte[] generateRsaKeyPair(int bits);
+
+    /** Why the most recent crypto call failed, for the CryptoException message. */
+    public static native String lastCryptoError();
+
+    /// Empties the last-error slot so a following call's failure can be told
+    /// apart from a stale message.
+    public static native void clearCryptoError();
 
     public static native int fileRead(long handle, byte[] buffer, int offset, int length);
 

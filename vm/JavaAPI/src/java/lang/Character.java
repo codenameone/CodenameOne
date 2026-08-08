@@ -363,10 +363,15 @@ public final class Character implements Comparable<Character>{
             case CURRENCY_SYMBOL:
                 return true;
             default:
-                return isIdentifierIgnorable(codePoint);
+                // No ignorable fallback here, unlike isJavaIdentifierPart. An
+                // identifier-ignorable character is allowed inside a name but
+                // never as its first character, and with getType now answering
+                // CONTROL for the ASCII controls, the old fallback let
+                // U+0000 through U+0008 start an identifier.
+                return false;
         }
     }
-    
+
     public static boolean isJavaIdentifierPart(char ch) {
         return isJavaIdentifierPart((int) ch);
     }
@@ -457,6 +462,22 @@ public final class Character implements Comparable<Character>{
         if (codePoint < 128) {
             return false;
         }
+        // Answer over the rest of the range this class documents as supported.
+        // Returning false for every code point above 127 contradicted both that
+        // documentation and getType, which now classifies Latin-1 properly --
+        // isLowerCase would have said false for a character getType calls a
+        // LOWERCASE_LETTER.
+        //
+        // The two ordinal indicators are lowercase without being in category
+        // Ll: Unicode gives them the derived Other_Lowercase property, and the
+        // JDK agrees, so a plain category test would disagree with it on
+        // exactly these two code points.
+        if (codePoint == 0x00AA || codePoint == 0x00BA) {
+            return true;
+        }
+        if (codePoint < LATIN1_TYPES.length) {
+            return LATIN1_TYPES[codePoint] == LOWERCASE_LETTER;
+        }
         //return isLowerCaseImpl(codePoint);
         return false;
     }
@@ -484,10 +505,15 @@ public final class Character implements Comparable<Character>{
         if ('A' <= codePoint && codePoint <= 'Z') {
             return true;
         }
-        /*if (codePoint < 128) {
+        if (codePoint < 128) {
             return false;
         }
-        return isUpperCaseImpl(codePoint);*/
+        // See isLowerCase: answer over the documented Latin-1 range rather than
+        // reporting false for every assigned character above ASCII.
+        if (codePoint < LATIN1_TYPES.length) {
+            return LATIN1_TYPES[codePoint] == UPPERCASE_LETTER;
+        }
+        /*return isUpperCaseImpl(codePoint);*/
         return false;
     }
 
@@ -1306,30 +1332,122 @@ public final class Character implements Comparable<Character>{
         return isHighSurrogate(ch) || isLowSurrogate(ch);
     }
     
-    private static UnicodeHelper.Range[] classMapping;
-    private static UnicodeHelper.Range[] getClasses() {
-       throw new UnsupportedOperationException("UnicodeHelper.getClasses() not supported");
-    }
-    
+    /**
+     * General category of every ISO Latin-1 code point, indexed by code point.
+     *
+     * This table used to be absent altogether and getType threw
+     * UnsupportedOperationException, which meant isLetter, isLetterOrDigit,
+     * isJavaIdentifierStart, isJavaIdentifierPart and isIdentifierIgnorable
+     * threw for every input on the ports that use this runtime.
+     *
+     * It covers Latin-1 rather than just ASCII because that is the range this
+     * class documents as supported (see the class comment and isLowerCase /
+     * isUpperCase / toLowerCase). Stopping at 127 answered UNASSIGNED for
+     * assigned characters, so isLetter('e' with an acute) and
+     * isJavaIdentifierStart came back false and a currency sign such as the
+     * pound got the wrong category.
+     *
+     * The 0x80-0xFF rows are not hand-written: they were generated from
+     * java.lang.Character.getType on a reference JDK and are verified against
+     * it -- CharacterLatin1TypeTest walks all 256 code points and compares.
+     */
+    private static final byte[] LATIN1_TYPES = {
+        /* 00-0f */ CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+                    CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 10-1f */ CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+                    CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL, CONTROL,
+        /* ' '!"# */ SPACE_SEPARATOR, OTHER_PUNCTUATION, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* $%&' */   CURRENCY_SYMBOL, OTHER_PUNCTUATION, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* ()*+ */   START_PUNCTUATION, END_PUNCTUATION, OTHER_PUNCTUATION, MATH_SYMBOL,
+        /* ,-./ */   OTHER_PUNCTUATION, DASH_PUNCTUATION, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* 0-7 */    DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER,
+                     DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER,
+        /* 89:; */   DECIMAL_DIGIT_NUMBER, DECIMAL_DIGIT_NUMBER, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* <=>? */   MATH_SYMBOL, MATH_SYMBOL, MATH_SYMBOL, OTHER_PUNCTUATION,
+        /* @A-G */   OTHER_PUNCTUATION, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+                     UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* H-O */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+                     UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* P-W */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+                     UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* XYZ[ */   UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, START_PUNCTUATION,
+        /* \]^_ */   OTHER_PUNCTUATION, END_PUNCTUATION, MODIFIER_SYMBOL, CONNECTOR_PUNCTUATION,
+        /* `a-g */   MODIFIER_SYMBOL, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+                     LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* h-o */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+                     LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* p-w */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+                     LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* xyz{ */   LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, START_PUNCTUATION,
+        /* |}~del */ MATH_SYMBOL, END_PUNCTUATION, MATH_SYMBOL, CONTROL,
+        /* 0x80-0x83 */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x84-0x87 */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x88-0x8B */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x8C-0x8F */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x90-0x93 */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x94-0x97 */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x98-0x9B */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0x9C-0x9F */    CONTROL, CONTROL, CONTROL, CONTROL,
+        /* 0xA0-0xA3 */    SPACE_SEPARATOR, OTHER_PUNCTUATION, CURRENCY_SYMBOL, CURRENCY_SYMBOL,
+        /* 0xA4-0xA7 */    CURRENCY_SYMBOL, CURRENCY_SYMBOL, OTHER_SYMBOL, OTHER_PUNCTUATION,
+        /* 0xA8-0xAB */    MODIFIER_SYMBOL, OTHER_SYMBOL, OTHER_LETTER, INITIAL_QUOTE_PUNCTUATION,
+        /* 0xAC-0xAF */    MATH_SYMBOL, FORMAT, OTHER_SYMBOL, MODIFIER_SYMBOL,
+        /* 0xB0-0xB3 */    OTHER_SYMBOL, MATH_SYMBOL, OTHER_NUMBER, OTHER_NUMBER,
+        /* 0xB4-0xB7 */    MODIFIER_SYMBOL, LOWERCASE_LETTER, OTHER_PUNCTUATION, OTHER_PUNCTUATION,
+        /* 0xB8-0xBB */    MODIFIER_SYMBOL, OTHER_NUMBER, OTHER_LETTER, FINAL_QUOTE_PUNCTUATION,
+        /* 0xBC-0xBF */    OTHER_NUMBER, OTHER_NUMBER, OTHER_NUMBER, OTHER_PUNCTUATION,
+        /* 0xC0-0xC3 */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* 0xC4-0xC7 */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* 0xC8-0xCB */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* 0xCC-0xCF */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* 0xD0-0xD3 */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* 0xD4-0xD7 */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, MATH_SYMBOL,
+        /* 0xD8-0xDB */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER,
+        /* 0xDC-0xDF */    UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xE0-0xE3 */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xE4-0xE7 */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xE8-0xEB */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xEC-0xEF */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xF0-0xF3 */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xF4-0xF7 */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, MATH_SYMBOL,
+        /* 0xF8-0xFB */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER,
+        /* 0xFC-0xFF */    LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER, LOWERCASE_LETTER
+    };
+
     public static int getType(int codePoint) {
         if (isBmpCodePoint(codePoint) && isSurrogate((char) codePoint)) {
             return SURROGATE;
         }
-        UnicodeHelper.Range[] classes = getClasses();
-        int l = 0;
-        int u = classes.length - 1;
-        while (l <= u) {
-            int i = (l + u) / 2;
-            UnicodeHelper.Range range = classes[i];
-            if (codePoint >= range.end) {
-                l = i + 1;
-            } else if (codePoint < range.start) {
-                u = i - 1;
-            } else {
-                return range.data[codePoint - range.start];
-            }
+        if (codePoint >= 0 && codePoint < LATIN1_TYPES.length) {
+            return LATIN1_TYPES[codePoint];
         }
-        return 0;
+        // Above ASCII this runtime carries no category table, so answer from
+        // the primitives it does implement instead of failing the call. The
+        // code points isWhitespace() knows about individually are named here:
+        // they are not all separators, and the two that are come from
+        // different categories.
+        if (codePoint == 0x2028) {
+            return LINE_SEPARATOR;
+        }
+        if (codePoint == 0x2029) {
+            return PARAGRAPH_SEPARATOR;
+        }
+        if (codePoint == 0x180E) {
+            return FORMAT;
+        }
+        if (isLowerCase(codePoint)) {
+            return LOWERCASE_LETTER;
+        }
+        if (isUpperCase(codePoint)) {
+            return UPPERCASE_LETTER;
+        }
+        if (isDigit(codePoint)) {
+            return DECIMAL_DIGIT_NUMBER;
+        }
+        if (isWhitespace(codePoint)) {
+            return SPACE_SEPARATOR;
+        }
+        return UNASSIGNED;
     }
     
     /**

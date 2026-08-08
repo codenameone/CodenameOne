@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.maps.MapSurface;
@@ -39,7 +61,18 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
     private static final int MIN_SETTLE_MS = 1500;
     // Generous: heavy first renders on a starved CI simulator have been observed
     // far beyond the old 9s cap; a healthy run exits after a few polls.
-    private static final int MAX_WAIT_MS = 30000;
+    //
+    // MUST stay strictly below the runner's per-test budget for these tests, or
+    // the "capture anyway" fallback below is unreachable. It used to exceed both
+    // defaults -- equal to the 30s native one, triple the 10s HTML5 one -- so the
+    // runner declared its own timeout first and the fallback never once fired: a
+    // map that was slow to report ready failed with no screenshot at all,
+    // instead of a screenshot showing what it did render.
+    //
+    // Package-visible on purpose: Cn1ssDeviceRunner derives the budget for every
+    // VectorMapScreenshotBaseTest from this value rather than restating it, so
+    // tuning the cap here cannot silently re-create that inversion.
+    static final int MAX_WAIT_MS = 30000;
     private static final int POLL_MS = 150;
     // The probe must hold across consecutive polls: a single true can sit right
     // before a generation clear (see MIN_SETTLE_MS note).

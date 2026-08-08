@@ -77,6 +77,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      # The device runner reports logical test failures through CN1SS log
+      # markers, not through the build or the screenshot comparison. Make the
+      # normalized report authoritative so a failing or never-run compliance
+      # test cannot leave this workflow green and then be published from master.
+      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/javascript-ui-tests
       # CN1_JS_TIMEOUT_SECONDS guards the per-suite SUITE:FINISHED wait.
