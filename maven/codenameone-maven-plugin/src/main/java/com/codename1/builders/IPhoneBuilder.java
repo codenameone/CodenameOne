@@ -154,14 +154,208 @@ public class IPhoneBuilder extends Executor {
     /// This is what both the phone entitlement decision and the watch target's
     /// CODE_SIGN_ENTITLEMENTS read, so the two slices of one app cannot disagree about whether the
     /// app uses HealthKit.
+    /// Whether each translation root reaches com.codename1.health.
+    ///
+    /// Both default to true so a project with one translation behaves exactly as before: the
+    /// question only has two different answers when the watch is translated from its own root.
+    private boolean phoneRootReachesHealth = true;
+
+    private boolean watchRootReachesHealth = true;
+
+    /// Internal names of every class reachable from a root, following constant-pool class
+    /// references.
+    ///
+    /// Deliberately an OVER-approximation: it follows references, not calls, so a type named only
+    /// in a signature counts as reached. That is the safe direction for what this is used for --
+    /// it can only leave a target entitled that might not have needed it, never strip the
+    /// entitlement from one that does.
+    ///
+    /// Roots are searched in order, which is how the isolated stubs are found: after the two entry
+    /// points are separated each stub lives in a directory of its own and no longer in classesDir.
+    java.util.Set<String> reachableClasses(java.util.List<File> roots, String rootInternal) {
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        if (rootInternal == null || rootInternal.length() == 0) {
+            return seen;
+        }
+        java.util.LinkedList<String> pending = new java.util.LinkedList<String>();
+        seen.add(rootInternal);
+        pending.add(rootInternal);
+        while (!pending.isEmpty()) {
+            String name = pending.removeFirst();
+            File classFile = null;
+            for (File root : roots) {
+                if (root == null) {
+                    continue;
+                }
+                File candidate = new File(root, name.replace('/', File.separatorChar) + ".class");
+                if (candidate.isFile()) {
+                    classFile = candidate;
+                    break;
+                }
+            }
+            if (classFile == null) {
+                // A JDK class, or something the app references without shipping. Neither is on the
+                // path to com.codename1.health and neither is ours to walk.
+                continue;
+            }
+            for (String referenced : classReferences(classFile)) {
+                if (seen.add(referenced)) {
+                    pending.add(referenced);
+                }
+            }
+        }
+        return seen;
+    }
+
+    /// The class names a single class file names, read straight out of its constant pool.
+    ///
+    /// Reads only as far as the pool, which is all this needs, and answers an empty set for
+    /// anything it cannot parse -- an unreadable class must not silently narrow reachability, and
+    /// the callers treat "not reached" as the less-entitled answer.
+    private java.util.List<String> classReferences(File classFile) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        DataInputStream in = null;
+        try {
+            in = new DataInputStream(new java.io.BufferedInputStream(
+                    new FileInputStream(classFile)));
+            if (in.readInt() != 0xCAFEBABE) {
+                return out;
+            }
+            in.readUnsignedShort();
+            in.readUnsignedShort();
+            int cpCount = in.readUnsignedShort();
+            String[] utf8 = new String[cpCount];
+            int[] classRefs = new int[cpCount];
+            for (int i = 1; i < cpCount; i++) {
+                int tag = in.readUnsignedByte();
+                switch (tag) {
+                    case 1:
+                        utf8[i] = in.readUTF();
+                        break;
+                    case 7:
+                    case 8:
+                    case 16:
+                    case 19:
+                    case 20:
+                        int index = in.readUnsignedShort();
+                        if (tag == 7) {
+                            classRefs[i] = index;
+                        }
+                        break;
+                    case 15:
+                        in.readUnsignedByte();
+                        in.readUnsignedShort();
+                        break;
+                    case 3:
+                    case 4:
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 12:
+                    case 17:
+                    case 18:
+                        in.readInt();
+                        break;
+                    case 5:
+                    case 6:
+                        in.readLong();
+                        // A long or double takes two pool slots; the second is unusable.
+                        i++;
+                        break;
+                    default:
+                        // An unknown tag makes every following offset meaningless, so stop rather
+                        // than read garbage as class names.
+                        return out;
+                }
+            }
+            for (int i = 1; i < cpCount; i++) {
+                if (classRefs[i] == 0) {
+                    continue;
+                }
+                String name = classRefs[i] < cpCount ? utf8[classRefs[i]] : null;
+                if (name == null || name.length() == 0 || name.charAt(0) == '[') {
+                    // An array type names its component elsewhere in the pool; there is no
+                    // "[Lcom/foo/Bar;.class" on disk to walk.
+                    continue;
+                }
+                out.add(name);
+            }
+        } catch (Throwable unreadable) {
+            return out;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                    // Nothing to do; the pool is already read or already lost.
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Whether the class graph rooted here reaches the health API at all.
+    private boolean reachesHealth(java.util.List<File> roots, String rootInternal) {
+        for (String name : reachableClasses(roots, rootInternal)) {
+            if (name.startsWith("com/codename1/health/")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Decides, once the stubs are separated, which target actually reaches the health API.
+    ///
+    /// The permission scan walks all of classesDir, so it answers "this app uses HealthKit"
+    /// and not "this TARGET does". With one translation that is the same question. With a distinct
+    /// watchMain it is not, and reading the flat answer entitled the phone for health code only the
+    /// watch contains -- release signing then fails against an App ID without the capability --
+    /// while the watch, which explicitly ignored those flags for a distinct root, went unentitled
+    /// and its authorization request was refused at runtime.
+    void resolveHealthUsagePerRoot(BuildRequest request, File classesDir) {
+        if (!watchNativeBuilder.needsOwnTranslation()) {
+            return;
+        }
+        String pkg = request.getPackageName() == null ? "" : request.getPackageName().replace('.', '/');
+        String prefix = pkg.length() == 0 ? "" : pkg + "/";
+        java.util.List<File> phoneRoots = java.util.Arrays.asList(phoneStubDir, classesDir);
+        java.util.List<File> watchRoots = java.util.Arrays.asList(watchStubDir, classesDir);
+        phoneRootReachesHealth = reachesHealth(phoneRoots, prefix + request.getMainClass() + "Stub");
+        watchRootReachesHealth = reachesHealth(watchRoots,
+                prefix + WatchNativeBuilder.translationRoot(request.getMainClass()) + "Stub");
+        log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
+                + ", watch=" + watchRootReachesHealth);
+    }
+
     boolean phoneUsesHealthData(BuildRequest request) {
-        return usesHealthRead || usesHealthWrite || usesHealthWorkout
+        // The scan is app-wide; the entitlement is per target. A distinct watchMain means the flags
+        // can describe code only the WATCH contains, and entitling the phone for it fails release
+        // signing against an App ID with no HealthKit capability.
+        return ((usesHealthRead || usesHealthWrite || usesHealthWorkout) && phoneRootReachesHealth)
+                || healthCapabilityDeclared(request);
+    }
+
+    /// The same question for the watch bundle, answered against the watch translation root.
+    ///
+    /// SCANNED evidence only, deliberately. The ios.health.* capabilities and the
+    /// com.apple.developer.healthkit entitlement are statements about the iOS app -- they say
+    /// nothing about which lifecycle uses HealthKit -- and entitling a watch bundle on their
+    /// strength fails codesigning for an ordinary watch app whose App ID has no HealthKit
+    /// capability. A watch whose health access lives in native code, where the scan sees nothing,
+    /// declares it with watchNative.health, which settles the question before this is consulted.
+    boolean watchRootUsesHealthData(BuildRequest request) {
+        return (usesHealthRead || usesHealthWrite || usesHealthWorkout) && watchRootReachesHealth;
+    }
+
+    /// HealthKit asked for explicitly, by any of its spellings.
+    private boolean healthCapabilityDeclared(BuildRequest request) {
+        return
                 // The parent entitlement asked for outright. Enumerating only the two
                 // sub-capabilities missed the plainest declaration of all: a project with native
                 // health code that says com.apple.developer.healthkit=true and supplies its purpose
                 // string. The phone kept the entitlement it was handed and the watch, signed
                 // independently, went without it.
-                || "true".equalsIgnoreCase(request.getArg(
+                "true".equalsIgnoreCase(request.getArg(
                         "ios.entitlements.com.apple.developer.healthkit", "false"))
                 || healthCapabilityRequested(request, "ios.health.backgroundDelivery",
                         "background-delivery")
@@ -2448,6 +2642,11 @@ public class IPhoneBuilder extends Executor {
             try {
                 phoneStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, false);
                 watchStubDir = watchNativeBuilder.isolateStub(request, classesDir, tmpFile, true);
+                // Now that each root has a stub of its own, ask which of them actually reaches the
+                // health API. Must happen here: the entitlement decision runs long before the
+                // translator, whose trees would answer the same question, because the capability it
+                // injects has to be in the request by the time the Info.plist is generated.
+                resolveHealthUsagePerRoot(request, classesDir);
             } catch (IOException ex) {
                 throw new BuildException("Failed to separate the phone and watch entry points", ex);
             }

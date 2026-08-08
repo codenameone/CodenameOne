@@ -1068,7 +1068,8 @@ class WatchNativeBuilder {
         // touches HealthKit -- which then failed codesigning against an App ID without the
         // capability, with nothing in the output to say why. Same rule, same accessor, as the
         // BuildDaemon mirror: a cloud build and a local build must reach the same verdict.
-        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData(request));
+        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData(request),
+                owner.watchRootUsesHealthData(request));
         boolean workoutProcessing =
                 "true".equalsIgnoreCase(workoutProcessingHint);
         if (needsPurposeString(watchHealth, healthShare, healthUpdate,
@@ -1150,7 +1151,7 @@ class WatchNativeBuilder {
      * {@code watchNative.health.workoutProcessing} implies it: a workout
      * session is HealthKit.</p>
      */
-    boolean watchUsesHealth(boolean phoneUsesHealth) {
+    boolean watchUsesHealth(boolean phoneUsesHealth, boolean watchRootUsesHealth) {
         if ("true".equalsIgnoreCase(healthHint)) {
             return true;
         }
@@ -1160,7 +1161,15 @@ class WatchNativeBuilder {
         if ("true".equalsIgnoreCase(workoutProcessingHint)) {
             return true;
         }
-        return phoneUsesHealth && !distinctWatchMain;
+        // Inherited when the two lifecycles are the same code. When they are not, the answer is
+        // whether the WATCH root reaches the health API -- which is the question the phone's flat
+        // scan cannot answer. Refusing outright, as this used to, left a watch app whose own code
+        // calls HealthKit unentitled and its authorization request refused, unless the project
+        // happened to set watchNative.health.
+        if (!distinctWatchMain) {
+            return phoneUsesHealth;
+        }
+        return watchRootUsesHealth;
     }
 
     /**
@@ -1258,7 +1267,7 @@ class WatchNativeBuilder {
         // description supplied through ios.plistInject produced a bundle that declared HealthKit
         // and was signed without the entitlement, so authorization failed on device.
         boolean phoneUsesHealth = owner.phoneUsesHealthData(request);
-        if (!watchUsesHealth(phoneUsesHealth)) {
+        if (!watchUsesHealth(phoneUsesHealth, owner.watchRootUsesHealthData(request))) {
             return "";
         }
         return "  bs['CODE_SIGN_ENTITLEMENTS'] = '"
