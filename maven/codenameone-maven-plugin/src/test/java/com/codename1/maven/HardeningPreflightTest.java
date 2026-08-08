@@ -144,4 +144,36 @@ public class HardeningPreflightTest {
         assertFalse(CN1BuildMojo.hardeningReducesToOff(new java.util.Properties(), "standard"));
         assertFalse(CN1BuildMojo.hardeningReducesToOff(allOff, "off"));
     }
+
+    @Test
+    public void controlFlowOnlyReducesToOffOnParparVMTargets() {
+        // aggressive with rename+strings off leaves only control flow, which the engine SKIPS on the
+        // ParparVM native ports. So on iOS this reduces to off (must not be rejected), while on a
+        // JVM-bytecode target (JavaSE/Android) control flow really runs and it does NOT reduce to off.
+        java.util.Properties cfOnly = new java.util.Properties();
+        cfOnly.setProperty("codename1.arg.harden.rename", "false");
+        cfOnly.setProperty("codename1.arg.harden.strings", "off");
+        // controlFlow unset -> on by default at aggressive.
+        assertTrue(CN1BuildMojo.hardeningReducesToOff(cfOnly, "aggressive", "ios"),
+                "control flow is skipped on iOS, so nothing runs");
+        assertTrue(CN1BuildMojo.hardeningReducesToOff(cfOnly, "aggressive", "win"));
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(cfOnly, "aggressive", "javase"),
+                "control flow really runs on JavaSE");
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(cfOnly, "aggressive", "and"),
+                "control flow really runs on Android");
+    }
+
+    @Test
+    public void stringOnlyReducesToOffOnJavaScript() {
+        // standard with rename+controlFlow off leaves only string encryption, which the engine SKIPS on
+        // JavaScript (the native bridge). So on JS this reduces to off, but on iOS strings really run.
+        java.util.Properties strOnly = new java.util.Properties();
+        strOnly.setProperty("codename1.arg.harden.rename", "false");
+        strOnly.setProperty("codename1.arg.harden.controlFlow", "false");
+        // strings unset -> constant-string encryption on by default at standard.
+        assertTrue(CN1BuildMojo.hardeningReducesToOff(strOnly, "standard", "javascript"),
+                "string encryption is skipped on JavaScript, so nothing runs");
+        assertFalse(CN1BuildMojo.hardeningReducesToOff(strOnly, "standard", "ios"),
+                "string encryption really runs on iOS");
+    }
 }

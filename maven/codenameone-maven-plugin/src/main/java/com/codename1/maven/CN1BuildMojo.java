@@ -224,7 +224,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // overrides to the effective transform set so such a build is not rejected on a local/source
         // or on-device-debug target for a "hardening" it isn't actually asking for. An unknown level
         // is NOT reduced here -- it must reach the preflight so the invalid-level check rejects it.
-        if (hardeningReducesToOff(settings, level)) {
+        if (hardeningReducesToOff(settings, level, hardenPlatform)) {
             level = "off";
         }
         boolean allowLocal = "true".equalsIgnoreCase(
@@ -313,10 +313,25 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * cloud build be submitted for the forked engine to reject later.
      */
     static boolean hardeningReducesToOff(Properties settings, String level) {
-        return hardenLevelRank(level) >= 1 && !hardeningRequestsAnyTransform(settings, level);
+        return hardeningReducesToOff(settings, level, null);
+    }
+
+    /**
+     * As {@link #hardeningReducesToOff(Properties, String)}, but taking the resolved hardening
+     * {@code platform} so a transform the engine SKIPS as unsafe on that target does not keep the level
+     * from reducing to off. Without this, a local iOS build with only control-flow left on (which the
+     * engine skips on the ParparVM native ports), or a JavaScript build with only string encryption left
+     * on (skipped on JS), would be rejected for a hardening it would never actually apply.
+     */
+    static boolean hardeningReducesToOff(Properties settings, String level, String platform) {
+        return hardenLevelRank(level) >= 1 && !hardeningRequestsAnyTransform(settings, level, platform);
     }
 
     static boolean hardeningRequestsAnyTransform(Properties settings, String level) {
+        return hardeningRequestsAnyTransform(settings, level, null);
+    }
+
+    static boolean hardeningRequestsAnyTransform(Properties settings, String level, String platform) {
         int rank = hardenLevelRank(level);
         if (rank <= 0) {
             return false;
@@ -325,13 +340,38 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // and constant-string encryption -- are on unless explicitly overridden off. Control-flow is a
         // default only from aggressive up.
         boolean atLeastAggressive = rank >= 2;
+        // Rename is delivered on every platform (by the engine, or by R8 on Android), so it always counts.
         boolean rename = hardenBoolTri(
                 settings.getProperty("codename1.arg.harden.rename"), true);
+        // String encryption and control-flow are subject to the engine's platform-safety rules: a
+        // transform the engine would skip on this target must not, on its own, keep the level from
+        // reducing to off. When the platform is unknown the safety checks pass (conservative -- the
+        // build is still preflighted rather than silently allowed).
         boolean stringsOn = hardenStringsRequested(
-                settings.getProperty("codename1.arg.harden.strings"), true);
+                settings.getProperty("codename1.arg.harden.strings"), true)
+                && stringEncryptionAppliesOn(platform);
         boolean controlFlow = hardenBoolTri(
-                settings.getProperty("codename1.arg.harden.controlFlow"), atLeastAggressive);
+                settings.getProperty("codename1.arg.harden.controlFlow"), atLeastAggressive)
+                && controlFlowAppliesOn(platform);
         return rename || stringsOn || controlFlow;
+    }
+
+    /** Engine rule: string encryption is skipped only on JavaScript (it would break the JS bridge). */
+    private static boolean stringEncryptionAppliesOn(String platform) {
+        return !"javascript".equals(platform);
+    }
+
+    /**
+     * Engine rule: control-flow obfuscation runs only on the JVM-bytecode ports (Android, JavaSE/
+     * desktop); it is skipped on the ParparVM native ports and JavaScript. An unknown platform is
+     * treated as applicable so an ambiguous build is preflighted rather than silently allowed.
+     */
+    private static boolean controlFlowAppliesOn(String platform) {
+        if (platform == null) {
+            return true;
+        }
+        return "and".equals(platform) || "android".equals(platform)
+                || "javase".equals(platform) || "desktop".equals(platform);
     }
 
     /** off/empty/unknown = 0, standard = 1, aggressive = 2, paranoid = 3. */
