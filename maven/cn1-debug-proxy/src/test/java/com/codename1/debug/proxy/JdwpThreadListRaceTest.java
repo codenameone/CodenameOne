@@ -103,6 +103,37 @@ public class JdwpThreadListRaceTest {
         }
     }
 
+    /**
+     * A device that never answers the enumeration still lists the threads
+     * events have revealed — an older build whose runtime does not send
+     * {@code EVT_THREAD_LIST}.
+     *
+     * <p>Characterisation, not a regression test: it passes whether or not
+     * {@code refreshed} distinguishes "a snapshot arrived" from "the request is
+     * no longer outstanding". The fallback it guards cannot currently
+     * contribute an id, because {@code knownThreads} only ever gains one
+     * alongside {@code deviceThreads} and is pruned to a subset of it on every
+     * snapshot. The distinction is still worth drawing — the flag otherwise
+     * reports a silent device as a successful refresh — but nothing observable
+     * turns on it until that invariant changes, and this test is here to catch
+     * the day a timeout starts clearing the thread map instead.</p>
+     */
+    @Test
+    public void aDeviceThatNeverAnswersFallsBackToThreadsSeenInEvents() throws Exception {
+        try (Fixture f = new Fixture(false, true)) {
+            // Primed here rather than awaited from the device: this device is
+            // deliberately unresponsive, and the breakpoint below needs them.
+            f.server.onSymbols(SymbolTable.load(new java.io.ByteArrayInputStream(
+                    TABLE.getBytes(StandardCharsets.UTF_8))));
+            f.server.onBreakpointHit(LATE_STOPPER, 0, 12);
+
+            List<Long> threads = f.allThreads();
+
+            assertTrue("the thread an event revealed should still be listed: " + threads,
+                    threads.contains(LATE_STOPPER));
+        }
+    }
+
     // ---- fixture -----------------------------------------------------------
 
     private final class Fixture implements AutoCloseable {
@@ -111,6 +142,10 @@ public class JdwpThreadListRaceTest {
         private final RacingDevice device;
 
         Fixture(boolean stopDuringRequest) throws Exception {
+            this(stopDuringRequest, false);
+        }
+
+        Fixture(boolean stopDuringRequest, boolean silent) throws Exception {
             int jdwpPort = JdwpTestClient.freePort();
             int devicePort = JdwpTestClient.freePort();
             server = new JdwpServer(jdwpPort, devicePort);
@@ -123,7 +158,7 @@ public class JdwpThreadListRaceTest {
             serving.setDaemon(true);
             serving.start();
 
-            device = new RacingDevice(devicePort, server, stopDuringRequest);
+            device = new RacingDevice(devicePort, server, stopDuringRequest, silent);
             client = JdwpTestClient.attach(server, jdwpPort);
             device.connect();
             device.awaitHello();
@@ -157,6 +192,8 @@ public class JdwpThreadListRaceTest {
     private static final class RacingDevice {
         private final JdwpServer server;
         private final boolean stopDuringRequest;
+        /** Never answers CMD_GET_THREADS, like a runtime that predates it. */
+        private final boolean silent;
         private final Socket socket;
         private final DataInputStream in;
         private final DataOutputStream out;
@@ -165,9 +202,11 @@ public class JdwpThreadListRaceTest {
         private volatile boolean helloDone;
         private volatile boolean running = true;
 
-        RacingDevice(int devicePort, JdwpServer server, boolean stopDuringRequest) throws Exception {
+        RacingDevice(int devicePort, JdwpServer server, boolean stopDuringRequest,
+                     boolean silent) throws Exception {
             this.server = server;
             this.stopDuringRequest = stopDuringRequest;
+            this.silent = silent;
             Socket connected = null;
             for (int i = 0; i < 100 && connected == null; i++) {
                 try {
@@ -227,6 +266,7 @@ public class JdwpThreadListRaceTest {
                     return;
                 }
                 case WireProtocol.CMD_GET_THREADS: {
+                    if (silent) return;   // an older runtime simply ignores it
                     if (stopDuringRequest) {
                         // The stop reaches the proxy before the list it raced.
                         server.onBreakpointHit(LATE_STOPPER, 0, 12);

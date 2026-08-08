@@ -24,6 +24,10 @@ package com.codename1.debug.proxy;
 
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.nio.charset.StandardCharsets;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -95,6 +99,53 @@ public class JdwpThreadIdNamespaceTest {
                     JdwpTestClient.toJdwpThread(tid) > ceiling);
         }
     }
+
+    /**
+     * Every thread ID the IDE is handed carries the tag, including the ones
+     * that are placeholders rather than real threads.
+     *
+     * <p>VM_START and a replayed CLASS_PREPARE both name a thread the proxy
+     * has to invent, and both wrote it raw. That is the same defect the
+     * namespace exists to prevent, twice: the ID decodes to a different device
+     * thread on the way back — raw 1 to thread 0 — and a small raw value is
+     * indistinguishable from a tagged int.</p>
+     */
+    @Test
+    public void eventsNamingAPlaceholderThreadStillTagIt() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            server.onSymbols(SymbolTable.load(new ByteArrayInputStream(
+                    TABLE.getBytes(StandardCharsets.UTF_8))));
+            server.onHello(1);
+
+            // A ClassPrepare request replays the already-loaded classes.
+            client.send(JdwpTestClient.CS_EVENT_REQUEST, 1,
+                    JdwpTestClient.classPrepareRequest(0, new String[0], new String[0]));
+
+            boolean sawVmStart = false;
+            boolean sawClassPrepare = false;
+            for (JdwpTestClient.Event e : client.drainEvents()) {
+                if (e.eventKind != 90 && e.eventKind != 8) continue;
+                long threadId = new DataInputStream(
+                        new ByteArrayInputStream(e.rest)).readLong();
+                assertTrue("event kind " + e.eventKind + " must carry a tagged thread id,"
+                                + " got 0x" + Long.toHexString(threadId),
+                        (threadId & JdwpTestClient.THREAD_ID_TAG) != 0);
+                assertEquals("and it must be even, like every thread id",
+                        0, threadId & 1);
+                if (e.eventKind == 90) sawVmStart = true;
+                if (e.eventKind == 8) sawClassPrepare = true;
+            }
+            assertTrue("expected a VM_START", sawVmStart);
+            assertTrue("expected a replayed CLASS_PREPARE", sawClassPrepare);
+        }
+    }
+
+    private static final String TABLE =
+            "version\t1\n"
+          + "class\t0\tcom_example_Main\tMain.java\t-1\tcom/example/Main\n"
+          + "method\t0\t0\thandler\t()V\t0\n";
 
     /** ParparVM's tagged encoding of an int. */
     private static long taggedInt(int value) {

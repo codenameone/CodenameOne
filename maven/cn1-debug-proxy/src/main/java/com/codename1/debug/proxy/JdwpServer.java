@@ -540,7 +540,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             b.writeInt(1);
             b.writeByte(EK_VM_START);
             b.writeInt(0);     // requestID 0 = auto-generated
-            b.writeLong(1);    // dummy thread id; jdb tolerates this
+            // Through the thread namespace like every other thread ID the IDE
+            // is given. Written raw, it would decode to a different thread on
+            // the way back -- and a raw small value is exactly what a tagged
+            // int looks like.
+            b.writeLong(toJdwpThread(1));  // placeholder thread; jdb tolerates it
             writeEventCommand(b.bytes());
         } catch (IOException e) {
             System.err.println("[jdwp] failed to send VM_START: " + e.getMessage());
@@ -1267,6 +1271,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private int abandonedSnapshots;
 
     /**
+     * Whether the request now being waited on produced a snapshot. Distinct
+     * from {@link #pendingThreads}, which is also cleared when the wait is
+     * abandoned. Guarded by {@link #threadsLock}.
+     */
+    private boolean threadsDelivered;
+
+    /**
      * Epoch at which the thread-list request now in flight was sent, or
      * {@code MAX_VALUE} when none is. With no request outstanding there is
      * nothing for a snapshot to be stale relative to, so it is taken as
@@ -1731,7 +1742,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 b.writeInt(1);
                 b.writeByte(EK_CLASS_PREPARE);
                 b.writeInt(cpr.requestId);
-                b.writeLong(lastSuspendedThread != 0 ? lastSuspendedThread : 1L);
+                // Tagged like every other thread ID leaving the proxy. A raw
+                // value here decoded to a different device thread on the way
+                // back -- raw 1 to thread 0 -- and could collide with a tagged
+                // int besides.
+                b.writeLong(toJdwpThread(lastSuspendedThread != 0 ? lastSuspendedThread : 1L));
                 b.writeByte(TYPE_TAG_CLASS);
                 b.writeLong(toJdwpRef(c.classId));
                 b.writeString(c.jvmSignature());
@@ -2077,6 +2092,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         if (device != null && deviceHelloReceived) {
             synchronized (threadsLock) {
                 pendingThreads = true;
+                threadsDelivered = false;
                 threadsRequestedAt = threadEpoch.incrementAndGet();
                 try {
                     device.getThreads();
@@ -2097,8 +2113,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 } catch (IOException io) {
                     pendingThreads = false;
                 }
-                // The reply landed, so deviceThreads is the whole truth.
-                refreshed = !pendingThreads;
+                // Whether a snapshot actually arrived, which is not the same as
+                // the request no longer being outstanding: a timeout and a send
+                // failure both clear that flag while leaving deviceThreads
+                // untouched. Reading the flag meant a device that never answers
+                // -- an older build with no EVT_THREAD_LIST -- looked like a
+                // successful refresh, so the fallback below was skipped and
+                // AllThreads dropped the threads events had already found.
+                refreshed = threadsDelivered;
             }
         }
         List<Long> ids = new ArrayList<>(deviceThreads.keySet());
@@ -2362,6 +2384,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             knownThreads.retainAll(deviceThreads.keySet());
         }
         synchronized (threadsLock) {
+            threadsDelivered = true;
             pendingThreads = false;
             threadsLock.notifyAll();
         }
