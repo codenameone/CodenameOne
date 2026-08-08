@@ -922,7 +922,7 @@ public final class StringEncryptTransform {
         if (cn.fields != null) {
             for (FieldNode fn : cn.fields) {
                 if ((fn.access & Opcodes.ACC_STATIC) != 0 && fn.value instanceof String
-                        && shouldEncrypt((String) fn.value)) {
+                        && shouldEncryptLiteral((String) fn.value)) {
                     out.add((String) fn.value);
                 }
             }
@@ -1102,7 +1102,11 @@ public final class StringEncryptTransform {
         java.util.List<FieldNode> toStrip = new java.util.ArrayList<FieldNode>();
         for (FieldNode fn : cn.fields) {
             boolean isStatic = (fn.access & Opcodes.ACC_STATIC) != 0;
-            if (isStatic && fn.value instanceof String && shouldEncrypt((String) fn.value)) {
+            // shouldEncryptLiteral, not shouldEncrypt: a value excluded jar-wide (some method could not
+            // grow to encrypt it) or shared with an unhardened library must stay plaintext HERE too, or a
+            // GETSTATIC read of this decoded+interned field would compare != to the excluded plaintext
+            // literal on ParparVM, breaking Java's literal identity guarantee.
+            if (isStatic && fn.value instanceof String && shouldEncryptLiteral((String) fn.value)) {
                 if (sourceReferencedNames != null && sourceReferencedNames.contains(fn.name)) {
                     // A carried .java/.kt source may use this constant in a constant-expression context
                     // (a case label, an annotation value, another constant's initializer). Stripping its

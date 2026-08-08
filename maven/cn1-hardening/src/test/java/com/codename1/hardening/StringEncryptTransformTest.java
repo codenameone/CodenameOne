@@ -353,6 +353,35 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void jarExcludedValueStaysPlaintextInAStaticFinalField() throws Exception {
+        // A value excluded jar-wide (a method elsewhere could not grow to encrypt it) must stay plaintext
+        // in the static-final field that declares it, or a GETSTATIC read of that decoded+interned field
+        // would compare != to the excluded plaintext literal on ParparVM. The static-field path must honor
+        // jarExcluded exactly like the method-literal path.
+        String excluded = "a jar-wide excluded constant that must remain plaintext everywhere";
+        String other = "an unrelated constant that is still encrypted here";
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Const", null, "java/lang/Object", null);
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "K", "Ljava/lang/String;", null, excluded).visitEnd();
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "K2", "Ljava/lang/String;", null, other).visitEnd();
+        w.visitEnd();
+
+        java.util.Set<String> jarExcluded = new java.util.HashSet<String>();
+        jarExcluded.add(excluded);
+        StringEncryptTransform t = new StringEncryptTransform(true, 3, null, null, jarExcluded);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+        assertTrue("the jar-excluded constant keeps its plaintext ConstantValue",
+                StringEncryptTransform.containsStringLiteral(out, excluded));
+        assertFalse("a non-excluded constant is still encrypted",
+                StringEncryptTransform.containsStringLiteral(out, other));
+    }
+
+    @Test
     public void shortLiteralsAreLeftPlaintextAndDisclosed() throws Exception {
         // One- and two-character literals are not worth the decoder overhead; in strings:all they stay
         // plaintext but must be counted (distinctly) so the coverage claim does not silently omit them.
