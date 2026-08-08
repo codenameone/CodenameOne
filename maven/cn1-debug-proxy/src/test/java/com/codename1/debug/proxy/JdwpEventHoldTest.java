@@ -118,6 +118,35 @@ public class JdwpEventHoldTest {
         }
     }
 
+    /**
+     * A hold does not outlive the session that asked for it.
+     *
+     * <p>An IDE that detaches between {@code HoldEvents} and
+     * {@code ReleaseEvents} left the hold in place, so the next attach queued
+     * its own VM_START instead of sending it — and a later release delivered
+     * events carrying the previous IDE's request ids to a debugger that never
+     * asked for them.</p>
+     */
+    @Test
+    public void aHoldDoesNotSurviveTheSessionThatSetIt() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient first = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            first.send(JdwpTestClient.CS_VIRTUAL_MACHINE, VM_HOLD_EVENTS, new byte[0]);
+            server.onVmDeath();   // queued behind the hold
+        }
+
+        try (JdwpTestClient second = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            server.onVmDeath();
+
+            List<JdwpTestClient.Event> events = second.drainEvents();
+            assertTrue("the new session's events should not be held",
+                    countVmDeaths(events) > 0);
+        }
+    }
+
     private int countVmDeaths(List<JdwpTestClient.Event> events) {
         int count = 0;
         for (JdwpTestClient.Event e : events) {

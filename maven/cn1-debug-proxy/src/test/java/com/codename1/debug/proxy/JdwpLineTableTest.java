@@ -205,6 +205,54 @@ public class JdwpLineTableTest {
         }
     }
 
+    /**
+     * An array reference type's signature starts with {@code [}.
+     *
+     * <p>The device reports an array by naming its component class and setting
+     * a flag, so the array and its component shared one reference-type ID and
+     * the array answered with the component's own signature. A debugger reads
+     * the component type back out by removing the leading character, so the
+     * missing {@code [} is not merely a wrong label: jdb strips the first
+     * character regardless and parses the rest, which is how printing an array
+     * local ended in {@code Invalid JNI signature character 'j'} — the 'j' of
+     * "java/lang/..." after the 'L' had been eaten.</p>
+     */
+    @Test
+    public void anArrayTypeReportsAnArraySignature() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+
+            String plain = signatureOf(client, refTypeOf(0, false));
+            String array = signatureOf(client, refTypeOf(0, true));
+
+            assertEquals("Lcom/example/Main;", plain);
+            assertEquals("[Lcom/example/Main;", array);
+            assertEquals("the component type is what remains after the '['",
+                    plain, array.substring(1));
+        }
+    }
+
+    /** Reference-type id for a class, as an array type or as itself. */
+    private long refTypeOf(int classId, boolean array) {
+        long ref = classId + 1L;
+        return array ? (0x2000000000000000L | ref) : ref;
+    }
+
+    private String signatureOf(JdwpTestClient client, long refType) throws Exception {
+        byte[] payload = new byte[8];
+        for (int i = 0; i < 8; i++) {
+            payload[7 - i] = (byte) (refType >>> (8 * i));
+        }
+        JdwpTestClient.Reply reply = client.send(2 /* ReferenceType */, 1 /* Signature */, payload);
+        assertEquals(0, reply.errorCode);
+        DataInputStream body = reply.stream();
+        byte[] utf8 = new byte[body.readInt()];
+        body.readFully(utf8);
+        return new String(utf8, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     /** Runs Method.LineTable for a method and returns the raw reply. */

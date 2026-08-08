@@ -320,6 +320,19 @@ class DebuggerObjectValidationTest {
         assertEquals("kept", probe("REFRESH_DESCENDANT_KEPT"));
     }
 
+    /**
+     * An object reached through two threads survives while either still is.
+     *
+     * <p>Recording only the most recent parent meant the second expansion
+     * overwrote the first, so when that thread went away the id went with it —
+     * while the IDE was still showing the same id under the thread that
+     * remained.</p>
+     */
+    @Test
+    void aDescendantSharedByTwoThreadsSurvivesWhileEitherDoes() throws Exception {
+        assertEquals("kept", probe("REFRESH_SHARED_DESCENDANT"));
+    }
+
     /** Reached transitively: a field of a field is no less reachable. */
     @Test
     void aRefreshKeepsDescendantsSeveralHopsDown() throws Exception {
@@ -521,6 +534,23 @@ class DebuggerObjectValidationTest {
             "        JAVA_OBJECT probe =\n" +
             "            strcmp(which, \"REFRESH_DESCENDANT_DEEP\") == 0 ? grandchild : child;\n" +
             "        printf(\"%s\\n\", cn1_debugger_was_issued(probe) ? \"kept\" : \"gone\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"REFRESH_SHARED_DESCENDANT\") == 0) {\n" +
+            "        /* One object reached through two threads' graphs; only\n" +
+            "         * one of those threads is still advertised afterwards. */\n" +
+            "        JAVA_OBJECT threadA = (JAVA_OBJECT)(uintptr_t)0x14000;\n" +
+            "        JAVA_OBJECT threadB = (JAVA_OBJECT)(uintptr_t)0x14008;\n" +
+            "        JAVA_OBJECT shared = (JAVA_OBJECT)(uintptr_t)0x14010;\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        cn1_debugger_note_issued(threadA);\n" +
+            "        cn1_debugger_note_issued(threadB);\n" +
+            "        cn1_debugger_end_thread_list();\n" +
+            "        cn1_debugger_note_issued_inheriting(shared, threadA);\n" +
+            "        cn1_debugger_note_issued_inheriting(shared, threadB);\n" +
+            "        cn1_debugger_begin_thread_list();\n" +
+            "        cn1_debugger_note_issued(threadA);   /* B is gone */\n" +
+            "        cn1_debugger_end_thread_list();\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(shared) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"DERIVED_INHERITS_ALL_OWNERS\") == 0) {\n" +
             "        /* A parent both parked threads expose, and a child reached\n" +

@@ -324,6 +324,26 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      */
     private static final long THREAD_ID_TAG = 0x4000000000000000L;
 
+    /*
+     * Array reference types get their own IDs, carrying the component class.
+     * The device reports an array by naming its component class and setting a
+     * flag, so without this an array and its component type shared one ID --
+     * and the type the IDE was told was an array then answered with the
+     * component's own signature. A debugger derives the component type by
+     * removing the leading '[', so a signature without one is not merely
+     * wrong: jdb strips the first character regardless and parses the rest,
+     * failing with "Invalid JNI signature character" on whatever it finds.
+     */
+    private static final long ARRAY_REF_TAG = 0x2000000000000000L;
+
+    private static boolean isArrayRef(long jdwpId) {
+        return (jdwpId & ARRAY_REF_TAG) != 0;
+    }
+
+    private static long toJdwpArrayRef(int componentClassId) {
+        return ARRAY_REF_TAG | toJdwpRef(componentClassId);
+    }
+
     private static boolean isThreadId(long jdwpId) {
         return (jdwpId & THREAD_ID_TAG) != 0;
     }
@@ -490,6 +510,15 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         // only log failures.
         classPrepareRequests.clear();
         vmDeathRequests.clear();
+        // Anything the last IDE held goes with it. A session that detached
+        // between HoldEvents and ReleaseEvents would otherwise leave the hold
+        // in place, so the next attach queued its own VM_START instead of
+        // sending it, and a later release delivered events carrying the
+        // previous IDE's request ids.
+        synchronized (writeLock) {
+            eventsHeld = false;
+            heldEvents.clear();
+        }
         // Re-arm VM_START for the next attach.
         vmStartSent = false;
         // Breakpoints stay in bpRequests so the device keeps them set; the
@@ -843,13 +872,26 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     // -------- ReferenceType -------------------------------------------------
 
+    /**
+     * The JVM signature to report for a reference type, array or not.
+     *
+     * <p>An array's is its component's with a {@code [} in front, which is
+     * also how a debugger reads the component back out of it.</p>
+     */
+    private static String signatureOf(SymbolTable.ClassInfo c, boolean array) {
+        String component = c != null ? c.jvmSignature() : "Ljava/lang/Object;";
+        return array ? "[" + component : component;
+    }
+
     private void handleRefType(int id, int cmd, byte[] p) throws IOException {
         long typeID = readLong(p, 0);
-        SymbolTable.ClassInfo c = symbols.classById(fromJdwpRef(typeID));
+        boolean array = isArrayRef(typeID);
+        SymbolTable.ClassInfo c =
+                symbols.classById(fromJdwpRef(typeID & ~ARRAY_REF_TAG));
         switch (cmd) {
             case 1: { // Signature
                 Buf b = new Buf();
-                b.writeString(c != null ? c.jvmSignature() : "Ljava/lang/Object;");
+                b.writeString(signatureOf(c, array));
                 writeReply(id, 0, b.bytes());
                 return;
             }
@@ -871,7 +913,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 // of showing it, taking the rest of that locals listing with
                 // it.
                 Buf b = new Buf();
-                b.writeString(c != null ? c.jvmSignature() : "Ljava/lang/Object;");
+                b.writeString(signatureOf(c, array));
                 b.writeString("");
                 writeReply(id, 0, b.bytes());
                 return;
@@ -1216,6 +1258,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      * can be ordered against each other.
      */
     private final AtomicLong threadEpoch = new AtomicLong();
+
+    /**
+     * Thread-list replies still owed by requests nobody waits for any more.
+     * Each is discarded on arrival rather than mistaken for the answer to a
+     * later request. Guarded by {@link #threadsLock}.
+     */
+    private int abandonedSnapshots;
 
     /**
      * Epoch at which the thread-list request now in flight was sent, or
@@ -1742,7 +1791,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     b.writeLong(0);
                 } else {
                     b.writeByte(isArr ? TYPE_TAG_ARRAY : TYPE_TAG_CLASS);
-                    b.writeLong(toJdwpRef(classId));
+                    b.writeLong(isArr ? toJdwpArrayRef(classId) : toJdwpRef(classId));
                 }
                 writeReply(id, 0, b.bytes());
                 return;
@@ -2036,6 +2085,15 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                         try { threadsLock.wait(deadline - System.currentTimeMillis()); }
                         catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
                     }
+                    if (pendingThreads) {
+                        // Gave up waiting. The device may still answer, and that
+                        // answer describes this request, not whichever one comes
+                        // next -- applying it there would judge a stop against
+                        // the wrong request and rebuild from a list older than
+                        // the one asked for. Counted so it can be discarded.
+                        abandonedSnapshots++;
+                        pendingThreads = false;
+                    }
                 } catch (IOException io) {
                     pendingThreads = false;
                 }
@@ -2246,6 +2304,16 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     }
 
     @Override public void onThreads(long[] threadIds, boolean[] suspended, long[] threadObjects) {
+        synchronized (threadsLock) {
+            if (abandonedSnapshots > 0) {
+                // Answer to a request that timed out. It describes the thread
+                // list as of that request, so applying it to a later one would
+                // judge suspensions against the wrong epoch and rebuild from a
+                // list older than the one actually asked for.
+                abandonedSnapshots--;
+                return;
+            }
+        }
         // Rebuild rather than merge: a thread absent from the device's list has
         // died, and keeping it would leave a phantom row in the IDE.
         // A snapshot can be sampled just before a thread stops and arrive just

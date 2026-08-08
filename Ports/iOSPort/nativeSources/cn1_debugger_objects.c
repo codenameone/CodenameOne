@@ -238,13 +238,27 @@ struct issued_entry {
      */
     unsigned int listGen;
     /*
-     * The reference this one was reached through, if any -- the Thread object
-     * whose field the IDE expanded, say. A descendant carries no owner of its
-     * own and no claim of its own, so without this link a thread-list refresh
+     * The references this one was reached through -- the Thread object whose
+     * field the IDE expanded, say. A descendant carries no owner of its own
+     * and no claim of its own, so without these links a thread-list refresh
      * would drop it even though the object it hangs off is still live and
      * still claimed, and every later request naming it would be rejected.
+     *
+     * A set, for the same reason the owners are: the same object can be
+     * reached through two different threads' graphs. Keeping only the most
+     * recent parent meant that when that one went away the child went with
+     * it, while the IDE was still displaying the same id under the thread
+     * that remained.
      */
-    uintptr_t parent;
+    uintptr_t parents[CN1_ISSUED_MAX_OWNERS];
+    unsigned char parentCount;
+    /*
+     * Set when more parents appeared than there are slots. Such an entry is
+     * kept while any thread-list generation is current, since we can no longer
+     * prove which graph reaches it -- keeping a root too long costs memory,
+     * dropping one frees an object an id still names.
+     */
+    unsigned char parentOverflow;
     /* Scratch for the reachability sweep in end_thread_list. */
     unsigned char survives;
     /*
@@ -288,6 +302,19 @@ static void entry_add_owner(struct issued_entry* e, int64_t owner) {
         e->owners[e->ownerCount++] = owner;
     } else {
         e->ownerOverflow = 1;
+    }
+}
+
+/* Adds a parent to an entry, ignoring duplicates. */
+static void entry_add_parent(struct issued_entry* e, uintptr_t parent) {
+    if (parent == 0) return;
+    for (unsigned i = 0; i < e->parentCount; i++) {
+        if (e->parents[i] == parent) return;
+    }
+    if (e->parentCount < CN1_ISSUED_MAX_OWNERS) {
+        e->parents[e->parentCount++] = parent;
+    } else {
+        e->parentOverflow = 1;
     }
 }
 
@@ -386,7 +413,7 @@ int cn1_debugger_note_issued_inheriting(JAVA_OBJECT obj, JAVA_OBJECT parent) {
                     entry_add_owner(e, from->owners[i]);
                 }
                 if (from->listGen > e->listGen) e->listGen = from->listGen;
-                e->parent = (uintptr_t)parent;
+                entry_add_parent(e, (uintptr_t)parent);
                 if (from->ownerOverflow) e->ownerOverflow = 1;
             }
         } else {
@@ -509,11 +536,21 @@ void cn1_debugger_end_thread_list(void) {
             changed = 0;
             for (unsigned i = 0; i < cap; i++) {
                 struct issued_entry* e = &g_issued[i];
-                if (e->key == 0 || e->survives || e->parent == 0) continue;
-                struct issued_entry* parent = issued_find(e->parent);
-                if (parent != NULL && parent->survives) {
+                if (e->key == 0 || e->survives) continue;
+                if (e->parentOverflow) {
+                    /* Too many graphs reached it to say which; assume one of
+                     * them still does rather than reject an id in use. */
                     e->survives = 1;
                     changed = 1;
+                    continue;
+                }
+                for (unsigned j = 0; j < e->parentCount; j++) {
+                    struct issued_entry* parent = issued_find(e->parents[j]);
+                    if (parent != NULL && parent->survives) {
+                        e->survives = 1;
+                        changed = 1;
+                        break;
+                    }
                 }
             }
         }
