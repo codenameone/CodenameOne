@@ -134,6 +134,8 @@ public final class StringEncryptTransform {
     private int clinitFullLiteralCount;
     private int methodFullLiteralCount;
     private int annotationLiteralCount;
+    private int indyLiteralCount;
+    private int shortLiteralCount;
     /** The input class's constant-pool item count, so hoisting can stay under the 65535-entry limit. */
     private int poolBaseItems;
     /**
@@ -310,6 +312,28 @@ public final class StringEncryptTransform {
      * {@code LDC "..."} nor in a field {@code ConstantValue}, and the condy is resolved at link time, so
      * rewriting it to a decode call is unsafe. Counted and reported rather than shipped unremarked.
      */
+    /**
+     * The number of {@code invokedynamic} sites -- other than the {@code StringConcatFactory} concat
+     * recipes counted by {@link #getConcatLiteralCount()} -- whose bootstrap arguments carry a plaintext
+     * String (directly or through a nested constant-dynamic). A custom {@code invokedynamic} emitted by a
+     * bytecode generator can hold a literal in its bootstrap arguments that no {@code LDC}/
+     * {@code ConstantValue} pass reaches, so it stays readable; reported so an {@code strings:all} build
+     * is not believed to have encrypted every string.
+     */
+    public int getIndyLiteralCount() {
+        return indyLiteralCount;
+    }
+
+    /**
+     * The number of distinct one- and two-character string literals the current mode would have
+     * encrypted but left plaintext because they are too short to be worth the decoder overhead. A
+     * two-character value is trivially brute-forced even when encrypted, so this is a disclosure note
+     * (the {@code strings:all} claim does not silently omit them), not a correctness risk.
+     */
+    public int getShortLiteralCount() {
+        return shortLiteralCount;
+    }
+
     public int getCondyLiteralCount() {
         return condyLiteralCount;
     }
@@ -392,7 +416,9 @@ public final class StringEncryptTransform {
         // silently shipped.
         concatLiteralCount += countConcatLiterals(cn);
         condyLiteralCount += countCondyLiterals(cn);
+        indyLiteralCount += countIndyLiterals(cn);
         annotationLiteralCount += countAnnotationStrings(cn);
+        shortLiteralCount += countShortLiterals(cn);
         // Count the distinct literals that would be encrypted but are too large to (their ciphertext
         // could overflow the constant pool), so the engine can report the exclusion rather than let an
         // strings:all build claim it encrypted everything.
@@ -614,6 +640,91 @@ public final class StringEncryptTransform {
             }
         }
         return count;
+    }
+
+    /**
+     * Counts the {@code invokedynamic} sites in {@code cn} that carry a plaintext String in their
+     * bootstrap arguments and are NOT the {@code StringConcatFactory.makeConcatWithConstants} concat
+     * recipes already tallied by {@link #countConcatLiterals(ClassNode)} (skipped here to avoid
+     * double-counting). A custom {@code invokedynamic} from a bytecode generator can hold a literal --
+     * directly or in a nested constant-dynamic argument -- that no {@code LDC}/{@code ConstantValue} pass
+     * reaches. Counts the site once when any bootstrap argument bears a String.
+     */
+    private static int countIndyLiterals(ClassNode cn) {
+        if (cn.methods == null) {
+            return 0;
+        }
+        int count = 0;
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null) {
+                continue;
+            }
+            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                if (!(insn instanceof InvokeDynamicInsnNode)) {
+                    continue;
+                }
+                InvokeDynamicInsnNode indy = (InvokeDynamicInsnNode) insn;
+                Handle bsm = indy.bsm;
+                if (bsm != null
+                        && "java/lang/invoke/StringConcatFactory".equals(bsm.getOwner())
+                        && "makeConcatWithConstants".equals(bsm.getName())) {
+                    continue;
+                }
+                if (indyBsmArgsHaveString(indy.bsmArgs)) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    /** True when any bootstrap argument is a String, or a constant-dynamic that (nested) carries one. */
+    private static boolean indyBsmArgsHaveString(Object[] bsmArgs) {
+        if (bsmArgs == null) {
+            return false;
+        }
+        for (Object arg : bsmArgs) {
+            if (arg instanceof String) {
+                return true;
+            }
+            if (arg instanceof ConstantDynamic && condyHasStringArgument((ConstantDynamic) arg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Counts the distinct one- and two-character string literals in {@code cn} that the current mode
+     * would encrypt (every {@code LDC} in "all" mode; a declared constant in "constants" mode) but
+     * {@link #shouldEncrypt(String)} leaves plaintext because they are too short to be worth the decoder
+     * overhead. Empty strings carry no information and are not counted; reported so the coverage claim
+     * discloses the short-literal exclusion rather than silently omitting it.
+     */
+    private int countShortLiterals(ClassNode cn) {
+        if (cn.methods == null) {
+            return 0;
+        }
+        java.util.Set<String> found = new java.util.HashSet<String>();
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null) {
+                continue;
+            }
+            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
+                    String v = (String) ((LdcInsnNode) insn).cst;
+                    if (v.length() >= 1 && v.length() <= 2 && wouldSelectButForLength(v)) {
+                        found.add(v);
+                    }
+                }
+            }
+        }
+        return found.size();
+    }
+
+    /** True when a value would be an encryption candidate in the current mode if it were long enough. */
+    private boolean wouldSelectButForLength(String v) {
+        return encryptAllStrings || (constantValues != null && constantValues.contains(v));
     }
 
     /** True when a constant-dynamic carries a String among its bootstrap arguments, nested ones too. */

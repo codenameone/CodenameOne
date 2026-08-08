@@ -186,6 +186,8 @@ public final class HardeningEngine {
         int legacyInterfaceConstants = 0;
         int oversizedLiterals = 0;
         int condyLiterals = 0;
+        int indyLiterals = 0;
+        int shortLiterals = 0;
         int clinitFullLiterals = 0;
         int annotationLiterals = 0;
         int jarExcludedLiterals = 0;
@@ -238,6 +240,8 @@ public final class HardeningEngine {
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
                 oversizedLiterals += t.getOversizedLiteralCount();
                 condyLiterals += t.getCondyLiteralCount();
+                indyLiterals += t.getIndyLiteralCount();
+                shortLiterals += t.getShortLiteralCount();
                 clinitFullLiterals += t.getClinitFullLiteralCount();
                 annotationLiterals += t.getAnnotationLiteralCount();
             }
@@ -251,6 +255,8 @@ public final class HardeningEngine {
                 legacyInterfaceConstants = 0;
                 oversizedLiterals = 0;
                 condyLiterals = 0;
+                indyLiterals = 0;
+                shortLiterals = 0;
                 clinitFullLiterals = 0;
                 annotationLiterals = 0;
                 libraryExcluded.clear();
@@ -265,6 +271,8 @@ public final class HardeningEngine {
                     legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
                     oversizedLiterals += t.getOversizedLiteralCount();
                     condyLiterals += t.getCondyLiteralCount();
+                    indyLiterals += t.getIndyLiteralCount();
+                    shortLiterals += t.getShortLiteralCount();
                     clinitFullLiterals += t.getClinitFullLiteralCount();
                     annotationLiterals += t.getAnnotationLiteralCount();
                 }
@@ -378,6 +386,20 @@ public final class HardeningEngine {
             result.getWarnings().add(condyLiterals + " constant-dynamic (LDC ConstantDynamic) site(s) "
                     + "carrying string bootstrap arguments were not encrypted; such constants are "
                     + "resolved at link time and remain in plaintext");
+        }
+        if (stringsApplied && indyLiterals > 0) {
+            // A custom invokedynamic (not a StringConcatFactory concat) can carry a plaintext string in
+            // its bootstrap arguments, resolved at link time, which no LDC/ConstantValue pass reaches.
+            result.getWarnings().add(indyLiterals + " invokedynamic site(s) carrying string bootstrap "
+                    + "arguments (a non-concat bootstrap emitted by a bytecode generator) were not "
+                    + "encrypted; such constants are resolved at link time and remain in plaintext");
+        }
+        if (stringsApplied && cfg.isEncryptAllStrings() && shortLiterals > 0) {
+            // One- and two-character literals are left plaintext (the decoder overhead dwarfs them, and a
+            // two-char value is trivially brute-forced even encrypted). Disclose so strings:all is honest.
+            result.getWarnings().add(shortLiterals + " distinct one- or two-character string literal(s) "
+                    + "were left in plaintext (too short to be worth encrypting); a short value is "
+                    + "trivially recovered even when encrypted, so this is a disclosure note");
         }
         if (stringsApplied && oversizedLiterals > 0) {
             // A literal longer than ~21,845 chars can widen to a 3-byte-per-char constant whose

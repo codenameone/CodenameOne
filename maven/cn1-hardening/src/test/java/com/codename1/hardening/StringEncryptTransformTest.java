@@ -353,6 +353,37 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void shortLiteralsAreLeftPlaintextAndDisclosed() throws Exception {
+        // One- and two-character literals are not worth the decoder overhead; in strings:all they stay
+        // plaintext but must be counted (distinctly) so the coverage claim does not silently omit them.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/Shorts", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor mv = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_STATIC, "run", "()V", null, null);
+        mv.visitCode();
+        mv.visitLdcInsn("x");     // 1 char -> short
+        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        mv.visitLdcInsn("ab");    // 2 char -> short
+        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        mv.visitLdcInsn("x");     // duplicate short -> distinct count is still 2
+        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        mv.visitLdcInsn("a long enough literal to actually encrypt");
+        mv.visitInsn(org.objectweb.asm.Opcodes.POP);
+        mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        mv.visitMaxs(1, 0);
+        mv.visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 9);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("two distinct short literals disclosed", 2, t.getShortLiteralCount());
+        assertTrue("the long literal is still encrypted", t.getEncryptedCount() >= 1);
+        assertTrue("a short literal stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, "ab"));
+    }
+
+    @Test
     public void perAccessEncryptionIsCappedByConstantPoolBudget() throws Exception {
         // The per-access channel is NOT pool-neutral when a value's plaintext is retained elsewhere: the
         // ciphertext Utf8+String is a NET addition. Here every literal is ALSO kept plaintext in a class

@@ -179,4 +179,60 @@ public class ConcatLiteralDetectionTest {
         t.transform(cw.toByteArray());
         assertEquals(1, t.getCondyLiteralCount());
     }
+
+    private static final Handle CUSTOM_BSM = new Handle(
+            Opcodes.H_INVOKESTATIC,
+            "app/CustomBootstrap",
+            "bootstrap",
+            "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;"
+                    + "Ljava/lang/invoke/MethodType;Ljava/lang/String;)Ljava/lang/invoke/CallSite;",
+            false);
+
+    private static byte[] customIndyFixture(Object[] bsmArgs) {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "app/CustomIndy", null, "java/lang/Object", null);
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run",
+                "()Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        mv.visitInvokeDynamicInsn("compute", "()Ljava/lang/Object;", CUSTOM_BSM, bsmArgs);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(1, 0);
+        mv.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    @Test
+    public void countsCustomInvokeDynamicStringBootstrapArguments() {
+        // A non-concat invokedynamic whose bootstrap arguments carry a plaintext String is reported.
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        t.transform(customIndyFixture(new Object[] {"a plaintext secret in a custom indy bootstrap"}));
+        assertEquals(1, t.getIndyLiteralCount());
+    }
+
+    @Test
+    public void countsStringNestedInCustomInvokeDynamicCondyArgument() {
+        // The custom indy has no direct String argument; its plaintext hides in a NESTED constant-dynamic.
+        ConstantDynamic inner = new ConstantDynamic("inner", "Ljava/lang/String;",
+                CONDY_BSM, "nested-indy-plaintext");
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        t.transform(customIndyFixture(new Object[] {inner}));
+        assertEquals(1, t.getIndyLiteralCount());
+    }
+
+    @Test
+    public void customInvokeDynamicWithoutStringArgsIsNotCounted() {
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        t.transform(customIndyFixture(new Object[] {Integer.valueOf(42)}));
+        assertEquals(0, t.getIndyLiteralCount());
+    }
+
+    @Test
+    public void concatSitesAreNotDoubleCountedAsGenericIndy() {
+        // The StringConcatFactory recipe sites are counted as concat exclusions, never again as indy.
+        StringEncryptTransform t = new StringEncryptTransform(true, 42);
+        t.transform(fixture());
+        assertEquals(2, t.getConcatLiteralCount());
+        assertEquals(0, t.getIndyLiteralCount());
+    }
 }
