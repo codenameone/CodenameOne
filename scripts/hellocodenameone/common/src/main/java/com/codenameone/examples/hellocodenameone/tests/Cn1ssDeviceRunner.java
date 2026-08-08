@@ -123,6 +123,19 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             return 45000;
         }
         if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof VectorMapScreenshotBaseTest) {
+            // VectorMapScreenshotBaseTest polls for rendered tiles up to its own
+            // MAX_WAIT_MS and then captures anyway, so that a map which never
+            // reports ready still produces an image to look at. That escape
+            // hatch only works if the poll cap is strictly INSIDE this budget,
+            // and at the default the two were both 30s: the runner declared the
+            // timeout first, every time, so the fallback was unreachable and a
+            // slow map leg failed with no screenshot at all rather than a
+            // screenshot showing what went wrong. Keep the outer budget clear of
+            // the poll cap. See MAX_WAIT_MS in VectorMapScreenshotBaseTest.
+            return TEST_TIMEOUT_MS_NATIVE * 2;
+        }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
                 && testClass instanceof BrowserComponentScreenshotTest) {
             // This is the first BrowserComponent in the process, so it pays a
             // one-time native web-engine start -- WebView2 on Windows, WebKitGTK

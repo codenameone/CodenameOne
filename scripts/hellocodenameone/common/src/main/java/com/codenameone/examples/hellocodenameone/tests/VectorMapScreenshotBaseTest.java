@@ -39,6 +39,14 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
     private static final int MIN_SETTLE_MS = 1500;
     // Generous: heavy first renders on a starved CI simulator have been observed
     // far beyond the old 9s cap; a healthy run exits after a few polls.
+    //
+    // MUST stay strictly below the runner's per-test budget for these tests, or
+    // the "capture anyway" fallback below is unreachable. It was equal to the
+    // 30s native default, so the runner declared its own timeout first and the
+    // fallback never once fired: a map that was slow to report ready failed with
+    // no screenshot at all, instead of a screenshot showing what it did render.
+    // Cn1ssDeviceRunner gives every VectorMapScreenshotBaseTest twice the default
+    // to keep that ordering; this cap and that budget move together.
     private static final int MAX_WAIT_MS = 30000;
     private static final int POLL_MS = 150;
     // The probe must hold across consecutive polls: a single true can sit right
