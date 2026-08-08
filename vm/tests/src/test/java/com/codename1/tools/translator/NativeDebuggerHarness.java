@@ -65,6 +65,11 @@ final class NativeDebuggerHarness {
         Files.write(dir.resolve("cn1_class_method_index.h"),
                 "#define cn1_array_start_offset 100000\n".getBytes(StandardCharsets.UTF_8));
         Files.write(dir.resolve("driver.c"), driver.getBytes(StandardCharsets.UTF_8));
+        // Symbols the translator emits per build that the unit references but
+        // does not own. Definitions, not stubs of behaviour: the unit only ever
+        // compares their addresses.
+        Files.write(dir.resolve("generated_symbols.c"),
+                GENERATED_SYMBOLS.getBytes(StandardCharsets.UTF_8));
 
         Path executable = dir.resolve(name);
         List<String> command = new ArrayList<>(Arrays.asList(
@@ -75,6 +80,7 @@ final class NativeDebuggerHarness {
                 "-I", nativeSources().toString(),
                 "-o", executable.toString(),
                 dir.resolve("driver.c").toString(),
+                dir.resolve("generated_symbols.c").toString(),
                 nativeSources().resolve("cn1_debugger_objects.c").toString()));
         Result compiled = exec(command, dir);
         assertEquals(0, compiled.exitCode,
@@ -96,6 +102,18 @@ final class NativeDebuggerHarness {
                 "probe died on " + Arrays.toString(args) + ": " + result.output);
         return result.output.trim();
     }
+
+    /**
+     * java.lang.Integer's clazz and the tagged-int proxy are emitted by the
+     * translator into the app's own sources. The debugger unit references both
+     * by symbol, so a host build has to supply them.
+     */
+    private static final String GENERATED_SYMBOLS =
+            "#include \"cn1_globals.h\"\n"
+          + "struct clazz class__java_lang_Integer = { 0 };\n"
+          + "#if CN1_TAGGED_ACTIVE\n"
+          + "struct JavaObjectPrototype cn1TaggedProxy = { 0 };\n"
+          + "#endif\n";
 
     private static Path runtimeInclude() {
         return resolve(Paths.get("..", "ByteCodeTranslator", "src"));

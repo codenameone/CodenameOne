@@ -92,12 +92,45 @@ class DebuggerObjectValidationTest {
         assertEquals("rejected", probe("WILD_POINTER"));
     }
 
-    /** Misaligned and null-page candidates are rejected before the syscall. */
+    /**
+     * Misaligned and null-page candidates are rejected before the syscall.
+     *
+     * <p>Misalignment here means bit 1, not bit 0: an odd reference is a
+     * tagged int by design, so it is a value rather than a bad pointer.</p>
+     */
     @Test
     void obviouslyImpossiblePointersAreRejected() throws Exception {
         assertEquals("rejected", probe("MISALIGNED"));
         assertEquals("rejected", probe("NULL_PAGE"));
         assertEquals("rejected", probe("NULL"));
+    }
+
+    /**
+     * A boxed {@code Integer} is a tagged value, not an address.
+     *
+     * <p>{@code Integer.valueOf()} returns {@code (v << 1) | 1} on every
+     * 64-bit target, which is the shipping iOS shape. Those references are
+     * deliberately odd, so the alignment rejection that guards the header read
+     * would discard every one of them — boxed integers in locals, fields,
+     * object arrays, invocation arguments and receivers would all read as
+     * null. They are recognised before any read is attempted.</p>
+     */
+    @Test
+    void aTaggedIntegerIsAcceptedWithoutBeingDereferenced() throws Exception {
+        assertEquals("accepted", probe("TAGGED_INT"));
+    }
+
+    /** And it reports Integer's class, so the IDE can name and expand it. */
+    @Test
+    void aTaggedIntegerReportsIntegersClass() throws Exception {
+        assertEquals("java.lang.Integer", probe("TAGGED_INT_CLASS"));
+    }
+
+    /** Its value comes from the tag, since there is no field to read. */
+    @Test
+    void aTaggedIntegerCarriesItsValueInTheReference() throws Exception {
+        assertEquals("42", probe("TAGGED_INT_VALUE"));
+        assertEquals("-7", probe("TAGGED_INT_NEGATIVE"));
     }
 
     /** A zeroed object has no class word to check. */
@@ -114,7 +147,8 @@ class DebuggerObjectValidationTest {
     void noCandidateEverCrashesTheProcess() throws Exception {
         List<String> cases = Arrays.asList("REGISTERED", "ARRAY", "IMPOSTOR",
                 "INT_AS_REFERENCE", "WILD_POINTER", "MISALIGNED", "NULL_PAGE",
-                "NULL", "NO_CLASS_WORD");
+                "NULL", "NO_CLASS_WORD", "TAGGED_INT", "TAGGED_INT_CLASS",
+                "TAGGED_INT_VALUE");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -188,8 +222,21 @@ class DebuggerObjectValidationTest {
             "        candidate = *(JAVA_OBJECT*)(void*)&slot;\n" +
             "    } else if (strcmp(which, \"WILD_POINTER\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0xDEADBEEFDEAD0000ULL;\n" +
+            "    } else if (strcmp(which, \"TAGGED_INT\") == 0) {\n" +
+            "        candidate = CN1_TAG_INT(42);\n" +
+            "    } else if (strcmp(which, \"TAGGED_INT_CLASS\") == 0) {\n" +
+            "        struct clazz* c = cn1_debugger_class_of(CN1_TAG_INT(42));\n" +
+            "        printf(\"%s\\n\", c == &class__java_lang_Integer\n" +
+            "                ? \"java.lang.Integer\" : \"other\");\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"TAGGED_INT_VALUE\") == 0) {\n" +
+            "        printf(\"%d\\n\", cn1_debugger_tagged_int_value(CN1_TAG_INT(42)));\n" +
+            "        return 0;\n" +
+            "    } else if (strcmp(which, \"TAGGED_INT_NEGATIVE\") == 0) {\n" +
+            "        printf(\"%d\\n\", cn1_debugger_tagged_int_value(CN1_TAG_INT(-7)));\n" +
+            "        return 0;\n" +
             "    } else if (strcmp(which, \"MISALIGNED\") == 0) {\n" +
-            "        candidate = (JAVA_OBJECT)(((uintptr_t)&object) | 1);\n" +
+            "        candidate = (JAVA_OBJECT)(((uintptr_t)&object) | 2);\n" +
             "    } else if (strcmp(which, \"NULL_PAGE\") == 0) {\n" +
             "        candidate = (JAVA_OBJECT)(uintptr_t)0x18;\n" +
             "    } else if (strcmp(which, \"NULL\") == 0) {\n" +

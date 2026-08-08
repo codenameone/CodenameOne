@@ -120,6 +120,13 @@ static int cn1_is_registered_class(const struct clazz* cls, int classId) {
  */
 struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
     if (obj == JAVA_NULL) return NULL;
+    // A tagged int is a value, not an address: Integer.valueOf() returns
+    // (v << 1) | 1 on every 64-bit target, which is the shipping iOS shape.
+    // It has no header to read, and the alignment rejection below would
+    // otherwise discard every boxed Integer the debugger was asked about.
+    if (CN1_IS_TAGGED(obj)) {
+        return &class__java_lang_Integer;
+    }
     struct clazz* cls = NULL;
     if (!cn1_debugger_safe_read(&obj->__codenameOneParentClsReference, &cls, sizeof(cls))) {
         return NULL;
@@ -149,6 +156,19 @@ struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj) {
 
 int cn1_debugger_is_valid_object(JAVA_OBJECT obj) {
     return cn1_debugger_class_of(obj) != NULL;
+}
+
+/**
+ * The value carried by a tagged int, for callers that must not treat it as an
+ * address. Returns 0 for anything else, so a caller that has already checked
+ * {@code cn1_debugger_is_tagged_int} reads the real value.
+ */
+int cn1_debugger_is_tagged_int(JAVA_OBJECT obj) {
+    return obj != JAVA_NULL && CN1_IS_TAGGED(obj);
+}
+
+JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
+    return CN1_IS_TAGGED(obj) ? CN1_UNTAG_INT(obj) : 0;
 }
 
 /**

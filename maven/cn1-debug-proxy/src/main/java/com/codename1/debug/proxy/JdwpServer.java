@@ -575,6 +575,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 System.out.println("[jdwp] VM.Resume");
                 invalidateStack();
                 invalidateLocals();
+                markAllResumed();
+                lastSuspendedThread = 0;
                 if (device != null) try { device.resumeAll(); } catch (IOException ignore) {}
                 writeReply(id, 0, empty());
                 return;
@@ -907,6 +909,30 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         return tid == lastSuspendedThread;
     }
 
+    /**
+     * Records a thread's suspend state from an event, so the IDE does not have
+     * to wait for the next thread-list refresh to see it.
+     *
+     * The snapshot is only as fresh as the last refresh, and a thread is
+     * usually enumerated while running and stopped a moment later. Without
+     * this, Status and SuspendCount kept reporting the thread the IDE had just
+     * stopped at as running.
+     */
+    private void markSuspended(long tid, boolean suspended) {
+        ThreadInfo previous = deviceThreads.get(tid);
+        deviceThreads.put(tid, new ThreadInfo(suspended,
+                previous != null ? previous.threadObject : 0));
+    }
+
+    /** Every thread is running again after a VM-wide resume. */
+    private void markAllResumed() {
+        for (Map.Entry<Long, ThreadInfo> e : deviceThreads.entrySet()) {
+            if (e.getValue().suspended) {
+                e.setValue(new ThreadInfo(false, e.getValue().threadObject));
+            }
+        }
+    }
+
     private void handleThread(int id, int cmd, byte[] p) throws IOException {
         long tid = readLong(p, 0);
         switch (cmd) {
@@ -920,6 +946,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 System.out.println("[jdwp] Thread.Resume tid=" + tid);
                 invalidateStack();
                 invalidateLocals();
+                markSuspended(tid, false);
+                if (tid == lastSuspendedThread) lastSuspendedThread = 0;
                 if (device != null) try { device.resume(tid); } catch (IOException ignore) {}
                 writeReply(id, 0, empty()); return;
             }
@@ -1632,6 +1660,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
      * degrades to the previous behaviour instead of an empty thread list.
      */
     private List<Long> currentThreadIds() {
+        boolean refreshed = false;
         if (device != null && deviceHelloReceived) {
             synchronized (threadsLock) {
                 pendingThreads = true;
@@ -1645,14 +1674,22 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 } catch (IOException io) {
                     pendingThreads = false;
                 }
+                // The reply landed, so deviceThreads is the whole truth.
+                refreshed = !pendingThreads;
             }
         }
         List<Long> ids = new ArrayList<>(deviceThreads.keySet());
-        // Union with event-derived ids: a thread that hit a breakpoint must
-        // stay listed even if the device list came back empty.
-        synchronized (knownThreads) {
-            for (Long t : knownThreads) {
-                if (!ids.contains(t)) ids.add(t);
+        if (!refreshed) {
+            // No usable answer from the device — an older build that does not
+            // implement the command, or a refresh that timed out. Fall back to
+            // the threads events have told us about, which is all the proxy
+            // had before. Only in this case: after a successful refresh,
+            // re-adding them would keep a dead worker in the IDE's thread list
+            // for the rest of the session.
+            synchronized (knownThreads) {
+                for (Long t : knownThreads) {
+                    if (!ids.contains(t)) ids.add(t);
+                }
             }
         }
         Collections.sort(ids);
@@ -1779,6 +1816,7 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             if (!knownThreads.contains(threadId)) knownThreads.add(threadId);
         }
         lastSuspendedThread = threadId;
+        markSuspended(threadId, true);
         // The thread just paused at a new location — drop any stale cache
         // from a previous suspension and re-fetch.
         invalidateStack();
@@ -1813,6 +1851,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     @Override public void onStepComplete(long threadId, int methodId, int line) {
         Integer rid = stepRequests.remove(threadId);
+        lastSuspendedThread = threadId;
+        markSuspended(threadId, true);
         // Drop any cached stack from before the step landed. Without this
         // the IDE's Frames request after STEP_COMPLETE hits the cache and
         // re-uses the BP_HIT stack — Frames panel sticks on the previous
@@ -1848,6 +1888,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
             deviceThreads.put(threadIds[i], new ThreadInfo(suspended[i], threadObjects[i]));
         }
         threadNames.keySet().retainAll(deviceThreads.keySet());
+        // The device's list is authoritative whenever it arrives, so a thread
+        // missing from it has died. Pruning here keeps the event-derived set
+        // bounded and stops a dead worker reappearing through the fallback in
+        // currentThreadIds.
+        synchronized (knownThreads) {
+            knownThreads.retainAll(deviceThreads.keySet());
+        }
         synchronized (threadsLock) {
             pendingThreads = false;
             threadsLock.notifyAll();

@@ -29,6 +29,7 @@ import java.io.DataInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -130,11 +131,100 @@ public class JdwpThreadListTest {
     }
 
     /**
-     * A device that cannot enumerate — an older build, or one whose reply is
-     * lost — must not make the panel worse than it was. Event-derived ids stay.
+     * A breakpoint reports the thread as suspended straight away.
+     *
+     * <p>The cached list is only as fresh as the last refresh, and a thread is
+     * normally enumerated while running and stopped a moment later. Preferring
+     * the cache unconditionally left the IDE told that the very thread it had
+     * just stopped at was still running.</p>
      */
     @Test
-    public void threadsSeenInEventsSurviveAnEmptyDeviceList() throws Exception {
+    public void aSuspendEventUpdatesTheCachedThreadState() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            // Enumerated while both are running...
+            server.onThreads(new long[] { 7, 9 },
+                             new boolean[] { false, false },
+                             new long[] { 0, 0 });
+            assertEquals(0, suspendStatus(client, 7));
+
+            // ...then one stops, with no refresh in between.
+            server.onBreakpointHit(7, 0, 12);
+
+            assertEquals("the stopped thread is suspended", 1, suspendStatus(client, 7));
+            assertEquals("the other one is not", 0, suspendStatus(client, 9));
+        }
+    }
+
+    /** Resuming puts it back, so the panel does not stick on "suspended". */
+    @Test
+    public void resumingClearsTheCachedSuspendState() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            server.onThreads(new long[] { 7 }, new boolean[] { false }, new long[] { 0 });
+            server.onBreakpointHit(7, 0, 12);
+            assertEquals(1, suspendStatus(client, 7));
+
+            // VirtualMachine.Resume
+            assertEquals(0, client.send(JdwpTestClient.CS_VIRTUAL_MACHINE, 9, new byte[0]).errorCode);
+
+            assertEquals("resumed threads are running again", 0, suspendStatus(client, 7));
+        }
+    }
+
+    /**
+     * A thread that stopped once and later exited must leave the list.
+     *
+     * <p>Event-derived ids accumulate for the life of the session, so unioning
+     * them into every answer kept a phantom row in the IDE for every worker
+     * that had ever hit a breakpoint. They are a fallback for when the device
+     * cannot answer, not an addition to when it can.</p>
+     */
+    @Test
+    public void aThreadThatStoppedAndThenDiedDoesNotLinger() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            server.onThreads(new long[] { 7, 21 }, new boolean[] { false, false }, new long[] { 0, 0 });
+            server.onBreakpointHit(21, 0, 12);
+            assertEquals(Arrays.asList(7L, 21L), allThreads(client));
+
+            // The worker exits; the device no longer reports it.
+            server.onThreads(new long[] { 7 }, new boolean[] { false }, new long[] { 0 });
+
+            assertEquals(Arrays.asList(7L), allThreads(client));
+        }
+    }
+
+    /**
+     * A device that never answers the enumeration — an older build, whose
+     * runtime replies with a bare status instead of a thread list — must not
+     * make the panel worse than it was. Event-derived ids stay.
+     *
+     * <p>Note the distinction from an <em>empty</em> list: that is a device
+     * that answered, and is treated as authoritative.</p>
+     */
+    @Test
+    public void threadsSeenInEventsSurviveADeviceThatCannotEnumerate() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+            server.onBreakpointHit(21, 0, 12);
+            // No onThreads at all — the device never sent EVT_THREAD_LIST.
+
+            assertEquals(Arrays.asList(21L), allThreads(client));
+        }
+    }
+
+    /** An empty list from a device that can answer means there is nothing to show. */
+    @Test
+    public void anEmptyDeviceListIsTreatedAsAuthoritative() throws Exception {
         int port = JdwpTestClient.freePort();
         JdwpServer server = new JdwpServer(port);
         try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
@@ -142,7 +232,7 @@ public class JdwpThreadListTest {
             server.onBreakpointHit(21, 0, 12);
             server.onThreads(new long[0], new boolean[0], new long[0]);
 
-            assertEquals(Arrays.asList(21L), allThreads(client));
+            assertEquals(Collections.<Long>emptyList(), allThreads(client));
         }
     }
 

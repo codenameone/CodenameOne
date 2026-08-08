@@ -104,6 +104,14 @@ extern struct clazz* cn1_debugger_class_of(JAVA_OBJECT obj);
 extern int cn1_debugger_is_valid_object(JAVA_OBJECT obj);
 
 /**
+ * Whether a reference is a tagged int rather than a heap object, and the value
+ * it carries. A tagged int has no object header, so no caller may compute a
+ * field address from one.
+ */
+extern int cn1_debugger_is_tagged_int(JAVA_OBJECT obj);
+extern JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj);
+
+/**
  * Whether a local described by one side-table row is in scope at a source
  * line. Locals out of scope are left out of the reply rather than reported
  * with the contents of storage that belongs to another scope.

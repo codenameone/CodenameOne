@@ -266,6 +266,42 @@ class OnDeviceDebugFrameTableTest {
     }
 
     /**
+     * A scope that runs to the end of the method stays live on the last line.
+     *
+     * <p>javac closes those scopes with a label placed after the final
+     * instruction, which no line number follows. Resolving it to the last line
+     * seen would make the exclusive end land <em>on</em> that line and hide
+     * every method-wide local — {@code this} and the parameters included — at
+     * exactly the breakpoint a developer is most likely to set, the closing
+     * brace or the return.</p>
+     */
+    @Test
+    void methodWideLocalsStayLiveOnTheFinalLine() throws Exception {
+        FrameTable table = frameTableOf(translateHost(), "handler");
+
+        for (int slot : new int[] { 0, 1, 4 }) {
+            Row row = rowFor(table, slot, 'L');
+            assertEquals(0, row.endLine,
+                    "slot " + slot + " runs to the end of the method, so its scope"
+                            + " must be open-ended, was:\n" + table);
+            assertTrue(row.liveAt(METHOD_END_LINE),
+                    "slot " + slot + " must still be visible on the last line, was:\n" + table);
+        }
+    }
+
+    /** A scope that genuinely closes mid-method still ends where it should. */
+    @Test
+    void aScopeThatClosesMidMethodIsStillBounded() throws Exception {
+        FrameTable table = frameTableOf(translateHost(), "handler");
+        Row count = rowFor(table, 2, 'I');
+
+        assertEquals(REF_SCOPE_LINE, count.endLine,
+                "the int's scope closes where the reference's opens, was:\n" + table);
+        assertFalse(count.liveAt(METHOD_END_LINE),
+                "and it must not reappear on the final line, was:\n" + table);
+    }
+
+    /**
      * The device's frame table and the symbol table the IDE reads describe the
      * same local the same way.
      *
@@ -538,9 +574,13 @@ class OnDeviceDebugFrameTableTest {
         handler.visitVarInsn(Opcodes.ASTORE, 2);        // String label — same slot
         handler.visitVarInsn(Opcodes.ALOAD, 2);
         handler.visitVarInsn(Opcodes.ASTORE, 4);        // Object held
-        handler.visitLabel(end);
-        handler.visitLineNumber(METHOD_END_LINE, end);
+        Label lastStatement = new Label();
+        handler.visitLabel(lastStatement);
+        handler.visitLineNumber(METHOD_END_LINE, lastStatement);
         handler.visitInsn(Opcodes.RETURN);
+        // The scope-closing label goes after the last instruction with no line
+        // number of its own, which is what javac emits.
+        handler.visitLabel(end);
         handler.visitLocalVariable("this", "Lcom/example/DbgHost;", null, start, end, 0);
         handler.visitLocalVariable("ev", "Ljava/lang/Object;", null, start, end, 1);
         handler.visitLocalVariable("count", "I", null, start, midpoint, 2);

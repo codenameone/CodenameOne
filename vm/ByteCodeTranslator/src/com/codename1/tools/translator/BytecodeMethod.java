@@ -1418,23 +1418,30 @@ public class BytecodeMethod implements SignatureSet {
     private Map<Label, Integer> lineByLabel() {
         Map<Label, Integer> lines = new HashMap<Label, Integer>();
         List<Label> pending = new ArrayList<Label>();
-        int currentLine = 0;
         for (Instruction i : instructions) {
             if (i instanceof LabelInstruction) {
                 pending.add(((LabelInstruction) i).getLabel());
             } else if (i instanceof LineNumber) {
-                currentLine = ((LineNumber) i).getLine();
+                int currentLine = ((LineNumber) i).getLine();
                 for (Label pendingLabel : pending) {
                     lines.put(pendingLabel, currentLine);
                 }
                 pending.clear();
             }
         }
+        // Labels with no line after them sit past the last statement — which is
+        // where javac puts the end label of every method-wide local, `this` and
+        // the parameters included. Giving them the last line would make an
+        // exclusive scope end *on* that line and hide those locals at exactly
+        // the breakpoint most likely to be set. They run to the end instead.
         for (Label trailing : pending) {
-            lines.put(trailing, currentLine);
+            lines.put(trailing, END_OF_METHOD);
         }
         return lines;
     }
+
+    /** Marks a label that no source line follows; see {@link #lineByLabel()}. */
+    private static final int END_OF_METHOD = Integer.MAX_VALUE;
 
     /**
      * The source-line range a local is in scope for, as {@code {start, end}}.
@@ -1493,14 +1500,15 @@ public class BytecodeMethod implements SignatureSet {
         }
         Integer startLine = lineByLabel.get(start);
         Integer endLine = lineByLabel.get(end);
-        if (startLine == null || endLine == null || startLine <= 0) {
+        if (startLine == null || endLine == null || startLine <= 0
+                || startLine == END_OF_METHOD) {
             return ALWAYS_LIVE;
         }
-        // A scope whose end resolves at or before its start tells us nothing
-        // usable (it happens when the whole scope sits on one line); treat it
-        // as open-ended rather than as an empty range that hides the local
-        // everywhere.
-        if (endLine <= startLine) {
+        // Open-ended when the scope runs to the end of the method, and when its
+        // end resolves at or before its start — the latter happens where the
+        // whole scope sits on one line, and an empty range would hide the local
+        // everywhere rather than nowhere.
+        if (endLine == END_OF_METHOD || endLine <= startLine) {
             return new int[] { startLine, 0 };
         }
         return new int[] { startLine, endLine };

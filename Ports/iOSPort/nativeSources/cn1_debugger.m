@@ -1077,7 +1077,17 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 char tc = 'L';
                 uint64_t val = 0;
                 const cn1_field_entry* fe = field_lookup_by_class_and_id(classId, fid, NULL);
-                if (fe && obj != JAVA_NULL) {
+                if (cn1_debugger_is_tagged_int(obj)) {
+                    // A tagged Integer carries its value in the reference
+                    // itself and has no fields to read at an offset. Serve the
+                    // one field it models -- Integer.value -- from the tag.
+                    if (fe && fe->type == 'I') {
+                        tc = 'I';
+                        val = (uint64_t)(uint32_t)cn1_debugger_tagged_int_value(obj);
+                    } else {
+                        tc = 'L'; val = 0;
+                    }
+                } else if (fe && obj != JAVA_NULL) {
                     field_read_into(obj, fe, &tc, &val);
                     // A reference field can legitimately hold a value the GC
                     // has since reclaimed; don't pass one on as an objectID.
@@ -1228,7 +1238,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             int length = 0;
             struct clazz* arrCls = cn1_debugger_class_of(obj);
-            if (arrCls != NULL && arrCls->isArray) {
+            if (arrCls != NULL && !cn1_debugger_is_tagged_int(obj) && arrCls->isArray) {
                 length = ((JAVA_ARRAY)obj)->length;
             }
             uint8_t reply[4];
@@ -1256,7 +1266,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             // Everything below indexes arr->data, so the reference has to be
             // a verified array before any of it runs.
             struct clazz* objArrCls = cn1_debugger_class_of(obj);
-            if (objArrCls == NULL || !objArrCls->isArray) {
+            if (objArrCls == NULL || cn1_debugger_is_tagged_int(obj) || !objArrCls->isArray) {
                 uint8_t err[5] = {'L', 0,0,0,0};
                 sendEvent(EVT_ARRAY_VALUES, err, 5);
                 return 0;
