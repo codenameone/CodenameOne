@@ -226,6 +226,27 @@ class AndroidCipherDB extends Database {
             migrateThroughExport(targetKey);
             return;
         }
+        // Claimed like the export route, and for the same reason in a different shape. This one
+        // does not replace the file, but it does change the key the file is written with, and it
+        // changes it only for this connection: another handle on the same database keeps the old
+        // key and every read it makes afterwards fails with "file is not a database". There is no
+        // way to rotate a key underneath another connection either, so the caller is told.
+        String path = db.getPath();
+        try {
+            AndroidImplementation.beginDatabaseMigration(path);
+        } catch (IOException openElsewhere) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    openElsewhere.getMessage(), openElsewhere);
+        }
+        try {
+            rekeyInPlace(targetKey);
+        } finally {
+            AndroidImplementation.endDatabaseMigration(path);
+        }
+    }
+
+    /** The key rotation itself, with this database claimed for the duration. */
+    private void rekeyInPlace(String targetKey) throws IOException {
         // Quote through the shared helper: a passphrase may contain quotes, and interpolating it
         // directly would let one change the statement.
         String statement = "PRAGMA rekey = " + toPragmaLiteral(targetKey);
