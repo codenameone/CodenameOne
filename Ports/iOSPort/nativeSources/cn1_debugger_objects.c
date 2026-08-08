@@ -223,12 +223,16 @@ struct issued_entry {
     int64_t owners[CN1_ISSUED_MAX_OWNERS];
     unsigned char ownerCount;
     /*
-     * Claimed by something not tied to a suspension -- the thread list's
-     * java.lang.Thread objects. Recorded separately from the owner set because
-     * the same reference can hold both claims: a Thread object can be exposed
-     * first through a stopped thread's locals and later by the thread list.
-     * Dropping the entry when that thread resumes would then reject an id the
-     * live thread list still advertises.
+     * Claimed by the thread list rather than by a suspension. Recorded
+     * separately from the owner set because the same reference can hold both:
+     * a Thread object can be exposed first through a stopped thread's locals
+     * and later by the thread list. Dropping the entry when that thread
+     * resumes would then reject an id the live thread list still advertises.
+     *
+     * Reconciled on every thread-list refresh rather than only on a full
+     * resume -- see cn1_debugger_forget_thread_list_claims. An IDE polling
+     * AllThreads on a running app would otherwise pin every Thread object it
+     * ever saw, and their retained graphs with them, for the session.
      */
     unsigned char unowned;
     /*
@@ -424,6 +428,44 @@ static int entry_survives_resume(struct issued_entry* e, int64_t owner) {
     }
     e->ownerCount = (unsigned char)remaining;
     return remaining > 0;                  /* another suspension still holds it */
+}
+
+/**
+ * Drops the thread list's claim on everything it previously advertised.
+ *
+ * Called before each refresh records the current set, so an entry a live
+ * snapshot no longer mentions loses its claim. Entries a suspension still owns
+ * survive, having lost only this claim; entries left with none are removed,
+ * which releases the GC roots holding dead Thread objects and whatever they
+ * reach.
+ */
+void cn1_debugger_forget_thread_list_claims(void) {
+    pthread_mutex_lock(&g_issuedMutex);
+    if (g_issued != NULL) {
+        unsigned cap = g_issuedCap;
+        struct issued_entry* kept =
+            (struct issued_entry*)calloc(cap, sizeof(struct issued_entry));
+        if (kept) {
+            unsigned keptCount = 0;
+            for (unsigned i = 0; i < cap; i++) {
+                if (g_issued[i].key == 0) continue;
+                g_issued[i].unowned = 0;
+                if (g_issued[i].ownerCount == 0 && !g_issued[i].ownerOverflow) {
+                    continue;   /* nothing claims it any more */
+                }
+                int created = 0;
+                struct issued_entry* moved =
+                    issued_put(kept, cap, g_issued[i].key, &created);
+                if (moved) { *moved = g_issued[i]; keptCount += (unsigned)created; }
+            }
+            free(g_issued);
+            g_issued = kept;
+            g_issuedCount = keptCount;
+        }
+        /* Out of memory: leave the table as it was. Keeping a root too long
+         * costs memory; dropping one frees an object an id still names. */
+    }
+    pthread_mutex_unlock(&g_issuedMutex);
 }
 
 void cn1_debugger_forget_issued_for(int64_t owner) {

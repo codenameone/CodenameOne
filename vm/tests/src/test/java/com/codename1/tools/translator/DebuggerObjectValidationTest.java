@@ -286,6 +286,25 @@ class DebuggerObjectValidationTest {
         assertEquals("kept", probe("UNOWNED_CLAIM_SURVIVES"));
     }
 
+    /**
+     * A thread-list refresh releases the objects the previous one advertised.
+     *
+     * <p>Every {@code java.lang.Thread} the list returns is rooted so its id
+     * stays usable. Released only on a full resume, an IDE polling the thread
+     * list on a running app would pin every thread object it ever saw — and
+     * whatever those threads retain — for the session.</p>
+     */
+    @Test
+    void aThreadListRefreshReleasesTheObjectsTheLastOneAdvertised() throws Exception {
+        assertEquals("gone", probe("THREAD_LIST_REFRESH_RELEASES"));
+    }
+
+    /** But not one a suspended thread is also holding. */
+    @Test
+    void aRefreshKeepsObjectsASuspensionStillOwns() throws Exception {
+        assertEquals("kept", probe("THREAD_LIST_REFRESH_KEEPS_OWNED"));
+    }
+
     /** A zeroed object has no class word to check. */
     @Test
     void anObjectWithNoClassWordIsRejected() throws Exception {
@@ -310,7 +329,8 @@ class DebuggerObjectValidationTest {
                 "SHARED_SURVIVES_FIRST_RESUME", "SHARED_DROPPED_BY_LAST_RESUME",
                 "ROOTS_MARK_ISSUED", "ROOTS_MARK_AFTER_GROWTH",
                 "ROOTS_RELEASED_NOT_MARKED", "ROOTS_TAGGED_NOT_MARKED",
-                "DERIVED_INHERITS_ALL_OWNERS", "UNOWNED_CLAIM_SURVIVES");
+                "DERIVED_INHERITS_ALL_OWNERS", "UNOWNED_CLAIM_SURVIVES",
+                "THREAD_LIST_REFRESH_RELEASES", "THREAD_LIST_REFRESH_KEEPS_OWNED");
         for (String candidate : cases) {
             NativeDebuggerHarness.Result result = harness().run(candidate);
             assertEquals(0, result.exitCode,
@@ -409,6 +429,19 @@ class DebuggerObjectValidationTest {
             "        cn1MarkedRootCount = 0;\n" +
             "        cn1_debugger_mark_issued_roots(NULL);\n" +
             "        printf(\"%s\\n\", cn1MarkRootTargetSeen ? \"marked\" : \"not-marked\");\n" +
+            "        return 0;\n" +
+            "    } else if (strncmp(which, \"THREAD_LIST_REFRESH_\", 20) == 0) {\n" +
+            "        /* A thread object the list advertised, and one a stopped\n" +
+            "         * thread also holds; then the next refresh comes round. */\n" +
+            "        JAVA_OBJECT dead = (JAVA_OBJECT)(uintptr_t)0x11000;\n" +
+            "        JAVA_OBJECT alsoOwned = (JAVA_OBJECT)(uintptr_t)0x11008;\n" +
+            "        cn1_debugger_note_issued(dead);\n" +
+            "        cn1_debugger_note_issued_for(alsoOwned, 7);\n" +
+            "        cn1_debugger_note_issued(alsoOwned);\n" +
+            "        cn1_debugger_forget_thread_list_claims();\n" +
+            "        JAVA_OBJECT probe =\n" +
+            "            strcmp(which, \"THREAD_LIST_REFRESH_KEEPS_OWNED\") == 0 ? alsoOwned : dead;\n" +
+            "        printf(\"%s\\n\", cn1_debugger_was_issued(probe) ? \"kept\" : \"gone\");\n" +
             "        return 0;\n" +
             "    } else if (strcmp(which, \"DERIVED_INHERITS_ALL_OWNERS\") == 0) {\n" +
             "        /* A parent both parked threads expose, and a child reached\n" +

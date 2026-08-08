@@ -818,6 +818,10 @@ static void handleGetStack(int64_t threadId) {
  * naming protocol.
  */
 static void handleGetThreads(void) {
+    // This snapshot supersedes the last, so the Thread objects it advertised
+    // stop being rooted by it. Without this an IDE polling the thread list on
+    // a running app would pin every thread object it ever saw.
+    cn1_debugger_forget_thread_list_claims();
     lockCriticalSection();
     int count = 0;
     if (allThreads != NULL) {

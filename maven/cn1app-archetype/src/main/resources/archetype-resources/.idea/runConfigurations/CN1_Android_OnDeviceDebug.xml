@@ -10,7 +10,7 @@
           </option>
           <option name="goals">
             <list>
-              <option value="codenameone:android-on-device-debugging" />
+              <option value="cn1:android-on-device-debugging" />
             </list>
           </option>
           <option name="pomFileName" value="pom.xml" />

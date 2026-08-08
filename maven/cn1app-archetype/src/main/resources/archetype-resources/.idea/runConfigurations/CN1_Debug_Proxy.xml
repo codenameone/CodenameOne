@@ -10,7 +10,7 @@
           </option>
           <option name="goals">
             <list>
-              <option value="codenameone:ios-on-device-debugging" />
+              <option value="cn1:ios-on-device-debugging" />
             </list>
           </option>
           <option name="pomFileName" value="pom.xml" />

@@ -10,7 +10,7 @@
           </option>
           <option name="goals">
             <list>
-              <option value="codenameone:buildIosOnDeviceDebug" />
+              <option value="cn1:buildIosOnDeviceDebug" />
             </list>
           </option>
           <option name="pomFileName" value="pom.xml" />

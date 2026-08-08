@@ -145,6 +145,12 @@ extern int64_t cn1_debugger_owner_of(JAVA_OBJECT obj);
 extern int cn1_debugger_note_issued_inheriting(JAVA_OBJECT obj, JAVA_OBJECT parent);
 extern void cn1_debugger_forget_issued_for(int64_t owner);
 
+/**
+ * Drops the thread list's claim on the objects it previously advertised, so
+ * each refresh supersedes the last and dead threads stop being rooted.
+ */
+extern void cn1_debugger_forget_thread_list_claims(void);
+
 /** Resolves an objectID that arrived from the IDE, or NULL to refuse it. */
 extern struct clazz* cn1_debugger_class_of_wire_id(JAVA_OBJECT obj);
 
