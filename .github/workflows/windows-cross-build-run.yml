@@ -278,7 +278,12 @@ jobs:
       github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write, because this job publishes the normalized report to the
+      # port-status-data branch itself (see the publish step below).
+      contents: write
+      # write, to dispatch website-docs.yml -- the Port Status page is static,
+      # so a published report is invisible until Hugo rebuilds.
+      actions: write
       pull-requests: write
       issues: write
     env:
@@ -387,3 +392,39 @@ jobs:
           path: artifacts/windows-port/port-status-windows-x64.json
           if-no-files-found: warn
           retention-days: 14
+
+      # Publish from here rather than waiting for port-status-publish.yml.
+      # That workflow reacts to a workflow_run "completed" event, and GitHub has
+      # never delivered one for this workflow: ports/windows-x64.json had never
+      # existed on the data branch, so the public table served the checked-in
+      # fallback for the Windows x64 column. The report is already on disk in
+      # this job, so publish it directly and depend on no event.
+      #
+      # if: always() for the same reason the job itself runs on failure -- a
+      # report recording real failures is the one the table most needs.
+      - name: Publish the Windows report to the data branch
+        if: >-
+          always() && github.ref == 'refs/heads/master' &&
+          (github.event_name == 'push' || github.event_name == 'schedule' ||
+          github.event_name == 'workflow_dispatch')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PORT_STATUS_PUBLISH: '1'
+        run: |
+          set -euo pipefail
+          report=artifacts/windows-port/port-status-windows-x64.json
+          if [ ! -f "$report" ]; then
+            echo "No normalized Windows report to publish." >&2
+            exit 1
+          fi
+          ./scripts/hellocodenameone/conformance/publish_port_status.sh "$report"
+          # Publishing to the data branch is only half the job. The Port Status
+          # page is STATIC -- Hugo reads the reports at build time -- and
+          # website-docs.yml is triggered by pushes to master, not by the data
+          # branch, so a report published here would sit unseen until the next
+          # daily rebuild. That is the same stale window this whole change
+          # exists to close. port-status-publish.yml dispatches the rebuild for
+          # the producers it handles; do the same for the ones that publish
+          # themselves. In the same step as the publish, so it runs only when
+          # the publish actually succeeded.
+          gh workflow run website-docs.yml --ref master -f deploy_production=true

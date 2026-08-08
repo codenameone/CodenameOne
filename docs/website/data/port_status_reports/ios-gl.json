@@ -1,36 +1,36 @@
 {
-  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
-  "generated_at": "2026-08-04T10:58:45Z",
+  "commit": "159c7e3cc8a0eb161ba96891b6912f1d06cd03c4",
+  "generated_at": "2026-08-07T18:03:05Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 483444000
+        "duration_ns": 455711000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 25544000
+        "duration_ns": 25744000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 149238000
+        "duration_ns": 161760000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 75007000
+        "duration_ns": 72715000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 444808000
+        "duration_ns": 393476000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 191325000
+        "duration_ns": 189548000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 299827000
+        "duration_ns": 238005000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -44,13 +44,13 @@
     "suite_checksum": 0
   },
   "port": "ios-gl",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242578",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31186473652",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "pass": 169,
+    "pass": 167,
     "fail": 0,
-    "skip": 2,
+    "skip": 4,
     "not-run": 7
   },
   "tests": {
@@ -252,34 +252,6 @@
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
       "status": "pass"
-    },
-    "DatabaseCursorLegacyTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
-    },
-    "DatabaseCursorTest": {
-      "feature": "sqlite-database",
-      "status": "not-run"
-    },
-    "DatabaseEncryptionTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
-    },
-    "DatabaseLifecycleTest": {
-      "feature": "sqlite-database",
-      "status": "not-run"
-    },
-    "DatabaseStatementLegacyTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
-    },
-    "DatabaseStatementTest": {
-      "feature": "sqlite-database",
-      "status": "not-run"
-    },
-    "DatabaseTransactionTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
     },
     "DesktopModeScreenshotTest": {
       "feature": "desktop-mode",
@@ -510,8 +482,11 @@
       "status": "pass"
     },
     "NativeMapFallbackScreenshotTest": {
+      "status": "skip",
       "feature": "vector-maps",
-      "status": "pass"
+      "reasons": [
+        "native-provider-active"
+      ]
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
@@ -658,8 +633,11 @@
       "status": "pass"
     },
     "SurfacesRemoteViewsScreenshotTest": {
+      "status": "skip",
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "android-only-remoteviews-lowering"
+      ]
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -764,13 +742,41 @@
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
       "reasons": [
-        "encode-unavailable-on-ios:Failed"
+        "encode-write-failed-on-ios"
       ],
       "status": "skip"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
       "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
     }
   }
 }

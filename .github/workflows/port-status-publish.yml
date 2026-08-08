@@ -1,5 +1,11 @@
 name: Publish port status reports
 
+# GitHub does not deliver a workflow_run event for every producer listed below.
+# The Linux and Windows cross-build suites have never triggered this workflow --
+# their ports had no report on the data branch at all -- so those two publish
+# their own report from the job that produced it. They stay listed here because
+# publication is timestamp-guarded and therefore idempotent: if GitHub ever does
+# deliver the event, the second publish is a no-op rather than a conflict.
 on:
   workflow_run:
     workflows:

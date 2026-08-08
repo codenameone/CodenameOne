@@ -1183,11 +1183,11 @@
       "test": "DialogThemeScreenshotTest"
     },
     {
-      "pattern": "CenteredDialogTitle_*",
+      "pattern": "CenteredDialogTitle*",
       "test": "CenteredDialogTitleScreenshotTest"
     },
     {
-      "pattern": "CenteredInteractionDialogTitle_*",
+      "pattern": "CenteredInteractionDialogTitle*",
       "test": "CenteredInteractionDialogTitleScreenshotTest"
     },
     {

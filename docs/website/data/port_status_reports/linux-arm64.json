@@ -1,48 +1,48 @@
 {
-  "commit": "12ecf37a1e695b71794b5243e1525328f7304e51",
-  "generated_at": "2026-08-04T07:46:40Z",
+  "commit": "42ebdde8da10f6809c3660710f09cb3088ea7a66",
+  "generated_at": "2026-08-08T01:16:27Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 169171845
+        "duration_ns": 170499731
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 25311725
+        "duration_ns": 24938082
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 35403188
+        "duration_ns": 35228203
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 62833423
+        "duration_ns": 62857914
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 39313867
+        "duration_ns": 39309604
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 270465811
+        "duration_ns": 274791392
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3639365036
+        "duration_ns": 4317530564
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 93678258
+        "duration_ns": 94804535
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 137501079
+        "duration_ns": 133658516
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 47882264
+        "duration_ns": 49459521
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,14 +52,14 @@
     "suite_checksum": 0
   },
   "port": "linux-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30887242018",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31231209720",
   "schema_version": 1,
-  "suite_finished": false,
+  "suite_finished": true,
   "summary": {
-    "pass": 161,
-    "fail": 7,
-    "skip": 0,
-    "not-run": 10
+    "pass": 168,
+    "fail": 0,
+    "skip": 3,
+    "not-run": 7
   },
   "tests": {
     "ARApiTest": {
@@ -96,10 +96,7 @@
     },
     "AudioMixerApiTest": {
       "feature": "audio-media-playback",
-      "reasons": [
-        "failed: AudioMixer API test failed: java.lang.IllegalStateException: mixed WAV file was not created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "BackgroundThreadUiAccessTest": {
       "feature": "threading",
@@ -115,10 +112,7 @@
     },
     "BrowserComponentScreenshotTest": {
       "feature": "embedded-web-content",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=show-completed"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
@@ -130,7 +124,7 @@
     },
     "CalendarApiTest": {
       "feature": "calendar-integration",
-      "status": "not-run"
+      "status": "pass"
     },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
@@ -139,9 +133,9 @@
     "CameraApiTest": {
       "feature": "camera-access",
       "reasons": [
-        "failed: Camera.getCameras() returned no cameras"
+        "no-camera-device-on-headless-runner"
       ],
-      "status": "fail"
+      "status": "skip"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
@@ -253,10 +247,7 @@
     },
     "CryptoApiTest": {
       "feature": "secure-storage-crypto",
-      "reasons": [
-        "failed: Crypto API test failed: com.codename1.security.CryptoException: Crypto operation secureRandomBytes is not supported on this platform. If you are running in a fresh CodenameOneImplementation subclass, override the matching method."
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CssFilterBlurScreenshotTest": {
       "feature": "theme-palette-css",
@@ -269,34 +260,6 @@
     "DarkLightShowcaseThemeScreenshotTest": {
       "feature": "theme-palette-css",
       "status": "pass"
-    },
-    "DatabaseCursorLegacyTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
-    },
-    "DatabaseCursorTest": {
-      "feature": "sqlite-database",
-      "status": "not-run"
-    },
-    "DatabaseEncryptionTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
-    },
-    "DatabaseLifecycleTest": {
-      "feature": "sqlite-database",
-      "status": "not-run"
-    },
-    "DatabaseStatementLegacyTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
-    },
-    "DatabaseStatementTest": {
-      "feature": "sqlite-database",
-      "status": "not-run"
-    },
-    "DatabaseTransactionTest": {
-      "feature": "sqlite-transactions",
-      "status": "not-run"
     },
     "DesktopModeScreenshotTest": {
       "feature": "desktop-mode",
@@ -360,10 +323,7 @@
     },
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
-      "reasons": [
-        "failed: openInputStream returned a stream (com.codename1.impl.linux.LinuxInputStream@FF0448FB4EB0) for a missing path /home/runner/.local/share/codenameone/this-file-must-not-exist-1502-1785828925633.bin instead of throwing. Platform=linux"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "FillArc": {
       "feature": "graphics-primitives",
@@ -406,8 +366,11 @@
       "status": "pass"
     },
     "GoogleWebMapScreenshotTest": {
+      "status": "skip",
       "feature": "native-web-maps",
-      "status": "pass"
+      "reasons": [
+        "no-api-key"
+      ]
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -671,18 +634,18 @@
     },
     "SurfacesPublishTest": {
       "feature": "surfaces",
-      "reasons": [
-        "failed: Surfaces publish contract failed: java.lang.UnsupportedOperationException: UnicodeHelper.getClasses() not supported"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
       "status": "pass"
     },
     "SurfacesRemoteViewsScreenshotTest": {
+      "status": "skip",
       "feature": "surfaces",
-      "status": "pass"
+      "reasons": [
+        "android-only-remoteviews-lowering"
+      ]
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -726,10 +689,7 @@
     },
     "TimeApiTest": {
       "feature": "java-standard-apis",
-      "reasons": [
-        "failed: Time API test failed: java.lang.RuntimeException: Expected [2020-03-08T01:30:00-05:00[America/New_York]], Actual [2020-03-08T11:30:00-05:00[America/New_York]]"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ToastBarTopPositionScreenshotTest": {
       "feature": "toast-notifications",
@@ -784,16 +744,44 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "feature": "video-decoding",
-      "status": "not-run"
+      "status": "pass",
+      "feature": "video-decoding"
     },
     "VideoIORoundTripTest": {
-      "feature": "video-round-trip",
-      "status": "not-run"
+      "status": "pass",
+      "feature": "video-round-trip"
     },
     "VisionOnDeviceApiTest": {
       "feature": "on-device-vision",
       "status": "pass"
+    },
+    "DatabaseCursorLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseCursorTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseEncryptionTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseLifecycleTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseStatementLegacyTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
+    },
+    "DatabaseStatementTest": {
+      "feature": "sqlite-database",
+      "status": "not-run"
+    },
+    "DatabaseTransactionTest": {
+      "feature": "sqlite-transactions",
+      "status": "not-run"
     }
   }
 }

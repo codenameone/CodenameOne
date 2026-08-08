@@ -85,6 +85,71 @@ class PortStatusTest(unittest.TestCase):
         self.assertNotIn("memory", report["performance"])
         self.assertEqual(12000000, report["performance"]["benchmarks"]["intArithmetic"]["duration_ns"])
 
+    def test_skip_reported_under_a_screenshot_name_is_not_a_pass(self):
+        # A screenshot test announces its skip under its screenshot OUTPUT name,
+        # not its class name. Matching the class name alone dropped the marker,
+        # and the surrounding start/finish pair then scored the test as a pass --
+        # a skipped VideoIO decode, a skipped map and a skipped watch dialog all
+        # rendered green on the public table.
+        log_text = "\n".join(
+            [
+                "CN1SS:INFO:suite starting test=VideoIODecodedFramesScreenshotTest",
+                "CN1SS:INFO:test=VideoIODecodedFrames status=SKIPPED reason=videoio-unavailable-on-linux",
+                "CN1SS:INFO:suite finished test=VideoIODecodedFramesScreenshotTest",
+                "CN1SS:INFO:suite starting test=CenteredDialogTitleScreenshotTest",
+                "CN1SS:INFO:test=CenteredDialogTitle status=SKIPPED reason=phone-dialog-on-watch",
+                "CN1SS:INFO:suite finished test=CenteredDialogTitleScreenshotTest",
+                "CN1SS:SUITE:FINISHED",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            report = port_status.normalize(
+                manifest=self.manifest,
+                port_id="linux-x64",
+                logs=[log_path],
+                comparisons=[],
+                output=root / "report.json",
+                run_url="https://example.invalid/run/3",
+                commit="abc123",
+                generated_at="2026-07-15T00:00:00Z",
+            )
+
+        decoded = report["tests"]["VideoIODecodedFramesScreenshotTest"]
+        self.assertEqual("skip", decoded["status"])
+        self.assertEqual(["videoio-unavailable-on-linux"], decoded["reasons"])
+        # The bare base name of a test whose outputs are all suffixed has to
+        # resolve too, or the same false pass comes back for the dialog tests.
+        dialog = report["tests"]["CenteredDialogTitleScreenshotTest"]
+        self.assertEqual("skip", dialog["status"])
+        self.assertEqual(["phone-dialog-on-watch"], dialog["reasons"])
+
+    def test_skip_marker_naming_nothing_in_the_contract_is_rejected(self):
+        log_text = "\n".join(
+            [
+                "CN1SS:INFO:test=SomethingNobodyMapped status=SKIPPED reason=whatever",
+                "CN1SS:SUITE:FINISHED",
+            ]
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            with self.assertRaises(port_status.ContractError) as caught:
+                port_status.normalize(
+                    manifest=self.manifest,
+                    port_id="linux-x64",
+                    logs=[log_path],
+                    comparisons=[],
+                    output=root / "report.json",
+                    run_url="https://example.invalid/run/4",
+                    commit="abc123",
+                    generated_at="2026-07-15T00:00:00Z",
+                )
+        self.assertIn("SomethingNobodyMapped", str(caught.exception))
+
     def test_error_lines_allow_messages_or_no_message(self):
         log_text = "\n".join(
             [
