@@ -185,6 +185,7 @@ public final class HardeningEngine {
         int concatLiterals = 0;
         int legacyInterfaceConstants = 0;
         int oversizedLiterals = 0;
+        int condyLiterals = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -208,6 +209,7 @@ public final class HardeningEngine {
                 concatLiterals += t.getConcatLiteralCount();
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
                 oversizedLiterals += t.getOversizedLiteralCount();
+                condyLiterals += t.getCondyLiteralCount();
             }
         }
 
@@ -307,6 +309,13 @@ public final class HardeningEngine {
             result.getWarnings().add(legacyInterfaceConstants + " static-final String constant(s) on "
                     + "pre-Java-8 interface(s) were not encrypted (such interfaces cannot host the "
                     + "decoder); recompile the interface at -target 8+ to encrypt its constant pool");
+        }
+        if (stringsApplied && condyLiterals > 0) {
+            // Java 11+ can carry plaintext through an LDC constant-dynamic whose bootstrap arguments
+            // hold the string; it is resolved at link time, so it cannot be rewritten to a decode call.
+            result.getWarnings().add(condyLiterals + " constant-dynamic (LDC ConstantDynamic) site(s) "
+                    + "carrying string bootstrap arguments were not encrypted; such constants are "
+                    + "resolved at link time and remain in plaintext");
         }
         if (stringsApplied && oversizedLiterals > 0) {
             // A literal longer than ~21,845 chars can widen to a 3-byte-per-char constant whose

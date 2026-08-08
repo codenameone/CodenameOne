@@ -26,6 +26,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -106,5 +107,52 @@ public class ConcatLiteralDetectionTest {
         t.transform(fixture());
         // withInlineLiteral (recipe literal) + withConstantArg (String bootstrap arg) = 2; pureDynamic = 0.
         assertEquals(2, t.getConcatLiteralCount());
+    }
+
+    private static final Handle CONDY_BSM = new Handle(
+            Opcodes.H_INVOKESTATIC,
+            "app/CondyBootstrap",
+            "make",
+            "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/Class;"
+                    + "Ljava/lang/Object;)Ljava/lang/Object;",
+            false);
+
+    /** A class with one string-bearing constant-dynamic LDC and one with only a numeric argument. */
+    private static byte[] condyFixture() {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, "com/codename1/hardening/fixture/Condy",
+                null, "java/lang/Object", null);
+
+        // LDC ConstantDynamic whose bootstrap argument carries plaintext.
+        ConstantDynamic withString = new ConstantDynamic("secretConst", "Ljava/lang/String;",
+                CONDY_BSM, "secret-plaintext-value");
+        MethodVisitor m1 = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "withString",
+                "()Ljava/lang/String;", null, null);
+        m1.visitCode();
+        m1.visitLdcInsn(withString);
+        m1.visitInsn(Opcodes.ARETURN);
+        m1.visitMaxs(1, 0);
+        m1.visitEnd();
+
+        // A constant-dynamic with only a numeric bootstrap argument: no plaintext, not counted.
+        ConstantDynamic numeric = new ConstantDynamic("numConst", "I",
+                CONDY_BSM, Integer.valueOf(7));
+        MethodVisitor m2 = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "numeric",
+                "()I", null, null);
+        m2.visitCode();
+        m2.visitLdcInsn(numeric);
+        m2.visitInsn(Opcodes.IRETURN);
+        m2.visitMaxs(1, 0);
+        m2.visitEnd();
+
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    @Test
+    public void countsConstantDynamicStringArgumentsOnly() {
+        StringEncryptTransform t = new StringEncryptTransform(true, 7);
+        t.transform(condyFixture());
+        assertEquals(1, t.getCondyLiteralCount());
     }
 }

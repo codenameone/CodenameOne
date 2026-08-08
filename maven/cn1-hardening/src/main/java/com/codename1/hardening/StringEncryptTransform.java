@@ -25,6 +25,7 @@ package com.codename1.hardening;
 import java.util.List;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -87,6 +88,7 @@ public final class StringEncryptTransform {
     private int concatLiteralCount;
     private int legacyInterfaceConstantCount;
     private int oversizedLiteralCount;
+    private int condyLiteralCount;
 
     public StringEncryptTransform(boolean encryptAllStrings, int seed) {
         this(encryptAllStrings, seed, null, null);
@@ -172,6 +174,17 @@ public final class StringEncryptTransform {
         return oversizedLiteralCount;
     }
 
+    /**
+     * The number of {@code LDC ConstantDynamic} sites carrying a String among their bootstrap arguments
+     * that this transform did NOT encrypt. Java 11+ bytecode can materialize a constant through a
+     * {@code constant-dynamic} whose bootstrap arguments hold plaintext; those live neither in a direct
+     * {@code LDC "..."} nor in a field {@code ConstantValue}, and the condy is resolved at link time, so
+     * rewriting it to a decode call is unsafe. Counted and reported rather than shipped unremarked.
+     */
+    public int getCondyLiteralCount() {
+        return condyLiteralCount;
+    }
+
     /** Encrypts {@code classBytes}, returning the transformed bytes (or the input if nothing changed). */
     public byte[] transform(byte[] classBytes) {
         ClassNode cn = new ClassNode();
@@ -212,6 +225,7 @@ public final class StringEncryptTransform {
         // engine turns a non-zero total into a build warning so plaintext concat fragments are never
         // silently shipped.
         concatLiteralCount += countConcatLiterals(cn);
+        condyLiteralCount += countCondyLiterals(cn);
         // Count the distinct literals that would be encrypted but are too large to (their ciphertext
         // could overflow the constant pool), so the engine can report the exclusion rather than let an
         // strings:all build claim it encrypted everything.
@@ -344,6 +358,42 @@ public final class StringEncryptTransform {
         }
         for (int i = 1; i < bsmArgs.length; i++) {
             if (bsmArgs[i] instanceof String) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Counts the {@code LDC ConstantDynamic} sites in {@code cn} whose bootstrap arguments include a
+     * String -- Java 11+ can carry plaintext through a constant-dynamic (e.g. an enum switch map or an
+     * explicit-condy compiler), which no {@code LDC}/{@code ConstantValue} pass reaches. Counts the site
+     * once when it bears any String argument.
+     */
+    private static int countCondyLiterals(ClassNode cn) {
+        if (cn.methods == null) {
+            return 0;
+        }
+        int count = 0;
+        for (MethodNode mn : cn.methods) {
+            if (mn.instructions == null) {
+                continue;
+            }
+            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof ConstantDynamic) {
+                    if (condyHasStringArgument((ConstantDynamic) ((LdcInsnNode) insn).cst)) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    /** True when a constant-dynamic carries a String among its bootstrap arguments. */
+    private static boolean condyHasStringArgument(ConstantDynamic condy) {
+        for (int i = 0, n = condy.getBootstrapMethodArgumentCount(); i < n; i++) {
+            if (condy.getBootstrapMethodArgument(i) instanceof String) {
                 return true;
             }
         }
@@ -549,7 +599,13 @@ public final class StringEncryptTransform {
         // even though every input method was valid). When the initializer is large, split it across
         // synthetic helper methods and have <clinit> call them in order. Each init unit ends with
         // PUTSTATIC (stack empty), so cutting after a PUTSTATIC keeps every chunk verifiable.
-        if (init.size() <= MAX_CLINIT_INSNS) {
+        //
+        // Measure the COMBINED size -- the class may already carry a large <clinit>, so even a small
+        // new initializer inserted directly could push the existing method over the limit. When the
+        // total is under the bound, insert directly; otherwise split so <clinit> only gains a few calls.
+        MethodNode existingClinit = findClinit(cn);
+        int existingSize = existingClinit == null ? 0 : existingClinit.instructions.size();
+        if (existingSize + init.size() <= MAX_CLINIT_INSNS) {
             insertIntoClinit(cn, init);
             return;
         }
@@ -592,16 +648,20 @@ public final class StringEncryptTransform {
         insertIntoClinit(cn, calls);
     }
 
-    private void insertIntoClinit(ClassNode cn, InsnList init) {
-        MethodNode clinit = null;
+    /** The class's existing {@code <clinit>}, or {@code null} if it has none. */
+    private static MethodNode findClinit(ClassNode cn) {
         if (cn.methods != null) {
             for (MethodNode mn : cn.methods) {
                 if ("<clinit>".equals(mn.name) && "()V".equals(mn.desc)) {
-                    clinit = mn;
-                    break;
+                    return mn;
                 }
             }
         }
+        return null;
+    }
+
+    private void insertIntoClinit(ClassNode cn, InsnList init) {
+        MethodNode clinit = findClinit(cn);
         if (clinit == null) {
             clinit = new MethodNode(Opcodes.ASM9,
                     Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);

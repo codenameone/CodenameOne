@@ -271,6 +271,54 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void existingLargeClinitIsSplitWhenCombinedWithNewInit() throws Exception {
+        // A class that already carries a large <clinit> must not have a new initializer inserted
+        // directly (which could push the combined method over the 65535-byte limit): the split
+        // decision accounts for the existing initializer, so even one small hoisted literal triggers a
+        // helper split when the class's <clinit> is already large.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/BigExistingClinit", null, "java/lang/Object", null);
+        // An existing <clinit> with more instructions than the split threshold, but each a harmless
+        // stack-neutral ICONST_0/POP pair.
+        org.objectweb.asm.MethodVisitor clinit = w.visitMethod(org.objectweb.asm.Opcodes.ACC_STATIC,
+                "<clinit>", "()V", null, null);
+        clinit.visitCode();
+        for (int i = 0; i < 5000; i++) {
+            clinit.visitInsn(org.objectweb.asm.Opcodes.ICONST_0);
+            clinit.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        clinit.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        clinit.visitMaxs(1, 0);
+        clinit.visitEnd();
+        // One encryptable literal, whose hoisted initializer would otherwise be inserted directly.
+        addStringGetter(w, "probe", "a small hoisted secret literal value");
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 13);
+        byte[] out = t.transform(w.toByteArray());
+        CheckClassAdapter.verify(new org.objectweb.asm.ClassReader(out), false,
+                new java.io.PrintWriter(new java.io.StringWriter()));
+
+        final boolean[] sawHelper = {false};
+        new org.objectweb.asm.ClassReader(out).accept(new org.objectweb.asm.ClassVisitor(
+                org.objectweb.asm.Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc,
+                    String sig, String[] exceptions) {
+                if (name.startsWith("zqCI$")) {
+                    sawHelper[0] = true;
+                }
+                return null;
+            }
+        }, org.objectweb.asm.ClassReader.SKIP_CODE);
+        assertTrue("a large existing <clinit> must push the new init into a helper", sawHelper[0]);
+
+        Class<?> c = new ByteLoader().define("app.BigExistingClinit", out);
+        assertEquals("a small hoisted secret literal value", c.getMethod("probe").invoke(null));
+    }
+
+    @Test
     public void preJava8InterfaceConstantIsCountedAsExcluded() throws Exception {
         // A Java 7 interface cannot host a <clinit>/decoder, so its own static-final String constant
         // stays plaintext. The transform must not silently ship it: it leaves it and counts it so the
