@@ -192,6 +192,7 @@ public final class HardeningEngine {
         int annotationLiterals = 0;
         int jarExcludedLiterals = 0;
         int libraryExcludedLiterals = 0;
+        int sourcePreservedConstants = 0;
         boolean stringsApplied = cfg.isAnyStringEncryption() && stringEncryptionSafeFor(cfg.getPlatform());
         if (stringsApplied) {
             // In "constants" mode, first collect the values declared as static-final String
@@ -221,6 +222,26 @@ public final class HardeningEngine {
             final java.util.Set<String> libLiterals =
                     libraryLiterals != null && !libraryLiterals.isEmpty() ? libraryLiterals : null;
             java.util.Set<String> libraryExcluded = new java.util.HashSet<String>();
+            // On a target that compiles the .java/.kt source bundled in the app jar against the
+            // transformed classes (Android places those sources in src/main/java and the hardened classes
+            // in libs/userClasses.jar), stripping a static-final String ConstantValue would break a
+            // case-label/annotation/const-initializer reference to it in that source. Collect the
+            // identifiers such sources reference so those constants keep their ConstantValue.
+            java.util.Set<String> srcNames = null;
+            if (compilesCarriedSource(cfg.getPlatform())) {
+                java.util.Set<String> ids = new java.util.HashSet<String>();
+                for (Map.Entry<String, byte[]> e : nonClass.asMap().entrySet()) {
+                    String name = e.getKey().toLowerCase();
+                    if (name.endsWith(".java") || name.endsWith(".kt")) {
+                        collectSourceIdentifiers(new String(e.getValue(),
+                                java.nio.charset.Charset.forName("UTF-8")), ids);
+                    }
+                }
+                if (!ids.isEmpty()) {
+                    srcNames = ids;
+                }
+            }
+            final java.util.Set<String> sourceReferencedNames = srcNames;
             // Pass 1 (from a snapshot of the input bytes): transform every class, tally the counts, and
             // collect the values any class could NOT encrypt (a method too full for the decode call, or a
             // class whose pool cannot fit the decoder). A value encrypted+interned in one class but left
@@ -232,9 +253,11 @@ public final class HardeningEngine {
                 StringEncryptTransform t = new StringEncryptTransform(
                         cfg.isEncryptAllStrings(), seed, hierarchy, constantValues, null);
                 t.setLibraryLiterals(libLiterals);
+                t.setSourceReferencedNames(sourceReferencedNames);
                 e.setValue(t.transform(e.getValue()));
                 jarExcluded.addAll(t.getNewlyExcluded());
                 libraryExcluded.addAll(t.getLibraryExcludedValues());
+                sourcePreservedConstants += t.getSourcePreservedConstantCount();
                 encryptedStrings += t.getEncryptedCount();
                 concatLiterals += t.getConcatLiteralCount();
                 legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
@@ -259,13 +282,16 @@ public final class HardeningEngine {
                 shortLiterals = 0;
                 clinitFullLiterals = 0;
                 annotationLiterals = 0;
+                sourcePreservedConstants = 0;
                 libraryExcluded.clear();
                 for (Map.Entry<String, byte[]> e : renamed.entrySet()) {
                     StringEncryptTransform t = new StringEncryptTransform(
                             cfg.isEncryptAllStrings(), seed, hierarchy, constantValues, jarExcluded);
                     t.setLibraryLiterals(libLiterals);
+                    t.setSourceReferencedNames(sourceReferencedNames);
                     e.setValue(t.transform(original.get(e.getKey())));
                     libraryExcluded.addAll(t.getLibraryExcludedValues());
+                    sourcePreservedConstants += t.getSourcePreservedConstantCount();
                     encryptedStrings += t.getEncryptedCount();
                     concatLiterals += t.getConcatLiteralCount();
                     legacyInterfaceConstants += t.getLegacyInterfaceConstantCount();
@@ -423,6 +449,14 @@ public final class HardeningEngine {
                     + "plaintext in every class because at least one class could not encrypt them (a "
                     + "method or constant pool near the JVM limit); those literals stay readable");
         }
+        if (stringsApplied && sourcePreservedConstants > 0) {
+            // A static-final String referenced by a bundled .java/.kt source in a constant-expression
+            // context keeps its ConstantValue so that source still compiles; disclose the plaintext.
+            result.getWarnings().add(sourcePreservedConstants + " static-final String constant(s) kept "
+                    + "their plaintext ConstantValue because a bundled .java/.kt source may reference them "
+                    + "as a compile-time constant (a case label or annotation value), which requires the "
+                    + "attribute to compile; their inlined reads are still encrypted");
+        }
         if (stringsApplied && libraryExcludedLiterals > 0) {
             // Values that also appear as a literal in an unhardened library class are left plaintext so a
             // literal == against the library's (never interned) constant-pool copy still holds on ParparVM.
@@ -506,6 +540,37 @@ public final class HardeningEngine {
     static boolean translatesThroughParparVMC(String platform) {
         return "ios".equals(platform) || "mac".equals(platform) || "watch".equals(platform)
                 || "tv".equals(platform) || "win".equals(platform) || "linux".equals(platform);
+    }
+
+    /**
+     * True for a target that javac/kotlinc-compiles the {@code .java}/{@code .kt} sources bundled in the
+     * app jar against the transformed classes. Android does (the sources land in {@code src/main/java}
+     * and the hardened classes in {@code libs/userClasses.jar}); iOS routes carried source into the
+     * resource tree and never compiles it, win/linux compile only the ParparVM translator's generated
+     * {@code .java}, and JavaSE runs the bytecode directly. On such a target a stripped
+     * {@code ConstantValue} would break a constant-expression reference from the carried source.
+     */
+    static boolean compilesCarriedSource(String platform) {
+        return "and".equals(platform) || "android".equals(platform);
+    }
+
+    /** Adds every Java/Kotlin identifier token in {@code source} to {@code out} (a safe over-set). */
+    private static void collectSourceIdentifiers(String source, java.util.Set<String> out) {
+        int n = source.length();
+        int i = 0;
+        while (i < n) {
+            char c = source.charAt(i);
+            if (Character.isJavaIdentifierStart(c)) {
+                int start = i;
+                i++;
+                while (i < n && Character.isJavaIdentifierPart(source.charAt(i))) {
+                    i++;
+                }
+                out.add(source.substring(start, i));
+            } else {
+                i++;
+            }
+        }
     }
 
     /**

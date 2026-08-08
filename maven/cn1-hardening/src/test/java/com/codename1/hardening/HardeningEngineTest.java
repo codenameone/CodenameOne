@@ -151,6 +151,99 @@ public class HardeningEngineTest {
         return HardeningEngine.harden(req);
     }
 
+    /**
+     * A class with {@code public static final String FIELD = value} plus a second, unreferenced
+     * {@code OTHER} constant so an Android build (where the referenced FIELD is preserved) still encrypts
+     * something and is marked hardened.
+     */
+    private static byte[] classWithStaticFinalString(String internal, String field, String value) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, "java/lang/Object", null);
+        cw.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, field, "Ljava/lang/String;", null, value).visitEnd();
+        cw.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "OTHER", "Ljava/lang/String;", null,
+                "an unrelated secret constant not named by any bundled source").visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    /** The ConstantValue of the named static-final String field in a class, or null if stripped/absent. */
+    private static String constantValueOf(byte[] classBytes, final String field) {
+        final String[] holder = new String[1];
+        new org.objectweb.asm.ClassReader(classBytes).accept(
+                new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
+                    @Override
+                    public org.objectweb.asm.FieldVisitor visitField(int access, String name, String desc,
+                            String sig, Object value) {
+                        if (field.equals(name)) {
+                            holder[0] = value instanceof String ? (String) value : null;
+                        }
+                        return null;
+                    }
+                }, org.objectweb.asm.ClassReader.SKIP_CODE);
+        return holder[0];
+    }
+
+    private HardeningResult hardenClassWithBundledSource(String platform, String constantValue,
+            String bundledSource, String suffix) throws Exception {
+        File jar = tmp.newFile("cv-" + suffix + ".jar");
+        FileOutputStream fo = new FileOutputStream(jar);
+        ZipOutputStream zos = new ZipOutputStream(fo);
+        zos.putNextEntry(new ZipEntry("app/Constants.class"));
+        zos.write(classWithStaticFinalString("app/Constants", "MODE", constantValue));
+        zos.closeEntry();
+        zos.putNextEntry(new ZipEntry("com/lib/Native.java"));
+        zos.write(bundledSource.getBytes("UTF-8"));
+        zos.closeEntry();
+        zos.finish();
+        fo.close();
+        Map<String, String> hints = new HashMap<String, String>();
+        hints.put("harden.level", "aggressive");
+        hints.put("harden.strings", "all");
+        hints.put("harden.rename", "false");
+        HardeningRequest req = new HardeningRequest()
+                .inputJar(jar).outputJar(tmp.newFile("cv-out-" + suffix + ".jar"))
+                .mappingFile(tmp.newFile("cv-map-" + suffix + ".txt"))
+                .reportFile(tmp.newFile("cv-report-" + suffix + ".json"))
+                .workDir(tmp.newFolder("cv-work-" + suffix))
+                .config(HardeningConfig.from(hints, platform, false))
+                .mainClass("app.Constants");
+        return HardeningEngine.harden(req);
+    }
+
+    @Test
+    public void staticFinalConstantReferencedByBundledSourceKeepsItsConstantValueOnAndroid() throws Exception {
+        // A bundled Android .java source references app.Constants.MODE in a case label. On Android the
+        // source is compiled against the transformed classes, so stripping MODE's ConstantValue would
+        // break that compilation. The engine preserves it (still a compile-time constant) on Android.
+        String value = "the mode constant a bundled source needs";
+        String source = "package com.lib; class Native { int f(int x){ switch(x){ "
+                + "case /* app.Constants. */ 0: return app.Constants.MODE.length(); default: return 0; } } }";
+        HardeningResult r = hardenClassWithBundledSource("and", value, source, "and");
+        assertTrue(r.isHardened());
+        byte[] cls = readAll(r.getHardenedJar()).get("app/Constants.class");
+        assertEquals("MODE keeps its ConstantValue so the bundled source still compiles", value,
+                constantValueOf(cls, "MODE"));
+        // Preservation is selective: a constant NOT named by any bundled source is still encrypted.
+        assertEquals("an unreferenced constant is still stripped/encrypted", null,
+                constantValueOf(cls, "OTHER"));
+    }
+
+    @Test
+    public void staticFinalConstantIsStrippedWhenNoSourceCompilesAgainstIt() throws Exception {
+        // iOS routes bundled .java into the resource tree and never compiles it, so there is no
+        // constant-expression hazard: MODE's ConstantValue is stripped and encrypted as usual.
+        String value = "the mode constant a bundled source needs";
+        String source = "package com.lib; class Native { int f(){ return app.Constants.MODE.length(); } }";
+        HardeningResult r = hardenClassWithBundledSource("ios", value, source, "ios");
+        assertTrue(r.isHardened());
+        assertEquals("on iOS the ConstantValue is stripped (encrypted), no bundled source compiles it",
+                null, constantValueOf(readAll(r.getHardenedJar()).get("app/Constants.class"), "MODE"));
+        assertTrue("the stripped constant is encrypted", r.getEncryptedStrings() >= 1);
+    }
+
     @Test
     public void librarySharedLiteralsStayPlaintextOnParparVM() throws Exception {
         // On a ParparVM-C target a compile-time literal is a never-interned constant-pool object while an

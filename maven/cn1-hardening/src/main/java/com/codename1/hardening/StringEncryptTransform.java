@@ -262,6 +262,28 @@ public final class StringEncryptTransform {
         return libraryExcludedValues;
     }
 
+    /**
+     * Simple field names a carried {@code .java}/{@code .kt} source (bundled in the app jar and compiled
+     * downstream against the transformed classes, e.g. an Android CN1Lib native source) may reference as a
+     * compile-time constant. A {@code static final String} whose name is in this set keeps its
+     * {@code ConstantValue} attribute: stripping it would make the field a non-constant and break a
+     * {@code case}/annotation/const-initializer reference in that source at javac/kotlinc time. Null on a
+     * target that does not compile carried source, where the attribute is stripped as usual.
+     */
+    private java.util.Set<String> sourceReferencedNames;
+    /** Count of static-final constants whose ConstantValue was preserved for a carried source reference. */
+    private int sourcePreservedConstantCount;
+
+    /** Sets the field names carried source may reference as constants, whose ConstantValue is preserved. */
+    void setSourceReferencedNames(java.util.Set<String> names) {
+        this.sourceReferencedNames = names;
+    }
+
+    /** Count of static-final String constants left plaintext to keep a carried source's compilation valid. */
+    int getSourcePreservedConstantCount() {
+        return sourcePreservedConstantCount;
+    }
+
     public int getEncryptedCount() {
         return encryptedCount;
     }
@@ -1081,6 +1103,15 @@ public final class StringEncryptTransform {
         for (FieldNode fn : cn.fields) {
             boolean isStatic = (fn.access & Opcodes.ACC_STATIC) != 0;
             if (isStatic && fn.value instanceof String && shouldEncrypt((String) fn.value)) {
+                if (sourceReferencedNames != null && sourceReferencedNames.contains(fn.name)) {
+                    // A carried .java/.kt source may use this constant in a constant-expression context
+                    // (a case label, an annotation value, another constant's initializer). Stripping its
+                    // ConstantValue would make the field a non-constant and break that source's javac/
+                    // kotlinc compilation against the transformed jar, so preserve it (plaintext,
+                    // disclosed). The inlined reads elsewhere in the app are still encrypted.
+                    sourcePreservedConstantCount++;
+                    continue;
+                }
                 if (toStrip.size() >= budget) {
                     // Pool budget exhausted: leave this constant plaintext (dead value, reported).
                     clinitFullLiteralCount++;
