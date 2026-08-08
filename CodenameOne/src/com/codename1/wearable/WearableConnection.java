@@ -504,10 +504,21 @@ public final class WearableConnection {
                 WearableMessage reply = null;
                 WearableMessageListener[] copy =
                         messageListenerSnapshot();
+                // Isolated per listener, as every other dispatch here is. A live message cannot be
+                // replayed, so a listener skipped because an EARLIER one threw simply never sees
+                // it -- and for a request the sender waits out its whole timeout even when a later
+                // listener would have answered.
+                RuntimeException failure = null;
                 for (WearableMessageListener l : copy) {
-                    WearableMessage r = l.messageReceived(m, replyToken != 0);
-                    if (r != null && reply == null) {
-                        reply = r;
+                    try {
+                        WearableMessage r = l.messageReceived(m, replyToken != 0);
+                        if (r != null && reply == null) {
+                            reply = r;
+                        }
+                    } catch (RuntimeException listenerFailed) {
+                        if (failure == null) {
+                            failure = listenerFailed;
+                        }
                     }
                 }
                 // Nothing answers for an app that has no listener left. The snapshot can empty
@@ -521,6 +532,11 @@ public final class WearableConnection {
                         b.sendReply(replyToken,
                                 reply == null ? new byte[0] : reply.toByteArray());
                     }
+                }
+                // Reported, not swallowed -- but only once every listener has been offered the
+                // message and the sender has its answer.
+                if (failure != null) {
+                    throw failure;
                 }
             }
         }, messageListeners, pendingMessages);
@@ -609,8 +625,23 @@ public final class WearableConnection {
                     return;
                 }
                 WearableMessage m = WearableMessage.fromByteArray(path, payload);
+                // Isolated per listener, as the tracked and removal paths already are. The port
+                // recorded this path as delivered before the runnable ran, and an unchanged
+                // replicated value raises no further callback, so a listener skipped because an
+                // earlier one threw stays stale until the peer happens to publish again.
+                RuntimeException failure = null;
                 for (WearableDataListener l : copy) {
-                    l.dataChanged(m);
+                    try {
+                        l.dataChanged(m);
+                    } catch (RuntimeException listenerFailed) {
+                        if (failure == null) {
+                            failure = listenerFailed;
+                        }
+                    }
+                }
+                // Reported, not swallowed -- but only once every listener has been offered it.
+                if (failure != null) {
+                    throw failure;
                 }
             }
         });

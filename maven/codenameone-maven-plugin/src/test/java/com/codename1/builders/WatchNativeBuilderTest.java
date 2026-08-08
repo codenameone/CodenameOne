@@ -453,6 +453,37 @@ class WatchNativeBuilderTest {
                 "the entity must not be escaped a second time: " + plist);
     }
 
+    /// CDATA is not an entity, so the entity decoder leaves it exactly as written. Read as text it
+    /// reaches the watch plist as literal markup, while an XML parser reading the phone's plist
+    /// resolves it -- the two bundles then disagree about a version string or a purpose string.
+    @Test
+    void injectedCdataIsResolvedNotEmitted(@TempDir Path tmp) throws IOException {
+        assertEquals("1.2", WatchNativeBuilder.plistStringContent("<![CDATA[1.2]]>"));
+        assertEquals("Health & Fitness",
+                WatchNativeBuilder.plistStringContent("<![CDATA[Health & Fitness]]>"),
+                "inside CDATA an ampersand is data, not the start of a reference");
+        assertEquals("a & b",
+                WatchNativeBuilder.plistStringContent("a &amp; <![CDATA[b]]>"),
+                "entities outside a CDATA section are still decoded");
+        assertEquals("a &amp; b",
+                WatchNativeBuilder.plistStringContent("<![CDATA[a &amp; b]]>"),
+                "and entities inside one are not");
+        assertEquals("</string>",
+                WatchNativeBuilder.plistStringContent("<![CDATA[</string>]]>"),
+                "an end tag inside CDATA is data");
+
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject", "<key>NSHealthShareUsageDescription</key>"
+                + "<string><![CDATA[Health & Fitness]]></string>");
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("Uses Health &amp; Fitness data")
+                        || plist.contains("Health &amp; Fitness"),
+                "the CDATA content must be escaped once, as text: " + plist);
+        assertFalse(plist.contains("CDATA"),
+                "the CDATA markup itself must not reach the watch plist: " + plist);
+    }
+
     /// Numeric references are ordinary XML, and a single left-to-right pass must not decode its
     /// own output -- "&amp;#38;" is an author writing a literal "&#38;", not an escaped ampersand.
     @Test

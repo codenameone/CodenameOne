@@ -717,11 +717,82 @@ class WatchNativeBuilder {
         if (open < 0) {
             return null;
         }
-        int close = inject.indexOf("</string>", open);
+        int close = closeOfString(inject, open + "<string>".length());
         if (close < 0) {
             return null;
         }
-        return decodeXmlEntities(inject.substring(open + "<string>".length(), close).trim());
+        return plistStringContent(inject.substring(open + "<string>".length(), close));
+    }
+
+    /// The {@code </string>} that closes the element, skipping over CDATA sections.
+    ///
+    /// A plain {@code indexOf} finds the first literal occurrence, and inside
+    /// {@code <![CDATA[a</string>b]]>} that occurrence is DATA -- the element would be cut in half
+    /// at a point the XML parser reading the phone's plist never stops at.
+    private static int closeOfString(String inject, int from) {
+        int i = from;
+        while (i <= inject.length()) {
+            int close = inject.indexOf("</string>", i);
+            if (close < 0) {
+                return -1;
+            }
+            int cdata = inject.indexOf("<![CDATA[", i);
+            if (cdata < 0 || cdata > close) {
+                return close;
+            }
+            int end = inject.indexOf("]]>", cdata + CDATA_OPEN.length());
+            if (end < 0) {
+                // Unterminated CDATA. Nothing after it can be located reliably, so the key is
+                // treated as absent rather than guessed at.
+                return -1;
+            }
+            i = end + CDATA_CLOSE.length();
+        }
+        return -1;
+    }
+
+    private static final String CDATA_OPEN = "<![CDATA[";
+
+    private static final String CDATA_CLOSE = "]]>";
+
+    /// The text a plist {@code <string>} actually carries.
+    ///
+    /// CDATA is not an entity, so the entity decoder leaves it exactly as written and the escaper
+    /// downstream emits {@code &lt;![CDATA[1.2]]&gt;} as the value. An XML parser reading the
+    /// phone's plist resolves the same markup to {@code 1.2}, so the watch ended up with a
+    /// different version string -- or with the markup itself shown in a permission prompt.
+    ///
+    /// Inside a CDATA section the content is taken verbatim, because that is what CDATA means: an
+    /// {@code &amp;} written there is an ampersand, not the start of a reference. Outside one the
+    /// entity decoding applies as before. The assembled value is trimmed, matching what this did
+    /// before CDATA was understood at all.
+    static String plistStringContent(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw.indexOf(CDATA_OPEN) < 0) {
+            return decodeXmlEntities(raw.trim());
+        }
+        StringBuilder out = new StringBuilder(raw.length());
+        int i = 0;
+        while (i < raw.length()) {
+            int cdata = raw.indexOf(CDATA_OPEN, i);
+            if (cdata < 0) {
+                out.append(decodeXmlEntities(raw.substring(i)));
+                break;
+            }
+            out.append(decodeXmlEntities(raw.substring(i, cdata)));
+            int body = cdata + CDATA_OPEN.length();
+            int end = raw.indexOf(CDATA_CLOSE, body);
+            if (end < 0) {
+                // Unterminated: take the remainder as data rather than emitting the marker as text.
+                out.append(raw.substring(body));
+                break;
+            }
+            out.append(raw, body, end);
+            i = end + CDATA_CLOSE.length();
+        }
+        return out.toString().trim();
     }
 
     /// Turns the five predefined XML entities back into their characters.
