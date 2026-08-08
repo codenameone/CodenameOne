@@ -5006,11 +5006,11 @@ public class IPhoneBuilder extends Executor {
                 ? manifestAppGroup
                 : (hintAppGroup != null && hintAppGroup.length() > 0
                         ? hintAppGroup : "group." + request.getPackageName());
-        if (!surfacesAppGroup.startsWith("group.")) {
-            throw new BuildException("The surfaces app group must start with 'group.' (Apple "
-                    + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
-                    + "appGroup or the ios.surfaces.appGroup build hint)");
-        }
+        // Validated further down, AFTER the kinds are parsed and it is known whether anything in
+        // this manifest reaches iOS at all. A watch-only manifest produces no iOS extension and no
+        // application-groups entitlement, so nothing consumes this value -- and failing the whole
+        // build on a stale or non-Apple app group that is never used would reject a project that
+        // is entirely valid.
         Object liveActivities = parsed.get("liveActivities");
         surfacesLiveActivities = Boolean.TRUE.equals(liveActivities)
                 || "true".equals(liveActivities);
@@ -5075,6 +5075,13 @@ public class IPhoneBuilder extends Executor {
             // Nothing further to prepare, and in particular no xcodeproj gem to require: that
             // check exists for wiring an extension into the project, and there is no extension.
             return;
+        }
+        // Only now, with an iOS surface confirmed, is the app group something this build actually
+        // uses -- and only now is rejecting a malformed one the right answer.
+        if (!surfacesAppGroup.startsWith("group.")) {
+            throw new BuildException("The surfaces app group must start with 'group.' (Apple "
+                    + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
+                    + "appGroup or the ios.surfaces.appGroup build hint)");
         }
         // The extension is wired into the Xcode project through the ruby xcodeproj gem;
         // fail early with a friendly message when it is missing.
