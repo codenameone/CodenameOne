@@ -169,6 +169,18 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void onlyTheTerminalTwoCoordinateGroupsArePreserved() {
+        // A frame URL can carry colon-delimited user data before the real :line:column, e.g.
+        // host/account:123456:1:42. Only the terminal two numeric groups (:1:42) are the coordinate;
+        // the earlier :123456 is data and must be scrubbed.
+        String stack = "TypeError: boom\n"
+                + "    at f (https://host/account:123456:1:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account:[num]:1:42)") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+    }
+
+    @Test
     void customScrubMessageOverrideReachesRawStack() {
         // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
         // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by

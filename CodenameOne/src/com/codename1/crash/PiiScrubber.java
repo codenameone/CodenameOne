@@ -235,15 +235,17 @@ public class PiiScrubber {
     }
 
     /// Index at which a trailing `:<line>` (optionally `:<line>:<column>`) location begins, or -1
-    /// when the string does not end in one. A single trailing `)` is allowed.
+    /// when the string does not end in one. A single trailing `)` is allowed. Consumes AT MOST two
+    /// numeric groups -- a real location is `:line` or `:line:column` -- so colon-delimited data before
+    /// the coordinate (a URL like `host/account:123456:1:42`) stays in the scrubbable head rather than
+    /// being preserved as if it were part of the coordinate.
     private static int trailingLocationStart(String t) {
         int i = t.length() - 1;
         if (i >= 0 && t.charAt(i) == ')') {
             i--;
         }
         int start = -1;
-        boolean matched = true;
-        while (matched) {
+        for (int groups = 0; groups < 2; groups++) {
             int j = i;
             int digits = 0;
             while (j >= 0 && t.charAt(j) >= '0' && t.charAt(j) <= '9') {
@@ -254,7 +256,7 @@ public class PiiScrubber {
                 start = j;
                 i = j - 1;
             } else {
-                matched = false;
+                break;
             }
         }
         return start;
