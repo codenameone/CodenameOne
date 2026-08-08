@@ -137,7 +137,7 @@ final class JdwpTestClient implements AutoCloseable {
                     return new Reply(packet.errorCode, packet.body);
                 }
             } else {
-                events.add(Event.parse(packet.body));
+                events.addAll(Event.parseAll(packet.body));
             }
         }
     }
@@ -152,7 +152,7 @@ final class JdwpTestClient implements AutoCloseable {
             while (true) {
                 Packet packet = readPacket();
                 if (!packet.isReply) {
-                    events.add(Event.parse(packet.body));
+                    events.addAll(Event.parseAll(packet.body));
                 }
             }
         } catch (IOException expected) {
@@ -288,19 +288,67 @@ final class JdwpTestClient implements AutoCloseable {
             this.rest = rest;
         }
 
-        static Event parse(byte[] body) {
+        /**
+         * Splits a composite packet into its events.
+         *
+         * A composite can carry more than one — a VM death matching several
+         * registered requests, for instance — so each event's payload has to
+         * be consumed by kind to find where the next one starts.
+         */
+        static List<Event> parseAll(byte[] body) {
             DataInputStream b = new DataInputStream(new ByteArrayInputStream(body));
+            List<Event> events = new ArrayList<>();
             try {
                 int suspendPolicy = b.readUnsignedByte();
-                b.readInt(); // event count
-                int eventKind = b.readUnsignedByte();
-                int requestId = b.readInt();
-                byte[] rest = new byte[b.available()];
-                b.readFully(rest);
-                return new Event(suspendPolicy, eventKind, requestId, rest);
+                int count = b.readInt();
+                for (int i = 0; i < count; i++) {
+                    int eventKind = b.readUnsignedByte();
+                    int requestId = b.readInt();
+                    events.add(new Event(suspendPolicy, eventKind, requestId,
+                            readEventPayload(b, eventKind)));
+                }
             } catch (IOException impossible) {
                 throw new AssertionError(impossible);
             }
+            return events;
+        }
+
+        /** Consumes the kind-specific tail of one event, returning its bytes. */
+        private static byte[] readEventPayload(DataInputStream b, int eventKind)
+                throws IOException {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            DataOutputStream w = new DataOutputStream(out);
+            switch (eventKind) {
+                case 99:  // VM_DEATH — no payload
+                    break;
+                case 90:  // VM_START — thread
+                    w.writeLong(b.readLong());
+                    break;
+                case 1:   // SINGLE_STEP
+                case 2: { // BREAKPOINT — thread + location
+                    w.writeLong(b.readLong());
+                    w.writeByte(b.readUnsignedByte());
+                    w.writeLong(b.readLong());
+                    w.writeLong(b.readLong());
+                    w.writeLong(b.readLong());
+                    break;
+                }
+                case 8: { // CLASS_PREPARE — thread, tag, typeID, signature, status
+                    w.writeLong(b.readLong());
+                    w.writeByte(b.readUnsignedByte());
+                    w.writeLong(b.readLong());
+                    int len = b.readInt();
+                    byte[] sig = new byte[len];
+                    b.readFully(sig);
+                    w.writeInt(len);
+                    w.write(sig);
+                    w.writeInt(b.readInt());
+                    break;
+                }
+                default:
+                    throw new IOException("test client cannot size event kind " + eventKind);
+            }
+            return out.toByteArray();
         }
 
         /**

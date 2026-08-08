@@ -30,6 +30,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -133,6 +134,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     // a proxy that accepts the request and never fires leaves those breakpoints
     // permanently unarmed.
     private final Map<Integer, ClassPrepareRequest> classPrepareRequests = new ConcurrentHashMap<>();
+    // VM_DEATH requests the IDE has registered, by request id, with the
+    // suspend policy each asked for. The spec's automatic VM-death event
+    // carries request id 0; a registered request expects its own id back, and
+    // an IDE that gets neither waits for a session end that never arrives.
+    private final Map<Integer, Integer> vmDeathRequests = new ConcurrentHashMap<>();
 
     /** What the device reports about one thread. Keyed by id in deviceThreads. */
     private static final class ThreadInfo {
@@ -346,9 +352,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         // Clear any pending step requests so a stale one from the previous
         // attach can't fire against the new debugger.
         stepRequests.clear();
-        // Same for class-prepare registrations: the next IDE re-registers its
-        // own, and replaying against a closed socket would only log failures.
+        // Same for class-prepare and VM-death registrations: the next IDE
+        // re-registers its own, and replaying against a closed socket would
+        // only log failures.
         classPrepareRequests.clear();
+        vmDeathRequests.clear();
         // Re-arm VM_START for the next attach.
         vmStartSent = false;
         // Breakpoints stay in bpRequests so the device keeps them set; the
@@ -1269,6 +1277,8 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     Buf reply = new Buf(); reply.writeInt(rid); writeReply(id, 0, reply.bytes());
                     replayClassPrepare(cpr);
                     return;
+                } else if (eventKind == EK_VM_DEATH) {
+                    vmDeathRequests.put(rid, suspendPolicy);
                 } else if (eventKind == EK_SINGLE_STEP && stepThread != 0) {
                     // depth: 0=INTO, 1=OVER, 2=OUT — same numeric values as
                     // the wire protocol's STEP_INTO/OVER/OUT, so no mapping.
@@ -1295,6 +1305,9 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 }
                 if (eventKind == EK_CLASS_PREPARE) {
                     classPrepareRequests.remove(rid);
+                }
+                if (eventKind == EK_VM_DEATH) {
+                    vmDeathRequests.remove(rid);
                 }
                 writeReply(id, 0, empty());
                 return;
@@ -1946,11 +1959,25 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     @Override public void onVmDeath() {
         try {
+            // One composite carrying the spec's automatic event (request id 0)
+            // plus every request the IDE registered, so a debugger waiting on
+            // its own id sees the session end. The composite's suspend policy
+            // is the strongest any request asked for — matching a lower one
+            // would leave a debugger that asked to suspend running on.
+            Map<Integer, Integer> registered = new LinkedHashMap<>(vmDeathRequests);
+            int suspendPolicy = SP_NONE;
+            for (int policy : registered.values()) {
+                if (policy > suspendPolicy) suspendPolicy = policy;
+            }
             Buf b = new Buf();
-            b.writeByte(SP_NONE);
-            b.writeInt(1);
+            b.writeByte(suspendPolicy);
+            b.writeInt(1 + registered.size());
             b.writeByte(EK_VM_DEATH);
             b.writeInt(0);
+            for (int rid : registered.keySet()) {
+                b.writeByte(EK_VM_DEATH);
+                b.writeInt(rid);
+            }
             writeEventCommand(b.bytes());
         } catch (IOException ignore) {}
     }

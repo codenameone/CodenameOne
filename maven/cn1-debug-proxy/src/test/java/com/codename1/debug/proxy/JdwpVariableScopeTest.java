@@ -167,6 +167,75 @@ public class JdwpVariableScopeTest {
         }
     }
 
+    /**
+     * A registered VM_DEATH request gets its own event when the session ends.
+     *
+     * <p>The capability is only honest if the request path works. The spec's
+     * automatic event carries request id 0; a debugger that registered a
+     * request is waiting for the id it was handed, and one that never arrives
+     * leaves it waiting for a session end that already happened.</p>
+     */
+    @Test
+    public void aRegisteredVmDeathRequestIsMatchedWhenTheSessionEnds() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+
+            byte[] set = new byte[6];
+            set[0] = 99;  // VM_DEATH
+            set[1] = 2;   // SUSPEND_ALL
+            JdwpTestClient.Reply reply = client.send(JdwpTestClient.CS_EVENT_REQUEST, 1, set);
+            assertEquals(0, reply.errorCode);
+            int rid = reply.stream().readInt();
+            assertTrue("a VM_DEATH request should get a real id", rid > 0);
+
+            server.onVmDeath();
+
+            List<Integer> ids = new ArrayList<>();
+            int suspendPolicy = -1;
+            for (JdwpTestClient.Event e : client.drainEvents()) {
+                if (e.eventKind == 99) {
+                    ids.add(e.requestId);
+                    suspendPolicy = e.suspendPolicy;
+                }
+            }
+            assertTrue("the automatic event must still be sent", ids.contains(0));
+            assertTrue("the registered request must be matched, got " + ids, ids.contains(rid));
+            assertEquals("the strongest requested policy wins", 2, suspendPolicy);
+        }
+    }
+
+    /** Clearing it stops the match, so a stale id is not sent to the next IDE. */
+    @Test
+    public void aClearedVmDeathRequestIsNoLongerMatched() throws Exception {
+        int port = JdwpTestClient.freePort();
+        JdwpServer server = new JdwpServer(port);
+        try (JdwpTestClient client = JdwpTestClient.attach(server, port)) {
+            primeSymbols(server);
+
+            byte[] set = new byte[6];
+            set[0] = 99;
+            int rid = client.send(JdwpTestClient.CS_EVENT_REQUEST, 1, set).stream().readInt();
+
+            byte[] clear = new byte[5];
+            clear[0] = 99;
+            clear[1] = (byte) (rid >>> 24);
+            clear[2] = (byte) (rid >>> 16);
+            clear[3] = (byte) (rid >>> 8);
+            clear[4] = (byte) rid;
+            assertEquals(0, client.send(JdwpTestClient.CS_EVENT_REQUEST, 2, clear).errorCode);
+
+            server.onVmDeath();
+
+            for (JdwpTestClient.Event e : client.drainEvents()) {
+                if (e.eventKind == 99) {
+                    assertEquals("only the automatic event remains", 0, e.requestId);
+                }
+            }
+        }
+    }
+
     // ---- helpers -----------------------------------------------------------
 
     private List<Var> variableTable() throws Exception {
