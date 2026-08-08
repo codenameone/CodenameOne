@@ -58,6 +58,10 @@ public final class BuiltinKeepRules {
         }
         // Generated registries the stub instantiates by literal name.
         r.add("-keep class com.codename1.router.generated.Routes { *; }");
+        // The transcoded-SVG registry: the platform builders probe for this class by its exact name to
+        // decide whether to emit its installGlobal() call, so renaming it would make them conclude no
+        // SVGs were generated and silently drop SVG rendering from the hardened app.
+        r.add("-keep class com.codename1.generated.svg.SVGRegistry { *; }");
         for (String b : BOOTSTRAPS) {
             r.add("-keep class cn1app." + b + " { *; }");
         }
