@@ -65,23 +65,34 @@ class WindowsDatabase extends Database {
     WindowsDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
         this.openKey = path;
-        peer = WindowsNative.sqlDbOpen(path);
-        if (key != null) {
-            int status = WindowsNative.sqlDbApplyKeyStatus(peer, key);
-            if (status != SQLITE_OK) {
-                WindowsNative.sqlDbClose(peer);
-                peer = 0;
-                if (status == SQLITE_NOTADB) {
-                    throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
-                            "The supplied key does not decrypt this database");
+        // Registration first, because it is also the refusal: a key change in progress is rewriting
+        // this file, and opening it before asking would touch it mid-rewrite and leave the handle
+        // behind when the refusal arrived.
+        registerOpenDatabase(openKey);
+        boolean opened = false;
+        try {
+            peer = WindowsNative.sqlDbOpen(path);
+            if (key != null) {
+                int status = WindowsNative.sqlDbApplyKeyStatus(peer, key);
+                if (status != SQLITE_OK) {
+                    WindowsNative.sqlDbClose(peer);
+                    peer = 0;
+                    if (status == SQLITE_NOTADB) {
+                        throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                                "The supplied key does not decrypt this database");
+                    }
+                    // A corrupt image or a read error, which no key repairs. Reporting it as a wrong
+                    // key would have an application prompting for a passphrase that cannot help.
+                    throw new IOException("The database " + databaseName + " could not be read, "
+                            + "SQLite result " + status);
                 }
-                // A corrupt image or a read error, which no key repairs. Reporting it as a wrong
-                // key would have an application prompting for a passphrase that cannot help.
-                throw new IOException("The database " + databaseName + " could not be read, "
-                        + "SQLite result " + status);
+            }
+            opened = true;
+        } finally {
+            if (!opened) {
+                releaseOpenDatabase(openKey);
             }
         }
-        registerOpenDatabase(openKey);
     }
 
     private void checkOpen() throws IOException {

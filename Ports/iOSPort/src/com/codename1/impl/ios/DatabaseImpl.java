@@ -60,8 +60,19 @@ class DatabaseImpl extends Database {
     public DatabaseImpl(String databaseName, String path) throws IOException {
         this.databaseName = databaseName;
         this.openKey = path;
-        peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
+        // Registration first, because it is also the refusal: a key change in progress is rewriting
+        // this file, and opening it before asking would touch it mid-rewrite and leave the handle
+        // behind when the refusal arrived.
         registerOpenDatabase(openKey);
+        boolean opened = false;
+        try {
+            peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
+            opened = true;
+        } finally {
+            if (!opened) {
+                releaseOpenDatabase(openKey);
+            }
+        }
     }
 
     /// SQLite's success code.
@@ -73,21 +84,31 @@ class DatabaseImpl extends Database {
     public DatabaseImpl(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
         this.openKey = path;
-        peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
-        int status = IOSImplementation.nativeInstance.sqlDbApplyKeyStatus(peer, key);
-        if (status != SQLITE_OK) {
-            IOSImplementation.nativeInstance.sqlDbClose(peer);
-            peer = 0;
-            if (status == SQLITE_NOTADB) {
-                throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
-                        "The supplied key does not decrypt this database");
-            }
-            // A corrupt image or a read error. Reporting it as a wrong key would send an
-            // application that follows the error codes into prompting for a passphrase forever.
-            throw new IOException("The database " + databaseName + " could not be read, SQLite "
-                    + "result " + status);
-        }
+        // See the other constructor: the registration is what refuses an open during a key change,
+        // so it has to happen before the file is touched.
         registerOpenDatabase(openKey);
+        boolean opened = false;
+        try {
+            peer = IOSImplementation.nativeInstance.sqlDbCreateAndOpen(path);
+            int status = IOSImplementation.nativeInstance.sqlDbApplyKeyStatus(peer, key);
+            if (status != SQLITE_OK) {
+                IOSImplementation.nativeInstance.sqlDbClose(peer);
+                peer = 0;
+                if (status == SQLITE_NOTADB) {
+                    throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
+                            "The supplied key does not decrypt this database");
+                }
+                // A corrupt image or a read error. Reporting it as a wrong key would send an
+                // application that follows the error codes into prompting for a passphrase forever.
+                throw new IOException("The database " + databaseName + " could not be read, SQLite "
+                        + "result " + status);
+            }
+            opened = true;
+        } finally {
+            if (!opened) {
+                releaseOpenDatabase(openKey);
+            }
+        }
     }
 
     public static long getPeer(Object db) {

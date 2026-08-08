@@ -6465,6 +6465,8 @@ bindNative([
 // synchronous afterwards.
 // ---------------------------------------------------------------------------
 let cn1Sqlite = null;          // the sqlite3 namespace once initialised
+let cn1SqlitePoolVfs = null;   // encrypting VFS over the OPFS pool, or null if there is none
+let cn1SqliteMemoryVfs = "memdb"; // the VFS memory-backed databases open through
 let cn1SqlitePool = null;      // the opfs-sahpool utility, when persistent
 let cn1SqliteInitPromise = null;
 let cn1SqliteHandles = new Map();
@@ -6608,9 +6610,41 @@ function cn1SqliteStartInit() {
         + "cause: " + err);
       cn1SqlitePool = null;
     }
+    cn1SqliteInstallCipherVfs();
     return true;
   })();
   return cn1SqliteInitPromise;
+}
+
+/**
+ * Wraps the storage VFS in the one that can encrypt.
+ *
+ * SQLite3MC does not encrypt through an arbitrary VFS: the cipher lives in a shim VFS that has to
+ * be created over the real one, and a database opened directly on the real one answers "Setting key
+ * failed. Encryption is not supported by the VFS." to every PRAGMA key. sqlite3mc_vfs_create
+ * registers "multipleciphers-<name>" over <name>; unencrypted databases work through either, so
+ * everything opens through the shim and the plain case simply never sets a key.
+ *
+ * A failure here is not fatal. It costs encryption, not storage, and the ports report encryption as
+ * unsupported in the ordinary way.
+ */
+function cn1SqliteInstallCipherVfs() {
+  if (!cn1Sqlite || !cn1Sqlite.capi || !cn1Sqlite.capi.sqlite3mc_vfs_create) {
+    return;
+  }
+  if (cn1SqlitePool) {
+    const real = cn1SqlitePool.vfsName || "opfs-sahpool";
+    if (cn1Sqlite.capi.sqlite3mc_vfs_create(real, 0) === 0) {
+      cn1SqlitePoolVfs = "multipleciphers-" + real;
+    } else {
+      console.warn("Codename One: this SQLite build cannot encrypt through the storage pool, so "
+        + "databases opened with a key will be refused.");
+    }
+    return;
+  }
+  if (cn1Sqlite.capi.sqlite3mc_vfs_create("memdb", 0) === 0) {
+    cn1SqliteMemoryVfs = "multipleciphers-memdb";
+  }
 }
 
 /**
@@ -6731,7 +6765,12 @@ function cn1SqliteApplyKeyAndProbe(db, key) {
 /** Opens a database by name, through the pool when one is available. */
 function cn1SqliteOpen(name, key) {
   if (cn1SqlitePool) {
-    const pooled = new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
+    // Not OpfsSAHPoolDb, which pins the connection to the pool's own VFS and so cannot be
+    // keyed. Same file, same pool underneath, reached through the shim that can encrypt.
+    const pooled = cn1SqlitePoolVfs
+        ? new cn1Sqlite.oo1.DB({ filename: cn1SqliteDbPath(name), flags: "c",
+            vfs: cn1SqlitePoolVfs })
+        : new cn1SqlitePool.OpfsSAHPoolDb(cn1SqliteDbPath(name));
     try {
       cn1SqliteApplyKeyAndProbe(pooled, key);
     } catch (err) {
@@ -6746,7 +6785,7 @@ function cn1SqliteOpen(name, key) {
     return pooled;
   }
   // filename: gives the connection a name inside the VFS, so reopening finds it again.
-  const uri = "file:" + encodeURIComponent(name) + "?vfs=memdb";
+  const uri = "file:" + encodeURIComponent(name) + "?vfs=" + cn1SqliteMemoryVfs;
   const anchored = cn1SqliteMemoryAnchors.has(name);
   const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
   try {
@@ -6816,7 +6855,15 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isPersistent_R_b
   function() { return !!cn1SqlitePool; });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_isCipherAvailable___R_boolean"],
-  function() { return !!cn1Sqlite; });
+  // A loaded engine is not enough: the cipher lives in a shim VFS, and a database opened on the
+  // storage VFS directly refuses every key. Answering yes here on an engine that cannot key the
+  // storage it actually uses turns a clear "encryption is unsupported" into an open that fails.
+  function() {
+    if (!cn1Sqlite) {
+      return false;
+    }
+    return cn1SqlitePool ? !!cn1SqlitePoolVfs : cn1SqliteMemoryVfs !== "memdb";
+  });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_exists___java_lang_String_R_boolean"],
   function(name) {
@@ -6943,7 +6990,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_parameterCount_l
     return cn1SqliteGuard(function() { return cn1SqliteLookup(Number(stmtId)).parameterCount; }, -1);
   });
 
-bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNulllong_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_boolean"],
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull_long_int_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_bindNull___long_int_R_boolean"],
   function(stmtId, index) {
     return cn1SqliteGuard(function() {
       cn1SqliteLookup(Number(stmtId)).bind(index | 0, null);

@@ -55,7 +55,23 @@ public class DatabaseImpl extends Database {
 
     public DatabaseImpl(String name, String key) throws IOException {
         this.databaseName = name;
-        peer = SQLiteNative.open(name, key);
+        // Registration first, because it is also the refusal: a key change in progress is rewriting
+        // this database, and opening it before asking would leave the handle behind when the
+        // refusal arrived.
+        registerOpenDatabase(databaseName);
+        boolean opened = false;
+        try {
+            peer = SQLiteNative.open(name, key);
+            opened = openOrFail(name);
+        } finally {
+            if (!opened) {
+                releaseOpenDatabase(databaseName);
+            }
+        }
+    }
+
+    /** Reports a failed open, or true when the peer is live. */
+    private boolean openOrFail(String name) throws IOException {
         if (peer == 0) {
             if (SQLiteNative.lastOpenWasWrongKey()) {
                 throw new DatabaseEncryptionException(DatabaseEncryptionException.WRONG_KEY,
@@ -67,7 +83,7 @@ public class DatabaseImpl extends Database {
             throw new IOException("The database " + name + " could not be opened: "
                     + SQLiteNative.lastError());
         }
-        registerOpenDatabase(databaseName);
+        return true;
     }
 
     /**
