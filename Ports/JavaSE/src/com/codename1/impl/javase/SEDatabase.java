@@ -52,7 +52,7 @@ public class SEDatabase extends Database {
     private String databaseName;
 
     /** The resolved file this connection holds, as the open-database registry knows it. */
-    private final String openKey;
+    private String openKey;
 
     /**
      * Cursors created from this connection. Closing the database has to invalidate them, because
@@ -65,7 +65,33 @@ public class SEDatabase extends Database {
     }
 
     public SEDatabase(java.sql.Connection conn, String databaseName) throws IOException {
-        this(conn, databaseName, databaseName);
+        reserveConnection(databaseName);
+        boolean kept = false;
+        try {
+            init(conn, databaseName, databaseName);
+            kept = true;
+        } finally {
+            if (!kept) {
+                releaseConnection(databaseName);
+            }
+        }
+    }
+
+    /// Claims a database file before anything opens it.
+    ///
+    /// The claim is also the refusal: a key change in progress is rewriting the file, and a
+    /// connection that opened it first would read pages from both sides of the rewrite before the
+    /// refusal arrived. So the caller takes this before `DriverManager.getConnection`, and passes
+    /// the same key to the constructor, which does not take it again.
+    ///
+    /// @param openKey the resolved file, as `#normalizeDatabasePathKey(String)` or a canonical path
+    static void reserveConnection(String openKey) throws IOException {
+        registerOpenDatabase(openKey);
+    }
+
+    /// Gives back a claim `#reserveConnection(String)` took, for an open that did not happen.
+    static void releaseConnection(String openKey) {
+        releaseOpenDatabase(openKey);
     }
 
     /**
@@ -73,13 +99,21 @@ public class SEDatabase extends Database {
      * differ here: a name is resolved against the storage directory unless it looks like a path,
      * so "app.db", the absolute path it resolves to, and "/tmp/./app.db" can all name one file.
      * Registering the name would let two of those spellings rekey the file under each other.
+     *
+     * <p>The caller is expected to hold the claim for that key already, from
+     * {@link #reserveConnection(String)}, taken before the connection was opened. This constructor
+     * does not take it, and closing the database gives it back.
      */
     public SEDatabase(java.sql.Connection conn, String databaseName, String openKey)
             throws IOException {
+        init(conn, databaseName, openKey);
+    }
+
+    /// Takes ownership of a connection whose claim the caller already holds.
+    private void init(java.sql.Connection conn, String databaseName, String openKey) {
         this.databaseName = databaseName;
         this.openKey = openKey;
         this.conn = conn;
-        registerOpenDatabase(openKey);
         try {
             conn.setAutoCommit(true);
         } catch (SQLException err) {

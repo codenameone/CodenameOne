@@ -1174,7 +1174,7 @@ public final class DatabaseConformanceSuite {
         }
 
         // ---- the single most valuable assertion here: the bytes on disk are not plaintext
-        r.check(!startsWithPlaintextHeader(databaseName),
+        checkStoredBytes(r, databaseName, false,
                 "the encrypted database does not begin with a plaintext SQLite header");
         r.check(Database.isEncrypted(databaseName), "isEncrypted reports true for it");
 
@@ -1276,8 +1276,7 @@ public final class DatabaseConformanceSuite {
             closeQuietly(plain);
         }
         Database.encrypt(migrateName, DatabaseConfig.passphrase(passphrase));
-        r.check(!startsWithPlaintextHeader(migrateName),
-                "encrypt() leaves ciphertext on disk");
+        checkStoredBytes(r, migrateName, false, "encrypt() leaves ciphertext on disk");
         Database migrated = Database.openOrCreate(migrateName,
                 DatabaseConfig.passphrase(passphrase));
         cur = null;
@@ -1290,8 +1289,7 @@ public final class DatabaseConformanceSuite {
             closeQuietly(migrated);
         }
         Database.decrypt(migrateName, DatabaseConfig.passphrase(passphrase));
-        r.check(startsWithPlaintextHeader(migrateName),
-                "decrypt() restores a plaintext SQLite file");
+        checkStoredBytes(r, migrateName, true, "decrypt() restores a plaintext SQLite file");
         deleteQuietly(migrateName);
     }
 
@@ -1377,20 +1375,38 @@ public final class DatabaseConformanceSuite {
         }
     }
 
-    private static boolean startsWithPlaintextHeader(String databaseName) {
+    /// The stored bytes could not be read, so neither answer below is available.
+    private static final int HEADER_UNREADABLE = -1;
+
+    /// The stored bytes do not begin with SQLite's plaintext header.
+    private static final int HEADER_ENCRYPTED = 0;
+
+    /// The stored bytes begin with SQLite's plaintext header.
+    private static final int HEADER_PLAINTEXT = 1;
+
+    /// Whether the file behind a database begins with SQLite's plaintext header.
+    ///
+    /// Three answers rather than two, because a platform that keeps its databases somewhere other
+    /// than the filesystem -- the browser's storage pool has no path to open -- can give neither.
+    /// Folding that into "not plaintext" is what made the ciphertext checks pass on a port where
+    /// nothing was read at all, which is the failure this suite exists to catch.
+    private static int plaintextHeaderState(String databaseName) {
         String path = Database.getDatabasePath(databaseName);
         if (path == null) {
-            return false;
+            return HEADER_UNREADABLE;
         }
         try {
             InputStream in = FileSystemStorage.getInstance().openInputStream(path);
+            if (in == null) {
+                return HEADER_UNREADABLE;
+            }
             try {
                 byte[] header = new byte[15];
                 int offset = 0;
                 while (offset < header.length) {
                     int read = in.read(header, offset, header.length - offset);
                     if (read < 0) {
-                        return false;
+                        return HEADER_UNREADABLE;
                     }
                     offset += read;
                 }
@@ -1400,16 +1416,35 @@ public final class DatabaseConformanceSuite {
                     'a', 't', ' ', '3'};
                 for (int iter = 0; iter < expected.length; iter++) {
                     if (header[iter] != expected[iter]) {
-                        return false;
+                        return HEADER_ENCRYPTED;
                     }
                 }
-                return true;
+                return HEADER_PLAINTEXT;
             } finally {
                 in.close();
             }
         } catch (IOException err) {
-            return false;
+            return HEADER_UNREADABLE;
         }
+    }
+
+    /// Asserts what the stored bytes are, where the platform lets them be read.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reporter
+    /// - `databaseName`: the database whose file to look at
+    /// - `expectPlaintext`: whether the file should begin with the plaintext header
+    /// - `message`: what is being asserted
+    private static void checkStoredBytes(Reporter r, String databaseName, boolean expectPlaintext,
+            String message) {
+        int state = plaintextHeaderState(databaseName);
+        if (state == HEADER_UNREADABLE) {
+            r.info("the stored bytes are not reachable on this platform, so this was not"
+                    + " checked: " + message);
+            return;
+        }
+        r.check((state == HEADER_PLAINTEXT) == expectPlaintext, message);
     }
 
     private static int countTables(Database db, String first, String second) throws IOException {

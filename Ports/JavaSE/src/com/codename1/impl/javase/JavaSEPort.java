@@ -16685,6 +16685,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         } catch (ClassNotFoundException ex) {
         }
         java.sql.Connection conn = null;
+        String openKey = null;
         try {
             // connect to the database.   This will load the db files and start the
             // database if it is not alread running.
@@ -16698,6 +16699,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!dir.exists()) {
                 dir.mkdirs();
             }
+
+            // The claim comes before the driver opens the file: a key change in progress is
+            // rewriting it, and a connection that got in first would read pages from both sides of
+            // that rewrite before the refusal reached it.
+            openKey = canonicalDatabaseKey(file);
+            SEDatabase.reserveConnection(openKey);
 
             java.util.Properties properties;
             if (config != null && config.isEncrypted()) {
@@ -16716,9 +16723,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             // The resolved file, not the name: a name is resolved against the storage directory
             // unless it looks like a path, so two names can be one file and the registry a key
-            // change consults has to see them as one.
-            SEDatabase result = new SEDatabase(conn, databaseName, canonicalDatabaseKey(file));
+            // change consults has to see them as one. The claim taken above moves to it.
+            SEDatabase result = new SEDatabase(conn, databaseName, openKey);
             conn = null;
+            openKey = null;
             return result;
         } catch (SQLException ex) {
             closeQuietly(conn);
@@ -16736,6 +16744,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             // file locked.
             closeQuietly(conn);
             throw ex;
+        } finally {
+            // Still set means the connection never reached an SEDatabase, so nothing else will
+            // give the claim back and the file would stay unopenable for the rest of the process.
+            SEDatabase.releaseConnection(openKey);
         }
     }
 
