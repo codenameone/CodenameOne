@@ -168,7 +168,15 @@ int cn1_debugger_is_tagged_int(JAVA_OBJECT obj) {
 }
 
 JAVA_INT cn1_debugger_tagged_int_value(JAVA_OBJECT obj) {
+#if CN1_TAGGED_ACTIVE
     return CN1_IS_TAGGED(obj) ? CN1_UNTAG_INT(obj) : 0;
+#else
+    // Tagged ints are compiled out on 32-bit targets and under
+    // -DCN1_DISABLE_TAGGED_INT, which also leaves CN1_UNTAG_INT undefined.
+    // Every reference is then a real object and no caller reaches this.
+    (void)obj;
+    return 0;
+#endif
 }
 
 /**
