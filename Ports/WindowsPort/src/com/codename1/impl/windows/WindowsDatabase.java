@@ -195,6 +195,10 @@ class WindowsDatabase extends Database {
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         bindText(stmt, params);
         WindowsNative.sqlStmtExecuteAndFinalize(stmt);
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override
@@ -212,6 +216,10 @@ class WindowsDatabase extends Database {
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         bind(stmt, params);
         WindowsNative.sqlStmtExecuteAndFinalize(stmt);
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override

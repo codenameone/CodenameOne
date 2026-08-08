@@ -194,6 +194,10 @@ class LinuxDatabase extends Database {
         long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
         bindText(stmt, params);
         LinuxNative.sqlStmtExecuteAndFinalize(stmt);
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override
@@ -211,6 +215,10 @@ class LinuxDatabase extends Database {
         long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
         bind(stmt, params);
         LinuxNative.sqlStmtExecuteAndFinalize(stmt);
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override

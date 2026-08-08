@@ -544,6 +544,10 @@ class AndroidCipherDB extends Database {
                 s.close();
             }
         }
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override
@@ -571,6 +575,10 @@ class AndroidCipherDB extends Database {
                 s.close();
             }
         }
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override

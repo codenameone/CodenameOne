@@ -928,6 +928,56 @@ public final class DatabaseConformanceSuite {
         db.execute("DROP TABLE IF EXISTS conf_tx");
         db.execute("CREATE TABLE conf_tx (id INTEGER PRIMARY KEY)");
 
+        // ---- a transaction opened by SQL is the same transaction
+        // The API offers two ways to open one and only one of them goes through
+        // beginTransaction(). If they disagree, changeKey() can replace the database underneath a
+        // transaction it cannot see, and a commit can address one that has already ended.
+        if (mode == MODE_STRICT) {
+            db.execute("BEGIN");
+            r.check(db.isInTransaction(), "execute(\"BEGIN\") opens a transaction the API sees");
+            db.execute("ROLLBACK");
+            r.check(!db.isInTransaction(), "execute(\"ROLLBACK\") ends it");
+
+            // Mixed, in both directions: whichever way a transaction is opened, the other way of
+            // ending it has to work. On an engine reached through a driver that keeps its own
+            // transaction state -- the simulator's -- these are the calls that catch the two
+            // states drifting apart, because one of them throws.
+            boolean mixedCommitWorked = false;
+            try {
+                db.execute("BEGIN");
+                db.execute("INSERT INTO conf_tx (id) VALUES (91)");
+                db.commitTransaction();
+                mixedCommitWorked = true;
+            } catch (IOException err) {
+                r.check(false, "commitTransaction() ends a transaction execute(\"BEGIN\") opened: "
+                        + err.getMessage());
+            }
+            if (mixedCommitWorked) {
+                r.check(rowCount(db, "conf_tx") == 1, "and the row it committed is there");
+                r.check(!db.isInTransaction(), "and nothing is left open");
+                db.execute("DELETE FROM conf_tx");
+            }
+
+            db.beginTransaction();
+            db.execute("COMMIT");
+            r.check(!db.isInTransaction(),
+                    "a transaction the API opened is ended by execute(\"COMMIT\")");
+            // And the connection is usable afterwards rather than left mid-transaction.
+            boolean usableAfter = false;
+            try {
+                db.beginTransaction();
+                db.execute("INSERT INTO conf_tx (id) VALUES (92)");
+                db.rollbackTransaction();
+                usableAfter = true;
+            } catch (IOException err) {
+                r.check(false, "a transaction still works after execute(\"COMMIT\") ended one: "
+                        + err.getMessage());
+            }
+            if (usableAfter) {
+                r.check(rowCount(db, "conf_tx") == 0, "and that rollback discarded its insert");
+            }
+        }
+
         // ---- commit persists
         db.beginTransaction();
         db.execute("INSERT INTO conf_tx (id) VALUES (1)");

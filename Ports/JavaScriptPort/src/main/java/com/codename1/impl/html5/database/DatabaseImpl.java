@@ -207,6 +207,10 @@ public class DatabaseImpl extends Database {
         checkPrepared(stmt);
         bindText(stmt, params);
         checkNative(SQLiteNative.executeAndFinish(stmt));
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override
@@ -225,6 +229,10 @@ public class DatabaseImpl extends Database {
         checkPrepared(stmt);
         bind(stmt, params);
         checkNative(SQLiteNative.executeAndFinish(stmt));
+        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
+        // changeKey depends on knowing that a transaction was opened, whichever entry point
+        // opened it.
+        noteScriptTransactionControl(sql);
     }
 
     @Override

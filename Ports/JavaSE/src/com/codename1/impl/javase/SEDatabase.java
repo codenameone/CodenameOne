@@ -86,6 +86,86 @@ public class SEDatabase extends Database {
         openCursors.remove(cursor);
     }
 
+    /// Carries out a transaction-control statement through JDBC, if that is what it is.
+    ///
+    /// The parameterized entry points reach this before preparing anything: `execute("BEGIN", ...)`
+    /// means what `beginTransaction()` means, and preparing it as ordinary SQL would open a
+    /// transaction the connection's autocommit flag knows nothing about.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the single statement the caller supplied
+    ///
+    /// #### Returns
+    ///
+    /// true if it was transaction control and has been carried out
+    private boolean runAsTransactionControl(String sql) throws IOException {
+        if (transactionKeyword(sql) == null) {
+            return false;
+        }
+        try {
+            executeTransactionControl(sql);
+        } catch (SQLException ex) {
+            throw new IOException(ex.getMessage(), ex);
+        }
+        noteScriptTransactionControl(sql);
+        return true;
+    }
+
+    /// Runs a transaction-control statement through JDBC, or reports that it is not one.
+    ///
+    /// `execute("BEGIN")` and `beginTransaction()` mean the same thing to the caller and have to
+    /// mean the same thing to the connection. Everything else is passed to the driver untouched.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: a single statement from the script
+    ///
+    /// #### Returns
+    ///
+    /// true if it was transaction control and has been carried out
+    private boolean executeTransactionControl(String statement) throws SQLException {
+        String keyword = transactionKeyword(statement);
+        if ("BEGIN".equals(keyword)) {
+            conn.setAutoCommit(false);
+            return true;
+        }
+        if ("COMMIT".equals(keyword) || "END".equals(keyword)) {
+            conn.commit();
+            conn.setAutoCommit(true);
+            return true;
+        }
+        if ("ROLLBACK".equals(keyword)) {
+            conn.rollback();
+            conn.setAutoCommit(true);
+            return true;
+        }
+        return false;
+    }
+
+    /// The transaction keyword a statement starts with, or null.
+    ///
+    /// Only a bare ROLLBACK counts; `ROLLBACK TO <savepoint>` unwinds within the transaction and
+    /// belongs to the driver, as SAVEPOINT and RELEASE do. `BEGIN` here is never a trigger body:
+    /// the splitter keeps a CREATE TRIGGER together, so its BEGIN is not a statement.
+    private static String transactionKeyword(String statement) {
+        String trimmed = statement == null ? "" : statement.trim();
+        String upper = trimmed.toUpperCase();
+        if (upper.startsWith("BEGIN") && !upper.startsWith("BEGINS")) {
+            return "BEGIN";
+        }
+        if (upper.startsWith("COMMIT")) {
+            return "COMMIT";
+        }
+        if (upper.equals("END") || upper.startsWith("END ") || upper.startsWith("END;")) {
+            return "END";
+        }
+        if (upper.startsWith("ROLLBACK") && upper.indexOf(" TO") < 0) {
+            return "ROLLBACK";
+        }
+        return null;
+    }
+
     @Override
     public void beginTransaction() throws IOException {
         checkOpen();
@@ -225,7 +305,15 @@ public class SEDatabase extends Database {
         try {
             s = conn.createStatement();
             for (int iter = 0; iter < statements.length; iter++) {
-                s.execute(statements[iter]);
+                // Transaction control goes through JDBC rather than to the driver as SQL. This
+                // connection's transaction is JDBC's autocommit flag, and handing it a raw BEGIN
+                // would leave the two disagreeing: a following commitTransaction() calls
+                // conn.commit() on a connection JDBC still believes is autocommitting, which
+                // throws, and a raw COMMIT after beginTransaction() would leave autocommit off
+                // over a transaction that has ended.
+                if (!executeTransactionControl(statements[iter])) {
+                    s.execute(statements[iter]);
+                }
                 // Recorded as each one succeeds, so a script that throws partway leaves the
                 // state describing what actually ran.
                 noteScriptTransactionControl(statements[iter]);
@@ -266,6 +354,9 @@ public class SEDatabase extends Database {
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        if (runAsTransactionControl(sql)) {
+            return;
+        }
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
@@ -299,6 +390,9 @@ public class SEDatabase extends Database {
         }
         checkOpen();
         requireSingleStatement(sql);
+        if (runAsTransactionControl(sql)) {
+            return;
+        }
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
