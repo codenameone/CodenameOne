@@ -4939,7 +4939,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // click -- refused every keystroke, so the editor read as completely dead. It bought
             // nothing either: saveSourceAndModel keeps only the user region and regenerates the
             // rest from the model, so edits to generated code are discarded on save regardless.
-            int userMarker = source.indexOf("// <gui-builder-user-code>");
+            int userMarker = markerLine(source, "// <gui-builder-user-code>", 0);
             final int editableOffset = userMarker < 0 ? 0
                     : userMarker + "// <gui-builder-user-code>".length() + 1;
             Component stage = canvasHost.getComponentCount() == 0 ? new Label() : canvasHost.getComponentAt(0);
@@ -5326,11 +5326,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         appendGeneratedProperties(out, document.root(), "this", rootType, "        ");
         appendGeneratedChildren(out, document.root(), "this", "        ");
+        if (!document.commands().isEmpty()) {
+            // getToolbar() is null unless the application called Toolbar.setGlobalToolbar(true),
+            // so a generated form carrying commands threw a NullPointerException in buildUI() in
+            // any project that had not opted in. One is created when it is missing.
+            out.append("        Toolbar toolbar = getToolbar();\n")
+                    .append("        if (toolbar == null) {\n")
+                    .append("            toolbar = new Toolbar();\n")
+                    .append("            setToolbar(toolbar);\n")
+                    .append("        }\n");
+        }
         for (Element command : document.commands()) {
             String placement = value(command, "placement", "right");
             String method = "left".equals(placement) ? "addCommandToLeftBar" : "overflow".equals(placement)
                     ? "addCommandToOverflowMenu" : "side".equals(placement) ? "addCommandToSideMenu" : "addCommandToRightBar";
-            out.append("        getToolbar().").append(method).append("(\"")
+            out.append("        toolbar.").append(method).append("(\"")
                     .append(javaEscape(value(command, "name", "Command"))).append("\", null, this::")
                     .append(javaIdentifier(value(command, "actionEvent", "onCommand"))).append(");\n");
         }
@@ -5931,23 +5941,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private String mergeGeneratedSource(String existing, String generated) {
         String startMarker = "// <gui-builder-user-code>";
         String endMarker = "// </gui-builder-user-code>";
-        int oldStart = existing.indexOf(startMarker);
+        int oldStart = markerLine(existing, startMarker, 0);
         int oldEnd = markerLine(existing, endMarker, oldStart < 0 ? 0 : oldStart);
         if (oldStart < 0 || oldEnd < oldStart) {
             if (existing.indexOf("// Generated live from ") >= 0) return generated;
             String migrated = migrateLegacySource(existing, generated);
             return migrated != null ? migrated : existing;
         }
-        int newStart = generated.indexOf(startMarker);
-        int newEnd = generated.indexOf(endMarker);
+        int newStart = markerLine(generated, startMarker, 0);
+        int newEnd = markerLine(generated, endMarker, newStart < 0 ? 0 : newStart);
         if (newStart < 0 || newEnd < newStart) return generated;
         String userCode = existing.substring(oldStart + startMarker.length(), oldEnd);
         // Imports too. Migration adds them once, but every later save takes this branch, and
         // keeping only the marker body dropped them again on the second ordinary Save while the
         // methods that need them stayed.
         String withImports = carriedImports(existing, generated);
-        int keepStart = withImports.indexOf(startMarker);
-        int keepEnd = withImports.indexOf(endMarker);
+        int keepStart = markerLine(withImports, startMarker, 0);
+        int keepEnd = markerLine(withImports, endMarker, keepStart < 0 ? 0 : keepStart);
         if (keepStart < 0 || keepEnd < keepStart) {
             return generated.substring(0, newStart + startMarker.length()) + userCode + generated.substring(newEnd);
         }
