@@ -502,6 +502,20 @@ public abstract class Executor {
         }
 
         /**
+         * Names the class whose bytecode the following callbacks come from.
+         *
+         * <p>Every other callback describes what is being CALLED, which answers "does this app do
+         * X" and nothing about where. That is the same question until a project has two translation
+         * roots: a flag raised by the watch lifecycle then entitles the phone too, and an
+         * entitlement the phone's provisioning profile does not carry fails release signing.
+         * Recording the caller lets a per-root walk decide which target actually did it.</p>
+         *
+         * @param internalName the caller's internal name, slashes and all
+         */
+        public default void scanningClass(String internalName) {
+        }
+
+        /**
          * Reports a call together with the descriptor of the method it
          * resolves to.
          *
@@ -613,6 +627,7 @@ public abstract class Executor {
                         public void visit(int i, int accessFlags, String string, String string1, String superName, String[] interfaces) {
                             scannedName = string;
                             scannedSuper = superName;
+                            scanner.scanningClass(string);
                             // ACC_PUBLIC 0x0001, ACC_INTERFACE 0x0200,
                             // ACC_ABSTRACT 0x0400. A class the generated
                             // bindings construct from another package has

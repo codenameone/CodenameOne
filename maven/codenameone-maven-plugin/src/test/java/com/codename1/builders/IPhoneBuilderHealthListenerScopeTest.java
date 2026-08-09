@@ -127,8 +127,33 @@ class IPhoneBuilderHealthListenerScopeTest {
                 "a BLE-only root must not be entitled for HealthKit");
 
         builder.sensorWriteThrough = true;
+        builder.sensorWriteThroughCallers.add("com/acme/MyApp");
         assertTrue(builder.reachesHealth(sensorsOnly),
                 "but writing samples through to the store is HealthKit use");
+    }
+
+    /**
+     * Write-through by the OTHER root does not entitle this one.
+     *
+     * <p>The app-wide flag said only "somebody writes through", so a watch lifecycle switching it
+     * on made the phone reach health as soon as its own code touched any sensors class -- and
+     * entitling the phone against a provisioning profile without HealthKit fails release signing.
+     * The caller decides.</p>
+     */
+    @Test
+    void writeThroughByAnotherRootDoesNotEntitleThisOne() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        builder.sensorWriteThrough = true;
+        builder.sensorWriteThroughCallers.add("com/acme/WatchLifecycle");
+
+        Set<String> phone = reachable("com/acme/MyApp",
+                "com/codename1/health/sensors/SensorSession");
+        assertFalse(builder.reachesHealth(phone),
+                "the phone reaches the sensors package but not the class that writes through");
+
+        Set<String> watch = reachable("com/acme/WatchApp", "com/acme/WatchLifecycle",
+                "com/codename1/health/sensors/SensorSession");
+        assertTrue(builder.reachesHealth(watch), "and the root that does write is entitled");
     }
 
     /** Write-through elsewhere in the app does not make an unrelated root reach health. */
@@ -136,6 +161,7 @@ class IPhoneBuilderHealthListenerScopeTest {
     void writeThroughDoesNotEntitleARootThatTouchesNoSensor() {
         IPhoneBuilder builder = new IPhoneBuilder();
         builder.sensorWriteThrough = true;
+        builder.sensorWriteThroughCallers.add("com/acme/Writer");
         assertFalse(builder.reachesHealth(reachable("com/acme/WatchApp", "com/acme/Ui")));
     }
 

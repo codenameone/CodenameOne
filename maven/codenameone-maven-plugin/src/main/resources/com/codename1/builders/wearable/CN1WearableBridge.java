@@ -155,6 +155,14 @@ public class CN1WearableBridge implements WearableBridge {
         // event of this run -- a one-shot message and a data removal have no other way back. First,
         // because these are older than whatever arrives next and the app should see them in order.
         drainSpool(this.context);
+        // And re-derive the logical clock from what is actually published.
+        //
+        // The stored floor can be missing: a refused commit leaves nothing on disk, and the retry
+        // only happens on the next observation. Restored from an older floor, the first putData of
+        // this run could stamp a sequence below a peer item that is still there, and
+        // deliverIfOutranks then ranks our own update stale and drops it with no error. The
+        // published items are themselves durable, so reading them says what the disk could not.
+        reconcileClockFromPublishedItems();
         // Sweep at startup as well as after each publish. An app that sends a few files and then
         // stops would otherwise never run the sweep again, leaving its last transfers published
         // indefinitely -- the post-publish sweep only helps an app that keeps transferring.
@@ -1267,6 +1275,35 @@ public class CN1WearableBridge implements WearableBridge {
                 + " was not written; it will be retried on the next observation");
     }
 
+    /// Raises the logical clock to match the highest sequence currently published, in the
+    /// background.
+    ///
+    /// Off the calling thread because it is a Data Layer round trip, and at startup because that is
+    /// the only moment the in-memory clock can be BEHIND what this device itself published -- every
+    /// later read raises it through sequenceOf as a matter of course.
+    private void reconcileClockFromPublishedItems() {
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
+                            TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    try {
+                        for (DataItem item : items) {
+                            // sequenceOf observes as it reads, which is the whole point: one pass
+                            // over what exists puts the clock above all of it.
+                            sequenceOf(valueMap(item));
+                        }
+                    } finally {
+                        items.release();
+                    }
+                } catch (Throwable unavailable) {
+                    // Best effort. The wall-clock seed still orders the common case, and the next
+                    // item this device reads raises the clock anyway.
+                }
+            }
+        }, 0);
+    }
+
     /// A context for a cold service process, where the clock still has to be durable.
     private static volatile Context serviceContext;
 
@@ -1403,7 +1440,11 @@ public class CN1WearableBridge implements WearableBridge {
                 edit.putLong(SPOOL_SEQ_KEY, seq);
                 // Zero-padded, because the drain replays in key order and the whole point is that
                 // a message arrives in the order it was sent.
-                edit.putString(spoolKey(seq), kind + "|" + encode(path) + "|"
+                //
+                // The leading 0 is the attempt count. Written explicitly rather than left to be
+                // inferred, so the record has one shape everywhere and no reader has to guess
+                // whether the first field is a count or a kind.
+                edit.putString(spoolKey(seq), "0|" + kind + "|" + encode(path) + "|"
                         + (payload == null ? "" : android.util.Base64.encodeToString(
                                 payload, android.util.Base64.NO_WRAP)));
                 trimSpool(prefs, edit);
@@ -1417,25 +1458,36 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
-    /// Replays everything written down, oldest first, and forgets it only once it is taken.
+    /// Replays everything written down, oldest first, forgetting each only once it is delivered.
     static void drainSpool(Context context) {
-        for (String record : takeSpooled(context)) {
+        for (Map.Entry<String, String> e : claimSpooled(context).entrySet()) {
             // Outside the lock. A listener runs arbitrary app code, and holding the spool across
             // it would block every worker trying to write the next delivery down.
-            replaySpooled(record);
+            replaySpooled(e.getValue());
+            // And only NOW is the record gone. Removing the whole batch up front was simpler and
+            // lost data: a process reclaimed between that commit and the callbacks took every
+            // record with it, which is precisely the crash this spool exists to survive.
+            releaseSpooled(context, e.getKey());
         }
     }
 
-    /// Removes every spooled record and returns it, oldest first.
+    /// How many launches a single record may be replayed on before it is abandoned.
     ///
-    /// Taken BEFORE replay, and committed. A listener that throws must not leave the entry behind
-    /// to be replayed on every launch from then on: delivered once is the contract for a one-shot,
-    /// and this is the only place that can hold to it.
-    private static java.util.List<String> takeSpooled(Context context) {
-        java.util.List<String> records = new ArrayList<String>();
+    /// The cost of keeping a record until delivery is that a listener which throws, or a process
+    /// that dies mid-callback, sees it again next time. That is the right trade for a one-shot --
+    /// delivered twice is recoverable, lost is not -- but it cannot be unbounded, or one poison
+    /// payload replays on every launch for ever.
+    private static final int SPOOL_MAX_ATTEMPTS = 3;
+
+    /// Marks every spooled record as being delivered, and returns the ones still worth trying.
+    ///
+    /// The attempt count is written back BEFORE the callbacks run, so a record that kills the
+    /// process is counted against its budget rather than retried for ever.
+    private static java.util.Map<String, String> claimSpooled(Context context) {
+        java.util.Map<String, String> out = new LinkedHashMap<String, String>();
         Context c = spoolContext(context);
         if (c == null) {
-            return records;
+            return out;
         }
         synchronized (SPOOL_LOCK) {
             try {
@@ -1449,29 +1501,82 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 }
                 if (keys.isEmpty()) {
-                    return records;
+                    return out;
                 }
                 java.util.Collections.sort(keys);
                 android.content.SharedPreferences.Editor edit = prefs.edit();
                 for (String k : keys) {
-                    edit.remove(k);
+                    Object raw = all.get(k);
+                    if (!(raw instanceof String)) {
+                        edit.remove(k);
+                        continue;
+                    }
+                    String record = (String) raw;
+                    int attempts = attemptsOf(record) + 1;
+                    if (attempts > SPOOL_MAX_ATTEMPTS) {
+                        android.util.Log.w("CN1Wearable", "giving up on a spooled wearable delivery"
+                                + " after " + SPOOL_MAX_ATTEMPTS + " attempts: " + bodyOf(record));
+                        edit.remove(k);
+                        continue;
+                    }
+                    edit.putString(k, attempts + "|" + bodyOf(record));
+                    out.put(k, bodyOf(record));
                 }
                 if (!edit.commit()) {
-                    // Still on disk, so leave it there and try again next time rather than
-                    // replaying records this process may fail to remove afterwards.
-                    return new ArrayList<String>();
-                }
-                for (String k : keys) {
-                    Object raw = all.get(k);
-                    if (raw instanceof String) {
-                        records.add((String) raw);
-                    }
+                    // The attempt counts did not land, so replaying now would be unbounded on a
+                    // record that keeps killing the process. Everything stays on disk for the next
+                    // launch, which is the safe direction.
+                    return new LinkedHashMap<String, String>();
                 }
             } catch (Throwable unavailable) {
-                return new ArrayList<String>();
+                return new LinkedHashMap<String, String>();
             }
         }
-        return records;
+        return out;
+    }
+
+    /// Forgets one record, after its callback has been handed to the application.
+    private static void releaseSpooled(Context context, String key) {
+        Context c = spoolContext(context);
+        if (c == null) {
+            return;
+        }
+        synchronized (SPOOL_LOCK) {
+            try {
+                c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE)
+                        .edit().remove(key).commit();
+            } catch (Throwable unavailable) {
+                // It keeps its attempt count and is retried, then abandoned. A duplicate is
+                // recoverable; this is the direction to fail in.
+            }
+        }
+    }
+
+    /// The leading attempt count of a stored record, or 0 for one written before it had one.
+    private static int attemptsOf(String record) {
+        int bar = record.indexOf('|');
+        if (bar <= 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(record.substring(0, bar));
+        } catch (NumberFormatException notCounted) {
+            return 0;
+        }
+    }
+
+    /// Everything after the attempt count: the record replaySpooled understands.
+    private static String bodyOf(String record) {
+        int bar = record.indexOf('|');
+        if (bar <= 0) {
+            return record;
+        }
+        try {
+            Integer.parseInt(record.substring(0, bar));
+        } catch (NumberFormatException notCounted) {
+            return record;
+        }
+        return record.substring(bar + 1);
     }
 
     private static void replaySpooled(String record) {

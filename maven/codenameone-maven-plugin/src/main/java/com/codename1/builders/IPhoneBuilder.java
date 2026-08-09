@@ -356,23 +356,27 @@ public class IPhoneBuilder extends Executor {
                 continue;
             }
             if (name.startsWith("com/codename1/health/sensors/")) {
-                // Normally BLE and nothing more -- but a sensor session can be told to write its
-                // samples through to the store, and then the sensors package IS the route into
-                // HealthKit. Excluding it unconditionally stripped the entitlement and the listener
-                // bindings from whichever target actually does the writing, which is the failure
-                // this attribution exists to prevent, arriving from the other direction.
+                // Normally BLE and nothing more. The exception is a sensor session told to write
+                // its samples through to the store, and then the sensors package IS a route into
+                // HealthKit -- excluding it unconditionally stripped the entitlement from whichever
+                // target does the writing, the same failure from the other direction.
                 //
-                // The write-through flag is app-wide, so a root that merely touches the sensors
-                // package is entitled alongside the one that writes. That is the safe direction:
-                // over-entitling costs nothing at runtime, under-entitling fails the authorization
-                // request.
-                if (sensorWriteThrough) {
-                    return true;
-                }
+                // Decided below, from the CALLER of that method rather than from the app-wide flag.
+                // The flag said only "somebody writes through", so a watch lifecycle switching it on
+                // made the phone reach health the moment its own code touched any sensors class,
+                // and entitling the phone against a profile without HealthKit fails release
+                // signing.
                 continue;
             }
             if (!"com/codename1/health/Health".equals(name)
                     && !isSharedHealthModel(name)) {
+                return true;
+            }
+        }
+        // The sensors package, decided per root: this graph reaches health through it only when it
+        // reaches a class that actually asked for write-through.
+        for (String caller : sensorWriteThroughCallers) {
+            if (reachable.contains(caller)) {
                 return true;
             }
         }
@@ -631,6 +635,18 @@ public class IPhoneBuilder extends Executor {
     /// permission but not the same evidence, and only this one says the sensors package is a route
     /// into HealthKit for the root that reaches it.
     boolean sensorWriteThrough;
+
+    /// The classes that actually made that call, by internal name.
+    ///
+    /// The flag alone is app-wide, and app-wide is the wrong grain the moment there are two
+    /// translation roots: a watch lifecycle switching write-through on made the PHONE reach health
+    /// as soon as its own code touched any sensors class, and entitling the phone for HealthKit
+    /// against a profile without the capability fails release signing. A root reaches health
+    /// through the sensors package only when it reaches one of THESE.
+    final java.util.Set<String> sensorWriteThroughCallers = new java.util.HashSet<String>();
+
+    /// The class the scanner is currently reading, so the callbacks above can be attributed.
+    private String scanningClassInternal;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
     private boolean usesCn1Vision;
@@ -1701,7 +1717,15 @@ public class IPhoneBuilder extends Executor {
                         usesHealthStore = true;
                         usesHealthWrite = true;
                         sensorWriteThrough = true;
+                        if (scanningClassInternal != null) {
+                            sensorWriteThroughCallers.add(scanningClassInternal);
+                        }
                     }
+                }
+
+                @Override
+                public void scanningClass(String internalName) {
+                    scanningClassInternal = internalName;
                 }
 
                 @Override

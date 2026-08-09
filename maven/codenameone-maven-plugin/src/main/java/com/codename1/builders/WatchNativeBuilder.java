@@ -1717,6 +1717,25 @@ class WatchNativeBuilder {
         // whoever built the binary. Guessing from the architecture list would not work -- arm64 is
         // both an iPhone and an Apple silicon watch simulator -- and guessing wrong here links an
         // iOS-only binary into a watch slice, which fails later and less clearly.
+        // A static archive is judged by the architectures it was actually built for.
+        //
+        // arm64_32 and armv7k exist on watchOS and nowhere else, so either one is proof of a watch
+        // device slice with no ambiguity to resolve -- unlike arm64, which is an iPhone and an
+        // Apple silicon watch simulator at once. An archive that names neither cannot link into a
+        // watch device build, and saying so by name beats a link error listing its symbols.
+        s.append("def cn1_watch_archive_has_watch_slice(ref)\n")
+                .append("  path = (ref.real_path.to_s rescue nil)\n")
+                .append("  return false unless path && File.exist?(path)\n")
+                .append("  archs = `lipo -archs \"#{path}\" 2>/dev/null`.split\n")
+                // A thin archive answers nothing to lipo -archs; ask the file itself.
+                .append("  archs = `file \"#{path}\" 2>/dev/null`.scan("
+                        + "/arm64_32|armv7k/) if archs.empty?\n")
+                .append("  watch = archs.any? { |a| a == 'arm64_32' || a == 'armv7k' }\n")
+                .append("  puts \"[watchNative] #{File.basename(path)} #{watch ? 'has' : 'has no'}"
+                        + " watchOS slice (#{archs.empty? ? 'unknown' : archs.join(' ')})\"\n")
+                .append("  watch\n")
+                .append("end\n");
+
         s.append("def cn1_watch_bundle_supports_watchos(ref)\n")
                 .append("  path = (ref.real_path.to_s rescue nil)\n")
                 .append("  return false unless path && File.exist?(path)\n")
@@ -1760,12 +1779,16 @@ class WatchNativeBuilder {
                 // Linkable inputs only. The app target's frameworks phase also carries entries that
                 // are not libraries -- the Info.plist and the prefix header are both in there.
                 //
-                // .a is deliberately absent. A static library is built, not provided by the SDK:
-                // CocoaPods' libPods-*.a and any vendored archive are compiled for iOS and have no
-                // watch slice, so linking one is a guaranteed failure rather than a possible one.
+                // .a is included, and then judged on what is actually in the archive.
+                //
+                // Skipping every static library was wrong for the developer's own: an ios.add_libs
+                // archive built with a watchOS slice links perfectly well, and omitting it left the
+                // watch target compiling the caller and failing on its symbols. CocoaPods'
+                // libPods-*.a is still excluded outright above -- it is generated for the iOS
+                // target and never has one.
                 .append("  next unless base.end_with?('.framework') "
                         + "|| base.end_with?('.xcframework') || base.end_with?('.dylib') "
-                        + "|| base.end_with?('.tbd')\n")
+                        + "|| base.end_with?('.tbd') || base.end_with?('.a')\n")
                 .append("  if base.end_with?('.framework') || base.end_with?('.xcframework')\n")
                 .append("    if ref.source_tree == 'SDKROOT'\n")
                 .append("      present = !watch_fw_dirs.empty? && watch_fw_dirs.all? { |dirs| "
@@ -1776,6 +1799,9 @@ class WatchNativeBuilder {
                 .append("      present = cn1_watch_bundle_supports_watchos(ref)\n")
                 .append("      vendored_linked ||= present\n")
                 .append("    end\n")
+                .append("  elsif base.end_with?('.a')\n")
+                .append("    present = cn1_watch_archive_has_watch_slice(ref)\n")
+                .append("    vendored_linked ||= present\n")
                 .append("  else\n")
                 .append("    stem = base.sub(/\\.(dylib|tbd)\\z/, '')\n")
                 .append("    present = !watch_sdks.empty? && watch_sdks.all? { |sdk| "

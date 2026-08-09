@@ -756,6 +756,12 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("app_target.copy_files_build_phases"), ruby);
         // And a project with no vendored framework must produce the project it did before.
         assertTrue(ruby.contains("if vendored_linked"), ruby);
+        // A developer's own static archive is judged on what is in it, not excluded outright:
+        // arm64_32 and armv7k exist on watchOS and nowhere else, so either is unambiguous proof.
+        // Skipping every .a left the watch compiling the caller and failing on its symbols.
+        assertTrue(ruby.contains("cn1_watch_archive_has_watch_slice(ref)"), ruby);
+        assertTrue(ruby.contains("arm64_32") && ruby.contains("armv7k"), ruby);
+        assertTrue(ruby.contains("base.end_with?('.a')"), ruby);
     }
 
     /**
