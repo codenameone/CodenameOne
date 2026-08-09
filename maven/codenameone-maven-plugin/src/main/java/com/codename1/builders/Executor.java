@@ -2576,9 +2576,14 @@ public abstract class Executor {
         if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
             return sourceZip;
         }
-        // The client-side pre-flight (Check 1) sets this when a local/source target opted into
-        // an unhardened build via harden.allowUnhardenedLocalBuild; honor it as a single point.
-        if ("true".equals(System.getProperty("cn1.harden.forceOff"))) {
+        // The client-side pre-flight (Check 1) sets this when a local/source target opted into an
+        // unhardened build via harden.allowUnhardenedLocalBuild; honor it as a single point. Prefer the
+        // per-build request arg (the Mojo injects its instance decision there) over the process-wide
+        // System property, which is racy under concurrent module builds -- another platform's build could
+        // clear it between this build's pre-flight and this read. The System property stays as a fallback
+        // for any caller that has not migrated to the request arg.
+        if ("true".equals(request.getArg("cn1.harden.forceOff", null))
+                || "true".equals(System.getProperty("cn1.harden.forceOff"))) {
             log("cn1-hardening: forced off for this local build; building unhardened");
             return sourceZip;
         }

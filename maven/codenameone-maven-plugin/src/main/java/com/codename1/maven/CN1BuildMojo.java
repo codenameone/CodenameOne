@@ -182,6 +182,28 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * hatch, forces hardening off) because a locally built binary never reaches the server and its
      * mapping would be orphaned from the crash-symbolication service.
      */
+    /**
+     * The hardening pre-flight decisions, carried on the Mojo INSTANCE (not JVM-global state) so a
+     * concurrent module build under {@code mvn -T} cannot clobber them. Each reactor module executes its
+     * own CN1BuildMojo instance, so instance fields are naturally per-build; a shared System property was
+     * racy -- another platform's build could clear {@code cn1.harden.forceOff} between this build setting
+     * it and the Executor reading it, running hardening locally despite the escape-hatch decision. These
+     * are injected into this build's BuildRequest ({@link #applyHardeningRequestArgs}) so the Executor
+     * reads them from the request it was handed rather than from process-wide state.
+     */
+    private boolean hardeningForceOff;
+    private String hardeningLibraryJars;
+
+    /** Injects the pre-flight hardening decisions into this build's request (per-build, not global). */
+    private void applyHardeningRequestArgs(BuildRequest r) {
+        if (hardeningForceOff) {
+            r.putArgument("cn1.harden.forceOff", "true");
+        }
+        if (hardeningLibraryJars != null && hardeningLibraryJars.length() > 0) {
+            r.putArgument("cn1.hardening.libraryJars", hardeningLibraryJars);
+        }
+    }
+
     private void applyHardeningPreflight() throws MojoFailureException {
         Properties settings = new Properties();
         File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
@@ -251,9 +273,9 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         if (r.isForceOff()) {
             getLog().warn(r.getMessage());
-            System.setProperty("cn1.harden.forceOff", "true");
+            hardeningForceOff = true;
         } else {
-            System.clearProperty("cn1.harden.forceOff");
+            hardeningForceOff = false;
         }
         // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
         // jars (so an application method that overrides a framework method is not renamed apart from
@@ -271,12 +293,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                         sb.append(f.getAbsolutePath());
                     }
                 }
-                System.setProperty("cn1.hardening.libraryJars", sb.toString());
+                hardeningLibraryJars = sb.toString();
             } catch (org.apache.maven.artifact.DependencyResolutionRequiredException ex) {
                 getLog().debug("Could not resolve compile classpath for hardening library jars", ex);
             }
         } else {
-            System.clearProperty("cn1.hardening.libraryJars");
+            hardeningLibraryJars = null;
         }
     }
 
@@ -1661,6 +1683,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument(currentKey, value);
             }
         }
+        applyHardeningRequestArgs(r);
 
         BuildRequest request = r;
         request.setIncludeSource(true);
@@ -1864,6 +1887,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument(currentKey, value);
             }
         }
+        applyHardeningRequestArgs(r);
 
         BuildRequest request = r;
         String incSources = request.getArg("build.incSources", null);
@@ -2181,6 +2205,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument(currentKey, value);
             }
         }
+        applyHardeningRequestArgs(r);
         r.setIncludeSource(true);
 
         try {
