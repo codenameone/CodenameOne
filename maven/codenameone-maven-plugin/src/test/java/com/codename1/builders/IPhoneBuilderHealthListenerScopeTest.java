@@ -107,6 +107,38 @@ class IPhoneBuilderHealthListenerScopeTest {
         assertSame(all, builder.healthListenersReachableFrom(all, null));
     }
 
+    /**
+     * The sensors package is BLE-only right up until a session is told to write through.
+     *
+     * <p>{@code SensorSessionOptions.setWriteToStore(true)} saves samples into HealthKit, and the
+     * app-wide scanner already treats that as health write usage. The per-root walk excluded
+     * everything under {@code health/sensors/} unconditionally, so the target actually doing the
+     * writing was judged not to reach health at all and lost both its entitlement and its listener
+     * bindings -- the same failure this attribution exists to prevent, from the other side.</p>
+     */
+    @Test
+    void sensorWriteThroughMakesTheSensorsPackageReachHealth() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        Set<String> sensorsOnly = reachable("com/acme/MyApp",
+                "com/codename1/health/sensors/SensorSession",
+                "com/codename1/health/sensors/SensorSessionOptions");
+
+        assertFalse(builder.reachesHealth(sensorsOnly),
+                "a BLE-only root must not be entitled for HealthKit");
+
+        builder.sensorWriteThrough = true;
+        assertTrue(builder.reachesHealth(sensorsOnly),
+                "but writing samples through to the store is HealthKit use");
+    }
+
+    /** Write-through elsewhere in the app does not make an unrelated root reach health. */
+    @Test
+    void writeThroughDoesNotEntitleARootThatTouchesNoSensor() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        builder.sensorWriteThrough = true;
+        assertFalse(builder.reachesHealth(reachable("com/acme/WatchApp", "com/acme/Ui")));
+    }
+
     /** A root that reaches no listener binds none, rather than falling back to all of them. */
     @Test
     void aRootThatReachesNoListenerBindsNone() {

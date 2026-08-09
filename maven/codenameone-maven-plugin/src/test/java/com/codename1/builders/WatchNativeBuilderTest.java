@@ -704,6 +704,39 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("next if watch_target.package_product_dependencies.any?"), ruby);
     }
 
+    /**
+     * A vendored framework declaring a watchOS slice reaches the watch target.
+     *
+     * <p>Only a system framework can be checked against the SDK, so everything referenced from a
+     * group was skipped outright -- including a third-party binary that ships a perfectly good
+     * watchOS slice, whose absence surfaced as undefined symbols with nothing naming what was left
+     * out. The bundle's own Info.plist is what decides now.</p>
+     */
+    @Test
+    void vendoredFrameworksDeclaringWatchosAreLinkedEmbeddedAndFound(@TempDir Path tmp)
+            throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        String ruby = parse(req).buildXcodeScript(req, tmp.toFile(), "1.0",
+                java.util.Collections.<String>emptyList());
+
+        // Both spellings of a declaration, because an .xcframework records it differently.
+        assertTrue(ruby.contains("CFBundleSupportedPlatforms"), ruby);
+        assertTrue(ruby.contains("AvailableLibraries"), ruby);
+        assertTrue(ruby.contains("cn1_watch_bundle_supports_watchos(ref)"),
+                "a non-SDKROOT reference must be judged by its own bundle: " + ruby);
+        // Linking alone is not enough. The linker has to be told where the binary lives, and a
+        // dynamic framework has to be copied into the watch bundle or it fails at install time.
+        assertTrue(ruby.contains("config.build_settings['FRAMEWORK_SEARCH_PATHS'] = paths"), ruby);
+        assertTrue(ruby.contains("symbol_dst_subfolder_spec == :frameworks"), ruby);
+        assertTrue(ruby.contains("'CodeSignOnCopy'"), ruby);
+        // Whether to embed is READ from the phone target rather than decided here: if the app
+        // embeds it, it is dynamic. A static framework must not be copied.
+        assertTrue(ruby.contains("app_target.copy_files_build_phases"), ruby);
+        // And a project with no vendored framework must produce the project it did before.
+        assertTrue(ruby.contains("if vendored_linked"), ruby);
+    }
+
     /// The bootstrap has to call the stub that actually exists in the watch binary.
     @Test
     void theBootstrapEntersTheWatchStub(@TempDir Path tmp) throws Exception {

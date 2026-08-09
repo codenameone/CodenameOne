@@ -1700,7 +1700,46 @@ class WatchNativeBuilder {
         //
         // Weak-linked, as the optional-framework list treats anything a slice may not need: a
         // symbol the watch code never calls costs it nothing.
-        s.append("watch_sdks = ['watchos', 'watchsimulator'].map { |sdk| "
+        // A VENDORED framework is judged by what it says about itself.
+        //
+        // The SDK check below can only speak for system frameworks. A developer's own or a
+        // third-party binary is referenced from a group rather than SDKROOT, and skipping every one
+        // of those meant a watch-reachable native implementation calling into a framework that ships
+        // a perfectly good watchOS slice never got it linked -- undefined symbols, with nothing in
+        // the build naming what was left out.
+        //
+        // The bundle's own Info.plist is the honest answer: CFBundleSupportedPlatforms for a plain
+        // .framework, AvailableLibraries/SupportedPlatform for an .xcframework. Both are written by
+        // whoever built the binary. Guessing from the architecture list would not work -- arm64 is
+        // both an iPhone and an Apple silicon watch simulator -- and guessing wrong here links an
+        // iOS-only binary into a watch slice, which fails later and less clearly.
+        s.append("def cn1_watch_bundle_supports_watchos(ref)\n")
+                .append("  path = (ref.real_path.to_s rescue nil)\n")
+                .append("  return false unless path && File.exist?(path)\n")
+                .append("  plist = ['Info.plist', 'Resources/Info.plist']"
+                        + ".map { |rel| File.join(path, rel) }.find { |c| File.file?(c) }\n")
+                .append("  return false unless plist\n")
+                .append("  begin\n")
+                .append("    info = Xcodeproj::Plist.read_from_path(plist)\n")
+                .append("  rescue StandardError\n")
+                // An unreadable plist is not evidence of support. Leaving it out costs a link
+                // error naming the framework; guessing yes costs a slice built against the wrong
+                // platform.
+                .append("    return false\n")
+                .append("  end\n")
+                .append("  return false unless info.is_a?(Hash)\n")
+                .append("  platforms = info['CFBundleSupportedPlatforms']\n")
+                .append("  if platforms.is_a?(Array) && platforms.any? { |p| "
+                        + "p.to_s.downcase.start_with?('watch') }\n")
+                .append("    return true\n")
+                .append("  end\n")
+                .append("  libs = info['AvailableLibraries']\n")
+                .append("  return false unless libs.is_a?(Array)\n")
+                .append("  libs.any? { |l| l.is_a?(Hash) && "
+                        + "l['SupportedPlatform'].to_s.downcase.start_with?('watch') }\n")
+                .append("end\n")
+                .append("vendored_linked = false\n")
+                .append("watch_sdks = ['watchos', 'watchsimulator'].map { |sdk| "
                         + "`xcrun --sdk #{sdk} --show-sdk-path 2>/dev/null`.strip }"
                         + ".reject { |dir| dir.empty? || !File.directory?(dir) }\n")
                 .append("watch_fw_dirs = watch_sdks.map { |dir| "
@@ -1720,15 +1759,19 @@ class WatchNativeBuilder {
                 // .a is deliberately absent. A static library is built, not provided by the SDK:
                 // CocoaPods' libPods-*.a and any vendored archive are compiled for iOS and have no
                 // watch slice, so linking one is a guaranteed failure rather than a possible one.
-                .append("  next unless base.end_with?('.framework') || base.end_with?('.dylib') "
+                .append("  next unless base.end_with?('.framework') "
+                        + "|| base.end_with?('.xcframework') || base.end_with?('.dylib') "
                         + "|| base.end_with?('.tbd')\n")
-                .append("  if base.end_with?('.framework')\n")
-                // Only a system framework can be checked against the SDK. An embedded or vendored
-                // .framework is the developer's own binary and nothing here can tell whether it has
-                // a watch slice, so it is left alone rather than guessed at.
-                .append("    next unless ref.source_tree == 'SDKROOT'\n")
-                .append("    present = !watch_fw_dirs.empty? && watch_fw_dirs.all? { |dirs| "
+                .append("  if base.end_with?('.framework') || base.end_with?('.xcframework')\n")
+                .append("    if ref.source_tree == 'SDKROOT'\n")
+                .append("      present = !watch_fw_dirs.empty? && watch_fw_dirs.all? { |dirs| "
                         + "dirs.any? { |d| File.directory?(File.join(d, base)) } }\n")
+                .append("    else\n")
+                // Vendored: the bundle's own declaration decides, and a yes means the search paths
+                // and any embed phase have to follow it below.
+                .append("      present = cn1_watch_bundle_supports_watchos(ref)\n")
+                .append("      vendored_linked ||= present\n")
+                .append("    end\n")
                 .append("  else\n")
                 .append("    stem = base.sub(/\\.(dylib|tbd)\\z/, '')\n")
                 .append("    present = !watch_sdks.empty? && watch_sdks.all? { |sdk| "
@@ -1737,7 +1780,8 @@ class WatchNativeBuilder {
                 .append("  end\n")
                 .append("  unless present\n")
                 .append("    puts \"[watchNative] not linking #{base} into the watch target: "
-                        + "absent from a watchOS SDK\"\n")
+                        + "#{ref.source_tree == 'SDKROOT' ? 'absent from a watchOS SDK' : "
+                        + "'its Info.plist declares no watchOS slice'}\"\n")
                 .append("    next\n")
                 .append("  end\n")
                 .append("  added = watch_target.frameworks_build_phase.add_file_reference(ref)\n")
@@ -1747,6 +1791,53 @@ class WatchNativeBuilder {
                 .append("    attrs << 'Weak' unless attrs.include?('Weak')\n")
                 .append("    settings['ATTRIBUTES'] = attrs\n")
                 .append("    added.settings = settings\n")
+                .append("  end\n")
+                .append("end\n");
+
+        // What a vendored framework needs beyond being listed in the link phase.
+        //
+        // FRAMEWORK_SEARCH_PATHS is where the linker looks, and it lives on the APP target -- the
+        // watch target has never been told about the directory the binary sits in, so linking the
+        // reference alone still fails with "framework not found". Mirrored per configuration, so a
+        // project whose Debug and Release paths differ keeps that difference.
+        //
+        // Then the embed phase, mirrored rather than decided: a static framework must NOT be
+        // copied into the bundle and a dynamic one must, and whether this particular binary is one
+        // or the other is already recorded in the project -- if the phone app embeds it, it is
+        // dynamic. Reading that beats parsing Mach-O headers to rediscover it.
+        //
+        // Both are gated on having actually linked a vendored framework, so a project without one
+        // produces exactly the Xcode project it did before.
+        s.append("if vendored_linked\n")
+                .append("  watch_target.build_configurations.each do |config|\n")
+                .append("    app_cfg = app_target.build_configurations.find { |c| "
+                        + "c.name == config.name } || app_target.build_configurations.first\n")
+                .append("    next unless app_cfg\n")
+                .append("    paths = app_cfg.build_settings['FRAMEWORK_SEARCH_PATHS']\n")
+                .append("    next unless paths\n")
+                .append("    config.build_settings['FRAMEWORK_SEARCH_PATHS'] = paths\n")
+                .append("  end\n")
+                .append("  embedded = app_target.copy_files_build_phases.to_a.select { |ph| "
+                        + "ph.symbol_dst_subfolder_spec == :frameworks }"
+                        + ".flat_map { |ph| ph.files.to_a }"
+                        + ".map { |bf| bf.file_ref }.compact\n")
+                .append("  watch_embed = nil\n")
+                .append("  watch_linked = watch_target.frameworks_build_phase.files_references\n")
+                .append("  embedded.each do |ref|\n")
+                .append("    next unless watch_linked.include?(ref)\n")
+                .append("    watch_embed ||= watch_target.copy_files_build_phases.to_a.find { |ph| "
+                        + "ph.symbol_dst_subfolder_spec == :frameworks }\n")
+                .append("    if watch_embed.nil?\n")
+                .append("      watch_embed = watch_target.new_copy_files_build_phase("
+                        + "'Embed Frameworks')\n")
+                .append("      watch_embed.symbol_dst_subfolder_spec = :frameworks\n")
+                .append("    end\n")
+                .append("    next if watch_embed.files_references.include?(ref)\n")
+                .append("    bf = watch_embed.add_file_reference(ref)\n")
+                // Signed on copy, as Xcode does for an embedded framework: an unsigned binary
+                // inside a signed watch app is rejected at install time.
+                .append("    bf.settings = { 'ATTRIBUTES' => ['CodeSignOnCopy', "
+                        + "'RemoveHeadersOnCopy'] } if bf\n")
                 .append("  end\n")
                 .append("end\n");
 

@@ -314,7 +314,7 @@ public class IPhoneBuilder extends Executor {
     }
 
     /// Whether the class graph rooted here reaches the health API at all.
-    private boolean reachesHealth(java.util.Set<String> reachable) {
+    boolean reachesHealth(java.util.Set<String> reachable) {
         for (String name : reachable) {
             // The SAME distinction the scanner draws, and for the same reason. The umbrella
             // package is not evidence of HealthKit: com.codename1.health.sensors is pure BLE, and
@@ -322,9 +322,26 @@ public class IPhoneBuilder extends Executor {
             // that never touches the store. Counting those here marked a BLE-only phone root as
             // health-reaching and re-entitled it -- the exact release-signing failure this
             // attribution exists to prevent.
-            if (name.startsWith("com/codename1/health/")
-                    && !name.startsWith("com/codename1/health/sensors/")
-                    && !"com/codename1/health/Health".equals(name)
+            if (!name.startsWith("com/codename1/health/")) {
+                continue;
+            }
+            if (name.startsWith("com/codename1/health/sensors/")) {
+                // Normally BLE and nothing more -- but a sensor session can be told to write its
+                // samples through to the store, and then the sensors package IS the route into
+                // HealthKit. Excluding it unconditionally stripped the entitlement and the listener
+                // bindings from whichever target actually does the writing, which is the failure
+                // this attribution exists to prevent, arriving from the other direction.
+                //
+                // The write-through flag is app-wide, so a root that merely touches the sensors
+                // package is entitled alongside the one that writes. That is the safe direction:
+                // over-entitling costs nothing at runtime, under-entitling fails the authorization
+                // request.
+                if (sensorWriteThrough) {
+                    return true;
+                }
+                continue;
+            }
+            if (!"com/codename1/health/Health".equals(name)
                     && !isSharedHealthModel(name)) {
                 return true;
             }
@@ -480,6 +497,13 @@ public class IPhoneBuilder extends Executor {
     private boolean usesHealthRead;
     private boolean usesHealthWrite;
     private boolean usesHealthWorkout;
+
+    /// Whether a sensor session was seen asking to write its samples through to the store.
+    ///
+    /// Kept apart from usesHealthWrite, which write-through also sets: the two are the same
+    /// permission but not the same evidence, and only this one says the sensors package is a route
+    /// into HealthKit for the root that reaches it.
+    boolean sensorWriteThrough;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
     private boolean usesCn1Vision;
@@ -1533,6 +1557,7 @@ public class IPhoneBuilder extends Executor {
                         usesHealth = true;
                         usesHealthStore = true;
                         usesHealthWrite = true;
+                        sensorWriteThrough = true;
                     }
                 }
 
