@@ -282,6 +282,9 @@ public final class GuiDocument {
         // from labelled on the canvas to blank at runtime. Store what the canvas shows.
         String defaultText = defaultTextFor(type);
         if (defaultText != null) child.setAttribute("text", defaultText);
+        // The preview shows a hint for a bare TextField while the generator emits an empty one, so
+        // saving an untouched field removed the only prompt the canvas had shown.
+        if ("TextField".equals(type)) child.setAttribute("hint", "Text field");
         if (acceptsChildren(child)) child.setAttribute("layout", "LayeredLayout");
         parent.addChild(child);
         assignFreeTableCell(parent, child);
@@ -310,7 +313,14 @@ public final class GuiDocument {
         // has to be free and inside the table -- checking only the anchor let a two-column
         // component land beside an occupied cell and overlap on the next rebuild.
         int childRowSpan = Math.max(1, parseInt(child.getAttribute("tableVerticalSpan"), 1));
-        int childColumnSpan = Math.max(1, parseInt(child.getAttribute("tableHorizontalSpan"), 1));
+        // Clamped to the destination: a component copied from a wider table can carry a span larger
+        // than this table has columns, and the search below would then reject every candidate and
+        // spin forever on the EDT.
+        int childColumnSpan = Math.min(columns,
+                Math.max(1, parseInt(child.getAttribute("tableHorizontalSpan"), 1)));
+        if (childColumnSpan != parseInt(child.getAttribute("tableHorizontalSpan"), 1)) {
+            setNormalizedAttribute(child, "tableHorizontalSpan", String.valueOf(childColumnSpan));
+        }
         for (int cursor = 0; ; cursor++) {
             int row = cursor / columns;
             int column = cursor % columns;

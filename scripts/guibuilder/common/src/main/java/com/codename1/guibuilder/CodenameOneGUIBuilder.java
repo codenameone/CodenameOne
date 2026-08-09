@@ -1994,7 +1994,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             boolean canSwap = oldParent == plan.parent && vacatedRow != null && vacatedColumn != null
                     && spanFitsAt(plan.parent, plan.occupied, dragged, vacatedRow.intValue(), vacatedColumn.intValue());
             int[] destination = canSwap ? new int[]{vacatedRow.intValue(), vacatedColumn.intValue()}
-                    : firstFreeRectangle(plan.parent, plan.occupied, dragged);
+                    : firstFreeRectangle(plan.parent, plan.occupied, dragged, row, column,
+                            Math.max(1, integer(dragged.getAttribute("tableVerticalSpan"), 1)),
+                            Math.max(1, integer(dragged.getAttribute("tableHorizontalSpan"), 1)));
             if (destination == null) {
                 setStatus("No free cell in this table can hold " + value(plan.occupied, "name", "that component"));
                 return false;
@@ -2090,15 +2092,33 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param ignored a child to disregard while testing
      * @return the anchor, or null when the table has no room for that rectangle
      */
-    private int[] firstFreeRectangle(Element parent, Element child, Element ignored) {
+    private int[] firstFreeRectangle(Element parent, Element child, Element ignored,
+            int blockedRow, int blockedColumn, int blockedRowSpan, int blockedColumnSpan) {
         int rows = Math.max(1, integer(value(parent, "tableLayoutRows", "2"), 2));
         int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
+        int rowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
+        int columnSpan = Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1));
         for (int row = 0; row < rows; row++) {
             for (int column = 0; column < columns; column++) {
+                // The cell the dragged component is taking is not a destination for the occupant,
+                // and rectangleFree() cannot see that: it skips the child it is placing, so the
+                // occupant's current cell reads as free and would be handed straight back --
+                // leaving both components on one anchor for normalizeTableCells() to shuffle.
+                if (rectanglesIntersect(row, column, rowSpan, columnSpan,
+                        blockedRow, blockedColumn, blockedRowSpan, blockedColumnSpan)) continue;
                 if (spanFitsAt(parent, child, ignored, row, column)) return new int[]{row, column};
             }
         }
         return null;
+    }
+
+    /**
+     * @return true when two cell rectangles share any cell
+     */
+    private static boolean rectanglesIntersect(int rowA, int columnA, int rowSpanA, int columnSpanA,
+            int rowB, int columnB, int rowSpanB, int columnSpanB) {
+        return rowA < rowB + rowSpanB && rowB < rowA + rowSpanA
+                && columnA < columnB + columnSpanB && columnB < columnA + columnSpanA;
     }
 
     /** The first cell in row-major order that no sibling claims, growing past the last row if needed. */
@@ -4505,6 +4525,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private boolean save() {
         if (document == null) return true;
         try {
+            // The model is written before anything else when a strategy change asked for it. Every
+            // individual write is atomic, but the sequence is not, and the model is the output most
+            // likely to fail -- read only, locked, or replaced by hand. Doing it first means a
+            // failure leaves the .gui and the companion describing the strategy they always did,
+            // rather than a companion on the new strategy beside a model on the old one.
+            if (!regenerateModelIfRequested(companionSourcePath())) return false;
             ProjectIO.write(document.path(), document.toXml());
             // The .gui file alone changes nothing at runtime. Without regenerating the companion
             // here, a component added in the designer and saved was simply absent from the running
@@ -4518,7 +4544,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // to "properties". Creating the model only when the Code pane is saved left an ordinary
             // Save producing source that referenced a class which did not exist.
             if (ensureBindingModel(sourcePath) == MODEL_FAILED) return false;
-            if (!regenerateModelIfRequested(sourcePath)) return false;
             // Only now: marking the document clean after the .gui write but before the companion
             // one meant a failed companion write left isModified() false, so the next form switch
             // went ahead without retrying and the runtime source stayed stale.
