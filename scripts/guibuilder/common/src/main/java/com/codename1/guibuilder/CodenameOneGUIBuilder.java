@@ -3429,7 +3429,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             return;
         }
         if (!ProjectIO.exists(modelPath)) {
-            ensureBindingModel(sourcePath);
+            // Deferred like a rewrite rather than written now: a model created at picker time is
+            // generated from unsaved state, is left behind if the strategy change is abandoned, and
+            // is skipped by Save afterwards because the file exists -- so any component added or
+            // renamed in between never reaches it.
+            regenerateModelFor = document;
+            setStatus("The binding model will be created when you save");
             return;
         }
         if (!com.codename1.ui.Dialog.show("Regenerate the binding model?",
@@ -4679,6 +4684,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (binding == null || binding.cssFile() == null) return;
         if (!confirmDiscardEditorBuffer("Opening the stylesheet", "css")) return;
         try {
+            // Same reason as the source and model panes: leaving the reopen callback in place makes
+            // refreshEditor() restore this pane and the split built below then nests inside it.
+            activeEditorReopen = null;
             refreshEditor();
             String css = ProjectIO.read(binding.cssFile());
             String keptCss = keptBuffer("css");
@@ -4758,7 +4766,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String modelPath = formPath.substring(0, formPath.length() - 5) + "Model.java";
         try {
             // Rebuild the canvas first: opening an editor over an already open one would nest
-            // split panes and push the design surface out of reach.
+            // split panes and push the design surface out of reach. The reopen callback is dropped
+            // for the duration, or refreshEditor() puts the current pane back and this method then
+            // wraps that split pane in another one -- clicking Code twice halved the canvas.
+            activeEditorReopen = null;
             refreshEditor();
             String source = ProjectIO.exists(modelPath) ? ProjectIO.read(modelPath) : generatedModelSource();
             String keptModel = keptBuffer("model");
@@ -4799,7 +4810,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String sourcePath = companionSourcePath();
         try {
             // Rebuild the canvas first: opening an editor over an already open one would nest
-            // split panes and push the design surface out of reach.
+            // split panes and push the design surface out of reach. The reopen callback is dropped
+            // for the duration, or refreshEditor() puts the current pane back and this method then
+            // wraps that split pane in another one -- clicking Code twice halved the canvas.
+            activeEditorReopen = null;
             refreshEditor();
             String generated = defaultCompanionSource();
             String source = ProjectIO.exists(sourcePath) ? mergeGeneratedSource(ProjectIO.read(sourcePath), generated) : generated;
@@ -5848,12 +5862,36 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * Drops every constructor of the scaffolded class. The generated region declares its own, and
      * the scaffolded ones call an {@code initGuiBuilderComponents} that no longer exists.
      */
+    /**
+     * Finds a constructor declaration, allowing space before the parenthesis and ignoring comments.
+     *
+     * @param source the text to search
+     * @param className the class whose constructor is wanted
+     * @param from where to start
+     * @return the index of the name, or -1 when there is no further match
+     */
+    private int constructorAt(String source, String className, int from) {
+        String code = stripComments(source);
+        int at = from;
+        while (true) {
+            at = code.indexOf(className, at);
+            if (at < 0) return -1;
+            int after = at + className.length();
+            int open = skipSpaces(code, after);
+            if (open < code.length() && code.charAt(open) == '(') return at;
+            at = after;
+        }
+    }
+
     private String removeConstructors(String body, String className) {
         if (className.length() == 0) return body;
         String out = body;
         int from = 0;
         while (true) {
-            int index = out.indexOf(className + "(", from);
+            // Whitespace before the parenthesis is legal and formatters produce it, so an exact
+            // "name(" search left a reformatted "MyForm (Resources res)" in place beside the
+            // regenerated constructors, still calling the initGuiBuilderComponents that is gone.
+            int index = constructorAt(out, className, from);
             if (index < 0) return out;
             char before = index == 0 ? ' ' : out.charAt(index - 1);
             int close = matchingBrace(out, out.indexOf(")", index));

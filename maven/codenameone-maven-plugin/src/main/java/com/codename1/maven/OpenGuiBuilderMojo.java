@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -54,7 +55,13 @@ import java.util.UUID;
  */
 @Mojo(name = "guibuilder")
 public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
-    private static final String LAUNCHED_PROPERTY = "com.codename1.maven.OpenGuiBuilderMojo.launched";
+    /**
+     * Marks the editor as launched for this reactor. Kept in the plugin context, which Maven scopes
+     * to the session: a JVM-wide system property survived in a long lived Maven -- an IDE Maven
+     * server or mvnd -- so every later invocation returned at the guard and the run configuration
+     * appeared to do nothing until that process was restarted.
+     */
+    private static final String LAUNCHED_KEY = "com.codename1.maven.OpenGuiBuilderMojo.launched";
 
     /** The editor is compiled for this Java release, so an older forked JVM cannot load it. */
     private static final int REQUIRED_JAVA_VERSION = 8;
@@ -71,7 +78,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        if (Boolean.getBoolean(LAUNCHED_PROPERTY)) {
+        if (alreadyLaunchedInThisSession()) {
             getLog().debug("Skipping guibuilder: already launched in this Maven invocation");
             return;
         }
@@ -80,7 +87,7 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
             return;
         }
         requireModernJdk();
-        System.setProperty(LAUNCHED_PROPERTY, "true");
+        markLaunchedInThisSession();
 
         File projectDir = getCN1ProjectDir();
         File guiDir = new File(projectDir, "src" + File.separator + "main" + File.separator + "guibuilder");
@@ -111,6 +118,21 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
             java.createJvmarg().setValue(arg);
         }
         java.executeJava();
+    }
+
+    /**
+     * @return true when this reactor has already opened the editor
+     */
+    @SuppressWarnings("unchecked")
+    private boolean alreadyLaunchedInThisSession() {
+        Map<Object, Object> context = getPluginContext();
+        return context != null && Boolean.TRUE.equals(context.get(LAUNCHED_KEY));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void markLaunchedInThisSession() {
+        Map<Object, Object> context = getPluginContext();
+        if (context != null) context.put(LAUNCHED_KEY, Boolean.TRUE);
     }
 
     /**
