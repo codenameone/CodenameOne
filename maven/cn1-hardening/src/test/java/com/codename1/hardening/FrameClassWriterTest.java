@@ -66,4 +66,50 @@ public class FrameClassWriterTest {
         assertEquals("java/lang/Object", common(null, "a/B", "c/D"));
         assertEquals("a/B", common(null, "a/B", "a/B"));
     }
+
+    @Test
+    public void resolvesSharedBaseFromBytesWhenBaseCannotBeLoaded() {
+        // app/A and app/B both extend app/Base, but Base is supplied only by the target platform and is
+        // absent from the hierarchy. Loading A or B fails (their super can't be linked), so the resolver
+        // must read the super_class name from the bytes and return app/Base -- NOT Object, which is not
+        // assignable to Base and would fail StackMapTable verification for a merge used as a Base.
+        java.util.Map<String, byte[]> res = new java.util.HashMap<String, byte[]>();
+        res.put("app/A.class", classExtending("app/A", "app/Base"));
+        res.put("app/B.class", classExtending("app/B", "app/Base"));
+        ClassLoader hierarchy = new BytesLoader(res);   // app/Base intentionally absent
+        assertEquals("app/Base", common(hierarchy, "app/A", "app/B"));
+    }
+
+    private static byte[] classExtending(String internal, String superName) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, superName, null);
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    /** A loader that serves the given {@code name.class -> bytes} as resources (parent = bootstrap). */
+    private static final class BytesLoader extends ClassLoader {
+        private final java.util.Map<String, byte[]> resources;
+
+        BytesLoader(java.util.Map<String, byte[]> resources) {
+            super(null);
+            this.resources = resources;
+        }
+
+        @Override
+        public java.io.InputStream getResourceAsStream(String name) {
+            byte[] b = resources.get(name);
+            return b != null ? new java.io.ByteArrayInputStream(b) : super.getResourceAsStream(name);
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            byte[] b = resources.get(name.replace('.', '/') + ".class");
+            if (b == null) {
+                throw new ClassNotFoundException(name);
+            }
+            return defineClass(name, b, 0, b.length);
+        }
+    }
 }
