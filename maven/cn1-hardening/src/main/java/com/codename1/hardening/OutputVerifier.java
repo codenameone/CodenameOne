@@ -26,6 +26,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Map;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.util.CheckClassAdapter;
 
 /**
@@ -53,6 +54,16 @@ public final class OutputVerifier {
             try {
                 CheckClassAdapter.verify(new ClassReader(e.getValue()), hierarchy, false, new PrintWriter(sw));
             } catch (Throwable t) {
+                if (isUnresolvedTypeFailure(t)) {
+                    // ASM's data-flow SimpleVerifier LOADS types to resolve the hierarchy and threw
+                    // because one is absent from the supplied jars -- typically an application class whose
+                    // superclass is supplied only by the target platform. That is not a bytecode defect:
+                    // FrameClassWriter already computed this class's frames from the bytes, and the target
+                    // JVM verifies it on-device. Fall back to structural verification here, which needs no
+                    // hierarchy, so a transform that emitted structurally invalid bytecode is still caught.
+                    verifyStructureOnly(e.getKey(), e.getValue());
+                    continue;
+                }
                 throw new HardeningException("Hardened class '" + e.getKey()
                         + "' failed bytecode verification: " + t.getMessage(), t);
             }
@@ -62,5 +73,35 @@ public final class OutputVerifier {
                         + "' failed bytecode verification:\n" + report);
             }
         }
+    }
+
+    /**
+     * Structural verification only (no data-flow, so no type loading): checks the class-file structure --
+     * visit order, valid access flags, names and descriptors. Used as the fallback when the data-flow
+     * verifier cannot resolve an absent type.
+     */
+    private static void verifyStructureOnly(String name, byte[] classBytes) throws HardeningException {
+        try {
+            new ClassReader(classBytes).accept(new CheckClassAdapter(new ClassWriter(0), false), 0);
+        } catch (Throwable t) {
+            throw new HardeningException("Hardened class '" + name
+                    + "' failed structural bytecode verification: " + t.getMessage(), t);
+        }
+    }
+
+    /** True when a verification failure is only a missing type (absent from the supplied jars), not a defect. */
+    private static boolean isUnresolvedTypeFailure(Throwable t) {
+        Throwable c = t;
+        for (int guard = 0; c != null && guard < 32; guard++) {
+            if (c instanceof TypeNotPresentException || c instanceof ClassNotFoundException
+                    || c instanceof NoClassDefFoundError) {
+                return true;
+            }
+            if (c == c.getCause()) {
+                break;
+            }
+            c = c.getCause();
+        }
+        return false;
     }
 }
