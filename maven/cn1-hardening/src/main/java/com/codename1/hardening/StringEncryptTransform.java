@@ -728,17 +728,31 @@ public final class StringEncryptTransform {
      * discloses the short-literal exclusion rather than silently omitting it.
      */
     private int countShortLiterals(ClassNode cn) {
-        if (cn.methods == null) {
-            return 0;
-        }
         java.util.Set<String> found = new java.util.HashSet<String>();
-        for (MethodNode mn : cn.methods) {
-            if (mn.instructions == null) {
-                continue;
+        if (cn.methods != null) {
+            for (MethodNode mn : cn.methods) {
+                if (mn.instructions == null) {
+                    continue;
+                }
+                for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
+                    if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
+                        String v = (String) ((LdcInsnNode) insn).cst;
+                        if (v.length() >= 1 && v.length() <= 2 && wouldSelectButForLength(v)) {
+                            found.add(v);
+                        }
+                    }
+                }
             }
-            for (AbstractInsnNode insn = mn.instructions.getFirst(); insn != null; insn = insn.getNext()) {
-                if (insn instanceof LdcInsnNode && ((LdcInsnNode) insn).cst instanceof String) {
-                    String v = (String) ((LdcInsnNode) insn).cst;
+        }
+        // The static-final ConstantValue channel skips short values for the same reason: encryptStaticFinalStrings
+        // gates on shouldEncryptLiteral -> shouldEncrypt, which rejects length <= 2, so a short static-final
+        // String is left plaintext in its ConstantValue slot and leaks into ParparVM's C pool uncounted. Include
+        // it (distinct by value, dedup'd with the LDC channel above) exactly as countOversizedLiterals does, so
+        // an strings:all build still discloses the exclusion rather than silently advertising full coverage.
+        if (cn.fields != null) {
+            for (FieldNode fn : cn.fields) {
+                if ((fn.access & Opcodes.ACC_STATIC) != 0 && fn.value instanceof String) {
+                    String v = (String) fn.value;
                     if (v.length() >= 1 && v.length() <= 2 && wouldSelectButForLength(v)) {
                         found.add(v);
                     }

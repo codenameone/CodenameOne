@@ -417,6 +417,27 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void shortStaticFinalConstantIsLeftPlaintextAndDisclosed() throws Exception {
+        // A short static-final String is skipped by encryptStaticFinalStrings (shouldEncryptLiteral ->
+        // shouldEncrypt rejects length <= 2), so its ConstantValue stays plaintext and would leak into
+        // ParparVM's C pool. The short-literal disclosure must count that field channel too -- not only
+        // method LDCs -- or an strings:all build could advertise full coverage while a short constant leaks.
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "app/ShortConst", null, "java/lang/Object", null);
+        // Only a short static-final constant, no method LDC of it: the count must come from the field channel.
+        w.visitField(org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC
+                | org.objectweb.asm.Opcodes.ACC_FINAL, "S", "Ljava/lang/String;", null, "ab").visitEnd();
+        w.visitEnd();
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 9);
+        byte[] out = t.transform(w.toByteArray());
+        assertEquals("the short static-final constant is disclosed", 1, t.getShortLiteralCount());
+        assertTrue("the short static-final constant stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, "ab"));
+    }
+
+    @Test
     public void perAccessEncryptionIsCappedByConstantPoolBudget() throws Exception {
         // The per-access channel is NOT pool-neutral when a value's plaintext is retained elsewhere: the
         // ciphertext Utf8+String is a NET addition. Here every literal is ALSO kept plaintext in a class
