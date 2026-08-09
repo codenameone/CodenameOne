@@ -488,28 +488,40 @@ public class IPhoneBuilder extends Executor {
         return "ios";
     }
 
+    /**
+     * Every Apple slice this one build ships from the SAME hardened jar: the iOS app plus any native-Mac,
+     * watchOS or tvOS target. hardeningPlatform() reports one tag ("mac" for a combined build), so the
+     * engine reads a single harden.<tag>.enabled; listing every slice here lets each target's
+     * harden.<platform>.enabled participate in the combined opt-out (Executor.writeHardeningConfig hardens
+     * unless EVERY slice is opted out). The slices cannot be hardened independently -- there is one binary.
+     * Reads the RAW hints, because this runs in the shared Executor before the slice builders' parseHints.
+     */
     @Override
-    protected String hardeningOptOutConflict(BuildRequest request) {
-        // A combined build (macNative.enabled=true) emits both an iOS and a native-Mac slice from the one
-        // shared hardened jar. hardeningPlatform() reports "mac", so the engine consults only
-        // harden.mac.enabled; harden.ios.enabled would be silently ignored. When the two per-slice
-        // opt-outs disagree the shared jar cannot satisfy both, so reject rather than harden one slice
-        // against its opt-out. Resolved with the engine's tri-state boolTri rules.
-        return combinedIosMacOptOutConflict(
-                "true".equals(request.getArg("macNative.enabled", "false")),
-                hardenBoolArg(request, "harden.ios.enabled", true),
-                hardenBoolArg(request, "harden.mac.enabled", true));
+    protected java.util.List<String> effectiveHardeningPlatforms(BuildRequest request) {
+        return appleHardeningSlices(request);
     }
 
-    /** The rejection message when a combined iOS+Mac build's per-slice opt-outs disagree, else null. */
-    static String combinedIosMacOptOutConflict(boolean macNative, boolean iosEnabled, boolean macEnabled) {
-        if (!macNative || iosEnabled == macEnabled) {
-            return null;
+    /** The Apple slices a build ships from the shared hardened jar: ios plus any mac/watch/tv target. */
+    static java.util.List<String> appleHardeningSlices(BuildRequest request) {
+        java.util.List<String> platforms = new java.util.ArrayList<String>();
+        platforms.add("ios");
+        if ("true".equals(request.getArg("macNative.enabled", "false"))) {
+            platforms.add("mac");
         }
-        return "A combined iOS + native-Mac build hardens one shared application jar, so it cannot harden "
-                + "one slice but not the other: harden.ios.enabled=" + iosEnabled + " conflicts with "
-                + "harden.mac.enabled=" + macEnabled + ". Set both to the same value, or use "
-                + "harden.level=off to disable hardening for the whole build.";
+        if (watchTargetEnabled(request)) {
+            platforms.add("watch");
+        }
+        if (tvTargetEnabled(request)) {
+            platforms.add("tv");
+        }
+        return platforms;
+    }
+
+    /** True when this build ships a tvOS slice (tvNative.enabled or a tvMain entry point). */
+    static boolean tvTargetEnabled(BuildRequest request) {
+        return "true".equals(request.getArg("tvNative.enabled", "false"))
+                || request.getArg("tvMain",
+                        request.getArg("tvNative.mainClass", "")).trim().length() > 0;
     }
 
     /**

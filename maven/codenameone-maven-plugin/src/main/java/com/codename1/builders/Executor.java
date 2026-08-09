@@ -2396,13 +2396,41 @@ public abstract class Executor {
     }
 
     /**
-     * An explanation to fail the build with when this builder emits multiple output slices from the one
-     * shared hardened jar and their per-slice {@code harden.<slice>.enabled} opt-outs disagree (a shared
-     * jar cannot be hardened one way for one slice and another for the other), or {@code null} when there
-     * is no such conflict. The default builder emits a single slice and never conflicts.
+     * The platform tags this one build ships from the SAME hardened jar. The default builder emits a
+     * single slice ({@link #hardeningPlatform(BuildRequest)}); the Apple builder widens it to the iOS app
+     * plus any native-Mac, watch or tv slice. A shared jar cannot be hardened per-slice, so its
+     * {@code harden.<slice>.enabled} opt-outs are combined: hardening runs unless EVERY shipped slice is
+     * opted out (see {@link #writeHardeningConfig}). Kept consistent with the daemon builder.
      */
-    protected String hardeningOptOutConflict(BuildRequest request) {
-        return null;
+    protected java.util.List<String> effectiveHardeningPlatforms(BuildRequest request) {
+        return java.util.Collections.singletonList(hardeningPlatform(request));
+    }
+
+    /**
+     * True when a {@code harden.*} boolean reads as disabled, matching the engine's tri-state parsing:
+     * {@code false}, {@code 0} and {@code off} all mean off, so a per-slice opt-out is recognized
+     * consistently rather than only as the literal {@code false}.
+     */
+    protected static boolean hardenDisabled(String value) {
+        if (value == null) {
+            return false;
+        }
+        String t = value.trim().toLowerCase();
+        return "false".equals(t) || "0".equals(t) || "off".equals(t);
+    }
+
+    /**
+     * True when at least one of the shipped {@code slices} still wants hardening, i.e. NOT every slice
+     * opted out via {@code harden.<slice>.enabled}. A shared jar is hardened as a whole, so the combined
+     * decision is this OR: hardening runs unless every slice is opted out.
+     */
+    static boolean anySliceHardeningEnabled(java.util.List<String> slices, BuildRequest request) {
+        for (String slice : slices) {
+            if (!hardenDisabled(request.getArg("harden." + slice + ".enabled", "true"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
@@ -2541,13 +2569,6 @@ public abstract class Executor {
             log("cn1-hardening: forced off for this local build; building unhardened");
             return sourceZip;
         }
-        // A builder that emits more than one output slice from this one shared jar (the combined
-        // iOS + native-Mac build) cannot harden one slice but not the other; reject a conflicting
-        // per-slice opt-out here rather than silently applying one slice's choice to both.
-        String optOutConflict = hardeningOptOutConflict(request);
-        if (optOutConflict != null) {
-            throw new BuildException(optOutConflict);
-        }
         try {
             File engine = getResourceAsFile("/cn1-hardening.jar", ".jar");
             File workDir = new File(sourceZip.getParentFile(), "cn1-harden-work");
@@ -2629,6 +2650,13 @@ public abstract class Executor {
             }
         }
         p.setProperty("cn1.platform", hardeningPlatform(request));
+        // A build can ship several slices from this ONE shared hardened jar (the iOS app plus a
+        // native-Mac/watch/tv slice). The engine reads a single harden.<cn1.platform>.enabled, so a
+        // combined build would otherwise honor only one slice's opt-out and silently ignore the others'.
+        // Coalesce them: hardening runs unless EVERY shipped slice is opted out. A shared jar cannot be
+        // hardened one way for one slice and another for the other, so this is the honest combination.
+        p.setProperty("harden." + hardeningPlatform(request) + ".enabled",
+                Boolean.toString(anySliceHardeningEnabled(effectiveHardeningPlatforms(request), request)));
         // The keep rule must name the FULLY QUALIFIED main class: getMainClass() is the simple name
         // (the stubs combine it with getPackageName()), so passing it bare would keep a default-package
         // class and let ProGuard rename the real application class out from under the generated stub.

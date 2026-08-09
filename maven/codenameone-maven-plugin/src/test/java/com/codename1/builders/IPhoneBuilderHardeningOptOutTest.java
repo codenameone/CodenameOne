@@ -22,33 +22,58 @@
  */
 package com.codename1.builders;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 /**
- * A combined iOS + native-Mac build hardens ONE shared jar, so it cannot harden one slice but not the
- * other; conflicting per-slice opt-outs must be rejected rather than silently applying one slice's choice.
+ * A combined build ships several Apple slices from one shared hardened jar, so every slice's
+ * harden.&lt;platform&gt;.enabled must participate in the opt-out: hardening runs unless EVERY slice is
+ * opted out. Matches the daemon builder so the local and cloud decisions agree.
  */
 class IPhoneBuilderHardeningOptOutTest {
 
     @Test
-    void combinedBuildRejectsConflictingPerSliceOptOuts() {
-        // macNative=true and the two opt-outs disagree -> reject (a shared jar can't satisfy both).
-        assertNotNull(IPhoneBuilder.combinedIosMacOptOutConflict(true, false, true),
-                "ios opted out but mac on -> conflict");
-        assertNotNull(IPhoneBuilder.combinedIosMacOptOutConflict(true, true, false),
-                "mac opted out but ios on -> conflict");
+    void combinedBuildListsEveryAppleSlice() {
+        BuildRequest plain = new BuildRequest();
+        assertEquals(Arrays.asList("ios"), IPhoneBuilder.appleHardeningSlices(plain),
+                "a plain iOS build ships only the iOS slice");
+
+        BuildRequest combined = new BuildRequest();
+        combined.putArgument("macNative.enabled", "true");
+        combined.putArgument("watchNative.enabled", "true");
+        assertEquals(Arrays.asList("ios", "mac", "watch"),
+                IPhoneBuilder.appleHardeningSlices(combined),
+                "a combined build lists the iOS app plus its native-Mac and watch slices");
     }
 
     @Test
-    void agreeingOrNonCombinedBuildsAreAccepted() {
-        // Agreeing opt-outs (both on / both off) are fine.
-        assertNull(IPhoneBuilder.combinedIosMacOptOutConflict(true, true, true));
-        assertNull(IPhoneBuilder.combinedIosMacOptOutConflict(true, false, false));
-        // A plain iOS build (no Mac slice) never conflicts, whatever the flags say.
-        assertNull(IPhoneBuilder.combinedIosMacOptOutConflict(false, true, false));
-        assertNull(IPhoneBuilder.combinedIosMacOptOutConflict(false, false, true));
+    void hardeningRunsUnlessEverySliceOptedOut() {
+        BuildRequest req = new BuildRequest();
+        java.util.List<String> iosMac = Arrays.asList("ios", "mac");
+
+        // Neither opted out -> harden.
+        assertTrue(Executor.anySliceHardeningEnabled(iosMac, req));
+
+        // Only the iOS slice opted out, Mac still on -> still harden (the shared jar is hardened for Mac).
+        req.putArgument("harden.ios.enabled", "false");
+        assertTrue(Executor.anySliceHardeningEnabled(iosMac, req),
+                "harden.ios.enabled=false alone must NOT skip hardening the shared jar the Mac slice wants");
+
+        // Only the Mac slice opted out, iOS still on -> still harden (fixes the old 'consult only mac' bug).
+        req = new BuildRequest();
+        req.putArgument("harden.mac.enabled", "off");
+        assertTrue(Executor.anySliceHardeningEnabled(iosMac, req),
+                "harden.mac.enabled=off must no longer leave the iOS artifact unhardened");
+
+        // EVERY slice opted out -> skip.
+        req = new BuildRequest();
+        req.putArgument("harden.ios.enabled", "false");
+        req.putArgument("harden.mac.enabled", "0");
+        assertFalse(Executor.anySliceHardeningEnabled(iosMac, req),
+                "hardening is skipped only when every shipped slice opted out");
     }
 }
