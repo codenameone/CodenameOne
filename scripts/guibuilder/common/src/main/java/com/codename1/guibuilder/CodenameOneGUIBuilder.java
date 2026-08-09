@@ -4928,7 +4928,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // name. Passing the raw Events value here appended a second, invalid declaration for
             // anything that is not already an identifier, so "on-click" opened source that could
             // not compile and could then be saved in that state.
-            if (handler != null) source = ensureHandler(source, javaIdentifier(handler));
+            if (handler != null) source = ensureHandler(source, handlerIdentifier(handler));
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
             trackEditorBuffer(editor, source, "source", keptSource == null);
@@ -5342,7 +5342,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     ? "addCommandToOverflowMenu" : "side".equals(placement) ? "addCommandToSideMenu" : "addCommandToRightBar";
             out.append("        toolbar.").append(method).append("(\"")
                     .append(javaEscape(value(command, "name", "Command"))).append("\", null, this::")
-                    .append(javaIdentifier(value(command, "actionEvent", "onCommand"))).append(");\n");
+                    .append(handlerIdentifier(value(command, "actionEvent", "onCommand"))).append(");\n");
         }
         out.append("    }\n\n");
         if (bindingEnabled) out.append("    public ").append(modelName).append(" getModel() { return model; }\n\n");
@@ -5369,7 +5369,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             appendGeneratedProperties(out, ((Element) value), name, type, indent);
             String handler = actionHandlerName(((Element) value));
             if (handler != null && handler.length() > 0 && firesActionEvents(type)) {
-                out.append(indent).append(name).append(".addActionListener(this::").append(javaIdentifier(handler)).append(");\n");
+                out.append(indent).append(name).append(".addActionListener(this::").append(handlerIdentifier(handler)).append(");\n");
             }
             if ("Tabs".equals(value(parent, "type", ""))) {
                 out.append(indent).append(parentName).append(".addTab(\"").append(javaEscape(value(((Element) value), "name", "Tab")))
@@ -5610,6 +5610,53 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return true when a listener can be registered on this type
      */
     /**
+     * Assigns each distinct handler value its own Java identifier.
+     *
+     * <p>Two values that normalize to the same identifier -- {@code save-item} and
+     * {@code save_item} -- collapsed onto one method, and because the stub list deduplicated the
+     * normalized name the two controls silently shared a handler. The mapping is built once per
+     * document so the listener, the stub and the editor all name the same method.
+     */
+    private void assignHandlerIdentifiers() {
+        handlerIdentifiers = new LinkedHashMap<>();
+        Set<String> used = new LinkedHashSet<>();
+        for (Element element : document.components()) {
+            claimHandlerIdentifier(used, actionHandlerName(element));
+        }
+        for (Element command : document.commands()) {
+            claimHandlerIdentifier(used, value(command, "actionEvent", "onCommand"));
+        }
+    }
+
+    private void claimHandlerIdentifier(Set<String> used, String raw) {
+        if (raw == null || raw.length() == 0 || handlerIdentifiers.containsKey(raw)) return;
+        String base = javaIdentifier(raw);
+        String candidate = base;
+        int suffix = 2;
+        while (!used.add(candidate)) {
+            candidate = base + suffix;
+            suffix++;
+        }
+        handlerIdentifiers.put(raw, candidate);
+    }
+
+    /**
+     * The Java method name for a handler value, disambiguated against every other handler in the
+     * document.
+     *
+     * @param raw the configured handler value
+     * @return the method name to emit
+     */
+    private String handlerIdentifier(String raw) {
+        if (raw == null || raw.length() == 0) return null;
+        String assigned = handlerIdentifiers == null ? null : handlerIdentifiers.get(raw);
+        return assigned == null ? javaIdentifier(raw) : assigned;
+    }
+
+    /** Raw handler value to the unique Java identifier emitted for it. */
+    private Map<String, String> handlerIdentifiers = new LinkedHashMap<>();
+
+    /**
      * The handler method an element's {@code actionEvent} refers to.
      *
      * <p>Older .gui files record the attribute as the boolean {@code true} and the companion
@@ -5706,12 +5753,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private List<String> generatedHandlers() {
         List<String> handlers = new ArrayList<>();
         for (Element element : document.components()) {
-            String handler = actionHandlerName(element);
-            if (handler != null && handler.length() > 0 && !handlers.contains(javaIdentifier(handler))) handlers.add(javaIdentifier(handler));
+            String handler = handlerIdentifier(actionHandlerName(element));
+            if (handler != null && !handlers.contains(handler)) handlers.add(handler);
         }
         for (Element command : document.commands()) {
-            String handler = javaIdentifier(value(command, "actionEvent", "onCommand"));
-            if (!handlers.contains(handler)) handlers.add(handler);
+            String handler = handlerIdentifier(value(command, "actionEvent", "onCommand"));
+            if (handler != null && !handlers.contains(handler)) handlers.add(handler);
         }
         return handlers;
     }
@@ -5729,6 +5776,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     /** Recomputed for every generation because a rename changes every name after it. */
     private void assignJavaNames() {
         javaNames = new LinkedHashMap<>();
+        assignHandlerIdentifiers();
         Set<String> used = new LinkedHashSet<>();
         // the names the generated class itself declares
         used.add("model");

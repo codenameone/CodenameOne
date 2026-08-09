@@ -161,6 +161,44 @@ public class CodeView extends EditorView {
         return false;
     }
 
+    /// Finds a marker that stands alone on its line.
+    ///
+    /// The documented contract is that a protected region is delimited by marker *lines*. Matching
+    /// the raw text meant a mention of the marker inside a string or a comment started a protected
+    /// region, and everything through the next end marker silently refused edits.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the text to search
+    ///
+    /// - `marker`: the marker text
+    ///
+    /// - `from`: the offset to search from
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the marker, or -1 when there is none
+    private static int markerLine(String source, String marker, int from) {
+        int at = from;
+        while (at >= 0 && at < source.length()) {
+            at = source.indexOf(marker, at);
+            if (at < 0) {
+                return -1;
+            }
+            int lineStart = source.lastIndexOf('\n', at) + 1;
+            int lineEnd = source.indexOf('\n', at);
+            if (lineEnd < 0) {
+                lineEnd = source.length();
+            }
+            if (source.substring(lineStart, at).trim().length() == 0
+                    && source.substring(at + marker.length(), lineEnd).trim().length() == 0) {
+                return at;
+            }
+            at += marker.length();
+        }
+        return -1;
+    }
+
     private boolean isProtectedEdit(int start, int end) {
         if (protectedStartMarker == null || protectedEndMarker == null) {
             return false;
@@ -168,11 +206,11 @@ public class CodeView extends EditorView {
         String source = getDocument().getText();
         int searchFrom = 0;
         while (searchFrom < source.length()) {
-            int protectedStart = source.indexOf(protectedStartMarker, searchFrom);
+            int protectedStart = markerLine(source, protectedStartMarker, searchFrom);
             if (protectedStart < 0) {
                 return false;
             }
-            int endMarker = source.indexOf(protectedEndMarker,
+            int endMarker = markerLine(source, protectedEndMarker,
                     protectedStart + protectedStartMarker.length());
             int protectedEnd = endMarker < 0
                     ? source.length() : endMarker + protectedEndMarker.length();

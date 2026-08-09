@@ -146,7 +146,14 @@ public final class ComponentPreviewFactory {
         // (Accordion the same), so backgrounds, borders and padding differed between the canvas
         // and the saved application.
         String explicitUiid = element.getAttribute("uiid");
-        if (explicitUiid != null && explicitUiid.length() > 0) component.setUIID(explicitUiid);
+        if (explicitUiid != null && explicitUiid.length() > 0) {
+            component.setUIID(explicitUiid);
+        } else if ("Form".equals(type) || "Dialog".equals(type)) {
+            // A root Form or Dialog is previewed through sizedContainer(), so it would carry the
+            // Container default while the generated class extends Form and inherits the "Form"
+            // UIID. Everything else keeps the default its own constructor sets.
+            component.setUIID(type);
+        }
         applyAttributes(component, element);
         if (component instanceof CheckBox) {
             ((CheckBox) component).setIcon(FontImage.createMaterial(((CheckBox) component).isSelected()
