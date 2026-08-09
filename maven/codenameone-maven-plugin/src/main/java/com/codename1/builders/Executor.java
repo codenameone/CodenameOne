@@ -2395,6 +2395,16 @@ public abstract class Executor {
                 || "tv".equals(platform) || "win".equals(platform) || "linux".equals(platform);
     }
 
+    /**
+     * An explanation to fail the build with when this builder emits multiple output slices from the one
+     * shared hardened jar and their per-slice {@code harden.<slice>.enabled} opt-outs disagree (a shared
+     * jar cannot be hardened one way for one slice and another for the other), or {@code null} when there
+     * is no such conflict. The default builder emits a single slice and never conflicts.
+     */
+    protected String hardeningOptOutConflict(BuildRequest request) {
+        return null;
+    }
+
     protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
         java.util.List<File> jars = new java.util.ArrayList<File>();
         // Always include the Codename One framework jar: every builder receives it, and it carries
@@ -2530,6 +2540,13 @@ public abstract class Executor {
         if ("true".equals(System.getProperty("cn1.harden.forceOff"))) {
             log("cn1-hardening: forced off for this local build; building unhardened");
             return sourceZip;
+        }
+        // A builder that emits more than one output slice from this one shared jar (the combined
+        // iOS + native-Mac build) cannot harden one slice but not the other; reject a conflicting
+        // per-slice opt-out here rather than silently applying one slice's choice to both.
+        String optOutConflict = hardeningOptOutConflict(request);
+        if (optOutConflict != null) {
+            throw new BuildException(optOutConflict);
         }
         try {
             File engine = getResourceAsFile("/cn1-hardening.jar", ".jar");

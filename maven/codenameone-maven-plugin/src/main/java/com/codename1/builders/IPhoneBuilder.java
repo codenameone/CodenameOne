@@ -488,6 +488,30 @@ public class IPhoneBuilder extends Executor {
         return "ios";
     }
 
+    @Override
+    protected String hardeningOptOutConflict(BuildRequest request) {
+        // A combined build (macNative.enabled=true) emits both an iOS and a native-Mac slice from the one
+        // shared hardened jar. hardeningPlatform() reports "mac", so the engine consults only
+        // harden.mac.enabled; harden.ios.enabled would be silently ignored. When the two per-slice
+        // opt-outs disagree the shared jar cannot satisfy both, so reject rather than harden one slice
+        // against its opt-out. Resolved with the engine's tri-state boolTri rules.
+        return combinedIosMacOptOutConflict(
+                "true".equals(request.getArg("macNative.enabled", "false")),
+                hardenBoolArg(request, "harden.ios.enabled", true),
+                hardenBoolArg(request, "harden.mac.enabled", true));
+    }
+
+    /** The rejection message when a combined iOS+Mac build's per-slice opt-outs disagree, else null. */
+    static String combinedIosMacOptOutConflict(boolean macNative, boolean iosEnabled, boolean macEnabled) {
+        if (!macNative || iosEnabled == macEnabled) {
+            return null;
+        }
+        return "A combined iOS + native-Mac build hardens one shared application jar, so it cannot harden "
+                + "one slice but not the other: harden.ios.enabled=" + iosEnabled + " conflicts with "
+                + "harden.mac.enabled=" + macEnabled + ". Set both to the same value, or use "
+                + "harden.level=off to disable hardening for the whole build.";
+    }
+
     /**
      * The watch lifecycle entry class is resolved by its ORIGINAL fully-qualified name at run time --
      * {@code CN1WatchBootstrap} embeds it in {@code cn1_watch_runtime_start("<watchMain>")} -- and that
