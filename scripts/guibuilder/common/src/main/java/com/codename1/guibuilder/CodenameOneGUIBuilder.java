@@ -1987,9 +1987,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (plan.occupied != null) {
             document.select(plan.occupied);
-            boolean canSwap = oldParent == plan.parent && vacatedRow != null && vacatedColumn != null;
+            // The displaced component keeps its own span, so the cell being vacated is only a
+            // destination if that whole rectangle fits there. Checking the dragged component's
+            // span and not this one left a spanning occupant anchored past the table edge or on
+            // top of a neighbour.
+            boolean canSwap = oldParent == plan.parent && vacatedRow != null && vacatedColumn != null
+                    && spanFitsAt(plan.parent, plan.occupied, dragged, vacatedRow.intValue(), vacatedColumn.intValue());
             int[] destination = canSwap ? new int[]{vacatedRow.intValue(), vacatedColumn.intValue()}
-                    : firstFreeTableCell(plan.parent, dragged, plan.occupied);
+                    : firstFreeRectangle(plan.parent, plan.occupied, dragged);
+            if (destination == null) {
+                setStatus("No free cell in this table can hold " + value(plan.occupied, "name", "that component"));
+                return false;
+            }
             document.setAttribute("tableRow", String.valueOf(destination[0]));
             document.setAttribute("tableColumn", String.valueOf(destination[1]));
         }
@@ -2055,6 +2064,41 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (rowsOverlap && columnsOverlap) return false;
         }
         return true;
+    }
+
+    /**
+     * Whether a child's own span rectangle fits at the given anchor.
+     *
+     * @param parent the table
+     * @param child the child being placed
+     * @param ignored a child to disregard, typically the one swapping with it
+     * @param row the anchor row
+     * @param column the anchor column
+     * @return true when the rectangle is inside the table and free
+     */
+    private boolean spanFitsAt(Element parent, Element child, Element ignored, int row, int column) {
+        return rectangleFree(parent, child, ignored, row, column,
+                Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1)),
+                Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1)));
+    }
+
+    /**
+     * The first anchor, in row-major order, where a child's whole span rectangle fits.
+     *
+     * @param parent the table
+     * @param child the child needing a home
+     * @param ignored a child to disregard while testing
+     * @return the anchor, or null when the table has no room for that rectangle
+     */
+    private int[] firstFreeRectangle(Element parent, Element child, Element ignored) {
+        int rows = Math.max(1, integer(value(parent, "tableLayoutRows", "2"), 2));
+        int columns = Math.max(1, integer(value(parent, "tableLayoutColumns", "2"), 2));
+        for (int row = 0; row < rows; row++) {
+            for (int column = 0; column < columns; column++) {
+                if (spanFitsAt(parent, child, ignored, row, column)) return new int[]{row, column};
+            }
+        }
+        return null;
     }
 
     /** The first cell in row-major order that no sibling claims, growing past the last row if needed. */
@@ -5439,19 +5483,38 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return true when the stub is already there
      */
     private boolean declaresActionHandler(String source, String handler) {
+        // Comments masked first: a commented-out handler or a line of prose naming it used to
+        // count as a declaration and suppress the stub the generated listener needs.
+        String code = stripComments(source);
         int at = 0;
         while (true) {
-            at = source.indexOf(handler + "(", at);
+            at = code.indexOf(handler, at);
             if (at < 0) return false;
-            int open = at + handler.length() + 1;
-            int close = source.indexOf(')', open);
-            if (close > open) {
-                String parameters = source.substring(open, close);
-                // A declaration, not a call: the parameter list names the ActionEvent type.
-                if (parameters.indexOf("ActionEvent") >= 0) return true;
+            int after = at + handler.length();
+            // Whole word, or "onClickHandler" would satisfy a search for "onClick".
+            boolean boundedLeft = at == 0 || !isIdentifierChar(code.charAt(at - 1));
+            int open = skipSpaces(code, after);
+            if (boundedLeft && open < code.length() && code.charAt(open) == '(') {
+                int close = code.indexOf(')', open);
+                if (close > open && code.substring(open + 1, close).indexOf("ActionEvent") >= 0) {
+                    // Legal formatting puts space between the name and the parenthesis, so
+                    // "void onClick (ActionEvent event)" is the same declaration.
+                    return true;
+                }
             }
-            at = open;
+            at = after;
         }
+    }
+
+    /**
+     * @param text the text to scan
+     * @param from the index to start at
+     * @return the index of the first character at or after from that is not a space or tab
+     */
+    private static int skipSpaces(String text, int from) {
+        int at = from;
+        while (at < text.length() && (text.charAt(at) == ' ' || text.charAt(at) == '\t')) at++;
+        return at;
     }
 
     private String mergeGeneratedSource(String existing, String generated) {
