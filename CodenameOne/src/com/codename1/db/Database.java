@@ -91,16 +91,20 @@ public abstract class Database {
     /// re-derived from each engine's very different native semantics.
     protected boolean inTransaction;
 
-    /// The savepoint that opened the current transaction, when a savepoint did. Releasing that one
-    /// ends the transaction; releasing any other leaves it open.
-    private String outermostSavepoint;
-
-    /// How many savepoints of that name are stacked up.
+    /// The savepoints standing open, outermost first, when a savepoint opened this transaction.
     ///
-    /// SQLite allows the same name twice, and `RELEASE` takes the nearest one, so
-    /// `SAVEPOINT s; SAVEPOINT s; RELEASE s` leaves the transaction open. Counting is what keeps
-    /// the first release from ending it.
-    private int outermostSavepointDepth;
+    /// A stack rather than a name and a count, because SQLite releases every savepoint above the
+    /// one named as well as that one. `SAVEPOINT s; SAVEPOINT t; SAVEPOINT s; RELEASE t` ends the
+    /// inner `s` along with `t`, which a count of the outer name cannot express -- it would still
+    /// read two and never reach zero, leaving a transaction reported open after the engine ended
+    /// it, and every later begin and key change refused until the connection closed.
+    private final java.util.Vector openSavepoints = new java.util.Vector();
+
+    /// Whether a savepoint opened the current transaction, rather than a BEGIN.
+    ///
+    /// Only then does releasing the last savepoint end it. Under a BEGIN the savepoints are marks
+    /// inside a transaction that BEGIN owns, and releasing all of them ends none of it.
+    private boolean savepointOwnsTransaction;
 
     /// How many nested `beginTransaction()` calls are outstanding.
     ///
@@ -748,23 +752,46 @@ public abstract class Database {
             if (!inTransaction) {
                 inTransaction = true;
                 transactionDepth = 1;
-                outermostSavepoint = name;
-                outermostSavepointDepth = 1;
-            } else if (outermostSavepoint != null && outermostSavepoint.equals(name)) {
-                // The same name again, which SQLite allows and stacks. The release below takes the
-                // nearest one, so without counting the first release would end a transaction that
-                // is still open.
-                outermostSavepointDepth++;
+                forgetSavepoints();
+                savepointOwnsTransaction = true;
             }
+            // Pushed whether or not a savepoint opened this transaction: inside a BEGIN the stack
+            // never empties into anything, because the BEGIN owns the transaction.
+            openSavepoints.addElement(name == null ? "" : name);
             return;
         }
-        if ("RELEASE".equals(keyword) && outermostSavepoint != null
-                && outermostSavepoint.equals(savepointName(statement, true))) {
-            outermostSavepointDepth--;
-            if (outermostSavepointDepth <= 0) {
-                endTransactionCompletely();
+        if (!"RELEASE".equals(keyword) || openSavepoints.isEmpty()) {
+            return;
+        }
+        int at = lastIndexOfSavepoint(savepointName(statement, true));
+        if (at < 0) {
+            // Names something that is not open. SQLite answers that with an error and releases
+            // nothing, so neither does this.
+            return;
+        }
+        // Everything above it goes as well, which is what makes the stack necessary.
+        while (openSavepoints.size() > at) {
+            openSavepoints.removeElementAt(openSavepoints.size() - 1);
+        }
+        if (openSavepoints.isEmpty() && savepointOwnsTransaction) {
+            // The outermost savepoint was the transaction, so releasing it ended the transaction.
+            // Under a BEGIN these were marks inside somebody else's transaction, which ends on its
+            // own COMMIT and not here.
+            endTransactionCompletely();
+        }
+    }
+
+    /// The position of the innermost open savepoint with this name, or -1.
+    private int lastIndexOfSavepoint(String name) {
+        if (name == null) {
+            return -1;
+        }
+        for (int iter = openSavepoints.size() - 1; iter >= 0; iter--) {
+            if (name.equals(openSavepoints.elementAt(iter))) {
+                return iter;
             }
         }
+        return -1;
     }
 
     /// The savepoint a SAVEPOINT or RELEASE names, upper cased, or null.
@@ -1255,8 +1282,8 @@ public abstract class Database {
 
     /// Drops what is remembered about savepoints, for a transaction that has ended by other means.
     private void forgetSavepoints() {
-        outermostSavepoint = null;
-        outermostSavepointDepth = 0;
+        openSavepoints.removeAllElements();
+        savepointOwnsTransaction = false;
     }
 
     /// Ends the transaction outright, however many begins are outstanding.

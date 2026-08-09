@@ -313,6 +313,44 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void anIntermediateReleaseTakesTheSavepointsAboveIt() {
+        // SQLite releases every savepoint above the one named, including a reuse of the outer
+        // name. Counting one name instead of keeping the stack never reached zero here, so the
+        // transaction stayed reported open after the engine had ended it -- and every later begin
+        // and key change was refused until the connection closed.
+        db.ran("SAVEPOINT s");
+        db.ran("SAVEPOINT t");
+        db.ran("SAVEPOINT s");
+        db.ran("RELEASE t");
+        assertTrue(db.isInTransaction(), "the outermost s is still open");
+        db.ran("RELEASE s");
+        assertFalse(db.isInTransaction(), "releasing it ended the transaction");
+    }
+
+    @Test
+    void savepointsUnderABeginEndNothing() {
+        // Under a BEGIN the savepoints are marks inside a transaction the BEGIN owns. Releasing
+        // all of them ends none of it.
+        db.ran("BEGIN");
+        db.ran("SAVEPOINT s");
+        db.ran("SAVEPOINT t");
+        db.ran("RELEASE s");
+        assertTrue(db.isInTransaction(), "the BEGIN still owns the transaction");
+        db.ran("COMMIT");
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
+    void releasingAnUnopenedSavepointReleasesNothing() {
+        // SQLite reports an error and releases nothing, so neither does the tracking.
+        db.ran("SAVEPOINT s");
+        db.ran("RELEASE nosuch");
+        assertTrue(db.isInTransaction(), "nothing was released");
+        db.ran("RELEASE s");
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
     void releasingSomethingElseLeavesTheTransactionOpen() {
         db.ran("SAVEPOINT outer");
         db.ran("RELEASE unrelated");

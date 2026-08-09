@@ -215,7 +215,23 @@ public class SEDatabase extends Database {
     /// true if it was transaction control and has been carried out
     private boolean executeTransactionControl(String statement) throws SQLException {
         String keyword = transactionControlKeyword(statement);
+        if (keyword == null) {
+            return false;
+        }
+        // Compiled but not run, purely to be told whether it is a statement at all. Translating to
+        // JDBC reads the leading keyword and the BEGIN mode and ignores the rest, so "BEGIN
+        // nonsense" would open a transaction and "COMMIT nonsense" would commit one -- syntax
+        // errors on every native port, silent state changes only here. Preparing does not execute,
+        // so a valid BEGIN opens nothing before the branches below decide what to do with it.
+        Statement check = conn.prepareStatement(statement);
+        check.close();
         if ("BEGIN".equals(keyword)) {
+            if (!conn.getAutoCommit()) {
+                // JDBC is already out of autocommit, so a second setAutoCommit(false) would do
+                // nothing at all and quietly accept a nesting SQLite rejects. The message is the
+                // engine's, so an application matching on it behaves the same here as on a device.
+                throw new SQLException("cannot start a transaction within a transaction");
+            }
             // BEGIN IMMEDIATE and BEGIN EXCLUSIVE take their write locks up front, which is the
             // whole reason to write them; reducing every variant to setAutoCommit(false) would
             // start a deferred transaction and let another writer take the lock first. The driver

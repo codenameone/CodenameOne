@@ -144,6 +144,17 @@ public final class DatabaseConfig {
                     + "cipher without being silently cut short there, so it is refused rather "
                     + "than quietly weakening the key.");
         }
+        // Refused for the same reason and in the same spirit: the engines read a key of exactly
+        // this shape as 32 raw bytes written in hexadecimal rather than as text to run the key
+        // derivation over. A passphrase that happens to look like one would therefore be used as a
+        // raw key, silently skipping the derivation this method promises -- weaker in a way
+        // nothing would report. Add any character to it, or use rawKey if raw bytes were meant.
+        if (looksLikeRawKeyLiteral(passphrase)) {
+            throw new IllegalArgumentException("The database passphrase must not have the form of "
+                    + "a raw key literal, x' followed by 64 hexadecimal digits and a closing "
+                    + "quote. The engines read that as raw bytes rather than as a passphrase, so "
+                    + "it would silently skip the key derivation. Use rawKey(byte[]) for raw bytes.");
+        }
         return new DatabaseConfig(KEY_PASSPHRASE, null, passphrase.toCharArray(), null);
     }
 
@@ -352,6 +363,29 @@ public final class DatabaseConfig {
             default:
                 return toKeyLiteral(ManagedKeys.keyFor(keyAlias != null ? keyAlias : databaseName));
         }
+    }
+
+    /// Whether a string is exactly the literal an engine reads as 32 raw bytes.
+    ///
+    /// `x'` then 64 hexadecimal digits then `'`, which is what `#toKeyLiteral(byte[])` writes.
+    static boolean looksLikeRawKeyLiteral(String value) {
+        if (value == null || value.length() != 68) {
+            return false;
+        }
+        if (value.charAt(0) != 'x' && value.charAt(0) != 'X') {
+            return false;
+        }
+        if (value.charAt(1) != '\'' || value.charAt(67) != '\'') {
+            return false;
+        }
+        for (int iter = 2; iter < 66; iter++) {
+            char c = value.charAt(iter);
+            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!hex) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Renders 32 bytes as the engine level raw key literal.
