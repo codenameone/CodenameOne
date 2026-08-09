@@ -2566,6 +2566,27 @@ static int cn1PageReleaseReusableErrno = 0;
 // a test. Deliberately NOT part of the CN1_GC_FAULT family: those live under
 // CN1_GC_VERIFY, and page release is disabled in verifier builds, so a fault
 // declared there could never fire.
+// CN1_BIBOP_FAIL_REUSABLE=<n> makes the first n MADV_FREE_REUSABLE calls report
+// failure so the MADV_FREE fallback is taken, then behaves normally. A count
+// rather than a switch because the interesting behaviour is what happens AFTER
+// the transient clears: pages released through the fallback are still charged to
+// the process and have to be upgraded by a later trim.
+static _Atomic int cn1ReusableFailBudget = -1;
+static int cn1ReusableFailInjectTake(void) {
+    int n = atomic_load_explicit(&cn1ReusableFailBudget, memory_order_relaxed);
+    if(n < 0) {
+        const char* e = getenv("CN1_BIBOP_FAIL_REUSABLE");
+        n = (e != 0) ? atoi(e) : 0;
+        if(n < 0) n = 0;
+        atomic_store_explicit(&cn1ReusableFailBudget, n, memory_order_relaxed);
+    }
+    if(n == 0) {
+        return 0;
+    }
+    atomic_store_explicit(&cn1ReusableFailBudget, n - 1, memory_order_relaxed);
+    return 1;
+}
+
 static _Atomic int cn1ReuseFailInject = -1;
 static int cn1ReuseFailInjectOn(void) {
     int on = atomic_load_explicit(&cn1ReuseFailInject, memory_order_relaxed);
@@ -2684,11 +2705,17 @@ static JAVA_BOOLEAN cn1BibopReleasePageMemory(CN1BibopPage* p) {
     // under pressure, just without moving the accounting. Pairing MADV_FREE_REUSE
     // with a range that only got MADV_FREE is harmless (it is rejected and there
     // is no accounting to restore), so one released flag covers both.
-    if(madvise(addr, len, MADV_FREE_REUSABLE) == 0) {
+    if(!cn1ReusableFailInjectTake() && madvise(addr, len, MADV_FREE_REUSABLE) == 0) {
         ok = JAVA_TRUE;
         p->gcPageReusableAdvice = JAVA_TRUE;   // must be restored before reuse
     } else {
         cn1PageReleaseReusableErrno = errno;
+        // FALLBACK. MADV_FREE lets the kernel take the pages under pressure but
+        // does NOT reduce phys_footprint, so this page is still charged to the
+        // process -- it is released in the sense that matters to the allocator
+        // but not in the sense this whole feature exists for. It is left with
+        // gcPageReusableAdvice clear, which is what cn1BibopUpgradeFallbackPages
+        // uses to find it and retry the reusable advice on a later trim.
         ok = (madvise(addr, len, MADV_FREE) == 0) ? JAVA_TRUE : JAVA_FALSE;
         p->gcPageReusableAdvice = JAVA_FALSE;  // no pairing to restore
     }
@@ -2749,6 +2776,57 @@ static JAVA_BOOLEAN cn1BibopReusePageMemory(CN1BibopPage* p) {
     return JAVA_TRUE;
 }
 
+// Retry MADV_FREE_REUSABLE on pages that only got the MADV_FREE fallback.
+//
+// Without this a transient rejection is permanent in effect: the page is filed
+// in bibopReleasedPool with gcPageReleased set, so every later trim skips it,
+// and it is only ever offered the reusable advice again if the workload happens
+// to exhaust the warm pool and reacquire it. A post-burst app that never does
+// leaves the page charged to phys_footprint indefinitely -- which is the exact
+// figure this feature exists to reduce.
+//
+// Bounded per trim, and it holds bibopMutex across the syscalls. Both are
+// deliberate: the list must not change under the walk, and this path only has
+// work to do when a rejection actually happened, which does not occur in normal
+// operation at all.
+// Matches CN1_BIBOP_RELEASE_PER_SWEEP: an upgrade costs exactly the same single
+// madvise a release does, so budgeting it lower only means a burst of transient
+// rejections takes proportionally longer to stop being charged. Measured with
+// 2000 injected rejections: at 64 per trim the probe ended at 179,776KB with the
+// backlog still draining, at this budget it lands on the uninjected figure.
+#ifndef CN1_BIBOP_UPGRADE_PER_SWEEP
+#define CN1_BIBOP_UPGRADE_PER_SWEEP CN1_BIBOP_RELEASE_PER_SWEEP
+#endif
+static int cn1BibopUpgradeFallbackPages(void) {
+#if !defined(CN1_BIBOP_NO_PAGE_RELEASE) && !defined(_WIN32) && defined(__APPLE__)
+    size_t off = cn1BibopReleaseOffset();
+    if(off == 0) {
+        return 0;
+    }
+    int upgraded = 0;
+    int examined = 0;
+    pthread_mutex_lock(&bibopMutex);
+    for(CN1BibopPage* p = bibopReleasedPool ;
+        p != 0 && examined < CN1_BIBOP_UPGRADE_PER_SWEEP ;
+        p = p->nextPool) {
+        examined++;
+        if(p->gcPageReusableAdvice) {
+            continue;                        // already off the footprint
+        }
+        if(!cn1ReusableFailInjectTake()
+           && madvise((char*)p + off, (size_t)CN1_BIBOP_PAGE_SIZE - off,
+                      MADV_FREE_REUSABLE) == 0) {
+            p->gcPageReusableAdvice = JAVA_TRUE;
+            upgraded++;
+        }
+    }
+    pthread_mutex_unlock(&bibopMutex);
+    return upgraded;
+#else
+    return 0;
+#endif
+}
+
 // Release the surplus of bibopFreePool. Called at the end of a sweep, on the GC
 // thread. The surplus is UNLINKED under the mutex before any madvise runs, so an
 // allocator can never acquire a page while its slot region is being dropped; the
@@ -2787,6 +2865,13 @@ static void cn1BibopTrimFreePool(void) {
     pthread_mutex_unlock(&bibopMutex);
 
     if(surplusTail == 0) {
+        // Still worth a pass: pages released through the fallback on an earlier
+        // trim are charged to the footprint until the reusable advice takes.
+        int upgradedOnly = cn1BibopUpgradeFallbackPages();
+        if(upgradedOnly != 0 && cn1PageReleaseTraceOn()) {
+            fprintf(stderr, "[PAGE-RELEASE] kept=%d surplus=0 upgraded=%d\n",
+                    kept, upgradedOnly);
+        }
         return;                             // nothing above the warm cache
     }
     // Partition the detached run: pages whose memory the kernel actually took go
@@ -2824,11 +2909,13 @@ static void cn1BibopTrimFreePool(void) {
         }
         q = next;
     }
+    int upgraded = cn1BibopUpgradeFallbackPages();
     if(cn1PageReleaseTraceOn()) {
         fprintf(stderr, "[PAGE-RELEASE] kept=%d taken=%d released=%d rejected=%d "
-                "headerBytes=%zu releaseErrno=%d reuseFailErrno=%d\n",
-                kept, taken, releasedNow, rejected, cn1BibopReleaseOffset(),
-                cn1PageReleaseReusableErrno, cn1PageReuseFailErrno);
+                "upgraded=%d headerBytes=%zu releaseErrno=%d reuseFailErrno=%d\n",
+                kept, taken, releasedNow, rejected, upgraded,
+                cn1BibopReleaseOffset(), cn1PageReleaseReusableErrno,
+                cn1PageReuseFailErrno);
     }
     pthread_mutex_lock(&bibopMutex);
     if(relTail != 0) {
