@@ -116,8 +116,37 @@ public class BibopPageFloorApp {
      * forceGc and notifies the collector thread, then returns), so each round is
      * a request plus a pause long enough for a full cycle to land.
      */
-    private static final int SETTLE_ROUNDS = 6;
-    private static final long SETTLE_PAUSE_MS = 400;
+    private static final int SETTLE_MIN_ROUNDS = 4;
+    private static final int SETTLE_MAX_ROUNDS = 60;
+    private static final int SETTLE_PLAIN_MIN_ROUNDS = 4;
+    private static final int SETTLE_PLAIN_MAX_ROUNDS = 12;
+    private static final long SETTLE_PAUSE_MS = 250;
+
+    /**
+     * Rounds that must ALL come back stable before a settle is believed. One
+     * stable round is not enough: reclamation does not begin immediately, so
+     * early rounds look stable simply because nothing has started coming back
+     * yet -- measured on Linux, where the first pages were not released until
+     * after a four-round settle had already concluded and the phase read as
+     * having released nothing.
+     */
+    private static final int SETTLE_STABLE_STREAK = 3;
+
+    /** Stack frames overwritten before a settle; see scrubStack. */
+    private static final int SCRUB_DEPTH = 512;
+
+    /**
+     * A settle stops once a round frees less than this. Reclamation is not a
+     * fixed number of cycles: a BiBOP object needs three sweeps to die (fresh
+     * mark -1 is promoted, and death is mark < V-1), the major sweep that
+     * refills the free pool runs on a cadence, and how many cycles land in a
+     * given wall-clock window depends on the machine. A fixed round count
+     * therefore measures the runner, not the collector -- measured directly:
+     * six rounds was enough on macOS but not on the Linux CI runner, where the
+     * footprint was still falling when the reading was taken and the phase
+     * looked like it had released nothing.
+     */
+    private static final long SETTLE_STABLE_KB = 2048;
 
     /**
      * How long a phase keeps its live set REACHABLE before dropping it. Without
@@ -176,10 +205,11 @@ public class BibopPageFloorApp {
             phaseChecksum += live[i][0] + live[i][SMALL_BYTES - 1];
         }
         phaseChecksum += hold(live, SMALL_BYTES);
+        long heldKb = footprintKb();
         endPhase(name, "objects=" + count + " liveBytes=" + liveBytes);
 
         live = null;
-        releasePhase(name);
+        releasePhase(name, heldKb, true);
         checksum = checksum * 131 + phaseChecksum;
     }
 
@@ -202,11 +232,12 @@ public class BibopPageFloorApp {
             phaseChecksum += textures[i][0] + textures[i][TEXTURE_BYTES - 1];
         }
         phaseChecksum += hold(textures, TEXTURE_BYTES);
+        long heldKb = footprintKb();
         endPhase(name, "textures=" + TEXTURE_COUNT
                 + " liveBytes=" + ((long) TEXTURE_COUNT * TEXTURE_BYTES));
 
         textures = null;
-        releasePhase(name);
+        releasePhase(name, heldKb, false);
         checksum = checksum * 131 + phaseChecksum;
     }
 
@@ -221,8 +252,20 @@ public class BibopPageFloorApp {
         System.out.println("ARM_STATS name=" + name + " " + stats);
     }
 
-    private static void releasePhase(String name) {
-        settle();
+    /**
+     * @param expectDrop whether this phase's memory is expected to come back.
+     *                   Only the small-object warm-up asserts on its released
+     *                   figure; the texture phases report theirs, and waiting
+     *                   out the full budget for a drop that is not expected
+     *                   there just burns wall time (15s per phase, measured).
+     */
+    private static void releasePhase(String name, long heldKb, boolean expectDrop) {
+        scrubStack(SCRUB_DEPTH);
+        if (expectDrop) {
+            settleForRelease(heldKb);
+        } else {
+            settle();
+        }
         mark("RELEASED", name);
         // Give an external sampler room to take a reading at the stamped
         // instant; the final phase's RELEASED is otherwise raced by exit.
@@ -261,6 +304,51 @@ public class BibopPageFloorApp {
         return c;
     }
 
+    /**
+     * Overwrite the stack region the phase just used, then settle. ParparVM
+     * scans thread stacks CONSERVATIVELY, so a dead slot still holding the
+     * address of the dropped ring keeps every object it referenced reachable --
+     * the collector cannot tell a stale word from a live reference. Measured on
+     * Linux: without this the warm-up's 192MB was still fully resident after its
+     * settle and only came back during the NEXT phase, once that phase's frames
+     * had overwritten the words. Recursing writes fresh values over those slots
+     * so the drop is observable where it actually happens.
+     */
+    /**
+     * Wait for the collector to give the phase's memory back, up to a bounded
+     * budget. Reclamation is ASYNCHRONOUS and takes a platform-dependent number
+     * of cycles -- a BiBOP object needs three sweeps to die, the major sweep
+     * that refills the free pool runs on a cadence, and cycles are paced at
+     * 200ms -- so waiting a fixed time measures the runner rather than the
+     * collector. Measured: the drop lands about 2s after the ring is dropped on
+     * macOS and about 7s in a Linux container, and a fixed six-round settle
+     * reported the Linux run as having released nothing.
+     *
+     * <p>Waiting for the drop we are about to assert on is deliberate and is not
+     * circular: the budget is finite, so a release that never happens still
+     * fails the assertion -- it just fails on the real behaviour rather than on
+     * whichever machine ran it.
+     */
+    private static void settleForRelease(long heldKb) {
+        long target = (heldKb * 3) / 5;
+        for (int i = 0; i < SETTLE_MAX_ROUNDS; i++) {
+            System.gc();
+            sleep(SETTLE_PAUSE_MS);
+            if (i + 1 >= SETTLE_MIN_ROUNDS && footprintKb() <= target) {
+                return;
+            }
+        }
+    }
+
+    private static long scrubStack(int depth) {
+        long a = depth, b = depth + 1, c = depth + 2, d = depth + 3;
+        long e = depth + 4, f = depth + 5, g = depth + 6, h = depth + 7;
+        if (depth <= 0) {
+            return a + b + c + d + e + f + g + h;
+        }
+        return a + b + c + d + e + f + g + h + scrubStack(depth - 1);
+    }
+
     private static void sleep(long ms) {
         try {
             Thread.sleep(ms);
@@ -270,10 +358,26 @@ public class BibopPageFloorApp {
         }
     }
 
+    /**
+     * Collect until the footprint stops falling, rather than for a fixed number
+     * of rounds. System.gc() only sets forceGc and notifies the collector thread
+     * -- it does not stop the world and does not wait -- so each round is a
+     * request plus a pause, and the loop exits when a round stops buying
+     * anything. Bounded so a platform that never reports a falling footprint
+     * cannot hang the probe.
+     */
     private static void settle() {
-        for (int i = 0; i < SETTLE_ROUNDS; i++) {
+        long prev = footprintKb();
+        int stable = 0;
+        for (int i = 0; i < SETTLE_PLAIN_MAX_ROUNDS; i++) {
             System.gc();
             sleep(SETTLE_PAUSE_MS);
+            long now = footprintKb();
+            stable = (now + SETTLE_STABLE_KB >= prev) ? stable + 1 : 0;
+            prev = now;
+            if (i + 1 >= SETTLE_PLAIN_MIN_ROUNDS && stable >= SETTLE_STABLE_STREAK) {
+                return;
+            }
         }
     }
 }
