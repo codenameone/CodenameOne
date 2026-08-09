@@ -690,6 +690,12 @@ class WatchNativeBuilderTest {
 
         assertTrue(ruby.contains("app_target.package_product_dependencies.to_a.each"),
                 "the phone's package products are the source of the mirror: " + ruby);
+        // Mirrored only when a staged watch source imports the product. Copying the phone's whole
+        // dependency set made Xcode resolve and build every one of them for watchOS, so an iOS-only
+        // package used solely by the phone broke the watch build for code the watch never touches.
+        assertTrue(ruby.contains("watch_import_text"), ruby);
+        assertTrue(ruby.contains("no staged watch source imports it"),
+                "a skip has to say so, or the link error that follows names nothing: " + ruby);
         // Both halves are required. Listing the product on the target is what makes Xcode resolve
         // the package for it; the frameworks-phase build file is what links it. Either alone
         // produces a project that still fails, and differently.

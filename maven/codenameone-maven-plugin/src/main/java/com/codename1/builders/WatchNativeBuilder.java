@@ -1862,13 +1862,52 @@ class WatchNativeBuilder {
         // conceptually its own list even though the pbxproj format would tolerate one object in
         // two.
         //
-        // No SDK check is possible here, unlike the system frameworks above. A package declares its
-        // supported platforms in its own Package.swift, which is not resolved until xcodebuild runs.
-        // So this mirrors the declaration and says so: a package with no watchOS support fails with
-        // Xcode naming the product, which is a better outcome than a link error naming nothing.
-        s.append("app_target.package_product_dependencies.to_a.each do |dep|\n")
+        // Mirrored only when the WATCH sources actually import the product.
+        //
+        // No SDK check is possible here, unlike the system frameworks above: a package declares its
+        // supported platforms in its own Package.swift, which xcodebuild does not resolve until
+        // long after this runs. Copying the phone's whole dependency set across therefore made
+        // Xcode resolve and build every one of them for watchOS -- so an iOS-only package used
+        // solely by the phone broke the watch build outright, for code the watch never references.
+        //
+        // The staged watch tree is the evidence that IS available. It is the complete set of
+        // sources this target compiles, so a product no file in it imports cannot be needed, and a
+        // product one of them does import is needed whatever the phone uses. Both import spellings
+        // are matched, plus the bridging-header form.
+        //
+        // If a watch source needs a product under a module name that differs from the product name
+        // -- legal, and rare -- the skip is logged with the name, so the link error that follows
+        // has something in the build output pointing at it.
+        s.append("watch_import_src = ")
+                .append(watchSources.isEmpty() ? "nil\n"
+                        : "File.join(File.dirname(project_file), watch_group_path)\n")
+                .append("watch_import_text = nil\n")
+                .append("if watch_import_src && File.directory?(watch_import_src)\n")
+                .append("  watch_import_text = ''\n")
+                .append("  Dir.glob(File.join(watch_import_src, '**', '*.{h,m,mm,c,cpp,cc,swift}'))"
+                        + ".each do |f|\n")
+                .append("    begin\n")
+                .append("      watch_import_text << File.read(f)\n")
+                .append("    rescue StandardError\n")
+                .append("      next\n")
+                .append("    end\n")
+                .append("  end\n")
+                .append("end\n")
+                .append("app_target.package_product_dependencies.to_a.each do |dep|\n")
                 .append("  name = dep.respond_to?(:product_name) ? dep.product_name : nil\n")
                 .append("  next unless name\n")
+                // watch_import_text is nil when the watch shares the phone's translation, and then
+                // the watch compiles the phone's sources and needs the phone's packages.
+                .append("  if watch_import_text\n")
+                .append("    used = watch_import_text.include?(\"import #{name}\") || "
+                        + "watch_import_text.include?(\"<#{name}/\") || "
+                        + "watch_import_text.include?(\"\\\"#{name}/\")\n")
+                .append("    unless used\n")
+                .append("      puts \"[watchNative] not linking Swift package product #{name} into "
+                        + "the watch target: no staged watch source imports it\"\n")
+                .append("      next\n")
+                .append("    end\n")
+                .append("  end\n")
                 .append("  next if watch_target.package_product_dependencies.any? { |d| "
                         + "d.respond_to?(:product_name) && d.product_name == name }\n")
                 .append("  mirrored = xcproj.new("
