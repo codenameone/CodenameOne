@@ -238,20 +238,21 @@ class BibopPageFloorIntegrationTest {
 
         Map<String, Map<String, Long>> marks = parseMarks(vmOutput);
         StringBuilder report = new StringBuilder();
-        report.append(String.format("%-24s %10s %10s %11s%n",
-                "phase", "baseKB", "heldKB", "releasedKB"));
+        report.append(String.format("%-24s %10s %10s %11s %11s%n",
+                "phase", "baseKB", "heldKB", "releasedKB", "minAfterKB"));
         for (Map.Entry<String, Map<String, Long>> e : marks.entrySet()) {
             Map<String, Long> m = e.getValue();
-            report.append(String.format("%-24s %10d %10d %11d%n", e.getKey(),
+            report.append(String.format("%-24s %10d %10d %11d %11d%n", e.getKey(),
                     m.containsKey("BASELINE") ? m.get("BASELINE") : -1,
                     m.containsKey("HELD") ? m.get("HELD") : -1,
-                    m.containsKey("RELEASED") ? m.get("RELEASED") : -1));
+                    m.containsKey("RELEASED") ? m.get("RELEASED") : -1,
+                    m.containsKey("MINAFTER") ? m.get("MINAFTER") : -1));
         }
         System.err.println("[BibopPageFloorIntegrationTest] texture set " + TEXTURE_SET_KB
                 + "KB, phys_footprint\n" + report);
 
         long warmupHeld = require(marks, "small-warmup", "HELD", report);
-        long warmupReleased = require(marks, "small-warmup", "RELEASED", report);
+        long warmupReleased = require(marks, "small-warmup", "MINAFTER", report);
         long treatmentBase = require(marks, "texture-after-small", "BASELINE", report);
         long treatmentHeld = require(marks, "texture-after-small", "HELD", report);
         long controlBase = require(marks, "texture-after-texture", "BASELINE", report);
@@ -273,11 +274,13 @@ class BibopPageFloorIntegrationTest {
         // 1. THE FIX: surplus empty pages are handed back to the OS.
         long floorBudget = (long) (warmupHeld * FLOOR_MAX_RETAINED_FRACTION);
         assertTrue(warmupReleased <= floorBudget,
-                "small-warmup dropped its entire live set and forced six collection cycles, yet "
-                        + "phys_footprint only fell from " + warmupHeld + "KB to " + warmupReleased
-                        + "KB (budget " + floorBudget + "KB). BiBOP is not returning surplus empty "
-                        + "pages -- check cn1BibopTrimFreePool, the major sweep that refills "
-                        + "bibopFreePool from the partial pools, and that "
+                "small-warmup dropped its entire live set, yet the LOWEST phys_footprint seen at "
+                        + "any point over the rest of the run was " + warmupReleased + "KB against "
+                        + warmupHeld + "KB held (budget " + floorBudget + "KB). This is a minimum "
+                        + "over the whole remainder, not a reading at one instant, so it cannot be "
+                        + "a matter of the collector being slow on a loaded runner -- the pages "
+                        + "were never given back. Check cn1BibopTrimFreePool, the major sweep that "
+                        + "refills bibopFreePool from the partial pools, and that "
                         + "CN1_BIBOP_NO_PAGE_RELEASE is not set.\n" + report);
 
         // 2. The original finding, still measured: pooled pages cannot serve a
@@ -323,8 +326,9 @@ class BibopPageFloorIntegrationTest {
 
         System.err.println("[BibopPageFloorIntegrationTest] page release returned "
                 + (warmupHeld - warmupReleased) + "KB of " + warmupHeld + "KB ("
-                + (100 - (warmupReleased * 100 / warmupHeld)) + "%); texture peak "
-                + treatmentHeld + "KB against " + unfixedPeak + "KB unfixed.");
+                + (100 - (warmupReleased * 100 / warmupHeld)) + "%, measured as the minimum over "
+                + "the rest of the run); texture peak " + treatmentHeld + "KB against "
+                + unfixedPeak + "KB unfixed.");
     }
 
     private long require(Map<String, Map<String, Long>> marks, String phase, String marker,
@@ -339,7 +343,7 @@ class BibopPageFloorIntegrationTest {
 
     private Map<String, Map<String, Long>> parseMarks(String output) {
         Pattern p = Pattern.compile(
-                "ARM_(BASELINE|BEGIN|HELD|RELEASED) name=(\\S+) tMs=\\d+ footprintKb=(\\d+)");
+                "ARM_(BASELINE|BEGIN|HELD|RELEASED|MINAFTER) name=(\\S+) tMs=\\d+ footprintKb=(\\d+)");
         Map<String, Map<String, Long>> marks = new LinkedHashMap<>();
         for (String line : output.split("\\R")) {
             Matcher m = p.matcher(line);

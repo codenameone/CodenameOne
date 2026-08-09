@@ -117,7 +117,7 @@ public class BibopPageFloorApp {
      * a request plus a pause long enough for a full cycle to land.
      */
     private static final int SETTLE_MIN_ROUNDS = 4;
-    private static final int SETTLE_MAX_ROUNDS = 60;
+    private static final int SETTLE_MAX_ROUNDS = 20;
     private static final int SETTLE_PLAIN_MIN_ROUNDS = 4;
     private static final int SETTLE_PLAIN_MAX_ROUNDS = 12;
     private static final long SETTLE_PAUSE_MS = 250;
@@ -160,6 +160,24 @@ public class BibopPageFloorApp {
 
     private static long checksum;
 
+    /**
+     * Lowest footprint seen at any point after the warm-up's live set was
+     * dropped, and the flag that starts tracking it.
+     *
+     * <p>This is what the release assertion reads, rather than the footprint at
+     * some chosen instant. Reclamation is asynchronous and its LATENCY is
+     * load-dependent: measured, the drop lands about 2s after the drop on an
+     * idle macOS host, about 7s in an idle Linux container, and had still not
+     * landed 15s in on a CI runner where surefire was running this probe
+     * alongside a dozen other forks. The claim under test is that the pages come
+     * back, not that they come back within some number of seconds, so waiting on
+     * a deadline was testing the runner's load rather than the collector. The
+     * minimum over the remainder of the run answers the actual question and
+     * cannot be made to pass by a release that never happens.
+     */
+    private static long minFootprintAfterDrop = Long.MAX_VALUE;
+    private static boolean trackMinFootprint;
+
     public static void main(String[] args) {
         System.out.println("CONFIG smallBytes=" + SMALL_BYTES
                 + " textureBytes=" + TEXTURE_BYTES
@@ -184,6 +202,9 @@ public class BibopPageFloorApp {
         //    access pattern all held identical.
         texturePhase("texture-after-texture");
 
+        System.out.println("ARM_MINAFTER name=small-warmup tMs=" + System.currentTimeMillis()
+                + " footprintKb="
+                + (minFootprintAfterDrop == Long.MAX_VALUE ? 0 : minFootprintAfterDrop));
         System.out.println("RESULT=" + checksum);
         System.out.println("BIBOP_PAGE_FLOOR_DONE");
     }
@@ -210,6 +231,9 @@ public class BibopPageFloorApp {
 
         live = null;
         releasePhase(name, heldKb, true);
+        // Everything from here on is after the warm-up's live set died, so every
+        // reading contributes to the minimum the release assertion reads.
+        trackMinFootprint = true;
         checksum = checksum * 131 + phaseChecksum;
     }
 
@@ -285,7 +309,11 @@ public class BibopPageFloorApp {
      */
     private static long footprintKb() {
         Runtime r = Runtime.getRuntime();
-        return (r.totalMemory() - r.freeMemory()) / 1024;
+        long kb = (r.totalMemory() - r.freeMemory()) / 1024;
+        if (trackMinFootprint && kb < minFootprintAfterDrop) {
+            minFootprintAfterDrop = kb;
+        }
+        return kb;
     }
 
     /**

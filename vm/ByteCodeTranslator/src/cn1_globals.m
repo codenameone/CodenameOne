@@ -2269,7 +2269,11 @@ static long bibopCycleAllocatedBytes = 0;
 // partial page into every sweep is worst: heavy legacy churn driving the cycles
 // while a large BiBOP survivor set supplies the pages to walk -- precisely the
 // issue-5425 workload. GC-thread only, published at cycle begin.
-static long legacyCycleAllocatedBytes = 0;
+// long long, NOT long: cn1LegacyBytesSinceGc is long long for the same reason --
+// on the Windows LLP64 target long is 32 bits, so a collector that falls more
+// than 2GB of legacy allocation behind would truncate this to a negative value
+// and the quiet-cycle test below would read a furiously allocating app as idle.
+static long long legacyCycleAllocatedBytes = 0;
 static long bibopLastCycleOccupiedBytes = 0;
 static long bibopLastCycleLiveBytes = 0;
 static long bibopLastCycleReclaimedBytes = 0;
@@ -2398,8 +2402,8 @@ void cn1BibopBeginGcCycle(void) {
     // Same atomic-exchange idiom as the BiBOP reset above: a racing fetch_add
     // lands either before the swap (covered by the cycle that is starting) or
     // after it (charged to the next cycle) -- never dropped.
-    legacyCycleAllocatedBytes = (long)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0,
-                                                               memory_order_acq_rel);
+    legacyCycleAllocatedBytes = atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0,
+                                                        memory_order_acq_rel);
     // Latch AFTER the counter: an allocator racing between the two exchanges
     // still sees the old latch and skips, so the fresh latch can never be
     // consumed by bytes just charged to the cycle that is starting.
@@ -3534,8 +3538,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // partial page in every sweep -- the O(all pages) regression issue 5425
         // fixed, reintroduced for exactly the workload that reported it.
         JAVA_BOOLEAN quiet =
-                (bibopCycleAllocatedBytes + legacyCycleAllocatedBytes)
-                        < CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
+                ((long long)bibopCycleAllocatedBytes + legacyCycleAllocatedBytes)
+                        < (long long)CN1_BIBOP_MAJOR_SWEEP_QUIET_BYTES;
         int major = atomic_load_explicit(&lowMemoryMode, memory_order_relaxed)
                 || quiet
                 || bibopCyclesSinceMajorSweep >= CN1_BIBOP_MAJOR_SWEEP_CYCLES;
