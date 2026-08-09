@@ -1798,8 +1798,73 @@ public final class Display extends CN1Constants {
         return impl.getStackTrace(parentThread, t);
     }
 
+    /// Breaks one EDT pass into its phases and reports the totals once a second, so
+    /// "the UI is not fluid" can be answered with which phase ate the frame rather
+    /// than guessed at. Enabled with -Dcn1.edt.trace=true; off by default and, when
+    /// off, costs one boolean test per pass.
+    ///
+    /// Deliberately phase totals rather than a per-pass log: a trace that prints every
+    /// pass changes what it measures, and slow passes are the ones that matter.
+    static final boolean EDT_TRACE =
+            "true".equals(System.getProperty("cn1.edt.trace"));
+    private long edtTraceReportTime;
+    private int edtTracePasses;
+    private long edtTraceIdle;
+    private long edtTraceEvents;
+    private long edtTraceRevalidate;
+    private long edtTracePaint;
+    private long edtTraceAnimations;
+    private long edtTraceSerial;
+    private long edtTraceWorstPass;
+
+    private void edtTraceReport(long passStart, long idle, long events, long revalidate,
+            long paint, long animations, long serial) {
+        edtTracePasses++;
+        edtTraceIdle += idle;
+        edtTraceEvents += events;
+        edtTraceRevalidate += revalidate;
+        edtTracePaint += paint;
+        edtTraceAnimations += animations;
+        edtTraceSerial += serial;
+        long now = System.currentTimeMillis();
+        edtTraceWorstPass = Math.max(edtTraceWorstPass, now - passStart);
+        if (edtTraceReportTime == 0) {
+            edtTraceReportTime = now;
+            return;
+        }
+        if (now - edtTraceReportTime < 1000) {
+            return;
+        }
+        System.out.println("[edt] passes=" + edtTracePasses
+                + " idle=" + edtTraceIdle + "ms events=" + edtTraceEvents
+                + "ms revalidateQueue=" + edtTraceRevalidate + "ms paintDirty=" + edtTracePaint
+                + "ms animations=" + edtTraceAnimations + "ms serialCalls=" + edtTraceSerial
+                + "ms worstPass=" + edtTraceWorstPass + "ms");
+        edtTraceReportTime = now;
+        edtTracePasses = 0;
+        edtTraceIdle = 0;
+        edtTraceEvents = 0;
+        edtTraceRevalidate = 0;
+        edtTracePaint = 0;
+        edtTraceAnimations = 0;
+        edtTraceSerial = 0;
+        edtTraceWorstPass = 0;
+    }
+
     /// Implementation of the event dispatch loop content
     void edtLoopImpl() {
+        long tracePassStart = 0;
+        long traceIdle = 0;
+        long traceEvents = 0;
+        long traceRevalidate = 0;
+        long tracePaint = 0;
+        long traceAnimations = 0;
+        long traceSerial = 0;
+        long traceMark = 0;
+        if (EDT_TRACE) {
+            tracePassStart = System.currentTimeMillis();
+            traceMark = tracePassStart;
+        }
         try {
             // transitions shouldn't be bound by framerate
             if (animationQueue == null || animationQueue.isEmpty()) {
@@ -1852,6 +1917,10 @@ public final class Display extends CN1Constants {
             Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
+        if (EDT_TRACE) {
+            traceIdle = currentTime - traceMark;
+            traceMark = currentTime;
+        }
 
         // minimal amount of sync, just flipping the stack pointers
         synchronized (lock) {
@@ -1905,6 +1974,11 @@ public final class Display extends CN1Constants {
         if (!impl.isInitialized()) {
             return;
         }
+        if (EDT_TRACE) {
+            long t = System.currentTimeMillis();
+            traceEvents = t - traceMark;
+            traceMark = t;
+        }
         codenameOneGraphics.setGraphics(impl.getNativeGraphics());
         Form current = impl.getCurrentForm();
         if (current != null) {
@@ -1912,7 +1986,17 @@ public final class Display extends CN1Constants {
             // before the next paint cycle.
             current.flushRevalidateQueue();
         }
+        if (EDT_TRACE) {
+            long t = System.currentTimeMillis();
+            traceRevalidate = t - traceMark;
+            traceMark = t;
+        }
         impl.paintDirty();
+        if (EDT_TRACE) {
+            long t = System.currentTimeMillis();
+            tracePaint = t - traceMark;
+            traceMark = t;
+        }
 
         // draw the animations
 
@@ -1951,7 +2035,20 @@ public final class Display extends CN1Constants {
         for (Window each : Desktop.getInstance().getWindows()) {
             each.serviceInputTimers(t, longPressInterval);
         }
+        if (EDT_TRACE) {
+            // Not `t`: the main surface's timer clock is already declared above in this
+            // scope, and reusing the name here would shadow it.
+            long traceNow = System.currentTimeMillis();
+            traceAnimations = traceNow - traceMark;
+            traceMark = traceNow;
+        }
         processSerialCalls();
+        if (EDT_TRACE) {
+            long t = System.currentTimeMillis();
+            traceSerial = t - traceMark;
+            edtTraceReport(tracePassStart, traceIdle, traceEvents, traceRevalidate,
+                    tracePaint, traceAnimations, traceSerial);
+        }
 
         time = System.currentTimeMillis() - currentTime;
     }
