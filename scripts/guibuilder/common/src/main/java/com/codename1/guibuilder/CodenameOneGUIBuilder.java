@@ -743,10 +743,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (com.codename1.ui.Dialog.show("Unsaved changes",
                 "The open editor has changes you have not saved. " + what + " discards them.",
                 "Discard", "Keep editing")) {
+            discardLivePreviewStyling();
             return true;
         }
         setStatus("Kept your unsaved editor changes");
         return false;
+    }
+
+    /**
+     * Puts the canvas back on the stylesheet that is actually on disk after unsaved CSS is thrown
+     * away. applyProjectCss() installs the edited theme as it is typed, so discarding the buffer
+     * without this left the preview showing styling the user had just rejected, and every layout
+     * decision after that was made against a canvas the project could not reproduce.
+     */
+    private void discardLivePreviewStyling() {
+        if (!"css".equals(editorBufferKind)) return;
+        loadProjectTheme();
+        refreshProjectThemeOnPreview();
+        lastObservedCss = null;
     }
 
     /** Rebuilds the open editor pane from what is now on disk. */
@@ -767,11 +781,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * asking discarded the user's work outright.
      */
     private void closeEditorPane() {
-        if (editorBufferIsDirty()
-                && !com.codename1.ui.Dialog.show("Unsaved changes",
-                        "Closing this editor discards the changes you have not saved.",
-                        "Discard", "Keep editing")) {
-            return;
+        if (editorBufferIsDirty()) {
+            if (!com.codename1.ui.Dialog.show("Unsaved changes",
+                    "Closing this editor discards the changes you have not saved.",
+                    "Discard", "Keep editing")) {
+                return;
+            }
+            discardLivePreviewStyling();
         }
         activeEditorReopen = null;
         editorBuffer = null;
@@ -4684,7 +4700,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             Container editorPane = editorPane(binding.cssFile(), editor,
                     () -> editor.getText(value -> saveCss(value, editor)), this::closeEditorPane);
             activeEditorReopen = this::openCss;
-            editor.addChangeListener(event -> scheduleLiveCss(editor));
+            editor.addChangeListener(event -> {
+                // Mirrored immediately, compiled on a debounce. Updating the buffer only inside the
+                // 120ms callback meant closing the pane within that window left editorBuffer equal
+                // to the file, so Close saw a clean editor, asked nothing, and the scheduled
+                // callback then bailed out because activeCodeEditor had already changed.
+                editor.getText(text -> editorBuffer = text);
+                scheduleLiveCss(editor);
+            });
             if (cssLiveTimer != null) cssLiveTimer.cancel();
             cssLiveTimer = com.codename1.ui.util.UITimer.timer(250, true, workspace, () -> {
                 if (activeCodeEditor != editor || editor.getComponentForm() != workspace) {
@@ -5013,13 +5036,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 && !ProjectIO.exists(modelPath);
         try {
             writeTracked(undo, path, companionSourceFor(source));
-            editorBufferOnDisk = editorBuffer;
             if (needsModel) {
                 writeTracked(undo, modelPath, generatedModelSource());
                 setStatus("Saved form source and created its binding model");
             } else {
                 setStatus("Saved form source • existing model left unchanged");
             }
+            // Only once every write has landed. Marking the buffer clean after the companion but
+            // before the model meant a failed model write rolled the companion back while Close,
+            // form switching and exit all believed there was nothing left unsaved.
+            editorBufferOnDisk = editorBuffer;
         } catch (IOException ex) {
             restore(undo);
             ToastBar.showErrorMessage("Save failed, nothing was changed: " + ex.getMessage());
