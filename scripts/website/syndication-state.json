@@ -1594,6 +1594,16 @@
       "medium": {
         "url": "https://medium.com/p/0555ea24ec4e/edit",
         "syndicated_at": "2026-08-09T15:01:51+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/on-device-ai-and-mcp-on-every-port",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a78b21c425a35184720d807",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-09T17:01:09+00:00"
       }
     }
   }
