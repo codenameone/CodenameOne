@@ -257,6 +257,20 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void v8AccessorAliasWithFreeTextIsScrubbed() {
+        // A real V8 accessor alias is a single property name ([as bar]); an indented continuation that
+        // hides free text inside the brackets -- "    at account [as failed message] (File.java:123456)"
+        // -- is not a frame, so its numeric tail must be scrubbed. A genuine accessor frame below (single
+        // token alias) keeps its coordinate.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "    at account [as failed message] (File.java:123456)\n"
+                + "    at handler [as onClick] (https://host/app.js:3:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:3:98765") >= 0, scrubbed);
+    }
+
+    @Test
     void v8AsyncFrameWithMultiWordLabelKeepsItsCoordinate() {
         // V8 labels async/constructor/accessor frames with spaces ("async load", "new Promise",
         // "Object.x [as y]"). Such an INDENTED frame with a real (url:line:col) is a genuine frame -- its

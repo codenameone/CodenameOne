@@ -262,6 +262,13 @@ public class PiiScrubber {
         }
         int asAt = core.indexOf(" [as ");
         if (asAt > 0 && core.endsWith("]")) {
+            // The accessor alias is itself a single property name (`[as bar]`, `[as Symbol.iterator]`),
+            // never free text. Validate it before discarding the suffix, or `[as failed message]` would
+            // let an arbitrary continuation keep its coordinate.
+            String alias = core.substring(asAt + " [as ".length(), core.length() - 1).trim();
+            if (!isFrameIdentity(alias)) {
+                return false;
+            }
             core = core.substring(0, asAt).trim();
         }
         String[] prefixes = {"async ", "new ", "bound ", "get ", "set "};
