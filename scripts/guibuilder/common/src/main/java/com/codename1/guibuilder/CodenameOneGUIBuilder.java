@@ -4543,37 +4543,74 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private boolean save() {
         if (document == null) return true;
+        String sourcePath = companionSourcePath();
+        String modelPath = sourcePath.substring(0, sourcePath.length() - 5) + "Model.java";
+        // Everything is prepared and every existing file read before any of them is written.
+        // Ordering alone did not make this safe: the model could land and the .gui or the companion
+        // then fail, leaving the project describing two different strategies. On any failure the
+        // files already written here are put back to what they held, so a failed save changes
+        // nothing on disk.
+        List<String[]> undo = new ArrayList<>();
         try {
-            // The model is written before anything else when a strategy change asked for it. Every
-            // individual write is atomic, but the sequence is not, and the model is the output most
-            // likely to fail -- read only, locked, or replaced by hand. Doing it first means a
-            // failure leaves the .gui and the companion describing the strategy they always did,
-            // rather than a companion on the new strategy beside a model on the old one.
-            if (!regenerateModelIfRequested(companionSourcePath())) return false;
-            ProjectIO.write(document.path(), document.toXml());
-            // The .gui file alone changes nothing at runtime. Without regenerating the companion
-            // here, a component added in the designer and saved was simply absent from the running
-            // application until the user happened to open the Code pane and save that too, and a
-            // freshly scaffolded form stayed an empty screen despite a successful save.
-            String sourcePath = companionSourcePath();
-            String existing = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
-            if (!writeCompanionSource(sourcePath, existing)) return false;
-            // The generated companion references <Form>Model whenever a binding strategy is set,
-            // and cn1:create-gui-form does not write bindingStrategy, so a scaffolded form defaults
-            // to "properties". Creating the model only when the Code pane is saved left an ordinary
-            // Save producing source that referenced a class which did not exist.
-            if (ensureBindingModel(sourcePath) == MODEL_FAILED) return false;
-            // Only now: marking the document clean after the .gui write but before the companion
-            // one meant a failed companion write left isModified() false, so the next form switch
-            // went ahead without retrying and the runtime source stayed stale.
+            String xml = document.toXml();
+            String existingCompanion = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
+            String companion = companionSourceFor(existingCompanion);
+            boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
+            String model = rewriteModel ? generatedModelSource() : null;
+            if (!rewriteModel && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
+                    && !ProjectIO.exists(modelPath)) {
+                // The generated companion refers to <Form>Model whenever a strategy is set, and
+                // cn1:create-gui-form does not write bindingStrategy, so a scaffolded form needs
+                // its model creating on an ordinary save or the project will not compile.
+                model = generatedModelSource();
+            }
+            if (model != null) writeTracked(undo, modelPath, model);
+            writeTracked(undo, document.path(), xml);
+            writeTracked(undo, sourcePath, companion);
+            regenerateModelFor = null;
             document.markSaved();
             recordAction("saved", "form", relativeFormName(document.path()));
             setStatus("Saved " + relativeFormName(document.path()) + " and its companion source");
             ToastBar.showMessage("GUI form saved", FontImage.MATERIAL_CHECK);
             return true;
         } catch (IOException ex) {
-            ToastBar.showErrorMessage("Save failed: " + ex.getMessage());
+            restore(undo);
+            ToastBar.showErrorMessage("Save failed, nothing was changed: " + ex.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Writes a file, remembering what it held so the save can be undone.
+     *
+     * @param undo the log of files written so far, newest last
+     * @param path the file to write
+     * @param content the new content
+     * @throws IOException when the write fails, before the log is appended to
+     */
+    private void writeTracked(List<String[]> undo, String path, String content) throws IOException {
+        String before = ProjectIO.exists(path) ? ProjectIO.read(path) : null;
+        ProjectIO.write(path, content);
+        undo.add(new String[]{path, before});
+    }
+
+    /**
+     * Puts back everything a failed save had already written, newest first. A file that did not
+     * exist before is left alone rather than deleted: the content is what matters here, and
+     * removing a file this editor may not have created is the more destructive mistake.
+     *
+     * @param undo the log built by writeTracked
+     */
+    private void restore(List<String[]> undo) {
+        for (int i = undo.size() - 1; i >= 0; i--) {
+            String[] entry = undo.get(i);
+            if (entry[1] == null) continue;
+            try {
+                ProjectIO.write(entry[0], entry[1]);
+            } catch (IOException ex) {
+                Log.e(ex);
+                ToastBar.showErrorMessage("Could not restore " + entry[0] + " after the failed save");
+            }
         }
     }
 
@@ -4888,17 +4925,29 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      *     code pane is saving, the file on disk when the designer is saving
      * @return true when the file reached disk
      */
+    /**
+     * Builds the companion source without writing it, so a caller staging several files can decide
+     * to write none of them.
+     *
+     * @param userSource the text to carry the user-code region from, or null to use the generated
+     *     source as-is
+     * @return the source to write
+     */
+    private String companionSourceFor(String userSource) {
+        String generated = defaultCompanionSource();
+        String merged = userSource == null ? generated : mergeGeneratedSource(userSource, generated);
+        // buildUI() emits addActionListener(this::handler) for every configured event, so a handler
+        // added since the file was last written needs its stub adding here too. Without it,
+        // assigning an event and pressing Save left the companion referring to a method that did
+        // not exist until the source editor happened to be opened, which is the only other place
+        // ensureHandler() ran.
+        for (String handler : generatedHandlers()) merged = ensureHandler(merged, handler);
+        return merged;
+    }
+
     private boolean writeCompanionSource(String path, String userSource) {
         try {
-            String generated = defaultCompanionSource();
-            String merged = userSource == null ? generated : mergeGeneratedSource(userSource, generated);
-            // buildUI() emits addActionListener(this::handler) for every configured event, so a
-            // handler added since the file was last written needs its stub adding here too. Without
-            // it, assigning an event and pressing Save left the companion referring to a method
-            // that did not exist until the source editor happened to be opened, which is the only
-            // other place ensureHandler() ran.
-            for (String handler : generatedHandlers()) merged = ensureHandler(merged, handler);
-            ProjectIO.write(path, merged);
+            ProjectIO.write(path, companionSourceFor(userSource));
             return true;
         } catch (IOException ex) {
             ToastBar.showErrorMessage("Source save failed: " + ex.getMessage());
@@ -4927,17 +4976,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
-    private void saveSource(String path, String source) {
+    private boolean saveSource(String path, String source) {
         if (writeCompanionSource(path, source)) {
             // The file now matches what was written, not the raw buffer: the generated regions were
             // regenerated on the way out, so Close must compare against that.
             editorBufferOnDisk = editorBuffer;
             setStatus("Saved companion Java source");
+            return true;
         }
+        return false;
     }
 
     private void saveSourceAndModel(String path, String source) {
-        saveSource(path, source);
+        // Stops here on failure: creating the model and announcing success over the error message
+        // told the user their source was saved when the file had not changed at all.
+        if (!saveSource(path, source)) return;
         int model = ensureBindingModel(path);
         setStatus(model == MODEL_CREATED ? "Saved form source and created its binding model"
                 : model == MODEL_FAILED ? "Saved form source, but its binding model could not be written"
