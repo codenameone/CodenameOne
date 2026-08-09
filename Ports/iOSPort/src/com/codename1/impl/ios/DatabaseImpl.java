@@ -255,16 +255,18 @@ class DatabaseImpl extends Database {
         // Bind through the statement API rather than the older sqlDbExec, which binds only the
         // values it is given and ignores the placeholder count: too few left placeholders bound to
         // NULL and extra values were discarded, both silently.
-        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
-        bindText(stmt, params);
-        IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
-        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
-        // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it. The names first, then the engine, exactly as execute(String) does -- without
-        // the engine read here a script that failed partway leaves this believing whatever its
-        // unexecuted statements said.
-        noteScriptTransactionControl(sql);
-        noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        try {
+            long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+            bindText(stmt, params);
+            IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction
+            // as it fails, so reading only on the success path would hold the flag over a
+            // transaction that is gone and refuse every begin and key change until close.
+            noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        }
     }
 
     @Override
@@ -284,16 +286,18 @@ class DatabaseImpl extends Database {
             execute(sql, coerceToText(params, "execute"));
             return;
         }
-        long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
-        bind(stmt, params);
-        IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
-        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
-        // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it. The names first, then the engine, exactly as execute(String) does -- without
-        // the engine read here a script that failed partway leaves this believing whatever its
-        // unexecuted statements said.
-        noteScriptTransactionControl(sql);
-        noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        try {
+            long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
+            bind(stmt, params);
+            IOSImplementation.nativeInstance.sqlStmtExecuteAndFinalize(stmt);
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction
+            // as it fails, so reading only on the success path would hold the flag over a
+            // transaction that is gone and refuse every begin and key change until close.
+            noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+        }
     }
 
     @Override

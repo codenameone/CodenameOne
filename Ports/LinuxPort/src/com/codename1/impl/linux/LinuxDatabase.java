@@ -227,16 +227,18 @@ class LinuxDatabase extends Database {
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
-        bindText(stmt, params);
-        LinuxNative.sqlStmtExecuteAndFinalize(stmt);
-        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
-        // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it. The names first, then the engine, exactly as execute(String) does -- without
-        // the engine read here a script that failed partway leaves this believing whatever its
-        // unexecuted statements said.
-        noteScriptTransactionControl(sql);
-        noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
+        try {
+            long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+            bindText(stmt, params);
+            LinuxNative.sqlStmtExecuteAndFinalize(stmt);
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the
+            // transaction as it fails, so reading only on the success path would hold the
+            // flag over a transaction that is gone and refuse every begin and key change.
+            noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
+        }
     }
 
     @Override
@@ -251,16 +253,18 @@ class LinuxDatabase extends Database {
         }
         checkOpen();
         requireSingleStatement(sql);
-        long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
-        bind(stmt, params);
-        LinuxNative.sqlStmtExecuteAndFinalize(stmt);
-        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
-        // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it. The names first, then the engine, exactly as execute(String) does -- without
-        // the engine read here a script that failed partway leaves this believing whatever its
-        // unexecuted statements said.
-        noteScriptTransactionControl(sql);
-        noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
+        try {
+            long stmt = LinuxNative.sqlStmtPrepare(peer, sql);
+            bind(stmt, params);
+            LinuxNative.sqlStmtExecuteAndFinalize(stmt);
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the
+            // transaction as it fails, so reading only on the success path would hold the
+            // flag over a transaction that is gone and refuse every begin and key change.
+            noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
+        }
     }
 
     @Override

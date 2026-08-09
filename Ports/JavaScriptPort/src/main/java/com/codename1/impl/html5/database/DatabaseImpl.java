@@ -262,13 +262,11 @@ public class DatabaseImpl extends Database {
         checkPrepared(stmt);
         bindText(stmt, params);
         checkNative(SQLiteNative.executeAndFinish(stmt));
-        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
-        // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it. The names first, then the engine, exactly as execute(String) does -- without
-        // the engine read here a script that failed partway leaves this believing whatever its
-        // unexecuted statements said.
+        // The names on success only -- a statement that failed opened no savepoint -- and the
+        // engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction as it
+        // fails, so leaving the read on the success path alone would hold the flag over a
+        // transaction that is gone and refuse every begin and key change until close.
         noteScriptTransactionControl(sql);
-        noteEngineTransactionState(SQLiteNative.inTransaction(peer));
     }
 
     @Override
@@ -287,13 +285,11 @@ public class DatabaseImpl extends Database {
         checkPrepared(stmt);
         bind(stmt, params);
         checkNative(SQLiteNative.executeAndFinish(stmt));
-        // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
-        // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it. The names first, then the engine, exactly as execute(String) does -- without
-        // the engine read here a script that failed partway leaves this believing whatever its
-        // unexecuted statements said.
+        // The names on success only -- a statement that failed opened no savepoint -- and the
+        // engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction as it
+        // fails, so leaving the read on the success path alone would hold the flag over a
+        // transaction that is gone and refuse every begin and key change until close.
         noteScriptTransactionControl(sql);
-        noteEngineTransactionState(SQLiteNative.inTransaction(peer));
     }
 
     @Override

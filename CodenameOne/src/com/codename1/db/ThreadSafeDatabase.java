@@ -116,16 +116,20 @@ public class ThreadSafeDatabase extends Database {
 
     private void invokeWithException(final RunnableWithIOException r) throws IOException {
         Object err;
+        if (et.isThisIt()) {
+            // Before the lock, not inside it. Already on the worker -- which getThread() hands out,
+            // so a task running there can reach this -- handing work to that worker and waiting
+            // for it is a deadlock on its own. Taking dispatchLock first makes it worse: another
+            // thread can hold the lock while waiting for this worker, so this call would block on
+            // the lock and that one on the worker, with neither able to move. The thread asking is
+            // the thread that would do the work, so it does the work, and reads `closed` without
+            // the lock -- there is one worker, so a close cannot be running on it concurrently.
+            checkOpen();
+            r.run();
+            return;
+        }
         synchronized (dispatchLock) {
             checkOpen();
-            if (et.isThisIt()) {
-                // Already on the worker, which getThread() hands out, so a task running there can
-                // reach this. Handing it work and waiting queues behind the task making the call
-                // and waits for the thread that would run it -- a permanent deadlock. The thread
-                // asking is the thread that would do the work, so it does the work.
-                r.run();
-                return;
-            }
             err = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -171,13 +175,13 @@ public class ThreadSafeDatabase extends Database {
 
     private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
         Object ret;
+        if (et.isThisIt()) {
+            // Before the lock; see the other invokeWithException for why both matter.
+            checkOpen();
+            return r.run();
+        }
         synchronized (dispatchLock) {
             checkOpen();
-            if (et.isThisIt()) {
-                // See the other invokeWithException: waiting on the worker from the worker never
-                // returns.
-                return r.run();
-            }
             ret = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -264,6 +268,22 @@ public class ThreadSafeDatabase extends Database {
 
     @Override
     public void close() throws IOException {
+        if (et.isThisIt()) {
+            // Before the lock, for the reason invokeWithException gives: another thread can hold
+            // dispatchLock while waiting for this worker, and blocking on it here would leave
+            // neither able to move. One worker means no close can be running on it concurrently,
+            // so the flag is read and set without the lock.
+            if (closed) {
+                return;
+            }
+            closed = true;
+            try {
+                underlying.close();
+            } finally {
+                et.kill();
+            }
+            return;
+        }
         synchronized (dispatchLock) {
             if (closed) {
                 // close() is idempotent by contract, and after the first call there is no worker
@@ -274,18 +294,6 @@ public class ThreadSafeDatabase extends Database {
             // either queues before this point or is rejected by checkOpen() after it. In between
             // it would hand work to a dead worker and wait on it forever.
             closed = true;
-            if (et.isThisIt()) {
-                // Already on the worker. Handing it work and waiting for the same thread to run it
-                // waits forever: the hand-off queues behind the task making this call. The thread
-                // that would do the work is the one asking for it, so it does the work here --
-                // which is also what makes the wait below safe to keep for everybody else.
-                try {
-                    underlying.close();
-                } finally {
-                    et.kill();
-                }
-                return;
-            }
             // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
             // return while the database was still open, and a delete() on the next line would race
             // it and fail with the file still in use.
