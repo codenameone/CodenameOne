@@ -1750,6 +1750,47 @@ class WatchNativeBuilder {
                 .append("  end\n")
                 .append("end\n");
 
+        // Swift Package Manager products, which the loop above cannot see.
+        //
+        // A build file for a package product carries a `product_ref` and NO `file_ref`, so every
+        // `next unless ref && ref.path` above skips it silently -- a project declaring
+        // ios.swiftPackages got its packages linked into the phone and not the watch, and a watch
+        // lifecycle calling into one failed to link with undefined symbols and nothing naming the
+        // cause. The product dependency also has to be listed on the target itself, not only in the
+        // frameworks phase, or Xcode does not resolve it for that target at all.
+        //
+        // A dependency object of its own per target, rather than the phone's shared between both:
+        // that is what Xcode itself writes, and a target's package_product_dependencies is
+        // conceptually its own list even though the pbxproj format would tolerate one object in
+        // two.
+        //
+        // No SDK check is possible here, unlike the system frameworks above. A package declares its
+        // supported platforms in its own Package.swift, which is not resolved until xcodebuild runs.
+        // So this mirrors the declaration and says so: a package with no watchOS support fails with
+        // Xcode naming the product, which is a better outcome than a link error naming nothing.
+        s.append("app_target.package_product_dependencies.to_a.each do |dep|\n")
+                .append("  name = dep.respond_to?(:product_name) ? dep.product_name : nil\n")
+                .append("  next unless name\n")
+                .append("  next if watch_target.package_product_dependencies.any? { |d| "
+                        + "d.respond_to?(:product_name) && d.product_name == name }\n")
+                .append("  mirrored = xcproj.new("
+                        + "Xcodeproj::Project::Object::XCSwiftPackageProductDependency)\n")
+                .append("  mirrored.package = dep.package if dep.respond_to?(:package)\n")
+                .append("  mirrored.product_name = name\n")
+                .append("  watch_target.package_product_dependencies << mirrored\n")
+                .append("  linked = watch_target.frameworks_build_phase.files.to_a.any? { |bf| "
+                        + "bf.respond_to?(:product_ref) && bf.product_ref && "
+                        + "bf.product_ref.respond_to?(:product_name) && "
+                        + "bf.product_ref.product_name == name }\n")
+                .append("  unless linked\n")
+                .append("    pbf = xcproj.new(Xcodeproj::Project::Object::PBXBuildFile)\n")
+                .append("    pbf.product_ref = mirrored\n")
+                .append("    watch_target.frameworks_build_phase.files << pbf\n")
+                .append("  end\n")
+                .append("  puts \"[watchNative] linking Swift package product #{name} into the "
+                        + "watch target; scope the package to iOS if it has no watchOS support\"\n")
+                .append("end\n");
+
         // Mirror the iOS app's bundle resources into the watch target. The CN1
         // runtime loads its theme + assets from the app bundle at runtime
         // (Resources.open(\"/iOS7Theme.res\"), the app theme.res / CN1Resource.res,

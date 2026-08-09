@@ -165,6 +165,22 @@ public class IPhoneBuilder extends Executor {
 
     private boolean watchRootReachesHealth = true;
 
+    /// What each root reaches, kept so the listener registry can be filtered by it too.
+    ///
+    /// Null means one translation, and null is what tells every consumer below to filter nothing:
+    /// with a single root the app-wide answer and the per-root answer are the same question.
+    private java.util.Set<String> phoneReachableClasses;
+
+    private java.util.Set<String> watchReachableClasses;
+
+    /// The listener bindings each root gets, resolved once where the stubs are written and read
+    /// again where the factory sources are generated.
+    private java.util.Map<String, String> phoneHealthListeners =
+            java.util.Collections.emptyMap();
+
+    private java.util.Map<String, String> watchHealthListeners =
+            java.util.Collections.emptyMap();
+
     /// Internal names of every class reachable from a root, following constant-pool class
     /// references.
     ///
@@ -298,8 +314,8 @@ public class IPhoneBuilder extends Executor {
     }
 
     /// Whether the class graph rooted here reaches the health API at all.
-    private boolean reachesHealth(java.util.List<File> roots, String rootInternal) {
-        for (String name : reachableClasses(roots, rootInternal)) {
+    private boolean reachesHealth(java.util.Set<String> reachable) {
+        for (String name : reachable) {
             // The SAME distinction the scanner draws, and for the same reason. The umbrella
             // package is not evidence of HealthKit: com.codename1.health.sensors is pure BLE, and
             // the shared model types (a HealthSample, a QuantitySample) are named by sensor code
@@ -346,11 +362,71 @@ public class IPhoneBuilder extends Executor {
         // very lifecycle that uses HealthKit.
         String phoneRoot = origMainClass != null && origMainClass.length() > 0
                 ? origMainClass : request.getMainClass();
-        phoneRootReachesHealth = reachesHealth(roots, prefix + phoneRoot);
-        watchRootReachesHealth = reachesHealth(roots,
+        phoneReachableClasses = reachableClasses(roots, prefix + phoneRoot);
+        watchReachableClasses = reachableClasses(roots,
                 watchNativeBuilder.getWatchMain().replace('.', '/'));
+        phoneRootReachesHealth = reachesHealth(phoneReachableClasses);
+        watchRootReachesHealth = reachesHealth(watchReachableClasses);
         log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
                 + ", watch=" + watchRootReachesHealth);
+    }
+
+    /// The listener bindings one translation root can actually reach.
+    ///
+    /// The scan that produced `all` walked the whole classes directory, so it answers "this app
+    /// declares these background listeners". The generated factory names every one of them in a
+    /// `new` expression, and that is a reference the translator follows -- so handing the app-wide
+    /// map to both roots pulls each target's listeners, and their whole transitive graph, into the
+    /// other target's binary. A watch that can never be relaunched for the phone's listener has no
+    /// business carrying it.
+    ///
+    /// Dropping a listener the root DOES need would be the dangerous direction, and cannot happen
+    /// here: `subscribe(request, MyListener.class)` puts the listener in its caller's constant pool,
+    /// and this walk is a strict over-approximation of what the translator keeps -- anything that
+    /// survives translation was reached by the walk first.
+    /// Writes one root's generated factory, if that root binds anything.
+    private void writeHealthBindings(File stubSource,
+            java.util.Map<String, String> listeners, String classSuffix)
+            throws BuildException {
+        String source = HealthListenerBindings.generate(listeners, classSuffix);
+        if (source == null) {
+            return;
+        }
+        File healthBindingsFile = new File(stubSource,
+                HealthListenerBindings.sourcePath(classSuffix));
+        healthBindingsFile.getParentFile().mkdirs();
+        try (OutputStream bindings = new FileOutputStream(healthBindingsFile)) {
+            bindings.write(source.getBytes("UTF-8"));
+        } catch (Exception ex) {
+            throw new BuildException(
+                    "Failed to write the health listener bindings", ex);
+        }
+        log("Generated health background-listener bindings for "
+                + listeners.keySet());
+    }
+
+    /// The indented install statement for one root's factory, or "" when that root has no
+    /// listeners to bind.
+    private String healthBindingsInstall(java.util.Map<String, String> listeners,
+            String classSuffix) {
+        String statement = HealthListenerBindings.installStatement(listeners, classSuffix);
+        return statement == null ? "" : "            " + statement;
+    }
+
+    java.util.Map<String, String> healthListenersReachableFrom(
+            java.util.Map<String, String> all, java.util.Set<String> reachable) {
+        if (reachable == null || all == null || all.isEmpty()) {
+            return all;
+        }
+        java.util.Map<String, String> out = new java.util.TreeMap<String, String>();
+        for (java.util.Map.Entry<String, String> e : all.entrySet()) {
+            // Binary name to internal name. Only the dots separating packages become slashes; a
+            // nested class keeps its dollar, which is exactly what the walk recorded.
+            if (reachable.contains(e.getKey().replace('.', '/'))) {
+                out.put(e.getKey(), e.getValue());
+            }
+        }
+        return out;
     }
 
     boolean phoneUsesHealthData(BuildRequest request) {
@@ -2159,20 +2235,23 @@ public class IPhoneBuilder extends Executor {
         // entitle that target and make it reach health code, which is the question being asked.
         resolveHealthUsagePerRoot(request, classesDir);
 
-        String healthBindingsInstall = "";
-        String healthInstallStatement = HealthListenerBindings
-                .installStatement(healthScan.resolve());
-        if (healthInstallStatement != null) {
-            healthBindingsInstall = "            "
-                    + healthInstallStatement;
-        }
         // Per target, because the registry is a hard reference to HealthStore and to every listener
-        // the app-wide scan found. Installing it in a stub whose lifecycle never touches health
-        // pulls HealthKit into that slice and entitles it -- release signing then fails against an
-        // App ID without the capability. A target that does not reach health has no listeners to
-        // register either, so withholding it costs that slice nothing.
-        String phoneHealthBindingsInstall = phoneRootReachesHealth ? healthBindingsInstall : "";
-        String watchHealthBindingsInstall = watchRootReachesHealth ? healthBindingsInstall : "";
+        // it names. Installing it in a stub whose lifecycle never touches health pulls HealthKit
+        // into that slice and entitles it -- release signing then fails against an App ID without
+        // the capability -- and installing the app-wide registry in BOTH stubs drags each target's
+        // listeners into the other. So each root gets a registry of its own, holding only the
+        // listeners that root reaches, and gets it only if it reaches health at all.
+        phoneHealthListeners = phoneRootReachesHealth
+                ? healthListenersReachableFrom(healthScan.resolve(), phoneReachableClasses)
+                : java.util.Collections.<String, String>emptyMap();
+        watchHealthListeners = watchRootReachesHealth
+                ? healthListenersReachableFrom(healthScan.resolve(), watchReachableClasses)
+                : java.util.Collections.<String, String>emptyMap();
+        String phoneHealthBindingsInstall = healthBindingsInstall(phoneHealthListeners, "");
+        String watchHealthBindingsInstall = watchNativeBuilder.needsOwnTranslation()
+                ? healthBindingsInstall(watchHealthListeners,
+                        HealthListenerBindings.WATCH_SUFFIX)
+                : "";
 
         String svgRegistryInstall = "";
         File svgRegistryClassFile = new File(classesDir,
@@ -2645,21 +2724,14 @@ public class IPhoneBuilder extends Executor {
         for (String warning : healthScan.warnings()) {
             log("WARNING: " + warning);
         }
-        String healthBindingsSource =
-                HealthListenerBindings.generate(healthScan.resolve());
-        if (healthBindingsSource != null) {
-            File healthBindingsFile = new File(stubSource,
-                    HealthListenerBindings.sourcePath());
-            healthBindingsFile.getParentFile().mkdirs();
-            try (OutputStream bindings =
-                    new FileOutputStream(healthBindingsFile)) {
-                bindings.write(healthBindingsSource.getBytes("UTF-8"));
-            } catch (Exception ex) {
-                throw new BuildException(
-                        "Failed to write the health listener bindings", ex);
-            }
-            log("Generated health background-listener bindings for "
-                    + healthScan.resolve().keySet());
+        // One factory per translation root, each holding only the listeners that root reaches --
+        // see healthListenersReachableFrom. The two are written into the same source folder because
+        // one javac pass compiles both stubs; it is the TRANSLATION that separates them, and each
+        // stub installs only its own.
+        writeHealthBindings(stubSource, phoneHealthListeners, "");
+        if (watchNativeBuilder.needsOwnTranslation()) {
+            writeHealthBindings(stubSource, watchHealthListeners,
+                    HealthListenerBindings.WATCH_SUFFIX);
         }
         String javacPath = System.getProperty("java.home") + "/../bin/javac";
         if (!new File(javacPath).exists()) {

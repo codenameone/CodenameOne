@@ -672,6 +672,38 @@ class WatchNativeBuilderTest {
                 "one binary cannot define main twice: " + ruby);
     }
 
+    /**
+     * Swift Package Manager products reach the watch target too.
+     *
+     * <p>A build file for a package product carries a {@code product_ref} and no {@code file_ref},
+     * so the framework-mirroring loop -- which skips anything without a path -- passed straight
+     * over them. A project declaring ios.spm.packages linked them into the phone and not the
+     * watch, and a watch lifecycle calling into one failed at link time with undefined symbols and
+     * nothing in the build naming the missing dependency.</p>
+     */
+    @Test
+    void swiftPackageProductsReachTheWatchTarget(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        String ruby = parse(req).buildXcodeScript(req, tmp.toFile(), "1.0",
+                java.util.Collections.<String>emptyList());
+
+        assertTrue(ruby.contains("app_target.package_product_dependencies.to_a.each"),
+                "the phone's package products are the source of the mirror: " + ruby);
+        // Both halves are required. Listing the product on the target is what makes Xcode resolve
+        // the package for it; the frameworks-phase build file is what links it. Either alone
+        // produces a project that still fails, and differently.
+        assertTrue(ruby.contains("watch_target.package_product_dependencies << mirrored"), ruby);
+        assertTrue(ruby.contains("pbf.product_ref = mirrored"), ruby);
+        assertTrue(ruby.contains("watch_target.frameworks_build_phase.files << pbf"), ruby);
+        // A dependency object per target, as Xcode itself writes -- not the phone's object listed
+        // under two targets.
+        assertTrue(ruby.contains(
+                "Xcodeproj::Project::Object::XCSwiftPackageProductDependency"), ruby);
+        // Re-running the generator must not add the product twice.
+        assertTrue(ruby.contains("next if watch_target.package_product_dependencies.any?"), ruby);
+    }
+
     /// The bootstrap has to call the stub that actually exists in the watch binary.
     @Test
     void theBootstrapEntersTheWatchStub(@TempDir Path tmp) throws Exception {

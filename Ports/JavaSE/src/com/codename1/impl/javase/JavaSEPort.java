@@ -4358,6 +4358,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void initializeCoordinates(BufferedImage map, Properties props, Map<Point, Integer> coordinates, java.awt.Rectangle screenPosition) {
+        if (map == null) {
+            // A skin with no coordinate map. The map is where the screen rectangle and the bezel
+            // hotspots normally come from, so the only thing left to believe is what the skin
+            // declares -- and a skin that declares its display geometry has said everything this
+            // method would have inferred. Without this the loader died on a NullPointerException
+            // one line down, which reads as a corrupt skin rather than a missing optional file.
+            screenPosition.x = Integer.parseInt(props.getProperty("displayX", "0"));
+            screenPosition.y = Integer.parseInt(props.getProperty("displayY", "0"));
+            screenPosition.width = Integer.parseInt(props.getProperty("displayWidth", "0"));
+            screenPosition.height = Integer.parseInt(props.getProperty("displayHeight", "0"));
+            return;
+        }
         int[] buffer = new int[map.getWidth() * map.getHeight()];
         map.getRGB(0, 0, map.getWidth(), map.getHeight(), buffer, 0, map.getWidth());
         int screenX1 = Integer.MAX_VALUE;

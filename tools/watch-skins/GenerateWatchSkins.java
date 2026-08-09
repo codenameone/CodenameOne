@@ -38,8 +38,9 @@ import javax.imageio.ImageIO;
  * is true and the "watch" override layer applies -- with simple programmatically
  * drawn bezel artwork. Replace skin.png with final design art when available.
  *
- * Each generated *.skin is a ZIP containing: skin.png, skin_l.png,
- * skin.properties and a theme .res copied from the bundled iPhoneX.skin.
+ * Each generated *.skin is a ZIP containing: skin.png, skin_l.png, skin_map.png,
+ * skin_map_l.png, skin.properties and a theme .res copied from the bundled
+ * iPhoneX.skin.
  *
  * Regenerate the shipped skins with:
  *   javac -d /tmp/wskin tools/watch-skins/GenerateWatchSkins.java
@@ -159,6 +160,34 @@ public class GenerateWatchSkins {
         ImageIO.write(skin, "png", png);
         byte[] skinPng = png.toByteArray();
 
+        // The coordinate map, and it is not optional artwork.
+        //
+        // JavaSEPort takes the screen rectangle and the bezel hotspot table out of a companion
+        // image the same size as the skin: white is bezel, black is the display, any other colour
+        // is a key mapped through a c<rrggbb> property. A skin without one loaded fine right up to
+        // initializeCoordinates, which dereferences it -- so every NON-round watch skin (both Apple
+        // Watch sizes and Wear Square) died with a NullPointerException the moment it was selected.
+        // The round path never reads the map, which is why Wear Round alone appeared to work.
+        //
+        // Emitted for the round faces too. It costs a few hundred bytes, it keeps every archive the
+        // same shape, and it means the answer no longer depends on which branch of the loader a
+        // future edit happens to take.
+        BufferedImage mapImage = new BufferedImage(imgW, imgH, BufferedImage.TYPE_INT_RGB);
+        Graphics2D mg = mapImage.createGraphics();
+        mg.setColor(Color.WHITE);
+        mg.fillRect(0, 0, imgW, imgH);
+        // A rectangle even for a circular face: the loader reads the black region's BOUNDING BOX,
+        // and an oval's bounding box is this rectangle anyway. Filling the rectangle keeps the two
+        // faces reporting identical geometry instead of leaving it to antialiasing at the rim.
+        mg.setColor(Color.BLACK);
+        mg.fillRect(displayX, displayY, m.dw, m.dh);
+        mg.dispose();
+        // No hotspots: these skins have no mapped bezel keys. The crown and the side button are
+        // artwork -- rotary input arrives as a wheel event, not as a skin key.
+        ByteArrayOutputStream mapPng = new ByteArrayOutputStream();
+        ImageIO.write(mapImage, "png", mapPng);
+        byte[] skinMapPng = mapPng.toByteArray();
+
         // Safe-area inset: the curve eats the corners, so content has to stay clear of them. A round
         // face loses far more than a rounded rectangle does -- inscribing a rectangle in a circle
         // costs about 15% a side -- and getting this wrong in the simulator is precisely the bug
@@ -205,6 +234,8 @@ public class GenerateWatchSkins {
         ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(out));
         putEntry(zos, "skin.png", skinPng);
         putEntry(zos, "skin_l.png", skinPng);
+        putEntry(zos, "skin_map.png", skinMapPng);
+        putEntry(zos, "skin_map_l.png", skinMapPng);
         putEntry(zos, "skin.properties", p.toString().getBytes("UTF-8"));
         putEntry(zos, m.themeEntry, themeRes);
         zos.close();
