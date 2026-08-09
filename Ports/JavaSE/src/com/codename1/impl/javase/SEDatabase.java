@@ -248,14 +248,21 @@ public class SEDatabase extends Database {
             conn.setAutoCommit(false);
             return true;
         }
-        if ("COMMIT".equals(keyword) || "END".equals(keyword)) {
-            conn.commit();
-            conn.setAutoCommit(true);
-            setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
-            return true;
-        }
-        if ("ROLLBACK".equals(keyword)) {
-            conn.rollback();
+        if ("COMMIT".equals(keyword) || "END".equals(keyword) || "ROLLBACK".equals(keyword)) {
+            String ending = "ROLLBACK".equals(keyword) ? "ROLLBACK" : "COMMIT";
+            if (conn.getAutoCommit()) {
+                // A SAVEPOINT opened this transaction, so JDBC never left autocommit and its
+                // commit() and rollback() reject the call outright. The same reasoning as the
+                // typed endings below, for the statement form: SQLite ends a savepoint-started
+                // transaction with an ordinary COMMIT or ROLLBACK.
+                endTransactionThroughSql(ending);
+                return true;
+            }
+            if ("ROLLBACK".equals(keyword)) {
+                conn.rollback();
+            } else {
+                conn.commit();
+            }
             conn.setAutoCommit(true);
             setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             return true;

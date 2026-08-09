@@ -173,6 +173,38 @@ public class SEDatabaseConformanceTest {
         }
     }
 
+    @Test
+    public void aSavepointTransactionEndsThroughARawCommit() throws Exception {
+        // A SAVEPOINT opens a transaction JDBC never hears about, so it stays in autocommit and
+        // its commit() rejects the call. The script form has to work here exactly as it does on
+        // the native ports.
+        db.execute("CREATE TABLE sp (id INTEGER PRIMARY KEY)");
+        db.execute("SAVEPOINT s");
+        db.execute("INSERT INTO sp (id) VALUES (1)");
+        db.execute("COMMIT");
+        assertFalse(db.isInTransaction(), "the COMMIT ended it");
+
+        Cursor cur = db.executeQuery("SELECT count(*) FROM sp");
+        try {
+            assertTrue(cur.next());
+            assertEquals(1, cur.getRow().getInteger(0), "and the row committed");
+        } finally {
+            cur.close();
+        }
+
+        db.execute("SAVEPOINT s2");
+        db.execute("INSERT INTO sp (id) VALUES (2)");
+        db.execute("ROLLBACK");
+        assertFalse(db.isInTransaction(), "the ROLLBACK ended it too");
+        cur = db.executeQuery("SELECT count(*) FROM sp");
+        try {
+            assertTrue(cur.next());
+            assertEquals(1, cur.getRow().getInteger(0), "and discarded its row");
+        } finally {
+            cur.close();
+        }
+    }
+
     private static Connection openPlain(File f) throws Exception {
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);
