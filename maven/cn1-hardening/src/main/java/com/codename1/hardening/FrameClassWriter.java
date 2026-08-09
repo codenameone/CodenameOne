@@ -111,6 +111,15 @@ public final class FrameClassWriter extends ClassWriter {
      * {@code java/lang/Object} only when the bytes cannot be read.
      */
     private String commonSuperFromBytes(String type1, String type2) {
+        // These are always non-array reference types (internal names like "pkg/A"), never array
+        // descriptors like "[Lpkg/A;", so readerFor()'s "<name>.class" lookup is correct. That is ASM's
+        // contract for getCommonSuperClass, verified empirically against ASM 9.8 (the shaded version):
+        // for a merge of same-dimension reference arrays A[] and B[], ASM strips the array dimension and
+        // hands us the ELEMENT names "pkg/A" and "pkg/B", then re-wraps OUR result back into "[Lpkg/Base;"
+        // itself -- so a shared but unloadable Base still resolves to Base[] via the scalar path below.
+        // A merge of array-vs-scalar, or of arrays of different dimension, is resolved to Object by ASM
+        // internally and getCommonSuperClass is never called at all. So an array-descriptor branch here
+        // would be unreachable dead code; the scalar resolution is the whole contract.
         if (type1.equals(type2)) {
             return type1;
         }

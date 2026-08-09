@@ -94,6 +94,17 @@ public class JavaScriptBuilder extends Executor {
         return "javascript";
     }
 
+    /**
+     * The ParparVM-to-JS build unpacks parparvm-java-api.jar into the translated app (see stageJavaApi),
+     * so that runtime's literals must be excluded from encryption to preserve reference equality --
+     * exactly as on the native ParparVM-C targets. hardeningPlatform() is "javascript" here, which the
+     * base class does not treat as ParparVM-C, so opt this builder in explicitly.
+     */
+    @Override
+    protected boolean stagesParparVMRuntime(BuildRequest request) {
+        return true;
+    }
+
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         debug("Request Args: ");

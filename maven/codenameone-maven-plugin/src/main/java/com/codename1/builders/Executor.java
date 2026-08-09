@@ -2396,6 +2396,19 @@ public abstract class Executor {
     }
 
     /**
+     * Whether this builder's artifact links against the un-interned ParparVM Java runtime, so that
+     * runtime's literals must be excluded from encryption to preserve reference equality. Defaults to the
+     * ParparVM-C platform test, but the platform tag alone is insufficient for the JavaScript port: the
+     * ParparVM-to-JS builder reports {@code javascript} yet unpacks {@code parparvm-java-api.jar} into the
+     * translated app exactly like the native ParparVM-C targets, so {@code JavaScriptBuilder} overrides
+     * this to true. (A TeaVM-based JS build would not link that runtime, but the plugin's local JS builder
+     * is ParparVM-only.)
+     */
+    protected boolean stagesParparVMRuntime(BuildRequest request) {
+        return isParparVMCPlatform(hardeningPlatform(request));
+    }
+
+    /**
      * The platform tags this one build ships from the SAME hardened jar. The default builder emits a
      * single slice ({@link #hardeningPlatform(BuildRequest)}); the Apple builder widens it to the iOS app
      * plus any native-Mac, watch or tv slice. A shared jar cannot be hardened per-slice, so its
@@ -2449,7 +2462,7 @@ public abstract class Executor {
         // or an app value like "true" (encrypted then interned) would compare != to a runtime-returned
         // copy such as Boolean.toString() -- a constant-pool literal ParparVM never interns -- breaking a
         // reference comparison that held before hardening. It doubles as a -libraryjars entry for ProGuard.
-        if (isParparVMCPlatform(hardeningPlatform(request))) {
+        if (stagesParparVMRuntime(request)) {
             try {
                 File runtime = getResourceAsFile("/parparvm-java-api.jar", ".jar");
                 if (runtime != null && runtime.exists() && !jars.contains(runtime)) {
