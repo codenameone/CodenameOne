@@ -1340,12 +1340,32 @@ public class CN1WearableBridge implements WearableBridge {
     private static long lastSequence;
 
     public byte[] getData(String path) {
-        // On the EDT (or Android's main thread) answer from the last known snapshot instead of
-        // blocking. resolveValue() waits on Play services for up to TIMEOUT_SECONDS, and taking
-        // that on the EDT freezes painting and input for the duration -- the state queries in this
-        // class already refuse to do it, and this public getter had no such guard. A caller that
-        // needs an authoritative read can make one off the EDT; a caller that is painting cannot
-        // afford five seconds either way.
+        // The EDT gets the AUTHORITATIVE answer, obtained without freezing.
+        //
+        // Answering an EDT caller from the cache was wrong in a way the contract cannot absorb:
+        // this getter documents null as "nothing is published here", and after a cold launch the
+        // cache is empty for durable state that still exists -- the Data Layer has no reason to
+        // re-announce an item it delivered before the restart. A UI action reading it then
+        // concluded there was no state and discarded valid data. Priming in the background does not
+        // fix that; it only makes the NEXT call right, and there may not be a next call.
+        //
+        // invokeAndBlock is exactly the tool for this: the query runs off the EDT while the EDT
+        // keeps pumping paint and input, so the caller gets the real answer and the UI does not
+        // freeze for TIMEOUT_SECONDS. As with any invokeAndBlock, do not call this from paint().
+        if (com.codename1.ui.CN.isEdt()) {
+            final String requested = path;
+            final byte[][] resolved = new byte[1][];
+            com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    resolved[0] = resolveDataBlocking(requested);
+                }
+            });
+            return resolved[0];
+        }
+        // Android's main thread is not the EDT and has no invokeAndBlock: this is where a Play
+        // services completion listener runs, and blocking it is an ANR rather than a slow frame.
+        // Internal callers only -- app code reaching this getter is on the EDT or a thread of its
+        // own -- so the cached answer plus a background prime is the best available here.
         if (isCallerLatencySensitive()) {
             byte[] cached = cachedValue(path);
             boolean absent;
@@ -1362,6 +1382,11 @@ public class CN1WearableBridge implements WearableBridge {
             }
             return cached;
         }
+        return resolveDataBlocking(path);
+    }
+
+    /// The blocking resolution, on a thread that can afford it.
+    private byte[] resolveDataBlocking(String path) {
         // Deliberately the same resolution the listener uses. This used to have its own loop, which
         // kept whichever item the buffer yielded first -- so once resolveValue() gained the
         // publisher tie-break, getData() could return a different value than the listener had just
@@ -1674,9 +1699,22 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public String[] getDataPaths() {
-        // Same reasoning as getData: this await can stall a painting thread for TIMEOUT_SECONDS.
-        // An EDT caller gets the last successful enumeration, or an empty array if there has not
-        // been one yet, rather than a frozen UI.
+        // Same reasoning as getData, and the same answer. An empty array read as "there is no
+        // persisted wearable state" is how one-shot initialisation code decides never to read it,
+        // and after a cold launch that is exactly what an unenumerated cache produced. The EDT gets
+        // the real enumeration through invokeAndBlock, which keeps painting and input alive while
+        // the await runs.
+        if (com.codename1.ui.CN.isEdt()) {
+            final String[][] enumerated = new String[1][];
+            com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    enumerated[0] = enumerateDataPathsBlocking();
+                }
+            });
+            return enumerated[0];
+        }
+        // Android's main thread: no invokeAndBlock, and blocking it is an ANR. Internal callers
+        // only; app code is on the EDT or a thread of its own.
         if (isCallerLatencySensitive()) {
             String[] known = pathsCache;
             if (known == null) {
@@ -1688,6 +1726,11 @@ public class CN1WearableBridge implements WearableBridge {
             }
             return known.clone();
         }
+        return enumerateDataPathsBlocking();
+    }
+
+    /// The blocking enumeration, on a thread that can afford it.
+    private String[] enumerateDataPathsBlocking() {
         int startedGeneration;
         synchronized (valueCache) {
             startedGeneration = pathsGeneration;

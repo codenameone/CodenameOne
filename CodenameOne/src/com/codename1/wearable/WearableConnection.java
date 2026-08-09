@@ -292,6 +292,12 @@ public final class WearableConnection {
 
     /// Reads the replicated value at a path, as published by either side.
     ///
+    /// Null means the path holds nothing, and it is safe to act on that: where the platform has to
+    /// ask its own replication layer -- Android does -- the query is authoritative rather than
+    /// answered from a cache that a cold launch leaves empty. Called on the EDT that query runs
+    /// through `invokeAndBlock`, so the UI keeps painting while it waits; as with any
+    /// `invokeAndBlock`, do not call this from `paint()`.
+    ///
     /// #### Parameters
     ///
     /// - `path`: the path to read
@@ -322,6 +328,9 @@ public final class WearableConnection {
     }
 
     /// Returns every path that currently holds a replicated value.
+    ///
+    /// An empty list means there is nothing published, not "not enumerated yet" -- see
+    /// [#getData(String)] for how that is arranged and what it costs on the EDT.
     ///
     /// #### Returns
     ///
