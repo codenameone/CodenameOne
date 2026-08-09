@@ -694,12 +694,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param editor the editor being shown
      * @param content the text it was opened with
      */
-    private void trackEditorBuffer(final CodeEditor editor, String content, String kind) {
+    private void trackEditorBuffer(final CodeEditor editor, String content, String kind, boolean fromDisk) {
         editorBuffer = content;
         editorBufferKind = kind;
-        // Only the reopen path carries a buffer forward; a fresh open agrees with disk by
-        // definition, and after a save the caller resets this to the text it wrote.
-        if (!reopeningEditor) editorBufferOnDisk = content;
+        // The baseline moves only when the content actually came from the file. Setting it from a
+        // buffer carried forward by keptBuffer() recorded unsaved text as the saved text, so
+        // clicking Code or Model a second time made Close and form switching treat the pane as
+        // clean and throw the edits away without asking.
+        if (fromDisk) editorBufferOnDisk = content;
         editor.addChangeListener(e -> editor.getText(text -> editorBuffer = text));
     }
 
@@ -4698,7 +4700,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // buffer from that path instead of registering a second change listener here.
             editorBuffer = css;
             editorBufferKind = "css";
-            if (!reopeningEditor) editorBufferOnDisk = css;
+            // Same rule as trackEditorBuffer: a buffer carried forward is not the saved text.
+            if (keptCss == null) editorBufferOnDisk = css;
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             editor.setShowLineNumbers(true);
@@ -4776,7 +4779,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (keptModel != null) source = keptModel;
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
-            trackEditorBuffer(editor, source, "model");
+            trackEditorBuffer(editor, source, "model", keptModel == null);
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             editor.onReady(editor::focusEditor);
@@ -4829,7 +4832,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (handler != null) source = ensureHandler(source, javaIdentifier(handler));
             CodeEditor editor = new CodeEditor("java", source);
             activeCodeEditor = editor;
-            trackEditorBuffer(editor, source, "source");
+            trackEditorBuffer(editor, source, "source", keptSource == null);
             editor.setTheme(darkMode ? "dark" : "light");
             editor.setEditable(true);
             // No protected regions here. Marking the generated blocks read-only meant the caret
