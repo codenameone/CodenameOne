@@ -527,6 +527,10 @@ public class StringEncryptTransformTest {
         assertEquals("its constant must be counted as an exclusion", 1, t.getLegacyInterfaceConstantCount());
         assertTrue("the constant is left as-is (reported, not silently dropped)",
                 StringEncryptTransform.containsStringLiteral(out, secret));
+        // It must ALSO be excluded jar-wide, or an equal LDC elsewhere would be encrypted+interned and a
+        // GETSTATIC read of this still-plaintext interface field would compare != to it on ParparVM.
+        assertTrue("the un-encryptable interface constant is recorded for jar-wide exclusion",
+                t.getNewlyExcluded().contains(secret));
     }
 
     @Test

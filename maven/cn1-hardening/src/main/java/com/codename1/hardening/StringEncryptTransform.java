@@ -418,6 +418,10 @@ public final class StringEncryptTransform {
                     if ((f.access & Opcodes.ACC_STATIC) != 0 && (f.access & Opcodes.ACC_FINAL) != 0
                             && f.value instanceof String && shouldEncryptLiteral((String) f.value)) {
                         legacyInterfaceConstantCount++;
+                        // Exclude it jar-wide: this ConstantValue stays plaintext here, so an equal LDC in
+                        // another class must NOT be encrypted+interned or a GETSTATIC read of this field
+                        // would compare != to that interned copy on ParparVM (a broken literal ==).
+                        newlyExcluded.add((String) f.value);
                     }
                 }
             }
