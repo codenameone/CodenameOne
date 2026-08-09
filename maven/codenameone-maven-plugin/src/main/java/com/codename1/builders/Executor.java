@@ -744,7 +744,21 @@ public abstract class Executor {
         "com/codename1/orm/EntityManager",
         "com/codename1/properties/SQLMap",
         "com/codename1/testing/DatabaseConformanceSuite",
-        "com/codename1/ui/Display"
+        "com/codename1/ui/Display",
+        // The database package itself. Listed by name rather than skipped as a directory: the
+        // package is the framework's by convention, not by ownership, and an application or a
+        // library is free to put a class in it -- which used to make that class invisible to this
+        // scan, so a helper there could configure encryption and the build would drop the cipher.
+        "com/codename1/db/Cursor",
+        "com/codename1/db/CursorExt",
+        "com/codename1/db/Database",
+        "com/codename1/db/DatabaseConfig",
+        "com/codename1/db/DatabaseEncryptionException",
+        "com/codename1/db/ManagedKeys",
+        "com/codename1/db/Row",
+        "com/codename1/db/RowExt",
+        "com/codename1/db/ThreadSafeDatabase",
+        "com/codename1/db/package-info"
     };
 
     /// The internal name of the database package, as every reference to a class in it is stored.
@@ -820,21 +834,64 @@ public abstract class Executor {
             String childPath = relativePath.length() == 0
                     ? child.getName() : relativePath + "/" + child.getName();
             if (child.isDirectory()) {
-                if (!DATABASE_PACKAGE.equals(childPath)) {
-                    scanForDatabaseUsage(child, childPath, found);
-                }
+                scanForDatabaseUsage(child, childPath, found);
+            } else if (child.getName().endsWith(".jar")) {
+                // A library can be the only thing that touches the database: the application calls
+                // the library, and Android stages the jar into libs and links it through the
+                // generated fileTree. Reading loose class files alone reported no database use and
+                // dropped the engine out from under code that runs it.
+                scanArchiveForDatabaseUsage(child, found);
             } else if (child.getName().endsWith(".class")
                     && !isFrameworkDatabaseClass(childPath)) {
-                byte[] bytes = readAllBytes(child);
-                if (!found[0] && (containsBytes(bytes, DATABASE_MARKER)
-                        || referencesDatabaseFacade(bytes))) {
-                    found[0] = true;
+                inspectClassForDatabaseUsage(readAllBytes(child), found);
+            }
+        }
+    }
+
+    /// Reads the class entries of a library archive, which carry the same weight as loose ones.
+    private void scanArchiveForDatabaseUsage(File archive, boolean[] found) {
+        java.util.zip.ZipFile zip = null;
+        try {
+            zip = new java.util.zip.ZipFile(archive);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements() && !(found[0] && found[1])) {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (entry.isDirectory() || !name.endsWith(".class")
+                        || isFrameworkDatabaseClass(name)) {
+                    continue;
                 }
-                if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)
-                        && callsEncryptingConfigFactory(bytes)) {
-                    found[1] = true;
+                java.io.InputStream in = zip.getInputStream(entry);
+                try {
+                    inspectClassForDatabaseUsage(readAllBytes(in), found);
+                } finally {
+                    in.close();
                 }
             }
+        } catch (IOException cannotRead) {
+            // An archive that cannot be opened says nothing either way, and refusing to build over
+            // it would fail every application carrying a jar this cannot parse.
+            log("WARNING: could not read " + archive + " while looking for database use");
+        } finally {
+            if (zip != null) {
+                try {
+                    zip.close();
+                } catch (IOException ignored) {
+                    // Nothing left to do with it.
+                }
+            }
+        }
+    }
+
+    /// Applies both questions to one class file's bytes.
+    private void inspectClassForDatabaseUsage(byte[] bytes, boolean[] found) {
+        if (!found[0] && (containsBytes(bytes, DATABASE_MARKER)
+                || referencesDatabaseFacade(bytes))) {
+            found[0] = true;
+        }
+        if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)
+                && callsEncryptingConfigFactory(bytes)) {
+            found[1] = true;
         }
     }
 
@@ -982,6 +1039,18 @@ public abstract class Executor {
             in.close();
         }
         return bytes;
+    }
+
+    /// Reads a stream whose length is not known in advance, which is every archive entry.
+    private static byte[] readAllBytes(InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buffer = new byte[8192];
+        int step = in.read(buffer);
+        while (step > 0) {
+            out.write(buffer, 0, step);
+            step = in.read(buffer);
+        }
+        return out.toByteArray();
     }
 
     private static boolean containsBytes(byte[] haystack, byte[] needle) {

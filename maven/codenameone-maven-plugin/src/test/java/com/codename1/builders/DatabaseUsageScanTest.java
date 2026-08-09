@@ -124,7 +124,18 @@ class DatabaseUsageScanTest {
     private void writeClassCalling(String path, String factory) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
-        java.io.DataOutputStream out = new java.io.DataOutputStream(new FileOutputStream(f));
+        OutputStream raw = new FileOutputStream(f);
+        try {
+            raw.write(classCalling(factory));
+        } finally {
+            raw.close();
+        }
+    }
+
+    /** The same bytes, for a caller that puts them somewhere other than a loose file. */
+    private byte[] classCalling(String factory) throws IOException {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
         try {
             out.writeInt(0xCAFEBABE);
             out.writeShort(0);
@@ -154,6 +165,48 @@ class DatabaseUsageScanTest {
         } finally {
             out.close();
         }
+        return bytes.toByteArray();
+    }
+
+    @Test
+    void anApplicationClassInsideTheFrameworkPackageIsStillScanned() throws IOException {
+        // The package is the framework's by convention, not by ownership. Skipping the whole
+        // directory made a helper an application or a library put there invisible, so it could
+        // configure encryption and the build would still drop the cipher.
+        writeClassCalling("com/codename1/db/AppKeyHelper.class", "passphrase");
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "a class there still counts");
+        assertTrue(usage.usesDatabaseCipher(), "and its key configuration counts too");
+    }
+
+    @Test
+    void theFrameworksOwnDatabaseClassesStillDoNotCount() throws IOException {
+        writeClass("com/codename1/db/Database.class", "com/codename1/db/DatabaseConfig");
+        writeClass("com/codename1/db/ThreadSafeDatabase.class", "com/codename1/db/DatabaseConfig");
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesDatabase(), "the framework referring to itself is not an application");
+    }
+
+    @Test
+    void aLibraryJarCountsAsUsingTheDatabase() throws IOException {
+        // A library can be the only thing that touches the database: the application calls the
+        // library and never names Database itself. Android stages the jar into libs and links it,
+        // so reading loose class files alone dropped the engine out from under code that runs it.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs());
+        File jar = new File(lib, "storage.jar");
+        java.util.zip.ZipOutputStream zip =
+                new java.util.zip.ZipOutputStream(new FileOutputStream(jar));
+        try {
+            zip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Storage.class"));
+            zip.write(classCalling("passphrase"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "the library uses the database");
+        assertTrue(usage.usesDatabaseCipher(), "and encrypts it");
     }
 
     @Test

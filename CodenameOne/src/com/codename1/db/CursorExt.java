@@ -51,17 +51,20 @@ public interface CursorExt extends Cursor {
     /// - `IOException`: if the cursor is closed or the rewind fails
     void beforeFirst() throws IOException;
 
-    /// Returns the number of rows in the result set, or -1 when the port cannot
-    /// determine it without walking the whole set.
+    /// Returns the number of rows in the result set, or -1 where a port cannot determine it.
     ///
-    /// Ports that already track the count report it directly. Ports backed by a
-    /// forward-only statement have to step to the end and rewind, so they report
-    /// the count once it is known and -1 before that. Treat -1 as "unknown", not
-    /// as "empty".
+    /// **This can be expensive.** Ports whose engine already tracks the count -- Android -- report
+    /// it directly. Ports backed by a forward-only statement, which is the rest of them, answer by
+    /// walking: rewind, step through every row, and rewind again. That is a full scan of the
+    /// result set, so calling it on a large query costs what the query costs, and doing so on the
+    /// EDT stops the application for that long. The count is remembered afterwards, and a rewind
+    /// through `#beforeFirst()` drops it, since the next pass may not see the same rows.
+    ///
+    /// -1 means the port cannot answer at all. Treat it as "unknown", not as "empty".
     ///
     /// #### Returns
     ///
-    /// the row count, or -1 when it is not cheaply available
+    /// the row count, or -1 where the port cannot determine it
     ///
     /// #### Throws
     ///

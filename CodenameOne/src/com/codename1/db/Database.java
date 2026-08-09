@@ -508,7 +508,11 @@ public abstract class Database {
         }
     }
 
-    /// Returns the number of rows a cursor holds, or -1 when that is not cheaply knowable.
+    /// Returns the number of rows a cursor holds, or -1 where the port cannot determine it.
+    ///
+    /// **This can be expensive.** Only Android's engine knows the count without looking; every
+    /// other port walks the result set to the end and rewinds, so this costs what the query costs
+    /// and should not be called on the EDT for a large one. See `CursorExt#getCount()`.
     ///
     /// #### Parameters
     ///
@@ -516,7 +520,7 @@ public abstract class Database {
     ///
     /// #### Returns
     ///
-    /// the row count, or -1 when unknown
+    /// the row count, or -1 where the port cannot determine it
     ///
     /// #### Throws
     ///
