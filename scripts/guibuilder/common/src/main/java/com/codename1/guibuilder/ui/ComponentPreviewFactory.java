@@ -140,7 +140,13 @@ public final class ComponentPreviewFactory {
                 component = sizedContainer(element, selected, handler, guidedWidth, guidedHeight);
                 break;
         }
-        component.setUIID(value(element, "uiid", type));
+        // Only an explicit uiid is applied, matching the generated source, which emits setUIID()
+        // for that attribute alone. Forcing the XML type here styled a SpanLabel preview as
+        // "SpanLabel" while new SpanLabel(...) runs with its constructor default of "Container"
+        // (Accordion the same), so backgrounds, borders and padding differed between the canvas
+        // and the saved application.
+        String explicitUiid = element.getAttribute("uiid");
+        if (explicitUiid != null && explicitUiid.length() > 0) component.setUIID(explicitUiid);
         applyAttributes(component, element);
         if (component instanceof CheckBox) {
             ((CheckBox) component).setIcon(FontImage.createMaterial(((CheckBox) component).isSelected()

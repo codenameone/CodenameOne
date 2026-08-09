@@ -4430,7 +4430,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 && component.getParent().getLayout() instanceof LayeredLayout) {
             try { ((LayeredLayout) component.getParent().getLayout()).setInsets(component, value); } catch (RuntimeException ignored) { }
         } else if ("uiid".equals(attribute)) {
-            component.setUIID(value == null || value.length() == 0 ? document.effectiveUiid(element) : value);
+            if (value == null || value.length() == 0) {
+                // Clearing it has to give back the component's own constructor default, which is
+                // what the generated source will use; setting the XML type here reintroduced the
+                // SpanLabel-previews-as-SpanLabel-runs-as-Container mismatch. Only a rebuild can
+                // restore a default UIID, so the canvas is refreshed.
+                scheduleDesignerRefresh();
+                return;
+            }
+            component.setUIID(value);
             refreshSinglePreviewTheme(component);
         }
         if (component.getParent() != null) component.getParent().revalidate();
