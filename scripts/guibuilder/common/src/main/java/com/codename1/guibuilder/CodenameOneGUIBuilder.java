@@ -574,6 +574,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             cancelDesignerDrag();
             document = GuiDocument.parse(path, ProjectIO.read(path));
             activeEditorReopen = null;
+            // The buffer describes the form that was open, so it cannot survive into this one.
+            // keptBuffer() matches on kind alone, so opening the same pane on the new form used to
+            // hand back the old form's text -- saving the model then wrote it over the new form's
+            // model, and saving source replaced the new form's user region with the old one.
+            editorBuffer = null;
+            editorBufferOnDisk = null;
+            editorBufferKind = null;
+            // A deferred model rewrite belongs to the form that asked for it.
+            regenerateModelFor = null;
             selectedElements.clear();
             recordAction("form_opened", "form", relativeFormName(path));
             loadProjectTheme();
@@ -4468,11 +4477,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void undo() {
+        // Undo can take the binding strategy back to what it was, and the rewrite was authorised
+        // for the change being undone; leaving it armed regenerated the developer's model on the
+        // next save for an edit that no longer exists. Compared across the undo, not before it.
+        String strategyBefore = document == null ? null : value(document.root(), "bindingStrategy", "properties");
+        boolean cancelled = false;
         finishInlineEditor();
         if (document != null && document.undo()) {
+            if (strategyBefore != null
+                    && !strategyBefore.equals(value(document.root(), "bindingStrategy", "properties"))) {
+                regenerateModelFor = null;
+                cancelled = true;
+            }
             refreshEditor();
             recordAction("undo", "form", relativeFormName(document.path()));
-            setStatus("Undo");
+            setStatus(cancelled ? "Undo - the pending binding model rewrite was cancelled with it" : "Undo");
         }
     }
 

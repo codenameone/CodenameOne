@@ -108,23 +108,30 @@ public final class ProjectIO {
         if (!fs.exists(temporary)) {
             throw new IOException("Failed to write " + path);
         }
-        // rename() cannot replace an existing file on every platform, so the target is removed
-        // first. The window this opens is one rename wide and only after the new content is
-        // safely on disk, where the truncating write left it open for the whole serialization.
-        if (fs.exists(url)) {
-            fs.delete(url);
+        // rename() cannot replace an existing file on every platform, so the target has to go
+        // before the replacement lands. Deleting it outright meant a rename that then failed --
+        // silently, as File.renameTo() does -- left nothing behind but a .cn1tmp the user has no
+        // reason to know about. The old content is moved aside instead and put back on failure,
+        // so a failed save costs the new text rather than the file.
+        String backup = url + ".cn1bak";
+        boolean hadTarget = fs.exists(url);
+        if (hadTarget) {
+            fs.delete(backup);
+            fs.rename(url, fileName(backup));
         }
         if (fs.exists(url)) {
-            // delete() and rename() both fail silently, and the target that survives a failed
-            // replacement still satisfies an exists() check, so a caller would be told the save
-            // succeeded while the new content sat in the temporary file.
             fs.delete(temporary);
             throw new IOException("Could not replace " + path + "; it may be open in another program");
         }
         fs.rename(temporary, fileName(url));
         if (!fs.exists(url) || fs.exists(temporary)) {
+            if (hadTarget && fs.exists(backup) && !fs.exists(url)) {
+                fs.rename(backup, fileName(url));
+            }
+            fs.delete(temporary);
             throw new IOException("Failed to replace " + path + " with the file just written");
         }
+        fs.delete(backup);
     }
 
     private static String fileName(String url) {

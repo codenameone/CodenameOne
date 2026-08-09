@@ -159,7 +159,13 @@ class LiveTypingTest {
      * @param expected the foreground colour the stylesheet should produce
      */
     private static void awaitForeground(CodenameOneGUIBuilder builder, String name, int expected) {
-        for (int attempt = 0; attempt < 100; attempt++) {
+        // A wall-clock deadline rather than a fixed attempt count. Every keystroke reschedules the
+        // 120ms debounce behind a 250ms poll, and this test runs after the rest of the suite: on a
+        // loaded machine the same work takes 169s where an idle one takes 111s, and a 30s budget
+        // expired before the colour arrived. Failing after the deadline still catches a colour that
+        // never applies, so this widens the window without weakening the assertion.
+        long deadline = System.currentTimeMillis() + 120000L;
+        while (System.currentTimeMillis() < deadline) {
             Display.getInstance().callSeriallyAndWait(() -> { });
             Component preview = previewOf(builder, name);
             if (preview != null && preview.getUnselectedStyle().getFgColor() == expected) return;
