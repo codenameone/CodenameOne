@@ -228,10 +228,18 @@ public class PageViewRenderElement extends ScrollRenderElement {
         }
 
         @Override
+        public void pointerPressed(int x, int y) {
+            // A new touch owns the pane; the previous flick's watcher must not fire a
+            // snap under the finger.
+            stopWatching();
+            super.pointerPressed(x, y);
+        }
+
+        @Override
         public void pointerReleased(int x, int y) {
             super.pointerReleased(x, y);
             if (pageView().isPageSnapping()) {
-                awaitMomentum(Integer.MIN_VALUE);
+                awaitMomentum();
             }
         }
 
@@ -249,19 +257,62 @@ public class PageViewRenderElement extends ScrollRenderElement {
             animateScroll(from, target);
         }
 
-        /** Polls until CN1's momentum stops moving the pane, then settles onto a page. */
-        private void awaitMomentum(final int previous) {
-            final int current = horizontal() ? getScrollX() : getScrollY();
-            if (current == previous) {
+        /// Registered while the release's momentum is still carrying the pane.
+        /// Held so a second release cannot stack a second watcher on the form.
+        private com.codename1.ui.animations.Animation momentumWatch;
+
+        /// Watches the pane once per frame until CN1's momentum stops moving it, then
+        /// settles onto the nearest page.
+        ///
+        /// This used to poll with {@code CN.setTimeout(50)}, which is wrong on both
+        /// counts: {@code Display.setTimeout} allocates a whole {@code java.util.Timer}
+        /// thread per call, so a single flick spun up and abandoned one thread per poll;
+        /// and a 50ms poll cannot see the moment momentum stops, so the snap started up
+        /// to a frame-and-a-half late. Riding the form's animation loop costs nothing
+        /// extra - the pane is already keeping the EDT awake while it glides - and
+        /// notices the stop on the very frame it happens.
+        private void awaitMomentum() {
+            final com.codename1.ui.Form form = getComponentForm();
+            if (form == null) {
                 snap();
                 return;
             }
-            com.codename1.ui.CN.setTimeout(50, new Runnable() {
+            if (momentumWatch != null) {
+                return;
+            }
+            momentumWatch = new com.codename1.ui.animations.Animation() {
+                private int previous = Integer.MIN_VALUE;
+
                 @Override
-                public void run() {
-                    awaitMomentum(current);
+                public boolean animate() {
+                    int current = horizontal() ? getScrollX() : getScrollY();
+                    if (current != previous) {
+                        previous = current;
+                        // False: the pane repaints itself as it scrolls; asking for a
+                        // repaint here would add a full one per frame on top.
+                        return false;
+                    }
+                    stopWatching();
+                    snap();
+                    return false;
                 }
-            });
+
+                @Override
+                public void paint(com.codename1.ui.Graphics g) {
+                }
+            };
+            form.registerAnimated(momentumWatch);
+        }
+
+        private void stopWatching() {
+            if (momentumWatch == null) {
+                return;
+            }
+            com.codename1.ui.Form f = getComponentForm();
+            if (f != null) {
+                f.deregisterAnimated(momentumWatch);
+            }
+            momentumWatch = null;
         }
 
         private void snap() {

@@ -7,11 +7,15 @@ import dart.core.Duration;
 
 /**
  * Drives an animation value between {@code lowerBound} and {@code upperBound}
- * over a {@link Duration} — Flutter's {@code AnimationController}. In this
- * runtime the controller self-drives: it advances the value on a repeating CN1
- * timer ({@code CN.setTimeout}) on the EDT, firing value listeners each frame
- * and status listeners at the transitions. The {@code vsync} TickerProvider is
- * accepted for API shape but not otherwise used.
+ * over a {@link Duration} — Flutter's {@code AnimationController}. The
+ * controller joins the shared {@link FrameDriver} clock, which rides Codename
+ * One's own animation loop, and advances once per frame — firing value
+ * listeners each frame and status listeners at the transitions. The
+ * {@code vsync} TickerProvider is accepted for API shape but not otherwise
+ * used, because the frame clock already is the vsync.
+ *
+ * <p>A run is timed from its FIRST tick, not from the call that started it,
+ * which is what Flutter's {@code Ticker} does; see {@code beginRun}.</p>
  *
  * <p>When CN1's Display is not initialized (headless), animations complete
  * synchronously so logic that awaits {@code forward()} still progresses.</p>
@@ -29,7 +33,9 @@ public class AnimationController extends Animation<Double> {
     // Active run state.
     private boolean running;
     private int generation;
-    private long runStartTime;
+    /** {@link #runStartTime} before the first tick has established the run's zero point. */
+    private static final long UNSTARTED = Long.MIN_VALUE;
+    private long runStartTime = UNSTARTED;
     private long runDurationMs;
     private double runStartValue;
     private double runTargetValue;
@@ -235,7 +241,14 @@ public class AnimationController extends Animation<Double> {
         runTargetValue = target;
         runDurationMs = Math.max(0, dMs);
         runStatus = phase;
-        runStartTime = now();
+        // NOT now(): the run is timed from its FIRST tick, which is what Flutter's Ticker
+        // does (it records _startTime inside the first frame callback). The gap between
+        // "start the animation" and "the clock reaches it" is setup - the setState that
+        // starts it, the build it triggers, the paint of that build - and charging it to
+        // the curve is what makes a short animation snap. Measured on the gallery's
+        // category expand that gap was 223ms against a 200ms duration, so the first tick
+        // already had t >= 1 and the animation only ever showed its end state.
+        runStartTime = UNSTARTED;
 
         if (status != phase) {
             status = phase;
@@ -265,7 +278,15 @@ public class AnimationController extends Animation<Double> {
             return;
         }
         int gen = generation;
+        if (runStartTime == UNSTARTED) {
+            // First tick of this run: it defines t = 0. The value is already runStartValue,
+            // so there is nothing to notify - fall through and let the next tick move it.
+            runStartTime = now();
+            FrameDriver.noteAdvance(0);
+            return;
+        }
         long elapsed = now() - runStartTime;
+        FrameDriver.noteAdvance(elapsed);
         double t = runDurationMs == 0 ? 1.0 : (double) elapsed / (double) runDurationMs;
         if (t >= 1.0) {
             finishRun(gen);

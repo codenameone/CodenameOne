@@ -86,6 +86,7 @@ public class BuildOwner {
             worstFrameMs = 0;
             RenderElement.resetLayoutCounters();
         }
+        com.codename1.flutter.animation.AnimationTrace.trace(on);
     }
 
     /// What the traced frames cost, as a one-line summary.
@@ -99,6 +100,7 @@ public class BuildOwner {
                 + ",\"layoutHits\":" + RenderElement.layoutHits
                 + ",\"missDirty\":" + RenderElement.layoutMissDirty
                 + ",\"missConstraints\":" + RenderElement.layoutMissConstraints
+                + "," + com.codename1.flutter.animation.AnimationTrace.stats()
                 + ",\"hot\":" + RenderElement.hotLayoutClasses(6) + "}";
     }
 

@@ -52,6 +52,80 @@ final class FrameDriver {
     private FrameDriver() {
     }
 
+    // ------------------------------------------------------------------
+    // Diagnostics
+    // ------------------------------------------------------------------
+    //
+    // "The animation snaps to its end state" and "the animation is choppy" are the same
+    // question asked twice: how many times did the clock tick between the start of a run
+    // and its end? A 200ms curve wants ~12 ticks. One tick means the first frame already
+    // measured t >= 1. So the counter that matters is ticks-per-run, not ticks-per-second.
+
+    private static boolean trace;
+    private static long ticks;
+    private static long lastTickTime;
+    private static long gapSum;
+    private static long gaps;
+    private static long worstGap;
+    private static long runs;
+    private static long ticksThisRun;
+    private static long minTicksPerRun = Long.MAX_VALUE;
+    private static long worstFirstTickLag;
+
+    static void trace(boolean on) {
+        trace = on;
+        ticks = 0;
+        gapSum = 0;
+        gaps = 0;
+        worstGap = 0;
+        runs = 0;
+        ticksThisRun = 0;
+        lastTickTime = 0;
+        minTicksPerRun = Long.MAX_VALUE;
+        worstFirstTickLag = 0;
+    }
+
+    /// How stale a controller already was the first time the clock reached it. An animation
+    /// that snaps has nothing wrong with its curve - it was simply handed a first frame
+    /// whose elapsed time already exceeded its duration.
+    static void noteAdvance(long elapsedMs) {
+        if (trace && ticksThisRun == 1) {
+            worstFirstTickLag = Math.max(worstFirstTickLag, elapsedMs);
+        }
+    }
+
+    /// The clock's own numbers, as JSON members (no braces) for embedding in a larger report.
+    static String stats() {
+        return "\"animTicks\":" + ticks
+                + ",\"animRuns\":" + runs
+                + ",\"animMinTicksPerRun\":" + (minTicksPerRun == Long.MAX_VALUE ? 0 : minTicksPerRun)
+                + ",\"animWorstFirstTickLagMs\":" + worstFirstTickLag
+                + ",\"animMeanGapMs\":" + (gaps == 0 ? 0 : gapSum / gaps)
+                + ",\"animWorstGapMs\":" + worstGap;
+    }
+
+    private static void traceTick() {
+        long now = System.currentTimeMillis();
+        ticks++;
+        ticksThisRun++;
+        if (lastTickTime != 0) {
+            long gap = now - lastTickTime;
+            gapSum += gap;
+            gaps++;
+            worstGap = Math.max(worstGap, gap);
+        }
+        lastTickTime = now;
+    }
+
+    private static void traceRunEnded() {
+        if (ticksThisRun > 0) {
+            runs++;
+            minTicksPerRun = Math.min(minTicksPerRun, ticksThisRun);
+            ticksThisRun = 0;
+        }
+        lastTickTime = 0;
+    }
+
     /** Adds a controller to the frame loop, starting the clock if it was idle. */
     static synchronized void add(AnimationController c) {
         if (!RUNNING.contains(c)) {
@@ -109,6 +183,9 @@ final class FrameDriver {
         if (registeredOn != null) {
             registeredOn.deregisterAnimated(CLOCK);
             registeredOn = null;
+            if (trace) {
+                traceRunEnded();
+            }
         }
     }
 
@@ -125,6 +202,9 @@ final class FrameDriver {
                 attach();
             }
             due = RUNNING.toArray(new AnimationController[RUNNING.size()]);
+            if (trace) {
+                traceTick();
+            }
         }
         // Advance every animation before anything rebuilds: the build owner coalesces the
         // dirty elements, so the whole frame costs one flush.
