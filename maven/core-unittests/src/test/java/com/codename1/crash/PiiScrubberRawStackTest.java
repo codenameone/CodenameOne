@@ -241,4 +241,18 @@ class PiiScrubberRawStackTest {
         assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
         assertTrue(scrubbed.indexOf("app.js:10:5") >= 0, scrubbed);
     }
+
+    @Test
+    void atSignMessageWithDottedHostButNoPathIsScrubbed() {
+        // An email-shaped continuation (status@host.com:1:123456) has a DOTTED domain but no URL path,
+        // so it is not a Firefox frame -- a real script source is always a URL with a '/'. Its six-digit
+        // tail must be scrubbed, not preserved as a fake column. The genuine URL-sourced frame below,
+        // which carries a path separator, keeps its coordinate.
+        String stack = "java.lang.RuntimeException: verifying\n"
+                + "status@host.com:1:123456\n"
+                + "renderApp@http://host/app.js:10:5\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:10:5") >= 0, scrubbed);
+    }
 }

@@ -177,12 +177,13 @@ public class PiiScrubber {
     }
 
     /// The body of a Firefox/Safari `fn@source:line:column` frame: a whitespace-free function
-    /// identity (empty for an anonymous frame), an `@`, and a URL/file source before the trailing
-    /// `:<line>:<column>`. The source must actually look like a URL or file -- contain a `/`
-    /// (`scheme://host/path`) or a `.` (`file.ext`). Without that check a wrapped message such as
-    /// `send status@host:1:123456` matches merely by containing an `@` and ending in two numeric
-    /// groups, and its six-digit tail would be preserved verbatim as a fake column instead of being
-    /// scrubbed. A bare source word like `host` fails the shape test, so the message stays scrubbed.
+    /// identity (empty for an anonymous frame), an `@`, and a URL source before the trailing
+    /// `:<line>:<column>`. The source must carry a URL path separator `/` (`scheme://host/path`,
+    /// `file:///a.js`, `webpack:///./x.js`) -- a real script source is always a URL. A plain `.`
+    /// is NOT enough: an email-shaped continuation like `status@host.com:1:123456` has a dotted
+    /// domain but no path, so requiring `/` keeps its six-digit tail scrubbable (it would otherwise
+    /// be preserved verbatim as a fake column, bypassing digit masking and any scrubMessage override).
+    /// A bare word like `host` or a dotted host `host.com` fails the check, so the message stays scrubbed.
     private static boolean atSignFrame(String t) {
         int at = t.indexOf('@');
         if (at < 0 || !endsWithLineColumn(t)) {
@@ -199,7 +200,7 @@ public class PiiScrubber {
             return false;
         }
         String source = t.substring(at + 1, loc);
-        return source.indexOf('/') >= 0 || source.indexOf('.') >= 0;
+        return source.indexOf('/') >= 0;
     }
 
     /// The body of an `at ...` line: a whitespace-free identity plus a real location. A message
