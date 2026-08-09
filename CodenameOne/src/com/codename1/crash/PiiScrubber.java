@@ -198,46 +198,27 @@ public class PiiScrubber {
     /// scrubbable. The `at ` form must then be a single whitespace-free identity
     /// (`<class>.<method>`, a JS function ref, or a URL) followed by a real location -- a
     /// parenthesized `(File.java:42)`/`(url:line:col)`/`(Native Method)`/`(Unknown Source)`,
-    /// or a bare trailing `:<line>` (ParparVM). The `@` form (Firefox/Safari, unindented by
-    /// that engine) must carry an `@`, a URL/file source, and a terminal `:<line>:<column>`.
+    /// or a bare trailing `:<line>` (ParparVM).
+    ///
+    /// The Firefox/Safari `fn@url:line:column` form is deliberately NOT recognized. That engine
+    /// emits frames WITHOUT indentation, so a message continuation that reproduces the grammar exactly
+    /// (`user@https://host/app.js:1:123456`) is indistinguishable from a real frame -- no shape check can
+    /// tell them apart. Preserving such a line's coordinate would let a crafted message's numeric tail
+    /// bypass digit masking, so an unindented `@` line is treated as a message and fully scrubbed. The
+    /// cost is only that a Firefox/Safari raw-stack frame's column is masked in the uploaded text; the
+    /// structured frames carry the coordinate for symbolication, and the indented V8 `at ...:line:col`
+    /// form (the common minified case) still preserves it.
     private static boolean isFrameLine(String line) {
         String t = line.trim();
         if (t.startsWith("at ")) {
             return startsWithWhitespace(line) && atFrame(t.substring(3).trim());
         }
-        return atSignFrame(t);
+        return false;
     }
 
     /// True when a line begins with the tab or space indentation that a real `at ...` frame carries.
     private static boolean startsWithWhitespace(String line) {
         return line.length() > 0 && (line.charAt(0) == ' ' || line.charAt(0) == '\t');
-    }
-
-    /// The body of a Firefox/Safari `fn@source:line:column` frame: a whitespace-free function
-    /// identity (empty for an anonymous frame), an `@`, and a URL source before the trailing
-    /// `:<line>:<column>`. The source must carry a URL path separator `/` (`scheme://host/path`,
-    /// `file:///a.js`, `webpack:///./x.js`) -- a real script source is always a URL. A plain `.`
-    /// is NOT enough: an email-shaped continuation like `status@host.com:1:123456` has a dotted
-    /// domain but no path, so requiring `/` keeps its six-digit tail scrubbable (it would otherwise
-    /// be preserved verbatim as a fake column, bypassing digit masking and any scrubMessage override).
-    /// A bare word like `host` or a dotted host `host.com` fails the check, so the message stays scrubbed.
-    private static boolean atSignFrame(String t) {
-        int at = t.indexOf('@');
-        if (at < 0 || !endsWithLineColumn(t)) {
-            return false;
-        }
-        // A wrapped message almost always has a space before the '@' (`send status@...`); a real frame's
-        // function ref is a single token. An empty identity is allowed (an anonymous `@url:1:2` frame).
-        String ident = t.substring(0, at);
-        if (ident.length() > 0 && !isFrameIdentity(ident)) {
-            return false;
-        }
-        int loc = trailingLocationStart(t);
-        if (loc <= at + 1) {
-            return false;
-        }
-        String source = t.substring(at + 1, loc);
-        return source.indexOf('/') >= 0;
     }
 
     /// The body of an `at ...` line: a whitespace-free identity plus a real location. A message
@@ -384,33 +365,6 @@ public class PiiScrubber {
             digits++;
         }
         return digits > 0 && i >= 0 && t.charAt(i) == ':';
-    }
-
-    /// True when `t` ends with a `:<line>:<column>` location: two colon-separated
-    /// runs of digits, allowing a single trailing `)` (a wrapped frame). This is
-    /// the JavaScript engine frame location; a free-form message ending in text
-    /// (or a lone number) does not match, so its digits stay subject to scrubbing.
-    private static boolean endsWithLineColumn(String t) {
-        int end = t.length();
-        if (end > 0 && t.charAt(end - 1) == ')') {
-            end--;
-        }
-        int i = end - 1;
-        int col = 0;
-        while (i >= 0 && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
-            i--;
-            col++;
-        }
-        if (col == 0 || i < 0 || t.charAt(i) != ':') {
-            return false;
-        }
-        i--;
-        int lineDigits = 0;
-        while (i >= 0 && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
-            i--;
-            lineDigits++;
-        }
-        return lineDigits > 0 && i >= 0 && t.charAt(i) == ':';
     }
 
     /// Replaces all occurrences of an email-like substring with the form

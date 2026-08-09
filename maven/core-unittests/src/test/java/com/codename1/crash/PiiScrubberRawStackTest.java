@@ -50,10 +50,16 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
-    void firefoxFramesSurvive() {
+    void unindentedFirefoxAtSignFrameIsScrubbedBecauseItIsAmbiguous() {
+        // The Firefox/Safari fn@url:line:col form is emitted WITHOUT indentation, so a message
+        // continuation that reproduces the grammar exactly (user@https://host/app.js:1:123456) is
+        // indistinguishable from a real frame -- no shape check can tell them apart. To avoid leaking a
+        // crafted message's numeric tail, an unindented @ line is treated as a message and its long tail
+        // is masked. (Structured frames carry the coordinate for symbolication; the indented V8
+        // 'at ...:line:col' form still preserves it -- see v8AsyncFrameWithMultiWordLabel...)
         String stack = "Error: boom\nrun@http://host/app.js:1:123456\n";
         String scrubbed = scrubber.scrubRawStack(stack);
-        assertTrue(scrubbed.indexOf("app.js:1:123456") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
     }
 
     @Test
@@ -229,17 +235,18 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
-    void atSignMessageWithoutUrlSourceIsScrubbed() {
-        // A wrapped message that merely contains an '@' and ends in two numeric groups
-        // (status@host:1:123456) is NOT a Firefox/Safari frame: its source `host` is neither a URL nor
-        // a file, so the six-digit tail must be scrubbed rather than preserved as a fake column. A real
-        // Firefox frame (fn@http://host/app.js:10:5) whose source IS a URL keeps its coordinate.
+    void atSignLineWithLongTailIsScrubbedWhateverItsSourceShape() {
+        // Every unindented '@' line is treated as a message (the Firefox form is ambiguous, see
+        // unindentedFirefoxAtSignFrame...), so a long numeric tail is masked whether the text after '@'
+        // is a bare host, a dotted host, or a full URL -- none of them is trusted as a frame coordinate.
         String stack = "java.lang.RuntimeException: verifying\n"
                 + "status@host:1:123456\n"
-                + "renderApp@http://host/app.js:10:5\n";
+                + "status@host.com:1:234567\n"
+                + "renderApp@https://host/app.js:1:345678\n";
         String scrubbed = scrubber.scrubRawStack(stack);
         assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
-        assertTrue(scrubbed.indexOf("app.js:10:5") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("234567") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("345678") < 0, scrubbed);
     }
 
     @Test
@@ -302,17 +309,4 @@ class PiiScrubberRawStackTest {
         assertTrue(scrubbed.indexOf("app.js:2:98765") >= 0, scrubbed);
     }
 
-    @Test
-    void atSignMessageWithDottedHostButNoPathIsScrubbed() {
-        // An email-shaped continuation (status@host.com:1:123456) has a DOTTED domain but no URL path,
-        // so it is not a Firefox frame -- a real script source is always a URL with a '/'. Its six-digit
-        // tail must be scrubbed, not preserved as a fake column. The genuine URL-sourced frame below,
-        // which carries a path separator, keeps its coordinate.
-        String stack = "java.lang.RuntimeException: verifying\n"
-                + "status@host.com:1:123456\n"
-                + "renderApp@http://host/app.js:10:5\n";
-        String scrubbed = scrubber.scrubRawStack(stack);
-        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
-        assertTrue(scrubbed.indexOf("app.js:10:5") >= 0, scrubbed);
-    }
 }
