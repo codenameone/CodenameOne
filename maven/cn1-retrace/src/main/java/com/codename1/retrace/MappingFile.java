@@ -134,7 +134,10 @@ public final class MappingFile {
     /**
      * Extracts the {@code fileName} from an R8 {@code sourceFile} metadata comment such as
      * {@code # {"id":"sourceFile","fileName":"Screen.kt"}}, or {@code null} when the comment is not
-     * one. Deliberately a small indexOf scan rather than a JSON dependency (this module is zero-dep).
+     * one. Deliberately a small hand scan rather than a JSON dependency (this module is zero-dep), but it
+     * DOES honor JSON string escapes: the engine writes the value with backslash-escaped {@code "} and
+     * {@code \}, so a filename containing either (a Unix path can) must be decoded back rather than
+     * truncated at the first escaped quote.
      */
     private static String parseSourceFileMetadata(String comment) {
         if (comment.indexOf("\"id\":\"sourceFile\"") < 0) {
@@ -145,13 +148,24 @@ public final class MappingFile {
         if (at < 0) {
             return null;
         }
-        int start = at + key.length();
-        int end = comment.indexOf('"', start);
-        if (end < 0) {
-            return null;
+        int i = at + key.length();
+        int n = comment.length();
+        StringBuilder name = new StringBuilder();
+        while (i < n) {
+            char c = comment.charAt(i);
+            if (c == '\\' && i + 1 < n) {
+                // A JSON escape: the next character is literal (covers the \" and \\ the writer emits).
+                name.append(comment.charAt(i + 1));
+                i += 2;
+            } else if (c == '"') {
+                String s = name.toString().trim();
+                return s.length() == 0 ? null : s;
+            } else {
+                name.append(c);
+                i++;
+            }
         }
-        String name = comment.substring(start, end).trim();
-        return name.length() == 0 ? null : name;
+        return null;   // unterminated JSON string
     }
 
     private ClassMapping parseClassLine(String line) {

@@ -78,6 +78,21 @@ public class MappingFileTest {
     }
 
     @Test
+    public void decodesJsonEscapesInSourceFileMetadata() throws Exception {
+        // The engine writes the sourceFile value JSON-escaped, so a filename containing a quote or a
+        // backslash (a Unix path can) arrives as \" / \\. The parser must decode those back rather than
+        // stopping at the first escaped quote, or the retraced filename is truncated/still-escaped.
+        // File value is: weird\"name\\.kt  (an escaped quote and an escaped backslash).
+        String mapping =
+                "com.example.Screen -> a.b:\n"
+                + "    # {\"id\":\"sourceFile\",\"fileName\":\"weird\\\"name\\\\.kt\"}\n"
+                + "    142:145:void onClick() -> a\n";
+        MappingFile mf = MappingFile.parse(mapping);
+        Frame out = mf.retrace(new Frame("a.b", "a", "b.java", 143));
+        assertEquals("weird\"name\\.kt", out.getFileName());
+    }
+
+    @Test
     public void synthesizesSourceFileWhenMappingHasNoMetadata() throws Exception {
         // Without sourceFile metadata, a stripped-SourceFile frame still synthesizes <Class>.java.
         String mapping =
