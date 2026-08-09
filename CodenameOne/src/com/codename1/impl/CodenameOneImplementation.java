@@ -9645,6 +9645,24 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// one of `#DATABASE_ENCRYPTED`, `#DATABASE_NOT_ENCRYPTED` or `#DATABASE_ENCRYPTION_UNKNOWN`
+    /// The identity a managed key with no explicit alias is stored under.
+    ///
+    /// The ports key an implicit managed alias on the file a name resolves to rather than on the
+    /// name, so that two accepted spellings of one database derive one key. Anything that has to
+    /// find that key afterwards -- `com.codename1.db.Database#forgetManagedKey(String)` -- has to
+    /// ask the same question, and only the port can answer it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name the application opens the database under
+    ///
+    /// #### Returns
+    ///
+    /// the identity, which is the name itself unless the port resolves it
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return databaseName;
+    }
+
     public int isDatabaseFileEncrypted(String databaseName) {
         return DATABASE_ENCRYPTION_UNKNOWN;
     }

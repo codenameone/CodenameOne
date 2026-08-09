@@ -6105,6 +6105,17 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// one of the `CodenameOneImplementation` DATABASE_ENCRYPT* constants
+    /**
+     * The identity a managed database key with no explicit alias is stored under; see
+     * {@link com.codename1.impl.CodenameOneImplementation#databaseManagedKeyIdentity(String)}.
+     *
+     * @param databaseName the name the application opens the database under
+     * @return the identity, which is the name itself unless the port resolves it
+     */
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return impl.databaseManagedKeyIdentity(databaseName);
+    }
+
     public int isDatabaseFileEncrypted(String databaseName) {
         return impl.isDatabaseFileEncrypted(databaseName);
     }

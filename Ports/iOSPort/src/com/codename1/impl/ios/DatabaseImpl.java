@@ -42,13 +42,6 @@ class DatabaseImpl extends Database {
     private long peer;
 
     /**
-     * The name this database was opened under. Retained because a managed key resolves its
-     * keystore alias from the database name, and changeKey() would otherwise have nothing to
-     * resolve against.
-     */
-    private final String databaseName;
-
-    /**
      * Cursors opened from this database. Closing the database finalizes its statements, so the
      * cursors have to be marked dead rather than left holding freed pointers.
      */
@@ -58,7 +51,6 @@ class DatabaseImpl extends Database {
     private final String openKey;
 
     public DatabaseImpl(String databaseName, String path) throws IOException {
-        this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
         this.openKey = normalizeDatabasePathKey(path);
@@ -84,7 +76,6 @@ class DatabaseImpl extends Database {
     private static final int SQLITE_NOTADB = 26;
 
     public DatabaseImpl(String databaseName, String path, String key) throws IOException {
-        this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
         this.openKey = normalizeDatabasePathKey(path);
@@ -222,7 +213,10 @@ class DatabaseImpl extends Database {
         try {
             String key = null;
             if (config != null && config.isEncrypted()) {
-                key = config.resolveKeyMaterial(databaseName);
+                // The resolved file, as the open path does: an implicit managed key is stored
+                // under what is passed here, and re-keying under the raw name would write a second
+                // key that the next open, which resolves the file, would not find.
+                key = config.resolveKeyMaterial(openKey);
             }
             IOSImplementation.nativeInstance.sqlDbRekey(peer, key);
         } finally {

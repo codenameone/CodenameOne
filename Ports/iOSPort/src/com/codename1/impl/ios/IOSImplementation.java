@@ -11185,6 +11185,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return Database.normalizeDatabaseKey(resolveDatabasePath(databaseName));
+    }
+
+    @Override
     public boolean isDatabaseEncryptionSupported() {
         // The encryption-capable SQLite build is only linked in for applications that reference
         // DatabaseConfig, so ask the engine rather than assuming.

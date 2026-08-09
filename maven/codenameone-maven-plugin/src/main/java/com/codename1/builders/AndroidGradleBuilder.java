@@ -1512,11 +1512,17 @@ public class AndroidGradleBuilder extends Executor {
         // unsynchronized; parallelizing the scanner requires revisiting them.
         try {
             DatabaseUsage databaseUsage = scanForDatabaseUsage(dummyClassesDir);
-            usesDatabase = databaseUsage.usesDatabase();
+            // libs as well as the classes: unzip writes submitted library jars there, and the
+            // generated gradle links them through a fileTree, so encryption used only inside a
+            // library is invisible to a scan of the loose class tree -- and the build would then
+            // delete the cipher implementation out from under the library that calls it.
+            DatabaseUsage libraryUsage = scanForDatabaseUsage(libsDir);
+            usesDatabase = databaseUsage.usesDatabase() || libraryUsage.usesDatabase();
             // Keeps the SQLCipher-backed impl package, which is deleted below for apps that never
             // encrypt, and pulls in the AAR through the catalog. The AAR carries minSdk 23, so a
             // false positive here raises the floor of every application that never encrypts.
-            dbCipherSupport = databaseUsage.usesDatabaseCipher();
+            dbCipherSupport = databaseUsage.usesDatabaseCipher()
+                    || libraryUsage.usesDatabaseCipher();
             if (dbCipherSupport) {
                 // Fed by name rather than by the scan, so the catalog applies its dependencies and
                 // its minimum SDK only when the application itself configures encryption.

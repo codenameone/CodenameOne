@@ -193,7 +193,10 @@ class LinuxDatabase extends Database {
         try {
             String key = null;
             if (config != null && config.isEncrypted()) {
-                key = config.resolveKeyMaterial(databaseName);
+                // The resolved file, as the open path does: an implicit managed key is stored
+                // under what is passed here, and re-keying under the raw name would write a second
+                // key that the next open, which resolves the file, would not find.
+                key = config.resolveKeyMaterial(openKey);
             }
             LinuxNative.sqlDbRekey(peer, key);
         } finally {

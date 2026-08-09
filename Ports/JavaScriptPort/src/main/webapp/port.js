@@ -6668,6 +6668,7 @@ const cn1SqliteMemoryAnchors = new Map();
  */
 const cn1SqliteMemoryOpenCounts = new Map();
 
+/** Both take the reduced name cn1SqliteDbPath produces, not the one the caller typed. */
 function cn1SqliteMemoryOpened(name) {
   cn1SqliteMemoryOpenCounts.set(name, (cn1SqliteMemoryOpenCounts.get(name) || 0) + 1);
 }
@@ -6802,9 +6803,13 @@ function cn1SqliteOpen(name, key) {
     }
     return pooled;
   }
+  // The same reduction the pool path applies, so "foo" and "/foo" are one database here too --
+  // they are one file in the pool, and two stores in memory would make the fallback disagree with
+  // the storage it stands in for, down to exists() and delete() seeing only one spelling.
+  const memoryName = cn1SqliteDbPath(name);
   // filename: gives the connection a name inside the VFS, so reopening finds it again.
-  const uri = "file:" + encodeURIComponent(name) + "?vfs=" + cn1SqliteMemoryVfs;
-  const anchored = cn1SqliteMemoryAnchors.has(name);
+  const uri = "file:" + encodeURIComponent(memoryName) + "?vfs=" + cn1SqliteMemoryVfs;
+  const anchored = cn1SqliteMemoryAnchors.has(memoryName);
   const db = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
   try {
     cn1SqlitePrepareConnection(db);
@@ -6821,12 +6826,12 @@ function cn1SqliteOpen(name, key) {
     // a later rekey through another connection leaves it holding a key it no longer needs.
     const anchor = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
     cn1SqliteApplyKey(anchor, key);
-    cn1SqliteMemoryAnchors.set(name, anchor);
+    cn1SqliteMemoryAnchors.set(memoryName, anchor);
   }
   // Tagged so closing this connection can decrement the count without another lookup, and so the
   // close binding can tell a memdb connection from a pooled one.
-  db.cn1MemoryName = name;
-  cn1SqliteMemoryOpened(name);
+  db.cn1MemoryName = memoryName;
+  cn1SqliteMemoryOpened(memoryName);
   return db;
 }
 
@@ -6899,7 +6904,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_exists_java_lang
     return cn1SqliteGuard(function() {
       const n = jvm.toNativeString(name);
       if (!cn1SqlitePool) {
-        return cn1SqliteMemoryAnchors.has(n);
+        return cn1SqliteMemoryAnchors.has(cn1SqliteDbPath(n));
       }
       return cn1SqlitePool.getFileNames().indexOf(cn1SqliteDbPath(n)) >= 0;
     }, false);
@@ -6912,7 +6917,7 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
       if (cn1SqlitePool) {
         cn1SqlitePool.unlink(cn1SqliteDbPath(n));
       } else {
-        if ((cn1SqliteMemoryOpenCounts.get(n) || 0) > 0) {
+        if ((cn1SqliteMemoryOpenCounts.get(cn1SqliteDbPath(n)) || 0) > 0) {
           // Refused rather than half done. Dropping the anchor here would take the name away
           // while the store lives on behind the connection that is still open -- exists() would
           // answer no, and reopening before that connection closed would find the original
@@ -6920,11 +6925,11 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
           cn1SqliteLastError = "the database " + n + " is still open; close it before deleting it";
           return false;
         }
-        const anchor = cn1SqliteMemoryAnchors.get(n);
+        const anchor = cn1SqliteMemoryAnchors.get(cn1SqliteDbPath(n));
         if (anchor) {
           // Dropping the anchor releases the store once every other connection to it has closed.
           anchor.close();
-          cn1SqliteMemoryAnchors.delete(n);
+          cn1SqliteMemoryAnchors.delete(cn1SqliteDbPath(n));
         }
       }
       return true;

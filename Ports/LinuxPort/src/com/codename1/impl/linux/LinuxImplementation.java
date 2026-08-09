@@ -3228,6 +3228,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return true;
     }
 
+    /// The file an implicit managed key is stored under; see the open path, which resolves the
+    /// same way so two spellings of one database derive one key.
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return com.codename1.db.Database.normalizeDatabaseKey(resolveDatabasePath(databaseName));
+    }
+
     @Override
     public boolean isDatabaseEncryptionSupported() {
         return LinuxNative.sqlDbIsCipherAvailable();

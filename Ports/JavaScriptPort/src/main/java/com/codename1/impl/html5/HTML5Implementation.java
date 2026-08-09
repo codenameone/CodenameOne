@@ -11490,6 +11490,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return new DatabaseImpl(databaseName, key);
     }
 
+    /// The file an implicit managed key is stored under; see the open path, which resolves the
+    /// same way so two spellings of one database derive one key.
+    @Override
+    public String databaseManagedKeyIdentity(String databaseName) {
+        return com.codename1.impl.html5.database.DatabaseImpl.poolKeyFor(databaseName);
+    }
+
     @Override
     public boolean isDatabaseEncryptionSupported() {
         return com.codename1.impl.html5.database.SQLiteNative.init()

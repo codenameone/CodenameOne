@@ -265,8 +265,11 @@ class AndroidCipherDB extends Database {
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
         checkNoTransactionForKeyChange();
+        // The file this connection holds, as the open path does: an implicit managed key is
+        // stored under what is passed here, so re-keying under the raw name would write a second
+        // key that the next open, which resolves the file, would not find -- and report as wrong.
         String targetKey = config == null || !config.isEncrypted()
-                ? "" : config.resolveKeyMaterial(databaseName);
+                ? "" : config.resolveKeyMaterial(openPath);
         if (currentKey.length() == 0 || targetKey.length() == 0) {
             // One side is plaintext, which rekey refuses outright.
             migrateThroughExport(targetKey);
