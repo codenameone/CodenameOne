@@ -1456,13 +1456,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         document.beginTransaction();
         boolean committed = false;
         try {
+            // The provisional parent comes from the pointer, not the selection. Adding under the
+            // selected component first meant a drop onto a container with plenty of room was
+            // refused because some unrelated selected BorderLayout happened to be full.
+            Element target = activePreviewElementAt(x, y);
+            Element provisional = target == null ? null
+                    : GuiDocument.acceptsChildren(target) ? target : document.parentOf(target);
+            if (provisional != null) document.select(provisional);
             added = document.addComponent(type);
             if (added == null) {
                 ToastBar.showErrorMessage("That container is a BorderLayout and all five regions are taken");
                 setStatus("Nothing added: the drop target is a full BorderLayout");
                 return;
             }
-            Element target = activePreviewElementAt(x, y);
             Component palettePreview = ComponentPreviewFactory.create(added, null, new ComponentPreviewFactory.SelectionHandler() {
                 @Override public void selected(Element element) { }
                 @Override public void dragPressed(Element element, Component source, int px, int py) { }
@@ -5318,7 +5324,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     .append(javaEscape(((Element) value).getAttribute("uiid"))).append("\");\n");
             appendHint(out, ((Element) value), name, type, indent);
             appendGeneratedProperties(out, ((Element) value), name, type, indent);
-            String handler = ((Element) value).getAttribute("actionEvent");
+            String handler = actionHandlerName(((Element) value));
             if (handler != null && handler.length() > 0 && firesActionEvents(type)) {
                 out.append(indent).append(name).append(".addActionListener(this::").append(javaIdentifier(handler)).append(");\n");
             }
@@ -5560,6 +5566,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param type the {@code type} attribute of the element
      * @return true when a listener can be registered on this type
      */
+    /**
+     * The handler method an element's {@code actionEvent} refers to.
+     *
+     * <p>Older .gui files record the attribute as the boolean {@code true} and the companion
+     * declares {@code on<Name>ActionEvent}. Taking the literal value as a method name generated
+     * {@code this::true_} against an empty {@code true_} stub, so the migrated form kept the
+     * developer's handler and never called it.
+     *
+     * @param element the component
+     * @return the handler name, or null when none is configured
+     */
+    private String actionHandlerName(Element element) {
+        String handler = element.getAttribute("actionEvent");
+        if (handler == null || handler.length() == 0 || "false".equals(handler)) return null;
+        if ("true".equals(handler)) {
+            return "on" + value(element, "name", value(element, "type", "Component")) + "ActionEvent";
+        }
+        return handler;
+    }
+
     private static boolean firesActionEvents(String type) {
         return "Button".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type)
                 || "TextField".equals(type) || "TextArea".equals(type) || "Slider".equals(type);
@@ -5629,7 +5655,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private List<String> generatedHandlers() {
         List<String> handlers = new ArrayList<>();
         for (Element element : document.components()) {
-            String handler = element.getAttribute("actionEvent");
+            String handler = actionHandlerName(element);
             if (handler != null && handler.length() > 0 && !handlers.contains(javaIdentifier(handler))) handlers.add(javaIdentifier(handler));
         }
         for (Element command : document.commands()) {
@@ -5831,6 +5857,75 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return withImports.substring(0, keepStart + startMarker.length()) + userCode + withImports.substring(keepEnd);
     }
 
+    /**
+     * Rewrites {@code gui_name} references to the field names this generator emits.
+     *
+     * @param carried the developer code being moved into the user region
+     * @return the same code referring to the current field names
+     */
+    private String renameLegacyFieldReferences(String carried) {
+        String out = carried;
+        for (Element element : document.components()) {
+            if (element == document.root()) continue; //NOPMD CompareObjectsWithEquals
+            String name = javaName(element);
+            out = replaceIdentifier(out, "gui_" + name, name);
+        }
+        return out;
+    }
+
+    /**
+     * Replaces whole-word occurrences of an identifier. Written by hand because the Codename One
+     * bytecode subset has no Pattern.quote, and a plain replace would rewrite gui_buttonLabel
+     * while renaming gui_button.
+     *
+     * @param text the text to rewrite
+     * @param identifier the identifier to find
+     * @param replacement what to put in its place
+     * @return the rewritten text
+     */
+    private static String replaceIdentifier(String text, String identifier, String replacement) {
+        StringBuilder out = new StringBuilder(text.length());
+        int at = 0;
+        while (true) {
+            int found = text.indexOf(identifier, at);
+            if (found < 0) {
+                out.append(text.substring(at));
+                return out.toString();
+            }
+            int after = found + identifier.length();
+            boolean boundedLeft = found == 0 || !isIdentifierChar(text.charAt(found - 1));
+            boolean boundedRight = after >= text.length() || !isIdentifierChar(text.charAt(after));
+            out.append(text.substring(at, found));
+            out.append(boundedLeft && boundedRight ? replacement : identifier);
+            at = after;
+        }
+    }
+
+    /**
+     * A delegating {@code (Resources)} constructor when the legacy file declared one, so callers
+     * outside the companion keep compiling after migration.
+     *
+     * @param existing the legacy source
+     * @return the constructor to carry over, or an empty string
+     */
+    private String legacyResourcesConstructor(String existing) {
+        String className = className(existing);
+        if (className.length() == 0) return "";
+        String code = stripComments(existing);
+        int at = constructorAt(code, className, 0);
+        while (at >= 0) {
+            int open = code.indexOf('(', at);
+            int close = code.indexOf(')', open);
+            if (close > open && code.substring(open + 1, close).indexOf("Resources") >= 0) {
+                return "\n    /** Kept so callers of the pre-migration constructor still compile. */\n"
+                        + "    public " + className + "(com.codename1.ui.util.Resources resourceObjectInstance) {\n"
+                        + "        this();\n    }\n";
+            }
+            at = constructorAt(code, className, at + className.length());
+        }
+        return "";
+    }
+
     static final String LEGACY_GENERATED_START = "//-- DON'T EDIT BELOW THIS LINE!!!";
     static final String LEGACY_GENERATED_END = "//-- DON'T EDIT ABOVE THIS LINE!!!";
 
@@ -5850,6 +5945,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int legacyEnd = existing.indexOf(LEGACY_GENERATED_END);
         if (legacyStart < 0 || legacyEnd < legacyStart) return null;
         String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
+        // Legacy generated companions named their fields gui_<name>; the new generator uses
+        // <name>. Developer methods carried out of the old file legally referenced the old names,
+        // so rewriting them here is what keeps the migrated companion compiling.
+        carried = renameLegacyFieldReferences(carried);
+        // The old scaffold exposed a public <Form>(Resources) constructor and application code
+        // outside this file may still call it. The new source has no such overload, so a
+        // delegating one is carried into the user region, where later saves preserve it.
+        carried = carried + legacyResourcesConstructor(existing);
         String marker = "// <gui-builder-user-code>";
         if (carried.length() == 0) return carriedImports(existing, generated);
         String merged = carriedImports(existing, dropStubsAlreadyWritten(generated, carried));
