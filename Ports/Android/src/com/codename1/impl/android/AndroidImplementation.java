@@ -10996,7 +10996,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         } catch (RuntimeException didNotOpen) {
             databaseConnectionClosed(nativePath);
-            throw didNotOpen;
+            // The engine reports a file it cannot read by throwing an unchecked
+            // SQLiteDatabaseCorruptException, and an encrypted database opened without its key is
+            // exactly that to the plain engine. This API promises every failure as an IOException,
+            // so the caller can catch one thing rather than an unchecked type per platform.
+            throw new IOException("The database " + databaseName + " could not be opened: "
+                    + didNotOpen.getMessage(), didNotOpen);
         } catch (IOException didNotRecover) {
             databaseConnectionClosed(nativePath);
             throw didNotRecover;
