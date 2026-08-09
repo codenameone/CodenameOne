@@ -243,6 +243,20 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void v8AsyncFrameWithMultiWordLabelKeepsItsCoordinate() {
+        // V8 labels async/constructor/accessor frames with spaces ("async load", "new Promise",
+        // "Object.x [as y]"). Such an INDENTED frame with a real (url:line:col) is a genuine frame -- its
+        // minified column must survive for source-map symbolication, not be masked to [num]. An unindented
+        // look-alike message is still rejected by the indentation gate.
+        String stack = "Error: boom\n"
+                + "    at async load (https://host/app.js:1:123456)\n"
+                + "    at new Promise (https://host/app.js:2:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("app.js:1:123456") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:2:98765") >= 0, scrubbed);
+    }
+
+    @Test
     void atSignMessageWithDottedHostButNoPathIsScrubbed() {
         // An email-shaped continuation (status@host.com:1:123456) has a DOTTED domain but no URL path,
         // so it is not a Firefox frame -- a real script source is always a URL with a '/'. Its six-digit

@@ -216,11 +216,14 @@ public class PiiScrubber {
                 return false;
             }
             String inside = rest.substring(open + 1, rest.length() - 1);
-            // The parenthesized location is the discriminator here (JVM `(File.java:42)`, Chrome
-            // `(url:line:col)`, or the `(Native Method)`/`(Unknown Source)` literals), so a plain
-            // whitespace-free identity before it is enough -- a Chrome frame's identity can be a bare
-            // function name with no dot.
-            return isParenLocation(inside) && isFrameIdentity(rest.substring(0, open).trim());
+            // The parenthesized location is the discriminator here (JVM `(File.java:42)`, V8
+            // `(url:line:col)`, or the `(Native Method)`/`(Unknown Source)` literals). The identity may
+            // contain spaces -- a V8 frame labels async/constructor/accessor frames `async load`,
+            // `new Promise`, `Object.x [as y]` -- so a non-empty identity is enough here. The line is
+            // already known to be INDENTED (isFrameLine rejects an unindented message continuation), and
+            // scrubFrameLine scrubs everything before the coordinate, so a whitespace-free requirement
+            // would only drop legitimate V8 frames and break their source-map symbolication.
+            return isParenLocation(inside) && rest.substring(0, open).trim().length() > 0;
         }
         int start = trailingLocationStart(rest);
         if (start <= 0) {
