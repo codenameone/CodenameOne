@@ -23,10 +23,14 @@
 package com.codename1.hardening;
 
 import java.io.InputStream;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
 
 /**
  * A {@link ClassWriter} that resolves the class hierarchy from the application and
@@ -98,41 +102,88 @@ public final class FrameClassWriter extends ClassWriter {
     }
 
     /**
-     * Finds a common supertype by reading {@code super_class} names from the class bytes, which does not
-     * require the (possibly absent) supertypes to be loadable. Walks {@code type1}'s ancestor chain into
-     * a set, then walks {@code type2}'s chain until it meets one of them. Falls back to
+     * Finds a common supertype from the class bytes, which does not require the (possibly absent)
+     * supertypes to be loadable. Mirrors the load-based logic exactly, using byte-based assignability
+     * that walks BOTH {@code super_class} and {@code interfaces[]}: if one type is a supertype (a
+     * superclass OR an implemented/extended interface) of the other it is returned; a merge involving an
+     * unrelated interface is {@code java/lang/Object} (the verifier treats an interface as Object); two
+     * unrelated classes resolve to the first shared {@code super_class}. Falls back to
      * {@code java/lang/Object} only when the bytes cannot be read.
      */
     private String commonSuperFromBytes(String type1, String type2) {
         if (type1.equals(type2)) {
             return type1;
         }
-        Set<String> ancestors1 = ancestorsFromBytes(type1);
-        String t = type2;
+        if (isAssignableFromBytes(type1, type2)) {
+            return type1;
+        }
+        if (isAssignableFromBytes(type2, type1)) {
+            return type2;
+        }
+        if (isInterfaceFromBytes(type1) || isInterfaceFromBytes(type2)) {
+            return "java/lang/Object";
+        }
+        String c = superNameFromBytes(type1);
         Set<String> seen = new LinkedHashSet<String>();
-        while (t != null && seen.add(t)) {
-            if (ancestors1.contains(t)) {
-                return t;
+        while (c != null && seen.add(c)) {
+            if (isAssignableFromBytes(c, type2)) {
+                return c;
             }
-            t = superNameFromBytes(t);
+            c = superNameFromBytes(c);
         }
         return "java/lang/Object";
     }
 
-    /** {@code type} and every super_class above it that can be read from bytes, plus Object as the root. */
-    private Set<String> ancestorsFromBytes(String type) {
-        Set<String> set = new LinkedHashSet<String>();
-        String t = type;
-        while (t != null && set.add(t)) {
-            t = superNameFromBytes(t);
+    /** True when {@code sub} is {@code sup}, or extends/implements it (transitively) per the class bytes. */
+    private boolean isAssignableFromBytes(String sup, String sub) {
+        if (sup.equals(sub) || "java/lang/Object".equals(sup)) {
+            return true;
         }
-        set.add("java/lang/Object");
-        return set;
+        Set<String> visited = new HashSet<String>();
+        Deque<String> stack = new ArrayDeque<String>();
+        stack.push(sub);
+        while (!stack.isEmpty()) {
+            String cur = stack.pop();
+            if (!visited.add(cur)) {
+                continue;
+            }
+            if (cur.equals(sup)) {
+                return true;
+            }
+            ClassReader cr = readerFor(cur);
+            if (cr == null) {
+                continue;
+            }
+            if (cr.getSuperName() != null) {
+                stack.push(cr.getSuperName());
+            }
+            String[] interfaces = cr.getInterfaces();
+            if (interfaces != null) {
+                for (int i = 0; i < interfaces.length; i++) {
+                    stack.push(interfaces[i]);
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isInterfaceFromBytes(String type) {
+        ClassReader cr = readerFor(type);
+        return cr != null && (cr.getAccess() & Opcodes.ACC_INTERFACE) != 0;
     }
 
     /** The {@code super_class} name from {@code type}'s bytes, or null when Object or unreadable/absent. */
     private String superNameFromBytes(String type) {
-        if (type == null || "java/lang/Object".equals(type) || hierarchy == null) {
+        if (type == null || "java/lang/Object".equals(type)) {
+            return null;
+        }
+        ClassReader cr = readerFor(type);
+        return cr == null ? null : cr.getSuperName();
+    }
+
+    /** A {@link ClassReader} over {@code type}'s bytes from the hierarchy loader, or null if unreadable. */
+    private ClassReader readerFor(String type) {
+        if (type == null || hierarchy == null) {
             return null;
         }
         InputStream in = hierarchy.getResourceAsStream(type + ".class");
@@ -140,7 +191,7 @@ public final class FrameClassWriter extends ClassWriter {
             return null;
         }
         try {
-            return new ClassReader(in).getSuperName();
+            return new ClassReader(in);
         } catch (Throwable t) {
             return null;
         } finally {

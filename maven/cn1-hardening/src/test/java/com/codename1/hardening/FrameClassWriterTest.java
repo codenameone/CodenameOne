@@ -80,10 +80,36 @@ public class FrameClassWriterTest {
         assertEquals("app/Base", common(hierarchy, "app/A", "app/B"));
     }
 
+    @Test
+    public void resolvesImplementedInterfaceFromBytesWhenSuperclassIsAbsent() {
+        // C implements app/I but extends an absent app/Base. Merging the interface-typed value with C must
+        // resolve to app/I (read from C's interfaces[] in the bytes), NOT Object -- else a subsequent
+        // invokeinterface on the merge gets an incompatible stack-map type.
+        java.util.Map<String, byte[]> res = new java.util.HashMap<String, byte[]>();
+        res.put("app/I.class", interfaceClass("app/I"));
+        res.put("app/C.class", classExtendingImplementing("app/C", "app/Base", "app/I"));
+        ClassLoader hierarchy = new BytesLoader(res);   // app/Base absent
+        assertEquals("app/I", common(hierarchy, "app/I", "app/C"));
+        assertEquals("app/I", common(hierarchy, "app/C", "app/I"));
+    }
+
     private static byte[] classExtending(String internal, String superName) {
+        return classExtendingImplementing(internal, superName, (String[]) null);
+    }
+
+    private static byte[] classExtendingImplementing(String internal, String superName, String... itfs) {
         org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
         cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
-                internal, null, superName, null);
+                internal, null, superName, itfs);
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    private static byte[] interfaceClass(String internal) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC
+                | org.objectweb.asm.Opcodes.ACC_ABSTRACT | org.objectweb.asm.Opcodes.ACC_INTERFACE,
+                internal, null, "java/lang/Object", null);
         cw.visitEnd();
         return cw.toByteArray();
     }
