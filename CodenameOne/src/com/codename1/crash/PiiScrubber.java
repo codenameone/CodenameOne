@@ -162,7 +162,11 @@ public class PiiScrubber {
         String cls = identity.substring(0, lastDot);
         String method = identity.substring(lastDot + 1);
         String scrubbed = scrubFrame(cls, method);
-        if (scrubbed == null || scrubbed.equals(method)) {
+        if (scrubbed == null) {
+            // The app removed the method name (its structured frame renders an empty method,
+            // CrashReportPayload.Frame); render it empty here too rather than restoring the original.
+            scrubbed = "";
+        } else if (scrubbed.equals(method)) {
             return line;
         }
         return line.substring(0, at + 3) + cls + "." + scrubbed + rest.substring(idEnd);

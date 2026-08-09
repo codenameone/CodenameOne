@@ -107,17 +107,18 @@ public final class Cn1NameFactory {
     }
 
     /**
-     * The dictionary size to use for a jar with {@code classCount} classes and at most
-     * {@code maxMembersInAnyClass} members (fields + methods) in any single class. The one dictionary
-     * feeds ProGuard's class, member AND package obfuscation, so it must exceed the LARGEST naming scope:
-     * the global class count, or the member count of the biggest class (a generated interface can have
-     * tens of thousands of same-descriptor methods, all needing distinct names). Sizing to only the class
-     * count would let a member-heavy class exhaust the dictionary and drop ProGuard back to its {@code a}/
-     * {@code b} short names, reintroducing the ParparVM native-scan pathology this class exists to avoid.
-     * Kept comfortably above that maximum with a floor for small apps.
+     * The dictionary size to use for a jar with {@code classCount} classes and a largest member naming
+     * scope of {@code maxMemberNamingScope} (the caller computes this: a class's field count, or the
+     * number of same-descriptor methods across an inheritance hierarchy, both of which need collision-free
+     * names). The one dictionary feeds ProGuard's class, member AND package obfuscation, so it must exceed
+     * the LARGEST naming scope: the global class count, or that member scope (a generated hierarchy can
+     * have tens of thousands of same-descriptor methods, all needing distinct names). Sizing to only the
+     * class count would let a member-heavy hierarchy exhaust the dictionary and drop ProGuard back to its
+     * {@code a}/{@code b} short names, reintroducing the ParparVM native-scan pathology this class exists
+     * to avoid. Kept comfortably above that maximum with a floor for small apps.
      */
-    public static int dictionarySizeFor(int classCount, int maxMembersInAnyClass) {
-        int largestScope = Math.max(classCount, maxMembersInAnyClass);
+    public static int dictionarySizeFor(int classCount, int maxMemberNamingScope) {
+        int largestScope = Math.max(classCount, maxMemberNamingScope);
         return Math.max(50000, largestScope * 4);
     }
 }

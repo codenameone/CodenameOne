@@ -160,7 +160,7 @@ public final class HardeningEngine {
             File dict = new File(workDir, "cn1-dict.txt");
             // Seed the dictionary so harden.seed / the build key actually changes the mapping.
             Cn1NameFactory.writeDictionary(dict,
-                    Cn1NameFactory.dictionarySizeFor(classesIn, maxMembersInAnyClass(inClasses)),
+                    Cn1NameFactory.dictionarySizeFor(classesIn, maxMemberNamingScope(inClasses)),
                     deriveSeed(cfg, req.getBuildKey()));
             File renamedJar = new File(workDir, "renamed.jar");
             ProGuardRunner.rename(classesJar, renamedJar, mappingFile,
@@ -586,37 +586,53 @@ public final class HardeningEngine {
     }
 
     /**
-     * The greatest member count (fields + methods) of any single class in {@code classes}. The
-     * obfuscation dictionary must exceed this, not just the class count: a class's members are renamed
-     * from the same dictionary, so a generated class with tens of thousands of members would otherwise
-     * exhaust it and drop ProGuard back to its short-name generator.
+     * The largest member NAMING scope in {@code classes}, which the obfuscation dictionary must exceed so
+     * ProGuard never exhausts it and falls back to short names. Two scopes matter, both beyond the class
+     * count:
+     * <ul>
+     *   <li>Fields: a class cannot declare two fields with the same name, so a class's fields all need
+     *       distinct names -- the per-class field count.</li>
+     *   <li>Methods: ProGuard cannot give two same-descriptor methods in one inheritance hierarchy the
+     *       same obfuscated name without creating an accidental override, so same-descriptor methods
+     *       accumulate ACROSS a hierarchy, not just within one class. The exact per-hierarchy count needs
+     *       a full hierarchy walk; the count of methods sharing a descriptor across the WHOLE jar is a
+     *       safe (and, for a generated deep hierarchy, tight) upper bound.</li>
+     * </ul>
      */
-    private static int maxMembersInAnyClass(java.util.Map<String, byte[]> classes) {
-        int max = 0;
+    static int maxMemberNamingScope(java.util.Map<String, byte[]> classes) {
+        final int[] maxFields = new int[1];
+        final java.util.Map<String, Integer> methodsByDescriptor = new java.util.HashMap<String, Integer>();
         for (byte[] bytes : classes.values()) {
-            final int[] members = new int[1];
+            final int[] fields = new int[1];
             new org.objectweb.asm.ClassReader(bytes).accept(
                     new org.objectweb.asm.ClassVisitor(org.objectweb.asm.Opcodes.ASM9) {
                         @Override
                         public org.objectweb.asm.FieldVisitor visitField(int a, String n, String d,
                                 String s, Object v) {
-                            members[0]++;
+                            fields[0]++;
                             return null;
                         }
 
                         @Override
-                        public org.objectweb.asm.MethodVisitor visitMethod(int a, String n, String d,
+                        public org.objectweb.asm.MethodVisitor visitMethod(int a, String n, String desc,
                                 String s, String[] e) {
-                            members[0]++;
+                            Integer c = methodsByDescriptor.get(desc);
+                            methodsByDescriptor.put(desc, c == null ? 1 : c + 1);
                             return null;
                         }
                     }, org.objectweb.asm.ClassReader.SKIP_CODE | org.objectweb.asm.ClassReader.SKIP_DEBUG
                             | org.objectweb.asm.ClassReader.SKIP_FRAMES);
-            if (members[0] > max) {
-                max = members[0];
+            if (fields[0] > maxFields[0]) {
+                maxFields[0] = fields[0];
             }
         }
-        return max;
+        int maxMethodsPerDescriptor = 0;
+        for (int c : methodsByDescriptor.values()) {
+            if (c > maxMethodsPerDescriptor) {
+                maxMethodsPerDescriptor = c;
+            }
+        }
+        return Math.max(maxFields[0], maxMethodsPerDescriptor);
     }
 
     /** The {@code <SimpleName>.java} a retrace synthesizes from an internal class name (its default). */

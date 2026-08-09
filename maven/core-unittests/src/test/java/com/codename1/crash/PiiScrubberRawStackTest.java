@@ -273,6 +273,22 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void scrubFrameOverrideReturningNullRemovesTheMethodFromRawStack() {
+        // scrubFrame may return null to REMOVE a sensitive synthetic method name (the structured frame
+        // renders it empty). The raw stack must not restore the original: the method is rendered empty.
+        PiiScrubber custom = new PiiScrubber() {
+            public String scrubFrame(String className, String methodName) {
+                return methodName.startsWith("secret") ? null : methodName;
+            }
+        };
+        String stack = "java.lang.RuntimeException: boom\n"
+                + "    at com.foo.Bar.secretHandler(Bar.java:42)\n";
+        String scrubbed = custom.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("secretHandler") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("com.foo.Bar.(Bar.java:42)") >= 0, scrubbed);
+    }
+
+    @Test
     void indentedMessageContinuationWithArbitraryLabelIsScrubbed() {
         // An INDENTED message continuation (the message itself contains "\n    at ...") whose text happens
         // to look like a frame -- an arbitrary multi-word label plus a (File.java:line) location -- must

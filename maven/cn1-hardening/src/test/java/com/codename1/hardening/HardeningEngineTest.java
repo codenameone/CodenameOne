@@ -100,6 +100,35 @@ public class HardeningEngineTest {
         return cw.toByteArray();
     }
 
+    /** A class declaring {@code count} distinct no-arg void methods (all sharing the {@code ()V} descriptor). */
+    private static byte[] classWithVoidMethods(String internal, int count) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, "java/lang/Object", null);
+        for (int i = 0; i < count; i++) {
+            org.objectweb.asm.MethodVisitor mv = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                    "m" + i, "()V", null, null);
+            mv.visitCode();
+            mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+            mv.visitMaxs(0, 1);
+            mv.visitEnd();
+        }
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    @Test
+    public void memberNamingScopeAccumulatesSameDescriptorMethodsAcrossClasses() {
+        // Same-descriptor methods across an inheritance hierarchy cannot share an obfuscated name (that
+        // would be an accidental override), so their naming scope is the SUM across classes, not the
+        // per-class max. Two classes each declaring 30 ()V methods => a scope of 60; the earlier per-class
+        // max (30) would undersize the dictionary and drop ProGuard back to short names.
+        java.util.Map<String, byte[]> classes = new java.util.HashMap<String, byte[]>();
+        classes.put("app/A", classWithVoidMethods("app/A", 30));
+        classes.put("app/B", classWithVoidMethods("app/B", 30));
+        assertEquals(60, HardeningEngine.maxMemberNamingScope(classes));
+    }
+
     /** A class with a SourceFile and a static run() that instantiates each referenced type (keeping it reachable). */
     private static byte[] mainReferencing(String internal, String sourceFile, String... refs) {
         org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(
