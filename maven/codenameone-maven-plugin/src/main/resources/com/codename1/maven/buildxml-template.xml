@@ -99,7 +99,7 @@ This the Ant build script used by the CN1BuildMojo for sending to the build serv
         translator emits debug-info side-tables and the iOS port links
         cn1_debugger.m into the binary. The companion goal
         cn1:ios-on-device-debugging launches the desktop JDWP proxy.
-        See docs/developer-guide/On-Device-Debugging.adoc for the full flow.
+        See docs/developer-guide/On-Device-Debugging.asciidoc for the full flow.
     -->
     <target name="ios-on-device-debug" depends="">
         <property name="ios.debug.targetType" value="iphone"/>

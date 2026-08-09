@@ -26,6 +26,216 @@
       ]
     },
     {
+      "test": "CenteredDialogTitleScreenshotTest",
+      "reason": "The centered dialog title baseline is a phone-sized dialog. The watch form factor lays dialogs out differently and has no comparable phone dialog to capture.",
+      "platform_support": "Dialogs and centered titles work on watchOS; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the dialog in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-dialog-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "CenteredInteractionDialogTitleScreenshotTest",
+      "reason": "The centered interaction-dialog title baseline is a phone-sized dialog. The watch form factor lays dialogs out differently and has no comparable phone dialog to capture.",
+      "platform_support": "Interaction dialogs work on watchOS; only this phone-geometry baseline does not apply there.",
+      "verification": "Every phone, desktop and browser leg renders the interaction dialog in both light and dark themes and compares it against stored goldens.",
+      "reason_codes": [
+        {
+          "prefix": "phone-dialog-on-watch",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "GoogleWebMapScreenshotTest",
+      "reason": "The live Google Maps JavaScript map needs three things at once: a web view that composites into the screenshot, a billed Google Maps API key, and network access to Google's tile servers. The deterministic desktop and web pipelines are not given the key, the Mac Catalyst and browser captures do not composite the native web view, tvOS ships no WebKit, and the watch form factor has no map surface at all.",
+      "platform_support": "Every listed port supports BrowserComponent and the map API where the table says so; this skip is about one live, key-gated and network-dependent third-party map rendering inside a screenshot comparison, not about map support.",
+      "verification": "The Android and iOS legs are given the API key and render the live Google map end to end, comparing the painted tiles against a stored golden. The offline vector maps that need no key are exercised on every port by the VectorMap and RealOsmVector tests.",
+      "reason_codes": [
+        {
+          "prefix": "no-api-key",
+          "ports": [
+            "linux-x64",
+            "linux-arm64",
+            "windows-x64",
+            "windows-arm64"
+          ]
+        },
+        {
+          "prefix": "webview-not-captured-on-desktop",
+          "ports": [
+            "mac-native",
+            "javascript"
+          ]
+        },
+        {
+          "prefix": "tv-no-webview",
+          "ports": [
+            "tvos"
+          ]
+        },
+        {
+          "prefix": "watch-form-factor",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "NativeMapFallbackScreenshotTest",
+      "reason": "This test asserts what the map component draws when NO native map provider is installed. On targets that ship an active native provider the fallback is unreachable by construction, and on the watch form factor there is no map surface to fall back to.",
+      "platform_support": "A skip here means the port has a real native map, which is the better outcome; the ports that render the fallback are the ones without one.",
+      "verification": "The ports with no native provider render and compare the fallback for real. Where a provider is active, that provider's own rendering is what the other map tests compare.",
+      "reason_codes": [
+        {
+          "prefix": "native-provider-active",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "mac-native",
+            "tvos"
+          ]
+        },
+        {
+          "prefix": "watch-form-factor",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "RealOsmVectorScreenshotTest",
+      "reason": "The live OpenStreetMap vector render is a full-screen map baseline. The watch form factor has no map surface of that geometry to capture.",
+      "platform_support": "The vector map renderer is supported on watchOS; this particular full-screen baseline is not comparable there.",
+      "verification": "Every phone, desktop and browser leg renders real OSM vector tiles and compares the result against a stored golden.",
+      "reason_codes": [
+        {
+          "prefix": "watch-form-factor",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SurfacesRasterizerScreenshotTest",
+      "reason": "The Surfaces rasterizer baseline is a phone/desktop-sized composition. The television and watch form factors do not expose the Surfaces host this test rasterizes into, so there is no comparable image to capture.",
+      "platform_support": "Surfaces is supported on the ports the table marks; this skip covers two form factors whose UI host the rasterizer does not target.",
+      "verification": "Every phone, desktop and browser leg rasterizes the same tree and compares it pixel for pixel against a stored golden.",
+      "reason_codes": [
+        {
+          "prefix": "surfaces-not-on-tv-or-watch",
+          "ports": [
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "SurfacesRemoteViewsScreenshotTest",
+      "reason": "Surfaces lowering to RemoteViews is an Android-only code path: it renders a Surfaces tree into the widget and notification hierarchy that only the Android framework defines. There is nothing to lower to on any other target, so the test reports a skip rather than asserting against a backend that does not exist.",
+      "platform_support": "Surfaces itself is supported everywhere the table lists it, and its normal rendering path is covered by SurfacesRasterizerScreenshotTest and SurfacesPublishTest on every port. Only the RemoteViews lowering is Android-specific.",
+      "verification": "The Android leg runs the lowering for real and compares the rendered widget against a stored golden, which is the only environment in which the code path exists.",
+      "reason_codes": [
+        {
+          "prefix": "android-only-remoteviews-lowering",
+          "ports": [
+            "ios-gl",
+            "ios-metal",
+            "mac-native",
+            "tvos",
+            "watchos",
+            "linux-x64",
+            "linux-arm64",
+            "windows-x64",
+            "windows-arm64",
+            "javascript"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "VRStereoSceneScreenshotTest",
+      "reason": "The stereo VR scene renders a side-by-side pair for a head-mounted display. tvOS has no stereo presentation mode to render into.",
+      "platform_support": "The VR scene renders on every port the table marks; only the television target lacks the stereo presentation path.",
+      "verification": "The phone, desktop and browser legs render the stereo pair and compare both eyes against a stored golden.",
+      "reason_codes": [
+        {
+          "prefix": "tv-no-stereo-vr",
+          "ports": [
+            "tvos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "VectorMapDarkStyleScreenshotTest",
+      "reason": "The dark-styled vector map is a full-screen map baseline. The watch form factor has no map surface of that geometry to capture.",
+      "platform_support": "The vector map renderer and its styling are supported on watchOS; this particular full-screen baseline is not comparable there.",
+      "verification": "Every phone, desktop and browser leg renders the dark style and compares the result against a stored golden.",
+      "reason_codes": [
+        {
+          "prefix": "watch-form-factor",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "VectorMapMarkersScreenshotTest",
+      "reason": "The vector-map marker baseline is a full-screen map. The watch form factor has no map surface of that geometry to capture.",
+      "platform_support": "Map markers are supported on watchOS; this particular full-screen baseline is not comparable there.",
+      "verification": "Every phone, desktop and browser leg renders the markers and compares the result against a stored golden.",
+      "reason_codes": [
+        {
+          "prefix": "watch-form-factor",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "VectorMapShapesScreenshotTest",
+      "reason": "The vector-map shape baseline is a full-screen map. The watch form factor has no map surface of that geometry to capture.",
+      "platform_support": "Map shapes are supported on watchOS; this particular full-screen baseline is not comparable there.",
+      "verification": "Every phone, desktop and browser leg renders the shapes and compares the result against a stored golden.",
+      "reason_codes": [
+        {
+          "prefix": "watch-form-factor",
+          "ports": [
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
+      "test": "VideoIODecodedFramesScreenshotTest",
+      "reason": "The decoded-frame grid has to encode a clip before it can decode one back. The Apple television and watch simulators expose no usable video encoder to a headless job, so there is no clip to decode and no grid to compare.",
+      "platform_support": "Video playback and frame decoding are supported on those ports; the skip covers creating a new encoded clip inside that CI environment, the same limitation VideoIORoundTripTest records.",
+      "verification": "Encoder-backed targets encode the counting frames, decode them back and compare the resulting grid against a stored golden with a per-port tolerance.",
+      "reason_codes": [
+        {
+          "prefix": "videoio-unavailable-on-",
+          "ports": [
+            "tvos",
+            "watchos"
+          ]
+        }
+      ]
+    },
+    {
       "test": "VideoIORoundTripTest",
       "reason": "This assertion requires a working video encoder as well as a decoder. Apple simulator and constrained-device runners do not expose a stable encoder to the headless job, so the encode/decode round trip is skipped there.",
       "platform_support": "The port remains supported. Video playback and frame decoding are measured separately by VideoIODecodedFramesScreenshotTest; this skip is limited to creating a new encoded video in that CI environment.",

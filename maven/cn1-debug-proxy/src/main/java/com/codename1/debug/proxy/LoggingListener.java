@@ -56,6 +56,16 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
         System.out.println("[event] STEP_COMPLETE tid=" + threadId + " " + describeLocation(methodId, line));
     }
 
+    @Override public void onThreads(long[] threadIds, boolean[] suspended, long[] threadObjects) {
+        System.out.println("[event] THREAD_LIST count=" + threadIds.length);
+        for (int i = 0; i < threadIds.length; i++) {
+            System.out.println("        tid=" + threadIds[i]
+                    + (suspended[i] ? " suspended" : " running")
+                    + " threadObj=" + (threadObjects[i] == 0
+                            ? "none" : "ref@0x" + Long.toHexString(threadObjects[i])));
+        }
+    }
+
     @Override public void onStack(long threadId, int[] methodIds, int[] lines) {
         System.out.println("[event] STACK tid=" + threadId + " depth=" + methodIds.length);
         for (int i = 0; i < methodIds.length; i++) {
@@ -73,8 +83,9 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
 
     @Override public void onVmDeath() { System.out.println("[event] VM_DEATH"); }
     @Override public void onStringValue(String value) { System.out.println("[event] STRING_VALUE=" + value); }
-    @Override public void onObjectClass(int classId, boolean isArray) {
-        System.out.println("[event] OBJECT_CLASS=" + classId + (isArray ? " (array)" : ""));
+    @Override public void onObjectClass(int classId, boolean isArray, int dimensions) {
+        System.out.println("[event] OBJECT_CLASS=" + classId
+                + (isArray ? " (array, " + dimensions + "d)" : ""));
     }
     @Override public void onObjectFields(byte[] typeCodes, long[] values) {
         System.out.println("[event] OBJECT_FIELDS count=" + typeCodes.length);

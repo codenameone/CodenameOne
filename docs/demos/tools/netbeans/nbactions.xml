@@ -131,6 +131,20 @@
         </properties>
     </action>
     <action>
+        <actionName>CUSTOM-Build for iOS On-Device Debug</actionName>
+        <displayName>Build for iOS On-Device Debug</displayName>
+        <goals>
+            <goal>cn1:buildIosOnDeviceDebug</goal>
+        </goals>
+    </action>
+    <action>
+        <actionName>CUSTOM-Start iOS Debug Proxy</actionName>
+        <displayName>Start iOS Debug Proxy</displayName>
+        <goals>
+            <goal>cn1:ios-on-device-debugging</goal>
+        </goals>
+    </action>
+    <action>
         <actionName>CUSTOM-Update Codename One</actionName>
         <displayName>Update Codename One</displayName>
         <goals>

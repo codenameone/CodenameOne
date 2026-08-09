@@ -57,16 +57,18 @@ extern void releaseCN1(JAVA_OBJECT o);
 static JAVA_OBJECT googleLoginCallback = NULL;
 static NSString *accessToken;
 
+#ifdef GOOGLE_SIGNIN
+void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError *error);
+#endif
+
 
 void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT instance) {
     if (googleLoginCallback == NULL) {
         googleLoginCallback = instance;
-#ifdef GOOGLE_SIGNIN
-        GIDSignIn* signIn = [GIDSignIn sharedInstance];
-#else
+#ifndef GOOGLE_SIGNIN
         GPPSignIn *signIn = [GPPSignIn sharedInstance];
 #endif
-        
+
         JAVA_OBJECT d = com_codename1_ui_Display_getInstance__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         JAVA_OBJECT jClientID = virtual_com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, fromNSString(CN1_THREAD_STATE_PASS_ARG @"ios.gplus.clientId"), JAVA_NULL);
         if (jClientID == JAVA_NULL) {
@@ -77,13 +79,15 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             return;
         }
 #ifdef GOOGLE_SIGNIN
+        // GoogleSignIn never routed through the Google+ app, so the hint that
+        // demands it has always been inert on this path.
         NSString *requireGplusApp = @"false";
 #else
         NSString *requireGplusApp = toNSString(CN1_THREAD_STATE_PASS_ARG virtual_com_codename1_ui_Display_getProperty___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG d, fromNSString(CN1_THREAD_STATE_PASS_ARG @"ios.gplus.requireGplusAppForLogin"), fromNSString(CN1_THREAD_STATE_PASS_ARG @"true"))
         );
 #endif
-        
-        
+
+
         if ([requireGplusApp isEqualToString:@"true"]) {
             BOOL isGooglePlusInstalled = [[UIApplication sharedApplication] canOpenURL: [NSURL
                                                                                          URLWithString:@"gplus://"]];
@@ -96,21 +100,39 @@ void com_codename1_impl_ios_IOSNative_googleLogin___java_lang_Object(CN1_THREAD_
             }
         }
         
-        signIn.clientID = toNSString(CN1_THREAD_STATE_PASS_ARG jClientID);
+        NSString *clientID = toNSString(CN1_THREAD_STATE_PASS_ARG jClientID);
         NSString *scope = toNSString(CN1_THREAD_STATE_PASS_ARG get_field_com_codename1_social_GoogleConnect_scope(googleLoginCallback));
-
+        NSArray *scopes = nil;
         if (scope != nil) {
-            signIn.scopes = [scope componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]; //@[scope];
+            scopes = [scope componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        }
+
+#ifndef GOOGLE_SIGNIN
+        signIn.clientID = clientID;
+        if (scopes != nil) {
+            signIn.scopes = scopes;
         }
         dispatch_async(dispatch_get_main_queue(), ^{
-#ifdef GOOGLE_SIGNIN
-            [GIDSignIn sharedInstance].presentingViewController = [CodenameOne_GLViewController instance];
-            [[GIDSignIn sharedInstance] signIn];
-#else
             [signIn authenticate];
-#endif
         });
-    } 
+#else
+        // GoogleSignIn 7 takes the client id through a GIDConfiguration and the
+        // scopes as an argument, and hands the result to a completion handler
+        // rather than to a delegate. Note that additionalScopes is additive:
+        // the app's scope no longer replaces the profile and email scopes the
+        // way assigning signIn.scopes used to.
+        dispatch_async(dispatch_get_main_queue(), ^{
+            GIDSignIn *signIn = [GIDSignIn sharedInstance];
+            signIn.configuration = [[[GIDConfiguration alloc] initWithClientID:clientID] autorelease];
+            [signIn signInWithPresentingViewController:[CodenameOne_GLViewController instance]
+                                                  hint:nil
+                                      additionalScopes:scopes
+                                            completion:^(GIDSignInResult *result, NSError *error) {
+                com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(result.user, error);
+            }];
+        });
+#endif
+    }
 }
 
 #ifndef GOOGLE_SIGNIN
@@ -140,16 +162,14 @@ void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authenti
 }
 #else
 void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GIDGoogleUser *user, NSError *error) {
-    
-    if (user.authentication.accessToken != nil) {
-        [accessToken release];
-    }
-    accessToken = user.authentication.accessToken;
-    if (accessToken != nil) {
-        [accessToken retain];
-    }
-    
-    
+
+    // GoogleSignIn 7 replaced user.authentication.accessToken with a GIDToken.
+    // The previous token is released unconditionally: releasing it only when a
+    // replacement arrived leaked the old one on every failed sign-in.
+    [accessToken release];
+    accessToken = [user.accessToken.tokenString retain];
+
+
     if (googleLoginCallback != NULL) {
         if (error != nil) {
             set_field_com_codename1_social_GoogleImpl_loginMessage(fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [error localizedDescription]), googleLoginCallback);
@@ -186,8 +206,16 @@ void com_codename1_impl_ios_IOSNative_googleLogout__(CN1_THREAD_STATE_MULTI_ARG 
 #ifndef GOOGLE_SIGNIN
     [[GPPSignIn sharedInstance] disconnect];
 #else
+    // -disconnect became -disconnectWithCompletion: in GoogleSignIn 7. The
+    // outcome now lands in the block below rather than in the view controller's
+    // signIn:didDisconnectWithUser: -- which used to call straight back into
+    // this function, so a delivered disconnect callback re-entered disconnect.
     dispatch_async(dispatch_get_main_queue(), ^{
-        [[GIDSignIn sharedInstance] disconnect];
+        [[GIDSignIn sharedInstance] disconnectWithCompletion:^(NSError *error) {
+            if (error != nil) {
+                CN1Log(@"Google disconnect failed: %@", [error localizedDescription]);
+            }
+        }];
     });
 #endif
     if (accessToken != nil) {

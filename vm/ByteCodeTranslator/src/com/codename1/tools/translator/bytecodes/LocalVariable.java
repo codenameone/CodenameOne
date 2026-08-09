@@ -23,7 +23,6 @@
 
 package com.codename1.tools.translator.bytecodes;
 
-import java.util.Objects;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 
@@ -35,15 +34,57 @@ public class LocalVariable extends Instruction {
     private String name;
     private String desc;
     private int index;
+    /**
+     * The bounds of the declaring scope, as ASM labels, or null for a local
+     * the translator synthesised from a store opcode rather than reading out
+     * of the class file's LocalVariableTable.
+     *
+     * Retained so the on-device debugger can resolve them to source lines and
+     * hide a local outside its scope. Two locals sharing a slot in disjoint
+     * scopes are otherwise indistinguishable at a breakpoint, and the debugger
+     * shows whichever one it happens to list — reporting the contents of a
+     * variable the code has not reached yet.
+     */
+    private final Label scopeStart;
+    private final Label scopeEnd;
+
+    /**
+     * Declaration order, so that two locals sharing a slot and a storage
+     * qualifier still sort deterministically. Identity hash codes vary per
+     * run, so without this the emitted side-table's row order depended on
+     * where the JVM happened to place the scope labels.
+     */
+    private final int sequence;
+    private static final java.util.concurrent.atomic.AtomicInteger SEQUENCE =
+            new java.util.concurrent.atomic.AtomicInteger();
+
     public LocalVariable(String name, String desc, String signature, Label start, Label end, int index) {
         super(Opcodes.ALOAD);
         this.name = name;
         this.desc = desc;
         this.index = index;
+        this.scopeStart = start;
+        this.scopeEnd = end;
+        this.sequence = SEQUENCE.incrementAndGet();
     }
-    
+
+    /** Relative declaration order within a method; see {@link #sequence}. */
+    public int getSequence() {
+        return sequence;
+    }
+
     public int getIndex() {
         return index;
+    }
+
+    /** The label where this local's scope opens, or null if unknown. */
+    public Label getScopeStart() {
+        return scopeStart;
+    }
+
+    /** The label where this local's scope closes, or null if unknown. */
+    public Label getScopeEnd() {
+        return scopeEnd;
     }
     
     public boolean isRightVariable(int index, char type) {
@@ -182,6 +223,22 @@ public class LocalVariable extends Instruction {
         return b.toString();
     }
     
+    /**
+     * Identity is the storage a local occupies <em>and</em> the scope it
+     * occupies it for.
+     *
+     * Slot and qualifier alone would make two variables declared in disjoint
+     * blocks of the same method — {@code int} in one, {@code int} in the next —
+     * the same local, and the set that holds these would keep only the first.
+     * That was survivable while every local was reported as live for the whole
+     * method, since the two shared one storage location anyway; once a local
+     * is filtered to its own scope it stops being survivable, because in the
+     * second block the debugger would have no row to show at all.
+     *
+     * Locals the translator synthesised from a store opcode carry no scope, so
+     * they still collapse onto one another, which is what keeps a repeated
+     * store from producing a row per occurrence.
+     */
     @Override
     public boolean equals(Object o) {
         if (o == null) {
@@ -189,7 +246,10 @@ public class LocalVariable extends Instruction {
         }
         if (o.getClass() == LocalVariable.class) {
             LocalVariable lv = (LocalVariable)o;
-            return lv.getIndex() == this.getIndex() && lv.getQualifier() == this.getQualifier();
+            return lv.getIndex() == this.getIndex()
+                    && lv.getQualifier() == this.getQualifier()
+                    && lv.scopeStart == this.scopeStart
+                    && lv.scopeEnd == this.scopeEnd;
         }
         return false;
     }
@@ -197,8 +257,10 @@ public class LocalVariable extends Instruction {
     @Override
     public int hashCode() {
         int hash = 3;
-        hash = 19 * hash + Objects.hashCode(this.desc);
+        hash = 19 * hash + this.getQualifier();
         hash = 19 * hash + this.index;
+        hash = 19 * hash + System.identityHashCode(this.scopeStart);
+        hash = 19 * hash + System.identityHashCode(this.scopeEnd);
         return hash;
     }
 }
