@@ -187,7 +187,11 @@ public final class ComponentPreviewFactory {
     }
 
     public static void stabilizeDesignStyles(Component component) {
-        component.setEnabled(true);
+        // The enabled state is left as applyAttributes() set it. Forcing it true painted every
+        // enabled="false" component with its enabled CSS while the generated source still emitted
+        // setEnabled(false), so the canvas showed a control the application would not. Selection
+        // does not depend on it: the workspace hit-tests by coordinate through elementAt(), which
+        // finds a disabled component like any other.
         component.setFocusable(false);
         component.setRippleEffect(false);
         component.setPressedStyle(new Style(component.getUnselectedStyle()));

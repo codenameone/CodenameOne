@@ -5775,7 +5775,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private String ensureHandler(String source, String handler) {
         if (declaresActionHandler(source, handler)) return source;
-        int close = source.indexOf("// </gui-builder-user-code>");
+        // markerLine(), not indexOf: the same text inside a string literal or comment would
+        // otherwise take the stub with it and leave the companion malformed. This is the sibling
+        // of the search fixed in mergeGeneratedSource and should have been changed with it.
+        int close = markerLine(source, "// </gui-builder-user-code>", 0);
         if (close < 0) close = source.lastIndexOf('}');
         String method = "\n    private void " + handler + "(ActionEvent event) {\n"
                 + "        // Add event behavior here.\n"
@@ -5810,7 +5813,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             boolean boundedLeft = !isIdentifierChar(previous) && previous != '.';
             int open = skipSpaces(code, after);
             if (boundedLeft && open < code.length() && code.charAt(open) == '(') {
-                int close = code.indexOf(')', open);
+                int close = matchingParenthesis(code, open);
                 if (close > open && isSingleActionEventParameter(code.substring(open + 1, close))
                         && code.charAt(skipSpaces(code, close + 1)) == '{') {
                     // A body follows a declaration; a call is followed by a semicolon or an
@@ -5834,8 +5837,61 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param parameters the text between the parentheses
      * @return true when the method can serve as the handler
      */
+    /**
+     * Removes parameter annotations, including any argument list they carry.
+     *
+     * @param parameters the text between the method parentheses
+     * @return the same text without annotations
+     */
+    private static String stripAnnotations(String parameters) {
+        StringBuilder out = new StringBuilder(parameters.length());
+        int at = 0;
+        while (at < parameters.length()) {
+            char c = parameters.charAt(at);
+            if (c != '@') {
+                out.append(c);
+                at++;
+                continue;
+            }
+            at++;
+            while (at < parameters.length() && isIdentifierChar(parameters.charAt(at))) at++;
+            int open = skipSpaces(parameters, at);
+            if (open < parameters.length() && parameters.charAt(open) == '(') {
+                int close = matchingParenthesis(parameters, open);
+                at = close < 0 ? parameters.length() : close + 1;
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * The parenthesis closing the one at {@code open}, counting nesting.
+     *
+     * <p>A parameter annotation carrying arguments -- {@code void onClick(@Foo("x") ActionEvent e)}
+     * -- puts a closing parenthesis inside the list, and taking the first one read the parameters
+     * as the annotation's argument, missed the declaration and let Save append a duplicate.
+     *
+     * @param text the text to scan
+     * @param open the index of the opening parenthesis
+     * @return the index of its match, or -1
+     */
+    private static int matchingParenthesis(String text, int open) {
+        int depth = 0;
+        for (int at = open; at < text.length(); at++) {
+            char c = text.charAt(at);
+            if (c == '(') depth++;
+            else if (c == ')') {
+                depth--;
+                if (depth == 0) return at;
+            }
+        }
+        return -1;
+    }
+
     private static boolean isSingleActionEventParameter(String parameters) {
-        String only = parameters.trim();
+        // Annotations are removed first: their arguments can contain both parentheses and commas,
+        // so @Foo("a,b") ActionEvent e would otherwise read as two parameters.
+        String only = stripAnnotations(parameters).trim();
         if (only.length() == 0 || only.indexOf(',') >= 0) return false;
         // "com.codename1.ui.events.ActionEvent event", "final ActionEvent e", "ActionEvent<T> e"
         int space = only.lastIndexOf(' ');
