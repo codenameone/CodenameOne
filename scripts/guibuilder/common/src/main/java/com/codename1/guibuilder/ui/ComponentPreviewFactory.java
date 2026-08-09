@@ -146,13 +146,17 @@ public final class ComponentPreviewFactory {
         // (Accordion the same), so backgrounds, borders and padding differed between the canvas
         // and the saved application.
         String explicitUiid = element.getAttribute("uiid");
-        if (explicitUiid != null && explicitUiid.length() > 0) {
+        if ("Form".equals(type) || "Dialog".equals(type)) {
+            // This container is the one the children are added to, and at runtime that is the
+            // content pane rather than the Form: Form.add() forwards into a container whose UIID
+            // is "ContentPane", and Dialog.add() into "DialogContentPane". The Form UIID belongs
+            // to the surface drawn around it, which the canvas builds as a separate layer, so
+            // naming this container "Form" left every ContentPane rule -- padding, background,
+            // scrolling -- applied to nothing. An explicit uiid also styles the Form rather than
+            // the pane, so it is applied to that surface and deliberately not here.
+            component.setUIID("Dialog".equals(type) ? "DialogContentPane" : "ContentPane");
+        } else if (explicitUiid != null && explicitUiid.length() > 0) {
             component.setUIID(explicitUiid);
-        } else if ("Form".equals(type) || "Dialog".equals(type)) {
-            // A root Form or Dialog is previewed through sizedContainer(), so it would carry the
-            // Container default while the generated class extends Form and inherits the "Form"
-            // UIID. Everything else keeps the default its own constructor sets.
-            component.setUIID(type);
         }
         applyAttributes(component, element);
         if (component instanceof CheckBox) {

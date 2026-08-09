@@ -108,6 +108,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private Container deviceSurface;
     private int themeApplyCount;
     private Hashtable builderTheme;
+    /** The canvas layer carrying the Form or Dialog UIID, or null for a Container root. */
+    private Container formSurfacePreview;
+
     private Component previewRoot;
     private Component formToolbarPreview;
     private Label formTitlePreview;
@@ -621,12 +624,22 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         };
         device.setUIID(desktop ? "BuilderDesktopSurface" : "BuilderDevice");
-        // A Container root generates a class extending Container, with no toolbar at runtime.
-        // Drawing one anyway cost design height and offered an editable title that writes root text
-        // the generated source ignores, so the canvas misrepresented the reusable component.
-        if (isFormLike(value(document.root(), "type", "Form"))) {
+        String rootType = value(document.root(), "type", "Form");
+        // The layer the Form UIID styles, holding the title area and the content pane exactly as a
+        // Form does at runtime -- so Form CSS covers the toolbar too, and ContentPane CSS reaches
+        // the container the children are actually added to. Null for a Container root: it
+        // generates a class extending Container, with no toolbar and no Form layer at runtime, and
+        // drawing one anyway cost design height and offered an editable title that writes root
+        // text the generated source ignores.
+        Container formSurface = null;
+        formSurfacePreview = null;
+        if (isFormLike(rootType)) {
+            formSurface = new Container(new BorderLayout());
+            formSurface.setUIID(value(document.root(), "uiid", rootType));
+            formSurface.setUIManager(previewUIManager);
             formToolbarPreview = buildFormToolbarPreview();
-            device.add(BorderLayout.NORTH, formToolbarPreview);
+            formSurface.add(BorderLayout.NORTH, formToolbarPreview);
+            formSurfacePreview = formSurface;
         } else {
             // Cleared together, or a stale title label from a previously opened Form root would
             // still be updated by attribute edits that no longer have anything on screen.
@@ -667,7 +680,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         device.setUIManager(previewUIManager);
         if (preview instanceof Container) ((Container) preview).setUIManager(previewUIManager);
         refreshProjectThemeOnPreview();
-        device.add(BorderLayout.CENTER, preview);
+        if (formSurface != null) {
+            formSurface.add(BorderLayout.CENTER, preview);
+            device.add(BorderLayout.CENTER, formSurface);
+        } else {
+            device.add(BorderLayout.CENTER, preview);
+        }
         if (desktop) stage.add(BorderLayout.CENTER, device); else stage.add(device);
         canvasHost.add(BorderLayout.CENTER, stage);
         refreshInspector();
@@ -2821,7 +2839,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         growTableToFit(parent, taken);
     }
 
-    /** Widens the declared row count so no assigned cell falls outside the table and disappears. */
     /** @return true when any cell of the rectangle is already reserved */
     private static boolean overlapsTaken(Set<String> taken, int row, int column, int rowSpan, int columnSpan) {
         for (int r = row; r < row + rowSpan; r++) {
@@ -2841,6 +2858,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
+    /** Widens the declared row count so no assigned cell falls outside the table and disappears. */
     private void growTableToFit(Element parent, Set<String> occupiedCells) {
         int requiredRows = 1;
         for (String cell : occupiedCells) {
@@ -2853,7 +2871,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
-    /** The child occupying {@code row}/{@code column}, or null. */
     /**
      * The child occupying a cell, counting the rectangle a span covers rather than only the cell a
      * child starts in. Testing the anchor alone treated a covered cell as empty, so a drop there
@@ -3111,6 +3128,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     Container canvasHostForTest() { return canvasHost; }
+
+    /** The canvas layer carrying the Form UIID, or null when the root is a Container. */
+    Container formSurfaceForTest() { return formSurfacePreview; }
 
     CodeEditor activeEditorForTest() { return activeCodeEditor; }
 
@@ -4178,22 +4198,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private static final int BORDER_LAYOUT_REGION_COUNT = 5;
 
     /**
-     * The highest row a child of this table may occupy. TableLayout grows by a single row when it
-     * is handed an out-of-range constraint and then indexes a positions array that is still too
-     * small, so the refresh threw and left a value the document could not render.
-     *
-     * @param parent the table the child belongs to
-     * @return the greatest valid row index
-     */
-    /**
-     * The number of rows or columns a table's existing children already require.
-     *
-     * @param parent the table
-     * @param cellAttribute {@code tableRow} or {@code tableColumn}
-     * @param spanAttribute the matching span attribute
-     * @return the smallest declared size that still contains every child
-     */
-    /**
      * How far a child may span from its anchor before leaving the table.
      *
      * @param parent the table
@@ -4209,6 +4213,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return declared - (anchor == null ? 0 : anchor.intValue());
     }
 
+    /**
+     * The number of rows or columns a table's existing children already require.
+     *
+     * @param parent the table
+     * @param cellAttribute {@code tableRow} or {@code tableColumn}
+     * @param spanAttribute the matching span attribute
+     * @return the smallest declared size that still contains every child
+     */
     private int occupiedTableExtent(Element parent, String cellAttribute, String spanAttribute) {
         int extent = 0;
         for (Element child : componentChildren(parent)) {
@@ -4225,6 +4237,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         boolean accepts(int value);
     }
 
+    /**
+     * The highest row a child of this table may occupy. TableLayout grows by a single row when it
+     * is handed an out-of-range constraint and then indexes a positions array that is still too
+     * small, so the refresh threw and left a value the document could not render.
+     *
+     * @param parent the table the child belongs to
+     * @return the greatest valid row index
+     */
     private int tableRowLimit(Element parent) {
         if (parent == null) return 99;
         return Math.max(0, integer(parent.getAttribute("tableLayoutRows"), 2) - 1);
@@ -5030,6 +5050,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         previewUIManager = UIManager.createInstance();
         previewUIManager.setThemeProps(projectTheme);
         if (deviceSurface != null) deviceSurface.setUIManager(previewUIManager);
+        // The Form layer resolves the Form/Dialog UIID out of the same manager. A CSS edit builds a
+        // brand new UIManager, so leaving this one behind kept the form background and padding on
+        // the stylesheet the canvas was opened with.
+        if (formSurfacePreview != null) {
+            formSurfacePreview.setUIManager(previewUIManager);
+            // setUIID drops this component's cached styles so the next resolution comes from the
+            // new manager. refreshTheme() would do that too and then cascade over the canvas and
+            // the toolbar, re-resolving what the calls below deliberately settle afterwards.
+            formSurfacePreview.setUIID(formSurfacePreview.getUIID());
+        }
         if (previewRoot instanceof Container) {
             ((Container) previewRoot).setUIManager(previewUIManager);
         }
@@ -5066,21 +5096,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * Writes the companion Java source for the current document, regenerating everything outside
-     * the user-code markers from the .gui model and keeping only what the developer wrote between
-     * them.
-     *
-     * <p>The editor deliberately leaves the generated regions editable, because marking them read
-     * only refused every keystroke wherever the caret happened to land. That makes regenerating
-     * here the thing that keeps the promise the editor makes: edits to imports, buildUI or the
-     * class braces cannot survive to diverge from the document or stop the file compiling.
-     *
-     * @param path the companion source path
-     * @param userSource the text to carry the user-code region from -- the editor buffer when the
-     *     code pane is saving, the file on disk when the designer is saving
-     * @return true when the file reached disk
-     */
-    /**
      * Builds the companion source without writing it, so a caller staging several files can decide
      * to write none of them.
      *
@@ -5100,6 +5115,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return merged;
     }
 
+    /**
+     * Writes the companion Java source for the current document, regenerating everything outside
+     * the user-code markers from the .gui model and keeping only what the developer wrote between
+     * them.
+     *
+     * <p>The editor deliberately leaves the generated regions editable, because marking them read
+     * only refused every keystroke wherever the caret happened to land. That makes regenerating
+     * here the thing that keeps the promise the editor makes: edits to imports, buildUI or the
+     * class braces cannot survive to diverge from the document or stop the file compiling.
+     *
+     * @param path the companion source path
+     * @param userSource the text to carry the user-code region from -- the editor buffer when the
+     *     code pane is saving, the file on disk when the designer is saving
+     * @return true when the file reached disk
+     */
     private boolean writeCompanionSource(String path, String userSource) {
         try {
             ProjectIO.write(path, companionSourceFor(userSource));
@@ -5593,23 +5623,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * True for the root types that carry a title and a toolbar. {@code cn1:create-gui-form
-     * -DguiType=Dialog} is explicitly supported and the generator already keeps Dialog as the
-     * superclass, so a Form-only test left those forms unable to edit the very attributes the
-     * generated source consumes.
-     *
-     * @param type the {@code type} attribute of the element
-     * @return true when the element behaves like a form
-     */
-    /**
-     * True for the component types that expose {@code addActionListener}. The Events tab offers a
-     * handler for all of them and a stub is generated either way, so leaving text inputs and
-     * sliders out here produced a form that compiled while the handler was never invoked.
-     *
-     * @param type the {@code type} attribute of the element
-     * @return true when a listener can be registered on this type
-     */
-    /**
      * Assigns each distinct handler value its own Java identifier.
      *
      * <p>Two values that normalize to the same identifier -- {@code save-item} and
@@ -5676,11 +5689,28 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return handler;
     }
 
+    /**
+     * True for the component types that expose {@code addActionListener}. The Events tab offers a
+     * handler for all of them and a stub is generated either way, so leaving text inputs and
+     * sliders out here produced a form that compiled while the handler was never invoked.
+     *
+     * @param type the {@code type} attribute of the element
+     * @return true when a listener can be registered on this type
+     */
     private static boolean firesActionEvents(String type) {
         return "Button".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type)
                 || "TextField".equals(type) || "TextArea".equals(type) || "Slider".equals(type);
     }
 
+    /**
+     * True for the root types that carry a title and a toolbar. {@code cn1:create-gui-form
+     * -DguiType=Dialog} is explicitly supported and the generator already keeps Dialog as the
+     * superclass, so a Form-only test left those forms unable to edit the very attributes the
+     * generated source consumes.
+     *
+     * @param type the {@code type} attribute of the element
+     * @return true when the element behaves like a form
+     */
     private static boolean isFormLike(String type) {
         return "Form".equals(type) || "Dialog".equals(type);
     }
@@ -5893,17 +5923,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * True when a parameter list is exactly one ActionEvent.
-     *
-     * <p>Parsed rather than searched for the substring: a legal overload such as
-     * {@code void onClick(String value, ActionEvent event)} contains the text but cannot be used as
-     * an ActionListener, and accepting it suppressed the one-argument stub that
-     * {@code this::onClick} needs.
-     *
-     * @param parameters the text between the parentheses
-     * @return true when the method can serve as the handler
-     */
-    /**
      * Removes parameter annotations, including any argument list they carry.
      *
      * @param parameters the text between the method parentheses
@@ -5954,6 +5973,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return -1;
     }
 
+    /**
+     * True when a parameter list is exactly one ActionEvent.
+     *
+     * <p>Parsed rather than searched for the substring: a legal overload such as
+     * {@code void onClick(String value, ActionEvent event)} contains the text but cannot be used as
+     * an ActionListener, and accepting it suppressed the one-argument stub that
+     * {@code this::onClick} needs.
+     *
+     * @param parameters the text between the parentheses
+     * @return true when the method can serve as the handler
+     */
     private static boolean isSingleActionEventParameter(String parameters) {
         // Annotations are removed first: their arguments can contain both parentheses and commas,
         // so @Foo("a,b") ActionEvent e would otherwise read as two parameters.
@@ -6270,10 +6300,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * Drops every constructor of the scaffolded class. The generated region declares its own, and
-     * the scaffolded ones call an {@code initGuiBuilderComponents} that no longer exists.
-     */
-    /**
      * Finds a constructor declaration, allowing space before the parenthesis and ignoring comments.
      *
      * @param source the text to search
@@ -6294,6 +6320,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
+    /**
+     * Drops every constructor of the scaffolded class. The generated region declares its own, and
+     * the scaffolded ones call an {@code initGuiBuilderComponents} that no longer exists.
+     */
     private String removeConstructors(String body, String className) {
         if (className.length() == 0) return body;
         String out = body;
@@ -6616,12 +6646,27 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     String mcpCommand(String command) {
         if (command == null) return "command is required";
         // A client that is told the save succeeded will happily go on to close the editor.
+        // save() writes the document, the companion and the model, and never the text in an open
+        // Code, Model or CSS pane -- for CSS it does not touch the stylesheet at all. Reporting
+        // success with a dirty buffer invited the client to close the builder while the only copy
+        // of that text was in memory. Refresh is refused for the same buffer: the interactive path
+        // asks before discarding it, and a modal on the EDT would leave the MCP call waiting for a
+        // human who is not there. Same answer mcpOpenForm() gives, for the same reason -- MCP
+        // cannot ask, so it refuses.
         if ("save".equals(command)) {
+            if (editorBufferIsDirty()) {
+                return "The open editor has unsaved changes; save or close that pane first";
+            }
             if (!save()) return "Save failed; the form is still only in the editor";
         }
         else if ("undo".equals(command)) undo();
         else if ("redo".equals(command)) redo();
-        else if ("refresh".equals(command)) refreshProject();
+        else if ("refresh".equals(command)) {
+            if (editorBufferIsDirty()) {
+                return "The open editor has unsaved changes; save or close that pane first";
+            }
+            refreshProject();
+        }
         else if ("toggleDarkMode".equals(command)) toggleDarkMode();
         else if ("phonePortrait".equals(command) || "phoneLandscape".equals(command)
                 || "tabletPortrait".equals(command) || "desktop".equals(command)) setCanvasMode(command);

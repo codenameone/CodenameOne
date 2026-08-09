@@ -146,7 +146,6 @@ class LiveTypingTest {
         return null;
     }
 
-    /** The live CSS path debounces twice, so it needs longer than an ordinary EDT flush. */
     /**
      * Waits for the live recompile to reach the canvas, rather than sleeping a fixed span and
      * hoping. Every keystroke reschedules a 120ms debounce and a 250ms poll drives the recompile,

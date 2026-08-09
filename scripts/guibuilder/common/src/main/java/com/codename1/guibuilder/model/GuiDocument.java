@@ -354,8 +354,7 @@ public final class GuiDocument {
      * Marks every cell a sibling covers, not just the one it starts in. A component with a span
      * greater than one occupies a rectangle; treating it as a single cell handed the next component
      * a slot underneath it, and TableLayout then placed two children in the same space.
-     */
-    /**
+     *
      * @param taken the cells already claimed
      * @param row the candidate anchor row
      * @param column the candidate anchor column
