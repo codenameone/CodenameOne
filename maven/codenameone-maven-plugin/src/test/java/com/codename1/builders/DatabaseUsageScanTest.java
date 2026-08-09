@@ -210,6 +210,35 @@ class DatabaseUsageScanTest {
     }
 
     @Test
+    void anAndroidArchiveCountsThroughItsNestedClassesJar() throws IOException {
+        // An AAR keeps its bytecode one level further in, and the generated gradle links it like
+        // any other dependency, so encryption configured inside one has to count.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs());
+        java.io.ByteArrayOutputStream inner = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream innerZip = new java.util.zip.ZipOutputStream(inner);
+        try {
+            innerZip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Secure.class"));
+            innerZip.write(classCalling("rawKey"));
+            innerZip.closeEntry();
+        } finally {
+            innerZip.close();
+        }
+        java.util.zip.ZipOutputStream aar = new java.util.zip.ZipOutputStream(
+                new FileOutputStream(new File(lib, "secure.aar")));
+        try {
+            aar.putNextEntry(new java.util.zip.ZipEntry("classes.jar"));
+            aar.write(inner.toByteArray());
+            aar.closeEntry();
+        } finally {
+            aar.close();
+        }
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "the archive uses the database");
+        assertTrue(usage.usesDatabaseCipher(), "and encrypts it");
+    }
+
+    @Test
     void anExplicitlyPlainConfigIsNotEncryption() throws IOException {
         // plain() is the documented way to say a database is not encrypted. Reading a reference to
         // DatabaseConfig as encryption charged that application the cipher library and, on

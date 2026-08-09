@@ -485,16 +485,22 @@ public abstract class Database {
     ///
     /// true if a key was removed
     public static boolean forgetManagedKey(String keyAlias) {
-        boolean removed = ManagedKeys.forget(keyAlias);
-        // A managed key with no explicit alias is stored under the file the name resolves to, so
-        // the name on its own does not find it -- and this is the documented way to destroy a key
-        // deliberately, which would have quietly done nothing. The alias is tried first, since an
-        // explicit one is stored exactly as it was given.
+        // Two interpretations, and only one of them can be meant. An explicit alias is stored
+        // exactly as it was given, so that is tried first; the resolved identity is the fallback
+        // for a key stored by managed() with no alias, which is filed under the file the name
+        // resolves to and would otherwise be unreachable through this method.
+        //
+        // The fallback runs only when the first found nothing. One application's explicit alias
+        // can be another database's name -- managed("shared") over here, a database called
+        // "shared" over there -- and destroying both would take out a key its owner never named.
+        if (ManagedKeys.forget(keyAlias)) {
+            return true;
+        }
         String identity = Display.getInstance().databaseManagedKeyIdentity(keyAlias);
         if (identity != null && !identity.equals(keyAlias)) {
-            removed = ManagedKeys.forget(identity) || removed;
+            return ManagedKeys.forget(identity);
         }
-        return removed;
+        return false;
     }
 
     /// Rewinds a cursor to before its first row.

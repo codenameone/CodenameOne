@@ -212,6 +212,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     public boolean first() throws IOException {
         checkOpen();
         if (isLegacyFirstRewind()) {
+            knownCount = -1;
             rewindInternal();
             return true;
         }
@@ -245,10 +246,23 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
             beforeFirst();
             return false;
         }
+        return seek(row, true);
+    }
+
+    /// Moves to a row, optionally treating a rewind as the start of a new pass.
+    ///
+    /// A caller seeking backwards re-executes the statement, and the pass that follows can differ
+    /// from the one before it, so the remembered count is dropped. `#getCount()` uses this with
+    /// the flag off: its rewinds are how it counts and how it puts the cursor back, and dropping
+    /// the count there would discard the one it had just taken.
+    private boolean seek(int row, boolean newPass) throws IOException {
         if (onRow && position == row) {
             return true;
         }
         if (!onRow || row < position) {
+            if (newPass) {
+                knownCount = -1;
+            }
             rewindInternal();
         }
         while (position < row) {
@@ -295,7 +309,7 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         position = total;
 
         if (wasOnRow) {
-            position(restoreTo);
+            seek(restoreTo, false);
         } else if (restoreTo < 0) {
             rewindInternal();
         }

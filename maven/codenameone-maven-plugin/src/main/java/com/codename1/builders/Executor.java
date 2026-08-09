@@ -715,6 +715,22 @@ public abstract class Executor {
             this.cipher = cipher;
         }
 
+        /// The answer from two roots, since a build can stage classes and libraries separately.
+        ///
+        /// #### Parameters
+        ///
+        /// - `other`: the usage found under another root
+        ///
+        /// #### Returns
+        ///
+        /// a usage that is true wherever either is
+        public DatabaseUsage merge(DatabaseUsage other) {
+            if (other == null) {
+                return this;
+            }
+            return new DatabaseUsage(database || other.database, cipher || other.cipher);
+        }
+
         /// Whether anything outside the framework references `com.codename1.db`.
         public boolean usesDatabase() {
             return database;
@@ -835,6 +851,11 @@ public abstract class Executor {
                     ? child.getName() : relativePath + "/" + child.getName();
             if (child.isDirectory()) {
                 scanForDatabaseUsage(child, childPath, found);
+            } else if (child.getName().endsWith(".aar")) {
+                // An Android archive carries its bytecode in a nested classes.jar, and the
+                // generated gradle links it like any other dependency, so encryption configured
+                // inside one has to count exactly as a plain jar's does.
+                scanArchiveForDatabaseUsage(child, found);
             } else if (child.getName().endsWith(".jar")) {
                 // A library can be the only thing that touches the database: the application calls
                 // the library, and Android stages the jar into libs and links it through the
@@ -857,8 +878,21 @@ public abstract class Executor {
             while (entries.hasMoreElements() && !(found[0] && found[1])) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
                 String name = entry.getName();
-                if (entry.isDirectory() || !name.endsWith(".class")
-                        || isFrameworkDatabaseClass(name)) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+                if (name.endsWith(".jar")) {
+                    // An Android archive keeps its bytecode in a nested classes.jar, so the
+                    // entries that matter are one level further in.
+                    java.io.InputStream nested = zip.getInputStream(entry);
+                    try {
+                        scanNestedArchiveForDatabaseUsage(nested, found);
+                    } finally {
+                        nested.close();
+                    }
+                    continue;
+                }
+                if (!name.endsWith(".class") || isFrameworkDatabaseClass(name)) {
                     continue;
                 }
                 java.io.InputStream in = zip.getInputStream(entry);
@@ -880,6 +914,21 @@ public abstract class Executor {
                     // Nothing left to do with it.
                 }
             }
+        }
+    }
+
+    /// Reads the class entries of an archive inside an archive, which is where an AAR keeps them.
+    private void scanNestedArchiveForDatabaseUsage(java.io.InputStream nested, boolean[] found)
+            throws IOException {
+        java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(nested);
+        java.util.zip.ZipEntry entry = in.getNextEntry();
+        while (entry != null && !(found[0] && found[1])) {
+            String name = entry.getName();
+            if (!entry.isDirectory() && name.endsWith(".class")
+                    && !isFrameworkDatabaseClass(name)) {
+                inspectClassForDatabaseUsage(readAllBytes(in), found);
+            }
+            entry = in.getNextEntry();
         }
     }
 
