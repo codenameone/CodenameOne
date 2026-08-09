@@ -68,6 +68,9 @@ public class IPhoneBuilder extends Executor {
 
     /// Where each entry-point stub lives once they have been separated, or null when there is one
     /// translation and the classpath is untouched. See WatchNativeBuilder.isolateStub.
+    /// The lifecycle class the project declared, before a unit-test build swaps it out.
+    private String origMainClass;
+
     private File phoneStubDir;
 
     private File watchStubDir;
@@ -336,7 +339,14 @@ public class IPhoneBuilder extends Executor {
         String pkg = request.getPackageName() == null ? "" : request.getPackageName().replace('.', '/');
         String prefix = pkg.length() == 0 ? "" : pkg + "/";
         java.util.List<File> roots = java.util.Arrays.asList(classesDir);
-        phoneRootReachesHealth = reachesHealth(roots, prefix + request.getMainClass());
+        // origMainClass, not request.getMainClass(). generateUnitTestFiles has already swapped the
+        // main class for CodenameOneUnitTestExecutor, which is not compiled into classesDir yet --
+        // so the walk found no root at all, answered "does not reach health", and stripped the
+        // phone's entitlement and its listener registry from a test build whose executor runs the
+        // very lifecycle that uses HealthKit.
+        String phoneRoot = origMainClass != null && origMainClass.length() > 0
+                ? origMainClass : request.getMainClass();
+        phoneRootReachesHealth = reachesHealth(roots, prefix + phoneRoot);
         watchRootReachesHealth = reachesHealth(roots,
                 watchNativeBuilder.getWatchMain().replace('.', '/'));
         log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
@@ -2119,6 +2129,11 @@ public class IPhoneBuilder extends Executor {
                         "Shows your location on the map.");
             }
         }
+        // Captured BEFORE generateUnitTestFiles, which replaces the main class with
+        // CodenameOneUnitTestExecutor. Anything downstream that needs the lifecycle the developer
+        // actually wrote -- the health reachability walk below is one -- cannot get it from the
+        // request afterwards, and the executor class is not compiled into classesDir yet either.
+        origMainClass = request.getMainClass();
         try {
             generateUnitTestFiles(request, stubSource);
         } catch (Exception ex) {
