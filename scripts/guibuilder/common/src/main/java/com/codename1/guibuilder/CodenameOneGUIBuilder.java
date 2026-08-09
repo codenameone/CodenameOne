@@ -47,6 +47,7 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Font;
 import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.TextArea;
@@ -4387,6 +4388,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             component.setName("preview." + value);
         } else if ("gap".equals(attribute) && component instanceof Label) {
             ((Label) component).setGap(integer(value, ((Label) component).getGap()));
+        } else if ("gap".equals(attribute) && component instanceof SpanLabel) {
+            // SpanLabel is a Container, not a Label, so the branch above never saw it and the
+            // canvas kept the old spacing while the saved source carried the new one. The initial
+            // preview already handles SpanLabel; this is the live path catching up.
+            ((SpanLabel) component).setGap(integer(value, ((SpanLabel) component).getGap()));
         } else if ("alignment".equals(attribute)) {
             int alignment = "center".equals(value) ? Component.CENTER : "right".equals(value) ? Component.RIGHT : Component.LEFT;
             if (component instanceof Label) ((Label) component).setAlignment(alignment);
@@ -4397,6 +4403,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             ((Button) component).setToggle("true".equals(value));
         } else if ("selected".equals(attribute) && component instanceof CheckBox) {
             ((CheckBox) component).setSelected("true".equals(value));
+            ((CheckBox) component).setIcon(FontImage.createMaterial(((CheckBox) component).isSelected()
+                    ? FontImage.MATERIAL_CHECK_BOX : FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK,
+                    ((CheckBox) component).getUnselectedStyle()));
+        } else if ("selected".equals(attribute) && component instanceof RadioButton) {
+            // RadioButton is a separate Button subclass, so the CheckBox branch never matched and
+            // the marker stayed as it was until an unrelated rebuild. The icon is redrawn with it,
+            // because the preview draws the marker itself rather than relying on the platform.
+            ((RadioButton) component).setSelected("true".equals(value));
+            ((RadioButton) component).setIcon(FontImage.createMaterial(((RadioButton) component).isSelected()
+                    ? FontImage.MATERIAL_RADIO_BUTTON_CHECKED : FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED,
+                    ((RadioButton) component).getUnselectedStyle()));
         } else if ("columns".equals(attribute) && component instanceof TextArea) {
             ((TextArea) component).setColumns(integer(value, ((TextArea) component).getColumns()));
         } else if ("rows".equals(attribute) && component instanceof TextArea) {
