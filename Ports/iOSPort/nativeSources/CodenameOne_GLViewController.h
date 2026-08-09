@@ -58,6 +58,16 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 //#define GOOGLE_SIGNIN
 //#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT
+#if TARGET_OS_WATCH
+// Neither Google SDK ships a watchOS slice, and the watch app cannot present a sign-in web flow
+// anyway. Both defines are switched on by the builder EDITING THIS FILE, so they arrive on every
+// slice of the project at once -- the watch translation stages the same header and then failed to
+// build with "'GoogleSignIn/GoogleSignIn.h' file not found", from a native source the watch never
+// calls into. Undefining here rather than guarding each import turns off the implementation blocks
+// in the .m files too, since every one of them is gated on the same two macros.
+#undef GOOGLE_SIGNIN
+#undef INCLUDE_GOOGLE_CONNECT
+#endif
 #ifndef GOOGLE_SIGNIN
 #ifdef INCLUDE_GOOGLE_CONNECT
 #ifdef GOOGLE_CONNECT_PODS
