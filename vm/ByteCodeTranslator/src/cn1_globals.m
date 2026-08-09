@@ -2580,8 +2580,29 @@ static CN1BibopPage* bibopReleasedPool = 0;
 // Released pages whose MADV_FREE_REUSE was rejected, so they cannot be handed to
 // the allocator yet. Kept OFF bibopReleasedPool so one unrestorable page cannot
 // stand in front of a stocked pool; consulted only when that pool is empty, and
-// then at most one per acquisition. bibopMutex.
+// then at most one per acquisition.
+//
+// A FIFO, with an explicit tail, and that detail is the whole point. Pushing a
+// failure back at the HEAD means the next acquisition pops the same page, fails
+// again, and puts it back -- so one permanently unrestorable page is retried
+// forever while every other parked page behind it is never reached again. That
+// is the same defect this pool was introduced to fix, one level down. Rotating
+// the failure to the tail gives round-robin retry: each acquisition tries a
+// different page, and a page that becomes restorable is eventually reached.
+// bibopMutex.
 static CN1BibopPage* bibopReuseFailedPool = 0;
+static CN1BibopPage* bibopReuseFailedTail = 0;
+
+// Park a page whose restore was rejected at the TAIL of the retry pool.
+static void cn1BibopParkReuseFailure(CN1BibopPage* p) {
+    p->nextPool = 0;
+    if(bibopReuseFailedTail != 0) {
+        bibopReuseFailedTail->nextPool = p;
+    } else {
+        bibopReuseFailedPool = p;
+    }
+    bibopReuseFailedTail = p;
+}
 
 // How many released pages one acquisition may try to restore before giving up
 // and allocating a fresh page. Bounds the syscalls a run of rejections can cost
@@ -3053,9 +3074,14 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
             } else if(attempt == 0 && bibopReuseFailedPool != 0) {
                 // Only ever one previously-failed page per acquisition, so a
                 // permanently unrestorable page costs one syscall and never
-                // starves the fresh-page fallback.
+                // starves the fresh-page fallback. Taken from the HEAD and, on
+                // failure, returned to the TAIL, so successive acquisitions
+                // rotate through the parked pages instead of retrying one.
                 cand = bibopReuseFailedPool;
                 bibopReuseFailedPool = cand->nextPool;
+                if(bibopReuseFailedPool == 0) {
+                    bibopReuseFailedTail = 0;
+                }
             } else {
                 break;
             }
@@ -3063,8 +3089,7 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
                 np = cand;
                 cn1BibopFormatPage(np, ci);
             } else {
-                cand->nextPool = bibopReuseFailedPool;
-                bibopReuseFailedPool = cand;
+                cn1BibopParkReuseFailure(cand);
             }
         }
     }
