@@ -421,6 +421,62 @@ public class IPhoneBuilder extends Executor {
                 + ", watch=" + watchRootReachesHealth);
     }
 
+    /// The native-interface registrations one translation root can reach.
+    ///
+    /// Every `NativeLookup.register(X.class, XStub.class)` is a hard reference and XStub holds one
+    /// to the generated implementation, so a stub installing the app-wide list roots every native
+    /// implementation in its own translation. With a distinct watchMain that meant a phone-only
+    /// native interface had its Objective-C staged and compiled for watchOS, where a UIKit import
+    /// or an iOS-only SDK is a build failure in code the watch never calls.
+    ///
+    /// The walk is complete for this question: the app zip, iOSPort.jar and the ParparVM Java API
+    /// are all unzipped into classesDir before anything here runs, so the whole translation
+    /// classpath is on disk in one directory and nothing is invisible to it.
+    ///
+    /// FRAMEWORK natives are kept regardless. com.codename1 plumbing is reached in ways a
+    /// constant-pool walk cannot always see -- a runtime lookup behind an interface, an
+    /// implementation picked at Display.init -- and an absent registration there does not fail the
+    /// build, it silently disables a service at runtime, which is far harder to attribute than the
+    /// compile error this exists to prevent. Only APP natives are shaken out, and they are the
+    /// whole of the case: the developer's own Objective-C is what imports an iOS-only SDK.
+    String nativeRegistrationsReachableFrom(String registrations,
+            java.util.Set<String> reachable) {
+        if (reachable == null || registrations == null || registrations.length() == 0) {
+            return registrations;
+        }
+        StringBuilder out = new StringBuilder();
+        for (String line : registrations.split("\n")) {
+            String registered = registeredInterfaceName(line);
+            String internal = registered == null ? null : registered.replace('.', '/');
+            // A line that registers nothing is passed through untouched rather than guessed at.
+            boolean keep = internal == null
+                    || internal.startsWith("com/codename1/")
+                    || reachable.contains(internal);
+            if (keep) {
+                out.append(line).append('\n');
+            } else {
+                log("[watchNative] not registering " + registered + " in the watch stub: the watch"
+                        + " translation root does not reach it");
+            }
+        }
+        return out.toString();
+    }
+
+    /// The interface named by one `NativeLookup.register(...)` line, or null if it is not one.
+    private String registeredInterfaceName(String line) {
+        final String open = "NativeLookup.register(";
+        int start = line.indexOf(open);
+        if (start < 0) {
+            return null;
+        }
+        start += open.length();
+        int end = line.indexOf(".class", start);
+        if (end <= start) {
+            return null;
+        }
+        return line.substring(start, end).trim();
+    }
+
     /// The generated registries a stub installs, as internal names, limited to the ones this
     /// project actually produced.
     ///
@@ -2562,9 +2618,11 @@ public class IPhoneBuilder extends Executor {
             // point actually reaches.
             if (watchNativeBuilder.needsOwnTranslation()) {
                 watchNativeBuilder.writeWatchStubSource(request, stubSource, buildVersion,
-                        registerNativeImplementationsAndCreateStubs(
-                                new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
-                                stubSource, classesDir),
+                        nativeRegistrationsReachableFrom(
+                                registerNativeImplementationsAndCreateStubs(
+                                        new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
+                                        stubSource, classesDir),
+                                watchReachableClasses),
                         iosMode, svgRegistryInstall, watchHealthBindingsInstall,
                         routeDispatcherInstallSource(sourceZip, "        "),
                         annotationFrameworksInstallSource(sourceZip, "        "));

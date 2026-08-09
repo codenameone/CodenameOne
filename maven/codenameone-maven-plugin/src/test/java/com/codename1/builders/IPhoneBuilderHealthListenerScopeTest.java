@@ -178,6 +178,56 @@ class IPhoneBuilderHealthListenerScopeTest {
         }
     }
 
+    /**
+     * A phone-only app native is not registered in the watch stub.
+     *
+     * <p>Each registration is a hard reference and the stub it names holds one to the native
+     * implementation, so the app-wide list rooted every native implementation in the watch
+     * translation -- and a phone-only one had its Objective-C compiled for watchOS, where a UIKit
+     * import is a build failure in code the watch never calls.</p>
+     */
+    @Test
+    void theWatchStubDropsAppNativesItCannotReach() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        String all = "        NativeLookup.register(com.acme.PhoneNative.class,"
+                + " com.acme.PhoneNativeStub.class);\n"
+                + "        NativeLookup.register(com.acme.WatchNative.class,"
+                + " com.acme.WatchNativeStub.class);\n";
+
+        String watch = builder.nativeRegistrationsReachableFrom(all,
+                reachable("com/acme/WatchApp", "com/acme/WatchNative"));
+        assertTrue(watch.contains("com.acme.WatchNative.class"), watch);
+        assertFalse(watch.contains("com.acme.PhoneNative.class"),
+                "the watch must not root the phone's native implementation: " + watch);
+    }
+
+    /**
+     * Framework natives are kept whether the walk reaches them or not.
+     *
+     * <p>com.codename1 plumbing is reached in ways a constant-pool walk cannot always see, and an
+     * absent registration there does not fail the build -- it silently disables a service at
+     * runtime. Dropping one is how the watch screenshot suite ended up running with no transport,
+     * which is exactly the failure mode this exemption exists to make impossible.</p>
+     */
+    @Test
+    void frameworkNativesAreNeverDropped() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        String all = "        NativeLookup.register(com.codename1.io.websocket.WebSocketNativeImpl"
+                + ".class, com.codename1.io.websocket.WebSocketNativeImplStub.class);\n";
+        assertEquals(all, builder.nativeRegistrationsReachableFrom(all,
+                reachable("com/acme/WatchApp")));
+    }
+
+    /** One translation registers everything, exactly as before. */
+    @Test
+    void oneTranslationRegistersEveryNative() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        String all = "        NativeLookup.register(com.acme.PhoneNative.class,"
+                + " com.acme.PhoneNativeStub.class);\n";
+        assertEquals(all, builder.nativeRegistrationsReachableFrom(all, null));
+        assertEquals("", builder.nativeRegistrationsReachableFrom("", reachable("com/acme/X")));
+    }
+
     /** A root that reaches no listener binds none, rather than falling back to all of them. */
     @Test
     void aRootThatReachesNoListenerBindsNone() {

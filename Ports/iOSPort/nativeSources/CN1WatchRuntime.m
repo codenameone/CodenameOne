@@ -184,10 +184,20 @@ static void cn1WatchQueuePhase(int phase) {
 /// cn1_watch_runtime_start sets its flag and then hands off to a THREAD that has yet to reach
 /// Display.init, so the flag is true for a window in which IOSImplementation.instance is still
 /// null. Forwarding a phase into that window dereferences null inside translated code, on a thread
-/// with no Java frame to unwind to. The view controller is created during Display.init by the
-/// implementation itself, so its existence is evidence the implementation exists.
+/// with no Java frame to unwind to.
+///
+/// Published by the app's own bootstrap, once its stub's main has returned -- Display.init has
+/// completed by then, so the implementation exists and the EDT is running.
+///
+/// It used to be inferred from `[CodenameOne_GLViewController instance] != nil` on the reasoning
+/// that the implementation creates the view controller during Display.init. That accessor
+/// LAZY-ALLOCATES: asking made it non-nil, so the test answered yes from the moment the runtime
+/// flag was set and proved nothing at all. A phase forwarded in that window reached a half-built
+/// VM, or delivered stop() before init() and start() had ever run.
+static volatile BOOL cn1WatchJavaLifecycleReady = NO;
+
 static BOOL cn1WatchJavaReady(void) {
-    return cn1WatchRuntimeStarted && [CodenameOne_GLViewController instance] != nil;
+    return cn1WatchJavaLifecycleReady;
 }
 
 static void cn1WatchDeliverPhase(int phase) {
@@ -198,6 +208,16 @@ static void cn1WatchDeliverPhase(int phase) {
         com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(
                 CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+}
+
+/// Called by the generated bootstrap once the watch stub's main has returned.
+///
+/// Anything queued while the VM was coming up is handed over immediately: the paint pump is the
+/// other drain and it is stopped while the watch is in the background, which is exactly when a
+/// queued background transition is waiting.
+void cn1_watch_runtime_markJavaReady(void) {
+    cn1WatchJavaLifecycleReady = YES;
+    cn1WatchReplayPendingPhase();
 }
 
 /// Hands over, in order, every phase the app could not be told about yet.

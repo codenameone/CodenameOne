@@ -591,7 +591,8 @@ class WatchNativeBuilder {
           .append("extern void cn1_watch_runtime_pointerDragged(int x, int y);\n")
           .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n")
           .append("extern void cn1_watch_runtime_didEnterBackground(void);\n")
-          .append("extern void cn1_watch_runtime_willEnterForeground(void);\n\n")
+          .append("extern void cn1_watch_runtime_willEnterForeground(void);\n")
+          .append("extern void cn1_watch_runtime_markJavaReady(void);\n\n")
           .append("// App-specific entry: register natives + set the main class, init\n")
           .append("// Display (starts the EDT) and block this thread inside initVM.\n")
           .append("extern void ").append(mainStub)
@@ -599,6 +600,12 @@ class WatchNativeBuilder {
           .append("void cn1_watch_app_main(void) {\n")
           .append("    ").append(mainStub)
           .append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n")
+          // Display.init has returned by here, so IOSImplementation.instance exists and the EDT is
+          // running. THIS is the readiness signal: the runtime used to infer it from
+          // [CodenameOne_GLViewController instance] != nil, and that accessor lazily allocates the
+          // singleton, so the test made itself true the moment the runtime flag was set and a
+          // lifecycle phase could be forwarded into a half-built VM.
+          .append("    cn1_watch_runtime_markJavaReady();\n")
           .append("}\n\n")
           .append("// Watch lifecycle entry class (mangled FQN): ").append(m).append("\n")
           .append("void cn1_watch_bootstrap(void) { cn1_watch_runtime_start(\"")

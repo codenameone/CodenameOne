@@ -1325,6 +1325,14 @@ public class CN1WearableBridge implements WearableBridge {
     /// that grows without bound is its own failure and the newest state is the more useful.
     private static final int SPOOL_MAX_ENTRIES = 256;
 
+    /// Guards sequence allocation, trimming, commit and drain together.
+    ///
+    /// Not decoration: the message worker and the data worker are different threads, and two of
+    /// them reading the same seq before either commits produced the same key -- the later write
+    /// then overwrote the earlier record and lost a delivery that has no other copy anywhere. A
+    /// SharedPreferences editor is not a transaction, so the read-modify-write has to be one.
+    private static final Object SPOOL_LOCK = new Object();
+
     private static final String SPOOL_MESSAGE = "m";
 
     private static final String SPOOL_REMOVAL = "r";
@@ -1373,75 +1381,84 @@ public class CN1WearableBridge implements WearableBridge {
         if (c == null) {
             return false;
         }
-        try {
-            android.content.SharedPreferences prefs =
-                    c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
-            long seq = prefs.getLong(SPOOL_SEQ_KEY, 0) + 1;
-            android.content.SharedPreferences.Editor edit = prefs.edit();
-            edit.putLong(SPOOL_SEQ_KEY, seq);
-            // Zero-padded, because the drain replays in key order and the whole point is that a
-            // message arrives in the order it was sent.
-            edit.putString(spoolKey(seq), kind + "|" + encode(path) + "|"
-                    + (payload == null ? "" : android.util.Base64.encodeToString(
-                            payload, android.util.Base64.NO_WRAP)));
-            trimSpool(prefs, edit);
-            // commit(), and its result: the caller falls back to the in-memory queue when the write
-            // did not land, so an ignored false would silently lose exactly what this exists for.
-            return edit.commit();
-        } catch (Throwable unavailable) {
-            return false;
+        synchronized (SPOOL_LOCK) {
+            try {
+                android.content.SharedPreferences prefs =
+                        c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
+                long seq = prefs.getLong(SPOOL_SEQ_KEY, 0) + 1;
+                android.content.SharedPreferences.Editor edit = prefs.edit();
+                edit.putLong(SPOOL_SEQ_KEY, seq);
+                // Zero-padded, because the drain replays in key order and the whole point is that
+                // a message arrives in the order it was sent.
+                edit.putString(spoolKey(seq), kind + "|" + encode(path) + "|"
+                        + (payload == null ? "" : android.util.Base64.encodeToString(
+                                payload, android.util.Base64.NO_WRAP)));
+                trimSpool(prefs, edit);
+                // commit(), and its result: the caller falls back to the in-memory queue when the
+                // write did not land, so an ignored false would silently lose exactly what this
+                // exists for.
+                return edit.commit();
+            } catch (Throwable unavailable) {
+                return false;
+            }
         }
     }
 
-    /// Replays everything written down, oldest first, and forgets it only once it is delivered.
+    /// Replays everything written down, oldest first, and forgets it only once it is taken.
     static void drainSpool(Context context) {
+        for (String record : takeSpooled(context)) {
+            // Outside the lock. A listener runs arbitrary app code, and holding the spool across
+            // it would block every worker trying to write the next delivery down.
+            replaySpooled(record);
+        }
+    }
+
+    /// Removes every spooled record and returns it, oldest first.
+    ///
+    /// Taken BEFORE replay, and committed. A listener that throws must not leave the entry behind
+    /// to be replayed on every launch from then on: delivered once is the contract for a one-shot,
+    /// and this is the only place that can hold to it.
+    private static java.util.List<String> takeSpooled(Context context) {
+        java.util.List<String> records = new ArrayList<String>();
         Context c = spoolContext(context);
         if (c == null) {
-            return;
+            return records;
         }
-        java.util.List<String> keys;
-        android.content.SharedPreferences prefs;
-        java.util.Map<String, ?> all;
-        try {
-            prefs = c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
-            all = prefs.getAll();
-            if (all.isEmpty()) {
-                return;
-            }
-            keys = new ArrayList<String>();
-            for (String k : all.keySet()) {
-                if (!SPOOL_SEQ_KEY.equals(k)) {
-                    keys.add(k);
+        synchronized (SPOOL_LOCK) {
+            try {
+                android.content.SharedPreferences prefs =
+                        c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
+                java.util.Map<String, ?> all = prefs.getAll();
+                java.util.List<String> keys = new ArrayList<String>();
+                for (String k : all.keySet()) {
+                    if (!SPOOL_SEQ_KEY.equals(k)) {
+                        keys.add(k);
+                    }
                 }
+                if (keys.isEmpty()) {
+                    return records;
+                }
+                java.util.Collections.sort(keys);
+                android.content.SharedPreferences.Editor edit = prefs.edit();
+                for (String k : keys) {
+                    edit.remove(k);
+                }
+                if (!edit.commit()) {
+                    // Still on disk, so leave it there and try again next time rather than
+                    // replaying records this process may fail to remove afterwards.
+                    return new ArrayList<String>();
+                }
+                for (String k : keys) {
+                    Object raw = all.get(k);
+                    if (raw instanceof String) {
+                        records.add((String) raw);
+                    }
+                }
+            } catch (Throwable unavailable) {
+                return new ArrayList<String>();
             }
-            if (keys.isEmpty()) {
-                return;
-            }
-            java.util.Collections.sort(keys);
-        } catch (Throwable unavailable) {
-            return;
         }
-        // Removed BEFORE replay, and committed. A listener that throws must not leave the entry
-        // behind to be replayed on every launch from then on; a one-shot delivered once is the
-        // contract, and this is the only place that can hold to it.
-        android.content.SharedPreferences.Editor edit = prefs.edit();
-        for (String k : keys) {
-            edit.remove(k);
-        }
-        try {
-            if (!edit.commit()) {
-                return;
-            }
-        } catch (Throwable unavailable) {
-            return;
-        }
-        for (String k : keys) {
-            Object raw = all.get(k);
-            if (!(raw instanceof String)) {
-                continue;
-            }
-            replaySpooled((String) raw);
-        }
+        return records;
     }
 
     private static void replaySpooled(String record) {
