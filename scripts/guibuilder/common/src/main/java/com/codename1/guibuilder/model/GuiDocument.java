@@ -250,7 +250,7 @@ public final class GuiDocument {
      * @param type the component type
      * @return the default text, or null for a type that has none
      */
-    private static String defaultTextFor(String type) {
+    public static String defaultTextFor(String type) {
         if ("Button".equals(type)) return "Button";
         if ("Label".equals(type)) return "Label";
         if ("SpanLabel".equals(type)) return "Wrapped label text";
@@ -258,6 +258,16 @@ public final class GuiDocument {
         if ("CheckBox".equals(type)) return "Check box";
         if ("RadioButton".equals(type)) return "Radio button";
         return null;
+    }
+
+    /**
+     * The hint the canvas shows for a component with none of its own.
+     *
+     * @param type the component type
+     * @return the default hint, or null for a type that has none
+     */
+    public static String defaultHintFor(String type) {
+        return "TextField".equals(type) ? "Text field" : null;
     }
 
     /** North, South, East, West and Center: everything a BorderLayout can hold. */
@@ -284,7 +294,8 @@ public final class GuiDocument {
         if (defaultText != null) child.setAttribute("text", defaultText);
         // The preview shows a hint for a bare TextField while the generator emits an empty one, so
         // saving an untouched field removed the only prompt the canvas had shown.
-        if ("TextField".equals(type)) child.setAttribute("hint", "Text field");
+        String defaultHint = defaultHintFor(type);
+        if (defaultHint != null) child.setAttribute("hint", defaultHint);
         if (acceptsChildren(child)) child.setAttribute("layout", "LayeredLayout");
         parent.addChild(child);
         assignFreeTableCell(parent, child);

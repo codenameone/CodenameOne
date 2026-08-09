@@ -5645,7 +5645,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private String componentSource(Element element) {
         String type = value(element, "type", "Container");
-        String text = "\"" + javaEscape(value(element, "text", "")) + "\"";
+        // The same fallback the canvas uses, so a .gui that omits text does not preview as
+        // "Button" and run blank. An attribute the user deliberately emptied still generates
+        // empty, because value() treats a present-but-empty attribute as a value.
+        String defaultText = GuiDocument.defaultTextFor(type);
+        String text = "\"" + javaEscape(value(element, "text", defaultText == null ? "" : defaultText)) + "\"";
         String source;
         if ("Container".equals(type)) source = "new Container(" + layoutSource(element) + ")";
         else if ("Tabs".equals(type)) source = "new Tabs()";
@@ -5654,7 +5658,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // fallback produced source that does not compile.
         else if ("Accordion".equals(type)) source = "new Accordion()";
         else if ("Slider".equals(type)) source = "new Slider()";
-        else if ("TextField".equals(type)) source = "new TextField(" + text + ", \"" + javaEscape(value(element, "hint", "")) + "\")";
+        else if ("TextField".equals(type)) {
+            String defaultHint = GuiDocument.defaultHintFor(type);
+            source = "new TextField(" + text + ", \""
+                    + javaEscape(value(element, "hint", defaultHint == null ? "" : defaultHint)) + "\")";
+        }
         else if ("TextArea".equals(type)) source = "new TextArea(" + text + ")";
         else source = "new " + type + "(" + text + ")";
         String fixedWidth = element.getAttribute("guidedPreferredWidth");
@@ -5860,7 +5868,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String startMarker = "// <gui-builder-user-code>";
         String endMarker = "// </gui-builder-user-code>";
         int oldStart = existing.indexOf(startMarker);
-        int oldEnd = existing.indexOf(endMarker);
+        int oldEnd = markerLine(existing, endMarker, oldStart < 0 ? 0 : oldStart);
         if (oldStart < 0 || oldEnd < oldStart) {
             if (existing.indexOf("// Generated live from ") >= 0) return generated;
             String migrated = migrateLegacySource(existing, generated);
@@ -5949,6 +5957,30 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             at = constructorAt(code, className, at + className.length());
         }
         return "";
+    }
+
+    /**
+     * Finds a marker that stands alone on its line.
+     *
+     * <p>A plain indexOf matched the same text inside a string literal or a comment in the user
+     * region, and the save then kept only what preceded it and dropped the rest of the developer's
+     * code. A structural marker occupies its own line, so anything with other code before it on
+     * that line is content rather than a marker.
+     *
+     * @param source the source to search
+     * @param marker the marker text
+     * @param from where to start
+     * @return the index of the marker, or -1
+     */
+    private static int markerLine(String source, String marker, int from) {
+        int at = from;
+        while (true) {
+            at = source.indexOf(marker, at);
+            if (at < 0) return -1;
+            int lineStart = source.lastIndexOf('\n', at) + 1;
+            if (source.substring(lineStart, at).trim().length() == 0) return at;
+            at += marker.length();
+        }
     }
 
     static final String LEGACY_GENERATED_START = "//-- DON'T EDIT BELOW THIS LINE!!!";

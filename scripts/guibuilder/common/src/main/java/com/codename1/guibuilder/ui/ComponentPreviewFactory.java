@@ -75,49 +75,49 @@ public final class ComponentPreviewFactory {
         Component component;
         switch (type) {
             case "Button":
-                component = new Button(value(element, "text", "Button")) {
+                component = new Button(defaultedText(element, "Button")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
                 break;
             case "Label":
-                component = new Label(value(element, "text", "Label")) {
+                component = new Label(defaultedText(element, "Label")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
                 break;
             case "SpanLabel":
-                component = new SpanLabel(value(element, "text", "Wrapped label text")) {
+                component = new SpanLabel(defaultedText(element, "SpanLabel")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
                 break;
             case "TextField":
-                component = new TextField(value(element, "text", ""), value(element, "hint", "Text field")) {
+                component = new TextField(value(element, "text", ""), defaultedHint(element, "TextField")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
                 break;
             case "TextArea":
-                component = new TextArea(value(element, "text", "Text area")) {
+                component = new TextArea(defaultedText(element, "TextArea")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
                 break;
             case "CheckBox":
-                component = new CheckBox(value(element, "text", "Check box")) {
+                component = new CheckBox(defaultedText(element, "CheckBox")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
             };
                 break;
             case "RadioButton":
-                component = new RadioButton(value(element, "text", "Radio button")) {
+                component = new RadioButton(defaultedText(element, "RadioButton")) {
                 @Override protected Dimension calcPreferredSize() {
                     return guidedSize(this, super.calcPreferredSize(), guidedWidth, guidedHeight);
                 }
@@ -310,6 +310,32 @@ public final class ComponentPreviewFactory {
         }
         if (sections == 0) accordion.addContent("Section", new Label("Drop content here"));
         return accordion;
+    }
+
+    /**
+     * The text to show, falling back to the shared default for the type.
+     *
+     * <p>These defaults live in GuiDocument so the canvas and the generated source cannot drift:
+     * the preview used to substitute "Button" while the generator emitted an empty string for a
+     * .gui that omitted the attribute, so a hand-written form looked different once it ran.
+     *
+     * @param element the component element
+     * @param type the component type
+     * @return the text to display
+     */
+    private static String defaultedText(Element element, String type) {
+        String fallback = GuiDocument.defaultTextFor(type);
+        return value(element, "text", fallback == null ? "" : fallback);
+    }
+
+    /**
+     * @param element the component element
+     * @param type the component type
+     * @return the hint to display, from the same shared defaults
+     */
+    private static String defaultedHint(Element element, String type) {
+        String fallback = GuiDocument.defaultHintFor(type);
+        return value(element, "hint", fallback == null ? "" : fallback);
     }
 
     private static Layout layout(Element element) {
