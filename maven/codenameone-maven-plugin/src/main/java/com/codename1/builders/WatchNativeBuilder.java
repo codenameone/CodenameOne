@@ -591,8 +591,7 @@ class WatchNativeBuilder {
           .append("extern void cn1_watch_runtime_pointerDragged(int x, int y);\n")
           .append("extern void cn1_watch_runtime_pointerReleased(int x, int y);\n")
           .append("extern void cn1_watch_runtime_didEnterBackground(void);\n")
-          .append("extern void cn1_watch_runtime_willEnterForeground(void);\n")
-          .append("extern void cn1_watch_runtime_markJavaReady(void);\n\n")
+          .append("extern void cn1_watch_runtime_willEnterForeground(void);\n\n")
           .append("// App-specific entry: register natives + set the main class, init\n")
           .append("// Display (starts the EDT) and block this thread inside initVM.\n")
           .append("extern void ").append(mainStub)
@@ -600,12 +599,10 @@ class WatchNativeBuilder {
           .append("void cn1_watch_app_main(void) {\n")
           .append("    ").append(mainStub)
           .append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n")
-          // Display.init has returned by here, so IOSImplementation.instance exists and the EDT is
-          // running. THIS is the readiness signal: the runtime used to infer it from
-          // [CodenameOne_GLViewController instance] != nil, and that accessor lazily allocates the
-          // singleton, so the test made itself true the moment the runtime flag was set and a
-          // lifecycle phase could be forwarded into a half-built VM.
-          .append("    cn1_watch_runtime_markJavaReady();\n")
+          // Nothing after the call above: it does not return. Display.init -> postInit ->
+          // IOSNative.initVM blocks this thread forever on the watch, exactly as UIApplicationMain
+          // does on the phone, so readiness is published from inside initVM's watch branch -- right
+          // after the lifecycle callback that makes it true. A call placed here would never run.
           .append("}\n\n")
           .append("// Watch lifecycle entry class (mangled FQN): ").append(m).append("\n")
           .append("void cn1_watch_bootstrap(void) { cn1_watch_runtime_start(\"")
@@ -1872,8 +1869,18 @@ class WatchNativeBuilder {
         //
         // The staged watch tree is the evidence that IS available. It is the complete set of
         // sources this target compiles, so a product no file in it imports cannot be needed, and a
-        // product one of them does import is needed whatever the phone uses. Both import spellings
-        // are matched, plus the bridging-header form.
+        // product one of them does import is needed whatever the phone uses.
+        //
+        // Matched on MODULE BOUNDARIES, not as a substring. A raw include? made a product named Foo
+        // look used by a source importing FooBar, which mirrored an unrelated iOS-only package onto
+        // the watch and broke the build in the exact way this gate exists to prevent. The name must
+        // be followed by end-of-token: a newline, a dot (Foo.Bar), a semicolon, or the closing
+        // bracket of an Objective-C import.
+        //
+        // Swift's declaration-scoped form counts too. `import struct Foo.Bar` names the module Foo
+        // just as `import Foo` does, and reading only the unqualified form dropped a product the
+        // source genuinely needs -- the opposite failure, and the worse one, because it breaks a
+        // build that should work.
         //
         // If a watch source needs a product under a module name that differs from the product name
         // -- legal, and rare -- the skip is logged with the name, so the link error that follows
@@ -1899,9 +1906,16 @@ class WatchNativeBuilder {
                 // watch_import_text is nil when the watch shares the phone's translation, and then
                 // the watch compiles the phone's sources and needs the phone's packages.
                 .append("  if watch_import_text\n")
-                .append("    used = watch_import_text.include?(\"import #{name}\") || "
-                        + "watch_import_text.include?(\"<#{name}/\") || "
-                        + "watch_import_text.include?(\"\\\"#{name}/\")\n")
+                .append("    q = Regexp.escape(name)\n")
+                // Swift: `import Foo`, `import Foo.Bar`, and the declaration-scoped
+                // `import struct Foo.Bar` -- the optional kind keyword is the whole difference.
+                // Objective-C / C: `#import <Foo/Foo.h>`, `#import "Foo/Foo.h"`, `@import Foo;`.
+                .append("    swift_import = /^\\s*(?:@_exported\\s+)?import\\s+"
+                        + "(?:typealias|struct|class|enum|protocol|let|var|func)?\\s*"
+                        + "#{q}(?:\\.|\\s|$)/\n")
+                .append("    objc_import = /(?:@import\\s+#{q}\\s*;|[<\\\"]#{q}\\/)/\n")
+                .append("    used = !(watch_import_text =~ swift_import).nil? || "
+                        + "!(watch_import_text =~ objc_import).nil?\n")
                 .append("    unless used\n")
                 .append("      puts \"[watchNative] not linking Swift package product #{name} into "
                         + "the watch target: no staged watch source imports it\"\n")

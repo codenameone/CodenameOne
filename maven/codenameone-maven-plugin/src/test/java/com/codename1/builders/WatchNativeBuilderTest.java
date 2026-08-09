@@ -696,6 +696,14 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("watch_import_text"), ruby);
         assertTrue(ruby.contains("no staged watch source imports it"),
                 "a skip has to say so, or the link error that follows names nothing: " + ruby);
+        // On module boundaries, not as a substring: a product Foo must not look used by a source
+        // importing FooBar, which mirrored an unrelated iOS-only package onto the watch.
+        assertTrue(ruby.contains("Regexp.escape(name)"), ruby);
+        assertFalse(ruby.contains("watch_import_text.include?(\"import #{name}\")"),
+                "the raw substring test is what matched a prefix: " + ruby);
+        // And Swift's declaration-scoped form names the module just as the plain one does; reading
+        // only `import Foo` dropped a product the source genuinely needs.
+        assertTrue(ruby.contains("typealias|struct|class|enum|protocol|let|var|func"), ruby);
         // Both halves are required. Listing the product on the target is what makes Xcode resolve
         // the package for it; the frameworks-phase build file is what links it. Either alone
         // produces a project that still fails, and differently.
@@ -741,6 +749,26 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("app_target.copy_files_build_phases"), ruby);
         // And a project with no vendored framework must produce the project it did before.
         assertTrue(ruby.contains("if vendored_linked"), ruby);
+    }
+
+    /**
+     * Readiness is not published from the bootstrap, because that code cannot run.
+     *
+     * <p>The stub's main reaches Display.init -> postInit -> IOSNative.initVM, whose watch branch
+     * blocks its thread forever exactly as UIApplicationMain does on the phone. A readiness call
+     * placed after the stub's main was dead code, so the flag stayed false and every background and
+     * foreground transition queued for ever -- which is the stop()/start() the watch app was
+     * missing to begin with. It is published from inside that branch instead.</p>
+     */
+    @Test
+    void theBootstrapDoesNotTryToPublishReadinessAfterMain(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        File dir = tmp.toFile();
+        parse(req).writeWatchEntry(req, dir);
+        String boot = read(new File(dir, "CN1WatchBootstrap.m"));
+        assertFalse(boot.contains("cn1_watch_runtime_markJavaReady"),
+                "unreachable after the stub's main, which never returns: " + boot);
     }
 
     /// The bootstrap has to call the stub that actually exists in the watch binary.

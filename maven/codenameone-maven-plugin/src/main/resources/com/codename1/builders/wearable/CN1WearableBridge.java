@@ -3897,7 +3897,6 @@ public class CN1WearableBridge implements WearableBridge {
         // would treat the two as one stream and discard the second sender's file whenever its
         // sequence did not happen to exceed the first's.
         String key = uri.getHost() + ":" + uri.getPath();
-        boolean durable;
         synchronized (transferClaims) {
             String previous = transferClaims.get(key);
             if (previous == null) {
@@ -3954,6 +3953,7 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         String key = uri.getHost() + ":" + uri.getPath();
+        boolean durable;
         synchronized (transferClaims) {
             // The persisted form carries a RECEIPT TIME that the in-memory form does not need. The
             // stamp is a Lamport sequence, and observeSequence deliberately drags that ahead of

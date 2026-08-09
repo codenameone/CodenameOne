@@ -186,8 +186,10 @@ static void cn1WatchQueuePhase(int phase) {
 /// null. Forwarding a phase into that window dereferences null inside translated code, on a thread
 /// with no Java frame to unwind to.
 ///
-/// Published by the app's own bootstrap, once its stub's main has returned -- Display.init has
-/// completed by then, so the implementation exists and the EDT is running.
+/// Published from IOSNative.initVM's watch branch, immediately after the IOSImplementation
+/// callback that installs the lifecycle and schedules the app start. That branch then blocks its
+/// thread forever, mirroring UIApplicationMain, so there is no later point to publish from: a call
+/// placed after the stub's main would never run.
 ///
 /// It used to be inferred from `[CodenameOne_GLViewController instance] != nil` on the reasoning
 /// that the implementation creates the view controller during Display.init. That accessor
@@ -210,7 +212,7 @@ static void cn1WatchDeliverPhase(int phase) {
     }
 }
 
-/// Called by the generated bootstrap once the watch stub's main has returned.
+/// Called from IOSNative.initVM's watch branch once the Java lifecycle callback has run.
 ///
 /// Anything queued while the VM was coming up is handed over immediately: the paint pump is the
 /// other drain and it is stopped while the watch is in the background, which is exactly when a
