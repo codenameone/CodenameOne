@@ -214,8 +214,20 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (hardenPlatform == null) {
             hardenPlatform = normalizeHardenPlatform(platform);
         }
-        if (hardenPlatform != null && isHardenFalse(
-                settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true"))) {
+        // A combined Apple build (iOS app + native-Mac/watch/tvOS slice) hardens ONE shared jar, so the
+        // builder hardens it unless EVERY shipped slice is opted out (Executor.anySliceHardeningEnabled).
+        // The preflight must use that same all-slice decision: keying off only the selected slice would,
+        // e.g. with harden.mac.enabled=false but iOS still on, treat the level as off and skip the
+        // local-build/on-device-debug refusal while the engine goes on to harden the shared jar locally
+        // and orphan its mapping. A non-Apple target has a single slice, so its own opt-out still applies.
+        boolean platformOptedOut;
+        if (isAppleHardenPlatform(hardenPlatform)) {
+            platformOptedOut = allAppleHardeningSlicesOptedOut(settings);
+        } else {
+            platformOptedOut = hardenPlatform != null && isHardenFalse(
+                    settings.getProperty("codename1.arg.harden." + hardenPlatform + ".enabled", "true"));
+        }
+        if (platformOptedOut) {
             level = "off";
         }
         // Even at a non-off level, a build that has overridden every individual transform off
@@ -295,6 +307,45 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         String t = value.trim().toLowerCase();
         return "false".equals(t) || "0".equals(t) || "off".equals(t);
+    }
+
+    /** True for the Apple hardening tags whose build ships several slices from one shared hardened jar. */
+    private static boolean isAppleHardenPlatform(String hardenPlatform) {
+        return "ios".equals(hardenPlatform) || "mac".equals(hardenPlatform);
+    }
+
+    /**
+     * True only when EVERY Apple slice this build ships (the iOS app plus any native-Mac/watch/tvOS
+     * target) has opted out via {@code harden.<slice>.enabled}. Mirrors IPhoneBuilder.appleHardeningSlices
+     * / Executor.anySliceHardeningEnabled from the settings so the preflight's "reduced to off" decision
+     * matches the builder's "harden unless every slice opted out". A slice is present only when its target
+     * is enabled, so an unrelated tvOS opt-out never affects a plain iOS build.
+     */
+    static boolean allAppleHardeningSlicesOptedOut(Properties settings) {
+        if (!isHardenFalse(settings.getProperty("codename1.arg.harden.ios.enabled", "true"))) {
+            return false;
+        }
+        if ("true".equals(settings.getProperty("codename1.arg.macNative.enabled", "false"))
+                && !isHardenFalse(settings.getProperty("codename1.arg.harden.mac.enabled", "true"))) {
+            return false;
+        }
+        if (appleSliceTargetEnabled(settings, "watch")
+                && !isHardenFalse(settings.getProperty("codename1.arg.harden.watch.enabled", "true"))) {
+            return false;
+        }
+        if (appleSliceTargetEnabled(settings, "tv")
+                && !isHardenFalse(settings.getProperty("codename1.arg.harden.tv.enabled", "true"))) {
+            return false;
+        }
+        return true;
+    }
+
+    /** True when the watch/tv slice is shipped: its {@code <slice>Native.enabled} or a {@code <slice>Main}. */
+    private static boolean appleSliceTargetEnabled(Properties settings, String slice) {
+        return "true".equals(settings.getProperty("codename1.arg." + slice + "Native.enabled", "false"))
+                || settings.getProperty("codename1.arg." + slice + "Main",
+                        settings.getProperty("codename1.arg." + slice + "Native.mainClass", "")).trim()
+                        .length() > 0;
     }
 
     /**

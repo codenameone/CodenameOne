@@ -152,8 +152,22 @@ public final class ProGuardRunner {
         return jars;
     }
 
-    private static String quote(File f) {
-        return "'" + f.getAbsolutePath() + "'";
+    static String quote(File f) {
+        String path = f.getAbsolutePath();
+        // ProGuard reads a quoted file name until the matching close quote and does not support escaping
+        // inside it, so a path containing the quote character cannot use that quote. Pick the quote the
+        // path does not contain -- a single quote/apostrophe (e.g. /home/o'brien/app.jar) forces double
+        // quotes. This is exactly what ProGuard's own ConfigurationParser accepts for such names.
+        if (path.indexOf('\'') < 0) {
+            return "'" + path + "'";
+        }
+        if (path.indexOf('"') < 0) {
+            return "\"" + path + "\"";
+        }
+        // A path containing BOTH a single and a double quote is unrepresentable to the ProGuard parser
+        // (essentially never a real filesystem path); fail clearly rather than emit invalid config.
+        throw new IllegalArgumentException("A hardening classpath entry cannot be passed to ProGuard "
+                + "because its path contains both a single and a double quote: " + path);
     }
 
     private static void close(ConfigurationParser parser) {

@@ -135,6 +135,9 @@ public class PiiScrubber {
     /// tail is appended verbatim so symbolication still works. A frame with no numeric coordinate
     /// (`(Native Method)`) has nothing to protect and no PII to speak of, so it gets only the email pass.
     private String scrubFrameLine(String line) {
+        // Apply the app's scrubFrame(className, methodName) override to a synthetic method name in the
+        // raw stack too, so a value the app removed from its structured frames does not resurface here.
+        line = applyFrameOverride(line);
         int loc = trailingLocationStart(line);
         if (loc <= 0) {
             // A coordinate-free frame ((Native Method)/(Unknown Source)): there is no numeric coordinate
@@ -144,6 +147,40 @@ public class PiiScrubber {
             return scrubMessage(line);
         }
         return scrubMessage(line.substring(0, loc)) + line.substring(loc);
+    }
+
+    /// Applies {@link #scrubFrame(String, String)} to the method name of a JVM/ParparVM
+    /// `at <class>.<method>(<loc>)` / `at <class>.<method>:<line>` frame, so an app that redacts a
+    /// synthetic method name in its structured frames redacts it in the raw stack too. Only these
+    /// dotted-identity forms carry a {@code class.method} the override addresses; other forms (a bare
+    /// V8 function, a URL frame) are returned unchanged. The default {@code scrubFrame} returns the
+    /// method unchanged, so a build that does not override it sees no difference.
+    private String applyFrameOverride(String line) {
+        int at = line.indexOf("at ");
+        if (at < 0 || line.substring(0, at).trim().length() != 0) {
+            return line;
+        }
+        String rest = line.substring(at + 3).trim();
+        int paren = rest.indexOf('(');
+        int idEnd;
+        if (paren >= 0) {
+            idEnd = paren;
+        } else {
+            int locStart = trailingLocationStart(rest);
+            idEnd = locStart > 0 ? locStart : rest.length();
+        }
+        String identity = rest.substring(0, idEnd).trim();
+        int lastDot = identity.lastIndexOf('.');
+        if (lastDot <= 0 || lastDot == identity.length() - 1 || !isFrameIdentity(identity)) {
+            return line;
+        }
+        String cls = identity.substring(0, lastDot);
+        String method = identity.substring(lastDot + 1);
+        String scrubbed = scrubFrame(cls, method);
+        if (scrubbed == null || scrubbed.equals(method)) {
+            return line;
+        }
+        return line.substring(0, at + 3) + cls + "." + scrubbed + rest.substring(idEnd);
     }
 
     /// True for a stack-trace line whose numeric tokens are source coordinates,
@@ -272,9 +309,9 @@ public class PiiScrubber {
             core = core.substring(0, asAt).trim();
         }
         String[] prefixes = {"async ", "new ", "bound ", "get ", "set "};
-        for (int i = 0; i < prefixes.length; i++) {
-            if (core.startsWith(prefixes[i])) {
-                core = core.substring(prefixes[i].length()).trim();
+        for (String prefix : prefixes) {
+            if (core.startsWith(prefix)) {
+                core = core.substring(prefix.length()).trim();
                 break;
             }
         }

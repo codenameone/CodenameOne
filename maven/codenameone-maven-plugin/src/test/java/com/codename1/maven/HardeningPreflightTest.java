@@ -176,4 +176,31 @@ public class HardeningPreflightTest {
         assertFalse(CN1BuildMojo.hardeningReducesToOff(strOnly, "standard", "ios"),
                 "string encryption really runs on iOS");
     }
+
+    @Test
+    public void combinedAppleBuildIsOffOnlyWhenEverySliceOptedOut() {
+        // The builder hardens a combined Apple build's shared jar unless EVERY slice opts out, so the
+        // preflight must reduce to off under the same all-slice rule. Otherwise a combined build that
+        // opted out only Mac would skip the local-build refusal while the engine still hardens for iOS.
+        java.util.Properties macOff = new java.util.Properties();
+        macOff.setProperty("codename1.arg.macNative.enabled", "true");
+        macOff.setProperty("codename1.arg.harden.mac.enabled", "false");
+        assertFalse(CN1BuildMojo.allAppleHardeningSlicesOptedOut(macOff),
+                "iOS still enabled -> the shared jar is hardened, so not off");
+
+        macOff.setProperty("codename1.arg.harden.ios.enabled", "off");
+        assertTrue(CN1BuildMojo.allAppleHardeningSlicesOptedOut(macOff),
+                "every shipped slice opted out -> off");
+
+        // A plain iOS build (no mac/watch/tv slice) with iOS opted out is off.
+        java.util.Properties iosOff = new java.util.Properties();
+        iosOff.setProperty("codename1.arg.harden.ios.enabled", "false");
+        assertTrue(CN1BuildMojo.allAppleHardeningSlicesOptedOut(iosOff));
+
+        // An unrelated tvOS opt-out on a build that ships no tvOS slice must not turn hardening off.
+        java.util.Properties tvOnly = new java.util.Properties();
+        tvOnly.setProperty("codename1.arg.harden.tv.enabled", "false");
+        assertFalse(CN1BuildMojo.allAppleHardeningSlicesOptedOut(tvOnly),
+                "iOS is still enabled and no tvOS slice ships, so hardening runs");
+    }
 }

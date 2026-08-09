@@ -243,6 +243,24 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void scrubFrameOverrideRedactsSyntheticMethodNameInRawStack() {
+        // An app that overrides scrubFrame to strip PII from a synthetic method name must have that
+        // redaction applied to the raw stack too, not only to the structured frames -- else the raw copy
+        // reintroduces the value the app explicitly removed. The frame's coordinate is still preserved.
+        PiiScrubber custom = new PiiScrubber() {
+            public String scrubFrame(String className, String methodName) {
+                return methodName.replace("secret", "[redacted]");
+            }
+        };
+        String stack = "java.lang.RuntimeException: boom\n"
+                + "    at com.foo.Bar.secretMethod(Bar.java:42)\n";
+        String scrubbed = custom.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("secretMethod") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("[redacted]Method") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:42") >= 0, scrubbed);
+    }
+
+    @Test
     void indentedMessageContinuationWithArbitraryLabelIsScrubbed() {
         // An INDENTED message continuation (the message itself contains "\n    at ...") whose text happens
         // to look like a frame -- an arbitrary multi-word label plus a (File.java:line) location -- must
