@@ -88,9 +88,14 @@ jobs:
         with: { distribution: 'temurin', java-version: '8' }
 
       - name: Build plugin + cn1-ads-mock (JDK 8)
+        # Maven Central intermittently serves 403/429 from the runner CDN edge and Maven treats it
+        # as a permanent resolution failure, which killed this job at dependency download before
+        # anything was compiled. See scripts/ci/retry.sh; these steps only build, so a blanket
+        # retry cannot turn a flaky test into a pass.
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
+            mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Build hellocodenameone-common (JDK 17)
@@ -102,7 +107,8 @@ jobs:
           sleep 2
           mkdir -p "$HOME/.codenameone"
           [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
-          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
+          bash scripts/ci/retry.sh \
+            mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests '-Dmaven.javadoc.skip=true'
 
       - name: Package suite classes
         run: |
