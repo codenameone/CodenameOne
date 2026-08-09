@@ -2465,9 +2465,42 @@ static uint64_t cn1PhysFootprint(void) {
 }
 #endif
 
+// Resident set of this process in bytes, read from /proc/self/statm (field 2 is
+// resident pages). Linux has no phys_footprint; RSS is the right metric there
+// because MADV_DONTNEED drops the pages immediately rather than deferring to
+// memory pressure, so a release shows up in RSS the moment it happens.
+#if defined(__linux__)
+static uint64_t cn1LinuxResidentBytes(void) {
+    FILE* f = fopen("/proc/self/statm", "r");
+    if(f == 0) {
+        return 0;
+    }
+    unsigned long total = 0, resident = 0;
+    int n = fscanf(f, "%lu %lu", &total, &resident);
+    fclose(f);
+    if(n != 2) {
+        return 0;
+    }
+    long ps = sysconf(_SC_PAGESIZE);
+    if(ps <= 0) {
+        return 0;
+    }
+    return (uint64_t)resident * (uint64_t)ps;
+}
+#endif
+
 JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
 #if defined(__APPLE__) && defined(__OBJC__)
     return [NSProcessInfo processInfo].physicalMemory;
+#elif defined(__linux__)
+    {
+        long pages = sysconf(_SC_PHYS_PAGES);
+        long ps = sysconf(_SC_PAGESIZE);
+        if(pages > 0 && ps > 0) {
+            return (JAVA_LONG)((uint64_t)pages * (uint64_t)ps);
+        }
+    }
+    return 1024*1024*1024;
 #elif defined(__APPLE__)
     // Plain-C Apple target (the translator's clean target emits .c, so the
     // __OBJC__ branch above is unavailable there). sysctl reports the same
@@ -2491,6 +2524,12 @@ JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
     {
         JAVA_LONG total = java_lang_Runtime_totalMemoryImpl___R_long(threadStateData);
         uint64_t used = cn1PhysFootprint();
+        return used == 0 ? total : total - (JAVA_LONG)used;
+    }
+#elif defined(__linux__)
+    {
+        JAVA_LONG total = java_lang_Runtime_totalMemoryImpl___R_long(threadStateData);
+        uint64_t used = cn1LinuxResidentBytes();
         return used == 0 ? total : total - (JAVA_LONG)used;
     }
 #else
