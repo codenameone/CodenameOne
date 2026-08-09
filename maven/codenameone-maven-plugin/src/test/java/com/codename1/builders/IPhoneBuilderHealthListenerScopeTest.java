@@ -139,6 +139,45 @@ class IPhoneBuilderHealthListenerScopeTest {
         assertFalse(builder.reachesHealth(reachable("com/acme/WatchApp", "com/acme/Ui")));
     }
 
+    /**
+     * A screen reached only through a generated registry still counts.
+     *
+     * <p>Both stubs install the route dispatcher and the annotation bootstraps, and each names
+     * every target it can dispatch to -- so ParparVM retains a HealthKit screen reached only by
+     * route string, while a walk starting at the lifecycle cannot see it. That target then shipped
+     * without its entitlement and had its authorization request refused.</p>
+     */
+    @Test
+    void generatedRegistriesAreRootsOfTheWalk(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tmp)
+            throws Exception {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        java.io.File classes = tmp.toFile();
+        assertTrue(builder.installedRegistryRoots(classes).isEmpty(),
+                "a project with no generated registry contributes no extra roots");
+
+        write(classes, "com/codename1/router/generated/Routes.class");
+        write(classes, "cn1app/MapperBootstrap.class");
+        java.util.List<String> roots = builder.installedRegistryRoots(classes);
+        assertTrue(roots.contains("com/codename1/router/generated/Routes"), roots.toString());
+        assertTrue(roots.contains("cn1app/MapperBootstrap"), roots.toString());
+        // The health binding factory must never be a root: it names every listener, so rooting
+        // there would make both targets reach health whatever their lifecycle does.
+        for (String root : roots) {
+            assertFalse(root.contains("CN1HealthListenerBindings"), root);
+        }
+    }
+
+    private static void write(java.io.File dir, String relative) throws Exception {
+        java.io.File f = new java.io.File(dir, relative.replace('/', java.io.File.separatorChar));
+        f.getParentFile().mkdirs();
+        java.io.FileOutputStream out = new java.io.FileOutputStream(f);
+        try {
+            out.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
+        } finally {
+            out.close();
+        }
+    }
+
     /** A root that reaches no listener binds none, rather than falling back to all of them. */
     @Test
     void aRootThatReachesNoListenerBindsNone() {

@@ -441,10 +441,15 @@ Layer APIs directly.
 |`com.codename1.wearable` over WatchConnectivity
 |`com.codename1.wearable` over the Wearable Data Layer
 
-|Complications
-|WidgetKit accessory families
-|Complication data source and Tiles
+|Complications (no target generated yet)
+|WidgetKit accessory families, declarable only
+|Complication data source and Tiles, declarable only
 |===
+
+The complication row describes where each platform's watch surfaces will come
+from, not something you can ship today. You can declare the watch families on a
+surface kind, and nothing builds a complication or tile from them yet -- see
+<<watch-complications>> for what that means in practice.
 
 The wearable build is additive on both platforms: without a watch main class,
 your phone builds are unchanged.

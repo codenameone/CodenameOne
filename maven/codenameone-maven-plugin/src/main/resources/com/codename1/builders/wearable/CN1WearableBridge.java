@@ -151,6 +151,10 @@ public class CN1WearableBridge implements WearableBridge {
         this.capabilityClient = Wearable.getCapabilityClient(this.context);
         current = this;
         restoreClock(this.context);
+        // Anything a service process wrote down while the app was away, replayed before any live
+        // event of this run -- a one-shot message and a data removal have no other way back. First,
+        // because these are older than whatever arrives next and the app should see them in order.
+        drainSpool(this.context);
         // Sweep at startup as well as after each publish. An app that sends a few files and then
         // stops would otherwise never run the sweep again, leaving its last transfers published
         // indefinitely -- the post-publish sweep only helps an app that keeps transferring.
@@ -1286,9 +1290,221 @@ public class CN1WearableBridge implements WearableBridge {
                 c.startActivity(launch);
             }
         } catch (Throwable notPermitted) {
-            // Background activity starts are restricted on newer Android. The delivery stays in the
-            // in-memory queue and is replayed if the app opens while this process is still alive.
+            // Background activity starts are restricted on newer Android. Nothing is lost by that
+            // any more: the two deliveries that cannot be reconstructed later are spooled to disk
+            // before this is even attempted -- see spoolOrDeliverMessage / spoolOrDeliverRemoval.
         }
+    }
+
+    // ==================================================================
+    // the durable spool
+    // ==================================================================
+
+    /// Deliveries that survive this process, because nothing else can reconstruct them.
+    ///
+    /// The in-memory queue in WearableConnection is the right home for a delivery that arrives
+    /// before a listener registers -- while the process lives. It is the wrong home for one that
+    /// arrives in a service process the OS then reclaims, and two kinds cannot be recovered
+    /// afterwards:
+    ///
+    /// - a one-shot message, which the Data Layer does not retain at all, and
+    /// - a data REMOVAL, whose item is by definition gone, so startup replay sees nothing to report.
+    ///
+    /// A replicated value needs none of this: the item is still published and startup replay finds
+    /// it. Nor does a reply-bearing request -- an answer produced after the peer's call has timed
+    /// out is not an answer -- so those keep going straight to the in-memory queue.
+    ///
+    /// Depending on the activity launch to bridge the gap was the bug: Android 10+ refuses a
+    /// background start, and the catch above then left the delivery in memory with nothing to
+    /// drain it.
+    private static final String SPOOL_PREFS = "cn1_wearable_spool";
+
+    private static final String SPOOL_SEQ_KEY = "seq";
+
+    /// Enough to absorb a burst while the app is away; past this the OLDEST go, because a spool
+    /// that grows without bound is its own failure and the newest state is the more useful.
+    private static final int SPOOL_MAX_ENTRIES = 256;
+
+    private static final String SPOOL_MESSAGE = "m";
+
+    private static final String SPOOL_REMOVAL = "r";
+
+    /// Hands a one-shot message to a live listener, or writes it down for the next process.
+    static void spoolOrDeliverMessage(Context context, String path, byte[] payload) {
+        if (deliverableNow(context)) {
+            WearableConnection.deliverMessage(path, payload, 0);
+            return;
+        }
+        if (!spool(context, SPOOL_MESSAGE, path, payload)) {
+            // The spool is the durable half; if it could not be written, the in-memory queue is
+            // still better than dropping the message outright.
+            WearableConnection.deliverMessage(path, payload, 0);
+        }
+    }
+
+    /// The same for a removal, whose item no longer exists to be replayed from.
+    static void spoolOrDeliverRemoval(Context context, String path) {
+        if (deliverableNow(context)) {
+            WearableConnection.deliverDataRemoved(path);
+            return;
+        }
+        if (!spool(context, SPOOL_REMOVAL, path, null)) {
+            WearableConnection.deliverDataRemoved(path);
+        }
+    }
+
+    /// Whether this process can actually run app code, rather than merely hold it in a queue.
+    private static boolean deliverableNow(Context context) {
+        try {
+            if (!com.codename1.ui.Display.isInitialized()) {
+                return false;
+            }
+        } catch (Throwable notInitialized) {
+            return false;
+        }
+        // Initialized, so anything already spooled has to go FIRST -- otherwise a delivery written
+        // moments ago would arrive after one that happened later.
+        drainSpool(context);
+        return true;
+    }
+
+    private static boolean spool(Context context, String kind, String path, byte[] payload) {
+        Context c = spoolContext(context);
+        if (c == null) {
+            return false;
+        }
+        try {
+            android.content.SharedPreferences prefs =
+                    c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
+            long seq = prefs.getLong(SPOOL_SEQ_KEY, 0) + 1;
+            android.content.SharedPreferences.Editor edit = prefs.edit();
+            edit.putLong(SPOOL_SEQ_KEY, seq);
+            // Zero-padded, because the drain replays in key order and the whole point is that a
+            // message arrives in the order it was sent.
+            edit.putString(spoolKey(seq), kind + "|" + encode(path) + "|"
+                    + (payload == null ? "" : android.util.Base64.encodeToString(
+                            payload, android.util.Base64.NO_WRAP)));
+            trimSpool(prefs, edit);
+            // commit(), and its result: the caller falls back to the in-memory queue when the write
+            // did not land, so an ignored false would silently lose exactly what this exists for.
+            return edit.commit();
+        } catch (Throwable unavailable) {
+            return false;
+        }
+    }
+
+    /// Replays everything written down, oldest first, and forgets it only once it is delivered.
+    static void drainSpool(Context context) {
+        Context c = spoolContext(context);
+        if (c == null) {
+            return;
+        }
+        java.util.List<String> keys;
+        android.content.SharedPreferences prefs;
+        java.util.Map<String, ?> all;
+        try {
+            prefs = c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
+            all = prefs.getAll();
+            if (all.isEmpty()) {
+                return;
+            }
+            keys = new ArrayList<String>();
+            for (String k : all.keySet()) {
+                if (!SPOOL_SEQ_KEY.equals(k)) {
+                    keys.add(k);
+                }
+            }
+            if (keys.isEmpty()) {
+                return;
+            }
+            java.util.Collections.sort(keys);
+        } catch (Throwable unavailable) {
+            return;
+        }
+        // Removed BEFORE replay, and committed. A listener that throws must not leave the entry
+        // behind to be replayed on every launch from then on; a one-shot delivered once is the
+        // contract, and this is the only place that can hold to it.
+        android.content.SharedPreferences.Editor edit = prefs.edit();
+        for (String k : keys) {
+            edit.remove(k);
+        }
+        try {
+            if (!edit.commit()) {
+                return;
+            }
+        } catch (Throwable unavailable) {
+            return;
+        }
+        for (String k : keys) {
+            Object raw = all.get(k);
+            if (!(raw instanceof String)) {
+                continue;
+            }
+            replaySpooled((String) raw);
+        }
+    }
+
+    private static void replaySpooled(String record) {
+        int first = record.indexOf('|');
+        int second = first < 0 ? -1 : record.indexOf('|', first + 1);
+        if (first < 0 || second < 0) {
+            return;
+        }
+        String kind = record.substring(0, first);
+        String path = decode(record.substring(first + 1, second));
+        String encoded = record.substring(second + 1);
+        try {
+            if (SPOOL_REMOVAL.equals(kind)) {
+                WearableConnection.deliverDataRemoved(path);
+                return;
+            }
+            byte[] payload = encoded.length() == 0 ? new byte[0]
+                    : android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP);
+            WearableConnection.deliverMessage(path, payload, 0);
+        } catch (Throwable unreadable) {
+            // A record this build cannot parse is dropped rather than retried forever.
+        }
+    }
+
+    private static void trimSpool(android.content.SharedPreferences prefs,
+            android.content.SharedPreferences.Editor edit) {
+        java.util.List<String> keys = new ArrayList<String>();
+        for (String k : prefs.getAll().keySet()) {
+            if (!SPOOL_SEQ_KEY.equals(k)) {
+                keys.add(k);
+            }
+        }
+        if (keys.size() < SPOOL_MAX_ENTRIES) {
+            return;
+        }
+        java.util.Collections.sort(keys);
+        int drop = keys.size() - SPOOL_MAX_ENTRIES + 1;
+        for (int i = 0; i < drop; i++) {
+            edit.remove(keys.get(i));
+            android.util.Log.w("CN1Wearable", "wearable spool is full at " + SPOOL_MAX_ENTRIES
+                    + " entries; dropping the oldest undelivered entry " + keys.get(i));
+        }
+    }
+
+    private static String spoolKey(long seq) {
+        String digits = Long.toString(seq);
+        StringBuilder sb = new StringBuilder("e");
+        for (int i = digits.length(); i < 18; i++) {
+            sb.append('0');
+        }
+        return sb.append(digits).toString();
+    }
+
+    private static Context spoolContext(Context context) {
+        Context c = context;
+        if (c == null) {
+            c = serviceContext;
+        }
+        if (c == null) {
+            CN1WearableBridge b = current;
+            c = b == null ? null : b.context;
+        }
+        return c;
     }
 
     static void noteServiceContext(Context context) {
@@ -2823,7 +3039,10 @@ public class CN1WearableBridge implements WearableBridge {
             // listener ever drains leaves the app's persisted state holding a value the peer
             // deleted, with nothing left to correct it.
             ensureAppRunning();
-            WearableConnection.deliverDataRemoved(path);
+            // Spooled rather than queued when nothing can run it: the deleted item is gone from
+            // startup replay, so a removal lost with the service process leaves the app holding a
+            // value the peer deleted, with nothing left to correct it.
+            spoolOrDeliverRemoval(null, path);
             return true;
         }
     }
@@ -2941,7 +3160,7 @@ public class CN1WearableBridge implements WearableBridge {
                     // queued with no lifecycle to drain it -- and the deleted item is absent from
                     // startup replay, so the app's persisted state kept a value the peer removed.
                     ensureAppRunning();
-                    WearableConnection.deliverDataRemoved(path);
+                    spoolOrDeliverRemoval(null, path);
                 }
             } else if (!isRemovalAnnounced(before)) {
                 // A sentinel means this logical removal has already been reported, by an earlier
@@ -3661,6 +3880,7 @@ public class CN1WearableBridge implements WearableBridge {
         // would treat the two as one stream and discard the second sender's file whenever its
         // sequence did not happen to exceed the first's.
         String key = uri.getHost() + ":" + uri.getPath();
+        boolean durable;
         synchronized (transferClaims) {
             String previous = transferClaims.get(key);
             if (previous == null) {
@@ -3725,9 +3945,22 @@ public class CN1WearableBridge implements WearableBridge {
             // and since every transfer gets a unique sequence-suffixed URI the store would grow
             // without bound. Pruning needs a clock that measures elapsed time; the sequence is not
             // one.
-            persistClaim(context, key, sequence + "|"
+            durable = persistClaim(context, key, sequence + "|"
                     + (uri.getHost() == null ? "" : uri.getHost())
                     + "|" + System.currentTimeMillis());
+        }
+        if (!durable) {
+            // No acknowledgement without a durable claim. The acknowledgement is what lets the
+            // SENDER retire the item, and retiring it while this device has no claim on disk means
+            // a restart here finds neither the claim nor -- eventually -- the item, so the one-shot
+            // transfer is simply lost. Staying silent costs the sender an item kept until the hard
+            // cap and buys a redelivery this device will accept, which is the recoverable side of
+            // the trade. commit() returning false is rare (a full or unwritable store) and is
+            // exactly when this matters.
+            android.util.Log.w("CN1Wearable", "transfer claim for " + key
+                    + " was not written; withholding the acknowledgement so the sender keeps the"
+                    + " item and can redeliver it");
+            return;
         }
         publishTransferAck(context, uri);
     }
@@ -3921,15 +4154,19 @@ public class CN1WearableBridge implements WearableBridge {
      * <p>Bounded by the same window the sender sweeps its transfers on: once the item itself is
      * gone there is nothing left to re-deliver, so the claim has no one to stop and keeping it
      * would grow this store without limit.</p>
+     *
+     * @return whether the claim actually reached disk. The caller publishes the acknowledgement
+     *         only on true: a false says the sender must keep the item, because this device has
+     *         nothing to stop a redelivery with and losing the transfer is the unrecoverable side.
      */
-    private static void persistClaim(Context context, String key, String stamp) {
+    private static boolean persistClaim(Context context, String key, String stamp) {
         Context c = context;
         if (c == null) {
             CN1WearableBridge b = current;
             c = b == null ? null : b.context;
         }
         if (c == null) {
-            return;
+            return false;
         }
         try {
             android.content.SharedPreferences prefs =
@@ -3943,7 +4180,13 @@ public class CN1WearableBridge implements WearableBridge {
             // was still published, so the next startup replay handed the app the same file again.
             //
             // Called from the confirmation path on a Data Layer worker, never the main thread.
-            edit.commit();
+            //
+            // The RESULT matters, and ignoring it undid half the point of using commit(): a full or
+            // unwritable store returns false, and the caller then acknowledged a transfer this
+            // device has no durable claim on.
+            if (!edit.commit()) {
+                return false;
+            }
             // NO inline prune. Writing one claim says nothing about whether OTHER items are still
             // published, and the sender retries a failed deletion indefinitely -- so age-pruning
             // here could drop a live transfer's claim while recording an unrelated one, and the
@@ -3951,8 +4194,11 @@ public class CN1WearableBridge implements WearableBridge {
             // goes through a replay pass that has just refreshed what still exists; the
             // maintenance timer below is what keeps the store bounded.
             scheduleClaimPrune(c);
+            return true;
         } catch (Throwable unavailable) {
-            // Best effort: the in-memory claim still holds for this process.
+            // The in-memory claim still holds for this process, but nothing is on disk -- so this
+            // is a failure by the only measure the caller cares about.
+            return false;
         }
     }
 

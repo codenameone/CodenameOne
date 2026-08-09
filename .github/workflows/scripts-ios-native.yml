@@ -179,7 +179,11 @@ jobs:
           ./scripts/run-ios-native-tests.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 25
+        # 25 was enough while the sample built one app. It declares a watchMain now, so the app
+        # scheme carries an embedded watch app with a ParparVM translation of its own, and
+        # xcodebuild builds that before it can run a single test -- 16 of the 25 minutes went on
+        # compiling it. The packaging job already allows 65 for the same reason.
+        timeout-minutes: 45
 
       - name: Upload native iOS artifacts
         if: always()

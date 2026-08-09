@@ -151,10 +151,14 @@ public class CN1WearableListenerService extends WearableListenerService {
         }
         if (path.startsWith(CN1WearableBridge.messagePath() + "/")) {
             ensureAppRunning();
-            WearableConnection.deliverMessage(
+            // Through the spool, not straight into the in-memory queue. A one-shot message is not
+            // retained by the Data Layer, so if this service process is reclaimed before the user
+            // opens the app there is nothing left to replay -- and the activity launch above cannot
+            // be relied on to prevent that, because Android 10+ refuses a background start.
+            CN1WearableBridge.spoolOrDeliverMessage(getApplicationContext(),
                     CN1WearableBridge.decode(
                             path.substring(CN1WearableBridge.messagePath().length() + 1)),
-                    event.getData(), 0);
+                    event.getData());
         }
     }
 

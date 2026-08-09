@@ -192,13 +192,32 @@ public class IPhoneBuilder extends Executor {
     /// Roots are searched in order, which is how the isolated stubs are found: after the two entry
     /// points are separated each stub lives in a directory of its own and no longer in classesDir.
     java.util.Set<String> reachableClasses(java.util.List<File> roots, String rootInternal) {
+        return reachableClasses(roots,
+                java.util.Collections.singletonList(rootInternal));
+    }
+
+    /// The same, seeded from several roots at once.
+    ///
+    /// A translation has more entry points than its lifecycle class: each generated stub installs
+    /// the route dispatcher and the annotation bootstraps, and those registries name every target
+    /// they can dispatch to. A screen reached only by route string is therefore retained by the
+    /// translation while being invisible to a walk that starts at the lifecycle -- so a HealthKit
+    /// screen behind a route lost its target's entitlement and was refused at runtime.
+    java.util.Set<String> reachableClasses(java.util.List<File> roots,
+            java.util.Collection<String> rootInternals) {
         java.util.Set<String> seen = new java.util.HashSet<String>();
-        if (rootInternal == null || rootInternal.length() == 0) {
+        if (rootInternals == null) {
             return seen;
         }
         java.util.LinkedList<String> pending = new java.util.LinkedList<String>();
-        seen.add(rootInternal);
-        pending.add(rootInternal);
+        for (String rootInternal : rootInternals) {
+            if (rootInternal == null || rootInternal.length() == 0) {
+                continue;
+            }
+            if (seen.add(rootInternal)) {
+                pending.add(rootInternal);
+            }
+        }
         while (!pending.isEmpty()) {
             String name = pending.removeFirst();
             File classFile = null;
@@ -379,13 +398,54 @@ public class IPhoneBuilder extends Executor {
         // very lifecycle that uses HealthKit.
         String phoneRoot = origMainClass != null && origMainClass.length() > 0
                 ? origMainClass : request.getMainClass();
-        phoneReachableClasses = reachableClasses(roots, prefix + phoneRoot);
-        watchReachableClasses = reachableClasses(roots,
-                watchNativeBuilder.getWatchMain().replace('.', '/'));
+        // The registries BOTH stubs install are roots too. Each one names every class it can
+        // dispatch to, so the translation retains them -- a screen reached only by route string, or
+        // a mapper reached only through the bootstrap, is live code that a lifecycle-rooted walk
+        // cannot see. Reading it as unreachable stripped the entitlement from the target that
+        // retains the screen, and the authorization request was then refused at runtime.
+        //
+        // The health binding factory is deliberately NOT among them: it names every listener, so
+        // rooting the walk there would make both targets reach health whatever their lifecycle
+        // does, which is the circularity this attribution was built to break. It does not exist
+        // yet at this point either -- the answer here is what decides its contents.
+        java.util.List<String> registryRoots = installedRegistryRoots(classesDir);
+        java.util.List<String> phoneRoots = new java.util.ArrayList<String>(registryRoots);
+        phoneRoots.add(prefix + phoneRoot);
+        java.util.List<String> watchRoots = new java.util.ArrayList<String>(registryRoots);
+        watchRoots.add(watchNativeBuilder.getWatchMain().replace('.', '/'));
+        phoneReachableClasses = reachableClasses(roots, phoneRoots);
+        watchReachableClasses = reachableClasses(roots, watchRoots);
         phoneRootReachesHealth = reachesHealth(phoneReachableClasses);
         watchRootReachesHealth = reachesHealth(watchReachableClasses);
         log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
                 + ", watch=" + watchRootReachesHealth);
+    }
+
+    /// The generated registries a stub installs, as internal names, limited to the ones this
+    /// project actually produced.
+    ///
+    /// Kept in step with routeDispatcherInstallSource and annotationFrameworksInstallSource: those
+    /// decide what the stub instantiates, and this decides what the walk starts from. A registry
+    /// the project does not have is simply absent from classesDir and contributes nothing.
+    java.util.List<String> installedRegistryRoots(File classesDir) {
+        String[] candidates = {
+            "com/codename1/router/generated/Routes",
+            "com/codename1/generated/svg/SVGRegistry",
+            "cn1app/MapperBootstrap",
+            "cn1app/BinderBootstrap",
+            "cn1app/DaoBootstrap",
+            "cn1app/RestClientBootstrap",
+            "cn1app/ProtoBootstrap",
+            "cn1app/GrpcClientBootstrap",
+            "cn1app/GraphQLClientBootstrap",
+        };
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        for (String name : candidates) {
+            if (new File(classesDir, name.replace('/', File.separatorChar) + ".class").isFile()) {
+                out.add(name);
+            }
+        }
+        return out;
     }
 
     /// The listener bindings one translation root can actually reach.
