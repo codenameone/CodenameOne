@@ -4601,6 +4601,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             writeTracked(undo, document.path(), xml);
             writeTracked(undo, sourcePath, companion);
             regenerateModelFor = null;
+            // An open Model pane still shows what it loaded. Leaving it there meant its Save wrote
+            // the previous strategy's model back over the one just generated, with the companion
+            // already on the new strategy. A dirty pane is left alone -- its unsaved text is the
+            // user's, and the discard prompt exists for that.
+            if (model != null && "model".equals(editorBufferKind) && !editorBufferIsDirty()
+                    && activeEditorReopen != null) {
+                editorBuffer = model;
+                editorBufferOnDisk = model;
+                reopenActiveEditor();
+            }
             document.markSaved();
             recordAction("saved", "form", relativeFormName(document.path()));
             setStatus("Saved " + relativeFormName(document.path()) + " and its companion source");
@@ -5592,12 +5602,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // The PropertyBusinessObject model declares its own PropertyIndex called index, so a
         // bindable control named "index" produced a model with two fields of that name.
         used.add("index");
+        // Accessor names are claimed alongside field names. The @Bindable model derives getX/setX
+        // by capitalising the first letter, so "email" and "Email" are distinct fields that produce
+        // one pair of accessors and a model that will not compile.
+        Set<String> accessors = new LinkedHashSet<>();
         for (Element element : document.components()) {
             if (element == document.root()) continue;
             String base = javaIdentifier(value(element, "name", value(element, "type", "component")));
             String candidate = base;
             int suffix = 2;
-            while (!used.add(candidate)) {
+            while (!used.add(candidate) || !accessors.add(accessorSuffix(candidate))) {
+                used.remove(candidate);
                 candidate = base + suffix;
                 suffix++;
             }
@@ -5622,6 +5637,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             + "package|private|protected|public|return|short|static|strictfp|super|switch|"
             + "synchronized|this|throw|throws|transient|true|try|void|volatile|while|_|var|record|"
             + "sealed|permits|yield|";
+
+    /**
+     * The capitalised stem the generated accessors use, so two field names that differ only in the
+     * case of their first letter can be told apart before they collide as getX/setX.
+     *
+     * @param name the field name
+     * @return the accessor stem
+     */
+    private static String accessorSuffix(String name) {
+        return name.length() == 0 ? name : Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
 
     private static boolean isJavaReserved(String identifier) {
         return JAVA_RESERVED.indexOf("|" + identifier + "|") >= 0;
@@ -5661,14 +5687,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             at = code.indexOf(handler, at);
             if (at < 0) return false;
             int after = at + handler.length();
-            // Whole word, or "onClickHandler" would satisfy a search for "onClick".
-            boolean boundedLeft = at == 0 || !isIdentifierChar(code.charAt(at - 1));
+            // Whole word, and not receiver qualified: "helper.onClick(new ActionEvent(this))" is a
+            // call, and accepting it suppressed the stub the generated this::onClick listener needs.
+            char previous = at == 0 ? ' ' : code.charAt(at - 1);
+            boolean boundedLeft = !isIdentifierChar(previous) && previous != '.';
             int open = skipSpaces(code, after);
             if (boundedLeft && open < code.length() && code.charAt(open) == '(') {
                 int close = code.indexOf(')', open);
-                if (close > open && code.substring(open + 1, close).indexOf("ActionEvent") >= 0) {
-                    // Legal formatting puts space between the name and the parenthesis, so
-                    // "void onClick (ActionEvent event)" is the same declaration.
+                if (close > open && code.substring(open + 1, close).indexOf("ActionEvent") >= 0
+                        && code.charAt(skipSpaces(code, close + 1)) == '{') {
+                    // A body follows a declaration; a call is followed by a semicolon or an
+                    // operator. Legal formatting puts space before the parenthesis and before the
+                    // brace, so "void onClick (ActionEvent event)\n{" is the same declaration.
                     return true;
                 }
             }
