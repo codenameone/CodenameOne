@@ -3513,6 +3513,14 @@ public class IPhoneBuilder extends Executor {
                 parparCmd.add("-DsaveUnitTests=" + isUnitTestMode());
                 parparCmd.add("-DfieldNullChecks=" + fieldNullChecks);
                 parparCmd.add("-DINCLUDE_NPE_CHECKS=" + includeNullChecks);
+                // Both keyed on the cipher flag, not on usesDatabase, and that is deliberate on
+                // iOS: cn1.sqlite emits the bundled engine, and this platform already has one.
+                // ByteCodeTranslator links the system libsqlite3.dylib whenever the cipher is off,
+                // and the bindings in cn1_db_sqlite_impl.h resolve against it, so an application
+                // that uses com.codename1.db without encryption gets a working database and pays
+                // nothing for a second copy of SQLite. Emitting the bundle here would put two
+                // implementations in one process. Encryption is the only thing the system engine
+                // cannot do, which is why turning it on switches both flags at once.
                 parparCmd.add("-Dcn1.sqlite=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
                 parparCmd.add("-Dcn1.onDeviceDebug=" + onDeviceDebug);

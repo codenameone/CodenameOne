@@ -760,16 +760,27 @@ public abstract class Database {
             openSavepoints.addElement(name == null ? "" : name);
             return;
         }
-        if (!"RELEASE".equals(keyword) || openSavepoints.isEmpty()) {
+        boolean rollbackTo = "ROLLBACK".equals(keyword) && hasToSavepoint(statement);
+        if (!"RELEASE".equals(keyword) && !rollbackTo) {
             return;
         }
-        int at = lastIndexOfSavepoint(savepointName(statement, true));
+        if (openSavepoints.isEmpty()) {
+            return;
+        }
+        // ROLLBACK TO names its savepoint after an optional TRANSACTION and an optional SAVEPOINT
+        // keyword, so the name is read past both.
+        int at = lastIndexOfSavepoint(rollbackTo
+                ? rollbackToSavepointName(statement) : savepointName(statement, true));
         if (at < 0) {
-            // Names something that is not open. SQLite answers that with an error and releases
+            // Names something that is not open. SQLite answers that with an error and unwinds
             // nothing, so neither does this.
             return;
         }
-        // Everything above it goes as well, which is what makes the stack necessary.
+        // Everything above it goes either way. The difference is the savepoint named: RELEASE
+        // takes it too, ROLLBACK TO keeps it open so the caller can roll back to it again.
+        if (rollbackTo) {
+            at++;
+        }
         while (openSavepoints.size() > at) {
             openSavepoints.removeElementAt(openSavepoints.size() - 1);
         }
@@ -779,6 +790,25 @@ public abstract class Database {
             // own COMMIT and not here.
             endTransactionCompletely();
         }
+    }
+
+    /// The savepoint a `ROLLBACK TO` names, upper cased, or null.
+    ///
+    /// `ROLLBACK [TRANSACTION] TO [SAVEPOINT] name`, so up to three optional words stand between
+    /// the keyword and the name.
+    private static String rollbackToSavepointName(String statement) {
+        int at = skipLeadingTrivia(statement, endOfKeyword(statement, skipLeadingTrivia(statement, 0)));
+        if ("TRANSACTION".equals(keywordAt(statement, at))) {
+            at = skipLeadingTrivia(statement, endOfKeyword(statement, at));
+        }
+        if (!"TO".equals(keywordAt(statement, at))) {
+            return null;
+        }
+        at = skipLeadingTrivia(statement, endOfKeyword(statement, at));
+        if ("SAVEPOINT".equals(keywordAt(statement, at))) {
+            at = skipLeadingTrivia(statement, endOfKeyword(statement, at));
+        }
+        return savepointNameAt(statement, at);
     }
 
     /// The position of the innermost open savepoint with this name, or -1.
@@ -811,6 +841,11 @@ public abstract class Database {
         if (optionalSavepointKeyword && "SAVEPOINT".equals(keywordAt(statement, at))) {
             at = skipLeadingTrivia(statement, endOfKeyword(statement, at));
         }
+        return savepointNameAt(statement, at);
+    }
+
+    /// The identifier starting at `from`, upper cased and unquoted, or null.
+    private static String savepointNameAt(String statement, int at) {
         int length = statement.length();
         if (at >= length) {
             return null;

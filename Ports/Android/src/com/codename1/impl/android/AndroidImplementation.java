@@ -11522,7 +11522,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         + "put back. The data is in that file; it was left there rather than "
                         + "removed.");
             }
-            displaced.delete();
+            // The same cleanup an abandoned export gets, and for the same reason: this file is a
+            // complete copy of the database, and after a failed decryption it is the plaintext
+            // one. A delete() whose result nobody reads would leave it beside the restored
+            // database under a predictable name while recovery reported success.
+            String surviving = discardDatabaseMigrationExport(displaced);
+            if (surviving.length() > 0) {
+                throw new IOException("The database " + path + " was restored from its backup, but"
+                        + " the converted copy could not be removed." + surviving);
+            }
             marker.delete();
             return;
         }

@@ -64,7 +64,14 @@ public class SEDatabase extends Database {
         this(conn, null, null);
     }
 
-    public SEDatabase(java.sql.Connection conn, String databaseName) throws IOException {
+    /**
+     * Package private for the same reason as the three-argument form: it keys the registry on the
+     * name it is handed, and a caller outside this package has no way to hand it the resolved file
+     * that {@code Database.openOrCreate} registers. Passing "app.db" for a connection to the file
+     * that name resolves to would file the same database under two entries, and either handle
+     * could then pass the sole-connection check and rekey it underneath the other.
+     */
+    SEDatabase(java.sql.Connection conn, String databaseName) throws IOException {
         reserveConnection(databaseName);
         boolean kept = false;
         try {

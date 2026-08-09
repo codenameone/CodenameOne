@@ -328,6 +328,32 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void rollbackToTakesTheSavepointsAboveItAndKeepsItsOwn() {
+        // ROLLBACK TO unwinds to its savepoint and releases everything above it, but keeps the one
+        // it names so the caller can roll back to it again. Ignoring it left stale entries below,
+        // so the final release never emptied the stack and the transaction was reported open after
+        // SQLite had ended it.
+        db.ran("SAVEPOINT s");
+        db.ran("SAVEPOINT t");
+        db.ran("SAVEPOINT s");
+        db.ran("ROLLBACK TO t");
+        assertTrue(db.isInTransaction(), "t and the outer s are still open");
+        db.ran("RELEASE s");
+        assertFalse(db.isInTransaction(), "releasing the outermost s ended the transaction");
+    }
+
+    @Test
+    void rollingBackToASavepointTwiceKeepsIt() {
+        // The savepoint survives its own rollback, so a second one is legal and ends nothing.
+        db.ran("SAVEPOINT outer");
+        db.ran("ROLLBACK TO outer");
+        db.ran("ROLLBACK TRANSACTION TO SAVEPOINT outer");
+        assertTrue(db.isInTransaction(), "the savepoint it names is still open");
+        db.ran("RELEASE outer");
+        assertFalse(db.isInTransaction());
+    }
+
+    @Test
     void savepointsUnderABeginEndNothing() {
         // Under a BEGIN the savepoints are marks inside a transaction the BEGIN owns. Releasing
         // all of them ends none of it.
