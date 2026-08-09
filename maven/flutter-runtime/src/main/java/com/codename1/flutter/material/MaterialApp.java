@@ -291,7 +291,12 @@ public class MaterialApp extends StatelessWidget {
                 }
             }
         }
-        return wrapWithLocalizations(content);
+        // Below the localizations scope, exactly where Flutter puts the app's Navigator.
+        // A push that arrives from outside the widget tree - a deep link, a notification
+        // tap, a test harness - inherits from here, so it sees the same Theme,
+        // MediaQuery, Localizations and providers a push from a widget would.
+        return wrapWithLocalizations(
+                new com.codename1.flutter.navigation.Navigator.RootScope(content));
     }
 
     /**

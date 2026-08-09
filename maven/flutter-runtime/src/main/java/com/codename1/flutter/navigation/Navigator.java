@@ -258,6 +258,7 @@ public class Navigator extends StatelessWidget {
      */
     public static void reset() {
         stack.clear();
+        rootScopeContext = null;
     }
 
     /**
@@ -346,8 +347,48 @@ public class Navigator extends StatelessWidget {
 
     /** The element a push should inherit from, or null when unknown. */
     private static com.codename1.flutter.Element pushingElement(BuildContext context) {
-        return context instanceof com.codename1.flutter.Element
-                ? (com.codename1.flutter.Element) context : null;
+        if (context instanceof com.codename1.flutter.Element) {
+            return (com.codename1.flutter.Element) context;
+        }
+        // A push from outside the tree - a deep link, a notification tap, a test
+        // harness - has no context of its own, and a route mounted with no ancestors
+        // dies on its first Theme.of / MediaQuery.of / Localizations.of. Inherit from
+        // the app's root navigator position instead, which is what pushing on the root
+        // navigator means in Flutter.
+        if (rootScopeContext != null && rootScopeContext.isMounted()) {
+            return rootScopeContext;
+        }
+        // No MaterialApp (a bare FlutterUI.wrap tree, say): the showing tree's root is
+        // the best ancestor available.
+        BuildContext showing = com.codename1.flutter.FlutterUI.currentContext();
+        return showing instanceof com.codename1.flutter.Element
+                ? (com.codename1.flutter.Element) showing : null;
+    }
+
+    /// Where the app's root navigator sits - below MaterialApp's Theme, MediaQuery and
+    /// Localizations, above the app content. Established by {@link RootScope}.
+    private static com.codename1.flutter.Element rootScopeContext;
+
+    /**
+     * Marks the app's root navigator position in the element tree. MaterialApp inserts
+     * one below its localizations scope; its only job is to remember its own context so
+     * a context-less {@code pushNamed} can inherit from the right place.
+     */
+    public static final class RootScope extends com.codename1.flutter.StatelessWidget {
+
+        private final Widget child;
+
+        public RootScope(Widget child) {
+            this.child = child;
+        }
+
+        @Override
+        public Widget build(BuildContext context) {
+            if (context instanceof com.codename1.flutter.Element) {
+                rootScopeContext = (com.codename1.flutter.Element) context;
+            }
+            return child;
+        }
     }
 
     /** A {@link NavigatorState} that pushes on behalf of a specific context. */

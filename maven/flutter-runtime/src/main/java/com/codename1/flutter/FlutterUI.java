@@ -63,9 +63,36 @@ public final class FlutterUI {
         host.form(f);
         Container c = new Container(new FlutterRootLayout(host));
         host.container(c);
-        mount(root, host, new BuildOwner(), contextFallback);
+        Element mounted = mount(root, host, new BuildOwner(), contextFallback);
+        // Kept on the Form rather than in a static: the Form owns its tree, so a popped
+        // route's element cannot outlive it here and currentContext() always answers for
+        // whatever is actually showing.
+        f.putClientProperty(ROOT_ELEMENT, mounted);
         f.add(BorderLayout.CENTER, c);
         return host;
+    }
+
+    private static final String ROOT_ELEMENT = "cn1$flutterRootElement";
+
+    /**
+     * A BuildContext for the tree currently on screen, or null when the current Form
+     * is not a Flutter one.
+     *
+     * <p>Exists because {@code Navigator.pushNamed} needs a context to inherit from: a
+     * route pushed with a null context gets no ancestor chain, so {@code Theme.of},
+     * {@code MediaQuery.of}, {@code Localizations.of} and every provider above it find
+     * nothing — the pushed page then throws on the first thing it looks up. Widgets
+     * always have their own context and should pass it; this is for callers OUTSIDE the
+     * tree — a deep link, a notification tap, a test harness — which have none of their
+     * own and would otherwise pass null.</p>
+     */
+    public static BuildContext currentContext() {
+        if (!Display.isInitialized()) {
+            return null;
+        }
+        Form f = Display.getInstance().getCurrent();
+        Object e = f == null ? null : f.getClientProperty(ROOT_ELEMENT);
+        return e instanceof Element && ((Element) e).mounted ? (Element) e : null;
     }
 
     /**
