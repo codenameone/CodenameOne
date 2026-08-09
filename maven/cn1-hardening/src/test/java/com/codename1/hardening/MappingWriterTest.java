@@ -22,6 +22,7 @@
  */
 package com.codename1.hardening;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -70,6 +71,23 @@ public class MappingWriterTest {
         // Widget got no comment (not in the map).
         assertFalse(out, out.contains("Widget.kt"));
         assertFalse(out, out.contains("\"fileName\":\"Widget"));
+    }
+
+    @Test
+    public void escapesControlCharactersInSourceFileMetadata() throws Exception {
+        File map = mappingWith("com.foo.Screen -> a:\n");
+        Map<String, String> sf = new HashMap<String, String>();
+        sf.put("com.foo.Screen", "od\td\nx.kt");   // a tab and a newline in the file name
+
+        MappingWriter.injectSourceFiles(map, sf);
+        String out = read(map);
+        // The control characters are emitted as escapes (\t, \n), so the metadata stays a single comment
+        // line -- a raw newline would split it and break the reader.
+        assertTrue(out, out.contains("\"fileName\":\"od\\td\\nx.kt\"}"));
+        // Exactly one metadata comment line -- the raw newline did NOT split it into two lines.
+        int first = out.indexOf("# {\"id\":\"sourceFile\"");
+        assertTrue(first >= 0);
+        assertEquals("metadata must be a single line", -1, out.indexOf("# {\"id\":\"sourceFile\"", first + 1));
     }
 
     @Test

@@ -93,6 +93,21 @@ public class MappingFileTest {
     }
 
     @Test
+    public void decodesControlCharacterEscapesInSourceFileMetadata() throws Exception {
+        // A filename with a control character (a tab here, plus a unicode-escaped 'A') is written with the
+        // control chars escaped so the single-line comment is not split. The parser must decode \t and
+        // the 4-hex-digit backslash-u form back to their literal characters, not the letters t / u.
+        // File value is: od\td\u0041.kt  ->  od<TAB>dA.kt
+        String mapping =
+                "com.example.Screen -> a.b:\n"
+                + "    # {\"id\":\"sourceFile\",\"fileName\":\"od\\td\\u0041.kt\"}\n"
+                + "    142:145:void onClick() -> a\n";
+        MappingFile mf = MappingFile.parse(mapping);
+        Frame out = mf.retrace(new Frame("a.b", "a", "b.java", 143));
+        assertEquals("od\td" + "A.kt", out.getFileName());
+    }
+
+    @Test
     public void synthesizesSourceFileWhenMappingHasNoMetadata() throws Exception {
         // Without sourceFile metadata, a stripped-SourceFile frame still synthesizes <Class>.java.
         String mapping =

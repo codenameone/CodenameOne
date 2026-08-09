@@ -154,8 +154,28 @@ public final class MappingFile {
         while (i < n) {
             char c = comment.charAt(i);
             if (c == '\\' && i + 1 < n) {
-                // A JSON escape: the next character is literal (covers the \" and \\ the writer emits).
-                name.append(comment.charAt(i + 1));
+                // A JSON escape. Decode the ones the writer emits -- the quote/backslash/slash escapes, the
+                // control-character escapes (b f n r t) and the 4-hex-digit backslash-u form -- back to
+                // their literal characters, so a filename that contained a control character round-trips
+                // instead of being read as the escape letters.
+                char e = comment.charAt(i + 1);
+                if (e == 'u' && i + 6 <= n) {
+                    try {
+                        name.append((char) Integer.parseInt(comment.substring(i + 2, i + 6), 16));
+                        i += 6;
+                        continue;
+                    } catch (NumberFormatException malformed) {
+                        // Not a valid 4-hex-digit escape; fall through and treat 'u' as a literal character.
+                    }
+                }
+                switch (e) {
+                    case 'b': name.append('\b'); break;
+                    case 'f': name.append('\f'); break;
+                    case 'n': name.append('\n'); break;
+                    case 'r': name.append('\r'); break;
+                    case 't': name.append('\t'); break;
+                    default:  name.append(e); break;   // \" \\ \/ and any other -> the literal next char
+                }
                 i += 2;
             } else if (c == '"') {
                 String s = name.toString().trim();

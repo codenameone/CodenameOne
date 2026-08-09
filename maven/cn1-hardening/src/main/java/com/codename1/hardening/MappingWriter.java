@@ -121,9 +121,38 @@ public final class MappingWriter {
         }
     }
 
-    /** Escapes the two characters that would break a JSON string value; filenames rarely need it. */
+    /**
+     * Escapes a string for a JSON value. Besides {@code \} and {@code "}, a control character (newline,
+     * tab, ...) must be escaped too: the metadata is a single mapping-comment line, so a raw newline would
+     * split it and a raw control char is invalid JSON, either of which stops the reader from recovering the
+     * filename. Reachable for a Kotlin or package-private Java class stored in an unusually named file.
+     */
     private static String jsonEscape(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder b = new StringBuilder(s.length() + 8);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\\': b.append("\\\\"); break;
+                case '"': b.append("\\\""); break;
+                case '\b': b.append("\\b"); break;
+                case '\f': b.append("\\f"); break;
+                case '\n': b.append("\\n"); break;
+                case '\r': b.append("\\r"); break;
+                case '\t': b.append("\\t"); break;
+                default:
+                    if (c < 0x20) {
+                        b.append("\\u");
+                        String hex = Integer.toHexString(c);
+                        for (int p = hex.length(); p < 4; p++) {
+                            b.append('0');
+                        }
+                        b.append(hex);
+                    } else {
+                        b.append(c);
+                    }
+            }
+        }
+        return b.toString();
     }
 
     static String sha256Hex(byte[] data) throws HardeningException {
