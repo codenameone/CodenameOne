@@ -93,6 +93,19 @@ public class MappingFileTest {
     }
 
     @Test
+    public void preservesLeadingAndTrailingWhitespaceInSourceFileName() throws Exception {
+        // A Unix source filename may legitimately have surrounding whitespace; the closing quote bounds the
+        // JSON value exactly, so the parser must keep it verbatim rather than trim it to a different name.
+        String mapping =
+                "com.example.Screen -> a.b:\n"
+                + "    # {\"id\":\"sourceFile\",\"fileName\":\" Screen .kt \"}\n"
+                + "    142:145:void onClick() -> a\n";
+        MappingFile mf = MappingFile.parse(mapping);
+        Frame out = mf.retrace(new Frame("a.b", "a", "b.java", 143));
+        assertEquals(" Screen .kt ", out.getFileName());
+    }
+
+    @Test
     public void decodesControlCharacterEscapesInSourceFileMetadata() throws Exception {
         // A filename with a control character (a tab here, plus a unicode-escaped 'A') is written with the
         // control chars escaped so the single-line comment is not split. The parser must decode \t and

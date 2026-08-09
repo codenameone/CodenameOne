@@ -178,8 +178,10 @@ public final class MappingFile {
                 }
                 i += 2;
             } else if (c == '"') {
-                String s = name.toString().trim();
-                return s.length() == 0 ? null : s;
+                // Return the decoded value verbatim: the closing quote bounds the JSON string exactly, so
+                // any leading/trailing whitespace is part of the filename (a Unix name may have it) and must
+                // be preserved, not trimmed. Only a genuinely empty value counts as "no source file".
+                return name.length() == 0 ? null : name.toString();
             } else {
                 name.append(c);
                 i++;
