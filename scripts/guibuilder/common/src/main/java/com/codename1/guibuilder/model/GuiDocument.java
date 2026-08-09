@@ -753,6 +753,23 @@ public final class GuiDocument {
         }
     }
 
+    /**
+     * Abandons the current transaction, putting the document back exactly as it was when the
+     * transaction opened and recording nothing on the undo stack.
+     *
+     * <p>A rejected drag used to be cleaned up with ordinary edits, so the insertion and its
+     * deletion both landed in the history and the next Undo resurrected a component the user had
+     * been told was discarded -- and left a freshly opened document marked modified even though its
+     * XML was unchanged.
+     */
+    public void abortTransaction() {
+        if (transactionDepth == 0) return;
+        transactionDepth = 0;
+        State start = transactionStart;
+        transactionStart = null;
+        if (start != null) restore(start);
+    }
+
     public boolean undo() {
         if (!canUndo()) return false;
         redo.add(capture());

@@ -1449,15 +1449,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private void addComponentAt(String type, int x, int y) {
         Element previous = document.selected();
         Element added = null;
-        // A rejected drop has to leave the document exactly as it was. The candidate is inserted
-        // under the current selection before the plan is known, and for a TableLayout parent that
-        // insertion assigns a cell and can grow tableLayoutRows -- undoing only the child left the
-        // table enlarged and the document dirty for a drop that never happened.
-        String tableRowsBefore = null;
-        Element candidateParent = GuiDocument.acceptsChildren(previous) ? previous : document.parentOf(previous);
-        if (candidateParent != null && "TableLayout".equals(candidateParent.getAttribute("layout"))) {
-            tableRowsBefore = candidateParent.getAttribute("tableLayoutRows");
-        }
+        // The whole speculative insert runs inside one transaction so a rejected drop can be
+        // abandoned outright. Undoing it with compensating edits left both the addition and its
+        // deletion in the history -- the next Undo brought back a component the user had been told
+        // was discarded -- and marked an untouched document modified.
+        document.beginTransaction();
+        boolean committed = false;
         try {
             added = document.addComponent(type);
             if (added == null) {
@@ -1474,42 +1471,33 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             });
             DropPlan plan = planDrop(added, target, palettePreview, x, y);
             if (plan == null || !plan.valid) {
-                document.select(added);
-                document.deleteSelected();
-                restoreTableRows(candidateParent, tableRowsBefore);
-                document.select(previous);
                 setStatus(plan == null ? "Drop inside the form to add " + type : plan.message);
                 return;
             }
-            if (applyDropPlan(added, plan, x, y)) {
-                setStatus("Added " + type + (plan.constraint == null ? "" : " to " + plan.constraint));
-                scheduleDesignerRefresh();
+            if (!applyDropPlan(added, plan, x, y)) {
+                // applyDropPlan refuses when it cannot place the component or relocate an
+                // occupant; without this the candidate stayed attached to the selection.
+                setStatus("Could not place " + type + " there");
+                return;
             }
+            committed = true;
+            setStatus("Added " + type + (plan.constraint == null ? "" : " to " + plan.constraint));
+            scheduleDesignerRefresh();
         } catch (Throwable ex) {
             Log.e(ex);
-            if (added != null && document.parentOf(added) != null) {
-                document.select(added);
-                document.deleteSelected();
-                restoreTableRows(candidateParent, tableRowsBefore);
+            setStatus("Drop failed safely - " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
+        } finally {
+            if (committed) {
+                document.endTransaction();
+            } else {
+                document.abortTransaction();
                 document.select(previous);
             }
-            setStatus("Drop failed safely — " + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
-        } finally {
             hideDropGuide();
             if (workspace != null) workspace.revalidate();
         }
     }
 
-    /**
-     * Puts a table's declared row count back after a rejected drop.
-     *
-     * @param parent the table the candidate was inserted into, or null when it was not a table
-     * @param rows the value the attribute held before, possibly null
-     */
-    private void restoreTableRows(Element parent, String rows) {
-        if (parent == null || !"TableLayout".equals(parent.getAttribute("layout"))) return;
-        document.setAttribute(parent, "tableLayoutRows", rows);
-    }
 
     private boolean dropAfter(Element target, String layout, int x, int y) {
         if (target == null || GuiDocument.acceptsChildren(target)) return false;
@@ -5713,7 +5701,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private static int skipSpaces(String text, int from) {
         int at = from;
-        while (at < text.length() && (text.charAt(at) == ' ' || text.charAt(at) == '\t')) at++;
+        // Line terminators too. The comment at the call site claimed Allman bracing was handled
+        // while this skipped only spaces and tabs, so "void onClick(ActionEvent event)\n{" was
+        // missed and Save appended a second method with the same signature.
+        while (at < text.length() && Character.isWhitespace(text.charAt(at))) at++;
         return at;
     }
 
