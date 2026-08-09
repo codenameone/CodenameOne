@@ -3085,22 +3085,30 @@ static CodenameOne_GLViewController *sharedSingleton;
   // Optional: declare signIn.actions, see "app activities"
   signIn.delegate = self;
 #else
-  // Nothing to set up ahead of time. GoogleSignIn carries the client id on a
-  // GIDConfiguration and the scopes on the sign-in call itself, and reports the result to a
-  // completion block rather than to a delegate, so all of it belongs at the point of sign-in.
+  // Nothing to prime for GoogleSignIn 7: none of the three properties this
+  // used to set still exist. The client id and the scopes are arguments to the
+  // sign-in call itself (see googleLogin in GoogleConnectImpl.m), which always
+  // requests the basic profile scopes, and the delegate is now a completion
+  // handler passed at the same call.
 #endif
 #endif
-    
+
 }
 
 #ifdef INCLUDE_GOOGLE_CONNECT
 #ifndef GOOGLE_SIGNIN
 extern void com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(GTMOAuth2Authentication *auth, NSError * error);
+
 - (void)finishedWithAuth: (GTMOAuth2Authentication *)auth
                    error: (NSError *) error {
     com_codename1_impl_ios_GoogleConnectImpl_finishedWithAuth(auth, error);
 }
 #endif
+// The GoogleSignIn path has no callbacks here any more: the two delegate
+// methods this file used to implement went away with GIDSignInDelegate, and
+// the result now arrives at the completion handler GoogleConnectImpl.m
+// installs, which is also where the Java-side fields are written. Nothing
+// forwards through the view controller.
 #endif
 
 bool lockDrawing;
