@@ -96,10 +96,14 @@ jobs:
           set -euo pipefail
           python3 scripts/website/queue_browser_syndication.py
 
-      - name: Queue scheduled LinkedIn posts
+      # LinkedIn's weekly blog-post syndication is paused. Keep validating
+      # existing artifacts so malformed inputs still fail CI, but do not add
+      # them to the browser publisher queue. An explicitly approved post can
+      # still be queued manually with queue_social_posts.py.
+      - name: Validate LinkedIn posts without queueing
         run: |
           set -euo pipefail
-          python3 scripts/website/queue_social_posts.py
+          python3 scripts/website/queue_social_posts.py --validate-only
 
       - name: Upload syndication screenshots on failure
         if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}
