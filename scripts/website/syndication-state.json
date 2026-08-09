@@ -1573,6 +1573,16 @@
       "medium": {
         "url": "https://medium.com/p/7dc7a4f45437/edit",
         "syndicated_at": "2026-08-08T17:00:47+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/health-data-without-fake-certainty",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a78966ec2a026bbfcbad16a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-09T15:03:05+00:00"
       }
     },
     "on-device-ai-mcp-loopback": {
@@ -1580,6 +1590,10 @@
         "id": 4353762,
         "url": "https://dev.to/codenameone/on-device-ai-and-mcp-on-every-port-9a2",
         "syndicated_at": "2026-08-09T13:43:43+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/0555ea24ec4e/edit",
+        "syndicated_at": "2026-08-09T15:01:51+00:00"
       }
     }
   }
