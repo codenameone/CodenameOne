@@ -134,6 +134,24 @@ public final class ProjectIO {
         fs.delete(backup);
     }
 
+    /**
+     * Removes a file, used when rolling back a save that created it.
+     *
+     * @param path the file to remove
+     * @throws IOException when the file is still there afterwards
+     */
+    public static void delete(String path) throws IOException {
+        FileSystemStorage fs = FileSystemStorage.getInstance();
+        String url = fsUrl(path);
+        if (!fs.exists(url)) return;
+        fs.delete(url);
+        if (fs.exists(url)) {
+            // delete() fails silently, so the caller would otherwise be told the rollback removed
+            // a file that is still on disk.
+            throw new IOException("Could not remove " + path);
+        }
+    }
+
     private static String fileName(String url) {
         int slash = url.lastIndexOf('/');
         return slash < 0 ? url : url.substring(slash + 1);

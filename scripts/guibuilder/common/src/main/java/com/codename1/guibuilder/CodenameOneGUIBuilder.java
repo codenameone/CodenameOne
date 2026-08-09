@@ -1990,19 +1990,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             setStatus("That cell cannot hold this component's span");
             return false;
         }
-        if (oldParent != plan.parent) {
-            document.select(dragged);
-            if (!document.moveSelectedToParent(plan.parent, componentChildren(plan.parent).size())) return false;
-        }
+        // The occupant's destination is decided here, before anything moves, for the same reason:
+        // the search can come back empty, and refusing the drop after moveSelectedToParent() has
+        // reparented the dragged component leaves that reparent committed by endTransaction().
+        int[] destination = null;
         if (plan.occupied != null) {
-            document.select(plan.occupied);
-            // The displaced component keeps its own span, so the cell being vacated is only a
-            // destination if that whole rectangle fits there. Checking the dragged component's
-            // span and not this one left a spanning occupant anchored past the table edge or on
-            // top of a neighbour.
             boolean canSwap = oldParent == plan.parent && vacatedRow != null && vacatedColumn != null
                     && spanFitsAt(plan.parent, plan.occupied, dragged, vacatedRow.intValue(), vacatedColumn.intValue());
-            int[] destination = canSwap ? new int[]{vacatedRow.intValue(), vacatedColumn.intValue()}
+            destination = canSwap ? new int[]{vacatedRow.intValue(), vacatedColumn.intValue()}
                     : firstFreeRectangle(plan.parent, plan.occupied, dragged, row, column,
                             Math.max(1, integer(dragged.getAttribute("tableVerticalSpan"), 1)),
                             Math.max(1, integer(dragged.getAttribute("tableHorizontalSpan"), 1)));
@@ -2010,6 +2005,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 setStatus("No free cell in this table can hold " + value(plan.occupied, "name", "that component"));
                 return false;
             }
+        }
+        if (oldParent != plan.parent) {
+            document.select(dragged);
+            if (!document.moveSelectedToParent(plan.parent, componentChildren(plan.parent).size())) return false;
+        }
+        if (plan.occupied != null) {
+            document.select(plan.occupied);
             document.setAttribute("tableRow", String.valueOf(destination[0]));
             document.setAttribute("tableColumn", String.valueOf(destination[1]));
         }
@@ -4496,8 +4498,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void redo() {
+        // Symmetric with undo: redoing a strategy change puts the document back on the strategy
+        // whose model rewrite undo had cancelled, so the question has to be asked again or Save
+        // would generate the companion for one strategy beside a model built for the other.
+        String strategyBefore = document == null ? null : value(document.root(), "bindingStrategy", "properties");
         finishInlineEditor();
         if (document != null && document.redo()) {
+            String strategyAfter = value(document.root(), "bindingStrategy", "properties");
+            if (strategyBefore != null && !strategyBefore.equals(strategyAfter)) {
+                syncBindingModel(strategyAfter);
+            }
             refreshEditor();
             recordAction("redo", "form", relativeFormName(document.path()));
             setStatus("Redo");
@@ -4595,18 +4605,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * Puts back everything a failed save had already written, newest first. A file that did not
-     * exist before is left alone rather than deleted: the content is what matters here, and
-     * removing a file this editor may not have created is the more destructive mistake.
+     * Puts back everything a failed save had already written, newest first.
+     *
+     * <p>A file whose recorded previous content is null did not exist when {@code writeTracked}
+     * looked at it a moment earlier, so this save created it and deleting it is the restoration --
+     * leaving it behind contradicted the "nothing was changed" report and left a model generated
+     * from state the user then discarded.
      *
      * @param undo the log built by writeTracked
      */
     private void restore(List<String[]> undo) {
         for (int i = undo.size() - 1; i >= 0; i--) {
             String[] entry = undo.get(i);
-            if (entry[1] == null) continue;
             try {
-                ProjectIO.write(entry[0], entry[1]);
+                if (entry[1] == null) {
+                    ProjectIO.delete(entry[0]);
+                } else {
+                    ProjectIO.write(entry[0], entry[1]);
+                }
             } catch (IOException ex) {
                 Log.e(ex);
                 ToastBar.showErrorMessage("Could not restore " + entry[0] + " after the failed save");
