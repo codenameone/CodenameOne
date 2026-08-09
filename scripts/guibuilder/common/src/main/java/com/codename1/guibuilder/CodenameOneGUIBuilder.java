@@ -2777,23 +2777,63 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         for (Element child : children) {
             Integer row = parseInteger(child.getAttribute("tableRow"));
             Integer column = parseInteger(child.getAttribute("tableColumn"));
+            int rowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
+            int columnSpan = Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1));
+            // Every cell the placed child covers, not just its anchor: an unplaced sibling was
+            // otherwise handed a cell inside somebody else's span and the rebuild reflowed both.
             if (row == null || column == null || row.intValue() < 0 || column.intValue() < 0
-                    || column.intValue() >= columns || !taken.add(row + ":" + column)) {
+                    || column.intValue() + columnSpan > columns
+                    || overlapsTaken(taken, row.intValue(), column.intValue(), rowSpan, columnSpan)) {
                 unplaced.add(child);
+                continue;
             }
+            reserveCells(taken, row.intValue(), column.intValue(), rowSpan, columnSpan);
         }
         int cursor = 0;
         for (Element child : unplaced) {
-            while (taken.contains((cursor / columns) + ":" + (cursor % columns))) cursor++;
-            taken.add((cursor / columns) + ":" + (cursor % columns));
+            int rowSpan = Math.max(1, integer(child.getAttribute("tableVerticalSpan"), 1));
+            int columnSpan = Math.min(columns,
+                    Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1)));
+            int row;
+            int column;
+            while (true) {
+                row = cursor / columns;
+                column = cursor % columns;
+                if (column + columnSpan <= columns
+                        && !overlapsTaken(taken, row, column, rowSpan, columnSpan)) break;
+                cursor++;
+            }
+            reserveCells(taken, row, column, rowSpan, columnSpan);
             document.select(child);
-            document.setAttribute("tableRow", String.valueOf(cursor / columns));
-            document.setAttribute("tableColumn", String.valueOf(cursor % columns));
+            document.setAttribute("tableRow", String.valueOf(row));
+            document.setAttribute("tableColumn", String.valueOf(column));
+            if (columnSpan != Math.max(1, integer(child.getAttribute("tableHorizontalSpan"), 1))) {
+                document.setAttribute("tableHorizontalSpan", String.valueOf(columnSpan));
+            }
         }
         growTableToFit(parent, taken);
     }
 
     /** Widens the declared row count so no assigned cell falls outside the table and disappears. */
+    /** @return true when any cell of the rectangle is already reserved */
+    private static boolean overlapsTaken(Set<String> taken, int row, int column, int rowSpan, int columnSpan) {
+        for (int r = row; r < row + rowSpan; r++) {
+            for (int c = column; c < column + columnSpan; c++) {
+                if (taken.contains(r + ":" + c)) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Reserves every cell of a rectangle, so a span blocks its whole area rather than one cell. */
+    private static void reserveCells(Set<String> taken, int row, int column, int rowSpan, int columnSpan) {
+        for (int r = row; r < row + rowSpan; r++) {
+            for (int c = column; c < column + columnSpan; c++) {
+                taken.add(r + ":" + c);
+            }
+        }
+    }
+
     private void growTableToFit(Element parent, Set<String> occupiedCells) {
         int requiredRows = 1;
         for (String cell : occupiedCells) {
@@ -3776,7 +3816,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (parent != null && "TableLayout".equals(value(parent, "layout", "BoxLayout"))) {
                 // Swap the two cells rather than renumbering the table from sibling order: the
                 // user asked these two components to trade places, not the rest to shuffle.
-                if (neighbour != null) swapTableCells(selected, neighbour);
+                if (neighbour != null && !swapTableCells(selected, neighbour)) {
+                    // The XML order has already moved, so a refused swap has to take that with it
+                    // rather than leave the child reordered but still in its old cell.
+                    document.abortTransaction();
+                    document.select(selected);
+                    return false;
+                }
                 normalizeTableCells(parent);
                 document.select(selected);
             }
@@ -3792,15 +3838,39 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return index < 0 || index >= children.size() ? null : children.get(index);
     }
 
-    private void swapTableCells(Element first, Element second) {
-        String firstRow = first.getAttribute("tableRow");
-        String firstColumn = first.getAttribute("tableColumn");
+    /**
+     * Swaps two children's cells, refusing when either span would not fit where the other sits.
+     *
+     * <p>Reordering bypassed the span checks the drag path does, and normalizeTableCells accepts an
+     * in-range anchor without looking at the rectangle, so moving a two-column child to the last
+     * column truncated it at runtime with nothing reporting the problem.
+     *
+     * @param first one child
+     * @param second the child to exchange cells with
+     * @return true when the swap happened
+     */
+    private boolean swapTableCells(Element first, Element second) {
+        Element parent = document.parentOf(first);
+        Integer firstRow = parseInteger(first.getAttribute("tableRow"));
+        Integer firstColumn = parseInteger(first.getAttribute("tableColumn"));
+        Integer secondRow = parseInteger(second.getAttribute("tableRow"));
+        Integer secondColumn = parseInteger(second.getAttribute("tableColumn"));
+        if (parent == null || firstRow == null || firstColumn == null
+                || secondRow == null || secondColumn == null) {
+            return false;
+        }
+        if (!spanFitsAt(parent, first, second, secondRow.intValue(), secondColumn.intValue())
+                || !spanFitsAt(parent, second, first, firstRow.intValue(), firstColumn.intValue())) {
+            setStatus("Those cells cannot hold each other's spans");
+            return false;
+        }
         document.select(first);
-        document.setAttribute("tableRow", second.getAttribute("tableRow"));
-        document.setAttribute("tableColumn", second.getAttribute("tableColumn"));
+        document.setAttribute("tableRow", String.valueOf(secondRow));
+        document.setAttribute("tableColumn", String.valueOf(secondColumn));
         document.select(second);
-        document.setAttribute("tableRow", firstRow);
-        document.setAttribute("tableColumn", firstColumn);
+        document.setAttribute("tableRow", String.valueOf(firstRow));
+        document.setAttribute("tableColumn", String.valueOf(firstColumn));
+        return true;
     }
 
     private void applyLayeredAction(String action) {
@@ -5682,7 +5752,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int open = skipSpaces(code, after);
             if (boundedLeft && open < code.length() && code.charAt(open) == '(') {
                 int close = code.indexOf(')', open);
-                if (close > open && code.substring(open + 1, close).indexOf("ActionEvent") >= 0
+                if (close > open && isSingleActionEventParameter(code.substring(open + 1, close))
                         && code.charAt(skipSpaces(code, close + 1)) == '{') {
                     // A body follows a declaration; a call is followed by a semicolon or an
                     // operator. Legal formatting puts space before the parenthesis and before the
@@ -5695,9 +5765,36 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * True when a parameter list is exactly one ActionEvent.
+     *
+     * <p>Parsed rather than searched for the substring: a legal overload such as
+     * {@code void onClick(String value, ActionEvent event)} contains the text but cannot be used as
+     * an ActionListener, and accepting it suppressed the one-argument stub that
+     * {@code this::onClick} needs.
+     *
+     * @param parameters the text between the parentheses
+     * @return true when the method can serve as the handler
+     */
+    private static boolean isSingleActionEventParameter(String parameters) {
+        String only = parameters.trim();
+        if (only.length() == 0 || only.indexOf(',') >= 0) return false;
+        // "com.codename1.ui.events.ActionEvent event", "final ActionEvent e", "ActionEvent<T> e"
+        int space = only.lastIndexOf(' ');
+        if (space < 0) return false;
+        String type = only.substring(0, space).trim();
+        int generic = type.indexOf('<');
+        if (generic > 0) type = type.substring(0, generic).trim();
+        int dot = type.lastIndexOf('.');
+        if (dot >= 0) type = type.substring(dot + 1);
+        int lastSpace = type.lastIndexOf(' ');
+        if (lastSpace >= 0) type = type.substring(lastSpace + 1);
+        return "ActionEvent".equals(type);
+    }
+
+    /**
      * @param text the text to scan
      * @param from the index to start at
-     * @return the index of the first character at or after from that is not a space or tab
+     * @return the index of the first character at or after from that is not whitespace
      */
     private static int skipSpaces(String text, int from) {
         int at = from;
