@@ -5004,13 +5004,27 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private void saveSourceAndModel(String path, String source) {
-        // Stops here on failure: creating the model and announcing success over the error message
-        // told the user their source was saved when the file had not changed at all.
-        if (!saveSource(path, source)) return;
-        int model = ensureBindingModel(path);
-        setStatus(model == MODEL_CREATED ? "Saved form source and created its binding model"
-                : model == MODEL_FAILED ? "Saved form source, but its binding model could not be written"
-                : "Saved form source • existing model left unchanged");
+        // Staged like the form save: this pane writes a companion that refers to <Form>Model and
+        // then creates that model, so a failure between the two left source committed against a
+        // type that does not exist. Nothing is kept unless both land.
+        List<String[]> undo = new ArrayList<>();
+        String modelPath = path.substring(0, path.length() - 5) + "Model.java";
+        boolean needsModel = !"none".equals(value(document.root(), "bindingStrategy", "properties"))
+                && !ProjectIO.exists(modelPath);
+        try {
+            writeTracked(undo, path, companionSourceFor(source));
+            editorBufferOnDisk = editorBuffer;
+            if (needsModel) {
+                writeTracked(undo, modelPath, generatedModelSource());
+                setStatus("Saved form source and created its binding model");
+            } else {
+                setStatus("Saved form source • existing model left unchanged");
+            }
+        } catch (IOException ex) {
+            restore(undo);
+            ToastBar.showErrorMessage("Save failed, nothing was changed: " + ex.getMessage());
+            setStatus("Save failed; the companion source is as it was");
+        }
     }
 
     /**
@@ -5720,7 +5734,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private String dropStubsAlreadyWritten(String generated, String carried) {
         String out = generated;
         for (String handler : generatedHandlers()) {
-            if (carried.indexOf(handler + "(") < 0) continue;
+            // declaresActionHandler(), not a substring search: the carried code may format the
+            // declaration as "void onClick (ActionEvent event)" or merely mention the name in a
+            // comment, and both were being read wrongly here while ensureHandler() got it right.
+            if (!declaresActionHandler(carried, handler)) continue;
             out = out.replace(handlerStub(handler), "");
         }
         return out;
