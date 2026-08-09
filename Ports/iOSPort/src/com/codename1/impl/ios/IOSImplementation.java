@@ -11175,8 +11175,13 @@ public class IOSImplementation extends CodenameOneImplementation {
             throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
                     "This build was not compiled with encrypted database support");
         }
-        return new DatabaseImpl(databaseName, resolveDatabasePath(databaseName),
-                config.resolveKeyMaterial(databaseName));
+        // The resolved file, not the name it was asked for: a managed key with no explicit alias
+        // is stored under what is passed here, so two accepted spellings of one database would
+        // derive two different keys and the second open would report a wrong key against intact
+        // data.
+        String path = resolveDatabasePath(databaseName);
+        return new DatabaseImpl(databaseName, path,
+                config.resolveKeyMaterial(Database.normalizeDatabaseKey(path)));
     }
 
     @Override

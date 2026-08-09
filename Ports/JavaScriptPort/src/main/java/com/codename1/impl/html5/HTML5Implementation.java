@@ -11481,7 +11481,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         String key = null;
         if (config != null && config.isEncrypted()) {
-            key = config.resolveKeyMaterial(databaseName);
+            // The resolved file, not the name it was asked for: a managed key with no explicit
+            // alias is stored under what is passed here, so two accepted spellings of one database
+            // would derive two different keys and the second open would report a wrong key against
+            // intact data.
+            key = config.resolveKeyMaterial(DatabaseImpl.poolKeyFor(databaseName));
         }
         return new DatabaseImpl(databaseName, key);
     }

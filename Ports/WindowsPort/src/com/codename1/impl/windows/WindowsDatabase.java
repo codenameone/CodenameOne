@@ -112,6 +112,11 @@ class WindowsDatabase extends Database {
     /// non-ASCII path that differ only in case would then be two entries. Named here because the
     /// error is in the unsafe direction, and closing it needs the platform asked for the real
     /// name, not a smarter fold.
+    /// The registry key for a path, for callers outside an instance -- the managed key alias.
+    static String registryKeyFor(String path) {
+        return windowsPathKey(path);
+    }
+
     private static String windowsPathKey(String path) {
         if (path == null) {
             return null;

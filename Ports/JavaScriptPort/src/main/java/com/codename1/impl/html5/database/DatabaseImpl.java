@@ -56,12 +56,20 @@ public class DatabaseImpl extends Database {
 
     private final List<CursorImpl> openCursors = new ArrayList<CursorImpl>();
 
+    /**
+     * The pool file a name maps to, which is what the registry and a managed key alias use.
+     * "foo" and "/foo" are the same file to the storage pool, and so the same database here.
+     */
+    public static String poolKeyFor(String name) {
+        return name != null && name.startsWith("/") ? name : "/" + name;
+    }
+
     public DatabaseImpl(String name, String key) throws IOException {
         this.databaseName = name;
         // The storage pool puts "foo" and "/foo" in the same file, so the registry has to see them
         // as one database: two entries for one file would let either connection pass the
         // sole-connection check and rekey the file underneath the other.
-        this.openKey = name != null && name.startsWith("/") ? name : "/" + name;
+        this.openKey = poolKeyFor(name);
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this database, and opening it before asking would leave the handle behind when the
         // refusal arrived.

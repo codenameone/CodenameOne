@@ -1092,6 +1092,22 @@ public abstract class Database {
     /// #### Returns
     ///
     /// the reduced path, or null for a null input
+    /// The shared path reduction, for a port that needs it outside a Database instance.
+    ///
+    /// The implementations resolve a managed key's implicit alias from this, so that two accepted
+    /// spellings of one file derive one key rather than two.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a native filesystem path, or null
+    ///
+    /// #### Returns
+    ///
+    /// the reduced path, or null for a null input
+    public static String normalizeDatabaseKey(String path) {
+        return normalizeDatabasePathKey(path);
+    }
+
     protected static String normalizeDatabasePathKey(String path) {
         if (path == null) {
             return null;
