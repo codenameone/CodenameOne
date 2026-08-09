@@ -78,7 +78,13 @@ install_jdk() {
     log "Using cached JDK archive $(basename "$archive")"
   else
     log "Downloading JDK from $url"
-    curl -fL --retry 3 --retry-all-errors "$url" -o "$archive"
+    # --retry-delay 15: curl's default backoff is 1s, 2s, 4s, which is nothing
+    # against a rate limit. Every Android job provisions its own JDKs from the
+    # same GitHub release at the same moment, so the whole matrix can trip 429
+    # together and all of it gave up inside seven seconds. curl waits for the
+    # larger of this and any Retry-After the server sends, and --retry-max-time
+    # bounds the whole thing so a genuinely dead mirror still fails the job.
+    curl -fL --retry 6 --retry-delay 15 --retry-max-time 300 --retry-all-errors "$url" -o "$archive"
   fi
 
   local top
@@ -130,7 +136,7 @@ if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
   else
     log "Downloading Maven from $MAVEN_URL"
-    curl -fL --retry 3 --retry-all-errors "$MAVEN_URL" -o "$mvn_archive"
+    curl -fL --retry 6 --retry-delay 15 --retry-max-time 300 --retry-all-errors "$MAVEN_URL" -o "$mvn_archive"
   fi
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
   if [ -z "$mvn_top" ]; then

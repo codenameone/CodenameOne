@@ -69,8 +69,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
-        <jcefmaven.version>135.0.20</jcefmaven.version>
-        <jcef.version>jcef-ca49ada+cef-135.0.20+ge7de5c3+chromium-135.0.7049.85</jcef.version>
+        <jcefmaven.version>146.0.10</jcefmaven.version>
+        <jcef.version>jcef-d3de827+cef-146.0.10+g8219561+chromium-146.0.7680.179</jcef.version>
         <ffmpeg.version>7.1-1.5.11</ffmpeg.version>
         <rhino.version>1.7.11</rhino.version>
         <maven-compiler-plugin.version>3.8.0</maven-compiler-plugin.version>
@@ -363,11 +363,17 @@
                 <artifactId>maven-invoker-plugin</artifactId>
                 <version>3.2.1</version>
             </dependency>
-            <!-- https://mvnrepository.com/artifact/commons-io/commons-io -->
+            <!-- https://mvnrepository.com/artifact/commons-io/commons-io
+                 Managed to 2.20.0 because JCEF Maven 146's commons-compress
+                 1.28.0 requires it to extract the native bundle; a reactor
+                 module (e.g. the javase-cef-ffmpeg-smoke app) that pulls
+                 codenameone-javase would otherwise have commons-io forced back
+                 to an older managed version and throw IllegalAccessError. Keep
+                 in sync with the commons-io pin in maven/javase/pom.xml. -->
             <dependency>
                 <groupId>commons-io</groupId>
                 <artifactId>commons-io</artifactId>
-                <version>2.16.1</version>
+                <version>2.20.0</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>

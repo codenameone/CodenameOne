@@ -227,6 +227,41 @@ class IPhoneBuilderDependencyConfigTest {
         assertEquals("15.5", target);
     }
 
+    /**
+     * GoogleSignIn 5.x and 6.0 shipped a vendored fat framework whose only
+     * arm64 slice is built for the device, so an arm64 simulator build of any
+     * app that enabled Google sign-in failed to link -- "building for
+     * 'iOS-simulator', but linking in object file ... built for 'iOS'". The
+     * source-distributed 7.x line has no such slice to pick wrong. Dropping
+     * back below 7 breaks the simulator again on every Apple Silicon Mac,
+     * which is the whole of the current simulator install base.
+     */
+    @Test
+    void googleSignInPodStaysAboveTheArm64SimulatorFloor() {
+        String spec = IPhoneBuilder.GOOGLE_SIGNIN_POD;
+        assertTrue(spec.startsWith("GoogleSignIn "), spec);
+
+        String requirement = spec.substring("GoogleSignIn ".length()).trim();
+        assertTrue(requirement.startsWith("~>"),
+                "expected a pessimistic requirement, got " + requirement);
+
+        String version = requirement.substring(2).trim();
+        int major = Integer.parseInt(version.split("\\.")[0]);
+        assertTrue(major >= 7,
+                "GoogleSignIn " + version + " predates the source-distributed "
+                        + "releases and has no arm64 simulator slice");
+    }
+
+    @Test
+    void googleSignInDeploymentFloorIsAcceptedByCurrentXcode() {
+        // Xcode 26 rejects deployment targets below 12.0, and the pod's own
+        // podspec floor of 10.0 is therefore not usable as the project value.
+        String[] parts = IPhoneBuilder.GOOGLE_SIGNIN_MIN_IOS.split("\\.");
+        assertTrue(Integer.parseInt(parts[0]) >= 12,
+                "deployment floor " + IPhoneBuilder.GOOGLE_SIGNIN_MIN_IOS
+                        + " is below what current Xcode accepts");
+    }
+
     @Test
     void catalogPrivacyDefaultsReachGeneratedPlistMap() throws Exception {
         Method apply = IPhoneBuilder.class.getDeclaredMethod(

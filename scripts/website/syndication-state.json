@@ -1521,6 +1521,66 @@
         "url": "https://medium.com/@Codename_One/compact-strings-cut-character-storage-in-half-d957eb397105?postPublishedType=initial",
         "syndicated_at": "2026-08-05T17:01:58+00:00"
       }
+    },
+    "push-v3-new-cloud": {
+      "devto": {
+        "id": 4341372,
+        "url": "https://dev.to/codenameone/push-v3-one-message-from-your-server-to-every-surface-5gfg",
+        "syndicated_at": "2026-08-07T14:08:16+00:00"
+      },
+      "foojay": {
+        "id": 125259,
+        "url": "https://foojay.io/wp-admin/post.php?post=125259&action=edit",
+        "preview_url": "https://foojay.io/?p=125259",
+        "featured_media_id": 125258,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-08-07T14:09:16+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/ba27b4e66789/edit",
+        "syndicated_at": "2026-08-07T15:04:55+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3669856/edit.html",
+        "syndicated_at": "2026-08-07T15:06:34+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/push-v3-one-message-from-your-server-to-every-surface",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a74bd9c454aef8f31c22d82",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-06T17:01:02+00:00"
+      }
+    },
+    "2026-08-07-1200-shai-app-shield-server-attestation": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-08-07T15:01:03+00:00",
+        "account": "shai",
+        "source_slug": "app-shield-server-attestation",
+        "scheduled_at": "2026-08-07T09:00:00+00:00"
+      }
+    },
+    "health-api-false-certainty": {
+      "devto": {
+        "id": 4348896,
+        "url": "https://dev.to/codenameone/health-data-without-fake-certainty-fok",
+        "syndicated_at": "2026-08-08T13:40:17+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/7dc7a4f45437/edit",
+        "syndicated_at": "2026-08-08T17:00:47+00:00"
+      }
+    },
+    "on-device-ai-mcp-loopback": {
+      "devto": {
+        "id": 4353762,
+        "url": "https://dev.to/codenameone/on-device-ai-and-mcp-on-every-port-9a2",
+        "syndicated_at": "2026-08-09T13:43:43+00:00"
+      }
     }
   }
 }

@@ -178,7 +178,19 @@ public abstract class Purchase {
             if (Storage.getInstance().exists(RECEIPTS_KEY)) {
                 Receipt.registerExternalizable();
                 try {
-                    receipts = (List<Receipt>) Storage.getInstance().readObject(RECEIPTS_KEY);
+                    // the type test is deliberate rather than letting the cast fail
+                    // into the catch: ParparVM does not throw on a bad cast, so on
+                    // iOS a storage entry of the wrong type would be used as a List
+                    Object stored = Storage.getInstance().readObject(RECEIPTS_KEY);
+                    if (stored instanceof List) {
+                        receipts = (List<Receipt>) stored;
+                    } else {
+                        if (stored != null) {
+                            Log.p("Ignoring " + RECEIPTS_KEY + " of unexpected type "
+                                    + stored.getClass().getName());
+                        }
+                        receipts = new ArrayList<Receipt>();
+                    }
                 } catch (Exception ex) {
                     Log.p("Failed to load receipts from " + RECEIPTS_KEY);
                     Log.e(ex);

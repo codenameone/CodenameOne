@@ -78,6 +78,21 @@ void cn1LinuxStubOnce(const char* tag) {
     fflush(stderr);
 }
 
+char* cn1LinuxJStrDup(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value) {
+    const char* utf8 = value == JAVA_NULL ? 0 : stringToUTF8(threadStateData, value);
+    char* copy;
+    size_t length;
+    if (utf8 == 0) {
+        return 0;
+    }
+    length = strlen(utf8);
+    copy = (char*) malloc(length + 1);
+    if (copy != 0) {
+        memcpy(copy, utf8, length + 1);
+    }
+    return copy;
+}
+
 JAVA_OBJECT cn1LinuxNewByteArray(CODENAME_ONE_THREAD_STATE, const void* src, int n) {
     JAVA_OBJECT arr;
     if (n < 0) {
@@ -153,15 +168,46 @@ static const char* cn1JStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
 
 /* ------------------------------------------------------------ file io */
 
+/* Reason the last open failed. The port reports "could not open X" from Java,
+ * where errno is long gone; without this the only way to tell a missing
+ * directory from a permission problem was another CI round trip. */
+/* Per-thread: two threads failing an open at once would otherwise overwrite
+ * each other and lastIoError() could report the wrong reason, or a torn
+ * mixture of both. */
+static __thread char cn1LastIoError[512];
+
+static void cn1RecordIoError(const char* path) {
+    if (path == 0) {
+        /* No fopen was attempted, so errno belongs to some earlier unrelated
+         * call and strerror would name a plausible-looking wrong reason --
+         * worse than saying nothing, since the whole point of this buffer is
+         * to explain a failure without another CI round trip. */
+        snprintf(cn1LastIoError, sizeof(cn1LastIoError), "%s",
+                 "no path supplied");
+        return;
+    }
+    snprintf(cn1LastIoError, sizeof(cn1LastIoError), "%s", strerror(errno));
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_lastIoError___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+    return newStringFromCString(threadStateData, cn1LastIoError[0] ? cn1LastIoError : "unknown error");
+}
+
 JAVA_LONG com_codename1_impl_linux_LinuxNative_fileOpenRead___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
     const char* p = cn1JStr(threadStateData, path);
     FILE* f = p ? fopen(p, "rb") : 0;
+    if (f == 0) {
+        cn1RecordIoError(p);
+    }
     return (JAVA_LONG) (intptr_t) f;
 }
 
 JAVA_LONG com_codename1_impl_linux_LinuxNative_fileOpenWrite___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_BOOLEAN append) {
     const char* p = cn1JStr(threadStateData, path);
     FILE* f = p ? fopen(p, append ? "ab" : "wb") : 0;
+    if (f == 0) {
+        cn1RecordIoError(p);
+    }
     return (JAVA_LONG) (intptr_t) f;
 }
 
@@ -234,15 +280,22 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fileMkdir___java_lang_String(CODE
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_fileRename___java_lang_String_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_OBJECT newName) {
-    const char* p = cn1JStr(threadStateData, path);
-    const char* n;
+    /* Two conversions: copy the first, or stringToUTF8's shared per-thread
+     * buffer repoints it at the new name and the file is renamed onto itself. */
+    char* p = cn1LinuxJStrDup(threadStateData, path);
+    char* n = 0;
     char dir[4096];
     char dest[4096];
     char* slash;
     if (!p || newName == JAVA_NULL) {
+        free(p);
         return;
     }
-    n = stringToUTF8(threadStateData, newName);
+    n = cn1LinuxJStrDup(threadStateData, newName);
+    if (!n) {
+        free(p);
+        return;
+    }
     /* newName is a leaf name; rename within the same parent directory. */
     strncpy(dir, p, sizeof(dir) - 1);
     dir[sizeof(dir) - 1] = 0;
@@ -254,6 +307,8 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fileRename___java_lang_String_jav
         snprintf(dest, sizeof(dest), "%s", n);
     }
     rename(p, dest);
+    free(p);
+    free(n);
 }
 
 JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileList___java_lang_String_R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
@@ -291,6 +346,30 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_fileList___java_lang_String_R_j
 /* The per-user app storage directory ($XDG_DATA_HOME/codenameone, else
  * ~/.local/share/codenameone), created on first use. Backs Storage + the
  * FileSystemStorage app-home. */
+/* Creates every missing component of an absolute path. mkdir(2) only creates
+ * the leaf, so a home without an existing ~/.local/share -- which is the state
+ * of a fresh CI runner or a freshly created account -- left the storage
+ * directory absent. Every write into it then failed at fopen(), which the port
+ * used to swallow: Storage entries and files written through
+ * FileSystemStorage were silently discarded. */
+static void cn1MkdirParents(const char* path) {
+    char work[4096];
+    char* p;
+    size_t len = strlen(path);
+    if (len == 0 || len >= sizeof(work)) {
+        return;
+    }
+    memcpy(work, path, len + 1);
+    for (p = work + 1; *p; p++) {
+        if (*p == '/') {
+            *p = 0;
+            mkdir(work, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(work, 0755);
+}
+
 static const char* cn1StorageDir(void) {
     static char dir[4096];
     if (dir[0] == 0) {
@@ -304,9 +383,8 @@ static const char* cn1StorageDir(void) {
         } else {
             snprintf(share, sizeof(share), "/tmp");
         }
-        mkdir(share, 0755);
         snprintf(dir, sizeof(dir), "%s/codenameone", share);
-        mkdir(dir, 0755);
+        cn1MkdirParents(dir);
     }
     return dir;
 }

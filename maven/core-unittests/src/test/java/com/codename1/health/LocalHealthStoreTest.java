@@ -731,22 +731,9 @@ class LocalHealthStoreTest extends UITestBase {
                 filtered.get(0).getSource().getBundleId());
     }
 
-    /**
-     * An {@code except} callback on an already-settled resource fires
-     * synchronously, so the error can be read without waiting.
-     */
+    /** Settles the resource and reads its failure; see {@link HealthAwait#errorOf}. */
     private static Throwable errorOf(com.codename1.util.AsyncResource<?> r) {
-        // Settled first. Results are delivered on the EDT on every backend
-        // now, so an off-EDT caller sees the error queued rather than already
-        // attached, and reading it without waiting found nothing.
-        HealthAwait.settled(r);
-        final Throwable[] err = new Throwable[1];
-        r.except(new com.codename1.util.SuccessCallback<Throwable>() {
-            public void onSucess(Throwable t) {
-                err[0] = t;
-            }
-        });
-        return err[0];
+        return HealthAwait.errorOf(r);
     }
 
     /**

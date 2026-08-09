@@ -58,6 +58,15 @@ import java.util.List;
  * This is an assertion test, not a screenshot test, so it does not affect baselines.
  */
 public class VideoIORoundTripTest extends BaseTest {
+
+    /// Not safe for the runner's silent-timeout retry: it encodes and decodes on a worker thread,
+    /// and that worker outlives runTest(). A retry resets the shared
+    /// completion state, so a late done() from the first attempt's worker
+    /// would complete the second attempt and advance the suite early.
+    @Override
+    public boolean isRetrySafe() {
+        return false;
+    }
     private static final int W = 128;
     private static final int H = 96;
     private static final int FRAMES = 6;
@@ -157,6 +166,13 @@ public class VideoIORoundTripTest extends BaseTest {
                 + "/cn1-videoio-roundtrip-" + System.currentTimeMillis() + (webm ? ".webm" : ".mp4");
 
         // ---- ENCODE (encode-side unavailability is a SKIP, not a failure) ----
+        // Two phases, reported differently on purpose. Failing to obtain a
+        // writer is the documented "this runner exposes no encoder" case and
+        // is skipped. Failing after one was obtained means the encoder is
+        // there and broke, which is a regression -- reporting that as the same
+        // skip made an encoder failure render as a documented green cell,
+        // indistinguishable from a target that never had an encoder.
+        VideoWriter writer;
         try {
             VideoWriterBuilder builder = new VideoWriterBuilder()
                     .path(path).container(container)
@@ -165,7 +181,13 @@ public class VideoIORoundTripTest extends BaseTest {
             if (withAudio) {
                 builder.hasAudio(true).audioCodec(audioCodec).sampleRate(SAMPLE_RATE).audioChannels(1);
             }
-            VideoWriter writer = io.createWriter(builder);
+            writer = io.createWriter(builder);
+        } catch (Throwable t) {
+            cleanup(path);
+            skip("encode-unavailable-on-" + Display.getInstance().getPlatformName());
+            return;
+        }
+        try {
             int samplesPerFrame = SAMPLE_RATE / FRAMES;
             for (int i = 0; i < FRAMES; i++) {
                 writer.writeFrame(makeCountingFrame(i), Math.round(i * 1000f / FPS));
@@ -174,9 +196,29 @@ public class VideoIORoundTripTest extends BaseTest {
                 }
             }
             writer.close();
+            writer = null;
         } catch (Throwable t) {
+            // The writer is still open whenever the throw came from a write
+            // rather than from close(). Leaving it open leaks the native
+            // encoder into the rest of the suite, which shares this process;
+            // best-effort close, and ignore a secondary failure because we are
+            // already reporting the first one.
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (Throwable ignored) {
+                    // reporting the original failure below
+                }
+            }
             cleanup(path);
-            skip("encode-unavailable-on-" + Display.getInstance().getPlatformName() + ":" + t.getMessage());
+            // Still a skip, with its own reason code. The Apple simulators
+            // obtain a writer and then fail to finalize the file, which is the
+            // same "no usable encoder in the headless job" condition as failing
+            // to obtain one -- it just surfaces later. Reporting it under a
+            // distinct code lets the errata document it for the targets where
+            // it is expected, while the same code from a port whose encoder is
+            // supposed to work stays undocumented and therefore not green.
+            skip("encode-write-failed-on-" + Display.getInstance().getPlatformName());
             return;
         }
 

@@ -225,6 +225,37 @@
         </plugins>
     </build>
 
+    <!--
+        Codename One publishes its releases to the Codename One repository. Both lists
+        below are needed: Maven resolves ordinary dependencies through the repositories
+        list and build plugins through the pluginRepositories list, so a project that
+        declared only the first could download the framework and still fail to find a
+        newer codenameone-maven-plugin.
+    -->
+    <repositories>
+        <repository>
+            <id>codenameone</id>
+            <url>https://repo.codenameone.com/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>codenameone-plugins</id>
+            <url>https://repo.codenameone.com/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
 
     <!-- The sign-artifacts profile is used for signing artifacts when you deploy to Maven
         central.  In order for this to work, you also need to add the following to your

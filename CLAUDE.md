@@ -199,6 +199,41 @@ mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
 
 Findings land in each module's `target/spotbugsXml.xml`.
 
+### Never rely on ClassCastException
+
+**ParparVM's `CHECKCAST` is unchecked.** `BC_CHECKCAST` expands to nothing and the
+optimizer drops the instruction, so a failed cast does *not* throw on iOS -- the
+wrong object is handed to the next instruction and the target type's fields get
+read out of it. That is a native crash no Java `catch` can see (issue #5531).
+
+Never write a cast whose failure you expect to handle:
+
+```java
+// WRONG -- the handler never runs on iOS
+try { return Double.parseDouble((String) o); } catch (Exception e) { return def; }
+
+// RIGHT -- works on every platform
+if (o instanceof Number) { return ((Number) o).doubleValue(); }
+```
+
+`scripts/check-cast-semantics.sh` enforces this in PR CI (Java 8 leg). It reports
+a `CHECKCAST` inside a `try` whose handler catches `ClassCastException` or a
+supertype, and holds the result against `scripts/cast-semantics-baseline.txt` --
+a ratchet of pre-existing debt, not an allow-list. **New code must not add
+entries**; delete one when you fix the method. An `instanceof`-guarded cast is
+recognized and never reported. Note the rule is about the *cast*: a
+`catch (ClassCastException)` with no cast under it is fine, because an
+*explicitly thrown* ClassCastException propagates normally.
+
+Run it locally (needs core/android/ios/JavaAPI built; unbuilt modules are skipped
+with a note):
+
+```bash
+source tools/env.sh
+scripts/check-cast-semantics.sh
+scripts/check-cast-semantics.sh --write-baseline   # after fixing a method
+```
+
 ### Working with Native Code
 
 Platform-specific native code locations:

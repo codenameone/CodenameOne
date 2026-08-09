@@ -441,7 +441,14 @@ JAVA_LONG com_codename1_impl_windows_WindowsNative_createMutableImage___int_int_
     D2D1_COLOR_F clearColor;
     uint32_t a, r, g, b;
 
+    /* Refuse a degenerate extent, but say so. Returning a bare 0 makes
+     * Image.getGraphics() answer null and the caller die with a
+     * NullPointerException nowhere near the cause. Clamping to 1x1 would hide
+     * it just as badly: whatever asked for a zero-sized image has a real bug --
+     * a metric that came out zero -- and silently handing back a 1x1 surface
+     * would leave that unfixed and render wrongly instead of crashing. */
     if (width <= 0 || height <= 0) {
+        cn1WindowsLog("createMutableImage refused a degenerate size");
         return 0;
     }
 

@@ -801,7 +801,14 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     /// an instance of the parent class or null if this failed
     public PropertyBusinessObject newInstance() {
         try {
-            return (PropertyBusinessObject) parent.getClass().newInstance();
+            // the type test is deliberate rather than letting the cast fail into the
+            // catch: ParparVM does not throw on a bad cast, so on iOS a parent that
+            // is not a PropertyBusinessObject would be returned as one
+            Object instance = parent.getClass().newInstance();
+            if (instance instanceof PropertyBusinessObject) {
+                return (PropertyBusinessObject) instance;
+            }
+            return null;
         } catch (Exception err) {
             Log.e(err);
             return null;

@@ -36,8 +36,10 @@
 #include <mfreadwrite.h>
 #include <mferror.h>
 #include <wrl/client.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include "cn1_windows.h"
 
 using Microsoft::WRL::ComPtr;
@@ -73,6 +75,14 @@ static void cn1StripFileWide(const char* utf8, wchar_t* out, int outLen) {
 
 struct CN1VideoReader {
     ComPtr<IMFSourceReader> reader;
+    /* The source URL, so readAudio can open a reader of its own. A plain
+     * malloc'd copy rather than std::wstring: including <string> drags in the
+     * MSVC STL, which hard-asserts on the compiler version (STL1000) and broke
+     * the cross-compile job, whose clang is not pinned to 19 the way the
+     * build+run job's is. Freed in the destructor below. */
+    wchar_t* url;
+    CN1VideoReader() : url(NULL) {}
+    ~CN1VideoReader() { free(url); }
     int width;
     int height;
     LONGLONG durationMs;
@@ -86,13 +96,32 @@ struct CN1VideoReader {
 
 struct CN1VideoWriter {
     ComPtr<IMFSinkWriter> writer;
+    unsigned long audioSamplesWritten;
+    unsigned long long audioBytesWritten;
     DWORD videoStream;
     DWORD audioStream;
     int width;
     int height;
     float frameRate;
     bool hasAudio;
+    /* The rate the AAC encoder was configured at. Media Foundation's AAC encoder
+     * accepts 44100 or 48000 Hz only, so a caller asking for anything else (the
+     * conformance suite records an 8 kHz tone) gets its PCM resampled on the way
+     * in rather than losing the audio stream. */
+    int audioEncRate;
+    int audioChannels;
+    HRESULT audioSetupHr;
 };
+
+/* The sample rates Media Foundation's AAC encoder will accept. */
+static int cn1AacEncoderRate(int requested) {
+    if (requested == 44100 || requested == 48000) {
+        return requested;
+    }
+    /* 44100 is the closer target for anything derived from CD-family rates
+     * (11025/22050); everything else lands on 48000. */
+    return (requested % 11025) == 0 ? 44100 : 48000;
+}
 
 // --------------------------------------------------------------------------
 // Reader
@@ -108,8 +137,26 @@ static JAVA_LONG cn1ReaderOpen(const wchar_t* url) {
         return 0;
     }
 
+    // Select the streams explicitly. Which streams a source reader starts with
+    // depends on the presentation descriptor, and SetCurrentMediaType succeeds on
+    // a stream that is not selected -- so the audio configuration below reported
+    // success, hasAudio became true, and ReadSample then produced nothing at all.
+    // That is exactly what VideoIORoundTripTest saw on Windows: "decoded clip
+    // reports audio but no PCM samples were returned". Deselect everything, then
+    // turn on the two streams this reader actually consumes.
+    reader->SetStreamSelection((DWORD) MF_SOURCE_READER_ALL_STREAMS, FALSE);
+    reader->SetStreamSelection((DWORD) MF_SOURCE_READER_FIRST_VIDEO_STREAM, TRUE);
+    reader->SetStreamSelection((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE);
+
     CN1VideoReader* st = new CN1VideoReader();
     st->reader = reader;
+    if (url != NULL) {
+        size_t urlChars = wcslen(url) + 1;
+        st->url = (wchar_t*) malloc(urlChars * sizeof(wchar_t));
+        if (st->url != NULL) {
+            memcpy(st->url, url, urlChars * sizeof(wchar_t));
+        }
+    }
     st->width = 0;
     st->height = 0;
     st->durationMs = -1;
@@ -250,11 +297,53 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
     if (!st->hasAudio) {
         return JAVA_NULL;
     }
-    // readAudio() promises the entire audio track. A prior frameAt()/readFrames()
-    // may have repositioned the shared source reader via SetCurrentPosition, which
-    // moves every stream (not just video), so rewind to the start before draining
-    // the audio stream -- otherwise audio would begin at the last video seek.
-    {
+    // readAudio() promises the entire audio track, and the shared reader has
+    // usually been driven to end-of-file by frameAt()/readFrames() first. Rewinding
+    // it with SetCurrentPosition did not bring the audio stream back: the very
+    // first ReadSample after the seek returned MF_SOURCE_READERF_ENDOFSTREAM with
+    // zero bytes (reads=1 lastFlags=0x2), which is what left VideoIORoundTripTest
+    // reporting "reports audio but no PCM samples were returned" on Windows.
+    //
+    // Open a reader of our own instead. A fresh source reader starts at the
+    // beginning by construction, so the audio track no longer depends on seek
+    // semantics or on what the video pass did to the shared position.
+    ComPtr<IMFSourceReader> audioReader;
+    if (st->url != NULL) {
+        ComPtr<IMFAttributes> attrs;
+        if (SUCCEEDED(MFCreateAttributes(&attrs, 1))) {
+            MFCreateSourceReaderFromURL(st->url, attrs.Get(), &audioReader);
+        }
+    }
+    if (audioReader != NULL) {
+        /* Configure it completely or not at all. Every call here was previously
+         * unchecked, so a reader that opened but could not select its stream or
+         * negotiate PCM stayed non-null and was used anyway -- reading an
+         * unselected stream, or the source's COMPRESSED native format, while the
+         * bytes were handed back with the cached 16-bit PCM rate and channel
+         * count beside them. Silent garbage is worse than the seek path this
+         * replaced, so a partially configured reader is discarded and the shared
+         * reader is rewound instead. */
+        bool configured = false;
+        if (SUCCEEDED(audioReader->SetStreamSelection((DWORD) MF_SOURCE_READER_ALL_STREAMS, FALSE))
+                && SUCCEEDED(audioReader->SetStreamSelection(
+                        (DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE))) {
+            ComPtr<IMFMediaType> pcmType;
+            if (SUCCEEDED(MFCreateMediaType(&pcmType))) {
+                pcmType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+                pcmType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+                pcmType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+                configured = SUCCEEDED(audioReader->SetCurrentMediaType(
+                        (DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, NULL, pcmType.Get()));
+            }
+        }
+        if (!configured) {
+            printf("CN1SS:INFO:winAudio fresh reader configuration failed; rewinding the shared reader\n");
+            fflush(stdout);
+            audioReader.Reset();
+        }
+    }
+    if (audioReader == NULL) {
+        /* No usable fresh reader: fall back to rewinding the shared one. */
         PROPVARIANT pos;
         PropVariantInit(&pos);
         pos.vt = VT_I8;
@@ -262,19 +351,35 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
         st->reader->SetCurrentPosition(GUID_NULL, pos);
         PropVariantClear(&pos);
     }
+    IMFSourceReader* src = audioReader != NULL ? audioReader.Get() : st->reader.Get();
     unsigned char* pcm = NULL;
     size_t pcmLen = 0, pcmCap = 0;
+    /* Diagnostics: readAudio returning empty is reported by the suite as
+     * "reports audio but no PCM samples were returned", which says nothing about
+     * WHY Media Foundation produced nothing -- and this only reproduces on a
+     * Windows runner. Report the reason once so the next run names it instead of
+     * inviting another guess. */
+    int loops = 0, nullSamples = 0;
+    HRESULT lastHr = S_OK;
+    DWORD lastFlags = 0;
     for (;;) {
         DWORD streamFlags = 0;
         LONGLONG timestamp = 0;
         ComPtr<IMFSample> sample;
-        if (FAILED(st->reader->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &streamFlags, &timestamp, &sample))) {
+        loops++;
+        lastHr = src->ReadSample((DWORD) MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &streamFlags, &timestamp, &sample);
+        lastFlags = streamFlags;
+        if (FAILED(lastHr)) {
             break;
         }
         if (streamFlags & MF_SOURCE_READERF_ENDOFSTREAM) {
             break;
         }
         if (sample == NULL) {
+            nullSamples++;
+            if (nullSamples > 512) {
+                break;   /* a stream that only ever ticks would spin here forever */
+            }
             continue;
         }
         ComPtr<IMFMediaBuffer> buffer;
@@ -299,6 +404,10 @@ static JAVA_OBJECT cn1ReaderReadAudio(CODENAME_ONE_THREAD_STATE, CN1VideoReader*
             buffer->Unlock();
         }
     }
+    printf("CN1SS:INFO:winAudio reads=%d nullSamples=%d bytes=%u lastHr=0x%08lx lastFlags=0x%lx rate=%d ch=%d\n",
+           loops, nullSamples, (unsigned) pcmLen, (unsigned long) lastHr,
+           (unsigned long) lastFlags, st->audioRate, st->audioChannels);
+    fflush(stdout);
     JAVA_OBJECT result = JAVA_NULL;
     if (pcm != NULL && pcmLen > 0) {
         result = allocArray(threadStateData, (int) pcmLen, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
@@ -326,11 +435,16 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
 
     CN1VideoWriter* st = new CN1VideoWriter();
     st->writer = writer;
+    st->audioSamplesWritten = 0;
+    st->audioBytesWritten = 0;
     st->width = width;
     st->height = height;
     st->frameRate = fps;
     st->hasAudio = hasAudio;
     st->audioStream = 0;
+    st->audioEncRate = 0;
+    st->audioChannels = channels > 0 ? channels : 1;
+    st->audioSetupHr = S_OK;
 
     // ---- video output (H.264 / HEVC) ----
     ComPtr<IMFMediaType> videoOut;
@@ -363,24 +477,53 @@ static JAVA_LONG cn1WriterOpen(const wchar_t* url, bool hevc, int width, int hei
 
     // ---- audio output (AAC) ----
     if (hasAudio) {
+        /* Media Foundation's AAC encoder publishes input types at 44100 and
+         * 48000 Hz only. Asking it for the caller's rate made AddStream fail for
+         * an 8 kHz tone, and the failure was swallowed by clearing hasAudio: the
+         * file then carried a video stream alone while the writer reported
+         * success, so VideoIORoundTripTest saw a clip whose audio never arrived.
+         * Configure the encoder at a rate it accepts and convert on the way in.
+         * Byte rate is likewise constrained (the encoder publishes 12000, 16000,
+         * 20000 and 24000 bytes/sec), so an unlisted bit rate is rounded to the
+         * nearest supported one instead of failing the stream. */
+        static const UINT32 aacByteRates[] = { 12000, 16000, 20000, 24000 };
+        UINT32 wanted = (UINT32) (audioBitRate / 8);
+        UINT32 byteRate = aacByteRates[0];
+        for (size_t i = 1; i < sizeof(aacByteRates) / sizeof(aacByteRates[0]); i++) {
+            UINT32 best = byteRate > wanted ? byteRate - wanted : wanted - byteRate;
+            UINT32 here = aacByteRates[i] > wanted ? aacByteRates[i] - wanted : wanted - aacByteRates[i];
+            if (here < best) {
+                byteRate = aacByteRates[i];
+            }
+        }
+        st->audioEncRate = cn1AacEncoderRate(sampleRate);
+        st->audioChannels = channels > 0 ? channels : 1;
+
         ComPtr<IMFMediaType> audioOut;
         MFCreateMediaType(&audioOut);
         audioOut->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
         audioOut->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
         audioOut->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-        audioOut->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) sampleRate);
-        audioOut->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) channels);
-        audioOut->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, (UINT32) (audioBitRate / 8));
-        if (SUCCEEDED(writer->AddStream(audioOut.Get(), &st->audioStream))) {
+        audioOut->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) st->audioEncRate);
+        audioOut->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) st->audioChannels);
+        audioOut->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, byteRate);
+        st->audioSetupHr = writer->AddStream(audioOut.Get(), &st->audioStream);
+        if (SUCCEEDED(st->audioSetupHr)) {
             ComPtr<IMFMediaType> audioIn;
             MFCreateMediaType(&audioIn);
             audioIn->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
             audioIn->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
             audioIn->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-            audioIn->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) sampleRate);
-            audioIn->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) channels);
-            writer->SetInputMediaType(st->audioStream, audioIn.Get(), NULL);
-        } else {
+            audioIn->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, (UINT32) st->audioEncRate);
+            audioIn->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, (UINT32) st->audioChannels);
+            /* The PCM input type is under-specified without these two: the
+             * encoder needs the frame size and byte rate to accept the type. */
+            audioIn->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, (UINT32) (2 * st->audioChannels));
+            audioIn->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND,
+                    (UINT32) (st->audioEncRate * 2 * st->audioChannels));
+            st->audioSetupHr = writer->SetInputMediaType(st->audioStream, audioIn.Get(), NULL);
+        }
+        if (FAILED(st->audioSetupHr)) {
             st->hasAudio = false;
         }
     }
@@ -533,9 +676,52 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_videoWriterAudio___long_byte_
     }
     BYTE* pcm = (BYTE*) (*(JAVA_ARRAY) pcmObj).data;
     DWORD len = (DWORD) (*(JAVA_ARRAY) pcmObj).length;
-    DWORD frames = len / (DWORD) (2 * (channels > 0 ? channels : 1));
+    int ch = channels > 0 ? channels : 1;
+    DWORD frames = len / (DWORD) (2 * ch);
+    BYTE* resampled = NULL;
+
+    /* The encoder runs at a rate it will accept (see cn1WriterOpen), so PCM
+     * recorded at any other rate is converted here. Linear interpolation between
+     * neighbouring frames: enough for the tone the conformance suite records,
+     * and it keeps the signal level -- and therefore the RMS the test measures --
+     * where the caller put it. */
+    if (sampleRate > 0 && st->audioEncRate > 0 && sampleRate != st->audioEncRate && frames > 0) {
+        double ratio = (double) st->audioEncRate / (double) sampleRate;
+        DWORD outFrames = (DWORD) (frames * ratio);
+        if (outFrames > 0) {
+            DWORD outLen = outFrames * (DWORD) (2 * ch);
+            resampled = (BYTE*) malloc(outLen);
+            if (resampled != NULL) {
+                const short* in = (const short*) pcm;
+                short* out = (short*) resampled;
+                for (DWORD f = 0; f < outFrames; f++) {
+                    double srcPos = (double) f / ratio;
+                    DWORD i0 = (DWORD) srcPos;
+                    DWORD i1 = i0 + 1 < frames ? i0 + 1 : frames - 1;
+                    double frac = srcPos - (double) i0;
+                    for (int c = 0; c < ch; c++) {
+                        double a = (double) in[i0 * ch + c];
+                        double b = (double) in[i1 * ch + c];
+                        out[f * ch + c] = (short) (a + (b - a) * frac);
+                    }
+                }
+                pcm = resampled;
+                len = outLen;
+                frames = outFrames;
+                sampleRate = st->audioEncRate;
+            }
+        }
+    }
+
     LONGLONG dur = sampleRate > 0 ? (LONGLONG) ((LONGLONG) frames * CN1_HNS_PER_SEC / sampleRate) : 0;
     cn1WriterWriteSample(st, st->audioStream, pcm, len, (LONGLONG) ptsMs * CN1_HNS_PER_MS, dur);
+    /* A freshly opened reader cannot be positioned at EOF, yet it still reports
+     * ENDOFSTREAM on its first audio read -- so the file carries an audio stream
+     * header with no samples behind it, which points here rather than at the
+     * reader. Count what actually goes in. */
+    st->audioSamplesWritten++;
+    st->audioBytesWritten += (unsigned long long) len;
+    free(resampled);
 }
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoWriterClose___long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_LONG peer) {
@@ -544,6 +730,11 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_videoWriterClose___long_R_
         return JAVA_FALSE;
     }
     HRESULT hr = st->writer->Finalize();
+    printf("CN1SS:INFO:winWriter audioSamples=%lu audioBytes=%llu hasAudio=%d encRate=%d "
+           "audioSetupHr=0x%08lx finalizeHr=0x%08lx\n",
+           st->audioSamplesWritten, st->audioBytesWritten, st->hasAudio ? 1 : 0,
+           st->audioEncRate, (unsigned long) st->audioSetupHr, (unsigned long) hr);
+    fflush(stdout);
     delete st;
     return SUCCEEDED(hr) ? JAVA_TRUE : JAVA_FALSE;
 }
