@@ -139,6 +139,39 @@ class IPhoneBuilderHealthListenerScopeTest {
         assertFalse(builder.reachesHealth(reachable("com/acme/WatchApp", "com/acme/Ui")));
     }
 
+    /**
+     * A phone-only native interface is not registered in the watch stub.
+     *
+     * <p>Each registration is a hard reference, and the generated stub it names holds one to the
+     * native implementation -- so the app-wide list rooted every native implementation in the watch
+     * translation, and a phone-only one had its Objective-C compiled for watchOS, where a UIKit
+     * import is a build failure in code the watch never calls.</p>
+     */
+    @Test
+    void theWatchStubRegistersOnlyTheNativesItReaches() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        String all = "        NativeLookup.register(com.acme.PhoneNative.class,"
+                + " com.acme.PhoneNativeStub.class);\n"
+                + "        NativeLookup.register(com.acme.WatchNative.class,"
+                + " com.acme.WatchNativeStub.class);\n";
+
+        String watch = builder.nativeRegistrationsReachableFrom(all,
+                reachable("com/acme/WatchApp", "com/acme/WatchNative"));
+        assertTrue(watch.contains("com.acme.WatchNative.class"), watch);
+        assertFalse(watch.contains("com.acme.PhoneNative.class"),
+                "the watch must not root the phone's native implementation: " + watch);
+    }
+
+    /** One translation registers everything, exactly as before. */
+    @Test
+    void oneTranslationRegistersEveryNative() {
+        IPhoneBuilder builder = new IPhoneBuilder();
+        String all = "        NativeLookup.register(com.acme.PhoneNative.class,"
+                + " com.acme.PhoneNativeStub.class);\n";
+        assertEquals(all, builder.nativeRegistrationsReachableFrom(all, null));
+        assertEquals("", builder.nativeRegistrationsReachableFrom("", reachable("com/acme/X")));
+    }
+
     /** A root that reaches no listener binds none, rather than falling back to all of them. */
     @Test
     void aRootThatReachesNoListenerBindsNone() {

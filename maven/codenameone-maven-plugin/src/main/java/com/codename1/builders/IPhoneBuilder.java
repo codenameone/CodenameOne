@@ -430,6 +430,50 @@ public class IPhoneBuilder extends Executor {
         return statement == null ? "" : "            " + statement;
     }
 
+    /// The native-interface registrations one translation root can reach.
+    ///
+    /// Every `NativeLookup.register(X.class, XStub.class)` is a hard reference, and XStub holds one
+    /// to the generated implementation -- so a stub installing the app-wide list roots every native
+    /// implementation in its own translation. A phone-only native interface then had its
+    /// Objective-C staged and compiled for watchOS, where a UIKit import or an iOS-only symbol is a
+    /// build failure in code the watch never calls.
+    ///
+    /// A watch root that uses a native interface names it: NativeLookup.create takes a class
+    /// literal, which lands in the caller's constant pool. As everywhere else here the walk
+    /// over-approximates, so anything the translation would keep is matched first.
+    String nativeRegistrationsReachableFrom(String registrations,
+            java.util.Set<String> reachable) {
+        if (reachable == null || registrations == null || registrations.length() == 0) {
+            return registrations;
+        }
+        StringBuilder out = new StringBuilder();
+        for (String line : registrations.split("\n")) {
+            String registered = registeredInterfaceName(line);
+            // A line that registers nothing is passed through untouched rather than guessed at:
+            // this block is generated, but it is not this method's job to decide what else may
+            // legitimately appear in it.
+            if (registered == null || reachable.contains(registered.replace('.', '/'))) {
+                out.append(line).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
+    /// The interface named by one `NativeLookup.register(...)` line, or null if it is not one.
+    private String registeredInterfaceName(String line) {
+        final String open = "NativeLookup.register(";
+        int start = line.indexOf(open);
+        if (start < 0) {
+            return null;
+        }
+        start += open.length();
+        int end = line.indexOf(".class", start);
+        if (end <= start) {
+            return null;
+        }
+        return line.substring(start, end).trim();
+    }
+
     java.util.Map<String, String> healthListenersReachableFrom(
             java.util.Map<String, String> all, java.util.Set<String> reachable) {
         if (reachable == null || all == null || all.isEmpty()) {
@@ -2502,9 +2546,11 @@ public class IPhoneBuilder extends Executor {
             // point actually reaches.
             if (watchNativeBuilder.needsOwnTranslation()) {
                 watchNativeBuilder.writeWatchStubSource(request, stubSource, buildVersion,
-                        registerNativeImplementationsAndCreateStubs(
-                                new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
-                                stubSource, classesDir),
+                        nativeRegistrationsReachableFrom(
+                                registerNativeImplementationsAndCreateStubs(
+                                        new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
+                                        stubSource, classesDir),
+                                watchReachableClasses),
                         iosMode, svgRegistryInstall, watchHealthBindingsInstall,
                         routeDispatcherInstallSource(sourceZip, "        "),
                         annotationFrameworksInstallSource(sourceZip, "        "));
