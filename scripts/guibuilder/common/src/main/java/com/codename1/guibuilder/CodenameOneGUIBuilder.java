@@ -5152,16 +5152,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 && !ProjectIO.exists(modelPath);
         try {
             writeTracked(undo, path, companionSourceFor(source));
+            // The companion is generated from the in-memory document, so the .gui goes with it.
+            // Writing only the Java left the two disagreeing whenever the designer had unsaved
+            // structural changes: discarding them afterwards kept a companion describing a
+            // component tree the form no longer had.
+            boolean documentWasModified = document.isModified();
+            if (documentWasModified) writeTracked(undo, document.path(), document.toXml());
             if (needsModel) {
                 writeTracked(undo, modelPath, generatedModelSource());
                 setStatus("Saved form source and created its binding model");
             } else {
-                setStatus("Saved form source • existing model left unchanged");
+                setStatus(documentWasModified ? "Saved form source and the form"
+                        : "Saved form source • existing model left unchanged");
             }
             // Only once every write has landed. Marking the buffer clean after the companion but
             // before the model meant a failed model write rolled the companion back while Close,
             // form switching and exit all believed there was nothing left unsaved.
             editorBufferOnDisk = editorBuffer;
+            if (documentWasModified) document.markSaved();
         } catch (IOException ex) {
             restore(undo);
             ToastBar.showErrorMessage("Save failed, nothing was changed: " + ex.getMessage());
@@ -6034,7 +6042,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             at = source.indexOf(marker, at);
             if (at < 0) return -1;
             int lineStart = source.lastIndexOf('\n', at) + 1;
-            if (source.substring(lineStart, at).trim().length() == 0) return at;
+            int lineEnd = source.indexOf('\n', at);
+            if (lineEnd < 0) lineEnd = source.length();
+            // Both sides: checking only what precedes the marker accepted
+            // "// </gui-builder-user-code> mentioned for documentation" as structural, and the
+            // save then dropped everything between that comment and the real marker.
+            if (source.substring(lineStart, at).trim().length() == 0
+                    && source.substring(at + marker.length(), lineEnd).trim().length() == 0) {
+                return at;
+            }
             at += marker.length();
         }
     }
