@@ -1907,10 +1907,18 @@ class WatchNativeBuilder {
                 // the watch compiles the phone's sources and needs the phone's packages.
                 .append("  if watch_import_text\n")
                 .append("    q = Regexp.escape(name)\n")
-                // Swift: `import Foo`, `import Foo.Bar`, and the declaration-scoped
-                // `import struct Foo.Bar` -- the optional kind keyword is the whole difference.
+                // Swift: `import Foo`, `import Foo.Bar`, the declaration-scoped
+                // `import struct Foo.Bar`, and whatever decorates the line in front of it.
+                //
+                // ANY attribute, not a hard-coded @_exported: @preconcurrency,
+                // @_implementationOnly, @_spi(Name) and the rest are all valid there, and a
+                // pattern naming one of them classified `@preconcurrency import Foo` as unused and
+                // dropped a module the source cannot compile without. Same for the access-level
+                // modifiers Swift now allows on an import.
                 // Objective-C / C: `#import <Foo/Foo.h>`, `#import "Foo/Foo.h"`, `@import Foo;`.
-                .append("    swift_import = /^\\s*(?:@_exported\\s+)?import\\s+"
+                .append("    swift_import = /^\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*"
+                        + "(?:(?:public|package|internal|fileprivate|private)\\s+)?"
+                        + "import\\s+"
                         + "(?:typealias|struct|class|enum|protocol|let|var|func)?\\s*"
                         + "#{q}(?:\\.|\\s|$)/\n")
                 .append("    objc_import = /(?:@import\\s+#{q}\\s*;|[<\\\"]#{q}\\/)/\n")

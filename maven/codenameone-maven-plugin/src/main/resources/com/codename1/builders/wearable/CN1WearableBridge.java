@@ -1236,7 +1236,11 @@ public class CN1WearableBridge implements WearableBridge {
         if (c == null || value <= persistedClock) {
             return;
         }
-        persistedClock = value;
+        // persistedClock is NOT advanced yet. It records what is on DISK, and moving it before the
+        // write meant a refused commit was remembered as a success: every later call saw
+        // value <= persistedClock, returned early, and the floor never reached disk at all. The
+        // next process then restored the older floor and published a sequence below a peer item
+        // that is still there, which deliverIfOutranks ranks stale and drops without a callback.
         try {
             // commit(), not apply(). This floor is the promise that no future publication of ours
             // will draw a sequence at or below one we have already SEEN from a peer. apply() writes
@@ -1247,11 +1251,20 @@ public class CN1WearableBridge implements WearableBridge {
             //
             // Runs off the main thread (the Data Layer workers), and only when the floor actually
             // moves, which is rare: the blocking write is bounded and not on any UI path.
-            c.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
-                    .edit().putLong(CLOCK_KEY, value).commit();
+            if (c.getSharedPreferences(CLOCK_PREFS, Context.MODE_PRIVATE)
+                    .edit().putLong(CLOCK_KEY, value).commit()) {
+                persistedClock = value;
+                return;
+            }
         } catch (Throwable unavailable) {
-            // Best effort: the in-memory floor still holds for this process.
+            // Falls through to the retry below, which is the same situation: nothing on disk.
         }
+        // A store that is full or momentarily unwritable is the case this exists for, so a single
+        // refused write must not be the end of it. persistedClock stays where it was, so the next
+        // observation or publication tries again -- and there is always a next one before the floor
+        // matters, because the floor only matters when this device publishes.
+        android.util.Log.w("CN1Wearable", "the wearable logical-clock floor " + value
+                + " was not written; it will be retried on the next observation");
     }
 
     /// A context for a cold service process, where the clock still has to be durable.

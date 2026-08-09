@@ -47,6 +47,12 @@ import javax.imageio.ImageIO;
  *   java  -cp /tmp/wskin GenerateWatchSkins path/to/iPhoneX.skin outDir Themes/AndroidMaterialTheme.res
  */
 public class GenerateWatchSkins {
+    /// Corner radius of the drawn display on a non-circular face, in pixels.
+    ///
+    /// Named because two things depend on it and they must not drift: the artwork that draws the
+    /// rounded display, and the safe-area inset that keeps content inside it.
+    static final int DISPLAY_CORNER_RADIUS = 28;
+
     static class Model {
         final String file, label;
         final int dw, dh;          // display size in points
@@ -151,7 +157,8 @@ public class GenerateWatchSkins {
         if (m.circular) {
             g.fillOval(displayX, displayY, m.dw, m.dh);
         } else {
-            g.fill(new RoundRectangle2D.Float(displayX, displayY, m.dw, m.dh, 56, 56));
+            g.fill(new RoundRectangle2D.Float(displayX, displayY, m.dw, m.dh,
+                    DISPLAY_CORNER_RADIUS * 2, DISPLAY_CORNER_RADIUS * 2));
         }
         g.dispose();
 
@@ -196,8 +203,24 @@ public class GenerateWatchSkins {
         // as well as its height. Reporting the full display width on a round watch is what lets a
         // layout that correctly honours the safe area still put content in the clipped left and right
         // corners.
-        int inset = Math.round(m.dh * (m.circular ? 0.15f : 0.06f));
-        int insetX = m.circular ? Math.round(m.dw * 0.15f) : 0;
+        // A rounded rectangle loses its CORNERS, so it has to inset horizontally too.
+        //
+        // The old answer was zero on the X axis, on the reasoning that a rounded rectangle keeps
+        // its full width. It keeps it along the middle and nowhere near the top and bottom, and the
+        // safe area is one rectangle: with insetX = 0 the advertised rectangle's own corners fell
+        // outside the drawn display, so a component that correctly honours getDisplaySafeArea()
+        // could still be clipped by the bezel -- which is the one bug this metadata exists to
+        // prevent, and the one that only shows up on hardware.
+        //
+        // The corner arc has its centre at (r, r), so a point inset by d on both axes is inside it
+        // when (r - d)^2 * 2 <= r^2, i.e. d >= r * (1 - 1/sqrt(2)). Rounded up, and applied as a
+        // FLOOR rather than a replacement: the vertical inset is already larger than this on every
+        // shipped size, and shrinking it to the geometric minimum would hand back margin that the
+        // bezel curve does not actually leave usable.
+        int cornerInset = m.circular ? 0
+                : (int) Math.ceil(DISPLAY_CORNER_RADIUS * (1.0 - 1.0 / Math.sqrt(2.0)));
+        int inset = Math.max(cornerInset, Math.round(m.dh * (m.circular ? 0.15f : 0.06f)));
+        int insetX = m.circular ? Math.round(m.dw * 0.15f) : cornerInset;
         StringBuilder p = new StringBuilder();
         p.append("# ").append(m.label).append(" - Codename One simulator skin (placeholder art)\n");
         p.append("touch=true\n");

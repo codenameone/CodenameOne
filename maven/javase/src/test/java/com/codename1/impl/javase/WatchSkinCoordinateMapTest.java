@@ -83,6 +83,87 @@ public class WatchSkinCoordinateMapTest {
     }
 
     /**
+     * The advertised safe area has to lie inside the display that is actually drawn.
+     *
+     * <p>A rounded rectangle loses its corners, and the non-circular skins advertised a safe area
+     * with no horizontal inset at all -- so its own corners fell outside the drawn display and a
+     * component that correctly honours {@code getDisplaySafeArea()} could still be clipped by the
+     * bezel. That is the one bug this metadata exists to prevent, and the one that only shows up on
+     * hardware.</p>
+     */
+    @Test
+    public void everySafeAreaLiesInsideTheDrawnDisplay() throws Exception {
+        for (String skinName : SKINS) {
+            ZipFile zip = new ZipFile(locate(skinName));
+            try {
+                Properties props = new Properties();
+                InputStream in = zip.getInputStream(entry(zip, skinName, "skin.properties"));
+                try {
+                    props.load(in);
+                } finally {
+                    in.close();
+                }
+                int dw = Integer.parseInt(props.getProperty("displayWidth"));
+                int dh = Integer.parseInt(props.getProperty("displayHeight"));
+                int x = Integer.parseInt(props.getProperty("safePortraitX"));
+                int y = Integer.parseInt(props.getProperty("safePortraitY"));
+                int w = Integer.parseInt(props.getProperty("safePortraitWidth"));
+                int h = Integer.parseInt(props.getProperty("safePortraitHeight"));
+                assertTrue(w > 0 && h > 0, skinName + " has an empty safe area");
+                assertTrue(x + w <= dw && y + h <= dh,
+                        skinName + " safe area runs past the display");
+                if (Boolean.parseBoolean(props.getProperty("roundScreen"))) {
+                    assertCornersInsideCircle(skinName, dw, dh, x, y, w, h);
+                } else {
+                    assertCornersInsideRoundedRect(skinName, dw, dh, x, y, w, h);
+                }
+            } finally {
+                zip.close();
+            }
+        }
+    }
+
+    /** Every corner of the safe rectangle inside the inscribed circle of a round face. */
+    private void assertCornersInsideCircle(String skinName, int dw, int dh,
+            int x, int y, int w, int h) {
+        double cx = dw / 2.0;
+        double cy = dh / 2.0;
+        int[][] corners = {{x, y}, {x + w, y}, {x, y + h}, {x + w, y + h}};
+        for (int[] c : corners) {
+            double u = (c[0] - cx) / cx;
+            double v = (c[1] - cy) / cy;
+            assertTrue(u * u + v * v <= 1.0001,
+                    skinName + " safe corner (" + c[0] + "," + c[1] + ") is outside the round face");
+        }
+    }
+
+    /**
+     * Every corner of the safe rectangle inside the drawn rounded rectangle.
+     *
+     * <p>The display's corner arc is centred at {@code (r, r)}, so a corner inset by {@code dx} and
+     * {@code dy} is inside when {@code (r-dx)^2 + (r-dy)^2 <= r^2} -- and trivially inside once
+     * either inset reaches {@code r}.</p>
+     */
+    private void assertCornersInsideRoundedRect(String skinName, int dw, int dh,
+            int x, int y, int w, int h) {
+        int[][] insets = {{x, y}, {dw - (x + w), y}, {x, dh - (y + h)},
+            {dw - (x + w), dh - (y + h)}};
+        for (int[] i : insets) {
+            double dx = i[0];
+            double dy = i[1];
+            boolean inside = dx >= DISPLAY_CORNER_RADIUS || dy >= DISPLAY_CORNER_RADIUS
+                    || Math.pow(DISPLAY_CORNER_RADIUS - dx, 2)
+                            + Math.pow(DISPLAY_CORNER_RADIUS - dy, 2)
+                        <= DISPLAY_CORNER_RADIUS * DISPLAY_CORNER_RADIUS + 0.01;
+            assertTrue(inside, skinName + " safe area corner inset (" + i[0] + "," + i[1]
+                    + ") falls outside the rounded display, radius " + DISPLAY_CORNER_RADIUS);
+        }
+    }
+
+    /** Mirrors GenerateWatchSkins.DISPLAY_CORNER_RADIUS -- the radius the artwork is drawn with. */
+    private static final int DISPLAY_CORNER_RADIUS = 28;
+
+    /**
      * The black region of the map has to be exactly the display the properties declare -- that
      * rectangle is what the simulator draws the app into, and a map disagreeing with the
      * properties puts the safe-area insets against different pixels than the frame.

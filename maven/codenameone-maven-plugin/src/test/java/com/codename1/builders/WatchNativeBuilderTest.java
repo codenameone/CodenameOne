@@ -704,6 +704,13 @@ class WatchNativeBuilderTest {
         // And Swift's declaration-scoped form names the module just as the plain one does; reading
         // only `import Foo` dropped a product the source genuinely needs.
         assertTrue(ruby.contains("typealias|struct|class|enum|protocol|let|var|func"), ruby);
+        // Any attribute, not one hard-coded name: @preconcurrency, @_implementationOnly and
+        // @_spi(Name) are all valid in front of an import, and naming only @_exported classified
+        // those lines as unused and dropped a module the source cannot compile without. Access-level
+        // imports are the same story.
+        assertTrue(ruby.contains("(?:@\\w+(?:\\([^)]*\\))?\\s*)*"),
+                "the attribute prefix has to be general: " + ruby);
+        assertTrue(ruby.contains("public|package|internal|fileprivate|private"), ruby);
         // Both halves are required. Listing the product on the target is what makes Xcode resolve
         // the package for it; the frameworks-phase build file is what links it. Either alone
         // produces a project that still fails, and differently.
