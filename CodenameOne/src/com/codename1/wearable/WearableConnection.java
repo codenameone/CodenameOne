@@ -506,6 +506,27 @@ public final class WearableConnection {
     /// - `payload`: the encoded payload
     /// - `replyToken`: a positive token when the peer is waiting for an answer, otherwise 0
     public static void deliverMessage(final String path, final byte[] payload, final int replyToken) {
+        deliverMessage(path, payload, replyToken, null);
+    }
+
+    /// The same, with a callback for a port that has the message written down somewhere durable.
+    ///
+    /// `delivered` runs on the EDT once every registered listener has been offered the message --
+    /// not when it is queued. A port whose spool survives process death needs exactly that
+    /// distinction: releasing its record when the delivery was merely queued loses the message if
+    /// the process dies before the EDT gets to it, which is the failure the spool exists for.
+    ///
+    /// Not called at all while the delivery is parked for want of a listener. That is the point: the
+    /// record stays durable until something actually receives it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path the message arrived on
+    /// - `payload`: the encoded payload
+    /// - `replyToken`: a positive token when the peer is waiting for an answer, otherwise 0
+    /// - `delivered`: run after the listeners have seen it, or null
+    public static void deliverMessage(final String path, final byte[] payload,
+            final int replyToken, final Runnable delivered) {
         deliver(new Runnable() {
             @Override
             public void run() {
@@ -542,6 +563,11 @@ public final class WearableConnection {
                                 reply == null ? new byte[0] : reply.toByteArray());
                     }
                 }
+                // Before the rethrow, and deliberately: every listener HAS been offered the
+                // message by here, so as far as the port's durable record is concerned this one is
+                // delivered. Holding it back because a listener threw would replay it on the next
+                // launch into the same listener, for ever.
+                runDeliveredCallback(delivered);
                 // Reported, not swallowed -- but only once every listener has been offered the
                 // message and the sender has its answer.
                 if (failure != null) {
@@ -683,6 +709,19 @@ public final class WearableConnection {
     ///
     /// - `path`: the path whose value is gone
     public static void deliverDataRemoved(final String path) {
+        deliverDataRemoved(path, null);
+    }
+
+    /// The same, with a callback for a port holding the removal in a durable spool.
+    ///
+    /// See [#deliverMessage(String,byte[],int,Runnable)]: `delivered` runs once the listeners have
+    /// been offered the removal, and never while it is parked for want of one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path whose value was removed
+    /// - `delivered`: run after the listeners have seen it, or null
+    public static void deliverDataRemoved(final String path, final Runnable delivered) {
         deliverTagged(path, new Runnable() {
             @Override
             public void run() {
@@ -707,6 +746,9 @@ public final class WearableConnection {
                         }
                     }
                 }
+                // Every listener has been offered the removal, so the port may forget its durable
+                // record. Before the rethrow, for the same reason as the message path.
+                runDeliveredCallback(delivered);
                 // Reported, not swallowed -- but only once every listener has been offered it.
                 if (failure != null) {
                     throw failure;
@@ -748,6 +790,21 @@ public final class WearableConnection {
 
     /// Parks a replicated delivery TAGGED with its path, so the cap can prefer an entry the
     /// incoming one actually supersedes.
+    /// Runs a port's delivery-confirmation callback without letting it break the dispatch.
+    ///
+    /// A port releasing a durable record does I/O, and an exception from that must not be mistaken
+    /// for a listener failure -- the listeners have already run by the time this is called.
+    private static void runDeliveredCallback(Runnable delivered) {
+        if (delivered == null) {
+            return;
+        }
+        try {
+            delivered.run();
+        } catch (RuntimeException portFailed) {
+            com.codename1.io.Log.e(portFailed);
+        }
+    }
+
     private static void deliverTagged(String path, Runnable delivery) {
         deliverTagged(path, delivery, false);
     }

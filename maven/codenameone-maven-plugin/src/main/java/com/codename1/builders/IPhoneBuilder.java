@@ -2650,7 +2650,16 @@ public class IPhoneBuilder extends Executor {
                     + "    }\n\n"
                     + "    public static void main(String[] argv) {\n"
                     + "        if(!(argv != null && argv.length > 0 && argv[0].equals(\"ignoreNative\"))) {\n"
-                    + registerNativeImplementationsAndCreateStubs(new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}), stubSource, classesDir)
+                    // Filtered by the PHONE root for the same reason the watch stub is filtered by
+                    // its own: with two translations the app-wide list roots every native
+                    // implementation in both, so a watch-only NativeInterface whose Objective-C
+                    // imports WatchKit broke the phone target -- the mirror image of the failure
+                    // the watch filter fixes.
+                    + nativeRegistrationsReachableFrom(
+                            registerNativeImplementationsAndCreateStubs(
+                                    new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
+                                    stubSource, classesDir),
+                            phoneReachableClasses)
                     + "        }\n"
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"

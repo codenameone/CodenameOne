@@ -784,6 +784,32 @@ class WatchNativeBuilderTest {
                 "unreachable after the stub's main, which never returns: " + boot);
     }
 
+    /**
+     * A key spelled with CDATA is the same key.
+     *
+     * <p>The phone's plist is read by an XML parser, so
+     * {@code <key><![CDATA[CFBundleShortVersionString]]></key>} suppresses its default -- while a
+     * literal text match here found nothing and gave the watch its fallback version. The pair then
+     * shipped with different marketing versions, which archive validation rejects.</p>
+     */
+    @Test
+    void injectedKeysAreMatchedAsContentNotAsMarkup(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key><![CDATA[CFBundleShortVersionString]]></key><string>2.0</string>");
+
+        assertEquals("2.0",
+                WatchNativeBuilder.injectedPlistString(req, "CFBundleShortVersionString"),
+                "a CDATA-spelled key names the same key an XML parser sees");
+        assertTrue(WatchNativeBuilder.injectedPlistKeys(req).contains("CFBundleShortVersionString"),
+                "and the key scan has to agree with the lookup");
+
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>2.0</string>"),
+                "the watch carries the injected version, not its fallback: " + plist);
+    }
+
     /// The bootstrap has to call the stub that actually exists in the watch binary.
     @Test
     void theBootstrapEntersTheWatchStub(@TempDir Path tmp) throws Exception {

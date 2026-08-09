@@ -1460,14 +1460,25 @@ public class CN1WearableBridge implements WearableBridge {
 
     /// Replays everything written down, oldest first, forgetting each only once it is delivered.
     static void drainSpool(Context context) {
-        for (Map.Entry<String, String> e : claimSpooled(context).entrySet()) {
-            // Outside the lock. A listener runs arbitrary app code, and holding the spool across
-            // it would block every worker trying to write the next delivery down.
-            replaySpooled(e.getValue());
-            // And only NOW is the record gone. Removing the whole batch up front was simpler and
-            // lost data: a process reclaimed between that commit and the callbacks took every
-            // record with it, which is precisely the crash this spool exists to survive.
-            releaseSpooled(context, e.getKey());
+        for (String key : spooledKeys(context)) {
+            // ONE record at a time. Charging an attempt to the whole batch up front meant the
+            // oldest record crashing the process three times threw away every later message and
+            // removal with it -- none of which had been tried even once.
+            String record = claimSpooled(context, key);
+            if (record == null) {
+                continue;
+            }
+            final Context c = context;
+            final String claimed = key;
+            // Released from the delivery callback, not here. replaySpooled only QUEUES onto
+            // WearableConnection: the listeners run later on the EDT, and may not run at all yet if
+            // none is registered. Forgetting the record at queue time lost exactly what this spool
+            // exists to survive -- a process that dies between the queueing and the callback.
+            replaySpooled(record, new Runnable() {
+                public void run() {
+                    releaseSpooled(c, claimed);
+                }
+            });
         }
     }
 
@@ -1479,63 +1490,70 @@ public class CN1WearableBridge implements WearableBridge {
     /// payload replays on every launch for ever.
     private static final int SPOOL_MAX_ATTEMPTS = 3;
 
-    /// Marks every spooled record as being delivered, and returns the ones still worth trying.
-    ///
-    /// The attempt count is written back BEFORE the callbacks run, so a record that kills the
-    /// process is counted against its budget rather than retried for ever.
-    private static java.util.Map<String, String> claimSpooled(Context context) {
-        java.util.Map<String, String> out = new LinkedHashMap<String, String>();
+    /// The spooled keys in delivery order, without touching their attempt counts.
+    private static java.util.List<String> spooledKeys(Context context) {
+        java.util.List<String> keys = new ArrayList<String>();
         Context c = spoolContext(context);
         if (c == null) {
-            return out;
+            return keys;
+        }
+        synchronized (SPOOL_LOCK) {
+            try {
+                for (String k : c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE)
+                        .getAll().keySet()) {
+                    if (!SPOOL_SEQ_KEY.equals(k)) {
+                        keys.add(k);
+                    }
+                }
+            } catch (Throwable unavailable) {
+                return new ArrayList<String>();
+            }
+        }
+        // Zero-padded keys, so lexical order IS the order they were written in.
+        java.util.Collections.sort(keys);
+        return keys;
+    }
+
+    /// Charges one attempt to a single record and returns what to replay, or null to skip it.
+    ///
+    /// The attempt is written BEFORE the callback runs, so a record that kills the process is
+    /// counted against its budget rather than retried for ever.
+    private static String claimSpooled(Context context, String key) {
+        Context c = spoolContext(context);
+        if (c == null) {
+            return null;
         }
         synchronized (SPOOL_LOCK) {
             try {
                 android.content.SharedPreferences prefs =
                         c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
-                java.util.Map<String, ?> all = prefs.getAll();
-                java.util.List<String> keys = new ArrayList<String>();
-                for (String k : all.keySet()) {
-                    if (!SPOOL_SEQ_KEY.equals(k)) {
-                        keys.add(k);
-                    }
+                String record = prefs.getString(key, null);
+                if (record == null) {
+                    return null;
                 }
-                if (keys.isEmpty()) {
-                    return out;
-                }
-                java.util.Collections.sort(keys);
+                int attempts = attemptsOf(record) + 1;
                 android.content.SharedPreferences.Editor edit = prefs.edit();
-                for (String k : keys) {
-                    Object raw = all.get(k);
-                    if (!(raw instanceof String)) {
-                        edit.remove(k);
-                        continue;
-                    }
-                    String record = (String) raw;
-                    int attempts = attemptsOf(record) + 1;
-                    if (attempts > SPOOL_MAX_ATTEMPTS) {
-                        android.util.Log.w("CN1Wearable", "giving up on a spooled wearable delivery"
-                                + " after " + SPOOL_MAX_ATTEMPTS + " attempts: " + bodyOf(record));
-                        edit.remove(k);
-                        continue;
-                    }
-                    edit.putString(k, attempts + "|" + bodyOf(record));
-                    out.put(k, bodyOf(record));
+                if (attempts > SPOOL_MAX_ATTEMPTS) {
+                    android.util.Log.w("CN1Wearable", "giving up on a spooled wearable delivery"
+                            + " after " + SPOOL_MAX_ATTEMPTS + " attempts: " + bodyOf(record));
+                    edit.remove(key);
+                    edit.commit();
+                    return null;
                 }
+                edit.putString(key, attempts + "|" + bodyOf(record));
                 if (!edit.commit()) {
-                    // The attempt counts did not land, so replaying now would be unbounded on a
-                    // record that keeps killing the process. Everything stays on disk for the next
-                    // launch, which is the safe direction.
-                    return new LinkedHashMap<String, String>();
+                    // The attempt did not land, so replaying now would be unbounded on a record
+                    // that keeps killing the process. It waits for the next launch.
+                    return null;
                 }
+                return bodyOf(record);
             } catch (Throwable unavailable) {
-                return new LinkedHashMap<String, String>();
+                return null;
             }
         }
-        return out;
     }
 
-    /// Forgets one record, after its callback has been handed to the application.
+    /// Forgets one record, once its listeners have actually seen it.
     private static void releaseSpooled(Context context, String key) {
         Context c = spoolContext(context);
         if (c == null) {
@@ -1579,7 +1597,7 @@ public class CN1WearableBridge implements WearableBridge {
         return record.substring(bar + 1);
     }
 
-    private static void replaySpooled(String record) {
+    private static void replaySpooled(String record, Runnable delivered) {
         int first = record.indexOf('|');
         int second = first < 0 ? -1 : record.indexOf('|', first + 1);
         if (first < 0 || second < 0) {
@@ -1590,12 +1608,12 @@ public class CN1WearableBridge implements WearableBridge {
         String encoded = record.substring(second + 1);
         try {
             if (SPOOL_REMOVAL.equals(kind)) {
-                WearableConnection.deliverDataRemoved(path);
+                WearableConnection.deliverDataRemoved(path, delivered);
                 return;
             }
             byte[] payload = encoded.length() == 0 ? new byte[0]
                     : android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP);
-            WearableConnection.deliverMessage(path, payload, 0);
+            WearableConnection.deliverMessage(path, payload, 0, delivered);
         } catch (Throwable unreadable) {
             // A record this build cannot parse is dropped rather than retried forever.
         }

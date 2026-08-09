@@ -736,11 +736,12 @@ class WatchNativeBuilder {
             if (open < 0) {
                 return out;
             }
-            int close = inject.indexOf("</key>", open);
+            int close = closeOfElement(inject, open + "<key>".length(), "</key>");
             if (close < 0) {
                 return out;
             }
-            String key = inject.substring(open + "<key>".length(), close).trim();
+            String key = plistStringContent(
+                    inject.substring(open + "<key>".length(), close)).trim();
             if (key.length() > 0 && !out.contains(key)) {
                 out.add(key);
             }
@@ -753,19 +754,39 @@ class WatchNativeBuilder {
         if (inject == null) {
             return null;
         }
-        int at = inject.indexOf("<key>" + key + "</key>");
-        if (at < 0) {
-            return null;
+        // The key's CONTENT, resolved, rather than the literal text `<key>NAME</key>`.
+        //
+        // A plist may spell a key as <key><![CDATA[CFBundleShortVersionString]]></key>, or wrap a
+        // comment around part of it, and an XML parser reads all of those as the same key -- which
+        // is what the phone's plist does. Matching the serialized form here meant the phone
+        // suppressed its default for a key the watch then failed to find, and the pair shipped with
+        // different marketing versions, which archive validation rejects.
+        int at = 0;
+        while (true) {
+            int open = inject.indexOf("<key>", at);
+            if (open < 0) {
+                return null;
+            }
+            int close = closeOfElement(inject, open + "<key>".length(), "</key>");
+            if (close < 0) {
+                return null;
+            }
+            at = close + "</key>".length();
+            if (!key.equals(plistStringContent(
+                    inject.substring(open + "<key>".length(), close)).trim())) {
+                continue;
+            }
+            int valueOpen = inject.indexOf("<string>", at);
+            if (valueOpen < 0) {
+                return null;
+            }
+            int valueClose = closeOfString(inject, valueOpen + "<string>".length());
+            if (valueClose < 0) {
+                return null;
+            }
+            return plistStringContent(
+                    inject.substring(valueOpen + "<string>".length(), valueClose));
         }
-        int open = inject.indexOf("<string>", at);
-        if (open < 0) {
-            return null;
-        }
-        int close = closeOfString(inject, open + "<string>".length());
-        if (close < 0) {
-            return null;
-        }
-        return plistStringContent(inject.substring(open + "<string>".length(), close));
     }
 
     /// The {@code </string>} that closes the element, skipping over CDATA sections.
@@ -774,9 +795,14 @@ class WatchNativeBuilder {
     /// {@code <![CDATA[a</string>b]]>} that occurrence is DATA -- the element would be cut in half
     /// at a point the XML parser reading the phone's plist never stops at.
     private static int closeOfString(String inject, int from) {
+        return closeOfElement(inject, from, "</string>");
+    }
+
+    /// The end tag that closes an element, skipping over CDATA sections and comments.
+    private static int closeOfElement(String inject, int from, String closeTag) {
         int i = from;
         while (i <= inject.length()) {
-            int close = inject.indexOf("</string>", i);
+            int close = inject.indexOf(closeTag, i);
             if (close < 0) {
                 return -1;
             }
