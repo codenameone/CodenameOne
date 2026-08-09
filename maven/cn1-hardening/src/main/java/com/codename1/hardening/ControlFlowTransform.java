@@ -169,7 +169,11 @@ public final class ControlFlowTransform {
             // A frame merge collapsed to Object because a supertype is absent from the supplied jars, so
             // the recomputed StackMapTable may be too weak and fail on-device verification. Ship this class
             // UNHARDENED (original valid frames) rather than a possibly-invalid one. Control flow leaves
-            // string literals untouched, so no jar-wide literal exclusion is needed here.
+            // string literals untouched, so no jar-wide literal exclusion is needed here. Reset the guard
+            // counts: no guard is actually emitted for a discarded class, and a stale count would let the
+            // engine advertise controlFlow and stamp cn1.hardened=true for byte-unmodified output.
+            guardedMethods = 0;
+            oversizedMethods = 0;
             return classBytes;
         }
         return cw.toByteArray();

@@ -516,6 +516,10 @@ public final class StringEncryptTransform {
             // exclude ALL of them jar-wide: a value encrypted+interned in another class must not compare !=
             // to this class's plaintext copy on ParparVM's deduplicated pool.
             collectAllLiterals(classBytes, newlyExcluded);
+            // No literal is actually encrypted for a discarded class; clear the applied count so the engine
+            // does not count these toward "some transform ran" and stamp cn1.hardened=true for output whose
+            // bytes never changed. The literals are disclosed via the hierarchy-incomplete skip instead.
+            encryptedCount = 0;
             hierarchyIncompleteSkipped = true;
             return classBytes;
         }
