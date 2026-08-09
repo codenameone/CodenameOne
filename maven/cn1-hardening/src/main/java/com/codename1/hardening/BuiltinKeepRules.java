@@ -79,6 +79,14 @@ public final class BuiltinKeepRules {
         r.add("-keep class * implements com.codename1.location.LocationListener { *; }");
         r.add("-keep class * implements com.codename1.background.BackgroundFetch { *; }");
         r.add("-keep class * implements com.codename1.background.BackgroundWorker { *; }");
+        // A HealthBackgroundListener is reconstructed after a process restart by its PERSISTED class name:
+        // HealthStore writes getClass().getName() to Preferences (PREF_LISTENER), and the platform builder
+        // scans the (hardened) jar to generate a HealthBackgroundListenerFactory that maps that name back
+        // to a constructor. The default per-build mapping seed changes the renamed name between builds, so
+        // after an app update the persisted name no longer matches the regenerated factory and
+        // resolveBackgroundListener() silently returns nothing -- background health delivery stops. Keep
+        // the implementors so the name stays stable, as the equivalent location/background rules do.
+        r.add("-keep class * implements com.codename1.health.HealthBackgroundListener { *; }");
         // A com.codename1.social.Login subclass persists its OAuth access/refresh tokens under keys
         // derived from getClass().getName() (Login.getAccessToken/setAccessToken/validateToken). Renaming
         // an app's Login subclass would change the key after an app update, so the stored session becomes
