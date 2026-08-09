@@ -79,6 +79,11 @@ class DatabaseUsageScanTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        setUpRoot();
+    }
+
+    /** A fresh scan root, so a test can run the scan more than once. */
+    private void setUpRoot() throws IOException {
         root = File.createTempFile("cn1-db-scan", "");
         assertTrue(root.delete());
         assertTrue(root.mkdirs());
@@ -109,6 +114,79 @@ class DatabaseUsageScanTest {
      * indistinguishable from a real class that references them, which is the whole of what is
      * under test here.
      */
+    /**
+     * A class file whose constant pool holds one method reference to DatabaseConfig.
+     *
+     * Real bytes rather than a string soup, because the question the scanner asks -- which factory
+     * is being called -- can only be answered from a constant pool. Just enough of one for the
+     * reference to be found: the class, the name and type, and the method reference tying them.
+     */
+    private void writeClassCalling(String path, String factory) throws IOException {
+        File f = new File(root, path.replace('/', File.separatorChar));
+        assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        java.io.DataOutputStream out = new java.io.DataOutputStream(new FileOutputStream(f));
+        try {
+            out.writeInt(0xCAFEBABE);
+            out.writeShort(0);
+            out.writeShort(52);
+            out.writeShort(7);
+            out.writeByte(1);
+            out.writeUTF("com/codename1/db/DatabaseConfig");
+            out.writeByte(7);
+            out.writeShort(1);
+            out.writeByte(1);
+            out.writeUTF(factory);
+            out.writeByte(1);
+            out.writeUTF("()Lcom/codename1/db/DatabaseConfig;");
+            out.writeByte(12);
+            out.writeShort(3);
+            out.writeShort(4);
+            out.writeByte(10);
+            out.writeShort(2);
+            out.writeShort(5);
+            out.writeShort(0x0021);
+            out.writeShort(2);
+            out.writeShort(2);
+            out.writeShort(0);
+            out.writeShort(0);
+            out.writeShort(0);
+            out.writeShort(0);
+        } finally {
+            out.close();
+        }
+    }
+
+    @Test
+    void anExplicitlyPlainConfigIsNotEncryption() throws IOException {
+        // plain() is the documented way to say a database is not encrypted. Reading a reference to
+        // DatabaseConfig as encryption charged that application the cipher library and, on
+        // Android, every device below API 23 -- for asking for no encryption at all.
+        writeClassCalling("com/example/App.class", "plain");
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "it still uses the database");
+        assertFalse(usage.usesDatabaseCipher(), "but it configures no key");
+    }
+
+    @Test
+    void eachEncryptingFactoryCountsAsEncryption() throws IOException {
+        String[] factories = {"passphrase", "rawKey", "managed"};
+        for (int iter = 0; iter < factories.length; iter++) {
+            setUpRoot();
+            writeClassCalling("com/example/App.class", factories[iter]);
+            Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+            assertTrue(usage.usesDatabaseCipher(), factories[iter] + " configures a key");
+        }
+    }
+
+    @Test
+    void anUnreadableClassIsTreatedAsEncrypting() throws IOException {
+        // The safe direction: an application that encrypts must not ship without a cipher because
+        // its class file could not be walked.
+        writeClass("com/example/App.class", "com/codename1/db/DatabaseConfig");
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabaseCipher(), "unreadable means assume the cipher is needed");
+    }
+
     private void writeClass(String path, String... references) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());

@@ -753,6 +753,9 @@ public abstract class Executor {
     /// The internal name of the class that turns encryption on.
     private static final byte[] DATABASE_CIPHER_MARKER = toAscii("com/codename1/db/DatabaseConfig");
 
+    /// The same name as the marker above, for reading method references out of a constant pool.
+    private static final String DATABASE_CONFIG_CLASS = "com/codename1/db/DatabaseConfig";
+
     /// Framework classes that are a database by another name.
     ///
     /// An application can use one of these and never mention `com.codename1.db` itself --
@@ -827,10 +830,114 @@ public abstract class Executor {
                         || referencesDatabaseFacade(bytes))) {
                     found[0] = true;
                 }
-                if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)) {
+                if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)
+                        && callsEncryptingConfigFactory(bytes)) {
                     found[1] = true;
                 }
             }
+        }
+    }
+
+    /// The DatabaseConfig factories that mean a database is encrypted.
+    ///
+    /// `plain()` is deliberately absent: it is the documented way to say a database is *not*
+    /// encrypted, and treating a reference to it as encryption costs that application the cipher
+    /// library and, on Android, every device below API 23.
+    private static final String[] ENCRYPTING_CONFIG_FACTORIES = {
+        "passphrase", "rawKey", "managed"
+    };
+
+    /// Whether a class calls one of DatabaseConfig's encrypting factories.
+    ///
+    /// Read out of the constant pool rather than by searching the bytes: the class name alone
+    /// appears for `DatabaseConfig.plain()` too, and a bare search for the method names would
+    /// match any application that happens to have a field called `passphrase`. A method reference
+    /// carries both halves, so this asks the question that was meant -- is a key being configured.
+    ///
+    /// A class file this cannot parse answers true, because the alternative is an application that
+    /// encrypts silently shipping without a cipher.
+    static boolean callsEncryptingConfigFactory(byte[] bytes) {
+        try {
+            java.io.DataInputStream in = new java.io.DataInputStream(
+                    new java.io.ByteArrayInputStream(bytes));
+            if (in.readInt() != 0xCAFEBABE) {
+                return true;
+            }
+            in.readUnsignedShort();
+            in.readUnsignedShort();
+            int count = in.readUnsignedShort();
+            String[] utf8 = new String[count];
+            int[] classNameIndex = new int[count];
+            int[] refClassIndex = new int[count];
+            int[] refNameAndType = new int[count];
+            int[] nameAndTypeName = new int[count];
+            for (int iter = 1; iter < count; iter++) {
+                int tag = in.readUnsignedByte();
+                switch (tag) {
+                    case 1:
+                        utf8[iter] = in.readUTF();
+                        break;
+                    case 7:
+                        classNameIndex[iter] = in.readUnsignedShort();
+                        break;
+                    case 9:
+                    case 10:
+                    case 11:
+                        refClassIndex[iter] = in.readUnsignedShort();
+                        refNameAndType[iter] = in.readUnsignedShort();
+                        break;
+                    case 12:
+                        nameAndTypeName[iter] = in.readUnsignedShort();
+                        in.readUnsignedShort();
+                        break;
+                    case 5:
+                    case 6:
+                        in.readLong();
+                        // A long or a double takes two entries, and the second one is unusable.
+                        iter++;
+                        break;
+                    case 3:
+                    case 4:
+                        in.readInt();
+                        break;
+                    case 8:
+                    case 16:
+                    case 19:
+                    case 20:
+                        in.readUnsignedShort();
+                        break;
+                    case 15:
+                        in.readUnsignedByte();
+                        in.readUnsignedShort();
+                        break;
+                    case 17:
+                    case 18:
+                        in.readUnsignedShort();
+                        in.readUnsignedShort();
+                        break;
+                    default:
+                        // A tag this does not know means the rest cannot be walked.
+                        return true;
+                }
+            }
+            for (int iter = 1; iter < count; iter++) {
+                if (refClassIndex[iter] == 0) {
+                    continue;
+                }
+                String owner = utf8[classNameIndex[refClassIndex[iter]]];
+                if (!DATABASE_CONFIG_CLASS.equals(owner)) {
+                    continue;
+                }
+                String method = utf8[nameAndTypeName[refNameAndType[iter]]];
+                for (int f = 0; f < ENCRYPTING_CONFIG_FACTORIES.length; f++) {
+                    if (ENCRYPTING_CONFIG_FACTORIES[f].equals(method)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } catch (Throwable cannotRead) {
+            return true;
         }
     }
 

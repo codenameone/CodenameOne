@@ -265,6 +265,14 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     @Override
     public void beforeFirst() throws IOException {
         checkOpen();
+        // The count goes with the pass that established it. Rewinding re-executes the statement,
+        // and outside a transaction the new pass can see rows another connection has written
+        // since -- so a remembered count would answer for a result set that no longer exists, and
+        // last() would stop on what used to be the final row.
+        //
+        // Only here, and not in the internal rewinds: getCount() and position() rewind as part of
+        // counting and seeking, and clearing it there would discard the count they just took.
+        knownCount = -1;
         rewindInternal();
     }
 

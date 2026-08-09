@@ -11028,9 +11028,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     String.class);
             // Cast outside the try, below. ParparVM does not throw on a failed cast, so a cast
             // inside a block that catches Throwable is a cast whose failure nothing can handle.
+            // The resolved file, not the name it was asked for: a managed key with no explicit
+            // alias is stored under whatever is passed here, so two accepted spellings of one
+            // database would derive two different keys and the second open would report a wrong
+            // key against data that is perfectly intact.
             opened = open.invoke(null,
                     resolveNativeDatabasePath(databaseName), databaseName,
-                    config.resolveKeyMaterial(databaseName));
+                    config.resolveKeyMaterial(nativePath));
         } catch (java.lang.reflect.InvocationTargetException err) {
             releaseUnusedDatabaseConnection(nativePath);
             Throwable cause = err.getCause();

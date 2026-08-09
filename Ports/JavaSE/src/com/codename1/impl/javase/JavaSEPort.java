@@ -16796,7 +16796,14 @@ public class JavaSEPort extends CodenameOneImplementation {
      * re-keying an already open connection.
      */
     static String databaseKeyMaterial(DatabaseConfig config, String databaseName) throws IOException {
-        return config.resolveKeyMaterial(databaseName);
+        // Keyed on the resolved file rather than the name: a managed key with no explicit alias is
+        // stored under what is passed here, and two spellings of one database would otherwise
+        // derive two different keys, so the second open would report a wrong key against intact
+        // data.
+        JavaSEPort port = instance;
+        String identity = port == null ? databaseName
+                : canonicalDatabaseKey(port.getDatabaseFile(databaseName));
+        return config.resolveKeyMaterial(identity);
     }
 
     private static boolean simulatorKeyWarningShown;

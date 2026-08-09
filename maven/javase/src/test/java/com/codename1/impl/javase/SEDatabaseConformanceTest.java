@@ -143,6 +143,36 @@ public class SEDatabaseConformanceTest {
         DatabaseConformanceSuite.setPortKind(DatabaseConformanceSuite.PORT_AUTODETECT);
     }
 
+    @Test
+    public void rewindingAfterAnotherConnectionWroteSeesTheNewRows() throws Exception {
+        // A cursor caches its row count once it has walked to the end. Rewinding re-executes the
+        // statement, and outside a transaction the new pass can see rows another connection wrote
+        // in between -- so a count carried over from the first pass answers for a result set that
+        // no longer exists, and last() stops on what used to be the final row.
+        db.execute("CREATE TABLE watched (id INTEGER PRIMARY KEY)");
+        db.execute("INSERT INTO watched (id) VALUES (1)");
+        db.execute("INSERT INTO watched (id) VALUES (2)");
+
+        Cursor cur = db.executeQuery("SELECT id FROM watched ORDER BY id");
+        try {
+            assertTrue(cur.last(), "walked to the end of the first pass");
+            assertEquals(2, com.codename1.db.Database.count(cur), "two rows to begin with");
+
+            com.codename1.db.Database.beforeFirst(cur);
+            // Written through this connection rather than a second one: an open cursor holds a
+            // read lock that a separate connection cannot write past, and the cache does not care
+            // who wrote. What it must not do is answer for the pass that has been rewound away.
+            db.execute("INSERT INTO watched (id) VALUES (3)");
+
+            assertEquals(3, com.codename1.db.Database.count(cur),
+                    "the rewound pass counts the row written since");
+            assertTrue(cur.last(), "and last() reaches it");
+            assertEquals(3, cur.getRow().getInteger(0), "which is the new final row");
+        } finally {
+            cur.close();
+        }
+    }
+
     private static Connection openPlain(File f) throws Exception {
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);
