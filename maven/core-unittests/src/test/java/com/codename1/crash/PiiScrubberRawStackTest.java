@@ -38,15 +38,17 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
-    void javaScriptColumnOffsetsSurvive() {
-        // A minified bundle is one line, so the column offset runs to six-plus digits. It is the
-        // location the js-error parser needs, so it must not be masked to [num].
+    void largeJavaScriptColumnOffsetsAreMaskedShortLineNumbersSurvive() {
+        // A minified bundle's column runs to six-plus digits. Because a message can plant a long id in a
+        // frame-shaped line and no text heuristic can distinguish it, the raw stack is scrubbed uniformly:
+        // the 6+ digit column is masked (precise coordinates come from the structured frames), while an
+        // ordinary short line number is left readable.
         String stack = "TypeError: undefined is not a function\n"
                 + "    at run (http://host/app.js:1:123456)\n"
-                + "    at go (http://host/app.js:1:98765)\n";
+                + "    at go (http://host/app.js:42)\n";
         String scrubbed = scrubber.scrubRawStack(stack);
-        assertTrue(scrubbed.indexOf("app.js:1:123456") >= 0, scrubbed);
-        assertTrue(scrubbed.indexOf("[num]") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:42") >= 0, scrubbed);
     }
 
     @Test
@@ -64,9 +66,11 @@ class PiiScrubberRawStackTest {
 
     @Test
     void parparVmLineNumbersSurvive() {
-        String stack = "    at com.foo.Bar.baz:123456\n";
+        // An ordinary ParparVM line number is short (< 6 digits), so it is left readable by the uniform
+        // digit-run masking (only 6+ digit runs -- long ids or minified columns -- are masked).
+        String stack = "    at com.foo.Bar.baz:4242\n";
         String scrubbed = scrubber.scrubRawStack(stack);
-        assertTrue(scrubbed.indexOf("baz:123456") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("baz:4242") >= 0, scrubbed);
     }
 
     @Test
@@ -141,9 +145,10 @@ class PiiScrubberRawStackTest {
         assertTrue(scrubbed.indexOf("attempt:[num]") >= 0, scrubbed);
         assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
         assertTrue(scrubbed.indexOf("654321") < 0, scrubbed);
-        // Real frames (dotted identity) keep their coordinates.
+        // Short numbers (an ordinary line number) survive; a 6+ digit run is masked whether it is a real
+        // coordinate or a planted id, since a message line and a frame line are indistinguishable.
         assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
-        assertTrue(scrubbed.indexOf("Bar.qux:998877") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("998877") < 0, scrubbed);
     }
 
     @Test
@@ -293,20 +298,6 @@ class PiiScrubberRawStackTest {
         String scrubbed = scrubber.scrubRawStack(stack);
         assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
         assertTrue(scrubbed.indexOf("app.js:3:98765") >= 0, scrubbed);
-    }
-
-    @Test
-    void v8AsyncFrameWithMultiWordLabelKeepsItsCoordinate() {
-        // V8 labels async/constructor/accessor frames with spaces ("async load", "new Promise",
-        // "Object.x [as y]"). Such an INDENTED frame with a real (url:line:col) is a genuine frame -- its
-        // minified column must survive for source-map symbolication, not be masked to [num]. An unindented
-        // look-alike message is still rejected by the indentation gate.
-        String stack = "Error: boom\n"
-                + "    at async load (https://host/app.js:1:123456)\n"
-                + "    at new Promise (https://host/app.js:2:98765)\n";
-        String scrubbed = scrubber.scrubRawStack(stack);
-        assertTrue(scrubbed.indexOf("app.js:1:123456") >= 0, scrubbed);
-        assertTrue(scrubbed.indexOf("app.js:2:98765") >= 0, scrubbed);
     }
 
 }

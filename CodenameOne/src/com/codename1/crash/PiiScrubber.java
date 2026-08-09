@@ -101,13 +101,18 @@ public class PiiScrubber {
     ///
     /// the scrubbed stack string, or `null` if `rawStack` is `null`.
     ///
-    /// A free-form (non-frame) line is routed through {@link #scrubMessage(String)}
-    /// -- the overridable method -- so an app that redacts app-specific tokens there
-    /// redacts them in `rawStack` too, not only in the separately-scrubbed message.
-    /// A frame line is scrubbed too, but only up to its terminal `:line:column`
-    /// coordinate: the coordinate is preserved for symbolication while the function
-    /// identity and any URL/query before it (which can carry user data, e.g.
-    /// `app.js?account=123456`) still get message scrubbing.
+    /// EVERY line is routed through {@link #scrubMessage(String)} -- the overridable method -- so an app
+    /// that redacts app-specific tokens there redacts them in `rawStack` too. No line is treated as a
+    /// "frame" whose coordinate is preserved: `printStackTrace` writes the exception MESSAGE verbatim, and
+    /// a message can contain an embedded, indented, frame-shaped line (e.g. code that folds another stack
+    /// trace into a message), which is indistinguishable from a real frame by any shape or indentation
+    /// check. Preserving a "coordinate" from such a line would let a crafted `:line:column` tail bypass
+    /// digit masking. So the raw stack is scrubbed uniformly; `scrubMessage` masks only 6+ digit runs, so
+    /// ordinary short line numbers survive and stay readable, while a large minified-bundle column (or a
+    /// long id planted as a fake column) is masked. Precise coordinates for symbolication come from the
+    /// structured frames, which are real `StackTraceElement`s, not parsed text. The app's
+    /// {@link #scrubFrame(String, String)} override is still applied to a `at <class>.<method>` line so a
+    /// synthetic method name redacted from the structured frames does not resurface here.
     public String scrubRawStack(String rawStack) {
         if (rawStack == null) {
             return null;
@@ -119,7 +124,7 @@ public class PiiScrubber {
             int nl = rawStack.indexOf('\n', i);
             int lineEnd = nl < 0 ? len : nl;
             String line = rawStack.substring(i, lineEnd);
-            out.append(isFrameLine(line) ? scrubFrameLine(line) : scrubMessage(line));
+            out.append(scrubMessage(applyFrameOverride(line)));
             if (nl < 0) {
                 break;
             }
@@ -127,26 +132,6 @@ public class PiiScrubber {
             i = nl + 1;
         }
         return out.toString();
-    }
-
-    /// Scrubs a recognized frame line while preserving its terminal `:line[:column]` coordinate.
-    /// Everything before the coordinate -- the function identity and any URL/query -- goes through
-    /// {@link #scrubMessage(String)}, so a URL query like `?account=123456` is masked; the coordinate
-    /// tail is appended verbatim so symbolication still works. A frame with no numeric coordinate
-    /// (`(Native Method)`) has nothing to protect and no PII to speak of, so it gets only the email pass.
-    private String scrubFrameLine(String line) {
-        // Apply the app's scrubFrame(className, methodName) override to a synthetic method name in the
-        // raw stack too, so a value the app removed from its structured frames does not resurface here.
-        line = applyFrameOverride(line);
-        int loc = trailingLocationStart(line);
-        if (loc <= 0) {
-            // A coordinate-free frame ((Native Method)/(Unknown Source)): there is no numeric coordinate
-            // to protect, so run the whole line through message scrubbing. A real such frame's identity
-            // is a dotted class.method with no long digit run, so it is unchanged; a message that merely
-            // mimics the shape (at account123456failed (Native Method)) has its id masked.
-            return scrubMessage(line);
-        }
-        return scrubMessage(line.substring(0, loc)) + line.substring(loc);
     }
 
     /// Applies {@link #scrubFrame(String, String)} to the method name of a JVM/ParparVM
@@ -183,122 +168,6 @@ public class PiiScrubber {
         return line.substring(0, at + 3) + cls + "." + scrubbed + rest.substring(idEnd);
     }
 
-    /// True for a stack-trace line whose numeric tokens are source coordinates,
-    /// not PII: the JVM/ParparVM `at <class>.<method>(...)` / `at <class>.<method>:<line>`
-    /// form (which every V8/Chrome JavaScript frame also uses), and the
-    /// Firefox/Safari `fn@url:line:column` form.
-    ///
-    /// A frame requires the full grammar, not just the leading token and some digits: a
-    /// message can wrap onto a line that begins with `at ` (`printStackTrace` puts
-    /// `at account 123456 failed:789` on its own line) and its id must still be scrubbed.
-    /// A real `at ...` frame is additionally always INDENTED -- `printStackTrace` emits a
-    /// leading tab, V8 four spaces -- while a wrapped message sits at column 0; requiring
-    /// the indentation rejects a continuation that otherwise matches the frame grammar
-    /// exactly (`at account.failed(File.java:123456)`), whose numeric tail must stay
-    /// scrubbable. The `at ` form must then be a single whitespace-free identity
-    /// (`<class>.<method>`, a JS function ref, or a URL) followed by a real location -- a
-    /// parenthesized `(File.java:42)`/`(url:line:col)`/`(Native Method)`/`(Unknown Source)`,
-    /// or a bare trailing `:<line>` (ParparVM).
-    ///
-    /// The Firefox/Safari `fn@url:line:column` form is deliberately NOT recognized. That engine
-    /// emits frames WITHOUT indentation, so a message continuation that reproduces the grammar exactly
-    /// (`user@https://host/app.js:1:123456`) is indistinguishable from a real frame -- no shape check can
-    /// tell them apart. Preserving such a line's coordinate would let a crafted message's numeric tail
-    /// bypass digit masking, so an unindented `@` line is treated as a message and fully scrubbed. The
-    /// cost is only that a Firefox/Safari raw-stack frame's column is masked in the uploaded text; the
-    /// structured frames carry the coordinate for symbolication, and the indented V8 `at ...:line:col`
-    /// form (the common minified case) still preserves it.
-    private static boolean isFrameLine(String line) {
-        String t = line.trim();
-        if (t.startsWith("at ")) {
-            return startsWithWhitespace(line) && atFrame(t.substring(3).trim());
-        }
-        return false;
-    }
-
-    /// True when a line begins with the tab or space indentation that a real `at ...` frame carries.
-    private static boolean startsWithWhitespace(String line) {
-        return line.length() > 0 && (line.charAt(0) == ' ' || line.charAt(0) == '\t');
-    }
-
-    /// The body of an `at ...` line: a whitespace-free identity plus a real location. A message
-    /// continuation such as `account 123456 failed:789` or `account 123456 failed (token:789)` has
-    /// spaces in its identity, so it is not a frame and its digits stay subject to scrubbing.
-    private static boolean atFrame(String rest) {
-        if (rest.length() == 0) {
-            return false;
-        }
-        if (rest.endsWith(")")) {
-            int open = rest.lastIndexOf('(');
-            if (open < 0) {
-                return false;
-            }
-            String inside = rest.substring(open + 1, rest.length() - 1);
-            // The parenthesized location is the discriminator here (JVM `(File.java:42)`, V8
-            // `(url:line:col)`, or the `(Native Method)`/`(Unknown Source)` literals). The identity may
-            // contain spaces, but ONLY in the specific shapes V8 uses (`async load`, `new Promise`,
-            // `Object.x [as y]`) -- accepting an arbitrary multi-word identity would re-admit an indented
-            // message continuation such as `account failed (File.java:123456)` whose numeric tail must
-            // stay scrubbable. So the identity must be a genuine V8 frame label.
-            return isParenLocation(inside) && isV8FrameIdentity(rest.substring(0, open).trim());
-        }
-        int start = trailingLocationStart(rest);
-        if (start <= 0) {
-            return false;
-        }
-        // The bare `IDENT:<line>` form is ParparVM (`com.foo.Bar.baz:42`) or a JS anonymous URL frame;
-        // its identity is always a dotted `<class>.<method>` or a URL. A message token such as
-        // `account123456failed` is neither, so its digits stay subject to scrubbing.
-        return isDottedOrUrlIdentity(rest.substring(0, start));
-    }
-
-    /// True when the content of an `at ...(<loc>)` is a real location: the `(Native Method)` /
-    /// `(Unknown Source)` literals, or a `file.ext:line` / `scheme://host/path:line:col` whose part
-    /// before the trailing `:<digits>` names a file (has an extension dot) or a URL (has a `/`). A
-    /// bare word like `attempt:123456` is not a location, so its digits stay subject to scrubbing.
-    private static boolean isParenLocation(String inside) {
-        if ("Native Method".equals(inside) || "Unknown Source".equals(inside)) {
-            return true;
-        }
-        if (!endsWithColonNumber(inside)) {
-            return false;
-        }
-        int loc = trailingLocationStart(inside);
-        String head = loc > 0 ? inside.substring(0, loc) : "";
-        return head.indexOf('.') >= 0 || head.indexOf('/') >= 0;
-    }
-
-    /// A V8 stack-frame label. Usually a single whitespace-free token (`foo`, `Object.bar`), but V8
-    /// also decorates it with a modifier prefix (`async foo`, `new Foo`, `bound foo`, `get x`, `set x`)
-    /// and/or an accessor suffix (`Object.x [as y]`). Those exact shapes are accepted; ANY OTHER
-    /// multi-word text (a wrapped message like `account failed`) is rejected, so its numeric tail is not
-    /// preserved as a fake coordinate. Strip the known suffix and prefix, then require a single token.
-    private static boolean isV8FrameIdentity(String id) {
-        String core = id.trim();
-        if (core.length() == 0) {
-            return false;
-        }
-        int asAt = core.indexOf(" [as ");
-        if (asAt > 0 && core.endsWith("]")) {
-            // The accessor alias is itself a single property name (`[as bar]`, `[as Symbol.iterator]`),
-            // never free text. Validate it before discarding the suffix, or `[as failed message]` would
-            // let an arbitrary continuation keep its coordinate.
-            String alias = core.substring(asAt + " [as ".length(), core.length() - 1).trim();
-            if (!isFrameIdentity(alias)) {
-                return false;
-            }
-            core = core.substring(0, asAt).trim();
-        }
-        String[] prefixes = {"async ", "new ", "bound ", "get ", "set "};
-        for (String prefix : prefixes) {
-            if (core.startsWith(prefix)) {
-                core = core.substring(prefix.length()).trim();
-                break;
-            }
-        }
-        return isFrameIdentity(core);
-    }
-
     /// A frame's identity is a single token: non-empty and free of whitespace. A free-form message
     /// continuation (`account 123456 failed`) has spaces, so it is rejected.
     private static boolean isFrameIdentity(String id) {
@@ -312,13 +181,6 @@ public class PiiScrubber {
             }
         }
         return true;
-    }
-
-    /// A stricter identity for the bare `IDENT:<line>` form: a whitespace-free token that is a dotted
-    /// `<class>.<method>` or a URL (has a `/`). A single word like `account123456failed` is rejected,
-    /// so a wrapped message that happens to start with `at ` and end in a colon-number is still scrubbed.
-    private static boolean isDottedOrUrlIdentity(String id) {
-        return isFrameIdentity(id) && (id.indexOf('.') >= 0 || id.indexOf('/') >= 0);
     }
 
     /// Index at which a trailing `:<line>` (optionally `:<line>:<column>`) location begins, or -1
@@ -347,24 +209,6 @@ public class PiiScrubber {
             }
         }
         return start;
-    }
-
-    /// True when `t` ends with a `:<digits>` run (a trailing `)` allowed): the
-    /// ParparVM frame coordinate `at <fqcn>.<method>:<line>`, and also the tail of a
-    /// `:<line>:<column>`. A message ending in text or a space-separated number does
-    /// not match, so its digits stay subject to scrubbing.
-    private static boolean endsWithColonNumber(String t) {
-        int end = t.length();
-        if (end > 0 && t.charAt(end - 1) == ')') {
-            end--;
-        }
-        int i = end - 1;
-        int digits = 0;
-        while (i >= 0 && t.charAt(i) >= '0' && t.charAt(i) <= '9') {
-            i--;
-            digits++;
-        }
-        return digits > 0 && i >= 0 && t.charAt(i) == ':';
     }
 
     /// Replaces all occurrences of an email-like substring with the form
