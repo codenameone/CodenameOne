@@ -377,6 +377,24 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void savepointNamesFoldAsSqliteFoldsThem() {
+        // SQLite folds ASCII and only ASCII. String.toUpperCase follows the process locale, and in
+        // Turkish it maps "i" to a dotted capital -- so SAVEPOINT i and RELEASE I stopped matching
+        // each other while SQLite released the savepoint, leaving the tracker holding a
+        // transaction forever and refusing every later begin and key change.
+        java.util.Locale previous = java.util.Locale.getDefault();
+        java.util.Locale.setDefault(new java.util.Locale("tr", "TR"));
+        try {
+            db.ran("SAVEPOINT i");
+            assertTrue(db.isInTransaction());
+            db.ran("RELEASE I");
+            assertFalse(db.isInTransaction(), "the release matched, as it does in SQLite");
+        } finally {
+            java.util.Locale.setDefault(previous);
+        }
+    }
+
+    @Test
     void releasingSomethingElseLeavesTheTransactionOpen() {
         db.ran("SAVEPOINT outer");
         db.ran("RELEASE unrelated");

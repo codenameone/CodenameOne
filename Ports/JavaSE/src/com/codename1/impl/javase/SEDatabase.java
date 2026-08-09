@@ -635,6 +635,22 @@ public class SEDatabase extends Database {
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
         checkNoTransactionForKeyChange();
+        try {
+            if (!conn.getAutoCommit()) {
+                // The connection is inside a transaction this wrapper does not know about. Under
+                // the legacy hint a rollback deliberately leaves autocommit off, so the next
+                // statement opens a real transaction while the tracked flag says none is open --
+                // and re-keying then rewrites the file while SQLite has uncommitted work, which
+                // its own commit during the rewrite would turn into committed work the caller
+                // never asked to keep. The driver is asked as well as the tracker.
+                throw new com.codename1.db.DatabaseEncryptionException(
+                        com.codename1.db.DatabaseEncryptionException.MIGRATION_FAILED,
+                        "This connection is inside a transaction, so its key cannot be changed."
+                        + " Commit or roll back first.");
+            }
+        } catch (SQLException cannotAsk) {
+            throw new IOException(cannotAsk.getMessage(), cannotAsk);
+        }
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
         requireSoleConnectionForKeyChange(openKey);

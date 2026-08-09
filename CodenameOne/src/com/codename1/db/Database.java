@@ -490,11 +490,14 @@ public abstract class Database {
         // for a key stored by managed() with no alias, which is filed under the file the name
         // resolves to and would otherwise be unreachable through this method.
         //
-        // The fallback runs only when the first found nothing. One application's explicit alias
-        // can be another database's name -- managed("shared") over here, a database called
-        // "shared" over there -- and destroying both would take out a key its owner never named.
-        if (ManagedKeys.forget(keyAlias)) {
-            return true;
+        // The fallback runs only when nothing is stored under the alias. That is asked with a
+        // lookup rather than inferred from the delete, which reports success on every platform for
+        // an entry that was not there -- so the fallback was unreachable and the implicit key
+        // survived. One application's explicit alias can also be another database's name --
+        // managed("shared") over here, a database called "shared" over there -- and deleting both
+        // would take out a key its owner never named.
+        if (ManagedKeys.has(keyAlias)) {
+            return ManagedKeys.forget(keyAlias);
         }
         String identity = Display.getInstance().databaseManagedKeyIdentity(keyAlias);
         if (identity != null && !identity.equals(keyAlias)) {
@@ -887,13 +890,13 @@ public abstract class Database {
                 name.append(c);
                 end++;
             }
-            return name.toString().toUpperCase();
+            return upperAscii(name.toString());
         }
         int end = at;
         while (end < length && isIdentifierChar(statement.charAt(end))) {
             end++;
         }
-        return end > at ? statement.substring(at, end).toUpperCase() : null;
+        return end > at ? upperAscii(statement.substring(at, end)) : null;
     }
 
     /// Records the transaction state a port read back from its engine.
@@ -992,7 +995,25 @@ public abstract class Database {
         while (end < length && isKeywordChar(statement.charAt(end))) {
             end++;
         }
-        return statement.substring(start, end).toUpperCase();
+        return upperAscii(statement.substring(start, end));
+    }
+
+    /// Upper cases the ASCII letters and leaves everything else alone.
+    ///
+    /// Not `String#toUpperCase()`, which follows the process locale: in Turkish it maps `i` to a
+    /// dotted capital, so `SAVEPOINT i` and `RELEASE I` stop matching each other while SQLite --
+    /// which folds ASCII and only ASCII -- releases the savepoint. The tracker would then hold a
+    /// transaction open forever and refuse every later begin and key change.
+    private static String upperAscii(String value) {
+        if (value == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        for (int iter = 0; iter < value.length(); iter++) {
+            char c = value.charAt(iter);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - ('a' - 'A')) : c);
+        }
+        return out.toString();
     }
 
     /// Whether a character continues an unquoted identifier.
@@ -1071,7 +1092,7 @@ public abstract class Database {
     private static String keywordAt(String statement, int from) {
         int start = skipLeadingTrivia(statement, from);
         int end = endOfKeyword(statement, start);
-        return statement.substring(start, end).toUpperCase();
+        return upperAscii(statement.substring(start, end));
     }
 
     /// Connections open on each database file, by a key the port supplies.

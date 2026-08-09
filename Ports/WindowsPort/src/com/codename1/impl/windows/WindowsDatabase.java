@@ -260,8 +260,11 @@ class WindowsDatabase extends Database {
         WindowsNative.sqlStmtExecuteAndFinalize(stmt);
         // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
         // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it.
+        // opened it. The names first, then the engine, exactly as execute(String) does -- without
+        // the engine read here a script that failed partway leaves this believing whatever its
+        // unexecuted statements said.
         noteScriptTransactionControl(sql);
+        noteEngineTransactionState(WindowsNative.sqlDbInTransaction(peer));
     }
 
     @Override
@@ -281,8 +284,11 @@ class WindowsDatabase extends Database {
         WindowsNative.sqlStmtExecuteAndFinalize(stmt);
         // A parameterized call is a single statement, and "BEGIN" is a legal one: the guard on
         // changeKey depends on knowing that a transaction was opened, whichever entry point
-        // opened it.
+        // opened it. The names first, then the engine, exactly as execute(String) does -- without
+        // the engine read here a script that failed partway leaves this believing whatever its
+        // unexecuted statements said.
         noteScriptTransactionControl(sql);
+        noteEngineTransactionState(WindowsNative.sqlDbInTransaction(peer));
     }
 
     @Override

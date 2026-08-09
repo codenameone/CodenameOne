@@ -105,6 +105,16 @@ final class ManagedKeys {
         return SecureStorage.getInstance().remove(accountName(alias));
     }
 
+    /// Whether a key is stored under this alias.
+    ///
+    /// `#forget(String)` cannot answer it: every platform's remove reports success for an entry
+    /// that was not there -- Android returns the commit result, the keychain treats
+    /// errSecItemNotFound as success -- so a caller choosing between two aliases has to look
+    /// before it deletes rather than infer from what the delete returned.
+    static boolean has(String alias) {
+        return SecureStorage.getInstance().get(accountName(alias)) != null;
+    }
+
     /// Maps an alias to the `SecureStorage` account name.
     ///
     /// A platform key store may not accept every character an application can put in a database
