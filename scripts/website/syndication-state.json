@@ -1605,6 +1605,18 @@
         "canonical_set": true,
         "syndicated_at": "2026-08-09T17:01:09+00:00"
       }
+    },
+    "road-following-map-routing": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-polyline-is-not-a-route",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a78ce418b389bf6d7448474",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-09T19:01:12+00:00"
+      }
     }
   }
 }
