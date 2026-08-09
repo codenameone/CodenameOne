@@ -218,12 +218,11 @@ public class PiiScrubber {
             String inside = rest.substring(open + 1, rest.length() - 1);
             // The parenthesized location is the discriminator here (JVM `(File.java:42)`, V8
             // `(url:line:col)`, or the `(Native Method)`/`(Unknown Source)` literals). The identity may
-            // contain spaces -- a V8 frame labels async/constructor/accessor frames `async load`,
-            // `new Promise`, `Object.x [as y]` -- so a non-empty identity is enough here. The line is
-            // already known to be INDENTED (isFrameLine rejects an unindented message continuation), and
-            // scrubFrameLine scrubs everything before the coordinate, so a whitespace-free requirement
-            // would only drop legitimate V8 frames and break their source-map symbolication.
-            return isParenLocation(inside) && rest.substring(0, open).trim().length() > 0;
+            // contain spaces, but ONLY in the specific shapes V8 uses (`async load`, `new Promise`,
+            // `Object.x [as y]`) -- accepting an arbitrary multi-word identity would re-admit an indented
+            // message continuation such as `account failed (File.java:123456)` whose numeric tail must
+            // stay scrubbable. So the identity must be a genuine V8 frame label.
+            return isParenLocation(inside) && isV8FrameIdentity(rest.substring(0, open).trim());
         }
         int start = trailingLocationStart(rest);
         if (start <= 0) {
@@ -249,6 +248,30 @@ public class PiiScrubber {
         int loc = trailingLocationStart(inside);
         String head = loc > 0 ? inside.substring(0, loc) : "";
         return head.indexOf('.') >= 0 || head.indexOf('/') >= 0;
+    }
+
+    /// A V8 stack-frame label. Usually a single whitespace-free token (`foo`, `Object.bar`), but V8
+    /// also decorates it with a modifier prefix (`async foo`, `new Foo`, `bound foo`, `get x`, `set x`)
+    /// and/or an accessor suffix (`Object.x [as y]`). Those exact shapes are accepted; ANY OTHER
+    /// multi-word text (a wrapped message like `account failed`) is rejected, so its numeric tail is not
+    /// preserved as a fake coordinate. Strip the known suffix and prefix, then require a single token.
+    private static boolean isV8FrameIdentity(String id) {
+        String core = id.trim();
+        if (core.length() == 0) {
+            return false;
+        }
+        int asAt = core.indexOf(" [as ");
+        if (asAt > 0 && core.endsWith("]")) {
+            core = core.substring(0, asAt).trim();
+        }
+        String[] prefixes = {"async ", "new ", "bound ", "get ", "set "};
+        for (int i = 0; i < prefixes.length; i++) {
+            if (core.startsWith(prefixes[i])) {
+                core = core.substring(prefixes[i].length()).trim();
+                break;
+            }
+        }
+        return isFrameIdentity(core);
     }
 
     /// A frame's identity is a single token: non-empty and free of whitespace. A free-form message

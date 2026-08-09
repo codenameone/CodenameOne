@@ -243,6 +243,20 @@ class PiiScrubberRawStackTest {
     }
 
     @Test
+    void indentedMessageContinuationWithArbitraryLabelIsScrubbed() {
+        // An INDENTED message continuation (the message itself contains "\n    at ...") whose text happens
+        // to look like a frame -- an arbitrary multi-word label plus a (File.java:line) location -- must
+        // still be scrubbed: "account failed" is not a V8 label shape (async/new/bound/get/set/[as]), so
+        // its six-digit tail is masked, not preserved. A genuine V8 async frame below keeps its coordinate.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "    at account failed (File.java:123456)\n"
+                + "    at async run (https://host/app.js:2:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:2:98765") >= 0, scrubbed);
+    }
+
+    @Test
     void v8AsyncFrameWithMultiWordLabelKeepsItsCoordinate() {
         // V8 labels async/constructor/accessor frames with spaces ("async load", "new Promise",
         // "Object.x [as y]"). Such an INDENTED frame with a real (url:line:col) is a genuine frame -- its
