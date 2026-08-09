@@ -51,6 +51,20 @@ public class Cn1NameFactoryTest {
     }
 
     @Test
+    public void dictionarySizeCoversTheLargestOfClassAndMemberScopes() {
+        // Small app, tiny class scope: the 50000 floor applies.
+        assertEquals(50000, Cn1NameFactory.dictionarySizeFor(100, 200));
+        // Class-heavy jar: sized to the class scope with headroom.
+        assertEquals(80000, Cn1NameFactory.dictionarySizeFor(20000, 200));
+        // A single member-heavy class (e.g. a generated interface with 55000 same-descriptor methods)
+        // must size the dictionary to the MEMBER scope, even though the class count is tiny -- otherwise
+        // ProGuard exhausts it and falls back to short names, reintroducing the ParparVM cull pathology.
+        assertTrue("dictionary must exceed the biggest class's member count",
+                Cn1NameFactory.dictionarySizeFor(50, 55000) >= 55000);
+        assertEquals(220000, Cn1NameFactory.dictionarySizeFor(50, 55000));
+    }
+
+    @Test
     public void differentSeedsProduceDifferentDictionariesButSameSeedReproduces() throws Exception {
         File a = tmp.newFile("a.txt");
         File b = tmp.newFile("b.txt");

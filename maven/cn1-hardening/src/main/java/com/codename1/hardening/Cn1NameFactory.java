@@ -107,10 +107,17 @@ public final class Cn1NameFactory {
     }
 
     /**
-     * The dictionary size to use for a jar with {@code classCount} classes: comfortably above the
-     * global class-naming scope (the largest single scope) with a floor for small apps.
+     * The dictionary size to use for a jar with {@code classCount} classes and at most
+     * {@code maxMembersInAnyClass} members (fields + methods) in any single class. The one dictionary
+     * feeds ProGuard's class, member AND package obfuscation, so it must exceed the LARGEST naming scope:
+     * the global class count, or the member count of the biggest class (a generated interface can have
+     * tens of thousands of same-descriptor methods, all needing distinct names). Sizing to only the class
+     * count would let a member-heavy class exhaust the dictionary and drop ProGuard back to its {@code a}/
+     * {@code b} short names, reintroducing the ParparVM native-scan pathology this class exists to avoid.
+     * Kept comfortably above that maximum with a floor for small apps.
      */
-    public static int dictionarySizeFor(int classCount) {
-        return Math.max(50000, classCount * 4);
+    public static int dictionarySizeFor(int classCount, int maxMembersInAnyClass) {
+        int largestScope = Math.max(classCount, maxMembersInAnyClass);
+        return Math.max(50000, largestScope * 4);
     }
 }
