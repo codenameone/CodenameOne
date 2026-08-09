@@ -500,6 +500,11 @@ public class SEDatabase extends Database {
                 }
             }
             s.execute();
+            // Recorded here as well as in the transaction-control branch: SAVEPOINT is not
+            // transaction control by this classifier, but an outermost one opens a real
+            // transaction, and a key change allowed over it replaces the database underneath
+            // uncommitted work. The device ports record every parameterized statement this way.
+            noteScriptTransactionControl(sql);
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
         } finally {
@@ -534,6 +539,11 @@ public class SEDatabase extends Database {
             }
             bind(s, params);
             s.execute();
+            // Recorded here as well as in the transaction-control branch: SAVEPOINT is not
+            // transaction control by this classifier, but an outermost one opens a real
+            // transaction, and a key change allowed over it replaces the database underneath
+            // uncommitted work. The device ports record every parameterized statement this way.
+            noteScriptTransactionControl(sql);
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);
         } finally {

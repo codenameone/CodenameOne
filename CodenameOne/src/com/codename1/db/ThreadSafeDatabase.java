@@ -118,6 +118,14 @@ public class ThreadSafeDatabase extends Database {
         Object err;
         synchronized (dispatchLock) {
             checkOpen();
+            if (et.isThisIt()) {
+                // Already on the worker, which getThread() hands out, so a task running there can
+                // reach this. Handing it work and waiting queues behind the task making the call
+                // and waits for the thread that would run it -- a permanent deadlock. The thread
+                // asking is the thread that would do the work, so it does the work.
+                r.run();
+                return;
+            }
             err = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -165,6 +173,11 @@ public class ThreadSafeDatabase extends Database {
         Object ret;
         synchronized (dispatchLock) {
             checkOpen();
+            if (et.isThisIt()) {
+                // See the other invokeWithException: waiting on the worker from the worker never
+                // returns.
+                return r.run();
+            }
             ret = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
