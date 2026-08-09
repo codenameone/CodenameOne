@@ -1469,6 +1469,12 @@ public class ByteCodeClass {
         b.append("    cn1_debugger_register_fields(cn1_class_id_").append(clsName).append(",\n");
         b.append("            __cn1_dbg_fields_").append(clsName).append(",\n");
         b.append("            (int)(sizeof(__cn1_dbg_fields_").append(clsName).append(") / sizeof(cn1_field_entry)));\n");
+        // Publish the clazz address too, so the runtime can tell a genuine
+        // object header from a stale or fabricated pointer by an exact
+        // identity check rather than a heuristic. Every generated class runs
+        // this constructor, so the registry is complete before main().
+        b.append("    cn1_debugger_register_class(cn1_class_id_").append(clsName)
+          .append(", &class__").append(clsName).append(");\n");
         b.append("}\n");
         b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
     }

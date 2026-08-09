@@ -88,6 +88,17 @@ public class IPhoneBuilder extends Executor {
     private int podTimeout = 300000; // 5 minutes
     private int xcodeVersion;
     private static final String GOOGLE_SIGNIN_TUTORIAL_URL = "http://www.codenameone.com/...";
+
+    /**
+     * The CocoaPods requirement injected when an app enables Google sign-in.
+     * Held here rather than inline so the arm64-simulator floor it encodes is
+     * assertable -- see the comment at the injection site.
+     */
+    static final String GOOGLE_SIGNIN_POD = "GoogleSignIn ~>7.1";
+
+    /** Deployment target floor that {@link #GOOGLE_SIGNIN_POD} requires. */
+    static final String GOOGLE_SIGNIN_MIN_IOS = "12.0";
+
     private File resultDir;
     private boolean includePush;
     private File tmpFile;
@@ -1421,8 +1432,24 @@ public class IPhoneBuilder extends Executor {
         
                 
         if (useGoogleSignIn) {
-            iosPods += (((iosPods.length() > 0) ? ",":"") + "GoogleSignIn ~>5.0.0");
-            addMinDeploymentTarget("8.0");
+            // 5.0.x shipped a vendored fat framework whose only arm64 slice is
+            // built for the device (LC_VERSION_MIN_IPHONEOS); its simulator
+            // slices are i386 and x86_64. On an Apple Silicon Mac the linker
+            // therefore picked the device slice for an arm64 simulator build
+            // and refused it, so no app that enables Google sign-in could run
+            // in the simulator at all. 7.x is distributed as source, so
+            // CocoaPods compiles a slice for whichever platform is being built.
+            //
+            // 8.x and 9.x add an AppCheckCore dependency, which is Swift and
+            // depends in turn on two pods that define no module map. Adopting
+            // either would require use_modular_headers! in every generated
+            // Podfile, changing pod resolution for projects that have nothing
+            // to do with Google sign-in. 7.1 is the newest release that drops
+            // in without that.
+            iosPods += (((iosPods.length() > 0) ? ",":"") + GOOGLE_SIGNIN_POD);
+            // GoogleSignIn 7.1's own floor is iOS 10, but Xcode 26 accepts
+            // deployment targets no lower than 12.0.
+            addMinDeploymentTarget(GOOGLE_SIGNIN_MIN_IOS);
         }
         
         // Accumulator for AI/ML class hits. After the scan we apply

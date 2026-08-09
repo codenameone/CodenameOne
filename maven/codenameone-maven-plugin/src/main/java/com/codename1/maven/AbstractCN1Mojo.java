@@ -47,6 +47,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.MavenProjectHelper;
 import org.apache.maven.repository.RepositorySystem;
@@ -205,6 +206,44 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         antProject.init();
     }
 
+    /**
+     * The properties Maven was invoked with, so a build hint given on the
+     * command line reaches the build.
+     */
+    @Parameter(defaultValue = "${session}", readonly = true)
+    private MavenSession session;
+
+    /**
+     * Lets {@code -Dcodename1.arg.x=y} override the settings file.
+     *
+     * Build hints were read only out of {@code codenameone_settings.properties},
+     * so a hint passed on the command line was accepted by Maven, printed in
+     * the build's own property dump, and then silently ignored — the builder
+     * asked {@code request.getArg(...)} and got the file's value or the
+     * default. That is what made {@code -Dcodename1.arg.ios.onDeviceDebug=true}
+     * produce a build with no symbol table and no debug listener, and it is why
+     * {@code cn1:buildIosOnDeviceDebug} could not turn the hint on for one
+     * build the way it says it does.
+     *
+     * Only user properties are overlaid — the values actually passed with -D or
+     * set by an invoking build — not the whole system property table, so
+     * unrelated JVM properties cannot become build hints.
+     */
+    protected void overlayCommandLineBuildHints(Properties target) {
+        if (session == null || target == null) {
+            return;
+        }
+        Properties userProperties = session.getUserProperties();
+        if (userProperties == null) {
+            return;
+        }
+        for (String key : userProperties.stringPropertyNames()) {
+            if (key.startsWith("codename1.")) {
+                target.setProperty(key, userProperties.getProperty(key));
+            }
+        }
+    }
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (getCN1ProjectDir() != null) {
@@ -217,7 +256,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     throw new MojoExecutionException("Failed to find codenameone_settings.properties file.", ex);
                 }
             }
-            
+            overlayCommandLineBuildHints(properties);
         } else {
             getLog().warn("Failed to find CN1 Project directory.  codenameone_settings.properties will not be loaded");
             if (project.getCompileSourceRoots() != null && !project.getCompileSourceRoots().isEmpty()) {

@@ -7,6 +7,19 @@
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ *
  * On-device-debug runtime. Single-file implementation: wire-protocol
  * encode/decode, breakpoint hash, per-thread suspend/resume, command
  * handlers. The translator emits per-frame metadata that this file reads
@@ -93,6 +106,12 @@ extern int cn1_debug_symbols_length(void) __attribute__((weak));
 // of falling through to a (currently unsupported) toString() InvokeMethod.
 extern struct clazz class__java_lang_String;
 
+// ParparVM's registry of live threads. Owned by nativeMethods.m and guarded by
+// the critical section already declared in cn1_globals.h; CMD_GET_THREADS walks
+// it so the IDE can list every thread instead of only the ones that happened to
+// hit a breakpoint.
+extern struct ThreadLocalData** allThreads;
+
 // Step kinds
 #define STEP_INTO 0
 #define STEP_OVER 1
@@ -104,6 +123,25 @@ volatile int cn1DebuggerActive = 0;
 
 static int g_proxyFd = -1;
 static pthread_mutex_t g_writeMutex = PTHREAD_MUTEX_INITIALIZER;
+
+// The listener thread's own ThreadLocalData, if ParparVM ever built one for it.
+//
+// It is a raw pthread, not a Java thread, but servicing CMD_GET_STRING calls
+// toNSString(getThreadLocalData(), ...), and getThreadLocalData() registers
+// whatever thread asks into allThreads. Nothing ever unregisters it, so
+// without this the debugger's own plumbing shows up in the IDE's Threads panel
+// as a permanent synthetic entry with no java.lang.Thread behind it — and it
+// only appears once the IDE resolves a thread name, i.e. as a side effect of
+// the very feature this change added.
+//
+// Captured lazily, at the one place the listener actually needs a Java
+// context, rather than eagerly at thread start: getThreadLocalData()
+// initialises threadIdKey, threadKeyCounter and the allThreads array without
+// synchronisation, so calling it from this thread during app startup could
+// race the main thread's first call and produce competing TLS keys or
+// duplicate thread ids. By the time a CMD_GET_STRING arrives, a proxy and an
+// IDE are both attached and the VM has long since initialised.
+static struct ThreadLocalData* g_listenerTsd = NULL;
 
 // Wait-for-attach state. cn1_debugger_run_when_ready stashes the VM-callback
 // block here; the listener thread invokes it on the main queue once the
@@ -119,7 +157,14 @@ static pthread_mutex_t g_attachMutex = PTHREAD_MUTEX_INITIALIZER;
 // attached. Installed as a subview of the app's keyWindow root view rather
 // than as a separate UIWindow because iOS 13+ scene-based apps (which
 // Codename One is by default) refuse to display non-scene UIWindows.
+//
+// UIKit is unavailable on watchOS, so the whole overlay is compiled out for
+// that slice. The watch app has no debugger UI to show and its own runtime
+// still connects; without this, enabling on-device debugging on any project
+// that has a watch target failed to compile the watch slice outright.
+#if !TARGET_OS_WATCH
 static UIView* g_waitOverlay = nil;
+#endif
 
 // Forward declaration; callers in the command dispatch sit above the
 // definition further down the file.
@@ -434,6 +479,16 @@ static void bp_clear(int methodId, int line) {
 struct sus_state {
     pthread_mutex_t mu;
     pthread_cond_t  cv;
+    /*
+     * Thread this slot belongs to, 0 when unclaimed. Held explicitly because
+     * the table is indexed by a hash of the thread ID and the runtime hands
+     * out IDs from a counter that only ever climbs -- so an app that has
+     * created SUS_TABLE_SIZE threads gives two *live* ones the same slot.
+     * Sharing it let either thread's suspend flag and frame pointer overwrite
+     * the other's, so a stack or locals request could answer about the wrong
+     * thread and resuming one woke the other.
+     */
+    int64_t owner;
     int suspended;
     int stepKind;       // -1 = none, otherwise STEP_INTO/OVER/OUT
     int stepFromDepth;  // callStackOffset captured at suspend
@@ -451,24 +506,95 @@ struct sus_state {
 
 #define SUS_TABLE_SIZE 1024
 static struct sus_state g_sus[SUS_TABLE_SIZE];
-static _Atomic int g_susInit = 0;
+static pthread_once_t g_susOnce = PTHREAD_ONCE_INIT;
 
-static void ensureSusInit(void) {
-    int expected = 0;
-    if (atomic_compare_exchange_strong(&g_susInit, &expected, 1)) {
-        for (int i = 0; i < SUS_TABLE_SIZE; i++) {
-            pthread_mutex_init(&g_sus[i].mu, NULL);
-            pthread_cond_init(&g_sus[i].cv, NULL);
-            g_sus[i].suspended = 0;
-            g_sus[i].stepKind = -1;
-            g_sus[i].tsd = NULL;
-        }
+static void susInitOnce(void) {
+    for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+        pthread_mutex_init(&g_sus[i].mu, NULL);
+        pthread_cond_init(&g_sus[i].cv, NULL);
+        g_sus[i].owner = 0;
+        g_sus[i].suspended = 0;
+        g_sus[i].stepKind = -1;
+        g_sus[i].tsd = NULL;
     }
 }
 
+/*
+ * pthread_once rather than a compare-and-swap on a flag: the flag has to be
+ * published before the mutexes are initialised or two threads would both
+ * initialise them, and publishing it first lets the losing caller return
+ * while the winner is still running pthread_mutex_init. It then locks a slot
+ * that does not exist yet. The window is one loop wide and needs the IDE's
+ * first AllThreads to race a thread reaching its first breakpoint, which is
+ * exactly when a debugger session starts. pthread_once holds every other
+ * caller until the initialiser has finished.
+ */
+static void ensureSusInit(void) {
+    pthread_once(&g_susOnce, susInitOnce);
+}
+
+/* Serialises claiming, so two threads cannot take the same slot. */
+static pthread_mutex_t g_susTableMutex = PTHREAD_MUTEX_INITIALIZER;
+
+/*
+ * The calling thread's own slot, remembered across calls.
+ *
+ * cn1_debugger_check asks for it at every source line of every method, which
+ * makes this the hottest path the debugger adds to a running app -- taking a
+ * process-wide lock and scanning the table there would cost more than the
+ * check it guards. A claimed slot never changes hands, so once a thread has
+ * found its own the answer cannot go stale.
+ */
+static __thread struct sus_state* t_ownSlot = NULL;
+static __thread int64_t t_ownSlotThread = 0;
+
+/**
+ * The suspension slot for a thread, claiming one on first use.
+ *
+ * Probes from the hash rather than indexing by it: the ID space is unbounded
+ * and the table is not, so two live threads can hash together. The claim makes
+ * the slot that thread's own until it is reclaimed.
+ *
+ * Slots are never taken back. That bounds how many threads can hold one at a
+ * time, and a table with none left falls back to the hashed slot unclaimed --
+ * degraded exactly as it was before any of this, but never NULL, because every
+ * caller dereferences the result. Reclaiming instead would mean a slot could
+ * change owner underneath the thread that holds it, which is the very thing
+ * being fixed, and would cost the lock-free fast path above.
+ */
 static struct sus_state* susForThread(int64_t threadId) {
     ensureSusInit();
-    return &g_sus[((uint64_t)threadId) & (SUS_TABLE_SIZE - 1)];
+    unsigned start = (unsigned)(((uint64_t)threadId) & (SUS_TABLE_SIZE - 1));
+    pthread_mutex_lock(&g_susTableMutex);
+    struct sus_state* freeSlot = NULL;
+    for (int i = 0; i < SUS_TABLE_SIZE; i++) {
+        struct sus_state* s = &g_sus[(start + (unsigned)i) & (SUS_TABLE_SIZE - 1)];
+        if (s->owner == threadId) {
+            pthread_mutex_unlock(&g_susTableMutex);
+            return s;
+        }
+        if (freeSlot == NULL && s->owner == 0) freeSlot = s;
+    }
+    if (freeSlot != NULL) {
+        freeSlot->owner = threadId;
+        pthread_mutex_unlock(&g_susTableMutex);
+        return freeSlot;
+    }
+    pthread_mutex_unlock(&g_susTableMutex);
+    return &g_sus[start];
+}
+
+/*
+ * The slot for the thread that is asking, through the per-thread cache. Only
+ * for a caller running *on* that thread: the listener asks about other threads
+ * and must not cache their slots as its own.
+ */
+static struct sus_state* susForCurrentThread(int64_t threadId) {
+    if (t_ownSlot != NULL && t_ownSlotThread == threadId) return t_ownSlot;
+    struct sus_state* s = susForThread(threadId);
+    t_ownSlot = s;
+    t_ownSlotThread = threadId;
+    return s;
 }
 
 /* --------------------------------------------------------------------- */
@@ -523,17 +649,54 @@ static void sendEvent(uint8_t cmd, const void* payload, uint32_t len) {
 /* doesn't block collection. resumeThread signals the condvar.          */
 /* --------------------------------------------------------------------- */
 
+/**
+ * Publishes a thread as suspended before the event announcing it goes out.
+ *
+ * The proxy can have a thread-list request in flight, and the reply is built
+ * from this flag. Emitting the stop first left a window where the listener
+ * sampled the thread as running and the proxy applied that reply *after* the
+ * stop event, putting the IDE back to showing the thread it had just stopped
+ * at as running. Marking first closes it: any snapshot taken after the event
+ * necessarily sees the suspension.
+ */
+static void markSuspendedBeforeEvent(struct ThreadLocalData* tsd) {
+    struct sus_state* s = susForThread((int64_t)tsd->threadId);
+    pthread_mutex_lock(&s->mu);
+    s->suspended = 1;
+    // The whole parked state, not just the flag: the proxy sends GET_STACK and
+    // GET_LOCALS as soon as it sees the event, and those read tsd out of here.
+    // Publishing them only once the thread reaches suspendCurrent left a window
+    // where the first stack request after a breakpoint answered empty.
+    s->stepFromDepth = tsd->callStackOffset;
+    s->tsd = tsd;
+    pthread_mutex_unlock(&s->mu);
+}
+
 static void suspendCurrent(struct ThreadLocalData* tsd) {
     int64_t threadId = (int64_t)tsd->threadId;
     struct sus_state* s = susForThread(threadId);
     pthread_mutex_lock(&s->mu);
-    s->suspended = 1;
+    // Deliberately does NOT set s->suspended. markSuspendedBeforeEvent already
+    // published it, and a CMD_RESUME can arrive in the window between that and
+    // this call -- the listener runs on its own thread and the event has
+    // already gone out. Re-asserting the flag would swallow that resume and
+    // then wait for a signal that has been and gone, parking the thread (often
+    // the EDT) until some later resume happened along.
     s->stepFromDepth = tsd->callStackOffset;
     s->tsd = tsd;
     // Mark thread inactive so the concurrent GC can mark/sweep freely.
     tsd->threadActive = JAVA_FALSE;
     while (s->suspended) {
-        pthread_cond_wait(&s->cv, &s->mu);
+        // Check for queued work *before* waiting, not after. The listener
+        // publishes an invocation and signals from its own thread, and
+        // markSuspendedBeforeEvent advertises this thread as ready to run one
+        // as soon as the stop event goes out -- which is before it gets here.
+        // A condition variable does not queue signals, so an invocation that
+        // arrived in that window had already been signalled by the time this
+        // thread reached the wait: the listener waits for a result nobody is
+        // running and the target waits for a signal that has been and gone.
+        // The session hangs with no way out.
+        //
         // The listener thread may have queued a debugger-invoked method
         // call for us to run. Servicing it on this thread keeps the call
         // inside a valid Java context (right tsd, right call stack) and
@@ -554,11 +717,26 @@ static void suspendCurrent(struct ThreadLocalData* tsd) {
             r.value.o = JAVA_NULL;
             thunk(tsd, thisObj, argsCopy, &r);
             pthread_mutex_lock(&s->mu);
+            // Root the result before going inactive, not after the listener
+            // picks it up. A thunk that returns or throws a freshly allocated
+            // object leaves the only reference to it right here in r, and the
+            // concurrent collector does not scan sus_state. Marking the thread
+            // inactive first opens a window in which that object can be
+            // collected, after which the ID handed to the IDE names reclaimed
+            // storage and the next field or class request reads it.
+            if ((r.type == 'L' || r.type == '[' || r.type == 'X') && r.value.o != JAVA_NULL) {
+                cn1_debugger_note_issued_for(r.value.o, (int64_t)tsd->threadId);
+            }
             tsd->threadActive = JAVA_FALSE;
             s->invokeResult = r;
             s->invokeReady = 1;
             pthread_cond_broadcast(&s->cv);
+            // Re-test the predicate rather than falling into a wait: a resume
+            // may have arrived while the thunk ran, and another invocation may
+            // already be queued behind this one.
+            continue;
         }
+        pthread_cond_wait(&s->cv, &s->mu);
     }
     // GC may have parked us; wait for it to finish before resuming.
     while (tsd->threadBlockedByGC) {
@@ -586,9 +764,13 @@ static void resumeThreadById(int64_t threadId, int preserveStep) {
     s->suspended = 0;
     pthread_cond_signal(&s->cv);
     pthread_mutex_unlock(&s->mu);
+    // Only this thread's ids: its objects can now be collected, while a thread
+    // that is still parked is still being inspected through its own.
+    cn1_debugger_forget_issued_for(threadId);
 }
 
 static void resumeAll(int preserveStep) {
+    cn1_debugger_forget_issued();
     for (int i = 0; i < SUS_TABLE_SIZE; i++) {
         pthread_mutex_lock(&g_sus[i].mu);
         if (g_sus[i].suspended) {
@@ -612,6 +794,7 @@ static void setStepAndResume(int64_t threadId, int stepKind) {
         pthread_cond_signal(&s->cv);
     }
     pthread_mutex_unlock(&s->mu);
+    cn1_debugger_forget_issued_for(threadId);
 }
 
 /* --------------------------------------------------------------------- */
@@ -654,7 +837,7 @@ void cn1_debugger_check(struct ThreadLocalData* tsd, int line) {
 
     // Stepping has priority over breakpoints so a step that lands on a
     // breakpoint reports once (as STEP_COMPLETE).
-    struct sus_state* s = susForThread(threadId);
+    struct sus_state* s = susForCurrentThread(threadId);
     int sk = s->stepKind;
     if (sk >= 0) {
         int depth = tsd->callStackOffset;
@@ -670,12 +853,14 @@ void cn1_debugger_check(struct ThreadLocalData* tsd, int line) {
             pthread_mutex_lock(&s->mu);
             s->stepKind = -1;
             pthread_mutex_unlock(&s->mu);
+            markSuspendedBeforeEvent(tsd);
             emitLocationEvent(EVT_STEP_COMPLETE, threadId, methodId, line);
             suspendCurrent(tsd);
             return;
         }
     }
     if (bp_contains(methodId, line)) {
+        markSuspendedBeforeEvent(tsd);
         emitLocationEvent(EVT_BP_HIT, threadId, methodId, line);
         suspendCurrent(tsd);
     }
@@ -703,6 +888,14 @@ static void handleGetStack(int64_t threadId) {
     if (depth > 256) depth = 256;
     size_t sz = 8 + 4 + (size_t)depth * 8;
     uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) {
+        pthread_mutex_unlock(&s->mu);
+        uint8_t empty[12];
+        writeBE64(empty,     (uint64_t)threadId);
+        writeBE32(empty + 8, 0);
+        sendEvent(EVT_STACK, empty, 12);
+        return;
+    }
     writeBE64(buf,     (uint64_t)threadId);
     writeBE32(buf + 8, (uint32_t)depth);
     // Frames emitted innermost-first.
@@ -717,6 +910,87 @@ static void handleGetStack(int64_t threadId) {
     }
     pthread_mutex_unlock(&s->mu);
     sendEvent(EVT_STACK, buf, (uint32_t)sz);
+    free(buf);
+}
+
+/**
+ * Enumerates every live Java thread for the proxy.
+ *
+ * The IDE's thread list used to show only threads that had already produced
+ * a breakpoint or step event, because that was the proxy's sole source of
+ * thread ids and this command was a stub that replied empty. ParparVM already
+ * keeps every ThreadLocalData in allThreads, so the list is simply that array
+ * minus its empty slots.
+ *
+ * Reply payload: count(4) then per thread threadId(8), flags(1),
+ * threadObject(8). Bit 0 of flags is "suspended by the debugger", bit 1 is
+ * "running Java code". threadObject is the java.lang.Thread instance (0 when
+ * the thread has not published one yet) so the proxy can read its name field
+ * through the ordinary object/field commands rather than needing a second
+ * naming protocol.
+ */
+static void handleGetThreads(void) {
+    // This snapshot supersedes the last, so the Thread objects it advertised
+    // stop being rooted by it. Without this an IDE polling the thread list on
+    // a running app would pin every thread object it ever saw. Opened here and
+    // closed once every thread has been noted, rather than clearing up front:
+    // the refresh re-advertises only top-level Thread objects, so clearing
+    // first also dropped everything the IDE had reached through one.
+    cn1_debugger_begin_thread_list();
+    lockCriticalSection();
+    int count = 0;
+    if (allThreads != NULL) {
+        for (int i = 0; i < NUMBER_OF_SUPPORTED_THREADS; i++) {
+            if (allThreads[i] != NULL && !allThreads[i]->threadKilled
+                    && allThreads[i] != g_listenerTsd) count++;
+        }
+    }
+    size_t sz = 4 + (size_t)count * 17;
+    uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) {
+        unlockCriticalSection();
+        // Closed on this path too: the reply says there are no threads, so
+        // leaving the generation open would let the next refresh reconcile
+        // against a list that was never built.
+        cn1_debugger_end_thread_list();
+        uint8_t empty[4] = {0,0,0,0};
+        sendEvent(EVT_THREAD_LIST, empty, 4);
+        return;
+    }
+    writeBE32(buf, (uint32_t)count);
+    uint8_t* p = buf + 4;
+    int emitted = 0;
+    if (allThreads != NULL) {
+        for (int i = 0; i < NUMBER_OF_SUPPORTED_THREADS && emitted < count; i++) {
+            struct ThreadLocalData* t = allThreads[i];
+            if (t == NULL || t->threadKilled) continue;
+            if (t == g_listenerTsd) continue;   // the debugger's own listener
+            int64_t tid = (int64_t)t->threadId;
+            struct sus_state* s = susForThread(tid);
+            pthread_mutex_lock(&s->mu);
+            int suspended = s->suspended;
+            pthread_mutex_unlock(&s->mu);
+            uint8_t flags = 0;
+            if (suspended) flags |= 0x01;
+            if (t->threadActive) flags |= 0x02;
+            JAVA_OBJECT threadObj = t->currentThreadObject;
+            if (!cn1_debugger_is_valid_object(threadObj)
+                    || !cn1_debugger_note_issued(threadObj)) {
+                threadObj = JAVA_NULL;
+            }
+            writeBE64(p, (uint64_t)tid); p += 8;
+            *p++ = flags;
+            writeBE64(p, (uint64_t)(uintptr_t)threadObj); p += 8;
+            emitted++;
+        }
+    }
+    unlockCriticalSection();
+    // Every thread in this refresh has now been noted, so anything the older
+    // generation claimed and this one does not -- and that nothing else holds
+    // -- can go. Outside the critical section: the claim table has its own
+    // lock and note_issued already takes it under this one.
+    cn1_debugger_end_thread_list();
+    sendEvent(EVT_THREAD_LIST, buf, (uint32_t)sz);
     free(buf);
 }
 
@@ -741,44 +1015,82 @@ static void handleGetLocals(int64_t threadId, int frameOffsetFromTop) {
         sendEvent(EVT_LOCALS, &zero, 4);
         return;
     }
-    int count = fi->varTableCount;
+    // Only locals in scope at the line the frame is stopped on are reported.
+    // A slot reused by two disjoint scopes has a row for each, and reporting
+    // both means one of them shows storage that belongs to the other scope —
+    // a variable the code has not reached yet, displaying whatever the earlier
+    // occupant left there.
+    int currentLine = tsd->callStackLine[frameIdx];
+    int rows = fi->varTableCount;
+    int count = 0;
+    for (int i = 0; i < rows; i++) {
+        if (cn1_debugger_var_in_scope(&fi->varTable[i], currentLine)) count++;
+    }
     size_t sz = 4 + (size_t)count * (4 + 1 + 8);
     uint8_t* buf = (uint8_t*)malloc(sz);
+    if (!buf) {
+        pthread_mutex_unlock(&s->mu);
+        uint32_t zero = 0;
+        sendEvent(EVT_LOCALS, &zero, 4);
+        return;
+    }
     writeBE32(buf, (uint32_t)count);
     uint8_t* p = buf + 4;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < rows; i++) {
         const struct cn1_var_entry* v = &fi->varTable[i];
+        if (!cn1_debugger_var_in_scope(v, currentLine)) continue;
         writeBE32(p, (uint32_t)v->slot); p += 4;
         uint8_t tag = (uint8_t)v->typeCode;
         uint64_t value = 0;
-        if (v->slot >= 0 && v->slot < fi->numLocals && addrs[v->slot] != NULL) {
+        // Row-indexed, NOT slot-indexed: disjoint scopes reuse a slot with
+        // different types and ParparVM gives each its own storage, so only the
+        // row's own address is guaranteed to hold the row's own type. Indexing
+        // by slot read an 8-byte reference out of a 4-byte JAVA_INT and then
+        // dereferenced it (issue #5333).
+        void* addr = addrs[i];
+        if (addr != NULL) {
             switch (v->typeCode) {
                 case 'I': case 'B': case 'S': case 'C': case 'Z':
-                    value = (uint64_t)(*(int32_t*)addrs[v->slot]);
+                    value = (uint64_t)(*(int32_t*)addr);
                     break;
                 case 'J':
-                    value = (uint64_t)(*(int64_t*)addrs[v->slot]);
+                    value = (uint64_t)(*(int64_t*)addr);
                     break;
                 case 'F': {
-                    float f = *(float*)addrs[v->slot];
+                    float f = *(float*)addr;
                     uint32_t u; memcpy(&u, &f, 4);
                     value = u;
                     break;
                 }
                 case 'D': {
-                    double d = *(double*)addrs[v->slot];
+                    double d = *(double*)addr;
                     uint64_t u; memcpy(&u, &d, 8);
                     value = u;
                     break;
                 }
                 case 'L': case '[': {
-                    JAVA_OBJECT obj = *(JAVA_OBJECT*)addrs[v->slot];
+                    JAVA_OBJECT obj = *(JAVA_OBJECT*)addr;
+                    // Report only references we can prove are live objects.
+                    // A slot the frame has not reached yet holds whatever the
+                    // branch left behind, and handing that to the IDE just
+                    // means it asks us to dereference it a moment later.
+                    struct clazz* cls = cn1_debugger_class_of(obj);
+                    if (cls == NULL) {
+                        value = 0;
+                        break;
+                    }
+                    if (!cn1_debugger_note_issued_for(obj, threadId)) {
+                        // Unrecordable, so every later request for it would be
+                        // refused; a reference the IDE can see but cannot
+                        // expand is worse than one it never saw.
+                        value = 0;
+                        break;
+                    }
                     value = (uint64_t)(uintptr_t)obj;
                     // Tag java.lang.String references with JDWP type 's'
                     // so the IDE can read their contents via
                     // StringReference.Value instead of invoking toString().
-                    if (v->typeCode == 'L' && obj != JAVA_NULL
-                            && obj->__codenameOneParentClsReference == &class__java_lang_String) {
+                    if (v->typeCode == 'L' && cls == &class__java_lang_String) {
                         tag = 's';
                     }
                     break;
@@ -878,19 +1190,35 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
             int classId = -1;
             uint8_t isArray = 0;
+            uint8_t dimensions = 0;
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
-                struct clazz* cls = obj->__codenameOneParentClsReference;
+            struct clazz* cls = cn1_debugger_class_of_wire_id(obj);
+            if (cls != NULL) {
                 classId = cls->classId;
                 isArray = cls->isArray ? 1 : 0;
+                if (isArray) {
+                    // An array's own class is synthetic -- the runtime makes
+                    // one per element type as needed -- so it has no entry in
+                    // the symbol table and its id resolves to nothing at the
+                    // other end. Every array therefore read as Object[]. Send
+                    // the component the table does know, and the depth, so the
+                    // proxy can name the type it actually is.
+                    int dims = 0;
+                    struct clazz* component = cn1_debugger_array_component(cls, &dims);
+                    if (component != NULL && dims > 0 && dims < 256) {
+                        classId = component->classId;
+                        dimensions = (uint8_t)dims;
+                    }
+                }
             }
-            // Reply: classId(4) + isArray(1). Older proxies that only read
-            // 4 bytes still work.
-            uint8_t reply[5];
+            // Reply: classId(4) + isArray(1) + dimensions(1). Older proxies
+            // reading 4 or 5 bytes are unaffected.
+            uint8_t reply[6];
             uint32_t cidBE = htonl((uint32_t)classId);
             memcpy(reply, &cidBE, 4);
             reply[4] = isArray;
-            sendEvent(EVT_OBJECT_CLASS, reply, 5);
+            reply[5] = dimensions;
+            sendEvent(EVT_OBJECT_CLASS, reply, 6);
             return 0;
         }
         case CMD_GET_STRING: {
@@ -905,8 +1233,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             NSString* ns = nil;
             @try {
-                if (obj != JAVA_NULL) {
-                    ns = toNSString(getThreadLocalData(), obj);
+                // toNSString walks the String's char[]; a reference that is
+                // not really a String would send it off into arbitrary memory.
+                if (cn1_debugger_class_of_wire_id(obj) == &class__java_lang_String) {
+                    struct ThreadLocalData* listenerTsd = getThreadLocalData();
+                    // This call is what registers the listener in allThreads;
+                    // remember it here so the enumeration can leave it out.
+                    g_listenerTsd = listenerTsd;
+                    ns = toNSString(listenerTsd, obj);
                 }
             } @catch (NSException* e) {
                 ns = nil;
@@ -937,10 +1271,13 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 return 0;
             }
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            int classId = -1;
-            if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != NULL) {
-                classId = obj->__codenameOneParentClsReference->classId;
-            }
+            struct clazz* objCls = cn1_debugger_class_of_wire_id(obj);
+            // Anything reached through this object belongs to whichever
+            // suspensions produced it, so it is invalidated with them.
+            int classId = objCls != NULL ? objCls->classId : -1;
+            // An unverifiable reference yields no fields rather than a read
+            // at obj+offset, which is where a bogus objectID used to fault.
+            if (objCls == NULL) obj = JAVA_NULL;
             // Reply payload: count(4) then per-field { type(1), value(8) }.
             uint32_t sz = 4 + (uint32_t)count * 9;
             uint8_t* buf = (uint8_t*)malloc(sz);
@@ -959,8 +1296,27 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 char tc = 'L';
                 uint64_t val = 0;
                 const cn1_field_entry* fe = field_lookup_by_class_and_id(classId, fid, NULL);
-                if (fe && obj != JAVA_NULL) {
+                if (cn1_debugger_is_tagged_int(obj)) {
+                    // A tagged Integer carries its value in the reference
+                    // itself and has no fields to read at an offset. Serve the
+                    // one field it models -- Integer.value -- from the tag.
+                    if (fe && fe->type == 'I') {
+                        tc = 'I';
+                        val = (uint64_t)(uint32_t)cn1_debugger_tagged_int_value(obj);
+                    } else {
+                        tc = 'L'; val = 0;
+                    }
+                } else if (fe && obj != JAVA_NULL) {
                     field_read_into(obj, fe, &tc, &val);
+                    // A reference field can legitimately hold a value the GC
+                    // has since reclaimed; don't pass one on as an objectID.
+                    if (tc == 'L') {
+                        JAVA_OBJECT ref = (JAVA_OBJECT)(uintptr_t)val;
+                        if (!cn1_debugger_is_valid_object(ref)
+                                || !cn1_debugger_note_issued_inheriting(ref, obj)) {
+                            val = 0;
+                        }
+                    }
                 } else {
                     tc = 'L'; val = 0;
                 }
@@ -991,6 +1347,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             memcpy(&thisHi, payload + 12, 4); memcpy(&thisLo, payload + 16, 4);
             uint64_t thisRaw = ((uint64_t)ntohl(thisHi) << 32) | (uint32_t)ntohl(thisLo);
             JAVA_OBJECT thisObj = (JAVA_OBJECT)(uintptr_t)thisRaw;
+            // The thunk dispatches through this receiver's vtable, so an
+            // unverifiable one would jump through a fabricated function
+            // pointer. Refuse the call instead.
+            if (thisObj != JAVA_NULL && cn1_debugger_class_of_wire_id(thisObj) == NULL) {
+                uint8_t badThis[9] = {'V',0,0,0,0,0,0,0,0};
+                sendEvent(EVT_INVOKE_RESULT, badThis, 9);
+                return 0;
+            }
             uint32_t cntBE;
             memcpy(&cntBE, payload + 20, 4);
             int argCount = (int)ntohl(cntBE);
@@ -1019,8 +1383,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                     }
                     case 'D':
                         memcpy(&argv[i].d, &v, 8); break;
-                    case 'L': case '[': default:
-                        argv[i].o = (JAVA_OBJECT)(uintptr_t)v; break;
+                    case 'L': case '[': default: {
+                        // Same reasoning as the receiver: the callee will
+                        // dereference this. An unverifiable argument becomes
+                        // null, which the callee can at least handle.
+                        JAVA_OBJECT arg = (JAVA_OBJECT)(uintptr_t)v;
+                        argv[i].o = cn1_debugger_class_of_wire_id(arg) != NULL ? arg : JAVA_NULL;
+                        break;
+                    }
                 }
             }
             cn1_invoke_thunk_t thunk = invoke_thunk_for(mid);
@@ -1070,7 +1440,9 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                 case 'D':
                     memcpy(&bits, &r.value.d, 8); break;
                 case 'L': case '[': case 'X':
-                    bits = (uint64_t)(uintptr_t)r.value.o; break;
+                    bits = cn1_debugger_note_issued_for(r.value.o, tid)
+                            ? (uint64_t)(uintptr_t)r.value.o : 0;
+                    break;
                 case 'V': default:
                     bits = 0; break;
             }
@@ -1090,7 +1462,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             uint64_t ptr = ((uint64_t)ntohl(hi) << 32) | (uint32_t)ntohl(lo);
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
             int length = 0;
-            if (obj != JAVA_NULL) {
+            struct clazz* arrCls = cn1_debugger_class_of_wire_id(obj);
+            if (arrCls != NULL && !cn1_debugger_is_tagged_int(obj) && arrCls->isArray) {
                 length = ((JAVA_ARRAY)obj)->length;
             }
             uint8_t reply[4];
@@ -1115,7 +1488,10 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             int firstIdx = (int)ntohl(fstBE);
             int reqCount = (int)ntohl(cntBE);
             JAVA_OBJECT obj = (JAVA_OBJECT)(uintptr_t)ptr;
-            if (obj == JAVA_NULL) {
+            // Everything below indexes arr->data, so the reference has to be
+            // a verified array before any of it runs.
+            struct clazz* objArrCls = cn1_debugger_class_of_wire_id(obj);
+            if (objArrCls == NULL || cn1_debugger_is_tagged_int(obj) || !objArrCls->isArray) {
                 uint8_t err[5] = {'L', 0,0,0,0};
                 sendEvent(EVT_ARRAY_VALUES, err, 5);
                 return 0;
@@ -1133,8 +1509,7 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             // vs float, ...).
             char tag = 'L';
             int elemSize = arr->primitiveSize;
-            struct clazz* arrCls = obj->__codenameOneParentClsReference;
-            struct clazz* elemCls = arrCls ? arrCls->arrayType : NULL;
+            struct clazz* elemCls = objArrCls->arrayType;
             if (elemSize == 0) {
                 tag = 'L';
             } else if (elemCls && elemCls->clsName) {
@@ -1208,7 +1583,14 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
                                 writeBE64(p, db); }
                               p += 8; break;
                     case 'L': case '[': default: {
+                        // Only hand back element references we can verify;
+                        // anything else would come straight back to us as an
+                        // objectID the IDE expects us to dereference.
                         JAVA_OBJECT v = ((JAVA_OBJECT*)arr->data)[idx];
+                        if (!cn1_debugger_is_valid_object(v)
+                                || !cn1_debugger_note_issued_inheriting(v, obj)) {
+                            v = JAVA_NULL;
+                        }
                         writeBE64(p, (uint64_t)(uintptr_t)v);
                         p += 8; break;
                     }
@@ -1252,6 +1634,8 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             return 0;
         }
         case CMD_GET_THREADS:
+            handleGetThreads();
+            return 0;
         case CMD_SUSPEND:
             // Minimal viable: reply empty so the proxy doesn't hang.
             sendEvent(EVT_REPLY_STATUS, NULL, 0);
@@ -1393,6 +1777,7 @@ static void* listenerThreadMain(void* arg) {
 /* attached (via CMD_RESUME).                                           */
 /* --------------------------------------------------------------------- */
 
+#if !TARGET_OS_WATCH
 static UIView* cn1_debugger_active_host_view(void) {
     UIWindow* w = nil;
     if (@available(iOS 13.0, *)) {
@@ -1505,6 +1890,11 @@ static void cn1_debugger_dismiss_wait_overlay(void) {
         g_waitOverlay = nil;
     });
 }
+#else
+// watchOS: no UIKit, so nothing to show and nothing to take down.
+static void cn1_debugger_install_wait_overlay(void) {}
+static void cn1_debugger_dismiss_wait_overlay(void) {}
+#endif
 
 /*
  * Invoked when the proxy confirms the IDE is ready. Fires the pending

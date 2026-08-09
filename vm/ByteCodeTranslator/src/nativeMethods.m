@@ -2428,6 +2428,7 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
     threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
     threadStateData->callStackClass[threadStateData->callStackOffset] = classNameId;
     threadStateData->callStackMethod[threadStateData->callStackOffset] = methodNameId;
+    CN1_DEBUG_FRAME_ENTER(threadStateData)
     threadStateData->callStackOffset++;
 }
 
