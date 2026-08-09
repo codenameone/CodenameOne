@@ -2551,6 +2551,22 @@ static int cn1PageReleaseTraceOn(void) {
 // the pages charged to the process, so a nonzero value here means the release
 // ran but bought nothing.
 static int cn1PageReleaseReusableErrno = 0;
+// CN1_BIBOP_FAIL_REUSE forces every MADV_FREE_REUSE to report failure. That path
+// is otherwise unreachable -- the call does not fail in practice -- so the code
+// that has to cope with a page which cannot be restored would never run outside
+// a test. Deliberately NOT part of the CN1_GC_FAULT family: those live under
+// CN1_GC_VERIFY, and page release is disabled in verifier builds, so a fault
+// declared there could never fire.
+static _Atomic int cn1ReuseFailInject = -1;
+static int cn1ReuseFailInjectOn(void) {
+    int on = atomic_load_explicit(&cn1ReuseFailInject, memory_order_relaxed);
+    if(on < 0) {
+        on = getenv("CN1_BIBOP_FAIL_REUSE") ? 1 : 0;
+        atomic_store_explicit(&cn1ReuseFailInject, on, memory_order_relaxed);
+    }
+    return on;
+}
+
 // Last errno from a rejected MADV_FREE_REUSE on a page that WAS marked reusable.
 // Distinct from the release errno above: this one means a page could not be
 // taken back out of the reusable state and was therefore not handed out.
@@ -2560,6 +2576,19 @@ static int cn1PageReuseFailErrno = 0;
 // bibopFreePool so the acquire path always prefers a warm page and only pays the
 // re-acquire plus refault when no warm page is left. bibopMutex.
 static CN1BibopPage* bibopReleasedPool = 0;
+
+// Released pages whose MADV_FREE_REUSE was rejected, so they cannot be handed to
+// the allocator yet. Kept OFF bibopReleasedPool so one unrestorable page cannot
+// stand in front of a stocked pool; consulted only when that pool is empty, and
+// then at most one per acquisition. bibopMutex.
+static CN1BibopPage* bibopReuseFailedPool = 0;
+
+// How many released pages one acquisition may try to restore before giving up
+// and allocating a fresh page. Bounds the syscalls a run of rejections can cost
+// while still stepping past a bad page rather than stalling on it.
+#ifndef CN1_BIBOP_REUSE_ATTEMPTS
+#define CN1_BIBOP_REUSE_ATTEMPTS 4
+#endif
 
 #if defined(CN1_GC_INSTRUMENT) && !defined(CN1_BIBOP_NO_PAGE_RELEASE)
 static _Atomic long cn1BibopPagesReleased = 0;
@@ -2671,6 +2700,9 @@ static JAVA_BOOLEAN cn1BibopReusePageMemory(CN1BibopPage* p) {
     }
 #if defined(__APPLE__)
     if(p->gcPageReusableAdvice) {
+        if(cn1ReuseFailInjectOn()) {
+            return JAVA_FALSE;               // fault injection; see the helper
+        }
         if(madvise((char*)p + off, (size_t)CN1_BIBOP_PAGE_SIZE - off,
                    MADV_FREE_REUSE) != 0) {
             cn1PageReuseFailErrno = errno;
@@ -3001,23 +3033,39 @@ static CN1BibopPage* cn1BibopAcquirePage(int ci) {
         np = bibopFreePool;
         bibopFreePool = np->nextPool;
         cn1BibopFormatPage(np, ci);
-    } else if(bibopReleasedPool != 0) {
+    } else if(bibopReleasedPool != 0 || bibopReuseFailedPool != 0) {
         // Warm pages are gone; take one whose slot region was handed back to the
         // OS. The REUSE call must precede the format, which writes into that
         // region (and under CN1_GC_VERIFY writes every slot).
-        np = bibopReleasedPool;
-        bibopReleasedPool = np->nextPool;
-        if(cn1BibopReusePageMemory(np)) {
-            cn1BibopFormatPage(np, ci);
-        } else {
-            // Could not restore it; putting a page the kernel still considers
-            // reusable into service risks losing whatever is written into it.
-            // Return it to the pool and fall through to a fresh page -- one
-            // failed syscall, no spin, and self-healing if the cause is
-            // transient.
-            np->nextPool = bibopReleasedPool;
-            bibopReleasedPool = np;
-            np = 0;
+        //
+        // A page whose restore FAILS must not go back at the head: every later
+        // acquisition would pop the same page, fail again, and allocate a fresh
+        // arena page, so a single unrestorable page would hide an entire stocked
+        // pool behind it and the heap would grow without bound. Failures are
+        // parked on a separate list that is only consulted once the good pool is
+        // empty, which both keeps them out of the way and still retries them
+        // eventually if the cause was transient.
+        for(int attempt = 0 ; np == 0 && attempt < CN1_BIBOP_REUSE_ATTEMPTS ; attempt++) {
+            CN1BibopPage* cand;
+            if(bibopReleasedPool != 0) {
+                cand = bibopReleasedPool;
+                bibopReleasedPool = cand->nextPool;
+            } else if(attempt == 0 && bibopReuseFailedPool != 0) {
+                // Only ever one previously-failed page per acquisition, so a
+                // permanently unrestorable page costs one syscall and never
+                // starves the fresh-page fallback.
+                cand = bibopReuseFailedPool;
+                bibopReuseFailedPool = cand->nextPool;
+            } else {
+                break;
+            }
+            if(cn1BibopReusePageMemory(cand)) {
+                np = cand;
+                cn1BibopFormatPage(np, ci);
+            } else {
+                cand->nextPool = bibopReuseFailedPool;
+                bibopReuseFailedPool = cand;
+            }
         }
     }
     pthread_mutex_unlock(&bibopMutex);
