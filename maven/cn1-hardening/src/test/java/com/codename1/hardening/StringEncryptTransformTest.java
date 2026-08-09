@@ -438,6 +438,89 @@ public class StringEncryptTransformTest {
     }
 
     @Test
+    public void classWithUnresolvableFrameMergeIsLeftUnhardenedAndLiteralsExcluded() throws Exception {
+        // app/C.pick merges app/A and app/B at a control-flow join; both extend absent platform
+        // intermediates whose shared base is also absent, so FrameClassWriter cannot resolve the merge and
+        // flags it incomplete. The transform must ship C UNHARDENED (its literal stays plaintext) rather
+        // than emit a possibly-invalid Object-widened frame, AND exclude that literal jar-wide so another
+        // class does not encrypt+intern it and break a valid == against C's plaintext copy on ParparVM.
+        int v18 = org.objectweb.asm.Opcodes.V1_8;
+        int pubStatic = org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_STATIC;
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(v18, org.objectweb.asm.Opcodes.ACC_PUBLIC, "app/C", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor s = w.visitMethod(pubStatic, "secret", "()Ljava/lang/String;", null, null);
+        s.visitCode();
+        s.visitLdcInsn("a token worth encrypting");
+        s.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        s.visitMaxs(1, 0);
+        s.visitEnd();
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(pubStatic, "pick",
+                "(ZLapp/A;Lapp/B;)Ljava/lang/Object;", null, null);
+        m.visitCode();
+        org.objectweb.asm.Label l1 = new org.objectweb.asm.Label();
+        org.objectweb.asm.Label l2 = new org.objectweb.asm.Label();
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 0);
+        m.visitJumpInsn(org.objectweb.asm.Opcodes.IFEQ, l1);
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 1);   // app/A
+        m.visitJumpInsn(org.objectweb.asm.Opcodes.GOTO, l2);
+        m.visitLabel(l1);
+        m.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 2);   // app/B
+        m.visitLabel(l2);                                     // frame here merges app/A and app/B
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 3);
+        m.visitEnd();
+        w.visitEnd();
+        byte[] input = w.toByteArray();
+
+        java.util.Map<String, byte[]> res = new java.util.HashMap<String, byte[]>();
+        res.put("app/A.class", classExtendingInternal("app/A", "app/PlatformA"));
+        res.put("app/B.class", classExtendingInternal("app/B", "app/PlatformB"));
+        ClassLoader hierarchy = new ResourceOnlyLoader(res);   // PlatformA, PlatformB, Base all absent
+
+        StringEncryptTransform t = new StringEncryptTransform(true, 9, hierarchy);
+        byte[] out = t.transform(input);
+        assertTrue("class with an unresolvable merge is left unhardened", t.isHierarchyIncompleteSkipped());
+        org.junit.Assert.assertArrayEquals("the unhardened class is returned byte-for-byte", input, out);
+        assertTrue("its literal stays plaintext",
+                StringEncryptTransform.containsStringLiteral(out, "a token worth encrypting"));
+        assertTrue("its literal is excluded jar-wide so no other class encrypts it",
+                t.getNewlyExcluded().contains("a token worth encrypting"));
+    }
+
+    private static byte[] classExtendingInternal(String internal, String superName) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internal, null, superName, null);
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    /** Serves {@code name.class -> bytes} as resources with no parent, so absent classes stay unresolvable. */
+    private static final class ResourceOnlyLoader extends ClassLoader {
+        private final java.util.Map<String, byte[]> resources;
+
+        ResourceOnlyLoader(java.util.Map<String, byte[]> resources) {
+            super(null);
+            this.resources = resources;
+        }
+
+        @Override
+        public InputStream getResourceAsStream(String name) {
+            byte[] b = resources.get(name);
+            return b != null ? new java.io.ByteArrayInputStream(b) : super.getResourceAsStream(name);
+        }
+
+        @Override
+        protected Class<?> findClass(String name) throws ClassNotFoundException {
+            byte[] b = resources.get(name.replace('.', '/') + ".class");
+            if (b == null) {
+                throw new ClassNotFoundException(name);
+            }
+            return defineClass(name, b, 0, b.length);
+        }
+    }
+
+    @Test
     public void perAccessEncryptionIsCappedByConstantPoolBudget() throws Exception {
         // The per-access channel is NOT pool-neutral when a value's plaintext is retained elsewhere: the
         // ciphertext Utf8+String is a NET addition. Here every literal is ALSO kept plaintext in a class

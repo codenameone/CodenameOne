@@ -136,6 +136,8 @@ public final class StringEncryptTransform {
     private int annotationLiteralCount;
     private int indyLiteralCount;
     private int shortLiteralCount;
+    /** True when this class was left UNHARDENED because its frame hierarchy could not be resolved. */
+    private boolean hierarchyIncompleteSkipped;
     /** The input class's constant-pool item count, so hoisting can stay under the 65535-entry limit. */
     private int poolBaseItems;
     /**
@@ -356,6 +358,15 @@ public final class StringEncryptTransform {
         return shortLiteralCount;
     }
 
+    /**
+     * True when this class was shipped UNHARDENED because a frame merge could not be resolved past a
+     * missing intermediate supertype (see {@link FrameClassWriter#isHierarchyIncomplete}). Reported so the
+     * coverage summary discloses the class rather than silently counting it as hardened.
+     */
+    public boolean isHierarchyIncompleteSkipped() {
+        return hierarchyIncompleteSkipped;
+    }
+
     public int getCondyLiteralCount() {
         return condyLiteralCount;
     }
@@ -494,8 +505,20 @@ public final class StringEncryptTransform {
 
         addDecoder(cn, base, isInterface, decoderName);
 
-        ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
+        FrameClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
+        if (cw.isHierarchyIncomplete()) {
+            // COMPUTE_FRAMES had to guess java/lang/Object for a merge whose real common base sits beyond a
+            // supertype absent from the supplied jars (e.g. A extends PlatformA, B extends PlatformB, both
+            // extend an absent Base). The recomputed frame may be too weak and fail on-device verification.
+            // Ship this class UNHARDENED -- its original javac-computed frames already encode the precise
+            // type -- rather than a possibly-invalid recomputed one. Its literals then stay plaintext, so
+            // exclude ALL of them jar-wide: a value encrypted+interned in another class must not compare !=
+            // to this class's plaintext copy on ParparVM's deduplicated pool.
+            collectAllLiterals(classBytes, newlyExcluded);
+            hierarchyIncompleteSkipped = true;
+            return classBytes;
+        }
         return cw.toByteArray();
     }
 

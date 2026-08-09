@@ -23,6 +23,8 @@
 package com.codename1.hardening;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -91,6 +93,43 @@ public class FrameClassWriterTest {
         ClassLoader hierarchy = new BytesLoader(res);   // app/Base absent
         assertEquals("app/I", common(hierarchy, "app/I", "app/C"));
         assertEquals("app/I", common(hierarchy, "app/C", "app/I"));
+    }
+
+    @Test
+    public void flagsIncompleteWhenIntermediateSupertypesAreAbsent() {
+        // app/A extends app/PlatformA, app/B extends app/PlatformB, and BOTH platform classes (which
+        // themselves share an absent Base) are absent from the hierarchy. The byte walk cannot see past the
+        // missing intermediates, so it collapses to Object -- but that guess may be too weak, so the writer
+        // must FLAG the merge incomplete so the caller ships the class unhardened with its original frames.
+        java.util.Map<String, byte[]> res = new java.util.HashMap<String, byte[]>();
+        res.put("app/A.class", classExtending("app/A", "app/PlatformA"));
+        res.put("app/B.class", classExtending("app/B", "app/PlatformB"));
+        ClassLoader hierarchy = new BytesLoader(res);   // PlatformA, PlatformB, Base all absent
+        FrameClassWriter w = new FrameClassWriter(0, hierarchy);
+        assertEquals("java/lang/Object", w.getCommonSuperClass("app/A", "app/B"));
+        assertTrue("a merge past a missing intermediate must be flagged incomplete", w.isHierarchyIncomplete());
+    }
+
+    @Test
+    public void resolvedSharedBaseIsNotFlaggedIncomplete() {
+        // When the byte walk DOES resolve the shared base (A and B both directly extend the absent Base),
+        // the result is Base, not a guess, so the merge must NOT be flagged incomplete -- the class can be
+        // hardened normally.
+        java.util.Map<String, byte[]> res = new java.util.HashMap<String, byte[]>();
+        res.put("app/A.class", classExtending("app/A", "app/Base"));
+        res.put("app/B.class", classExtending("app/B", "app/Base"));
+        FrameClassWriter w = new FrameClassWriter(0, new BytesLoader(res));   // app/Base absent
+        assertEquals("app/Base", w.getCommonSuperClass("app/A", "app/B"));
+        assertFalse("a resolved shared base must not be flagged incomplete", w.isHierarchyIncomplete());
+    }
+
+    @Test
+    public void loaderResolvedMergeIsNotFlaggedIncomplete() {
+        // A precise, load-based Object result (two unrelated JDK types) is exact, not a hierarchy gap, so
+        // it must not be flagged.
+        FrameClassWriter w = new FrameClassWriter(0, getClass().getClassLoader());
+        assertEquals("java/lang/Object", w.getCommonSuperClass("java/lang/String", "java/lang/Integer"));
+        assertFalse(w.isHierarchyIncomplete());
     }
 
     private static byte[] classExtending(String internal, String superName) {

@@ -59,10 +59,23 @@ import org.objectweb.asm.Opcodes;
 public final class FrameClassWriter extends ClassWriter {
 
     private final ClassLoader hierarchy;
+    private boolean hierarchyIncomplete;
 
     public FrameClassWriter(int flags, ClassLoader hierarchy) {
         super(flags);
         this.hierarchy = hierarchy;
+    }
+
+    /**
+     * True when a frame merge had to collapse to {@code java/lang/Object} because the type hierarchy was
+     * INCOMPLETE -- a supertype on the path to the real common base could not be read (absent from the
+     * supplied jars), not because the two types genuinely share only {@code Object}. In that case the
+     * recomputed {@code Object} stack-map type may be weaker than the type the target expects (e.g. a
+     * shared {@code Base} reachable only through two missing intermediates), so the caller must ship the
+     * class UNHARDENED -- with its original, javac-computed frames -- rather than a possibly-invalid one.
+     */
+    public boolean isHierarchyIncomplete() {
+        return hierarchyIncomplete;
     }
 
     @Override
@@ -140,7 +153,36 @@ public final class FrameClassWriter extends ClassWriter {
             }
             c = superNameFromBytes(c);
         }
+        // Falling through to Object. That is only SOUND when both chains are fully readable up to Object
+        // and genuinely share no closer ancestor. If either chain is broken by a missing intermediate, the
+        // real common base (reachable only through the absent class) is invisible here, so Object is a
+        // guess that may be too weak -- flag it so the caller ships the class unhardened with its original
+        // frames instead of emitting a possibly-invalid recomputed one.
+        if (!chainReachesObject(type1) || !chainReachesObject(type2)) {
+            hierarchyIncomplete = true;
+        }
         return "java/lang/Object";
+    }
+
+    /**
+     * True when {@code type}'s superclass chain can be walked entirely to {@code java/lang/Object} (or a
+     * readable root) through readable bytes. False when a link in the chain is absent from the supplied
+     * jars, which means the byte-based resolver cannot see a shared base that lies beyond that gap.
+     */
+    private boolean chainReachesObject(String type) {
+        String c = type;
+        Set<String> seen = new HashSet<String>();
+        while (c != null && seen.add(c)) {
+            if ("java/lang/Object".equals(c)) {
+                return true;
+            }
+            ClassReader cr = readerFor(c);
+            if (cr == null) {
+                return false;
+            }
+            c = cr.getSuperName();
+        }
+        return true;
     }
 
     /** True when {@code sub} is {@code sup}, or extends/implements it (transitively) per the class bytes. */

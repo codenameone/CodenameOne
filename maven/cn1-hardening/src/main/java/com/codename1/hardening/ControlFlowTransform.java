@@ -163,8 +163,15 @@ public final class ControlFlowTransform {
         addGuardField(cn, guardField);
         initGuardField(cn, guardField);
 
-        ClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
+        FrameClassWriter cw = new FrameClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, hierarchy);
         cn.accept(cw);
+        if (cw.isHierarchyIncomplete()) {
+            // A frame merge collapsed to Object because a supertype is absent from the supplied jars, so
+            // the recomputed StackMapTable may be too weak and fail on-device verification. Ship this class
+            // UNHARDENED (original valid frames) rather than a possibly-invalid one. Control flow leaves
+            // string literals untouched, so no jar-wide literal exclusion is needed here.
+            return classBytes;
+        }
         return cw.toByteArray();
     }
 

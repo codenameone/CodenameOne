@@ -189,6 +189,7 @@ public final class HardeningEngine {
         int condyLiterals = 0;
         int indyLiterals = 0;
         int shortLiterals = 0;
+        int hierarchyIncompleteSkips = 0;
         int clinitFullLiterals = 0;
         int annotationLiterals = 0;
         int jarExcludedLiterals = 0;
@@ -266,6 +267,7 @@ public final class HardeningEngine {
                 condyLiterals += t.getCondyLiteralCount();
                 indyLiterals += t.getIndyLiteralCount();
                 shortLiterals += t.getShortLiteralCount();
+                hierarchyIncompleteSkips += t.isHierarchyIncompleteSkipped() ? 1 : 0;
                 clinitFullLiterals += t.getClinitFullLiteralCount();
                 annotationLiterals += t.getAnnotationLiteralCount();
             }
@@ -281,6 +283,7 @@ public final class HardeningEngine {
                 condyLiterals = 0;
                 indyLiterals = 0;
                 shortLiterals = 0;
+                hierarchyIncompleteSkips = 0;
                 clinitFullLiterals = 0;
                 annotationLiterals = 0;
                 sourcePreservedConstants = 0;
@@ -300,6 +303,7 @@ public final class HardeningEngine {
                     condyLiterals += t.getCondyLiteralCount();
                     indyLiterals += t.getIndyLiteralCount();
                     shortLiterals += t.getShortLiteralCount();
+                    hierarchyIncompleteSkips += t.isHierarchyIncompleteSkipped() ? 1 : 0;
                     clinitFullLiterals += t.getClinitFullLiteralCount();
                     annotationLiterals += t.getAnnotationLiteralCount();
                 }
@@ -431,6 +435,14 @@ public final class HardeningEngine {
             result.getWarnings().add(shortLiterals + " distinct one- or two-character string literal(s) "
                     + "were left in plaintext (too short to be worth encrypting); a short value is "
                     + "trivially recovered even when encrypted, so this is a disclosure note");
+        }
+        if (hierarchyIncompleteSkips > 0) {
+            // A class whose frame merge could not be resolved past a supertype absent from the supplied
+            // jars is shipped UNHARDENED (original frames) rather than risk an Object-widened frame that
+            // fails on-device verification. Disclose it so the coverage claim is honest.
+            result.getWarnings().add(hierarchyIncompleteSkips + " class(es) were left unhardened because a "
+                    + "supertype needed to compute their stack-map frames was absent from the supplied "
+                    + "library jars; supplying that platform's jars lets them be hardened");
         }
         if (stringsApplied && oversizedLiterals > 0) {
             // A literal longer than ~21,845 chars can widen to a 3-byte-per-char constant whose
