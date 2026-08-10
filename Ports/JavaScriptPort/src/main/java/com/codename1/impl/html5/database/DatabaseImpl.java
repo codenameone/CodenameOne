@@ -258,15 +258,19 @@ public class DatabaseImpl extends Database {
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
-        long stmt = SQLiteNative.prepare(peer, sql);
-        checkPrepared(stmt);
-        bindText(stmt, params);
-        checkNative(SQLiteNative.executeAndFinish(stmt));
-        // The names on success only -- a statement that failed opened no savepoint -- and the
-        // engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction as it
-        // fails, so leaving the read on the success path alone would hold the flag over a
-        // transaction that is gone and refuse every begin and key change until close.
-        noteScriptTransactionControl(sql);
+        try {
+            long stmt = SQLiteNative.prepare(peer, sql);
+            checkPrepared(stmt);
+            bindText(stmt, params);
+            checkNative(SQLiteNative.executeAndFinish(stmt));
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction
+            // as it fails, so reading only on the success path would hold the flag over a
+            // transaction that is gone and refuse every begin and key change until close.
+            noteEngineTransactionState(SQLiteNative.inTransaction(peer));
+        }
     }
 
     @Override
@@ -281,15 +285,19 @@ public class DatabaseImpl extends Database {
         }
         checkOpen();
         requireSingleStatement(sql);
-        long stmt = SQLiteNative.prepare(peer, sql);
-        checkPrepared(stmt);
-        bind(stmt, params);
-        checkNative(SQLiteNative.executeAndFinish(stmt));
-        // The names on success only -- a statement that failed opened no savepoint -- and the
-        // engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction as it
-        // fails, so leaving the read on the success path alone would hold the flag over a
-        // transaction that is gone and refuse every begin and key change until close.
-        noteScriptTransactionControl(sql);
+        try {
+            long stmt = SQLiteNative.prepare(peer, sql);
+            checkPrepared(stmt);
+            bind(stmt, params);
+            checkNative(SQLiteNative.executeAndFinish(stmt));
+            // The names on success only -- a statement that failed opened no savepoint.
+            noteScriptTransactionControl(sql);
+        } finally {
+            // The engine either way. A constraint with ON CONFLICT ROLLBACK ends the transaction
+            // as it fails, so reading only on the success path would hold the flag over a
+            // transaction that is gone and refuse every begin and key change until close.
+            noteEngineTransactionState(SQLiteNative.inTransaction(peer));
+        }
     }
 
     @Override

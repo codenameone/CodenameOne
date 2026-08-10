@@ -248,6 +248,13 @@ public class ThreadSafeDatabase extends Database {
         // would park that thread behind whatever statement is running, which on Android is an
         // ANR. Taking the lock can still wait for an in-flight call, but only for as long as that
         // call holds it, and the answer is then current rather than stale.
+        if (et.isThisIt()) {
+            // Already on the worker, so the lock buys nothing and can cost everything: another
+            // thread may hold it while waiting for this worker, and blocking here would leave the
+            // two waiting on each other. The publishing this comment describes is not needed on
+            // this path either -- the writes were made by this same thread.
+            return underlying.isInTransaction();
+        }
         synchronized (dispatchLock) {
             return underlying.isInTransaction();
         }
