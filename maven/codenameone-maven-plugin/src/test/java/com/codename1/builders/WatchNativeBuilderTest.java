@@ -876,10 +876,14 @@ class WatchNativeBuilderTest {
 
         // Zero minimum distance, so the same gesture still covers a plain tap.
         assertTrue(swift.contains("DragGesture(minimumDistance: 0)"), swift);
-        assertTrue(swift.contains("pointerPressed(atX:"), swift);
-        assertTrue(swift.contains("pointerDragged(toX:"),
+        // The names Swift actually imports these ObjC selectors under. pointerPressedAtX:y:
+        // becomes pointerPressedAt(x:y:), the same shape as the tapAtX:y: call that already
+        // worked -- guessing pointerPressed(atX:) instead compiled as valid Swift and failed to
+        // resolve, which broke every iOS job.
+        assertTrue(swift.contains("pointerPressedAt(x:"), swift);
+        assertTrue(swift.contains("pointerDraggedTo(x:"),
                 "the middle of a drag has to arrive, or a Slider cannot move: " + swift);
-        assertTrue(swift.contains("pointerReleased(atX:"), swift);
+        assertTrue(swift.contains("pointerReleasedAt(x:"), swift);
         // A press exactly once per gesture: the flag is what separates the first onChanged from
         // the rest, and it also covers a gesture that ends without any onChanged at all.
         assertTrue(swift.contains("if dragging {") && swift.contains("if !dragging {"), swift);
