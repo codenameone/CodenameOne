@@ -351,7 +351,13 @@ public class PageViewRenderElement extends ScrollRenderElement {
                             f.deregisterAnimated(this);
                         }
                     }
-                    return true;
+                    // False, even though this animation changes the screen every frame:
+                    // setScroll already repaints the pane, and returning true from a
+                    // registered Animation that is NOT a Component makes paintDirty flush
+                    // the WHOLE screen after calling paint() on it - which paints nothing
+                    // here. That flushes a buffer the frame never drew into, i.e. a
+                    // full-screen flicker for the length of the settle.
+                    return false;
                 }
 
                 @Override

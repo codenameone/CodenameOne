@@ -166,12 +166,31 @@ final class InkFeedback {
         clock = new Animation() {
             @Override
             public boolean animate() {
-                if (!active) {
-                    detach(target);
-                    return false;
+                // Expire on the CLOCK, not in paint(). paint() only runs while the
+                // component is actually being painted, so ink on a component that scrolls
+                // away or stops repainting would stay "active" forever and keep this
+                // clock - and its repaint - running for the life of the form.
+                if (active && !held
+                        && System.currentTimeMillis() - releasedAt >= FADE_MS) {
+                    active = false;
                 }
-                // True: this IS the thing that changed, so it owns its own repaint.
-                return true;
+                if (active) {
+                    // Repaint the COMPONENT, and always return false.
+                    //
+                    // Returning true from a registered Animation that is not a Component
+                    // makes paintDirty set the flush region to the whole screen, call
+                    // paint() on the animation - which paints nothing here, the ink is
+                    // drawn by the component - and then flush the entire screen. That
+                    // pushes a buffer this frame never painted into, which is visible as
+                    // a full-screen flicker for as long as any ink is running.
+                    //
+                    // Repainting the component instead queues it with a real dirty
+                    // region, so only the tap target is flushed.
+                    target.repaint();
+                } else {
+                    detach(target);
+                }
+                return false;
             }
 
             @Override
