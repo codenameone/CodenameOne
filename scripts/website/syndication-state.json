@@ -1622,6 +1622,18 @@
         "url": "https://dev.to/codenameone/a-polyline-is-not-a-route-5fek",
         "syndicated_at": "2026-08-10T14:43:58+00:00"
       }
+    },
+    "maven-central-cloudflare-r2": {
+      "hashnode": {
+        "url": "https://debugagent.com/why-codename-one-is-moving-beyond-maven-central",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a7a03ecce38e6e6be69683a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-10T17:02:26+00:00"
+      }
     }
   }
 }
