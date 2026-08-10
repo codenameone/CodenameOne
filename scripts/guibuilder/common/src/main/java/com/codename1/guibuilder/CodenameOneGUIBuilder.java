@@ -6251,12 +6251,37 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // keeping only the marker body dropped them again on the second ordinary Save while the
         // methods that need them stayed.
         String withImports = carriedImports(existing, generated);
+        // And whatever the file declares after the class. Migration puts a top level helper back
+        // once, but this branch runs on every later save and rebuilds from the template, so the
+        // helper survived exactly one save and was deleted by the next.
+        String trailing = trailingAfterGeneratedClass(existing);
         int keepStart = markerLine(withImports, startMarker, 0);
         int keepEnd = markerLine(withImports, endMarker, keepStart < 0 ? 0 : keepStart);
         if (keepStart < 0 || keepEnd < keepStart) {
-            return generated.substring(0, newStart + startMarker.length()) + userCode + generated.substring(newEnd);
+            return generated.substring(0, newStart + startMarker.length()) + userCode
+                    + generated.substring(newEnd) + trailing;
         }
-        return withImports.substring(0, keepStart + startMarker.length()) + userCode + withImports.substring(keepEnd);
+        return withImports.substring(0, keepStart + startMarker.length()) + userCode
+                + withImports.substring(keepEnd) + trailing;
+    }
+
+    /**
+     * Whatever one of our own companions declares after its final generated marker.
+     *
+     * @param existing the companion on disk
+     * @return the declarations, ready to append, or an empty string
+     */
+    private static String trailingAfterGeneratedClass(String existing) {
+        String marker = "// </gui-builder-generated>";
+        int at = -1;
+        int next = markerLine(existing, marker, 0);
+        while (next >= 0) {
+            at = next;
+            next = markerLine(existing, marker, next + marker.length());
+        }
+        if (at < 0) return "";
+        String trailing = existing.substring(at + marker.length()).trim();
+        return trailing.length() == 0 ? "" : "\n" + trailing + "\n";
     }
 
     /**

@@ -997,6 +997,36 @@ class GeneratedSourceTest {
                 invoke(builder, "defaultCompanionSource")));
     }
 
+    @Test
+    void aTrailingHelperSurvivesEverySaveNotJustTheMigration() throws Exception {
+        // Migration puts it back once; every later save takes the ordinary marker branch, which
+        // rebuilds from the template, so the helper lived exactly one save.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n"
+                + "class LoginHelper {\n    void help() { }\n}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+        assertTrue(migrated.contains("class LoginHelper"), migrated);
+
+        String saved = merge(builder, migrated, invoke(builder, "defaultCompanionSource"));
+        assertTrue(saved.contains("class LoginHelper"),
+                "the second save must keep it too:\n" + saved);
+        assertTrue(saved.contains("public void mine()"), saved);
+
+        String third = merge(builder, saved, invoke(builder, "defaultCompanionSource"));
+        assertTrue(third.contains("class LoginHelper"), "and every save after that:\n" + third);
+        assertEquals(1, countOccurrences(third, "class LoginHelper"),
+                "without accumulating copies of it:\n" + third);
+        compile("LoginForm", third, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
