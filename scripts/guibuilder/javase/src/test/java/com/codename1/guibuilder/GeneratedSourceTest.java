@@ -578,6 +578,36 @@ class GeneratedSourceTest {
         assertTrue(document.isModified(), "the document still holds unsaved changes");
     }
 
+    @Test
+    void anAliasShapedStringOrCommentIsLeftAloneWhileTheFieldIsRenamed() throws Exception {
+        // The alias rewrite used to be textual, so an annotation value or an analytics key that
+        // merely looks like a field reference was rewritten too -- the first save quietly changed
+        // behaviour that has nothing to do with the generated field.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    private String key = \"gui_submit\";\n"
+                + "    // gui_submit is described here\n"
+                + "    public void describe() {\n"
+                + "        gui_submit.setText(key);\n"
+                + "        String label = \"tap gui_submit now\";\n"
+                + "        setTitle(label);\n"
+                + "    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertTrue(migrated.contains("submit.setText(key)"),
+                "the real field reference must still be migrated:\n" + migrated);
+        assertTrue(migrated.contains("\"gui_submit\""), "a string literal is data, not a reference:\n" + migrated);
+        assertTrue(migrated.contains("tap gui_submit now"), "and so is text inside one:\n" + migrated);
+        assertTrue(migrated.contains("// gui_submit is described here"), "a comment is not a reference:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

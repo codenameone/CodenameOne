@@ -4366,6 +4366,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return picker;
     }
 
+    /** Applies an inspector edit to the selected element, as the inspector fields do. */
+    void updateForTest(String attribute, String value) { update(attribute, value); }
+
     private void update(String attribute, String value) {
         update(document.selected(), attribute, value);
     }
@@ -4393,6 +4396,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (element == document.root() && "title".equals(attribute) && formTitlePreview != null) {
             formTitlePreview.setText(value == null || value.length() == 0 ? "Untitled Form" : value);
             formTitlePreview.getParent().revalidate();
+            return;
+        }
+        // A Form or Dialog root is two layers on the canvas, and its UIID belongs to the outer one
+        // -- that is where the rebuild puts it, and setUIID() on the generated class styles the
+        // Form rather than its content pane. componentForElement() finds the pane, so a typed UIID
+        // styled the wrong layer until something rebuilt the canvas and moved it.
+        if (element == document.root() && "uiid".equals(attribute) && formSurfacePreview != null) {
+            if (value == null || value.length() == 0) {
+                scheduleDesignerRefresh();
+                return;
+            }
+            formSurfacePreview.setUIID(value);
+            refreshSinglePreviewTheme(formSurfacePreview);
+            formSurfacePreview.revalidate();
+            formSurfacePreview.repaint();
             return;
         }
         Component component = componentForElement(canvasHost, element);
@@ -6118,8 +6136,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return the same code referring to the current field names
      */
     private String renameLegacyFieldReferences(String carried) {
-        String out = carried;
-        Set<String> rewritten = new LinkedHashSet<>();
+        Map<String, String> byAlias = new LinkedHashMap<>();
         for (Element element : document.components()) {
             if (element == document.root()) continue; //NOPMD CompareObjectsWithEquals
             // The alias in the carried code is gui_ plus the component's own name, which is what
@@ -6130,38 +6147,32 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String alias = "gui_" + javaIdentifier(value(element, "name", value(element, "type", "component")));
             // Two controls sharing a name shared one alias in the old source as well, so there is
             // nothing to tell them apart; the first wins rather than the last.
-            if (!rewritten.add(alias)) continue;
-            out = replaceIdentifier(out, alias, javaName(element));
+            if (!byAlias.containsKey(alias)) byAlias.put(alias, javaName(element));
         }
-        return out;
-    }
-
-    /**
-     * Replaces whole-word occurrences of an identifier. Written by hand because the Codename One
-     * bytecode subset has no Pattern.quote, and a plain replace would rewrite gui_buttonLabel
-     * while renaming gui_button.
-     *
-     * @param text the text to rewrite
-     * @param identifier the identifier to find
-     * @param replacement what to put in its place
-     * @return the rewritten text
-     */
-    private static String replaceIdentifier(String text, String identifier, String replacement) {
-        StringBuilder out = new StringBuilder(text.length());
+        if (byAlias.isEmpty()) return carried;
+        // Identifier tokens only, and only outside literals and comments. A textual replacement
+        // also rewrote @Named("gui_submit") and analytics keys that merely look like an alias, so
+        // migrating a field reference silently changed behaviour that had nothing to do with the
+        // generated field. stripComments() blanks literals and comments while preserving every
+        // offset, which makes it exactly the mask this needs: a character it blanked is content.
+        String mask = stripComments(carried);
+        StringBuilder out = new StringBuilder(carried.length());
         int at = 0;
-        while (true) {
-            int found = text.indexOf(identifier, at);
-            if (found < 0) {
-                out.append(text.substring(at));
-                return out.toString();
+        while (at < carried.length()) {
+            char masked = mask.charAt(at);
+            if (!isIdentifierChar(masked) || at > 0 && isIdentifierChar(mask.charAt(at - 1))) {
+                out.append(carried.charAt(at));
+                at++;
+                continue;
             }
-            int after = found + identifier.length();
-            boolean boundedLeft = found == 0 || !isIdentifierChar(text.charAt(found - 1));
-            boolean boundedRight = after >= text.length() || !isIdentifierChar(text.charAt(after));
-            out.append(text.substring(at, found));
-            out.append(boundedLeft && boundedRight ? replacement : identifier);
-            at = after;
+            int end = at;
+            while (end < mask.length() && isIdentifierChar(mask.charAt(end))) end++;
+            String token = carried.substring(at, end);
+            String replacement = byAlias.get(token);
+            out.append(replacement == null ? token : replacement);
+            at = end;
         }
+        return out.toString();
     }
 
     /**

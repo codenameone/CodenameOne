@@ -193,6 +193,32 @@ class LiveCssTest {
     /** The stylesheet the most recent builderFor() call wrote. */
     private static Path cssFile;
 
+    @Test
+    void typingARootUiidRestylesTheFormLayerNotTheContentPane() throws Exception {
+        // componentForElement() finds the content pane for a Form root, but the root UIID belongs
+        // to the layer around it -- that is where a rebuild puts it, and where setUIID() lands at
+        // runtime. Applying it to the pane styled the wrong layer until something rebuilt.
+        CodenameOneGUIBuilder builder = builderFor("Form { background-color: #00ff00; }\n"
+                + "CustomForm { background-color: #ff00ff; }\n");
+        Container surface = builder.formSurfaceForTest();
+        assertEquals(0x00ff00, surface.getUnselectedStyle().getBgColor(), "fixture");
+        Component styled = find(builder.canvasHostForTest(), builder, "styled");
+        Container pane = styled.getParent();
+
+        onEdt(() -> {
+            builder.documentForTest().select(builder.documentForTest().root());
+            builder.updateForTest("uiid", "CustomForm");
+            return null;
+        });
+        settle();
+
+        assertEquals("CustomForm", builder.formSurfaceForTest().getUIID(),
+                "the root UIID belongs to the Form layer");
+        assertEquals(0xff00ff, builder.formSurfaceForTest().getUnselectedStyle().getBgColor(),
+                "and the canvas must restyle without waiting for a rebuild");
+        assertEquals("ContentPane", pane.getUIID(), "the content pane keeps its own UIID");
+    }
+
     private static int foreground(CodenameOneGUIBuilder builder, String name) {
         Component preview = find(builder.canvasHostForTest(), builder, name);
         assertNotNull(preview, name + " does not render");
