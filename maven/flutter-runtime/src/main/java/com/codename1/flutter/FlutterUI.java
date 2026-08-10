@@ -147,6 +147,35 @@ public final class FlutterUI {
             com.codename1.io.Log.p("Flutter runtime: could not install Material base theme: " + t);
         }
         installFlutterUiidDerives();
+        installFlutterScrollPhysics();
+    }
+
+    /**
+     * Matches Codename One's fling to Flutter's scroll physics.
+     *
+     * <p>The CURVE already agrees: CN1's exponential decay uses a 500ms time constant, and
+     * Flutter's iOS {@code FrictionSimulation} (drag 0.135) e-folds at 1/-ln(0.135) =
+     * 499ms. Only the distance differs. CN1 coasts to
+     * {@code release velocity * DecayMotionScaleFactorInt}, 950 by default, while Flutter
+     * travels {@code -v/ln(0.135) = 0.4994 * v} — so an identical flick carries 1.90x too
+     * far, which reads as the list being slippery and overshooting where you meant to
+     * stop.</p>
+     *
+     * <p>500 makes the two simulations agree to three decimal places rather than being a
+     * number tuned by eye.</p>
+     *
+     * <p>This is an app-level theme constant, so it applies to the whole app rather than
+     * only to Flutter subtrees. That is right for {@code runApp}, which owns the app; a
+     * host app embedding Flutter through {@code wrap} can set it back afterwards.</p>
+     */
+    private static void installFlutterScrollPhysics() {
+        try {
+            java.util.Hashtable<String, Object> physics = new java.util.Hashtable<String, Object>();
+            physics.put("DecayMotionScaleFactorInt", "500");
+            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(physics);
+        } catch (Throwable t) {
+            com.codename1.io.Log.p("Flutter runtime: could not install scroll physics: " + t);
+        }
     }
 
     /**
