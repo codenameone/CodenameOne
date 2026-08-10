@@ -624,6 +624,34 @@ public final class WearableConnection {
     /// #### Returns
     ///
     /// `true` when a request registered under that token is still outstanding.
+    /// Framework/port entry point: whether any application code is listening for messages yet.
+    ///
+    /// A port with a durable spool asks this before handing a one-shot message to the in-memory
+    /// queue instead. `Display` being initialized is not the same question: between initialization
+    /// and the app's `addMessageListener` call the queue holds payloads nothing has received, and a
+    /// process killed in that window loses a message the Data Layer does not retain either. A port
+    /// that can write the message down should keep doing so until someone is there to take it.
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one message listener is registered
+    public static boolean hasMessageListener() {
+        synchronized (pendingMessages) {
+            return !messageListeners.isEmpty();
+        }
+    }
+
+    /// The same question for replicated-data listeners, which receive removals.
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one data listener is registered
+    public static boolean hasDataListener() {
+        synchronized (pendingData) {
+            return !dataListeners.isEmpty();
+        }
+    }
+
     public static boolean hasPendingReply(int replyToken) {
         synchronized (pendingReplies) {
             return pendingReplies.containsKey(Integer.valueOf(replyToken));

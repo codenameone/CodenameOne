@@ -1389,7 +1389,7 @@ public class CN1WearableBridge implements WearableBridge {
 
     /// Hands a one-shot message to a live listener, or writes it down for the next process.
     static void spoolOrDeliverMessage(Context context, String path, byte[] payload) {
-        if (deliverableNow(context)) {
+        if (deliverableNow(context, true)) {
             WearableConnection.deliverMessage(path, payload, 0);
             return;
         }
@@ -1421,7 +1421,7 @@ public class CN1WearableBridge implements WearableBridge {
     /// with it has nothing to cancel.
     static void spoolOrDeliverRequest(Context context, String path, byte[] payload,
             int peerToken, String sourceNodeId) {
-        if (deliverableNow(context)) {
+        if (deliverableNow(context, true)) {
             // The peer's token is unique only on the peer, so trade it for a locally unique one
             // keyed to the node that asked; two watches can otherwise pick the same number.
             int localToken = rememberRequestOrigin(peerToken, sourceNodeId);
@@ -1440,7 +1440,7 @@ public class CN1WearableBridge implements WearableBridge {
 
     /// The same for a removal, whose item no longer exists to be replayed from.
     static void spoolOrDeliverRemoval(Context context, String path) {
-        if (deliverableNow(context)) {
+        if (deliverableNow(context, false)) {
             WearableConnection.deliverDataRemoved(path);
             return;
         }
@@ -1451,10 +1451,25 @@ public class CN1WearableBridge implements WearableBridge {
         drainSpool(context);
     }
 
-    /// Whether this process can run app code AND nothing older is still waiting to be replayed.
-    private static boolean deliverableNow(Context context) {
+    /// Whether a LISTENER can take this right now, and nothing older is waiting to be replayed.
+    ///
+    /// `Display.isInitialized()` was the whole test, and it answers a different question. Between
+    /// initialization and the app's addMessageListener call the in-memory queue holds payloads
+    /// nothing has received -- and a process killed in that window loses a one-shot message the
+    /// Data Layer does not retain and a removal whose item is already gone. The spool is the thing
+    /// that survives it, so the bar for skipping the spool is someone actually being there.
+    ///
+    /// @param wantsMessageListener true for a message or a request, false for a data removal
+    private static boolean deliverableNow(Context context, boolean wantsMessageListener) {
         try {
             if (!com.codename1.ui.Display.isInitialized()) {
+                return false;
+            }
+            if (wantsMessageListener) {
+                if (!WearableConnection.hasMessageListener()) {
+                    return false;
+                }
+            } else if (!WearableConnection.hasDataListener()) {
                 return false;
             }
         } catch (Throwable notInitialized) {
