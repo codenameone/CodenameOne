@@ -331,6 +331,19 @@ public class AndroidGradleBuilder extends Executor {
         return request.getArg("watchMain", "").trim();
     }
 
+    /// Whether the new wearable declaration governs, leaving the retired android.wear hints out.
+    ///
+    /// The one rule the manifest and the lifecycle selection share. They used to disagree: the
+    /// manifest honoured android.wear on its own, while the lifecycle read only the new settings --
+    /// so a migrated project asking for a COMPANION got a Wear-only APK rooted at the phone
+    /// lifecycle, which is neither thing it could have meant.
+    ///
+    /// A project that has not declared watchMain has not migrated, and its legacy hints keep
+    /// working exactly as they did.
+    static boolean watchMainRetiresLegacyWear(String watchMain, String watchStandalone) {
+        return watchMain != null && watchMain.trim().length() > 0;
+    }
+
     private String appLifecycleClass(BuildRequest request) {
         // Unit-test mode wins. generateUnitTestFiles has already replaced the main class with
         // CodenameOneUnitTestExecutor, and rooting the APK at the watch lifecycle instead started
@@ -1452,10 +1465,26 @@ public class AndroidGradleBuilder extends Executor {
         // phone project carrying a stray android.wear.standalone=true would otherwise be given the
         // API 23 floor and a REQUIRED android.hardware.type.watch feature, and Play would filter
         // that APK off every phone -- a working phone app made undeliverable, with no error.
-        boolean legacyWear = legacyWearMode(request.getArg("android.wear", "false"));
-        boolean legacyStandaloneStillOn = legacyWearStandalone(
+        //
+        // And the legacy flag yields entirely once watchMain is declared. A migrated project that
+        // adds watchMain and leaves watchStandalone false is asking for a COMPANION, but the old
+        // flag still forced the required watch feature and the standalone marker -- producing a
+        // Wear-only APK, while appLifecycleClass (which reads only the new settings) rooted it at
+        // the PHONE lifecycle. A watch-only artifact running the phone app is not either of the two
+        // things the project could have meant. One rule now governs both: the new declaration wins
+        // where it exists, and the legacy flag keeps working exactly as before where it does not.
+        boolean migrated = watchMainRetiresLegacyWear(watchMain,
+                request.getArg("watchStandalone", "false"));
+        boolean legacyWear = !migrated
+                && legacyWearMode(request.getArg("android.wear", "false"));
+        boolean legacyStandaloneStillOn = !migrated && legacyWearStandalone(
                 request.getArg("android.wear", "false"),
                 request.getArg("android.wear.standalone", ""));
+        if (migrated && legacyWearMode(request.getArg("android.wear", "false"))) {
+            log("[wearable] ignoring android.wear: codename1.watchMain is declared, so"
+                    + " codename1.watchStandalone alone decides whether this is a standalone watch"
+                    + " app or a companion.");
+        }
         if (legacyWear) {
             log("[wearable] android.wear is superseded by codename1.watchMain plus "
                     + "codename1.watchStandalone; still honoured, but the new settings also build "

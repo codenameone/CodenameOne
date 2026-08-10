@@ -39,6 +39,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AndroidLegacyWearHintTest {
 
     /** The regression: a stray standalone sub-hint must not turn a phone build into a Wear build. */
+    /**
+     * The new declaration governs once it exists.
+     *
+     * <p>A migrated project that keeps {@code android.wear=true}, adds a {@code watchMain} and
+     * leaves {@code watchStandalone} false is asking for a companion. The legacy flag still forced
+     * the required watch feature and the standalone marker, producing a Wear-only APK -- while the
+     * lifecycle selection, which reads only the new settings, rooted it at the PHONE lifecycle. A
+     * watch-only artifact running the phone app is neither of the two things the project could have
+     * meant.</p>
+     */
+    @Test
+    void aDeclaredWatchMainRetiresTheLegacyWearFlag() {
+        // The helpers themselves are unchanged -- they still describe what the legacy hints meant.
+        assertTrue(AndroidGradleBuilder.legacyWearMode("true"));
+        assertTrue(AndroidGradleBuilder.legacyWearStandalone("true", ""));
+        // What changed is that the builder consults them only when no watchMain is declared, which
+        // is the single rule the manifest and the lifecycle selection now share.
+        assertFalse(AndroidGradleBuilder.watchMainRetiresLegacyWear("", "false"),
+                "no watchMain: the legacy flag still governs, as it always did");
+        assertTrue(AndroidGradleBuilder.watchMainRetiresLegacyWear("com.acme.WatchApp", "false"),
+                "a companion watchMain must not be overridden into a standalone Wear APK");
+        assertTrue(AndroidGradleBuilder.watchMainRetiresLegacyWear("com.acme.WatchApp", "true"),
+                "and the same rule applies when the new settings ask for standalone");
+    }
+
     @Test
     void standaloneAloneDoesNotEnableWearMode() {
         assertFalse(AndroidGradleBuilder.legacyWearMode("false"));

@@ -534,6 +534,15 @@ public final class WearableConnection {
                 WearableMessage reply = null;
                 WearableMessageListener[] copy =
                         messageListenerSnapshot();
+                if (copy.length == 0) {
+                    // The snapshot emptied between the dispatch and this runnable -- an app
+                    // shutting down, or one that deregisters on pause. Parked again rather than
+                    // run through: nobody received the message, so the port must NOT be told it
+                    // was delivered. It would release its durable record on that word and the
+                    // one-shot would be gone, which is the failure the record exists to prevent.
+                    deliver(this, messageListeners, pendingMessages);
+                    return;
+                }
                 // Isolated per listener, as every other dispatch here is. A live message cannot be
                 // replayed, so a listener skipped because an EARLIER one threw simply never sees
                 // it -- and for a request the sender waits out its whole timeout even when a later
@@ -551,12 +560,11 @@ public final class WearableConnection {
                         }
                     }
                 }
-                // Nothing answers for an app that has no listener left. The snapshot can empty
-                // between the dispatch and this runnable -- an app shutting down, or one that
-                // deregisters on pause -- and replying anyway handed the sender an empty SUCCESS,
-                // so replyReceived fired for a request no application code ever saw. Staying
-                // silent lets the sender's own timeout report the failure it actually had.
-                if (replyToken != 0 && copy.length > 0) {
+                // An app with no listener left answers nothing, which the re-park above now
+                // handles: replying anyway handed the sender an empty SUCCESS, so replyReceived
+                // fired for a request no application code ever saw, and the sender's own timeout
+                // is the honest report of what happened.
+                if (replyToken != 0) {
                     WearableBridge b = bridge();
                     if (b != null) {
                         b.sendReply(replyToken,
