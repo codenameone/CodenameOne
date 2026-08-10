@@ -35,6 +35,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.xml.Element;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -1580,6 +1581,46 @@ class DesignerInteractionTest {
         // is detached and still carries the old value.
         assertEquals("before", document.components().get(1).getAttribute("text"),
                 "one undo must reach the state before the edit, not an identical snapshot");
+    }
+
+    @Test
+    void theInspectorOffersTheDefaultsTheRuntimeActuallyHas() throws Exception {
+        // A TextField has 20 columns and a maximum of 124, a TextArea derives its columns from its
+        // text, and a Slider starts at 0 -- none of which were the numbers the inspector showed,
+        // so it described settings the saved form would not have.
+        GuiDocument document = document("<component type=\"Form\" name=\"F\" layout=\"BoxLayout\">"
+                + "<component type=\"TextField\" name=\"field\" hint=\"Hint\"/>"
+                + "<component type=\"TextArea\" name=\"area\" text=\"some text here\"/>"
+                + "<component type=\"Slider\" name=\"slider\"/></component>");
+        CodenameOneGUIBuilder builder = builder(document);
+        Container canvas = new Container(new LayeredLayout());
+        canvas.add(render(document, 600, 400));
+        set(builder, "canvasHost", canvas);
+
+        Method runtimeDefault = CodenameOneGUIBuilder.class.getDeclaredMethod("runtimeDefault",
+                Element.class, String.class, String.class);
+        runtimeDefault.setAccessible(true);
+
+        Element field = document.components().get(1);
+        Element area = document.components().get(2);
+        Element slider = document.components().get(3);
+        Component fieldPreview = componentForElement(canvas, field);
+        Component areaPreview = componentForElement(canvas, area);
+
+        assertEquals(String.valueOf(((com.codename1.ui.TextArea) fieldPreview).getColumns()),
+                runtimeDefault.invoke(builder, field, "columns", "20"),
+                "the inspector and the component must agree about columns");
+        assertEquals(String.valueOf(((com.codename1.ui.TextArea) areaPreview).getColumns()),
+                runtimeDefault.invoke(builder, area, "columns", "20"),
+                "a TextArea derives its columns, so a literal cannot be right for both");
+        assertEquals("124", runtimeDefault.invoke(builder, field, "maxSize", "124"));
+        assertEquals("0", runtimeDefault.invoke(builder, slider, "progress", "0"));
+
+        // An explicit value is the user's and is offered back unchanged.
+        document.select(field);
+        document.setAttribute("columns", "7");
+        assertEquals("20", runtimeDefault.invoke(builder, field, "columns", "20"),
+                "the field shows the stored value, not the default, once one is set");
     }
 
     private static String value(Element element, String attribute) {

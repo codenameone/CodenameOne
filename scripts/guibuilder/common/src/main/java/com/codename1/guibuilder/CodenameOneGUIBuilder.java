@@ -899,10 +899,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         refreshEditor();
     }
 
+    /**
+     * The title the canvas shows, which is the one the generated form will have.
+     *
+     * <p>The canvas said "Untitled Form" while {@code super(className, layout)} puts the class name
+     * on the running screen, so the design surface and the application disagreed about the one
+     * piece of text the user is looking straight at.
+     *
+     * @return the title to display
+     */
+    private String previewFormTitle() {
+        String title = document.root().getAttribute("title");
+        if (title != null && title.length() > 0) return title;
+        String className = expectedCompanionClassName();
+        return className.length() == 0 ? "Untitled Form" : className;
+    }
+
     private Component buildFormToolbarPreview() {
         Container bar = new Container(new BorderLayout());
         bar.setUIID("BuilderFormToolbar");
-        formTitlePreview = new Label(document.root().getAttribute("title") == null ? "Untitled Form" : document.root().getAttribute("title"), "Title");
+        formTitlePreview = new Label(previewFormTitle(), "Title");
         formTitlePreview.getSemantics().setIdentifier("guibuilder.preview.formTitle")
                 .setLabel("Form title").setHint("Double click to edit the form title");
         formTitlePreview.addLongPressListener(e -> { document.select(document.root()); editSelectedContent(); });
@@ -3476,18 +3492,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // Validated, like the table sizes: an unrestricted field stored "garbage", the preview
             // fell back to its previous value and appendIntSetter() emitted nothing, so the canvas
             // showed 20 while the saved form used the runtime default and Save reported success.
-            fields.add(numericPropertyField("Columns", "columns", "12", 1, 999));
-            fields.add(numericPropertyField("Maximum length", "maxSize", "0", 0, 99999));
+            // The constructor's own values, read off the component on the canvas. A TextField has
+            // 20 columns and a maximum of 124, a TextArea derives its columns from its text, and
+            // none of them is what was shown here -- so the inspector described settings the saved
+            // form would not have.
+            fields.add(numericPropertyField("Columns", "columns", runtimeDefault(element, "columns", "20"), 1, 999));
+            fields.add(numericPropertyField("Maximum length", "maxSize",
+                    runtimeDefault(element, "maxSize", "124"), 0, 99999));
             fields.add(booleanProperty("Editable", "editable", true));
             fields.add(booleanProperty("Grow by content", "growByContent", true));
             fields.add(pickerProperty("Input constraint", "constraint",
                     new String[]{"ANY", "EMAILADDR", "PASSWORD", "NUMERIC", "URL"}, "ANY"));
         }
-        if ("TextArea".equals(type)) fields.add(numericPropertyField("Rows", "rows", "3", 1, 999));
+        if ("TextArea".equals(type)) {
+            fields.add(numericPropertyField("Rows", "rows", runtimeDefault(element, "rows", "1"), 1, 999));
+        }
         if ("Slider".equals(type)) {
             fields.add(numericPropertyField("Minimum", "minValue", "0", -99999, 99999));
             fields.add(numericPropertyField("Maximum", "maxValue", "100", -99999, 99999));
-            fields.add(numericPropertyField("Progress", "progress", "50", -99999, 99999));
+            fields.add(numericPropertyField("Progress", "progress",
+                    runtimeDefault(element, "progress", "0"), -99999, 99999));
             fields.add(booleanProperty("Editable", "editable", false));
             fields.add(booleanProperty("Infinite progress", "infinite", false));
         }
@@ -4338,6 +4362,33 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * What a component actually has for an attribute the document does not set.
+     *
+     * <p>Read off the preview, which is the same object the generated source builds, so a value
+     * the constructor derives -- a TextArea's columns come from its text -- is right rather than
+     * merely plausible. The literal is only for the moment before the canvas exists.
+     *
+     * @param element the selected element
+     * @param attribute the attribute being offered
+     * @param fallback the value to show when there is no preview yet
+     * @return the effective value as text
+     */
+    private String runtimeDefault(Element element, String attribute, String fallback) {
+        if (element.getAttribute(attribute) != null) return fallback;
+        Component preview = canvasHost == null ? null : componentForElement(canvasHost, element);
+        if (preview instanceof TextArea) {
+            TextArea text = (TextArea) preview;
+            if ("columns".equals(attribute)) return String.valueOf(text.getColumns());
+            if ("rows".equals(attribute)) return String.valueOf(text.getRows());
+            if ("maxSize".equals(attribute)) return String.valueOf(text.getMaxSize());
+        }
+        if (preview instanceof com.codename1.ui.Slider && "progress".equals(attribute)) {
+            return String.valueOf(((com.codename1.ui.Slider) preview).getProgress());
+        }
+        return fallback;
+    }
+
+    /**
      * Applies a chosen BorderLayout region, swapping with whoever already holds it.
      *
      * @param element the selected child
@@ -4529,7 +4580,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
 
     private void updatePreviewAttribute(Element element, String attribute, String value) {
         if (element == document.root() && "title".equals(attribute) && formTitlePreview != null) {
-            formTitlePreview.setText(value == null || value.length() == 0 ? "Untitled Form" : value);
+            formTitlePreview.setText(value == null || value.length() == 0 ? previewFormTitle() : value);
             formTitlePreview.getParent().revalidate();
             return;
         }
