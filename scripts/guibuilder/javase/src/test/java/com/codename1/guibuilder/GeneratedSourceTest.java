@@ -1674,6 +1674,48 @@ class GeneratedSourceTest {
                 "a Form in this package is what Form means here");
     }
 
+    @Test
+    void theCodePaneSaveReconcilesTheModelToo() throws Exception {
+        // Checking only a pending rewrite or a missing file meant saving from the Code pane left a
+        // model that does not name the new control, so it stayed unbound until some later toolbar
+        // save happened to notice.
+        Path project = Files.createTempDirectory("guibuilderPaneModel");
+        Path java = Files.createDirectories(project.resolve("src/main/java/com/example"));
+        Path gui = Files.createDirectories(project.resolve("src/main/guibuilder/com/example"));
+        Path guiFile = gui.resolve("LoginForm.gui");
+        String xml = "<component type=\"Form\" name=\"LoginForm\" title=\"Login\" layout=\"BoxLayout\""
+                + " bindingStrategy=\"properties\">"
+                + "<component type=\"TextField\" name=\"email\" hint=\"Email\"/>"
+                + "<component type=\"TextField\" name=\"added\" hint=\"Added\"/></component>";
+        Files.write(guiFile, xml.getBytes(StandardCharsets.UTF_8));
+
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder() {
+            @Override boolean confirmModelRegeneration() { return true; }
+        };
+        set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
+                + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
+                + "\ncssFile=" + project.resolve("theme.css") + "\n"));
+        set(builder, "document", GuiDocument.parse(ProjectIO.fsUrl(guiFile.toString()), xml));
+
+        Path model = java.resolve("LoginFormModel.java");
+        Files.write(model, ("package com.example;\nimport com.codename1.properties.*;\n"
+                + "public class LoginFormModel implements PropertyBusinessObject {\n"
+                + "    public final Property<String, LoginFormModel> email = new Property<>(\"email\", \"\");\n"
+                + "    private final PropertyIndex index = new PropertyIndex(this, \"LoginFormModel\", email);\n"
+                + "    @Override public PropertyIndex getPropertyIndex() { return index; }\n}\n")
+                .getBytes(StandardCharsets.UTF_8));
+
+        Method save = CodenameOneGUIBuilder.class.getDeclaredMethod("saveSourceAndModel",
+                String.class, String.class);
+        save.setAccessible(true);
+        save.invoke(builder, java.resolve("LoginForm.java").toString(),
+                invoke(builder, "defaultCompanionSource"));
+
+        String written = new String(Files.readAllBytes(model), StandardCharsets.UTF_8);
+        assertTrue(written.contains("added"),
+                "saving from the Code pane must reconcile the model as the toolbar does:\n" + written);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

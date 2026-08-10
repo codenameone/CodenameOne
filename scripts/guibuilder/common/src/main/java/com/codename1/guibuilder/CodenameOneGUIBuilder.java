@@ -5526,6 +5526,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // companion against the previous strategy's model, and the project stayed uncompilable
         // until something else saved the form.
         boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
+        // The same reconciliation the toolbar save does. Checking only a pending rewrite or a
+        // missing file meant saving from the Code pane wrote the .gui and the companion while
+        // leaving a model that does not name the new control, so it stayed unbound until some
+        // later toolbar save happened to notice.
+        if (!rewriteModel && modelHasDivergedFromTheForm(modelPath)) {
+            rewriteModel = confirmModelRegeneration();
+        }
         boolean needsModel = !rewriteModel
                 && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
                 && !ProjectIO.exists(modelPath);
