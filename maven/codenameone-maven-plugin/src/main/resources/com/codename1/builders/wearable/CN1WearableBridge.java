@@ -1490,6 +1490,19 @@ public class CN1WearableBridge implements WearableBridge {
     /// payload replays on every launch for ever.
     private static final int SPOOL_MAX_ATTEMPTS = 3;
 
+    /// Keys that have been claimed and whose delivery has not been confirmed yet.
+    ///
+    /// A drain runs from deliverableNow, which every incoming message and removal calls, so a
+    /// second event can re-enter it while the first record is still queued on the EDT. With nothing
+    /// marking the record as in flight it was claimed again: the same callback queued twice, and
+    /// three such events inside one process burned the whole attempt budget and deleted the durable
+    /// copy before any listener had run.
+    ///
+    /// Guarded by SPOOL_LOCK. A record parked for want of a listener stays here for the life of the
+    /// process, which is exactly right -- the parked runnable still holds it, and re-claiming it
+    /// would duplicate the delivery rather than rescue it.
+    private static final java.util.Set<String> SPOOL_IN_FLIGHT = new java.util.HashSet<String>();
+
     /// The spooled keys in delivery order, without touching their attempt counts.
     private static java.util.List<String> spooledKeys(Context context) {
         java.util.List<String> keys = new ArrayList<String>();
@@ -1524,11 +1537,17 @@ public class CN1WearableBridge implements WearableBridge {
             return null;
         }
         synchronized (SPOOL_LOCK) {
+            // Already being delivered, by an earlier drain whose callback has not fired. Claiming
+            // it again would queue the same payload a second time.
+            if (!SPOOL_IN_FLIGHT.add(key)) {
+                return null;
+            }
             try {
                 android.content.SharedPreferences prefs =
                         c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
                 String record = prefs.getString(key, null);
                 if (record == null) {
+                    SPOOL_IN_FLIGHT.remove(key);
                     return null;
                 }
                 int attempts = attemptsOf(record) + 1;
@@ -1538,16 +1557,19 @@ public class CN1WearableBridge implements WearableBridge {
                             + " after " + SPOOL_MAX_ATTEMPTS + " attempts: " + bodyOf(record));
                     edit.remove(key);
                     edit.commit();
+                    SPOOL_IN_FLIGHT.remove(key);
                     return null;
                 }
                 edit.putString(key, attempts + "|" + bodyOf(record));
                 if (!edit.commit()) {
                     // The attempt did not land, so replaying now would be unbounded on a record
                     // that keeps killing the process. It waits for the next launch.
+                    SPOOL_IN_FLIGHT.remove(key);
                     return null;
                 }
                 return bodyOf(record);
             } catch (Throwable unavailable) {
+                SPOOL_IN_FLIGHT.remove(key);
                 return null;
             }
         }
@@ -1561,11 +1583,15 @@ public class CN1WearableBridge implements WearableBridge {
         }
         synchronized (SPOOL_LOCK) {
             try {
-                c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE)
-                        .edit().remove(key).commit();
+                if (c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE)
+                        .edit().remove(key).commit()) {
+                    SPOOL_IN_FLIGHT.remove(key);
+                }
+                // Still on disk if that failed, and deliberately still in flight: the listeners
+                // have already had it, so re-claiming it in THIS process would only duplicate the
+                // delivery. The next launch retries it, and the attempt count bounds that.
             } catch (Throwable unavailable) {
-                // It keeps its attempt count and is retried, then abandoned. A duplicate is
-                // recoverable; this is the direction to fail in.
+                // Same reasoning. It keeps its attempt count and is retried on a later launch.
             }
         }
     }
