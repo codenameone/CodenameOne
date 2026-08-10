@@ -1397,7 +1397,11 @@ public class CN1WearableBridge implements WearableBridge {
             // The spool is the durable half; if it could not be written, the in-memory queue is
             // still better than dropping the message outright.
             WearableConnection.deliverMessage(path, payload, 0);
+            return;
         }
+        // Whoever writes tries to drain. If an owner already holds the walk this returns at once,
+        // and the dirty flag raised above is what makes that owner come back for this record.
+        drainSpool(context);
     }
 
     /// Hands a reply-bearing request to a live listener, or writes the PAYLOAD down for later.
@@ -1429,7 +1433,9 @@ public class CN1WearableBridge implements WearableBridge {
         if (!spool(context, SPOOL_MESSAGE, path, payload)) {
             int localToken = rememberRequestOrigin(peerToken, sourceNodeId);
             WearableConnection.deliverMessage(path, payload, localToken);
+            return;
         }
+        drainSpool(context);
     }
 
     /// The same for a removal, whose item no longer exists to be replayed from.
@@ -1440,7 +1446,9 @@ public class CN1WearableBridge implements WearableBridge {
         }
         if (!spool(context, SPOOL_REMOVAL, path, null)) {
             WearableConnection.deliverDataRemoved(path);
+            return;
         }
+        drainSpool(context);
     }
 
     /// Whether this process can run app code AND nothing older is still waiting to be replayed.
@@ -1496,6 +1504,9 @@ public class CN1WearableBridge implements WearableBridge {
                         + (payload == null ? "" : android.util.Base64.encodeToString(
                                 payload, android.util.Base64.NO_WRAP)));
                 trimSpool(prefs, edit);
+                // Under the lock, and before the commit: an owner finishing its last pass has to
+                // see this rather than stop with the record unread.
+                spoolDirty = true;
                 // commit(), and its result: the caller falls back to the in-memory queue when the
                 // write did not land, so an ignored false would silently lose exactly what this
                 // exists for.
@@ -1518,6 +1529,15 @@ public class CN1WearableBridge implements WearableBridge {
     /// the store is empty, so anything written meanwhile is picked up before it finishes.
     private static boolean spoolDraining;
 
+    /// Set by every writer, cleared by the owner only when it is about to stop.
+    ///
+    /// Ownership alone leaves a gap at the very end: a worker that sees a drain in progress spools
+    /// its event and does not start one, and if the owner clears the flag before that write lands,
+    /// nobody is left looking. The record then waits for unrelated traffic or a restart. Raising
+    /// this under the same lock the owner checks closes it -- the owner either sees the flag and
+    /// loops, or has not finished yet and the writer's record is in a pass still to come.
+    private static boolean spoolDirty;
+
     /// Replays everything written down, oldest first, forgetting each only once it is delivered.
     static void drainSpool(Context context) {
         synchronized (SPOOL_LOCK) {
@@ -1527,15 +1547,25 @@ public class CN1WearableBridge implements WearableBridge {
             spoolDraining = true;
         }
         try {
-            while (drainSpoolPass(context)) {
-                // Again, because a worker that wrote a record while this pass was running returned
-                // without draining it -- this owner is the one that has to pick it up.
-                continue;
+            while (true) {
+                drainSpoolPass(context);
+                synchronized (SPOOL_LOCK) {
+                    if (!spoolDirty) {
+                        // Nothing arrived while that pass ran, and no writer can slip in behind
+                        // this: a writer raises the flag under this same lock, so it either did so
+                        // before this check -- and the loop continues -- or it is still waiting to
+                        // take the lock, and will find spoolDraining false and drain for itself.
+                        spoolDraining = false;
+                        return;
+                    }
+                    spoolDirty = false;
+                }
             }
-        } finally {
+        } catch (RuntimeException failed) {
             synchronized (SPOOL_LOCK) {
                 spoolDraining = false;
             }
+            throw failed;
         }
     }
 

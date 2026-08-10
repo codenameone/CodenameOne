@@ -845,6 +845,35 @@ class WatchNativeBuilderTest {
                 "it keeps the project's own version: " + plist);
     }
 
+    /**
+     * Every phase of a drag reaches the pointer pipeline, not just the completed tap.
+     *
+     * <p>A SpatialTapGesture reports one point when the finger lifts, which the host turned into a
+     * press immediately followed by a release -- so nothing reached {@code pointerDraggedToX} and
+     * every drag-driven control was inert: a Slider could not be moved, a scrollable container
+     * could not be dragged, a swipe never fired.</p>
+     */
+    @Test
+    void dragPhasesReachTheWatchPointerPipeline(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        File dir = tmp.toFile();
+        parse(req).writeWatchEntry(req, dir);
+        String swift = read(new File(dir, "CN1WatchApp.swift"));
+
+        // Zero minimum distance, so the same gesture still covers a plain tap.
+        assertTrue(swift.contains("DragGesture(minimumDistance: 0)"), swift);
+        assertTrue(swift.contains("pointerPressed(atX:"), swift);
+        assertTrue(swift.contains("pointerDragged(toX:"),
+                "the middle of a drag has to arrive, or a Slider cannot move: " + swift);
+        assertTrue(swift.contains("pointerReleased(atX:"), swift);
+        // A press exactly once per gesture: the flag is what separates the first onChanged from
+        // the rest, and it also covers a gesture that ends without any onChanged at all.
+        assertTrue(swift.contains("if dragging {") && swift.contains("if !dragging {"), swift);
+        assertFalse(swift.contains("SpatialTapGesture"),
+                "the tap-only gesture is what could not express a drag: " + swift);
+    }
+
     /// The bootstrap has to call the stub that actually exists in the watch binary.
     @Test
     void theBootstrapEntersTheWatchStub(@TempDir Path tmp) throws Exception {

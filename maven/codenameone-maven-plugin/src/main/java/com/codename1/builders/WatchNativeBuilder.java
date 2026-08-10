@@ -518,6 +518,7 @@ class WatchNativeBuilder {
           .append("struct CN1WatchRootView: View {\n")
           .append("    @StateObject private var model = CN1WatchFrameModel()\n")
           .append("    @State private var crown: Double = 0\n")
+          .append("    @State private var dragging = false\n")
           .append("    var body: some View {\n")
           .append("        GeometryReader { geo in\n")
           .append("            ZStack {\n")
@@ -532,9 +533,40 @@ class WatchNativeBuilder {
           .append("            .onChange(of: crown) { oldValue, newValue in\n")
           .append("                CN1WatchHost.shared().crownRotated(by: newValue - oldValue)\n")
           .append("            }\n")
-          .append("            .gesture(SpatialTapGesture().onEnded { e in\n")
-          .append("                CN1WatchHost.shared().tapAt(x: Int32(e.location.x), y: Int32(e.location.y))\n")
-          .append("            })\n")
+          // A DRAG gesture, with a zero minimum distance, so it also covers a plain tap.
+          //
+          // SpatialTapGesture reports only a completed tap, at its final point, which the host
+          // turned into a press immediately followed by a release. Nothing in between ever reached
+          // pointerDraggedToX, so a Slider could not be moved, a scrollable container could not be
+          // dragged, and a swipe gesture never fired -- every drag-driven control on the watch was
+          // inert while looking like it had been touched.
+          //
+          // onChanged fires continuously from the moment the finger lands, so the FIRST one is the
+          // press and the rest are drags; the flag is what tells them apart, and onEnded clears it
+          // after the release. A tap produces exactly one onChanged and one onEnded, which is the
+          // press/release pair it produced before.
+          .append("            .gesture(DragGesture(minimumDistance: 0)\n")
+          .append("                .onChanged { e in\n")
+          .append("                    let x = Int32(e.location.x)\n")
+          .append("                    let y = Int32(e.location.y)\n")
+          .append("                    if dragging {\n")
+          .append("                        CN1WatchHost.shared().pointerDragged(toX: x, y: y)\n")
+          .append("                    } else {\n")
+          .append("                        dragging = true\n")
+          .append("                        CN1WatchHost.shared().pointerPressed(atX: x, y: y)\n")
+          .append("                    }\n")
+          .append("                }\n")
+          .append("                .onEnded { e in\n")
+          .append("                    let x = Int32(e.location.x)\n")
+          .append("                    let y = Int32(e.location.y)\n")
+          // Press first if onChanged never ran: a gesture can end without one, and a release with
+          // no press leaves the CN1 event stream unbalanced.
+          .append("                    if !dragging {\n")
+          .append("                        CN1WatchHost.shared().pointerPressed(atX: x, y: y)\n")
+          .append("                    }\n")
+          .append("                    dragging = false\n")
+          .append("                    CN1WatchHost.shared().pointerReleased(atX: x, y: y)\n")
+          .append("                })\n")
           .append("            .ignoresSafeArea()\n")
           .append("            .onAppear {\n")
           .append("                let d = WKInterfaceDevice.current()\n")
@@ -1945,6 +1977,54 @@ class WatchNativeBuilder {
         // conceptually its own list even though the pbxproj format would tolerate one object in
         // two.
         //
+        // Imports the Swift compiler will not see do not make a package a watch dependency.
+        //
+        // A staged source guarding an iOS-only package with `#if os(iOS) import PhoneSDK #endif`
+        // still contains the word `import PhoneSDK`, and a raw text match read that as a watch
+        // dependency -- attaching a package that intentionally supports only iOS and breaking
+        // watchOS resolution over code the compiler excludes.
+        //
+        // Only a condition that is DEMONSTRABLY not watchOS is dropped: an os() test naming other
+        // platforms, or one negating watchOS. Anything else -- a custom flag, a compiler-version
+        // test, an expression this cannot evaluate -- is kept, because dropping an import the watch
+        // does need is the worse failure of the two and the one that produces no explanation.
+        s.append("def cn1_watch_strip_non_watch(src)\n")
+                .append("  out = []\n")
+                .append("  suppressed_at = nil\n")
+                .append("  depth = 0\n")
+                .append("  src.each_line do |line|\n")
+                .append("    t = line.strip\n")
+                .append("    if t.start_with?('#if')\n")
+                .append("      depth += 1\n")
+                .append("      if suppressed_at.nil? && cn1_watch_excludes_watch(t)\n")
+                .append("        suppressed_at = depth\n")
+                .append("      end\n")
+                .append("      next\n")
+                .append("    elsif t.start_with?('#elseif') || t.start_with?('#else')\n")
+                // The other arm of a branch we suppressed is the arm that DOES apply to watchOS,
+                // unless it too names a platform that is not one.
+                .append("      if suppressed_at == depth\n")
+                .append("        suppressed_at = cn1_watch_excludes_watch(t) ? depth : nil\n")
+                .append("      end\n")
+                .append("      next\n")
+                .append("    elsif t.start_with?('#endif')\n")
+                .append("      suppressed_at = nil if suppressed_at == depth\n")
+                .append("      depth -= 1 if depth > 0\n")
+                .append("      next\n")
+                .append("    end\n")
+                .append("    out << line if suppressed_at.nil?\n")
+                .append("  end\n")
+                .append("  out.join\n")
+                .append("end\n")
+                .append("def cn1_watch_excludes_watch(condition)\n")
+                .append("  return false unless condition.include?('os(')\n")
+                // Positively naming watchOS keeps the block; negating it drops the block.
+                .append("  return true if condition =~ /!\\s*os\\(\\s*watchOS\\s*\\)/\n")
+                .append("  return false if condition.include?('os(watchOS)')\n")
+                .append("  condition =~ /os\\(\\s*(iOS|macOS|tvOS|visionOS|Linux|Windows|Android)"
+                        + "\\s*\\)/ ? true : false\n")
+                .append("end\n");
+
         // Mirrored only when the WATCH sources actually import the product.
         //
         // No SDK check is possible here, unlike the system frameworks above: a package declares its
@@ -1980,13 +2060,13 @@ class WatchNativeBuilder {
                 .append("  Dir.glob(File.join(watch_import_src, '**', '*.{h,m,mm,c,cpp,cc,swift}'))"
                         + ".each do |f|\n")
                 .append("    begin\n")
-                .append("      watch_import_text << File.read(f)\n")
+                .append("      watch_import_text << cn1_watch_strip_non_watch(File.read(f))\n")
                 .append("    rescue StandardError\n")
                 .append("      next\n")
                 .append("    end\n")
                 .append("  end\n")
                 .append("end\n")
-                // A product name is not always its module name.
+        // A product name is not always its module name.
                 //
                 // A package may export product FooKit containing target Foo, and staged code then
                 // says `import Foo` -- which matches no product, so the strict gate concluded FooKit
