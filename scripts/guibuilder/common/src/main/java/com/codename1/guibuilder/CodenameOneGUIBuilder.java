@@ -606,6 +606,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         normalizeSelection();
         cancelDesignerDrag();
         activeCodeEditor = null;
+        activeEditorSave = null;
         finishInlineEditor();
         canvasHost.removeAll();
         boolean desktop = "desktop".equals(canvasMode);
@@ -784,6 +785,54 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         lastObservedCss = null;
     }
 
+    /**
+     * Backspace inside whatever Codename One text surface has the keyboard.
+     *
+     * <p>Lives here rather than in the desktop stub so it can be tested: the stub keeps only the
+     * AWT branch, which has to stay on the Swing thread.
+     *
+     * @return false when nothing editable is focused, so the caller may treat the key as a command
+     */
+    static boolean backspaceFocusedText() {
+        Form form = Display.getInstance().getCurrent();
+        Component focused = form == null ? null : form.getFocused();
+        if (focused instanceof com.codename1.ui.editor.EditorView) {
+            // deleteBackward, not deleteSurroundingText: the latter is the IME oriented API and
+            // ignores the selection, and would split a surrogate pair after an emoji.
+            ((com.codename1.ui.editor.EditorView) focused).deleteBackward();
+            return true;
+        }
+        if (focused instanceof TextArea) {
+            TextArea area = (TextArea) focused;
+            String text = area.getText();
+            if (text == null || text.length() == 0) return true;
+            int caret = area.getCursorPosition();
+            // A caret the component does not track lands at the end, which is where typing was
+            // going anyway.
+            if (caret < 0 || caret > text.length()) caret = text.length();
+            if (caret == 0) return true;
+            area.setText(text.substring(0, caret - 1) + text.substring(caret));
+            return true;
+        }
+        return false;
+    }
+
+    /** The open pane's own Save, or null when no editor is open. */
+    private Runnable activeEditorSave;
+
+    /**
+     * Runs the focused editor pane's own Save.
+     *
+     * @return false when no pane has the keyboard, so the caller saves the form instead
+     */
+    static boolean saveFocusedActiveEditor() {
+        if (active == null || active.activeEditorSave == null) return false;
+        Form form = Display.getInstance().getCurrent();
+        if (form == null || !(form.getFocused() instanceof com.codename1.ui.editor.EditorView)) return false;
+        active.activeEditorSave.run();
+        return true;
+    }
+
     /** Rebuilds the open editor pane from what is now on disk. */
     private void reopenActiveEditor() {
         Runnable reopen = activeEditorReopen;
@@ -811,6 +860,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             discardLivePreviewStyling();
         }
         activeEditorReopen = null;
+        activeEditorSave = null;
         editorBuffer = null;
         editorBufferOnDisk = null;
         editorBufferKind = null;
@@ -5009,6 +5059,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private Container editorPane(String title, CodeEditor editor, Runnable saveAction, Runnable closeAction) {
+        // Remembered so the Save shortcut can reach it. Cmd+S ran the form save while a pane was
+        // focused, which does not write the pane at all -- for CSS it does not touch the
+        // stylesheet -- so the standard keystroke reported a successful save and left the edit in
+        // the buffer, where the next Close or form switch offered to discard it.
+        activeEditorSave = saveAction;
         Container pane = new Container(new BorderLayout());
         pane.setUIID("BuilderEditorPane");
         Container actions = new Container(new BorderLayout());
@@ -6272,6 +6327,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             return null;
         }
         String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
+        // removeConstructors() refuses here rather than deleting a customised constructor, and the
+        // refusal has to stop the migration the same way an unknown base class does.
+        if (legacyMigrationRefusal != null) return null;
         // Legacy generated companions named their fields gui_<name>; the new generator uses
         // <name>. Developer methods carried out of the old file legally referenced the old names,
         // so rewriting them here is what keeps the migrated companion compiling.
@@ -6591,8 +6649,18 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // took LoginForm(Resources resources, String title) with it and put back a delegate
             // with a different signature, so the developer's constructor and its body were gone.
             boolean scaffolded = parameters.trim().length() == 0
-                    || isSingleParameterOfType(parameters, "Resources")
-                    || out.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0;
+                    || isSingleParameterOfType(parameters, "Resources");
+            // A signature the generated class does not provide, whose body calls the initializer
+            // that no longer exists, cannot be deleted and cannot be kept: nothing replaces it, and
+            // the call it makes is gone. Recorded so migration refuses, which leaves the file
+            // intact -- deleting it took the developer's own logic with the signature.
+            if (!scaffolded && out.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0) {
+                legacyMigrationRefusal = "Cannot migrate " + className + ": its "
+                        + parameters.trim() + " constructor calls initGuiBuilderComponents, which this"
+                        + " generator does not produce - the file was left untouched";
+                setStatus(legacyMigrationRefusal);
+                return body;
+            }
             if (!scaffolded) {
                 from = close + 1;
                 continue;

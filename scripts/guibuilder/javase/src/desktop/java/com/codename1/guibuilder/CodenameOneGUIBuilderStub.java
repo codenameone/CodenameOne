@@ -479,7 +479,7 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
     private static void installMenus() {
         JMenuBar bar = new JMenuBar();
         JMenu file = new JMenu("File");
-        file.add(item("Save Form", KeyEvent.VK_S, true, onCn1Edt(CodenameOneGUIBuilder::saveActiveDocument)));
+        file.add(item("Save Form", KeyEvent.VK_S, true, onCn1Edt(CodenameOneGUIBuilderStub::saveFocusedEditorOrForm)));
         file.add(item("Reload Project Forms", KeyEvent.VK_R, true, onCn1Edt(CodenameOneGUIBuilder::refreshActiveProject)));
         file.addSeparator();
         file.add(item("Close GUI Builder", KeyEvent.VK_W, true, onCn1Edt(CodenameOneGUIBuilderStub::exitWithConfirmation)));
@@ -498,17 +498,8 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         // Bare Backspace, so it competes with typing. The accelerator consumes the key before the
         // pure editor ever sees it, so guarding alone left Backspace doing nothing at all while
         // text was focused; the keystroke is handed to the editor instead.
-        edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false, onCn1Edt(() -> {
-            com.codename1.ui.Form form = com.codename1.ui.CN.getCurrentForm();
-            com.codename1.ui.Component focused = form == null ? null : form.getFocused();
-            if (focused instanceof com.codename1.ui.editor.EditorView) {
-                // deleteBackward, not deleteSurroundingText: the latter is the IME oriented API and
-                // ignores the selection, and would split a surrogate pair after an emoji.
-                ((com.codename1.ui.editor.EditorView) focused).deleteBackward();
-                return;
-            }
-            CodenameOneGUIBuilder.deleteActiveSelection();
-        })));
+        edit.add(item("Delete Component", KeyEvent.VK_BACK_SPACE, false,
+                CodenameOneGUIBuilderStub::backspaceFocusedTextOrDeleteSelection));
 
         JMenu view = new JMenu("View");
         JCheckBoxMenuItem dark = new JCheckBoxMenuItem("Dark Mode", CodenameOneGUIBuilder.isActiveDarkMode());
@@ -619,6 +610,11 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
         return true;
     }
 
+    private static void saveFocusedEditorOrForm() {
+        if (CodenameOneGUIBuilder.saveFocusedActiveEditor()) return;
+        CodenameOneGUIBuilder.saveActiveDocument();
+    }
+
     private static void undoFocusedEditorOrForm() {
         if (undoFocusedCodeEditor(false)) return;
         CodenameOneGUIBuilder.undoActiveEdit();
@@ -658,6 +654,41 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
                 if ("cut".equals(operation)) CodenameOneGUIBuilder.cutActiveSelection();
                 else if ("copy".equals(operation)) CodenameOneGUIBuilder.copyActiveSelection();
                 else CodenameOneGUIBuilder.pasteActiveSelection();
+            }
+        });
+    }
+
+    /**
+     * Backspace, which is a designer command only when nothing is being typed into.
+     *
+     * <p>The accelerator is bare, so it competes with typing and consumes the keystroke before
+     * either toolkit sees it. Recognising the code editor alone was not enough: a property field in
+     * the inspector and the inline editor on the canvas are ordinary text components, and
+     * backspacing in one of those deleted the selected component instead of a character. Every
+     * focused editable surface is served first and only an unfocused one falls through to the
+     * command.
+     */
+    private static void backspaceFocusedTextOrDeleteSelection() {
+        // The Swing branch stays on the AWT thread: while a Codename One text component is being
+        // edited the JavaSE port puts a real text component on top, and that is what holds focus.
+        java.awt.Component focus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+        if (focus instanceof JTextComponent) {
+            JTextComponent text = (JTextComponent) focus;
+            if (text.getSelectionStart() != text.getSelectionEnd()) {
+                text.replaceSelection("");
+            } else if (text.getCaretPosition() > 0) {
+                int caret = text.getCaretPosition();
+                text.select(caret - 1, caret);
+                text.replaceSelection("");
+            }
+            return;
+        }
+        com.codename1.ui.CN.callSerially(new Runnable() {
+            @Override public void run() {
+                // The Codename One half lives in the builder so it can be tested; only the AWT
+                // branch above has to be here, on the Swing thread.
+                if (CodenameOneGUIBuilder.backspaceFocusedText()) return;
+                CodenameOneGUIBuilder.deleteActiveSelection();
             }
         });
     }

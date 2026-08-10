@@ -30,6 +30,7 @@ import com.codename1.xml.XMLWriter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,11 +120,32 @@ public final class GuiDocument {
         modified = true;
     }
 
+    /**
+     * The UIID that is actually in force, which is what the CSS selector field must show.
+     *
+     * <p>The XML type is not it. A SpanLabel and an Accordion are Containers that never call
+     * setUIID, so both the preview and the generated application style them as "Container" while
+     * this field claimed "SpanLabel" -- a developer could write a rule against the selector the
+     * designer told them was live and watch it apply to nothing. A Form or Dialog root reports its
+     * own UIID rather than the content pane's, because that is the one setUIID() sets at runtime.
+     *
+     * @param element the selected element
+     * @return the UIID the runtime will resolve styles from
+     */
     public String effectiveUiid(Element element) {
         String explicit = element == null ? null : element.getAttribute("uiid");
         if (explicit != null && explicit.length() > 0) return explicit;
         String type = element == null ? null : element.getAttribute("type");
-        return type == null || type.length() == 0 ? "Component" : type;
+        if (type == null || type.length() == 0) return "Component";
+        String constructorDefault = CONSTRUCTOR_UIID.get(type);
+        return constructorDefault == null ? type : constructorDefault;
+    }
+
+    /** Types whose constructor leaves a UIID that is not the type's own name. */
+    private static final Map<String, String> CONSTRUCTOR_UIID = new HashMap<String, String>();
+    static {
+        CONSTRUCTOR_UIID.put("SpanLabel", "Container");
+        CONSTRUCTOR_UIID.put("Accordion", "Container");
     }
 
     public Element parentOf(Element element) {

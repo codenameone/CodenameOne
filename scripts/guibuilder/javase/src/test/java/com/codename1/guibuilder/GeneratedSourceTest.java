@@ -25,6 +25,9 @@ package com.codename1.guibuilder;
 
 import com.codename1.guibuilder.model.GuiDocument;
 import com.codename1.guibuilder.project.ProjectBinding;
+import com.codename1.guibuilder.ui.ComponentPreviewFactory;
+import com.codename1.ui.Component;
+import com.codename1.xml.Element;
 import com.codename1.guibuilder.project.ProjectIO;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
@@ -606,6 +609,54 @@ class GeneratedSourceTest {
         assertTrue(migrated.contains("tap gui_submit now"), "and so is text inside one:\n" + migrated);
         assertTrue(migrated.contains("// gui_submit is described here"), "a comment is not a reference:\n" + migrated);
         compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aCustomisedScaffoldConstructorStopsTheMigrationInsteadOfBeingDeleted() throws Exception {
+        // Nothing replaces this signature and the call in its body is gone, so it can neither be
+        // kept nor deleted. Deleting it took the developer's own logic with it.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm(String title) {\n"
+                + "        initGuiBuilderComponents(Resources.getGlobalResources());\n"
+                + "        setTitle(title);\n"
+                + "    }\n"
+                + "}\n";
+
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "the migration must refuse rather than delete the constructor");
+    }
+
+    @Test
+    void theInspectorReportsTheUiidTheRuntimeActuallyUses() throws Exception {
+        // Every non-root type: what the CSS selector field claims has to be what the preview -- and
+        // therefore the generated application -- resolves styles from, or a rule written against
+        // the designer's answer applies to nothing.
+        String[] types = {"Button", "Label", "SpanLabel", "TextField", "TextArea", "CheckBox",
+            "RadioButton", "Slider", "Tabs", "Accordion", "Container"};
+        for (String type : types) {
+            GuiDocument document = GuiDocument.parse("/tmp/project/gui/com/example/LoginForm.gui",
+                    "<component type=\"Form\" name=\"LoginForm\" layout=\"BoxLayout\">"
+                    + "<component type=\"" + type + "\" name=\"x\"/></component>");
+            Element element = document.components().get(1);
+            Component preview = ComponentPreviewFactory.create(element, null, null);
+            assertEquals(preview.getUIID(), document.effectiveUiid(element),
+                    "the inspector and the runtime disagree about " + type);
+        }
+
+        // The root is the exception the preview cannot answer: create() builds the content pane,
+        // while the field describes the Form, which is what setUIID() sets on the generated class.
+        GuiDocument form = GuiDocument.parse("/tmp/project/gui/com/example/LoginForm.gui",
+                "<component type=\"Form\" name=\"LoginForm\" layout=\"BoxLayout\"/>");
+        assertEquals("Form", form.effectiveUiid(form.root()));
+        GuiDocument dialog = GuiDocument.parse("/tmp/project/gui/com/example/LoginForm.gui",
+                "<component type=\"Dialog\" name=\"LoginForm\" layout=\"BoxLayout\"/>");
+        assertEquals("Dialog", dialog.effectiveUiid(dialog.root()));
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
