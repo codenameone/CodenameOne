@@ -1400,6 +1400,38 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /// Hands a reply-bearing request to a live listener, or writes the PAYLOAD down for later.
+    ///
+    /// The answer cannot be saved for later -- the peer waits out a timeout measured in seconds and
+    /// is long gone by the next launch -- but the request itself is still information the app asked
+    /// to receive, and dropping it was the outcome before this. On Android 10+ the background
+    /// activity start is refused, so a cold-start request went into a process-local queue that
+    /// nothing would ever drain, and the app never learned it had been asked.
+    ///
+    /// So: delivered as a request while the app can answer, and spooled as an ordinary one-shot
+    /// message when it cannot. The listener then sees it on the next launch with `expectsReply`
+    /// false, which is exactly what it means -- nobody is waiting any more.
+    ///
+    /// The local token is allocated only on the live path. Trading the peer's token for one of ours
+    /// records an origin that would never be answered, and the reply-timeout bookkeeping that goes
+    /// with it has nothing to cancel.
+    static void spoolOrDeliverRequest(Context context, String path, byte[] payload,
+            int peerToken, String sourceNodeId) {
+        if (deliverableNow(context)) {
+            // The peer's token is unique only on the peer, so trade it for a locally unique one
+            // keyed to the node that asked; two watches can otherwise pick the same number.
+            int localToken = rememberRequestOrigin(peerToken, sourceNodeId);
+            WearableConnection.deliverMessage(path, payload, localToken);
+            return;
+        }
+        android.util.Log.w("CN1Wearable", "no listener can answer the request on " + path
+                + " right now; spooling it as a plain message, and the peer will time out");
+        if (!spool(context, SPOOL_MESSAGE, path, payload)) {
+            int localToken = rememberRequestOrigin(peerToken, sourceNodeId);
+            WearableConnection.deliverMessage(path, payload, localToken);
+        }
+    }
+
     /// The same for a removal, whose item no longer exists to be replayed from.
     static void spoolOrDeliverRemoval(Context context, String path) {
         if (deliverableNow(context)) {

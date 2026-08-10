@@ -32,6 +32,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Pins the watch build's contract with the project: declaring a watch lifecycle
@@ -816,6 +817,32 @@ class WatchNativeBuilderTest {
         String plist = writeInfoPlist(req, tmp);
         assertTrue(plist.contains("<key>CFBundleShortVersionString</key>\n    <string>2.0</string>"),
                 "the watch carries the injected version, not its fallback: " + plist);
+    }
+
+    /**
+     * A key inside an XML comment is not a key.
+     *
+     * <p>A plist fragment routinely carries an example in a comment, and the phone's parser ignores
+     * it -- so the watch taking the commented version while the app it embeds keeps its real one is
+     * a version mismatch archive validation rejects.</p>
+     */
+    @Test
+    void commentedOutKeysAreNotHonoured(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<!-- <key>CFBundleVersion</key><string>9.9</string> -->");
+
+        assertNull(WatchNativeBuilder.injectedPlistString(req, "CFBundleVersion"),
+                "a commented key is markup the phone's parser never sees");
+        assertFalse(WatchNativeBuilder.injectedPlistKeys(req).contains("CFBundleVersion"), 
+                "and the key scan has to agree with the lookup");
+
+        String plist = writeInfoPlist(req, tmp);
+        assertFalse(plist.contains("<string>9.9</string>"),
+                "the watch must not take a version from a comment: " + plist);
+        assertTrue(plist.contains("<key>CFBundleVersion</key>\n    <string>2.5</string>"),
+                "it keeps the project's own version: " + plist);
     }
 
     /// The bootstrap has to call the stub that actually exists in the watch binary.

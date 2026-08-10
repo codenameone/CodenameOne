@@ -132,18 +132,14 @@ public class CN1WearableListenerService extends WearableListenerService {
             }
             try {
                 int peerToken = Integer.parseInt(rest.substring(0, slash));
-                // The peer's token is unique only on the peer, so trade it for a locally unique one
-                // keyed to the node that asked; two watches can otherwise pick the same number.
-                int localToken = CN1WearableBridge.rememberRequestOrigin(
-                        peerToken, event.getSourceNodeId());
                 // The path parsed and a peer is waiting for an answer, so this one is worth a
                 // launch: without the app up nothing will ever answer it.
                 ensureAppRunning();
                 // Past the delimiter, not onto it: the encoded application path escapes its own
                 // slashes, so this one belongs to the wire format and is not part of the app's path.
-                WearableConnection.deliverMessage(
+                CN1WearableBridge.spoolOrDeliverRequest(getApplicationContext(),
                         CN1WearableBridge.decode(rest.substring(slash + 1)),
-                        event.getData(), localToken);
+                        event.getData(), peerToken, event.getSourceNodeId());
             } catch (NumberFormatException malformed) {
                 // Not ours.
             }

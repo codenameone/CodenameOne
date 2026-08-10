@@ -732,7 +732,7 @@ class WatchNativeBuilder {
         }
         int at = 0;
         while (true) {
-            int open = inject.indexOf("<key>", at);
+            int open = nextMarkup(inject, "<key>", at);
             if (open < 0) {
                 return out;
             }
@@ -763,7 +763,7 @@ class WatchNativeBuilder {
         // different marketing versions, which archive validation rejects.
         int at = 0;
         while (true) {
-            int open = inject.indexOf("<key>", at);
+            int open = nextMarkup(inject, "<key>", at);
             if (open < 0) {
                 return null;
             }
@@ -776,7 +776,7 @@ class WatchNativeBuilder {
                     inject.substring(open + "<key>".length(), close)).trim())) {
                 continue;
             }
-            int valueOpen = inject.indexOf("<string>", at);
+            int valueOpen = nextMarkup(inject, "<string>", at);
             if (valueOpen < 0) {
                 return null;
             }
@@ -796,6 +796,40 @@ class WatchNativeBuilder {
     /// at a point the XML parser reading the phone's plist never stops at.
     private static int closeOfString(String inject, int from) {
         return closeOfElement(inject, from, "</string>");
+    }
+
+    /// The next occurrence of a tag that is really markup, skipping comments and CDATA.
+    ///
+    /// A plist fragment routinely carries an EXAMPLE in a comment --
+    /// {@code <!-- <key>CFBundleVersion</key><string>9.9</string> -->} -- and the phone's XML parser
+    /// ignores it. A raw indexOf did not: the watch took the commented version while the app it is
+    /// embedded in kept its real one, and archive validation rejects that mismatch. CDATA is the
+    /// same story from the other side: {@code <![CDATA[<key>x</key>]]>} is text, not an element.
+    private static int nextMarkup(String inject, String tag, int from) {
+        int i = from;
+        while (i <= inject.length()) {
+            int at = inject.indexOf(tag, i);
+            if (at < 0) {
+                return -1;
+            }
+            int cdata = inject.indexOf(CDATA_OPEN, i);
+            int comment = inject.indexOf(COMMENT_OPEN, i);
+            boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
+            int skipFrom = cdataFirst ? cdata : comment;
+            if (skipFrom < 0 || skipFrom > at) {
+                return at;
+            }
+            String opener = cdataFirst ? CDATA_OPEN : COMMENT_OPEN;
+            String closer = cdataFirst ? CDATA_CLOSE : COMMENT_CLOSE;
+            int end = inject.indexOf(closer, skipFrom + opener.length());
+            if (end < 0) {
+                // Unterminated: nothing after it can be located reliably, so the key is treated as
+                // absent rather than guessed at.
+                return -1;
+            }
+            i = end + closer.length();
+        }
+        return -1;
     }
 
     /// The end tag that closes an element, skipping over CDATA sections and comments.
