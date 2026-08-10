@@ -6124,10 +6124,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // Comments masked first: a commented-out handler or a line of prose naming it used to
         // count as a declaration and suppress the stub the generated listener needs.
         String code = stripComments(source);
+        // And the form's own class body, at member level. An unscoped scan let a trailing helper's
+        // Helper.onClick(ActionEvent) satisfy the check, so ensureHandler() left the stub out while
+        // buildUI() still emitted this::onClick and the companion did not compile.
+        int classAt = declarationNamed(code, expectedCompanionClassName());
+        int bodyStart = classAt < 0 ? -1 : code.indexOf('{', classAt);
+        int bodyEnd = bodyStart < 0 ? code.length() : matchingBrace(code, bodyStart);
+        if (bodyEnd < 0) bodyEnd = code.length();
+        // A fragment of members has no class braces of its own, so its members sit at depth zero.
+        int memberDepth = bodyStart < 0 ? 0 : 1;
         int at = 0;
         while (true) {
             at = code.indexOf(handler, at);
             if (at < 0) return false;
+            if (at < bodyStart || at > bodyEnd || braceDepth(code, bodyStart < 0 ? 0 : bodyStart, at) != memberDepth) {
+                at += handler.length();
+                continue;
+            }
             int after = at + handler.length();
             // Whole word, and not receiver qualified: "helper.onClick(new ActionEvent(this))" is a
             // call, and accepting it suppressed the stub the generated this::onClick listener needs.
@@ -6149,6 +6162,24 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
             at = after;
         }
+    }
+
+    /**
+     * How many unclosed braces stand between two offsets.
+     *
+     * @param code the comment and literal masked source
+     * @param from where to start counting
+     * @param to the offset to reach
+     * @return the nesting depth at {@code to}
+     */
+    private static int braceDepth(String code, int from, int to) {
+        int depth = 0;
+        for (int i = Math.max(0, from); i < to && i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+        }
+        return depth;
     }
 
     /**
@@ -7280,7 +7311,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param nameAt the index of the matched name
      * @return true when the declaration has a return type
      */
-    private static boolean hasReturnType(String code, int nameAt) {
+    private static boolean hasReturnType(String rawCode, int nameAt) {
+        // Annotations are blanked first: "@Inject LoginForm(Resources r)" has no access modifier,
+        // so Inject was read as the return type and neither constructor path recognised the
+        // declaration -- it was carried into the generated class still calling the initializer
+        // that is gone.
+        String code = new String(blankAnnotations(rawCode, nameAt));
         int end = nameAt;
         while (end > 0 && Character.isWhitespace(code.charAt(end - 1))) end--;
         if (end == 0) return false;

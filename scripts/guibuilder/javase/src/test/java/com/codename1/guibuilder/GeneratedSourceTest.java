@@ -1354,6 +1354,48 @@ class GeneratedSourceTest {
                 invoke(builder, "defaultCompanionSource")), "and so is the only wildcard in the file");
     }
 
+    @Test
+    void aHelperClassHandlerDoesNotSatisfyTheFormsOwn() throws Exception {
+        // An unscoped scan let a trailing helper's onSubmit(ActionEvent) count, so the stub was
+        // left out while buildUI() still emitted this::onSubmit.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.events.ActionEvent;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n"
+                + "class LoginHelper {\n"
+                + "    public void onSubmit(ActionEvent event) { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertTrue(migrated.contains("this::onSubmit"), "the listener is still generated:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void anAnnotatedPackagePrivateConstructorIsStillAConstructor() throws Exception {
+        // "@Inject LoginForm(Resources r)" has no access modifier, so the annotation was read as a
+        // return type and the constructor was carried into the generated class still calling the
+        // initializer that no longer exists.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    @Deprecated LoginForm(Resources res) { initGuiBuilderComponents(); }\n"
+                + "}\n";
+
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "an annotated constructor is recognised and refused, not carried over broken");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
