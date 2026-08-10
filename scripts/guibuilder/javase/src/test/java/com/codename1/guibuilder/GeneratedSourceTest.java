@@ -1149,6 +1149,46 @@ class GeneratedSourceTest {
         assertNotNull(migrate(builder, plain, invoke(builder, "defaultCompanionSource")));
     }
 
+    @Test
+    void aClassAnnotationSurvivesEverySaveNotJustTheMigration() throws Exception {
+        // Migration puts it on once; every later save rebuilds the declaration from the template,
+        // so a registration marker survived migration and vanished on the next save.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "@Deprecated\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+        assertTrue(migrated.contains("@Deprecated"), migrated);
+
+        String saved = merge(builder, migrated, invoke(builder, "defaultCompanionSource"));
+        assertTrue(saved.contains("@Deprecated"), "the second save must keep it:\n" + saved);
+        String third = merge(builder, saved, invoke(builder, "defaultCompanionSource"));
+        assertEquals(1, countOccurrences(third, "@Deprecated"),
+                "and every save after that, exactly once:\n" + third);
+        compile("LoginForm", third, null);
+    }
+
+    @Test
+    void aComponentNamedClassDoesNotGenerateAnIllegalAccessor() throws Exception {
+        // "Class" produced public String getClass(), which cannot override the final
+        // Object.getClass(); the collision check only knew about accessors it had emitted itself.
+        CodenameOneGUIBuilder builder = builderFor("bindable",
+                "<component type=\"TextField\" name=\"Class\" hint=\"Class\"/>"
+                + "<component type=\"TextField\" name=\"ok\" hint=\"Ok\"/>");
+
+        String form = invoke(builder, "defaultCompanionSource");
+        String model = invoke(builder, "generatedModelSource");
+
+        assertFalse(model.contains("getClass()"), "Object.getClass() cannot be overridden:\n" + model);
+        compile("LoginForm", form, model);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

@@ -6018,6 +6018,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // by capitalising the first letter, so "email" and "Email" are distinct fields that produce
         // one pair of accessors and a model that will not compile.
         Set<String> accessors = new LinkedHashSet<>();
+        // The accessors every class already inherits. A bindable component named "Class" produced
+        // "public String getClass()", which cannot override the final Object.getClass() and left
+        // the generated model uncompilable -- the check only looked at accessors this generator
+        // had already emitted, so nothing was there to collide with.
+        accessors.add(accessorSuffix("class"));
+        accessors.add(accessorSuffix("hashCode"));
+        accessors.add(accessorSuffix("toString"));
         for (Element element : document.components()) {
             if (element == document.root()) continue;
             String base = javaIdentifier(value(element, "name", value(element, "type", "component")));
@@ -6302,6 +6309,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // once, but this branch runs on every later save and rebuilds from the template, so the
         // helper survived exactly one save and was deleted by the next.
         String trailing = trailingAfterGeneratedClass(existing);
+        // The annotations as well. Migration puts them on once, but this branch runs on every
+        // later save and rebuilds the declaration from the template, so a registration marker
+        // survived migration and vanished on the next save.
+        withImports = carryClassAnnotations(existing, withImports);
         int keepStart = markerLine(withImports, startMarker, 0);
         int keepEnd = markerLine(withImports, endMarker, keepStart < 0 ? 0 : keepStart);
         if (keepStart < 0 || keepEnd < keepStart) {
