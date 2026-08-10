@@ -2040,6 +2040,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (oldParent != plan.parent) {
             document.select(dragged);
             if (!document.moveSelectedToParent(plan.parent, componentChildren(plan.parent).size())) return false;
+            // The same cleanup the general drop path does, for the same reason: a guided reference
+            // only resolves among its parent's own children, so a sibling still pointing at a
+            // component that has moved into this table resolves to null on the next refresh and
+            // jumps or resizes. Dropping into a table is not a reason to skip it.
+            if (oldParent != null) document.detachReferencesWithin(oldParent, dragged);
         }
         if (plan.occupied != null) {
             document.select(plan.occupied);
@@ -5178,7 +5183,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // type that does not exist. Nothing is kept unless both land.
         List<String[]> undo = new ArrayList<>();
         String modelPath = path.substring(0, path.length() - 5) + "Model.java";
-        boolean needsModel = !"none".equals(value(document.root(), "bindingStrategy", "properties"))
+        // A strategy change the user agreed to regenerate for is pending on the document, not on
+        // whichever pane happens to save it. Honouring it only in the toolbar save committed this
+        // companion against the previous strategy's model, and the project stayed uncompilable
+        // until something else saved the form.
+        boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
+        boolean needsModel = !rewriteModel
+                && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
                 && !ProjectIO.exists(modelPath);
         try {
             writeTracked(undo, path, companionSourceFor(source));
@@ -5188,13 +5199,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // component tree the form no longer had.
             boolean documentWasModified = document.isModified();
             if (documentWasModified) writeTracked(undo, document.path(), document.toXml());
-            if (needsModel) {
+            if (rewriteModel || needsModel) {
                 writeTracked(undo, modelPath, generatedModelSource());
-                setStatus("Saved form source and created its binding model");
+                setStatus(rewriteModel ? "Saved form source and regenerated its binding model"
+                        : "Saved form source and created its binding model");
             } else {
                 setStatus(documentWasModified ? "Saved form source and the form"
                         : "Saved form source • existing model left unchanged");
             }
+            // Cleared only once the model it asked for is on disk, so a failed write leaves the
+            // request standing for the next save rather than dropping it silently.
+            regenerateModelFor = null;
             // Only once every write has landed. Marking the buffer clean after the companion but
             // before the model meant a failed model write rolled the companion back while Close,
             // form switching and exit all believed there was nothing left unsaved.
@@ -5207,13 +5222,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
-    /**
-     * Writes the binding model the generated companion refers to, when the form uses a binding
-     * strategy and the model is not already there.
-     *
-     * @param sourcePath the companion source path
-     * @return true when a model was created by this call
-     */
     private static final int MODEL_NOT_NEEDED = 0;
     private static final int MODEL_CREATED = 1;
     private static final int MODEL_FAILED = 2;
@@ -5910,12 +5918,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int open = skipSpaces(code, after);
             if (boundedLeft && open < code.length() && code.charAt(open) == '(') {
                 int close = matchingParenthesis(code, open);
-                if (close > open && isSingleActionEventParameter(code.substring(open + 1, close))
-                        && code.charAt(skipSpaces(code, close + 1)) == '{') {
+                if (close > open && isSingleActionEventParameter(code.substring(open + 1, close))) {
                     // A body follows a declaration; a call is followed by a semicolon or an
                     // operator. Legal formatting puts space before the parenthesis and before the
-                    // brace, so "void onClick (ActionEvent event)\n{" is the same declaration.
-                    return true;
+                    // brace, so "void onClick (ActionEvent event)\n{" is the same declaration, and
+                    // a throws clause sits between the two -- requiring the brace immediately
+                    // after the parameters reported "void onClick(ActionEvent event) throws
+                    // RuntimeException" missing and Save appended a duplicate signature.
+                    int body = skipThrowsClause(code, skipSpaces(code, close + 1));
+                    if (body < code.length() && code.charAt(body) == '{') return true;
                 }
             }
             at = after;
@@ -6007,6 +6018,29 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param from the index to start at
      * @return the index of the first character at or after from that is not whitespace
      */
+    /**
+     * Steps over a {@code throws} clause so the caller sees the body brace behind it.
+     *
+     * @param code the source with comments and literals already masked
+     * @param from the index just past the parameter list
+     * @return the index of the first character after the clause, or {@code from} when there is none
+     */
+    private static int skipThrowsClause(String code, int from) {
+        if (!code.startsWith("throws", from)) return from;
+        int at = from + "throws".length();
+        // "throwsSomething" is an identifier, not a clause.
+        if (at < code.length() && isIdentifierChar(code.charAt(at))) return from;
+        while (at < code.length()) {
+            char c = code.charAt(at);
+            if (c == '{' || c == ';') return at;
+            // Names, qualifiers and separators only. Anything else means this was never a throws
+            // clause, so the caller should judge the text it already had rather than this guess.
+            if (!isIdentifierChar(c) && c != '.' && c != ',' && !Character.isWhitespace(c)) return from;
+            at++;
+        }
+        return from;
+    }
+
     private static int skipSpaces(String text, int from) {
         int at = from;
         // Line terminators too. The comment at the call site claimed Allman bracing was handled

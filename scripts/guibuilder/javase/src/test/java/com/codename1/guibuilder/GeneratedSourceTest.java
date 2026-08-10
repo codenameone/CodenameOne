@@ -368,6 +368,92 @@ class GeneratedSourceTest {
         compile("LoginForm", migrated, null);
     }
 
+    @Test
+    void aHandlerDeclaringAThrowsClauseIsNotDeclaredATwiceOver() throws Exception {
+        // The scanner wanted the body brace immediately after the parameter list, so a throws
+        // clause between them read as "no such handler" and Save appended a second method with the
+        // same signature -- a companion that does not compile.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.events.ActionEvent;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void onSubmit(ActionEvent event) throws RuntimeException {\n"
+                + "        setTitle(\"submitted\");\n"
+                + "    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        int first = migrated.indexOf("void onSubmit(");
+        assertTrue(first >= 0, "the developer's handler must be carried over:\n" + migrated);
+        assertEquals(-1, migrated.indexOf("void onSubmit(", first + 1),
+                "a throws clause does not make it a different method:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aThrowsLikeIdentifierIsNotMistakenForAClause() throws Exception {
+        // The guard has to be narrow: "throwsSomething" is an identifier, and a call rather than a
+        // declaration must still not count.
+        CodenameOneGUIBuilder builder = builder("none");
+        assertFalse(declares(builder, "helper.onSubmit(new ActionEvent(this)); {", "onSubmit"),
+                "a receiver-qualified call is not a declaration");
+        assertFalse(declares(builder, "void onSubmit(ActionEvent event) throwsRuntimeException {}", "onSubmit"),
+                "throwsRuntimeException is one identifier, not a clause and a type");
+        assertTrue(declares(builder, "void onSubmit(ActionEvent event) throws java.io.IOException, IllegalStateException {}", "onSubmit"),
+                "a qualified, multi-exception clause is still a declaration");
+        assertFalse(declares(builder, "abstract void onSubmit(ActionEvent event) throws RuntimeException;", "onSubmit"),
+                "a declaration with no body is not a stub that can be dropped");
+    }
+
+    private static boolean declares(CodenameOneGUIBuilder builder, String source, String handler) throws Exception {
+        Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("declaresActionHandler", String.class, String.class);
+        method.setAccessible(true);
+        return ((Boolean) method.invoke(builder, source, handler)).booleanValue();
+    }
+
+    @Test
+    void theCodePaneSaveRegeneratesAModelTheStrategyChangeAskedFor() throws Exception {
+        // "Regenerate on save" is recorded against the document, not against whichever pane saves
+        // it. Honouring it only in the toolbar save committed this companion against the previous
+        // strategy's model and left the project uncompilable until something else saved the form.
+        // No hyphen in the name: the package the companion declares is derived from this path.
+        Path project = Files.createTempDirectory("guibuilderModelRegen");
+        Path java = Files.createDirectories(project.resolve("src/main/java/com/example"));
+        Path gui = Files.createDirectories(project.resolve("src/main/guibuilder/com/example"));
+        Path model = java.resolve("LoginFormModel.java");
+        Files.write(model, "package com.example;\n// the previous strategy's model\n".getBytes(StandardCharsets.UTF_8));
+
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
+                + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
+                + "\ncssFile=" + project.resolve("theme.css") + "\n"));
+        set(builder, "document", GuiDocument.parse(gui.resolve("LoginForm.gui").toString(),
+                "<component type=\"Form\" name=\"LoginForm\" title=\"Login\" layout=\"BoxLayout\" bindingStrategy=\"bindable\">"
+                + "<component type=\"TextField\" name=\"email\" hint=\"Email\"/></component>"));
+        set(builder, "regenerateModelFor", field(builder, "document"));
+
+        Method save = CodenameOneGUIBuilder.class.getDeclaredMethod("saveSourceAndModel", String.class, String.class);
+        save.setAccessible(true);
+        save.invoke(builder, java.resolve("LoginForm.java").toString(), invoke(builder, "defaultCompanionSource"));
+
+        String written = new String(Files.readAllBytes(model), StandardCharsets.UTF_8);
+        assertFalse(written.contains("the previous strategy's model"),
+                "the pending regeneration must be part of this save:\n" + written);
+        assertTrue(written.contains("@Bindable"), "the model must follow the strategy now set:\n" + written);
+        assertNull(field(builder, "regenerateModelFor"), "the request is spent once the model is on disk");
+        compile("LoginForm", new String(Files.readAllBytes(java.resolve("LoginForm.java")), StandardCharsets.UTF_8), written);
+    }
+
+    private static Object field(Object target, String name) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(target);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

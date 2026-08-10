@@ -1519,6 +1519,44 @@ class DesignerInteractionTest {
         assertTrue(additive.contains("\\\"selectedComponents\\\":[\\\"first\\\",\\\"second\\\"]"), additive);
     }
 
+    @Test
+    void draggingAnAnchorIntoATableDetachesTheSiblingsItLeavesBehind() throws Exception {
+        // The general drop path drops these relationships; the table path reparented and skipped
+        // it, so a sibling kept pointing at a component that is no longer among its parent's
+        // children and resolved to null on the next refresh.
+        GuiDocument document = document("<component type=\"Form\" name=\"Form\" layout=\"BoxLayout\">"
+                + "<component type=\"Container\" name=\"stack\" layout=\"LayeredLayout\">"
+                + "<component type=\"Label\" name=\"anchor\" text=\"Anchor\" layeredInsets=\"20px auto auto 20px\"/>"
+                + "<component type=\"Button\" name=\"follower\" text=\"Follows\" layeredInsets=\"24px auto auto 0px\" "
+                + "guidedReferences=\"anchor|-|-|anchor\" guidedReferencePositions=\"1 0 0 0\"/>"
+                + "</component>"
+                + "<component type=\"Container\" name=\"grid\" layout=\"TableLayout\" tableLayoutRows=\"1\" tableLayoutColumns=\"2\">"
+                + "<component type=\"Button\" name=\"cellA\" tableRow=\"0\" tableColumn=\"0\"/>"
+                + "</component></component>");
+        Element stack = document.components().get(1);
+        Element anchor = document.components().get(2);
+        Element follower = document.components().get(3);
+        Element grid = document.components().get(4);
+        assertTrue(follower.getAttribute("guidedReferences").contains("anchor"), "fixture");
+
+        CodenameOneGUIBuilder builder = builder(document);
+        CodenameOneGUIBuilder.DropPlan plan = sequentialPlan(document, grid, grid, "TableLayout", false);
+        // The cell is what routes applyDropPlan() into applyTableDrop(); without it the drop takes
+        // the general path, which already detaches, and the test proves nothing.
+        plan.tableCell = new int[]{0, 1};
+        assertTrue(builder.applyDropPlan(anchor, plan, 0, 0));
+
+        assertEquals(grid, document.parentOf(anchor), "the drop must reparent into the table");
+        assertFalse(follower.getAttribute("guidedReferences").contains("anchor"),
+                "a reference that can no longer resolve in " + value(stack, "name") + " must be detached: "
+                        + follower.getAttribute("guidedReferences"));
+    }
+
+    private static String value(Element element, String attribute) {
+        String out = element.getAttribute(attribute);
+        return out == null ? "" : out;
+    }
+
     private static CodenameOneGUIBuilder.DropPlan sequentialPlan(GuiDocument document, Element parent, Element target, String layout, boolean after) {
         CodenameOneGUIBuilder.DropPlan plan = new CodenameOneGUIBuilder.DropPlan();
         plan.document = document;
