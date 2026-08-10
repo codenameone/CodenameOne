@@ -2623,6 +2623,13 @@ static CN1BibopPage* bibopReleasedPool = 0;
 static CN1BibopPage* bibopReuseFailedPool = 0;
 static CN1BibopPage* bibopReuseFailedTail = 0;
 
+// Pages sitting in bibopReleasedPool that only got the MADV_FREE fallback, so
+// they are still charged to phys_footprint and want the reusable advice retried.
+// Lets the upgrade pass skip its walk entirely in the normal case, which is
+// every case: the fallback is only taken when MADV_FREE_REUSABLE is rejected,
+// which does not happen in ordinary operation.
+static _Atomic long bibopFallbackPageCount = 0;
+
 // Park a page whose restore was rejected at the TAIL of the retry pool.
 static void cn1BibopParkReuseFailure(CN1BibopPage* p) {
     p->nextPool = 0;
@@ -2718,6 +2725,9 @@ static JAVA_BOOLEAN cn1BibopReleasePageMemory(CN1BibopPage* p) {
         // uses to find it and retry the reusable advice on a later trim.
         ok = (madvise(addr, len, MADV_FREE) == 0) ? JAVA_TRUE : JAVA_FALSE;
         p->gcPageReusableAdvice = JAVA_FALSE;  // no pairing to restore
+        if(ok) {
+            atomic_fetch_add_explicit(&bibopFallbackPageCount, 1, memory_order_relaxed);
+        }
     }
 #elif defined(MADV_DONTNEED)
     // Linux: drops the pages and re-faults them as zero, which is exactly the
@@ -2756,6 +2766,11 @@ static JAVA_BOOLEAN cn1BibopReusePageMemory(CN1BibopPage* p) {
         return JAVA_TRUE;
     }
 #if defined(__APPLE__)
+    if(!p->gcPageReusableAdvice) {
+        // Released through the fallback: nothing to restore, but it is leaving
+        // bibopReleasedPool, so it is no longer waiting for an upgrade.
+        atomic_fetch_sub_explicit(&bibopFallbackPageCount, 1, memory_order_relaxed);
+    }
     if(p->gcPageReusableAdvice) {
         if(cn1ReuseFailInjectOn()) {
             return JAVA_FALSE;               // fault injection; see the helper
@@ -2803,21 +2818,31 @@ static int cn1BibopUpgradeFallbackPages(void) {
     if(off == 0) {
         return 0;
     }
+    if(atomic_load_explicit(&bibopFallbackPageCount, memory_order_relaxed) <= 0) {
+        return 0;                            // nothing is waiting; skip the walk
+    }
     int upgraded = 0;
-    int examined = 0;
+    int attempted = 0;
     pthread_mutex_lock(&bibopMutex);
+    // The budget counts ATTEMPTS, not pages looked at. Counting skips would mean
+    // that once the leading budget-sized window is upgraded, every later pass
+    // spends its whole budget re-walking that window and never reaches the
+    // fallback pages behind it -- they would stay charged forever unless
+    // allocation happened to reacquire them. Walking past an already-upgraded
+    // page is a pointer dereference; only the madvise is worth budgeting.
     for(CN1BibopPage* p = bibopReleasedPool ;
-        p != 0 && examined < CN1_BIBOP_UPGRADE_PER_SWEEP ;
+        p != 0 && attempted < CN1_BIBOP_UPGRADE_PER_SWEEP ;
         p = p->nextPool) {
-        examined++;
         if(p->gcPageReusableAdvice) {
             continue;                        // already off the footprint
         }
+        attempted++;
         if(!cn1ReusableFailInjectTake()
            && madvise((char*)p + off, (size_t)CN1_BIBOP_PAGE_SIZE - off,
                       MADV_FREE_REUSABLE) == 0) {
             p->gcPageReusableAdvice = JAVA_TRUE;
             upgraded++;
+            atomic_fetch_sub_explicit(&bibopFallbackPageCount, 1, memory_order_relaxed);
         }
     }
     pthread_mutex_unlock(&bibopMutex);
