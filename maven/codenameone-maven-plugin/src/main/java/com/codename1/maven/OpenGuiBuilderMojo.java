@@ -34,6 +34,9 @@ import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.descriptor.PluginDescriptor;
+import org.apache.maven.project.MavenProject;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.tools.ant.taskdefs.Java;
@@ -68,6 +71,14 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
 
     /** {@code --add-exports} is a Java 9 option; passing it to an 8 JVM stops it from starting. */
     private static final int MODULE_OPTIONS_VERSION = 9;
+
+    /** The invocation the guard belongs to. */
+    @Parameter(defaultValue = "${session}", readonly = true)
+    private MavenSession guardSession;
+
+    /** Identifies this plugin when asking the session for a context shared across the reactor. */
+    @Parameter(defaultValue = "${plugin}", readonly = true)
+    private PluginDescriptor guardPlugin;
 
     /** Optional fully-qualified form to select initially. */
     @Parameter(property = "className", required = false)
@@ -121,17 +132,46 @@ public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * @return true when this reactor has already opened the editor
+     * The guard's home: one map per Maven invocation, shared by every project in the reactor.
+     *
+     * <p>getPluginContext() is indexed by the current project, and isCN1ProjectDir() accepts both
+     * the aggregator and the app module, so running the goal from a generated multi-module root
+     * gave each execution its own empty map and launched a second editor on the same files.
+     * Keyed on the top level project instead, which is one map for the invocation and still not a
+     * JVM-wide flag -- that was the previous bug, where a long lived Maven never launched again.
+     *
+     * @return the context to record the launch in, or null when there is none
      */
     @SuppressWarnings("unchecked")
+    Map<String, Object> launchGuardContext() {
+        Map<String, Object> shared = sharedReactorContext();
+        return shared != null ? shared : getPluginContext();
+    }
+
+    /**
+     * The session's context for the top level project, which every project in the reactor resolves
+     * to the same map.
+     *
+     * <p>Its own method so a test can supply one without building a MavenSession.
+     *
+     * @return the shared map, or null when there is no session to ask
+     */
+    Map<String, Object> sharedReactorContext() {
+        if (guardSession == null || guardPlugin == null) return null;
+        MavenProject top = guardSession.getTopLevelProject();
+        return top == null ? null : guardSession.getPluginContext(guardPlugin, top);
+    }
+
+    /**
+     * @return true when this reactor has already opened the editor
+     */
     private boolean alreadyLaunchedInThisSession() {
-        Map<Object, Object> context = getPluginContext();
+        Map<String, Object> context = launchGuardContext();
         return context != null && Boolean.TRUE.equals(context.get(LAUNCHED_KEY));
     }
 
-    @SuppressWarnings("unchecked")
     private void markLaunchedInThisSession() {
-        Map<Object, Object> context = getPluginContext();
+        Map<String, Object> context = launchGuardContext();
         if (context != null) context.put(LAUNCHED_KEY, Boolean.TRUE);
     }
 

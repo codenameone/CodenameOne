@@ -109,4 +109,42 @@ public class OpenGuiBuilderMojoTest {
         mojo.project = project;
         assertTrue(mojo.isCN1ProjectDir());
     }
+    /**
+     * Two reactor executions, one guard. getPluginContext() is indexed by the current project and
+     * isCN1ProjectDir() accepts both the aggregator and the app module, so running the goal from a
+     * generated multi-module root gave each execution its own empty map and launched a second
+     * editor over the same files.
+     */
+    @Test
+    public void theLaunchGuardIsSharedAcrossTheReactor() {
+        final java.util.Map<String, Object> reactor = new java.util.HashMap<String, Object>();
+        OpenGuiBuilderMojo aggregator = new OpenGuiBuilderMojo() {
+            @Override java.util.Map<String, Object> sharedReactorContext() { return reactor; }
+        };
+        OpenGuiBuilderMojo module = new OpenGuiBuilderMojo() {
+            @Override java.util.Map<String, Object> sharedReactorContext() { return reactor; }
+        };
+        java.util.Map<String, Object> perProject = new java.util.HashMap<String, Object>();
+        aggregator.setPluginContext(perProject);
+        module.setPluginContext(new java.util.HashMap<String, Object>());
+
+        assertSame("both executions must resolve to one map",
+                aggregator.launchGuardContext(), module.launchGuardContext());
+        aggregator.launchGuardContext().put("launched", Boolean.TRUE);
+        assertEquals("the second execution must see the first one's mark",
+                Boolean.TRUE, module.launchGuardContext().get("launched"));
+        assertTrue("the per-project context is not what was written to", perProject.isEmpty());
+    }
+
+    /** Without a session -- a single module build -- the mojo's own context still serves. */
+    @Test
+    public void theGuardFallsBackToThePerProjectContext() {
+        OpenGuiBuilderMojo mojo = new OpenGuiBuilderMojo() {
+            @Override java.util.Map<String, Object> sharedReactorContext() { return null; }
+        };
+        java.util.Map<String, Object> perProject = new java.util.HashMap<String, Object>();
+        mojo.setPluginContext(perProject);
+        assertSame(perProject, mojo.launchGuardContext());
+    }
+
 }
