@@ -4618,7 +4618,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     : "right".equals(value) ? Component.RIGHT : Component.TOP);
         } else if ("layeredInsets".equals(attribute) && component.getParent() != null
                 && component.getParent().getLayout() instanceof LayeredLayout) {
-            try { ((LayeredLayout) component.getParent().getLayout()).setInsets(component, value); } catch (RuntimeException ignored) { }
+            // Swallowing the parse failure left the canvas on the previous constraint while the
+            // document kept the text, and the same text went into the generated source, where
+            // LayeredLayout.setInsets() threw while the form was being constructed. The value is
+            // taken back out of the document instead.
+            try {
+                ((LayeredLayout) component.getParent().getLayout()).setInsets(component, value);
+            } catch (RuntimeException invalid) {
+                setStatus("That inset is not something LayeredLayout can read: " + value);
+                document.select(element);
+                document.setAttribute(attribute, null);
+                scheduleDesignerRefresh();
+                return;
+            }
         } else if ("uiid".equals(attribute)) {
             if (value == null || value.length() == 0) {
                 // Clearing it has to give back the component's own constructor default, which is
@@ -5569,9 +5581,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String placement = value(command, "placement", "right");
             String method = "left".equals(placement) ? "addCommandToLeftBar" : "overflow".equals(placement)
                     ? "addCommandToOverflowMenu" : "side".equals(placement) ? "addCommandToSideMenu" : "addCommandToRightBar";
+            // A cleared Event field left handlerIdentifier() with nothing to name and the emitted
+            // "this::null" did not compile. An unhandled command is a legitimate thing to want, so
+            // it is added without a listener rather than refused.
+            String commandHandler = handlerIdentifier(value(command, "actionEvent", ""));
             out.append("        toolbar.").append(method).append("(\"")
-                    .append(javaEscape(value(command, "name", "Command"))).append("\", null, this::")
-                    .append(handlerIdentifier(value(command, "actionEvent", "onCommand"))).append(");\n");
+                    .append(javaEscape(value(command, "name", "Command"))).append("\", null, ")
+                    .append(commandHandler == null ? "e -> { }" : "this::" + commandHandler).append(");\n");
         }
         out.append("    }\n\n");
         if (bindingEnabled) out.append("    public ").append(modelName).append(" getModel() { return model; }\n\n");

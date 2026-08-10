@@ -27,6 +27,7 @@ import com.codename1.guibuilder.model.GuiDocument;
 import com.codename1.guibuilder.project.ProjectBinding;
 import com.codename1.guibuilder.ui.ComponentPreviewFactory;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.xml.Element;
 import com.codename1.guibuilder.project.ProjectIO;
 import java.io.ByteArrayOutputStream;
@@ -1283,6 +1284,41 @@ class GeneratedSourceTest {
         assertFalse(migrated.contains("initGuiBuilderComponents"),
                 "while the real constructor is still removed:\n" + migrated);
         compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aCommandWithNoHandlerStillCompiles() throws Exception {
+        // A cleared Event field left nothing to name and the emitted "this::null" did not compile.
+        CodenameOneGUIBuilder builder = builderFor("none",
+                "<component type=\"Button\" name=\"ok\" text=\"Ok\"/>"
+                + "<command name=\"Save\" placement=\"right\" actionEvent=\"\"/>");
+
+        String form = invoke(builder, "defaultCompanionSource");
+
+        assertFalse(form.contains("this::null"), "an unnamed handler is not a method reference:\n" + form);
+        compile("LoginForm", form, null);
+    }
+
+    @Test
+    void aFormRootReportsTheScrollingItWillHaveAtRuntime() throws Exception {
+        // A Form's content pane arrives scrollable on Y and the generator emits no setter when the
+        // attribute is absent, so a canvas that forced it off disagreed with the running form.
+        GuiDocument document = GuiDocument.parse("/tmp/project/gui/com/example/LoginForm.gui",
+                "<component type=\"Form\" name=\"LoginForm\" layout=\"BoxLayout\">"
+                + "<component type=\"Label\" name=\"x\"/></component>");
+        Container pane = (Container) ComponentPreviewFactory.create(document.root(), null, null);
+        assertTrue(pane.isScrollableY(), "the content pane scrolls unless the document says otherwise");
+
+        GuiDocument off = GuiDocument.parse("/tmp/project/gui/com/example/LoginForm.gui",
+                "<component type=\"Form\" name=\"LoginForm\" layout=\"BoxLayout\" scrollableY=\"false\">"
+                + "<component type=\"Label\" name=\"x\"/></component>");
+        assertFalse(((Container) ComponentPreviewFactory.create(off.root(), null, null)).isScrollableY(),
+                "and stops when it does");
+
+        GuiDocument container = GuiDocument.parse("/tmp/project/gui/com/example/Panel.gui",
+                "<component type=\"Container\" name=\"Panel\" layout=\"BoxLayout\"/>");
+        assertFalse(((Container) ComponentPreviewFactory.create(container.root(), null, null)).isScrollableY(),
+                "a plain Container is not scrollable by default");
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {

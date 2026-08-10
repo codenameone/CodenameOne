@@ -480,12 +480,20 @@ public final class ComponentPreviewFactory {
             ((TextArea) component).setConstraint(constraint(value(element, "constraint", "ANY")));
         }
         if (component instanceof Container) {
+            // A Form's content pane arrives scrollable on the Y axis, and the generated source
+            // emits no setter when the attribute is absent -- so forcing false here had the canvas
+            // and the inspector reporting no scrolling for a form that scrolls when it runs.
+            boolean formRoot = isRootOnly(value(element, "type", "Container"));
+            String scrollableDefault = formRoot ? "true" : "false";
             ((Container) component).setScrollableX("true".equals(value(element, "scrollableX", "false")));
-            ((Container) component).setScrollableY("true".equals(value(element, "scrollableY", "false")));
+            ((Container) component).setScrollableY("true".equals(value(element, "scrollableY", scrollableDefault)));
             ((Container) component).setTensileDragEnabled(false);
             ((Container) component).setAlwaysTensile(false);
             ((Container) component).setSmoothScrolling(false);
-            ((Container) component).setScrollVisible(true);
+            // The gutter is hidden when the scrolling is the Form's own default rather than
+            // something the document asked for. Showing it took a few pixels of width off the
+            // canvas that the running form does not lose, which moved every centred component.
+            ((Container) component).setScrollVisible(!formRoot || element.getAttribute("scrollableY") != null);
         }
         if (component instanceof Slider) {
             ((Slider) component).setMinValue(integer(element, "minValue", ((Slider) component).getMinValue()));
