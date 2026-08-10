@@ -3585,6 +3585,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             setStatus("The binding model will be created when you save");
             return;
         }
+        if (cannotAskTheUser()) {
+            // Keeping the model is the answer that loses nothing; the divergence check asks again
+            // on the next interactive save.
+            regenerateModelFor = null;
+            setStatus("Kept the existing model; regenerate it from the toolbar if it no longer binds");
+            return;
+        }
         if (!com.codename1.ui.Dialog.show("Regenerate the binding model?",
                 "The existing model was generated for the previous strategy and will not bind"
                 + " correctly. Regenerate it when you save? Your own changes to that file are"
@@ -5390,6 +5397,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     boolean confirmModelRegeneration() {
         if (modelRegenerationDeclined == document) return false; //NOPMD CompareObjectsWithEquals
+        if (cannotAskTheUser()) return false;
         if (com.codename1.ui.Dialog.show("Regenerate the binding model?",
                 "This form has bindable components the model does not know about, so they will not"
                 + " bind. Regenerate it? Your own changes to that file are replaced.",
@@ -7784,6 +7792,52 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return out;
     }
 
+    /**
+     * True while a command is running on behalf of a client that cannot answer a dialog.
+     *
+     * <p>MCP executes synchronously on the EDT, so a modal opened underneath it waits for a human
+     * who is not there and the call never returns. Every confirmation checks this and takes the
+     * branch that keeps the user's work instead of asking. Adding these one site at a time is what
+     * let redo reach syncBindingModel()'s prompt after save and refresh had already been guarded.
+     *
+     * @return true when the question has to answer itself
+     */
+    private boolean cannotAskTheUser() {
+        return unattended;
+    }
+
+    /** Set while an MCP command runs. */
+    private boolean unattended;
+
+    /** A command run on behalf of a client that cannot answer a dialog. */
+    interface UnattendedCommand {
+        /**
+         * Runs the command.
+         *
+         * @return its report, or null when it succeeded silently
+         */
+        String run();
+    }
+
+    /**
+     * Runs an MCP command with the confirmations suppressed.
+     *
+     * @param work the command
+     * @return whatever the command reports
+     */
+    private String unattended(UnattendedCommand work) {
+        boolean previous = unattended;
+        unattended = true;
+        try {
+            return work.run();
+        } catch (RuntimeException failure) {
+            return "The command failed: " + (failure.getMessage() == null
+                    ? failure.getClass().getSimpleName() : failure.getMessage());
+        } finally {
+            unattended = previous;
+        }
+    }
+
     boolean mcpSelectComponent(String componentName) {
         return mcpSelectComponent(componentName, false);
     }
@@ -7798,6 +7852,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     String mcpOpenForm(String formName) {
+        return unattended(() -> mcpOpenFormImpl(formName));
+    }
+
+    private String mcpOpenFormImpl(String formName) {
         if (formName == null || formName.length() == 0) return "form is required";
         if (document != null && document.isModified()) return "Active form has unsaved changes";
         // Not routed through switchForm(), so the prompt added there does not apply here; MCP
@@ -7816,6 +7874,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     String mcpDragComponent(String componentName, String targetName, String placement,
+            Integer requestedX, Integer requestedY) {
+        return unattended(() -> mcpDragComponentImpl(componentName, targetName, placement,
+                requestedX, requestedY));
+    }
+
+    private String mcpDragComponentImpl(String componentName, String targetName, String placement,
             Integer requestedX, Integer requestedY) {
         if (document == null || canvasHost == null) return "No active GUI document";
         Element element = findElementNamed(document, componentName);
@@ -7880,6 +7944,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     String mcpCommand(String command) {
+        return unattended(() -> mcpCommandImpl(command));
+    }
+
+    private String mcpCommandImpl(String command) {
         if (command == null) return "command is required";
         // A client that is told the save succeeded will happily go on to close the editor.
         // save() writes the document, the companion and the model, and never the text in an open

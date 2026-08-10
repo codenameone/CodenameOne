@@ -1586,6 +1586,40 @@ class GeneratedSourceTest {
         compile("LoginForm", form, null);
     }
 
+    @Test
+    void anMcpCommandNeverWaitsForADialog() throws Exception {
+        // MCP runs synchronously on the EDT, so a modal underneath it waits for a human who is not
+        // there. Redo reached syncBindingModel()'s prompt after save and refresh had been guarded
+        // one at a time, so the condition is now checked in one place and asserted here.
+        CodenameOneGUIBuilder builder = builder("none");
+        Method cannotAsk = CodenameOneGUIBuilder.class.getDeclaredMethod("cannotAskTheUser");
+        cannotAsk.setAccessible(true);
+        assertFalse(((Boolean) cannotAsk.invoke(builder)).booleanValue(), "the toolbar may ask");
+
+        Method unattended = CodenameOneGUIBuilder.class.getDeclaredMethod("unattended",
+                CodenameOneGUIBuilder.UnattendedCommand.class);
+        unattended.setAccessible(true);
+        final Boolean[] seen = new Boolean[1];
+        CodenameOneGUIBuilder.UnattendedCommand probe = () -> {
+            try {
+                seen[0] = (Boolean) cannotAsk.invoke(builder);
+            } catch (Exception unreachable) {
+                throw new IllegalStateException(unreachable);
+            }
+            return null;
+        };
+        assertNull(unattended.invoke(builder, probe));
+        assertEquals(Boolean.TRUE, seen[0], "a command running for MCP must not ask");
+        assertFalse(((Boolean) cannotAsk.invoke(builder)).booleanValue(),
+                "and the flag is put back afterwards");
+
+        // A failure inside the command is reported rather than escaping as an exception, which
+        // would leave the flag set for everything after it.
+        CodenameOneGUIBuilder.UnattendedCommand boom = () -> { throw new IllegalStateException("no"); };
+        assertEquals("The command failed: no", unattended.invoke(builder, boom));
+        assertFalse(((Boolean) cannotAsk.invoke(builder)).booleanValue());
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
