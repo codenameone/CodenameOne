@@ -755,8 +755,14 @@ public class SEDatabase extends Database {
             if (config == null || !config.isEncrypted()) {
                 s.execute("PRAGMA rekey = ''");
             } else {
-                s.execute("PRAGMA rekey = "
-                        + toPragmaLiteral(JavaSEPort.databaseKeyMaterial(config, databaseName)));
+                // A connection-taking handle has no name -- only the file it resolved from the
+                // JDBC URL -- and resolving key material from a null name walks into
+                // getDatabaseFile(null). The identity is what an implicit managed alias keys on
+                // anyway, so it is the right argument whenever the name is absent.
+                String keyMaterial = databaseName == null
+                        ? config.resolveKeyMaterial(openKey)
+                        : JavaSEPort.databaseKeyMaterial(config, databaseName);
+                s.execute("PRAGMA rekey = " + toPragmaLiteral(keyMaterial));
             }
         } catch (SQLException ex) {
             throw new IOException(ex.getMessage(), ex);

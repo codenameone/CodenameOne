@@ -667,7 +667,10 @@ public abstract class Database {
         if (keyMaterial == null) {
             return "''";
         }
-        if (keyMaterial.length() > 2 && keyMaterial.startsWith("x'") && keyMaterial.endsWith("'")) {
+        // The exact literal, not merely the framing: "x'not-hex'" is a perfectly good passphrase,
+        // and passphrase() only refuses the exact form, so anything looser than that predicate
+        // sends a passphrase to the engine as an unquoted token and the re-key fails on syntax.
+        if (DatabaseConfig.looksLikeRawKeyLiteral(keyMaterial)) {
             return keyMaterial;
         }
         StringBuilder b = new StringBuilder(keyMaterial.length() + 8);
