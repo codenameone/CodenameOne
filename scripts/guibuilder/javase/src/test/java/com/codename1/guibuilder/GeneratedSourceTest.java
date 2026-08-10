@@ -921,9 +921,11 @@ class GeneratedSourceTest {
 
         assertNotNull(migrated, "this file is migratable:\n" + legacy);
         assertTrue(migrated.contains("public void mine()"), "the form's own member is carried:\n" + migrated);
-        assertFalse(migrated.contains("class LoginHelper"),
-                "the helper after the form is not part of it:\n" + migrated);
-        assertFalse(migrated.contains("void help()"), migrated);
+        assertTrue(migrated.contains("class LoginHelper"),
+                "the helper is not part of the form, but it is part of the file:\n" + migrated);
+        assertTrue(migrated.contains("void help()"), migrated);
+        assertTrue(migrated.indexOf("class LoginHelper") > migrated.indexOf("public void mine()"),
+                "and it stays outside the regenerated class:\n" + migrated);
         compile("LoginForm", migrated, null);
     }
 
@@ -951,6 +953,48 @@ class GeneratedSourceTest {
                 "a type-use annotation is part of the clause, not the end of it");
         assertTrue(declares(builder,
                 "void onSubmit(ActionEvent event) throws @Deprecated RuntimeException {}", "onSubmit"));
+    }
+
+    @Test
+    void anImportFollowedByACommentIsStillCarried() throws Exception {
+        // The statement did not end with a semicolon, so the import was dropped while the member
+        // that needed it was carried across, and the project stopped compiling.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.Label; // used by the callback\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public Label make() { return new Label(\"hi\"); }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertTrue(migrated.contains("import com.codename1.ui.Label;"),
+                "the import the carried member needs must survive its trailing comment:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void anAnnotatedScaffoldConstructorStopsTheMigration() throws Exception {
+        // The replacement is generated and the delegate is hand-built; neither carries the
+        // annotation, so the class would still compile while DI stopped seeing the constructor.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    @Deprecated public LoginForm(Resources res) { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "an annotated constructor must not be replaced by an unannotated one");
+
+        // Without the annotation it is an ordinary scaffold constructor again.
+        assertNotNull(migrate(builder, legacy.replace("@Deprecated ", ""),
+                invoke(builder, "defaultCompanionSource")));
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {

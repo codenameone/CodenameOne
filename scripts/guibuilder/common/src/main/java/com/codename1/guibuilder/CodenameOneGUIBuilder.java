@@ -6306,6 +6306,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * True when an annotation sits in front of a constructor.
+     *
+     * @param code the comment masked source
+     * @param constructorAt the index of the constructor's name
+     * @return true when the declaration carries an annotation
+     */
+    private static boolean constructorIsAnnotated(String code, int constructorAt) {
+        char[] masked = blankAnnotations(code, constructorAt);
+        int at = constructorAt;
+        // Back over the modifiers. If blanking an annotation is what cleared the text behind them,
+        // the declaration was annotated.
+        while (at > 0) {
+            char c = masked[at - 1];
+            if (!Character.isWhitespace(c) && !isIdentifierChar(c)) break;
+            at--;
+        }
+        return !code.substring(at, constructorAt).equals(new String(masked, at, constructorAt - at));
+    }
+
+    /**
      * True when a constructor body does more than the old scaffold's did.
      *
      * <p>The scaffold only chained and called its initializer, and both are reproduced by the
@@ -6364,6 +6384,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // The same test removeConstructors() uses, so the delegate is added exactly when the
             // constructor it stands in for was taken away.
             if (close > open && isSingleParameterOfType(code.substring(open + 1, close), "Resources")) {
+                // The scaffold's own constructors live inside the DON'T EDIT block and are dropped
+                // with it, so this delegate is their only replacement -- and it cannot carry an
+                // annotation the original had, which would leave DI blind to a class that still
+                // compiles.
+                if (constructorIsAnnotated(code, at)) {
+                    companionRefusal = "Cannot migrate " + className + ": its Resources constructor"
+                            + " is annotated, and the delegate that replaces it cannot carry that"
+                            + " - the file was left untouched";
+                    setStatus(companionRefusal);
+                    return "";
+                }
                 return "\n    /** Kept so callers of the pre-migration constructor still compile. */\n"
                         + "    public " + className + "(com.codename1.ui.util.Resources resourceObjectInstance) {\n"
                         + "        this();\n    }\n";
@@ -6479,18 +6510,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // outside this file may still call it. The new source has no such overload, so a
         // delegating one is carried into the user region, where later saves preserve it.
         carried = carried + legacyResourcesConstructor(existing);
+        if (companionRefusal != null) return null;
+        // Bounding the carried region at the form's brace stopped a helper class being pulled
+        // inside it, and then dropped it entirely -- silently deleting a top level declaration and
+        // its callers' only definition. It is put back after the regenerated class, where it was.
+        String trailing = legacyTrailingDeclarations(existing);
         String marker = "// <gui-builder-user-code>";
         // The interfaces come across even when the body does not: dropping "implements Observer"
         // silently changed what the class is to every caller and left the carried methods
         // implementing nothing.
         String withHeader = carryClassAnnotations(existing,
                 carryImplements(generated, headerClause(header, "implements")));
-        if (carried.length() == 0) return carriedImports(existing, withHeader);
+        if (carried.length() == 0) return carriedImports(existing, withHeader) + trailing;
         String merged = carriedImports(existing, dropStubsAlreadyWritten(withHeader, carried));
         int insert = merged.indexOf(marker);
-        if (insert < 0) return merged;
+        if (insert < 0) return merged + trailing;
         insert += marker.length();
-        return merged.substring(0, insert) + "\n" + carried + "\n" + merged.substring(insert);
+        return merged.substring(0, insert) + "\n" + carried + "\n" + merged.substring(insert) + trailing;
     }
 
     /**
@@ -6694,6 +6730,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * Whatever the legacy file declares after the form: a package-private helper class, usually.
+     *
+     * @param existing the legacy companion source
+     * @return the declarations, ready to append, or an empty string
+     */
+    private String legacyTrailingDeclarations(String existing) {
+        String masked = stripComments(existing);
+        int bodyStart = masked.indexOf('{', classDeclaration(existing));
+        int bodyEnd = matchingBrace(masked, bodyStart);
+        if (bodyEnd < 0 || bodyEnd + 1 >= existing.length()) return "";
+        String trailing = existing.substring(bodyEnd + 1).trim();
+        return trailing.length() == 0 ? "" : "\n" + trailing + "\n";
+    }
+
+    /**
      * Adds the legacy file's own imports to the generated header. Migration carries the class body
      * across but the header is regenerated, so a user method that depended on a custom import
      * compiled before the migration and not after it -- an existing project would stop building on
@@ -6705,11 +6756,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private String carriedImports(String existing, String generated) {
         int classAt = classDeclaration(existing);
-        String header = classAt < 0 ? existing : existing.substring(0, classAt);
+        // The comment masked header, and the statement is cut at its semicolon: an
+        // "import com.example.Widget; // used by callbacks" did not end with a semicolon, so the
+        // import was dropped while the members that needed it were carried across.
+        String header = stripComments(classAt < 0 ? existing : existing.substring(0, classAt));
         StringBuilder missing = new StringBuilder();
         for (String line : header.split("\n")) {
             String statement = line.trim();
-            if (!statement.startsWith("import ") || !statement.endsWith(";")) continue;
+            if (!statement.startsWith("import ")) continue;
+            int semicolon = statement.indexOf(';');
+            if (semicolon < 0) continue;
+            statement = statement.substring(0, semicolon + 1);
             if (generated.indexOf(statement) >= 0) continue;
             missing.append(statement).append('\n');
         }
@@ -6944,6 +7001,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // The signature alone is not enough. A developer who added setup to the scaffolded
             // constructor -- this(resources); setTitle(loadTitle()); -- loses it, because the
             // generated replacement and the delegate know nothing about those statements.
+            // An annotation on the declaration line goes with the constructor, and the generated
+            // replacement -- or the delegate -- carries nothing, so a DI framework stops seeing it
+            // while the class still compiles. Nothing generated can hold it, so this refuses.
+            if (scaffolded && constructorIsAnnotated(code, index)) {
+                companionRefusal = "Cannot migrate " + className + ": its "
+                        + (parameters.trim().length() == 0 ? "no-argument" : parameters.trim())
+                        + " constructor is annotated, and the generated replacement cannot carry"
+                        + " that - the file was left untouched";
+                setStatus(companionRefusal);
+                return body;
+            }
             if (scaffolded && hasCustomConstructorBody(code.substring(parametersEnd, close))) {
                 companionRefusal = "Cannot migrate " + className + ": its "
                         + (parameters.trim().length() == 0 ? "no-argument" : parameters.trim())
