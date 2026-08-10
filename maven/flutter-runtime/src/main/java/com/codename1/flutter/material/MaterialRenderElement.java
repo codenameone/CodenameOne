@@ -70,7 +70,8 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
             com.codename1.ui.Container pane, Runnable paintChildren) {
         styleOnce(pane);
         int radius = (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
-        if (radius <= 0 || material().getClipBehavior() == com.codename1.flutter.Clip.none) {
+        if (radius <= 0 || material().getClipBehavior() == com.codename1.flutter.Clip.none
+                || noShapeClip()) {
             paintChildren.run();
             return;
         }
@@ -108,6 +109,18 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         } finally {
             g.setClip(cx, cy, cw, ch);
         }
+    }
+
+    /// A/B switch for the rounded clip, flipped at runtime with
+    /// {@code Display.setProperty("cn1.flutter.noShapeClip", "true")}.
+    ///
+    /// Exists because the clip is a per-card, per-frame native call whose cost is only
+    /// measurable on a device, and turning it off is the one experiment that separates
+    /// "the clip is expensive" from "something else is". Read per paint deliberately: an
+    /// A/B you have to rebuild for is an A/B you run once and mis-attribute.
+    private static boolean noShapeClip() {
+        return "true".equals(com.codename1.ui.Display.getInstance()
+                .getProperty("cn1.flutter.noShapeClip", "false"));
     }
 
     /// A rounded rectangle in the coordinate space a component paints in - parent-relative,
