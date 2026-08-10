@@ -677,8 +677,10 @@ public final class CodenameOneGUIBuilderStub implements Runnable, WindowListener
             if (text.getSelectionStart() != text.getSelectionEnd()) {
                 text.replaceSelection("");
             } else if (text.getCaretPosition() > 0) {
+                // A whole code point: caret - 1 split an emoji and left an unpaired surrogate,
+                // which becomes a replacement character as soon as the text is stored.
                 int caret = text.getCaretPosition();
-                text.select(caret - 1, caret);
+                text.select(CodenameOneGUIBuilder.previousCodePointStart(text.getText(), caret), caret);
                 text.replaceSelection("");
             }
             return;

@@ -718,6 +718,47 @@ class GeneratedSourceTest {
                 "a constructor that only does what the scaffold did is still removable");
     }
 
+    @Test
+    void aBraceInACommentDoesNotCutAConstructorInHalf() throws Exception {
+        // matchingBrace() ignores braces in literals but was reading the raw text, so "// }" ended
+        // the constructor early: the prefix was removed and its remaining statements were left
+        // loose in the class body.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() {\n"
+                + "        // the next brace is a decoy }\n"
+                + "        initGuiBuilderComponents();\n"
+                + "    }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "the constructor is a plain scaffold and must migrate:\n" + legacy);
+        assertFalse(migrated.contains("initGuiBuilderComponents"),
+                "the whole constructor goes, not just its opening:\n" + migrated);
+        assertFalse(migrated.contains("decoy"), "and its comment with it:\n" + migrated);
+        assertTrue(migrated.contains("public void mine()"), "the developer's method stays:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void backspaceDeletesAWholeCodePoint() {
+        // caret - 1 splits a surrogate pair and leaves half an emoji, which becomes a replacement
+        // character the moment the text is stored.
+        String emoji = "ab\uD83D\uDE00";
+        assertEquals(2, CodenameOneGUIBuilder.previousCodePointStart(emoji, emoji.length()),
+                "an emoji is one character to delete");
+        assertEquals(1, CodenameOneGUIBuilder.previousCodePointStart("abc", 2));
+        assertEquals(0, CodenameOneGUIBuilder.previousCodePointStart("abc", 0));
+        assertEquals(2, CodenameOneGUIBuilder.previousCodePointStart("abc", 99),
+                "a caret past the end is clamped, then steps back one character");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

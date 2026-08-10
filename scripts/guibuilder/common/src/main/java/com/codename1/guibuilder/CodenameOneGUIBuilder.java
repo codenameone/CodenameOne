@@ -786,6 +786,28 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * Where the character before the caret begins, counting a surrogate pair as one character.
+     *
+     * <p>Taking {@code caret - 1} split an emoji and left an unpaired surrogate behind, which turns
+     * into a replacement character the moment the text is stored.
+     *
+     * @param text the text being edited
+     * @param caret the offset to step back from
+     * @return the offset the preceding code point starts at
+     */
+    static int previousCodePointStart(String text, int caret) {
+        if (caret <= 0) return 0;
+        int at = caret > text.length() ? text.length() : caret;
+        // By hand rather than offsetByCodePoints: that method is outside the Codename One bytecode
+        // subset, and this class is compiled against it.
+        if (at >= 2 && Character.isLowSurrogate(text.charAt(at - 1))
+                && Character.isHighSurrogate(text.charAt(at - 2))) {
+            return at - 2;
+        }
+        return at - 1;
+    }
+
+    /**
      * Backspace inside whatever Codename One text surface has the keyboard.
      *
      * <p>Lives here rather than in the desktop stub so it can be tested: the stub keeps only the
@@ -811,10 +833,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // going anyway.
             if (caret < 0 || caret > text.length()) caret = text.length();
             if (caret == 0) return true;
-            area.setText(text.substring(0, caret - 1) + text.substring(caret));
+            int start = previousCodePointStart(text, caret);
+            area.setText(text.substring(0, start) + text.substring(caret));
             // setText leaves the old offset behind, so the caret ended up one character to the
             // right of the deletion and the next keystroke landed in the wrong place.
-            if (area instanceof TextField) ((TextField) area).setCursorPosition(caret - 1);
+            if (area instanceof TextField) ((TextField) area).setCursorPosition(start);
             return true;
         }
         return false;
@@ -6691,16 +6714,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String out = body;
         int from = 0;
         while (true) {
+            // Every index is found in the masked copy and applied to the original. stripComments()
+            // preserves offsets, so the two line up -- and a "// }" in a legacy constructor no
+            // longer reads as the end of it, which used to cut the constructor in half and leave
+            // its remaining statements loose in the class body.
+            String code = stripComments(out);
             // Whitespace before the parenthesis is legal and formatters produce it, so an exact
             // "name(" search left a reformatted "MyForm (Resources res)" in place beside the
             // regenerated constructors, still calling the initGuiBuilderComponents that is gone.
-            int index = constructorAt(out, className, from);
+            int index = constructorAt(code, className, from);
             if (index < 0) return out;
-            char before = index == 0 ? ' ' : out.charAt(index - 1);
-            int open = out.indexOf("(", index);
-            int parametersEnd = matchingParenthesis(out, open);
-            int close = matchingBrace(out, out.indexOf(")", index));
-            boolean instantiation = index >= 4 && "new ".equals(out.substring(index - 4, index));
+            char before = index == 0 ? ' ' : code.charAt(index - 1);
+            int open = code.indexOf("(", index);
+            int parametersEnd = matchingParenthesis(code, open);
+            int close = matchingBrace(code, code.indexOf(")", index));
+            boolean instantiation = index >= 4 && "new ".equals(code.substring(index - 4, index));
             if (isIdentifierChar(before) || before == '.' || instantiation || close < 0 || parametersEnd < 0) {
                 from = index + className.length();
                 continue;
@@ -6711,7 +6739,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // class will declare or has replaced: the no-arg constructor, the (Resources) one that
             // legacyResourcesConstructor() re-adds as a delegate, and anything still calling the
             // initGuiBuilderComponents that no longer exists.
-            String parameters = out.substring(open + 1, parametersEnd);
+            String parameters = code.substring(open + 1, parametersEnd);
             // Exactly one Resources parameter -- the scaffold's own overload, and the one
             // legacyResourcesConstructor() re-adds. Any parameter list merely containing the word
             // took LoginForm(Resources resources, String title) with it and put back a delegate
@@ -6721,7 +6749,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // The signature alone is not enough. A developer who added setup to the scaffolded
             // constructor -- this(resources); setTitle(loadTitle()); -- loses it, because the
             // generated replacement and the delegate know nothing about those statements.
-            if (scaffolded && hasCustomConstructorBody(out.substring(parametersEnd, close))) {
+            if (scaffolded && hasCustomConstructorBody(code.substring(parametersEnd, close))) {
                 companionRefusal = "Cannot migrate " + className + ": its "
                         + (parameters.trim().length() == 0 ? "no-argument" : parameters.trim())
                         + " constructor does more than the scaffold did, and nothing generated"
@@ -6733,7 +6761,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // that no longer exists, cannot be deleted and cannot be kept: nothing replaces it, and
             // the call it makes is gone. Recorded so migration refuses, which leaves the file
             // intact -- deleting it took the developer's own logic with the signature.
-            if (!scaffolded && out.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0) {
+            if (!scaffolded && code.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0) {
                 companionRefusal = "Cannot migrate " + className + ": its "
                         + parameters.trim() + " constructor calls initGuiBuilderComponents, which this"
                         + " generator does not produce - the file was left untouched";
@@ -6744,7 +6772,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 from = close + 1;
                 continue;
             }
-            int lineStart = out.lastIndexOf("\n", index);
+            int lineStart = code.lastIndexOf("\n", index);
             int cut = lineStart < 0 ? 0 : lineStart;
             out = out.substring(0, cut) + out.substring(close + 1);
             from = cut;
