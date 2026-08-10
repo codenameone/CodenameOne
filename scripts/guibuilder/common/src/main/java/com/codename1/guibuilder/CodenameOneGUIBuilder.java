@@ -4875,8 +4875,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String existingCompanion = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
             String companion = companionSourceFor(existingCompanion);
             if (companionSaveBlocked()) return false;
-            boolean rewriteModel = regenerateModelFor == document //NOPMD CompareObjectsWithEquals
-                    || modelHasDivergedFromTheForm(modelPath);
+            boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
+            if (!rewriteModel && modelHasDivergedFromTheForm(modelPath)) {
+                // Asked, not assumed. saveModelSource() keeps that file exactly as typed, so it
+                // may hold fields, validation annotations and methods this generator knows nothing
+                // about, and replacing it wholesale to add one property would throw those away.
+                rewriteModel = confirmModelRegeneration();
+            }
             String model = rewriteModel ? generatedModelSource() : null;
             if (!rewriteModel && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
                     && !ProjectIO.exists(modelPath)) {
@@ -5377,6 +5382,31 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * Asks whether a model that no longer matches the form may be regenerated.
+     *
+     * <p>Package visible so a test can answer it without a dialog.
+     *
+     * @return true when the caller may replace it
+     */
+    boolean confirmModelRegeneration() {
+        if (modelRegenerationDeclined == document) return false; //NOPMD CompareObjectsWithEquals
+        if (com.codename1.ui.Dialog.show("Regenerate the binding model?",
+                "This form has bindable components the model does not know about, so they will not"
+                + " bind. Regenerate it? Your own changes to that file are replaced.",
+                "Regenerate", "Keep mine")) {
+            return true;
+        }
+        // Remembered for this form, or every save would ask again about a model the user has
+        // already decided to keep.
+        modelRegenerationDeclined = document;
+        setStatus("Kept your model; the components it does not name will not bind");
+        return false;
+    }
+
+    /** The document whose model the user chose to keep as it is. */
+    private GuiDocument modelRegenerationDeclined;
+
+    /**
      * Whether the model on disk still describes the form's bindable components.
      *
      * <p>Regeneration was armed only by a strategy change, so adding, renaming or deleting a
@@ -5399,7 +5429,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // The bound names, not any identifier: both strategies write the name as a string literal
         // -- new Property<>("email", ...) and @Bind(name = "email", ...) -- while a plain
         // identifier search matched a setter parameter and called a stale model current.
-        Set<String> bound = quotedNames(existing);
+        Set<String> bound = boundNames(existing);
         for (Element element : document.components()) {
             if (element == document.root() || !isBindable(value(element, "type", ""))) continue; //NOPMD CompareObjectsWithEquals
             if (!bound.contains(value(element, "name", javaName(element)))) return true;
@@ -5408,25 +5438,53 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * Every string literal in a source file.
+     * The names a model actually binds: the two declaration forms this generator writes.
      *
-     * @param source the text to scan
-     * @return the literal contents, without their quotes
+     * <p>Every string literal was too broad -- an error message or a validation value in a
+     * customised model that happened to equal a component's name made an unbound control look
+     * bound, which is the same class of false positive as matching a setter parameter.
+     *
+     * @param source the model source
+     * @return the bound names
      */
-    private static Set<String> quotedNames(String source) {
+    private static Set<String> boundNames(String source) {
         Set<String> out = new LinkedHashSet<>();
-        int at = source.indexOf('"');
-        while (at >= 0) {
-            int end = at + 1;
-            while (end < source.length() && source.charAt(end) != '"' && source.charAt(end) != '\n') {
-                if (source.charAt(end) == '\\') end++;
-                end++;
-            }
-            if (end >= source.length() || source.charAt(end) != '"') return out;
-            out.add(source.substring(at + 1, end));
-            at = source.indexOf('"', end + 1);
-        }
+        collectBoundNames(source, "new Property<", out, false);
+        collectBoundNames(source, "@Bind(", out, true);
         return out;
+    }
+
+    /**
+     * Adds the name each occurrence of a binding declaration carries.
+     *
+     * @param source the model source
+     * @param marker the text introducing the declaration
+     * @param out where to put the names
+     * @param afterNameAttribute true when the literal follows a {@code name =} attribute
+     */
+    private static void collectBoundNames(String source, String marker, Set<String> out,
+            boolean afterNameAttribute) {
+        int at = source.indexOf(marker);
+        while (at >= 0) {
+            int from = at + marker.length();
+            if (afterNameAttribute) {
+                int name = source.indexOf("name", from);
+                int close = source.indexOf(')', from);
+                if (name < 0 || close >= 0 && name > close) {
+                    at = source.indexOf(marker, from);
+                    continue;
+                }
+                from = name;
+            }
+            int quote = source.indexOf('"', from);
+            int end = quote < 0 ? -1 : source.indexOf('"', quote + 1);
+            // The literal has to be part of this declaration, not the next statement's.
+            int statementEnd = source.indexOf(';', from);
+            if (quote >= 0 && end > quote && (statementEnd < 0 || quote < statementEnd)) {
+                out.add(source.substring(quote + 1, end));
+            }
+            at = source.indexOf(marker, from);
+        }
     }
 
     /**
@@ -7820,6 +7878,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // human who is not there. Same answer mcpOpenForm() gives, for the same reason -- MCP
         // cannot ask, so it refuses.
         if ("save".equals(command)) {
+            // A divergent model would put a modal in front of a client that cannot answer it.
+            if (document != null && modelRegenerationDeclined != document //NOPMD CompareObjectsWithEquals
+                    && modelHasDivergedFromTheForm(companionSourcePath().substring(0,
+                            companionSourcePath().length() - 5) + "Model.java")) {
+                return "The binding model does not know about every component; save from the"
+                        + " toolbar so the regeneration can be confirmed";
+            }
             if (editorBufferIsDirty()) {
                 return "The open editor has unsaved changes; save or close that pane first";
             }

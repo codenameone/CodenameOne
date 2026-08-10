@@ -1413,7 +1413,9 @@ class GeneratedSourceTest {
                 + "<component type=\"TextField\" name=\"added\" hint=\"Added\"/></component>";
         Files.write(guiFile, xml.getBytes(StandardCharsets.UTF_8));
 
-        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder() {
+            @Override boolean confirmModelRegeneration() { return true; }
+        };
         set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
                 + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
                 + "\ncssFile=" + project.resolve("theme.css") + "\n"));
@@ -1452,7 +1454,9 @@ class GeneratedSourceTest {
                 + "<component type=\"TextField\" name=\"value\" hint=\"Value\"/></component>";
         Files.write(guiFile, xml.getBytes(StandardCharsets.UTF_8));
 
-        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder() {
+            @Override boolean confirmModelRegeneration() { return true; }
+        };
         set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
                 + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
                 + "\ncssFile=" + project.resolve("theme.css") + "\n"));
@@ -1498,6 +1502,72 @@ class GeneratedSourceTest {
         String scaffold = legacy.replace("    public LoginForm() {", "    public LoginForm(Resources res) {")
                 .replace("    private Resources res = Resources.getGlobalResources();\n", "");
         assertNotNull(migrate(builder, scaffold, invoke(builder, "defaultCompanionSource")));
+    }
+
+    @Test
+    void aCustomisedModelIsNotReplacedWithoutAsking() throws Exception {
+        // saveModelSource() keeps that file exactly as typed, so it can hold fields, annotations
+        // and methods this generator knows nothing about; adding one property is not a reason to
+        // throw those away without a word.
+        Path project = Files.createTempDirectory("guibuilderModelKept");
+        Path java = Files.createDirectories(project.resolve("src/main/java/com/example"));
+        Path gui = Files.createDirectories(project.resolve("src/main/guibuilder/com/example"));
+        Path guiFile = gui.resolve("LoginForm.gui");
+        String xml = "<component type=\"Form\" name=\"LoginForm\" title=\"Login\" layout=\"BoxLayout\""
+                + " bindingStrategy=\"properties\">"
+                + "<component type=\"TextField\" name=\"email\" hint=\"Email\"/>"
+                + "<component type=\"TextField\" name=\"added\" hint=\"Added\"/></component>";
+        Files.write(guiFile, xml.getBytes(StandardCharsets.UTF_8));
+
+        final boolean[] asked = {false};
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder() {
+            @Override boolean confirmModelRegeneration() {
+                asked[0] = true;
+                return false;
+            }
+        };
+        set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
+                + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
+                + "\ncssFile=" + project.resolve("theme.css") + "\n"));
+        set(builder, "document", GuiDocument.parse(ProjectIO.fsUrl(guiFile.toString()), xml));
+
+        Path model = java.resolve("LoginFormModel.java");
+        String mine = "package com.example;\nimport com.codename1.properties.*;\n"
+                + "public class LoginFormModel implements PropertyBusinessObject {\n"
+                + "    public final Property<String, LoginFormModel> email = new Property<>(\"email\", \"\");\n"
+                + "    public String validate() { return null; }\n"
+                + "    private final PropertyIndex index = new PropertyIndex(this, \"LoginFormModel\", email);\n"
+                + "    @Override public PropertyIndex getPropertyIndex() { return index; }\n}\n";
+        Files.write(model, mine.getBytes(StandardCharsets.UTF_8));
+
+        Method save = CodenameOneGUIBuilder.class.getDeclaredMethod("save");
+        save.setAccessible(true);
+        assertTrue(((Boolean) save.invoke(builder)).booleanValue(), "the form still saves");
+
+        assertTrue(asked[0], "the user must be asked before their model is replaced");
+        assertEquals(mine, new String(Files.readAllBytes(model), StandardCharsets.UTF_8),
+                "declining must leave the model byte for byte as it was");
+    }
+
+    @Test
+    void anUnrelatedLiteralDoesNotMakeAControlLookBound() throws Exception {
+        // Every string literal was too broad: a validation message equal to a component's name
+        // made an unbound control look bound.
+        CodenameOneGUIBuilder builder = builder("none");
+        Method bound = CodenameOneGUIBuilder.class.getDeclaredMethod("boundNames", String.class);
+        bound.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Set<String> names = (java.util.Set<String>) bound.invoke(null,
+                "public class M {\n"
+                + "    public final Property<String, M> email = new Property<>(\"email\", \"\");\n"
+                + "    @Bind(name = \"phone\", attr = BindAttr.TEXT) private String phone;\n"
+                + "    private String message = \"added\";\n"
+                + "    public void setEmail(String value) { }\n}\n");
+
+        assertTrue(names.contains("email"), names.toString());
+        assertTrue(names.contains("phone"), names.toString());
+        assertFalse(names.contains("added"), "a message is not a binding: " + names);
+        assertFalse(names.contains("value"), names.toString());
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
