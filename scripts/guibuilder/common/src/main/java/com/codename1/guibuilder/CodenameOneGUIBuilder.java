@@ -6913,16 +6913,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return removeConstructors(body, className(existing)).trim();
     }
 
-    /**
-     * Index of the real {@code class } keyword, skipping comments.
-     *
-     * <p>A legacy companion's licence header or Javadoc routinely contains prose such as "this
-     * class is", and taking that as the declaration made migration derive the wrong class name and
-     * leave the old constructors in place beside the regenerated ones.
-     *
-     * @param source the companion source
-     * @return the index of the declaration, or 0 when none was found
-     */
     /** The class name the open document's companion carries. */
     private String expectedCompanionClassName() {
         if (document == null || document.path() == null) return "";
@@ -6955,6 +6945,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return -1;
     }
 
+    /**
+     * Index of the companion's own {@code class} keyword.
+     *
+     * <p>Comments are masked first: a licence header or Javadoc routinely contains prose such as
+     * "this class is", and taking that as the declaration made migration derive the wrong class
+     * name and leave the old constructors beside the regenerated ones. The declaration is then
+     * chosen by name, so a helper class declared before the form does not win.
+     *
+     * @param source the companion source
+     * @return the index of the declaration, or 0 when none was found
+     */
     private int classDeclaration(String source) {
         String code = stripComments(source);
         // The companion's own class. A legal package-private helper declared before the form used
