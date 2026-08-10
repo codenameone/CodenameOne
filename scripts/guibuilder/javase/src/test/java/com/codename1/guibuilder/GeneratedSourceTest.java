@@ -1762,6 +1762,47 @@ class GeneratedSourceTest {
                 "a generic return type still marks it a method:\n" + second);
     }
 
+    @Test
+    void theCanvasSaysWhichCssDeclarationsItCannotShow() throws Exception {
+        // The canvas runs the compiler in core, the project is built by the Maven one, and the
+        // difference was passed over in silence while the status line said the preview was updated.
+        CodenameOneGUIBuilder builder = builder("none");
+        Method unsupported = CodenameOneGUIBuilder.class.getDeclaredMethod("unsupportedDeclarations",
+                String.class);
+        unsupported.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> reported = (java.util.List<Object>) unsupported.invoke(builder,
+                "Label {\n  color: #ff0000;\n  font-size: 3mm;\n}\n");
+        assertEquals(1, reported.size(), "one declaration the canvas drops: " + reported);
+        assertTrue(reported.get(0).toString().contains("font-size")
+                        || describe(reported.get(0)).contains("font-size"),
+                "and it names the property: " + describe(reported.get(0)));
+
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> clean = (java.util.List<Object>) unsupported.invoke(builder,
+                "Label { color: #ff0000; background-color: #00ff00; padding: 2mm; margin: 1mm; }\n");
+        assertTrue(clean.isEmpty(), "everything here reaches the canvas: " + clean);
+
+        // A comment is not a declaration.
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> commented = (java.util.List<Object>) unsupported.invoke(builder,
+                "Label {\n  /* font-size: 3mm; */\n  color: #ff0000;\n}\n");
+        assertTrue(commented.isEmpty(), "a commented-out declaration is not reported: " + commented);
+    }
+
+    private static String describe(Object diagnostic) throws Exception {
+        for (String getter : new String[]{"getMessage", "getDescription", "getText"}) {
+            try {
+                Method m = diagnostic.getClass().getMethod(getter);
+                return String.valueOf(m.invoke(diagnostic));
+            } catch (NoSuchMethodException keepLooking) {
+                continue;
+            }
+        }
+        return diagnostic.toString();
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

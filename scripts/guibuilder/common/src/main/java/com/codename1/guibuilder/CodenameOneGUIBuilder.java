@@ -5270,9 +5270,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             new CSSThemeCompiler().compile(css, resources, "ProjectTheme");
             projectTheme = resources.getTheme("ProjectTheme");
             normalizeCompiledTheme(projectTheme);
-            editor.setDiagnostics(new ArrayList<CodeDiagnostic>());
+            // Declarations this compiler does not implement are reported rather than passed over.
+            // The canvas runs the Codename One CSS compiler that ships in core, while the project
+            // is built by the Maven one, which understands more -- font-size and font-style among
+            // them. Silently dropping those and announcing success let the canvas differ from the
+            // built application with nothing to say so.
+            List<CodeDiagnostic> ignored = unsupportedDeclarations(css);
+            editor.setDiagnostics(ignored);
             refreshProjectThemeOnPreview();
-            setStatus("CSS compiled • live preview updated");
+            setStatus(ignored.isEmpty() ? "CSS compiled • live preview updated"
+                    : "CSS compiled • " + ignored.size()
+                            + " declaration(s) the canvas cannot show are marked in the editor");
             return true;
         } catch (RuntimeException ex) {
             List<CodeDiagnostic> diagnostics = new ArrayList<>();
@@ -5280,6 +5288,92 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             editor.setDiagnostics(diagnostics);
             setStatus("CSS error • fix the highlighted problem before saving");
             return false;
+        }
+    }
+
+    /**
+     * The declarations the canvas compiler drops.
+     *
+     * <p>Measured rather than listed: each property the stylesheet uses is compiled on its own
+     * against a baseline rule, and one that adds nothing to the theme is one the preview cannot
+     * show. A hand-kept list of supported properties would go stale the first time the compiler
+     * learned another one, and it would go stale silently.
+     *
+     * @param css the stylesheet
+     * @return a diagnostic per declaration that will not reach the canvas
+     */
+    private List<CodeDiagnostic> unsupportedDeclarations(String css) {
+        List<CodeDiagnostic> out = new ArrayList<>();
+        Set<String> baseline = compiledKeys("");
+        if (baseline == null) return out;
+        Map<String, Boolean> judged = new LinkedHashMap<>();
+        String masked = stripComments(css);
+        int line = 1;
+        for (int at = 0; at < masked.length(); at++) {
+            char c = masked.charAt(at);
+            if (c == '\n') {
+                line++;
+                continue;
+            }
+            if (c != ':') continue;
+            int nameEnd = at;
+            while (nameEnd > 0 && Character.isWhitespace(masked.charAt(nameEnd - 1))) nameEnd--;
+            int nameStart = nameEnd;
+            while (nameStart > 0 && isCssNameChar(masked.charAt(nameStart - 1))) nameStart--;
+            int valueEnd = masked.indexOf(';', at);
+            int blockEnd = masked.indexOf('}', at);
+            if (valueEnd < 0 || blockEnd >= 0 && blockEnd < valueEnd) valueEnd = blockEnd;
+            if (nameStart >= nameEnd || valueEnd < 0) continue;
+            String property = css.substring(nameStart, nameEnd).trim();
+            String value = css.substring(at + 1, valueEnd).trim();
+            if (property.length() == 0 || value.length() == 0 || property.startsWith("@")) continue;
+            Boolean supported = judged.get(property);
+            if (supported == null) {
+                Set<String> withProperty = compiledKeys(property + ": " + value + ";");
+                supported = Boolean.valueOf(withProperty == null || !withProperty.equals(baseline));
+                judged.put(property, supported);
+            }
+            if (!supported.booleanValue()) {
+                out.add(new CodeDiagnostic(line, nameStart - lineStartBefore(masked, nameStart) + 1,
+                        property + " is not applied by the canvas compiler; the built application"
+                        + " will still honour it"));
+            }
+        }
+        return out;
+    }
+
+    /** True for the characters a CSS property name is made of. */
+    private static boolean isCssNameChar(char c) {
+        return c == '-' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9';
+    }
+
+    /** The offset the line containing {@code at} starts on. */
+    private static int lineStartBefore(String text, int at) {
+        return text.lastIndexOf('\n', Math.max(0, at - 1)) + 1;
+    }
+
+    /**
+     * The theme keys a single probe rule produces, or null when it cannot be compiled.
+     *
+     * @param declaration the declaration to add to the probe rule
+     * @return the keys, or null
+     */
+    private Set<String> compiledKeys(String declaration) {
+        try {
+            MutableResource probe = new MutableResource();
+            new CSSThemeCompiler().compile("CanvasCssProbe { color: #010203; " + declaration + " }",
+                    probe, "Probe");
+            Set<String> keys = new LinkedHashSet<>();
+            Hashtable theme = probe.getTheme("Probe");
+            if (theme == null) return null;
+            // Key and value: the baseline rule sets a colour of its own, so comparing key names
+            // alone made "color" look like a property that changes nothing.
+            for (Object key : theme.keySet()) {
+                keys.add(String.valueOf(key) + "=" + String.valueOf(theme.get(key)));
+            }
+            return keys;
+        } catch (RuntimeException unreadable) {
+            return null;
         }
     }
 
