@@ -157,14 +157,16 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
         if (platform.contains("android")) {
             if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
-                String apkName = project.getBuild().getFinalName() + ".apk";
-                File apkFile = new File(project.getBuild().getDirectory() + File.separator + apkName);
+                File apkFile = androidApkFile();
                 try {
-                    // The up-to-date check is source-timestamp only, so it cannot see a hardening request
-                    // that arrived via a build hint (e.g. -Dcodename1.arg.harden.level=standard). When the
-                    // pre-flight above resolved that hardening WILL run, never reuse a cached APK -- it may
-                    // have been built unhardened -- and rebuild so the request is honored.
-                    if (!hardeningWillRun && apkFile.exists()
+                    // Up-to-date only when the APK is newer than the sources AND was built with the SAME
+                    // hardening outcome, recorded in the marker beside it. The source-timestamp check cannot
+                    // see a hardening change made through a build hint, so a change in EITHER direction --
+                    // enabling hardening (a stale unhardened APK) or disabling it (a stale hardened APK) --
+                    // must invalidate the cache and rebuild, rather than publish an APK that contradicts the
+                    // current configuration.
+                    if (apkFile.exists()
+                            && hardeningCacheKey.equals(readTextFileOrNull(androidHardeningCacheMarker()))
                             && apkFile.lastModified() >= getSourcesModificationTime()) {
                         getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
                         return;
@@ -184,6 +186,53 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             getLog().error("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage());
             throw new MojoExecutionException("Failed to merge properties from library "+ex.libName+".  " + ex.getMessage(), ex);
         }
+
+        // Record the hardening outcome this APK was built with, so a later invocation that changes
+        // hardening (in either direction) invalidates the timestamp-only up-to-date cache above.
+        if (platform.contains("android") && !BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
+            File marker = androidHardeningCacheMarker();
+            if (androidApkFile().exists()) {
+                try {
+                    writeStringToFile(marker, hardeningCacheKey);
+                } catch (IOException ex) {
+                    getLog().debug("Could not record the hardening cache key at " + marker, ex);
+                }
+            }
+        }
+    }
+
+    /** The Android APK this build produces (also the cache key's anchor). */
+    private File androidApkFile() {
+        String apkName = project.getBuild().getFinalName() + ".apk";
+        return new File(project.getBuild().getDirectory() + File.separator + apkName);
+    }
+
+    /** The marker recording the hardening outcome the cached APK was built with, beside the APK. */
+    private File androidHardeningCacheMarker() {
+        File apk = androidApkFile();
+        return new File(apk.getParentFile(), apk.getName() + ".cn1hardenkey");
+    }
+
+    /** Reads a small text file's trimmed content, or {@code null} if it is absent or unreadable. */
+    private static String readTextFileOrNull(File f) {
+        if (f == null || !f.isFile()) {
+            return null;
+        }
+        try {
+            return new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                    java.nio.charset.Charset.forName("UTF-8")).trim();
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    /** Writes {@code content} to {@code f} (UTF-8), creating parent directories as needed. */
+    private static void writeStringToFile(File f, String content) throws IOException {
+        if (f.getParentFile() != null) {
+            f.getParentFile().mkdirs();
+        }
+        java.nio.file.Files.write(f.toPath(),
+                content.getBytes(java.nio.charset.Charset.forName("UTF-8")));
     }
 
     /**
@@ -205,9 +254,13 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     private boolean hardeningForceOff;
     private String hardeningLibraryJars;
     /** True once the pre-flight has resolved that hardening will ACTUALLY run for this build (non-off,
-     * not force-off): such a build must not be served the timestamp-only up-to-date cache, whose staleness
-     * check ignores build hints, or an off->standard request could reuse a previously-built unhardened APK. */
+     * not force-off). Used to publish the library classpath the engine needs. */
     private boolean hardeningWillRun;
+    /** A fingerprint of the hardening OUTCOME for this build ("unhardened", or "hardened:&lt;level&gt;"),
+     * recorded next to the Android APK so the timestamp-only up-to-date cache -- which cannot see a
+     * hardening change made through a build hint -- is invalidated when the outcome changes in EITHER
+     * direction (enabling or disabling hardening), not just off-&gt;on. */
+    private String hardeningCacheKey = "unhardened";
 
     /** Injects the pre-flight hardening decisions into this build's request (per-build, not global). */
     private void applyHardeningRequestArgs(BuildRequest r) {
@@ -298,6 +351,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             hardeningForceOff = false;
         }
         hardeningWillRun = !"off".equalsIgnoreCase(level.trim()) && !r.isForceOff();
+        // The APK's hardening OUTCOME: an unhardened build has one key regardless of the nominal level, so
+        // two off/force-off invocations still hit the cache; a hardened build keys on the level so a
+        // standard->paranoid change also rebuilds. Compared against the marker recorded beside the APK.
+        hardeningCacheKey = hardeningWillRun ? "hardened:" + level.trim().toLowerCase() : "unhardened";
         // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
         // jars (so an application method that overrides a framework method is not renamed apart from
         // its superclass). Only needed when hardening will actually run.
