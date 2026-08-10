@@ -717,6 +717,13 @@ class WatchNativeBuilderTest {
         // watchOS framework) and steps aside rather than withholding a module the sources import.
         assertTrue(ruby.contains("strict_products"), ruby);
         assertTrue(ruby.contains("unattributed"), ruby);
+        // Conditional-compilation regions: an import the Swift compiler excludes is not a watch
+        // dependency, and once a watchOS arm is taken the other arms are excluded too -- a single
+        // "am I suppressed" flag kept both arms of `#if os(watchOS) ... #else ... #endif`.
+        assertTrue(ruby.contains("cn1_watch_strip_non_watch"), ruby);
+        assertTrue(ruby.contains("decided << true") && ruby.contains("decided[i]"),
+                "the taken-arm state is what drops the else of a watch-first branch: " + ruby);
+        assertTrue(ruby.contains("cn1_watch_selects_watch"), ruby);
         assertTrue(ruby.contains("matches no product name"),
                 "stepping aside has to be logged, or a mirrored iOS-only package looks arbitrary: "
                         + ruby);

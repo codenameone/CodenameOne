@@ -1990,39 +1990,58 @@ class WatchNativeBuilder {
         // does need is the worse failure of the two and the one that produces no explanation.
         s.append("def cn1_watch_strip_non_watch(src)\n")
                 .append("  out = []\n")
-                .append("  suppressed_at = nil\n")
-                .append("  depth = 0\n")
+                // A STACK per level, and two facts about each: whether this arm is suppressed, and
+                // whether an arm that positively applies to watchOS has already been taken. The
+                // second is what makes `#if os(watchOS) ... #else ... #endif` drop its else -- a
+                // single "am I suppressed" flag only ever switched arms when the FIRST one was
+                // suppressed, so both arms of a watch-first branch were kept and an iOS-only
+                // package imported by the else was mirrored onto the watch.
+                .append("  suppressed = []\n")
+                .append("  decided = []\n")
                 .append("  src.each_line do |line|\n")
                 .append("    t = line.strip\n")
                 .append("    if t.start_with?('#if')\n")
-                .append("      depth += 1\n")
-                .append("      if suppressed_at.nil? && cn1_watch_excludes_watch(t)\n")
-                .append("        suppressed_at = depth\n")
+                .append("      if cn1_watch_excludes_watch(t)\n")
+                .append("        suppressed << true; decided << false\n")
+                .append("      elsif cn1_watch_selects_watch(t)\n")
+                .append("        suppressed << false; decided << true\n")
+                .append("      else\n")
+                // Unevaluatable -- a custom flag, an ObjC macro, a compiler-version test. Both arms
+                // are kept, because guessing either way risks dropping an import the watch needs.
+                .append("        suppressed << false; decided << false\n")
                 .append("      end\n")
                 .append("      next\n")
                 .append("    elsif t.start_with?('#elseif') || t.start_with?('#else')\n")
-                // The other arm of a branch we suppressed is the arm that DOES apply to watchOS,
-                // unless it too names a platform that is not one.
-                .append("      if suppressed_at == depth\n")
-                .append("        suppressed_at = cn1_watch_excludes_watch(t) ? depth : nil\n")
+                .append("      next if suppressed.empty?\n")
+                .append("      i = suppressed.length - 1\n")
+                .append("      if decided[i]\n")
+                .append("        suppressed[i] = true\n")
+                .append("      elsif cn1_watch_excludes_watch(t)\n")
+                .append("        suppressed[i] = true\n")
+                .append("      else\n")
+                .append("        suppressed[i] = false\n")
+                .append("        decided[i] = true\n")
                 .append("      end\n")
                 .append("      next\n")
                 .append("    elsif t.start_with?('#endif')\n")
-                .append("      suppressed_at = nil if suppressed_at == depth\n")
-                .append("      depth -= 1 if depth > 0\n")
+                .append("      suppressed.pop; decided.pop\n")
                 .append("      next\n")
                 .append("    end\n")
-                .append("    out << line if suppressed_at.nil?\n")
+                .append("    out << line unless suppressed.any?\n")
                 .append("  end\n")
                 .append("  out.join\n")
                 .append("end\n")
                 .append("def cn1_watch_excludes_watch(condition)\n")
                 .append("  return false unless condition.include?('os(')\n")
-                // Positively naming watchOS keeps the block; negating it drops the block.
                 .append("  return true if condition =~ /!\\s*os\\(\\s*watchOS\\s*\\)/\n")
                 .append("  return false if condition.include?('os(watchOS)')\n")
                 .append("  condition =~ /os\\(\\s*(iOS|macOS|tvOS|visionOS|Linux|Windows|Android)"
                         + "\\s*\\)/ ? true : false\n")
+                .append("end\n")
+                /// Positively naming watchOS, which is what lets the other arms be dropped.
+                .append("def cn1_watch_selects_watch(condition)\n")
+                .append("  condition.include?('os(watchOS)') && "
+                        + "!(condition =~ /!\\s*os\\(\\s*watchOS\\s*\\)/)\n")
                 .append("end\n");
 
         // Mirrored only when the WATCH sources actually import the product.
