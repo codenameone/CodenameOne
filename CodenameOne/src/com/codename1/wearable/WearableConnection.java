@@ -1213,7 +1213,20 @@ public final class WearableConnection {
         }
         synchronized (pendingMessages) {
             messageListeners.clear();
-            pendingMessages.clear();
+            // The QUEUE survives the reload, unlike the listeners.
+            //
+            // A parked message is one nothing has received yet, and there is nothing to receive it
+            // from a second time: the port consumed the socket frame to park it, and no later
+            // enumeration reconstructs a live message the way a replicated value is re-read above.
+            // Clearing it therefore lost the payload outright, and a reply-bearing request left the
+            // peer waiting out its whole timeout for an answer no code would ever be asked for.
+            //
+            // Safe to keep, because a parked delivery captures the payload and NOT the listeners:
+            // it resolves them through messageListenerSnapshot() when it finally runs, which is the
+            // reloaded app's set. That is the same reason the replicated paths are handed back
+            // rather than dropped.
+            //
+            // Nothing else needs resetting here: the pending list is its own drain state.
         }
         synchronized (stateListeners) {
             stateListeners.clear();

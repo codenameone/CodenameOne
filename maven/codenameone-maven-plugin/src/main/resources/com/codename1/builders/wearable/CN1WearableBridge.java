@@ -1411,7 +1411,7 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
-    /// Whether this process can actually run app code, rather than merely hold it in a queue.
+    /// Whether this process can run app code AND nothing older is still waiting to be replayed.
     private static boolean deliverableNow(Context context) {
         try {
             if (!com.codename1.ui.Display.isInitialized()) {
@@ -1421,9 +1421,25 @@ public class CN1WearableBridge implements WearableBridge {
             return false;
         }
         // Initialized, so anything already spooled has to go FIRST -- otherwise a delivery written
-        // moments ago would arrive after one that happened later.
+        // moments ago would arrive after one that happened later. Returns at once if another worker
+        // already owns the drain.
         drainSpool(context);
-        return true;
+        // And a live event does NOT overtake that drain. Answering true while an owner was midway
+        // through the store let the message worker hand the app a NEW event before the data worker
+        // had queued an older spooled one -- the reversal the single owner was supposed to end,
+        // arriving through the other door. Saying no here spools this event instead, so it takes a
+        // later key than everything outstanding and the owner replays it in order.
+        return !spoolBusy();
+    }
+
+    /// Whether a drain is running or any claimed record has yet to be confirmed.
+    ///
+    /// In-flight records count: one parked for want of a listener has not reached the app, and a
+    /// live event delivered past it would arrive first.
+    private static boolean spoolBusy() {
+        synchronized (SPOOL_LOCK) {
+            return spoolDraining || !SPOOL_IN_FLIGHT.isEmpty();
+        }
     }
 
     private static boolean spool(Context context, String kind, String path, byte[] payload) {
