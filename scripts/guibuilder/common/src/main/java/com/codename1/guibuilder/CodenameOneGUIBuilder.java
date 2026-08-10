@@ -6435,10 +6435,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int at = constructorAt(code, className, 0);
         while (at >= 0) {
             int open = code.indexOf('(', at);
-            int close = code.indexOf(')', open);
+            // Balanced, like removeConstructors(): the first ')' is the annotation's in
+            // "@Named(\"theme\") Resources resources", so this stopped recognising the overload
+            // while the removal path -- which counts nesting -- still took it away. No delegate
+            // was added and every caller of the old constructor stopped compiling.
+            int close = matchingParenthesis(code, open);
             // The same test removeConstructors() uses, so the delegate is added exactly when the
             // constructor it stands in for was taken away.
             if (close > open && isSingleParameterOfType(code.substring(open + 1, close), "Resources")) {
+                // The delegate declares a plain parameter, so an annotation on the original one is
+                // not something it can reproduce either.
+                if (code.substring(open + 1, close).indexOf('@') >= 0) {
+                    companionRefusal = "Cannot migrate " + className + ": its Resources constructor"
+                            + " has an annotated parameter, and the delegate that replaces it"
+                            + " cannot carry that - the file was left untouched";
+                    setStatus(companionRefusal);
+                    return "";
+                }
                 // The scaffold's own constructors live inside the DON'T EDIT block and are dropped
                 // with it, so this delegate is their only replacement -- and it cannot carry an
                 // annotation the original had, which would leave DI blind to a class that still

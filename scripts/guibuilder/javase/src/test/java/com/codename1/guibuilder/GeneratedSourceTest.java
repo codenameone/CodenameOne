@@ -1100,6 +1100,32 @@ class GeneratedSourceTest {
         assertNotNull(migrate(builder, scaffold, invoke(builder, "defaultCompanionSource")));
     }
 
+    @Test
+    void anAnnotatedResourcesParameterIsRecognisedRatherThanSilentlyDropped() throws Exception {
+        // The delegate path stopped at the annotation's closing parenthesis while the removal path
+        // counted nesting, so the constructor was taken away and nothing replaced it -- every
+        // caller of new LoginForm(resources) stopped compiling.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm(@SuppressWarnings(\"x\") Resources res) { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "an annotated parameter the delegate cannot reproduce must refuse");
+
+        // Unannotated, the overload is recognised and the delegate is added as before.
+        String plain = legacy.replace("@SuppressWarnings(\"x\") ", "");
+        String migrated = migrate(builder, plain, invoke(builder, "defaultCompanionSource"));
+        assertNotNull(migrated, "the ordinary overload still migrates");
+        assertTrue(migrated.contains("Resources resourceObjectInstance"),
+                "and its callers keep a constructor to call:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
