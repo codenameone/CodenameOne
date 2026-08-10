@@ -6313,6 +6313,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // later save and rebuilds the declaration from the template, so a registration marker
         // survived migration and vanished on the next save.
         withImports = carryClassAnnotations(existing, withImports);
+        // And the interfaces. This is the fourth thing migration adds outside the marker regions
+        // that this branch had to be taught to reapply, after the imports, the trailing
+        // declarations and the annotations -- so this time I went through what migration does and
+        // there is nothing left: everything else it adds lands inside the user region, which is
+        // carried verbatim.
+        withImports = carryImplements(withImports, headerClause(legacyClassHeader(existing), "implements"));
         int keepStart = markerLine(withImports, startMarker, 0);
         int keepEnd = markerLine(withImports, endMarker, keepStart < 0 ? 0 : keepStart);
         if (keepStart < 0 || keepEnd < keepStart) {
@@ -7193,9 +7199,42 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (at < 0) return -1;
             int after = at + className.length();
             int open = skipSpaces(code, after);
-            if (open < code.length() && code.charAt(open) == '(') return at;
+            char before = at == 0 ? ' ' : code.charAt(at - 1);
+            // Whole word, and nothing but modifiers in front of it: "void LoginForm(Resources r)"
+            // is a legal method, and taking it for a constructor let removeConstructors() delete
+            // it -- its callers stopped compiling for a migration they had nothing to do with.
+            if (!isIdentifierChar(before) && before != '.'
+                    && (after >= code.length() || !isIdentifierChar(code.charAt(after)))
+                    && open < code.length() && code.charAt(open) == '('
+                    && !hasReturnType(code, at)) {
+                return at;
+            }
             at = after;
         }
+    }
+
+    /** The modifiers that may legally precede a constructor name. */
+    private static final String CONSTRUCTOR_MODIFIERS = "|public|protected|private|final|strictfp|";
+
+    /**
+     * True when a type precedes the name, which makes it a method rather than a constructor.
+     *
+     * @param code the comment masked source
+     * @param nameAt the index of the matched name
+     * @return true when the declaration has a return type
+     */
+    private static boolean hasReturnType(String code, int nameAt) {
+        int end = nameAt;
+        while (end > 0 && Character.isWhitespace(code.charAt(end - 1))) end--;
+        if (end == 0) return false;
+        // Generics and arrays end a return type without being identifier characters.
+        char last = code.charAt(end - 1);
+        if (last == '>' || last == ']') return true;
+        int start = end;
+        while (start > 0 && isIdentifierChar(code.charAt(start - 1))) start--;
+        if (start == end) return false;
+        String token = code.substring(start, end);
+        return CONSTRUCTOR_MODIFIERS.indexOf("|" + token + "|") < 0;
     }
 
     /**

@@ -1234,6 +1234,57 @@ class GeneratedSourceTest {
         }
     }
 
+    @Test
+    void anImplementsClauseSurvivesEverySaveNotJustTheMigration() throws Exception {
+        // Migration keeps it once; the ordinary branch rebuilds the declaration from the template,
+        // so the class quietly stopped implementing the interface on the next save and any
+        // @Override among the carried members stopped compiling with it.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import java.util.Observer;\nimport java.util.Observable;\n"
+                + "public class LoginForm extends Form implements Observer {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    @Override public void update(Observable o, Object arg) { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+        assertTrue(migrated.contains("implements Observer"), migrated);
+
+        String saved = merge(builder, migrated, invoke(builder, "defaultCompanionSource"));
+        assertTrue(saved.contains("implements Observer"), "the second save must keep it:\n" + saved);
+        String third = merge(builder, saved, invoke(builder, "defaultCompanionSource"));
+        assertEquals(1, countOccurrences(third, "implements Observer"),
+                "and every save after that, exactly once:\n" + third);
+        compile("LoginForm", third, null);
+    }
+
+    @Test
+    void aMethodNamedAfterTheClassIsNotAConstructor() throws Exception {
+        // "void LoginForm(Resources r)" is a legal method; treating it as a constructor deleted it
+        // during migration and its callers stopped compiling.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    void LoginForm(Resources resources) { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertTrue(migrated.contains("void LoginForm(Resources resources)"),
+                "the method must survive:\n" + migrated);
+        assertFalse(migrated.contains("initGuiBuilderComponents"),
+                "while the real constructor is still removed:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
