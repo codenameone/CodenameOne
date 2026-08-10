@@ -205,6 +205,29 @@ public class SEDatabaseConformanceTest {
         }
     }
 
+    @Test
+    public void aWrappedConnectionIsVisibleToAnotherHandlesKeyChange() throws Exception {
+        // The connection-taking constructor takes the file from the connection's own JDBC URL. An
+        // unregistered handle is invisible to the sole-connection check, so a database opened the
+        // ordinary way could be re-keyed while this one held it open and read on through the
+        // rewrite.
+        SEDatabase wrapped = new SEDatabase(openPlain(dbFile));
+        try {
+            boolean refused = false;
+            try {
+                db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException expected) {
+                refused = true;
+            }
+            assertTrue(refused, "the other open handle was seen");
+        } finally {
+            wrapped.close();
+        }
+
+        // And once it closes, the key change goes through.
+        db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+    }
+
     private static Connection openPlain(File f) throws Exception {
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);

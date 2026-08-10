@@ -27,6 +27,7 @@ import com.codename1.db.Database;
 import com.codename1.db.DatabaseConfig;
 import com.codename1.impl.SQLStatementSplitter;
 
+import java.io.File;
 import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -51,6 +52,20 @@ public class SEDatabase extends Database {
      */
     private String databaseName;
 
+    /// The registry key for a database file: canonical where the filesystem gives one, absolute
+    /// otherwise. Canonical resolves "." segments and symlinks, which is what makes two spellings
+    /// of one path a single entry.
+    static String canonicalDatabaseFileKey(File f) {
+        try {
+            return f.getCanonicalPath();
+        } catch (IOException cannotResolve) {
+            return f.getAbsolutePath();
+        }
+    }
+
+    /// The prefix every SQLite JDBC URL carries, and everything after it is the file.
+    private static final String SQLITE_URL_PREFIX = "jdbc:sqlite:";
+
     /** The resolved file this connection holds, as the open-database registry knows it. */
     private String openKey;
 
@@ -60,8 +75,52 @@ public class SEDatabase extends Database {
      */
     private final List<SECursor> openCursors = new ArrayList<SECursor>();
 
+    /**
+     * Wraps a connection somebody else opened.
+     *
+     * <p>The file is taken from the connection's own JDBC URL rather than left unknown. An
+     * unregistered handle is invisible to the sole-connection check, so a database opened the
+     * ordinary way could be re-keyed while this one held it open and read on through the rewrite.
+     * Where the URL names no file -- an in-memory database, or a driver that does not report one
+     * -- there is nothing to register, and a key change through this handle is refused rather than
+     * performed without knowing what else holds the file.
+     */
     public SEDatabase(java.sql.Connection conn) throws IOException {
-        this(conn, null, null);
+        String fromUrl = fileFromConnection(conn);
+        reserveConnection(fromUrl);
+        boolean kept = false;
+        try {
+            init(conn, null, fromUrl);
+            kept = true;
+        } finally {
+            if (!kept) {
+                releaseConnection(fromUrl);
+            }
+        }
+    }
+
+    /// The database file a JDBC connection is open on, canonicalized, or null.
+    private static String fileFromConnection(java.sql.Connection conn) {
+        String url;
+        try {
+            url = conn.getMetaData().getURL();
+        } catch (SQLException cannotAsk) {
+            return null;
+        }
+        if (url == null || !url.startsWith(SQLITE_URL_PREFIX)) {
+            return null;
+        }
+        String path = url.substring(SQLITE_URL_PREFIX.length());
+        int query = path.indexOf('?');
+        if (query >= 0) {
+            path = path.substring(0, query);
+        }
+        if (path.length() == 0 || path.startsWith(":")) {
+            // ":memory:" and the like name no file, so there is nothing for another connection to
+            // hold and nothing to register.
+            return null;
+        }
+        return canonicalDatabaseFileKey(new File(path));
     }
 
     /**

@@ -287,7 +287,17 @@ public class ThreadSafeDatabase extends Database {
             try {
                 underlying.close();
             } finally {
-                et.kill();
+                // Queued, not immediate. Another thread can already be waiting on a synchronous
+                // hand-off that is sitting behind the task making this call: killing the worker
+                // here ends its loop as soon as that task returns, and that caller waits forever.
+                // A kill queued at the back runs after those callbacks, which now find a closed
+                // database and fail with it rather than never being answered at all.
+                et.run(new Runnable() {
+                    @Override
+                    public void run() {
+                        et.kill();
+                    }
+                });
             }
             return;
         }
