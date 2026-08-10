@@ -365,20 +365,27 @@ public final class DatabaseConfig {
         }
     }
 
+    /// The length of the literal `#toKeyLiteral(byte[])` writes: `x'`, 64 hex digits, `'`.
+    private static final int RAW_KEY_LITERAL_LENGTH = 67;
+
     /// Whether a string is exactly the literal an engine reads as 32 raw bytes.
     ///
     /// `x'` then 64 hexadecimal digits then `'`, which is what `#toKeyLiteral(byte[])` writes.
     static boolean looksLikeRawKeyLiteral(String value) {
-        if (value == null || value.length() != 68) {
+        // 67: "x'" is two, the digits are sixty-four, the closing quote is one. Requiring 68
+        // meant the literal toKeyLiteral actually writes was never recognized, so the rejection
+        // this method exists for never fired and such a passphrase reached the engines as a raw
+        // key -- exactly the silent skip of the derivation it was written to prevent.
+        if (value == null || value.length() != RAW_KEY_LITERAL_LENGTH) {
             return false;
         }
         if (value.charAt(0) != 'x' && value.charAt(0) != 'X') {
             return false;
         }
-        if (value.charAt(1) != '\'' || value.charAt(67) != '\'') {
+        if (value.charAt(1) != '\'' || value.charAt(RAW_KEY_LITERAL_LENGTH - 1) != '\'') {
             return false;
         }
-        for (int iter = 2; iter < 66; iter++) {
+        for (int iter = 2; iter < RAW_KEY_LITERAL_LENGTH - 1; iter++) {
             char c = value.charAt(iter);
             boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
             if (!hex) {

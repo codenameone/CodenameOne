@@ -510,6 +510,31 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
+    void aPassphraseShapedLikeARawKeyIsRefused() {
+        // Built from toKeyLiteral rather than written out here, so the check and the thing it
+        // guards against cannot drift apart: the first version of this required 68 characters
+        // where the literal is 67, so it matched nothing and the rejection never fired -- and such
+        // a passphrase reached the engines as raw bytes, skipping the derivation it promises.
+        byte[] key = new byte[32];
+        for (int iter = 0; iter < key.length; iter++) {
+            key[iter] = (byte) iter;
+        }
+        String literal = DatabaseConfig.toKeyLiteral(key);
+        assertEquals(67, literal.length(), "x', 64 hex digits, closing quote");
+
+        boolean refused = false;
+        try {
+            DatabaseConfig.passphrase(literal);
+        } catch (IllegalArgumentException expected) {
+            refused = true;
+        }
+        assertTrue(refused, "a passphrase in raw-key form is refused, not silently used as one");
+
+        // One character longer is not that form, so it is an ordinary passphrase.
+        DatabaseConfig.passphrase(literal + "x");
+    }
+
+    @Test
     void anOrdinaryScriptLeavesTheStateAlone() {
         db.ran("CREATE TABLE t (a INTEGER); INSERT INTO t VALUES (1)");
         assertFalse(db.isInTransaction());

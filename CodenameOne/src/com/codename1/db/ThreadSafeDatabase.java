@@ -635,6 +635,17 @@ public class ThreadSafeDatabase extends Database {
 
         @Override
         public void close() throws IOException {
+            if (et.isThisIt()) {
+                // Before the lock, like every other entry point: another thread can hold
+                // dispatchLock while waiting for this worker, so taking it here would leave the
+                // two waiting on each other. The read of `closed` is safe for the same reason --
+                // one worker, so no close can be running on it concurrently.
+                if (closed) {
+                    return;
+                }
+                underlyingCursor.close();
+                return;
+            }
             // Under the lock so the database cannot close between the check and the hand-off,
             // which would turn this no-op into a spurious "database has been closed". The monitor
             // is reentrant, so the nested acquisition inside invokeWithException is free.
