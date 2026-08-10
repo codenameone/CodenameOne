@@ -147,6 +147,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             return;
         }
 
+        // Run the hardening pre-flight BEFORE the Android up-to-date cache short-circuit below. The cache
+        // check keys only on source-file timestamps (getSourcesModificationTime), not on build hints, so an
+        // explicit hardening request -- especially one made via a -D command-line property -- would
+        // otherwise return a stale, potentially unhardened APK without the pre-flight ever validating (or
+        // refusing) it. Checking here means an invalid/unsupported hardening request fails loudly instead
+        // of silently succeeding with the cached artifact.
+        applyHardeningPreflight();
+
         if (platform.contains("android")) {
             if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 String apkName = project.getBuild().getFinalName() + ".apk";
@@ -161,8 +169,6 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
             }
         }
-
-        applyHardeningPreflight();
 
         try {
             createAntProject();
@@ -214,6 +220,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 getLog().debug("Could not read codenameone_settings.properties for hardening pre-flight", ex);
             }
         }
+        // Overlay -D command-line hints (e.g. -Dcodename1.arg.harden.level=standard) so an explicit
+        // hardening request made only on the command line is seen by this early check -- and, because this
+        // runs before the Android up-to-date cache short-circuit, is not silently dropped when a prior APK
+        // is newer than the sources (getSourcesModificationTime does not account for build hints).
+        overlayCommandLineBuildHints(settings);
         applyHardeningPreflight(settings);
     }
 
