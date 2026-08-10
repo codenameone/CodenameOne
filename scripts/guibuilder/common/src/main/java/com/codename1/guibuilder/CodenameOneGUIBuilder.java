@@ -6416,8 +6416,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // Self-contained, like mergeGeneratedSource(): this is reachable on its own, and a refusal
         // left over from the previous file must not decide this one.
         companionRefusal = null;
-        int legacyStart = existing.indexOf(LEGACY_GENERATED_START);
-        int legacyEnd = existing.indexOf(LEGACY_GENERATED_END);
+        // markerLine, not indexOf: the same rule the new-format merger uses. Either marker quoted
+        // in a string or mentioned in a comment above the scaffold was picked instead of the real
+        // one, and legacyUserMembers() then cut from that offset to the real end marker -- taking
+        // the developer's members with it.
+        int legacyStart = markerLine(existing, LEGACY_GENERATED_START, 0);
+        int legacyEnd = markerLine(existing, LEGACY_GENERATED_END, legacyStart < 0 ? 0 : legacyStart);
         if (legacyStart < 0 || legacyEnd < legacyStart) return null;
         // Migration rebuilds the header from the .gui, so a companion customised to extend a
         // project base class would have lost it on the first save, along with whatever that base
@@ -6490,7 +6494,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String code = stripComments(existing);
         int at = classDeclaration(existing);
         if (at < 0 || at == 0 && !existing.startsWith("class ")) return "";
-        int start = at + "class ".length();
+        int start = skipSpaces(code, at + "class".length());
         while (start < code.length() && isIdentifierChar(code.charAt(start))) start++;
         int brace = code.indexOf('{', start);
         return brace < 0 ? "" : code.substring(start, brace).trim();
@@ -6688,8 +6692,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return the index of the declaration, or 0 when none was found
      */
     private int classDeclaration(String source) {
-        int index = stripComments(source).indexOf("class ");
-        return index < 0 ? 0 : index;
+        String code = stripComments(source);
+        int at = code.indexOf("class");
+        while (at >= 0) {
+            char before = at == 0 ? ' ' : code.charAt(at - 1);
+            int after = at + "class".length();
+            // A keyword, not the tail of an identifier and not a class literal: @Register(Login
+            // Form.class ) put a "class " in front of the real declaration, and the empty name
+            // that came back left the legacy constructors in place beside the generated one.
+            if (!isIdentifierChar(before) && before != '.'
+                    && after < code.length() && Character.isWhitespace(code.charAt(after))) {
+                return at;
+            }
+            at = code.indexOf("class", after);
+        }
+        return 0;
     }
 
     /**
@@ -6775,7 +6792,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private String className(String source) {
         int index = classDeclaration(source);
         if (index == 0 && !source.startsWith("class ")) return "";
-        int start = index + "class ".length();
+        // Whitespace, not one space: "class\n    LoginForm" is legal and a formatter can produce it.
+        int start = skipSpaces(source, index + "class".length());
         int end = start;
         while (end < source.length() && isIdentifierChar(source.charAt(end))) end++;
         return source.substring(start, end);

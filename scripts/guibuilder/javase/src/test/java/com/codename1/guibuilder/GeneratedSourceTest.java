@@ -829,6 +829,56 @@ class GeneratedSourceTest {
         compile("LoginForm", form, null);
     }
 
+    @Test
+    void aQuotedLegacyMarkerIsNotMistakenForTheScaffolds() throws Exception {
+        // Either marker quoted in a string above the scaffold used to be found first, and the cut
+        // then ran from there to the real end marker -- taking the developer's members with it.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "    private String hint = \"//-- DON'T EDIT BELOW THIS LINE!!!\";\n"
+                + "    public void keepMe() { }\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertTrue(migrated.contains("public void keepMe()"),
+                "the member above the quoted marker must survive:\n" + migrated);
+        assertTrue(migrated.contains("hint = \"//-- DON'T EDIT BELOW THIS LINE!!!\""),
+                "and so must the string itself:\n" + migrated);
+        assertFalse(migrated.contains("initGuiBuilderComponents"), migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aClassLiteralInAnAnnotationIsNotTheDeclaration() throws Exception {
+        // "@Register(LoginForm.class )" puts a "class " in front of the real declaration; the empty
+        // name that came back left the scaffolded constructors beside the generated one.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "@SuppressWarnings(\"unchecked\")\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { Object c = LoginForm.class ; }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertFalse(migrated.contains("initGuiBuilderComponents"),
+                "the scaffolded constructor must still be found and removed:\n" + migrated);
+        assertTrue(migrated.contains("public void mine()"), migrated);
+        compile("LoginForm", migrated, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
