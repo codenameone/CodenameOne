@@ -160,7 +160,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 String apkName = project.getBuild().getFinalName() + ".apk";
                 File apkFile = new File(project.getBuild().getDirectory() + File.separator + apkName);
                 try {
-                    if (apkFile.exists() && apkFile.lastModified() >= getSourcesModificationTime()) {
+                    // The up-to-date check is source-timestamp only, so it cannot see a hardening request
+                    // that arrived via a build hint (e.g. -Dcodename1.arg.harden.level=standard). When the
+                    // pre-flight above resolved that hardening WILL run, never reuse a cached APK -- it may
+                    // have been built unhardened -- and rebuild so the request is honored.
+                    if (!hardeningWillRun && apkFile.exists()
+                            && apkFile.lastModified() >= getSourcesModificationTime()) {
                         getLog().info("Sources have not been modified since APK at " + apkFile + " was created.  Skipping Android build");
                         return;
                     }
@@ -199,6 +204,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     private boolean hardeningForceOff;
     private String hardeningLibraryJars;
+    /** True once the pre-flight has resolved that hardening will ACTUALLY run for this build (non-off,
+     * not force-off): such a build must not be served the timestamp-only up-to-date cache, whose staleness
+     * check ignores build hints, or an off->standard request could reuse a previously-built unhardened APK. */
+    private boolean hardeningWillRun;
 
     /** Injects the pre-flight hardening decisions into this build's request (per-build, not global). */
     private void applyHardeningRequestArgs(BuildRequest r) {
@@ -288,10 +297,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         } else {
             hardeningForceOff = false;
         }
+        hardeningWillRun = !"off".equalsIgnoreCase(level.trim()) && !r.isForceOff();
         // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
         // jars (so an application method that overrides a framework method is not renamed apart from
         // its superclass). Only needed when hardening will actually run.
-        if (!"off".equalsIgnoreCase(level.trim()) && !r.isForceOff()) {
+        if (hardeningWillRun) {
             try {
                 List<String> cp = project.getCompileClasspathElements();
                 StringBuilder sb = new StringBuilder();
