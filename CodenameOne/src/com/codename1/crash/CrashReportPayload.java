@@ -142,19 +142,37 @@ final class CrashReportPayload {
         if (isJavaScriptPlatform(platform)) {
             return TRACE_JS;
         }
-        // A ParparVM frame line is exactly "    at <fqcn>.<method>:<line>" -- no '(', URL or '@'.
-        int at = rawStack.indexOf("    at ");
-        if (at >= 0) {
-            int lineEnd = rawStack.indexOf('\n', at);
-            String body = lineEnd < 0 ? rawStack.substring(at + 7) : rawStack.substring(at + 7, lineEnd);
-            if (body.indexOf('(') < 0 && body.indexOf('/') < 0 && body.indexOf('@') < 0) {
-                return TRACE_PARPARVM;
+        // The "    at <fqcn>.<method>:<line>" text is only produced by ParparVM's own printStackTrace on a
+        // C target. Gate on the platform: an Android/desktop (real-JVM) throwable whose MESSAGE happens to
+        // contain such a line -- the message is echoed into the raw stack by printStackTrace -- must NOT be
+        // labeled parparvm-text, or the server would fabricate a frame from message text or drop a real
+        // cause trace. The shape check still guards against an unexpected stack on a ParparVM-C platform.
+        if (isParparVmTextPlatform(platform)) {
+            // A ParparVM frame line is exactly "    at <fqcn>.<method>:<line>" -- no '(', URL or '@'.
+            int at = rawStack.indexOf("    at ");
+            if (at >= 0) {
+                int lineEnd = rawStack.indexOf('\n', at);
+                String body = lineEnd < 0 ? rawStack.substring(at + 7) : rawStack.substring(at + 7, lineEnd);
+                if (body.indexOf('(') < 0 && body.indexOf('/') < 0 && body.indexOf('@') < 0) {
+                    return TRACE_PARPARVM;
+                }
             }
         }
-        // Not JavaScript and not the ParparVM text shape: an ordinary JVM printStackTrace body. There
-        // is no JVM raw parser, so report NONE and let the server keep the text verbatim rather than
-        // misparsing it as a JavaScript stack.
+        // Not JavaScript and not a ParparVM-C target's text shape: an ordinary JVM printStackTrace body.
+        // There is no JVM raw parser, so report NONE and let the server keep the text verbatim rather than
+        // misparsing it.
         return TRACE_NONE;
+    }
+
+    /// The ParparVM-to-C runtime platforms, whose {@code printStackTrace} emits the
+    /// "    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;" text. Matches {@link Display#getPlatformName()};
+    /// {@code and} (Android) and {@code javase} (desktop) run on a real JVM and are deliberately excluded.
+    private static boolean isParparVmTextPlatform(String platform) {
+        if (platform == null) {
+            return false;
+        }
+        String p = platform.toLowerCase();
+        return "ios".equals(p) || "mac".equals(p) || "linux".equals(p) || "win".equals(p);
     }
 
     /// The JavaScript port's platform name; its raw stack is a JS engine {@code Error().stack}.

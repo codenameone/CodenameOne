@@ -53,6 +53,22 @@ class TraceFormatTest {
     }
 
     @Test
+    void jvmMessageWithParparvmShapedLineIsNotParparvm() {
+        // A real-JVM (Android/desktop) throwable whose MESSAGE contains a line shaped like a ParparVM frame
+        // ("    at X.Y:N", no parentheses); printStackTrace echoes the message into the raw stack. The
+        // platform gate must keep it NONE so the server does not fabricate a frame from message text.
+        String raw = "java.lang.IllegalStateException: bad input:\n    at fake.Type.method:12\n";
+        assertEquals(CrashReportPayload.TRACE_NONE,
+                CrashReportPayload.deriveTraceFormat(null, raw, "Android"));
+        assertEquals(CrashReportPayload.TRACE_NONE,
+                CrashReportPayload.deriveTraceFormat(null, raw, "SE"));
+        // The very same raw text on an actual ParparVM-C platform IS parparvm-text -- only the platform
+        // distinguishes them, which is the point of the gate.
+        assertEquals(CrashReportPayload.TRACE_PARPARVM,
+                CrashReportPayload.deriveTraceFormat(null, raw, "win"));
+    }
+
+    @Test
     void jvmStackIsNotMislabeledJavaScript() {
         // A stackless JVM/Android throwable whose only frames are in its cause: printStackTrace
         // produces a tab-indented JVM trace with parentheses. It must NOT be labeled js-error.
