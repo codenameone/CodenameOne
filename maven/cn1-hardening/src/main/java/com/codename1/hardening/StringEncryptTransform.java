@@ -281,9 +281,51 @@ public final class StringEncryptTransform {
         this.sourceReferencedNames = names;
     }
 
+    /** "owner/name" of every static String field read by a GETSTATIC across the jar (non-inlined reads). */
+    private java.util.Set<String> externallyReadStaticFields;
+    /** Count of static-final constants whose ConstantValue was preserved because a GETSTATIC reads them. */
+    private int externallyReadConstantCount;
+
+    /**
+     * Sets the fully-qualified ({@code owner/name}) static String fields that are read somewhere in the
+     * jar by a {@code GETSTATIC} rather than an inlined {@code LDC}; their {@code ConstantValue} must not
+     * be migrated to {@code <clinit>} (it would change reentrant-initialization ordering).
+     */
+    void setExternallyReadStaticFields(java.util.Set<String> fields) {
+        this.externallyReadStaticFields = fields;
+    }
+
+    /**
+     * Collects into {@code out} the {@code owner/name} of every static {@code String} field read by a
+     * {@code GETSTATIC} in {@code classBytes}. A compile-time String constant is normally inlined by
+     * javac/kotlinc, so a surviving {@code GETSTATIC} means a non-inlined read whose declaring field's
+     * {@code ConstantValue} must be preserved rather than moved into {@code <clinit>}.
+     */
+    public static void collectGetStaticStringReads(byte[] classBytes, final java.util.Set<String> out) {
+        new ClassReader(classBytes).accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc,
+                    String sig, String[] ex) {
+                return new org.objectweb.asm.MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitFieldInsn(int opcode, String owner, String fname, String fdesc) {
+                        if (opcode == Opcodes.GETSTATIC && "Ljava/lang/String;".equals(fdesc)) {
+                            out.add(owner + "." + fname);
+                        }
+                    }
+                };
+            }
+        }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+    }
+
     /** Count of static-final String constants left plaintext to keep a carried source's compilation valid. */
     int getSourcePreservedConstantCount() {
         return sourcePreservedConstantCount;
+    }
+
+    /** Count of static-final constants left plaintext because a GETSTATIC (non-inlined) read observes them. */
+    int getExternallyReadConstantCount() {
+        return externallyReadConstantCount;
     }
 
     public int getEncryptedCount() {
@@ -1159,6 +1201,21 @@ public final class StringEncryptTransform {
                     // kotlinc compilation against the transformed jar, so preserve it (plaintext,
                     // disclosed). The inlined reads elsewhere in the app are still encrypted.
                     sourcePreservedConstantCount++;
+                    continue;
+                }
+                if (externallyReadStaticFields != null
+                        && externallyReadStaticFields.contains(cn.name + "." + fn.name)) {
+                    // Some class reads this constant with a GETSTATIC rather than an inlined LDC (generated
+                    // bytecode -- javac and kotlinc both inline compile-time String constant reads). Moving
+                    // the assignment into <clinit> would change initialization ORDER: the ConstantValue is
+                    // otherwise assigned during preparation, before any <clinit> runs, so a superclass whose
+                    // <clinit> reads this subclass constant during a REENTRANT initialization observes the
+                    // value; a <clinit>-assigned field would still be null at that reentrant point and the
+                    // read would see null. Preserve the ConstantValue (plaintext, disclosed) and exclude the
+                    // value jar-wide so an equal LDC elsewhere is not encrypted+interned and then compares
+                    // != to this still-plaintext field on ParparVM.
+                    externallyReadConstantCount++;
+                    newlyExcluded.add((String) fn.value);
                     continue;
                 }
                 if (toStrip.size() >= budget) {
