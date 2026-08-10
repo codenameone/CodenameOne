@@ -354,6 +354,7 @@ public abstract class RenderElement extends Element {
         // Drop only THIS element's real result; ancestors are untouched, so this does not
         // escalate into the whole-tree invalidation the cache exists to avoid.
         lastConstraints = null;
+        trace(true, constraints, drySize);
         return drySize;
     }
 
@@ -374,7 +375,26 @@ public abstract class RenderElement extends Element {
         lastConstraints = constraints;
         size = timedPerformLayout(constraints);
         needsLayout = false;
+        trace(false, constraints, size);
         return size;
+    }
+
+    /// Set to a class-name substring with -Dcn1.flutter.layout.trace to print every
+    /// layout of the matching elements: which constraints went in, which size came out,
+    /// and whether the pass was dry.
+    ///
+    /// The distinction that matters is dry-vs-real. A dry measurement runs the same
+    /// performLayout, so it writes whatever that method keeps in fields; if the last pass
+    /// over an element was dry, its component can end up sized from a measurement taken
+    /// under constraints that were never real.
+    private static final String LAYOUT_TRACE = System.getProperty("cn1.flutter.layout.trace");
+
+    private void trace(boolean dry, BoxConstraints c, Size s) {
+        if (LAYOUT_TRACE == null || !getClass().getName().contains(LAYOUT_TRACE)) {
+            return;
+        }
+        com.codename1.io.Log.p((dry ? "[dry] " : "[lay] ") + getClass().getSimpleName()
+                + " in=" + c + " out=" + s);
     }
 
     /**

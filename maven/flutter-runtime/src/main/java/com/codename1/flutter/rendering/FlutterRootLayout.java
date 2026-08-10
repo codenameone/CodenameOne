@@ -32,6 +32,20 @@ public class FlutterRootLayout extends Layout {
             return;
         }
         Style s = parent.getStyle();
+        root.layout(constraintsFor(parent));
+        root.position(s.getPaddingLeftNoRTL(), s.getPaddingTop());
+    }
+
+    /**
+     * The constraints this pass hands the subtree. By default the pane's own box, which
+     * is right for a top-level host: CN1 owns that container's size.
+     *
+     * <p>A nested host (an effect's pane) overrides this, because there the Flutter pass
+     * already decided the subtree's constraints and the pane's component size may not
+     * reflect them yet.</p>
+     */
+    protected BoxConstraints constraintsFor(Container parent) {
+        Style s = parent.getStyle();
         int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
         int height = parent.getLayoutHeight() - parent.getBottomGap() - s.getVerticalPadding();
         if (width < 0) {
@@ -40,8 +54,7 @@ public class FlutterRootLayout extends Layout {
         if (height < 0) {
             height = 0;
         }
-        root.layout(BoxConstraints.tight(width, height));
-        root.position(s.getPaddingLeftNoRTL(), s.getPaddingTop());
+        return BoxConstraints.tight(width, height);
     }
 
     @Override

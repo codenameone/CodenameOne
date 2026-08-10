@@ -10,10 +10,10 @@ import com.codename1.flutter.widgets.PositionedRenderElement;
  * Stack — Flutter's {@code PositionedTransition}. It resolves the animation's
  * current {@code RelativeRect} and hosts the child as a {@link Positioned}
  * (LTRB insets from the stack edges) so the Stack lays it out in place. The
- * gallery's Backdrop drives two of these to slide the home/settings panels; at
- * rest the home's rect is {@code RelativeRect.fill} (fills the stack) and the
- * settings rect sits off the top edge (hidden). Interpolated motion during the
- * slide is deferred; the resolved rest/target frame is correct.
+ * gallery's Backdrop drives two of these to slide the home/settings panels.
+ *
+ * <p>{@link PositionedTransitionElement} follows the animation frame by frame; the
+ * widget only carries the configuration.</p>
  */
 public class PositionedTransition extends AnimatedChildWidget {
 
@@ -37,6 +37,8 @@ public class PositionedTransition extends AnimatedChildWidget {
         p.right(r.right());
         p.bottom(r.bottom());
         p.child(getChild());
-        return new PositionedRenderElement(p);
+        PositionedTransitionElement e = new PositionedTransitionElement(p);
+        e.transition(this);
+        return e;
     }
 }

@@ -59,12 +59,26 @@ public abstract class ScrollRenderElement extends RenderElement {
     }
 
     /**
-     * Whether CN1's scroll indicator is suppressed. A Flutter PageView paints
-     * no scrollbar at all — the peeking neighbour pages ARE the affordance —
-     * so a bar under the carousel is a visible artifact, not a feature.
+     * Whether CN1's scroll indicator is suppressed.
+     *
+     * <p>Flutter shows a scrollbar only where the tree asks for one, by wrapping the
+     * scrollable in a {@link Scrollbar} or {@link RawScrollbar}; a bare ListView,
+     * SingleChildScrollView or PageView draws none. Codename One draws one by default,
+     * so without this every scrollable in a transpiled app carried a bar Flutter never
+     * put there — on the gallery's carousel it painted a black thumb across the bottom
+     * edge of the study card.</p>
+     *
+     * <p>An ancestor walk is the right test because that is exactly the relationship
+     * Flutter uses: {@code Scrollbar} WRAPS the scrollable it decorates.</p>
      */
     protected boolean hideScrollbar() {
-        return false;
+        for (Element a = parent(); a != null; a = a.parent()) {
+            Widget w = a.widget();
+            if (w instanceof Scrollbar || w instanceof RawScrollbar) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private RenderHost innerHost() {

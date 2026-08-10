@@ -88,8 +88,29 @@ public abstract class EffectRenderElement extends RenderElement {
         }
     }
 
+    /// The constraints the Flutter pass last gave this effect.
+    ///
+    /// The nested pane carries its own {@link FlutterRootLayout}, and Codename One runs
+    /// that layout independently, deriving constraints from the pane's CURRENT component
+    /// size. That size is only the Flutter-assigned one after {@code position} has written
+    /// it; before then it is whatever CN1 last put there — for a fresh subtree, its
+    /// preferred size. So the subtree could be laid out against a height it was never
+    /// given: the gallery's study card was measured at its unconstrained 272dp instead of
+    /// the carousel's 240dp viewport, which is why its caption was clipped and its bottom
+    /// corners came out square.
+    ///
+    /// Remembering the real constraints and handing them to the nested pass removes the
+    /// disagreement: the Flutter pass owns this subtree's geometry, and CN1's pass must
+    /// reproduce it rather than re-derive it.
+    private BoxConstraints lastConstraints;
+
+    BoxConstraints effectConstraints() {
+        return lastConstraints;
+    }
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
+        lastConstraints = constraints;
         RenderElement c = findRenderElement(content);
         if (c == null) {
             return constraints.smallest();
@@ -124,7 +145,13 @@ public abstract class EffectRenderElement extends RenderElement {
     private final class EffectPane extends Container {
 
         EffectPane(RenderHost host) {
-            super(new FlutterRootLayout(host));
+            super(new FlutterRootLayout(host) {
+                @Override
+                protected BoxConstraints constraintsFor(com.codename1.ui.Container parent) {
+                    BoxConstraints c = effectConstraints();
+                    return c != null ? c : super.constraintsFor(parent);
+                }
+            });
             setUIID("FlutterEffect");
             getAllStyles().setPadding(0, 0, 0, 0);
             getAllStyles().setMargin(0, 0, 0, 0);
