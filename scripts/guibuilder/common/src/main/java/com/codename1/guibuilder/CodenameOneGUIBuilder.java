@@ -5396,25 +5396,37 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (!ProjectIO.exists(modelPath)) return false;
         String existing = readQuietly(modelPath);
         if (existing == null) return false;
-        String code = stripComments(existing);
+        // The bound names, not any identifier: both strategies write the name as a string literal
+        // -- new Property<>("email", ...) and @Bind(name = "email", ...) -- while a plain
+        // identifier search matched a setter parameter and called a stale model current.
+        Set<String> bound = quotedNames(existing);
         for (Element element : document.components()) {
             if (element == document.root() || !isBindable(value(element, "type", ""))) continue; //NOPMD CompareObjectsWithEquals
-            if (!declaresIdentifier(code, javaName(element))) return true;
+            if (!bound.contains(value(element, "name", javaName(element)))) return true;
         }
         return false;
     }
 
-    /** True when the masked source declares the identifier as a whole word. */
-    private static boolean declaresIdentifier(String code, String identifier) {
-        int at = code.indexOf(identifier);
+    /**
+     * Every string literal in a source file.
+     *
+     * @param source the text to scan
+     * @return the literal contents, without their quotes
+     */
+    private static Set<String> quotedNames(String source) {
+        Set<String> out = new LinkedHashSet<>();
+        int at = source.indexOf('"');
         while (at >= 0) {
-            int after = at + identifier.length();
-            boolean left = at == 0 || !isIdentifierChar(code.charAt(at - 1));
-            boolean right = after >= code.length() || !isIdentifierChar(code.charAt(after));
-            if (left && right) return true;
-            at = code.indexOf(identifier, after);
+            int end = at + 1;
+            while (end < source.length() && source.charAt(end) != '"' && source.charAt(end) != '\n') {
+                if (source.charAt(end) == '\\') end++;
+                end++;
+            }
+            if (end >= source.length() || source.charAt(end) != '"') return out;
+            out.add(source.substring(at + 1, end));
+            at = source.indexOf('"', end + 1);
         }
-        return false;
+        return out;
     }
 
     /**
@@ -6537,6 +6549,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * The name of a single-parameter list, or null when there is not exactly one.
+     *
+     * @param parameters the text between the parentheses
+     * @return the parameter's name
+     */
+    private static String soleParameterName(String parameters) {
+        String only = stripAnnotations(parameters).trim();
+        if (only.length() == 0 || only.indexOf(',') >= 0) return null;
+        int space = only.lastIndexOf(' ');
+        return space < 0 ? null : only.substring(space + 1).trim();
+    }
+
+    /**
      * True when a constructor body does more than the old scaffold's did.
      *
      * <p>The scaffold only chained and called its initializer, and both are reproduced by the
@@ -6546,7 +6571,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param body the constructor's text, from its parameter list to its closing brace
      * @return true when a statement would be lost by removing the constructor
      */
-    private static boolean hasCustomConstructorBody(String body) {
+    private static boolean hasCustomConstructorBody(String body, String parameterName) {
         int open = body.indexOf('{');
         if (open < 0) return false;
         String statements = stripComments(body.substring(open + 1));
@@ -6558,16 +6583,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (c == '(' || c == '{') depth++;
             else if (c == ')' || c == '}') depth--;
             if (c == ';' && depth <= 0) {
-                if (isCustomStatement(statements.substring(start, at))) return true;
+                if (isCustomStatement(statements.substring(start, at), parameterName)) return true;
                 start = at + 1;
             }
             at++;
         }
-        return isCustomStatement(statements.substring(Math.min(start, statements.length())));
+        return isCustomStatement(statements.substring(Math.min(start, statements.length())), parameterName);
     }
 
     /** True for a statement the scaffold would not have written. */
-    private static boolean isCustomStatement(String statement) {
+    private static boolean isCustomStatement(String statement, String parameterName) {
         String only = statement.trim();
         if (only.length() == 0 || "}".equals(only)) return false;
         while (only.endsWith("}")) only = only.substring(0, only.length() - 1).trim();
@@ -6596,12 +6621,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int close = only.lastIndexOf(')');
         if (close < paren) return true;
         String arguments = withoutSpaces(only.substring(paren + 1, close));
+        // An identifier is only the scaffold's if it is this constructor's own Resources
+        // parameter. The names were hard-coded, so a no-argument constructor calling
+        // initGuiBuilderComponents(res) against a field named res read as scaffolding and the
+        // developer's resource selection went with the constructor.
         return arguments.length() != 0
                 && !"Resources.getGlobalResources()".equals(arguments)
                 && !"com.codename1.ui.util.Resources.getGlobalResources()".equals(arguments)
-                && !"res".equals(arguments)
-                && !"resources".equals(arguments)
-                && !"resourceObjectInstance".equals(arguments);
+                && !arguments.equals(parameterName);
     }
 
     /** The statement with its whitespace removed, for comparing against a canonical form. */
@@ -7456,7 +7483,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 setStatus(companionRefusal);
                 return body;
             }
-            if (scaffolded && hasCustomConstructorBody(code.substring(parametersEnd, close))) {
+            if (scaffolded && hasCustomConstructorBody(code.substring(parametersEnd, close),
+                    soleParameterName(parameters))) {
                 companionRefusal = "Cannot migrate " + className + ": its "
                         + (parameters.trim().length() == 0 ? "no-argument" : parameters.trim())
                         + " constructor does more than the scaffold did, and nothing generated"

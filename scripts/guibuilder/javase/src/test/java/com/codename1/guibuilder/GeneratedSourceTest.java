@@ -1228,8 +1228,10 @@ class GeneratedSourceTest {
         assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
                 "a custom argument is a call the migration would silently drop");
 
-        // The scaffold's own forms are still scaffolding.
-        for (String argument : new String[]{"", "Resources.getGlobalResources()", "res"}) {
+        // The scaffold's own forms are still scaffolding. "res" is not among them here: in a
+        // no-argument constructor that is a field, which is the case anInitializerArgumentThatIs
+        // NotTheParameter covers -- it is scaffolding only when it is the constructor's parameter.
+        for (String argument : new String[]{"", "Resources.getGlobalResources()"}) {
             String scaffold = legacy.replace("registerAndGetResources()", argument);
             assertNotNull(migrate(builder, scaffold, invoke(builder, "defaultCompanionSource")),
                     "initGuiBuilderComponents(" + argument + ") is what the scaffold wrote");
@@ -1434,6 +1436,68 @@ class GeneratedSourceTest {
         assertTrue(written.contains("added"),
                 "a bindable control the model has never heard of must reach it:\n" + written);
         assertTrue(written.contains("email"), written);
+    }
+
+    @Test
+    void aSetterParameterDoesNotMakeAStaleModelLookCurrent() throws Exception {
+        // "value" appears in every generated setter, so an identifier search found it and called
+        // the model current while no property for that control existed.
+        Path project = Files.createTempDirectory("guibuilderModelNames");
+        Path java = Files.createDirectories(project.resolve("src/main/java/com/example"));
+        Path gui = Files.createDirectories(project.resolve("src/main/guibuilder/com/example"));
+        Path guiFile = gui.resolve("LoginForm.gui");
+        String xml = "<component type=\"Form\" name=\"LoginForm\" title=\"Login\" layout=\"BoxLayout\""
+                + " bindingStrategy=\"bindable\">"
+                + "<component type=\"TextField\" name=\"email\" hint=\"Email\"/>"
+                + "<component type=\"TextField\" name=\"value\" hint=\"Value\"/></component>";
+        Files.write(guiFile, xml.getBytes(StandardCharsets.UTF_8));
+
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
+                + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
+                + "\ncssFile=" + project.resolve("theme.css") + "\n"));
+        set(builder, "document", GuiDocument.parse(ProjectIO.fsUrl(guiFile.toString()), xml));
+
+        // A model for "email" alone -- whose setter parameter is called value.
+        Path model = java.resolve("LoginFormModel.java");
+        Files.write(model, ("package com.example;\n"
+                + "import com.codename1.annotations.Bindable;\nimport com.codename1.binding.BindAttr;\n"
+                + "@Bindable\npublic class LoginFormModel {\n"
+                + "    @Bind(name = \"email\", attr = BindAttr.TEXT)\n    private String email = \"\";\n"
+                + "    public String getEmail() { return email; }\n"
+                + "    public void setEmail(String value) { this.email = value; }\n}\n")
+                .getBytes(StandardCharsets.UTF_8));
+
+        Method save = CodenameOneGUIBuilder.class.getDeclaredMethod("save");
+        save.setAccessible(true);
+        assertTrue(((Boolean) save.invoke(builder)).booleanValue());
+
+        String written = new String(Files.readAllBytes(model), StandardCharsets.UTF_8);
+        assertTrue(written.contains("name = \"value\"") || written.contains("\"value\""),
+                "the control named value must be bound, not matched against a setter parameter:\n" + written);
+    }
+
+    @Test
+    void anInitializerArgumentThatIsNotTheParameterIsCustom() throws Exception {
+        // A no-argument constructor calling initGuiBuilderComponents(res) is passing a field, not
+        // a parameter the scaffold ever had.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    private Resources res = Resources.getGlobalResources();\n"
+                + "    public LoginForm() { initGuiBuilderComponents(res); }\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a field is not the constructor's parameter");
+
+        // The same call where res really is the parameter is the scaffold's own.
+        String scaffold = legacy.replace("    public LoginForm() {", "    public LoginForm(Resources res) {")
+                .replace("    private Resources res = Resources.getGlobalResources();\n", "");
+        assertNotNull(migrate(builder, scaffold, invoke(builder, "defaultCompanionSource")));
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
