@@ -539,6 +539,20 @@ public final class GuiDocument {
     }
 
     /**
+     * Whether a container scrolls vertically when the document says nothing about it.
+     *
+     * <p>A Form or Dialog builds a content pane that arrives scrollable, and the generator emits
+     * no setter for an absent attribute, so that is the value in force. Lives here so the preview
+     * and the inspector cannot answer differently -- they already had, once.
+     *
+     * @param type the {@code type} attribute
+     * @return the default for that type
+     */
+    public static boolean defaultScrollableY(String type) {
+        return isRootOnlyType(type);
+    }
+
+    /**
      * True for the types that can only be a document root.
      *
      * @param type the {@code type} attribute

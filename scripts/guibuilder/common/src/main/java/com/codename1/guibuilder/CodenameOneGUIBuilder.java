@@ -3499,7 +3499,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         if (GuiDocument.acceptsChildren(element)) {
             fields.add(booleanProperty("Scroll horizontally", "scrollableX", false));
-            fields.add(booleanProperty("Scroll vertically", "scrollableY", false));
+            // The same default the preview uses, from the model rather than repeated here: the
+            // checkbox read off for a Form whose content pane scrolls, so saving without touching
+            // it looked like it would disable scrolling and did not.
+            fields.add(booleanProperty("Scroll vertically", "scrollableY",
+                    GuiDocument.defaultScrollableY(type)));
         }
         if (hasText(type) || isFormLike(type)) {
             Button inline = new Button("Edit content in place", material(FontImage.MATERIAL_EDIT, "BuilderInlineIcon"));

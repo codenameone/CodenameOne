@@ -1319,6 +1319,14 @@ class GeneratedSourceTest {
                 "<component type=\"Container\" name=\"Panel\" layout=\"BoxLayout\"/>");
         assertFalse(((Container) ComponentPreviewFactory.create(container.root(), null, null)).isScrollableY(),
                 "a plain Container is not scrollable by default");
+
+        // The inspector checkbox reads the same default, from the same method, so the two cannot
+        // disagree again -- they already did once, with the canvas scrolling and the box unticked.
+        assertTrue(GuiDocument.defaultScrollableY("Form"));
+        assertTrue(GuiDocument.defaultScrollableY("Dialog"));
+        assertFalse(GuiDocument.defaultScrollableY("Container"));
+        assertEquals(pane.isScrollableY(), GuiDocument.defaultScrollableY("Form"),
+                "the preview and the inspector answer from one place");
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {

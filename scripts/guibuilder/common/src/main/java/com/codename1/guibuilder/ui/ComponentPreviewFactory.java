@@ -484,7 +484,8 @@ public final class ComponentPreviewFactory {
             // emits no setter when the attribute is absent -- so forcing false here had the canvas
             // and the inspector reporting no scrolling for a form that scrolls when it runs.
             boolean formRoot = isRootOnly(value(element, "type", "Container"));
-            String scrollableDefault = formRoot ? "true" : "false";
+            String scrollableDefault = GuiDocument.defaultScrollableY(value(element, "type", "Container"))
+                    ? "true" : "false";
             ((Container) component).setScrollableX("true".equals(value(element, "scrollableX", "false")));
             ((Container) component).setScrollableY("true".equals(value(element, "scrollableY", scrollableDefault)));
             ((Container) component).setTensileDragEnabled(false);
