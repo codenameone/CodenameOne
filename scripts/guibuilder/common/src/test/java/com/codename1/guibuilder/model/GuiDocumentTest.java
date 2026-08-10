@@ -459,4 +459,25 @@ class GuiDocumentTest {
                 "and the reference still has four sides: " + follower.getAttribute("guidedReferences"));
     }
 
+    @Test
+    void movingEarlierSkipsCommandNodes() {
+        // A command interleaved with the components meant the move swapped across the command:
+        // success reported, history dirtied, generated order unchanged.
+        GuiDocument document = GuiDocument.parse("/tmp/p/gui/com/example/F.gui",
+                "<component type=\"Form\" name=\"F\" layout=\"BoxLayout\">"
+                + "<component type=\"Button\" name=\"first\"/>"
+                + "<command name=\"Save\" actionEvent=\"onSave\"/>"
+                + "<component type=\"Button\" name=\"second\"/></component>");
+        Element second = document.components().get(2);
+        assertEquals("second", second.getAttribute("name"), "fixture");
+        document.select(second);
+
+        assertTrue(document.moveSelectedBy(-1), "there is a component to move past");
+
+        assertEquals("second", document.components().get(1).getAttribute("name"),
+                "one move must reorder the components: " + document.toXml());
+        assertEquals("first", document.components().get(2).getAttribute("name"), document.toXml());
+        assertEquals(1, document.commands().size(), "and the command is still there");
+    }
+
 }

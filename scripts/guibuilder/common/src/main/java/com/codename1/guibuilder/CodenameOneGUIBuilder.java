@@ -3714,7 +3714,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             }
         }
         Picker constraint = stringPicker(new String[]{"", "North", "South", "East", "West", "Center"}, document.attribute("layoutConstraint", ""));
-        constraint.addActionListener(e -> update("layoutConstraint", constraint.getSelectedString()));
+        // The occupant is moved out of the way, the way a drop into an occupied region does.
+        // Storing the request alone let effectiveBorderConstraint() quietly relocate this child
+        // instead, so the picker read Center while the canvas and the generated source both kept
+        // it in North.
+        constraint.addActionListener(e -> chooseBorderConstraint(element, constraint.getSelectedString()));
         fields.add(fieldLabel("Parent constraint"));
         fields.add(constraint);
         if ("LayeredLayout".equals(document.parentLayout(element))) {
@@ -4317,6 +4321,41 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             extent = Math.max(extent, cell.intValue() + span);
         }
         return extent;
+    }
+
+    /**
+     * Applies a chosen BorderLayout region, swapping with whoever already holds it.
+     *
+     * @param element the selected child
+     * @param requested the region the picker offered
+     */
+    private void chooseBorderConstraint(Element element, String requested) {
+        Element parent = document.parentOf(element);
+        if (parent == null || requested == null || requested.length() == 0) {
+            update("layoutConstraint", requested);
+            return;
+        }
+        Element occupant = null;
+        for (Element sibling : componentChildren(parent)) {
+            if (sibling == element) continue; //NOPMD CompareObjectsWithEquals
+            if (requested.equals(GuiDocument.effectiveBorderConstraint(parent, sibling))) {
+                occupant = sibling;
+                break;
+            }
+        }
+        String vacated = GuiDocument.effectiveBorderConstraint(parent, element);
+        document.beginTransaction();
+        try {
+            update("layoutConstraint", requested);
+            if (occupant != null) {
+                document.select(occupant);
+                document.setAttribute("layoutConstraint", vacated);
+            }
+        } finally {
+            document.endTransaction();
+        }
+        document.select(element);
+        scheduleDesignerRefresh();
     }
 
     /** Rejects an in-range table coordinate or span that would collide with a sibling. */
@@ -6408,7 +6447,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     && !"this(Resources.getGlobalResources())".equals(call)
                     && !"this(com.codename1.ui.util.Resources.getGlobalResources())".equals(call);
         }
-        return !only.startsWith("initGuiBuilderComponents");
+        // The exact call, not a prefix: initGuiBuilderComponentsExtra() is the developer's helper
+        // and would have gone with the constructor.
+        int paren = only.indexOf('(');
+        return paren < 0 || !"initGuiBuilderComponents".equals(only.substring(0, paren).trim());
     }
 
     /** The statement with its whitespace removed, for comparing against a canonical form. */

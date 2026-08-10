@@ -1126,6 +1126,29 @@ class GeneratedSourceTest {
         compile("LoginForm", migrated, null);
     }
 
+    @Test
+    void aHelperCallBesideTheInitializerStopsTheMigration() throws Exception {
+        // Prefix matching accepted initGuiBuilderComponentsExtra() as scaffolding, so removing the
+        // constructor took the developer's helper call and its side effects with it.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm() {\n"
+                + "        initGuiBuilderComponents();\n"
+                + "        initGuiBuilderComponentsExtra();\n"
+                + "    }\n"
+                + "    private void initGuiBuilderComponentsExtra() { }\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a helper whose name merely starts the same way is not the scaffold's call");
+
+        String plain = legacy.replace("        initGuiBuilderComponentsExtra();\n", "");
+        assertNotNull(migrate(builder, plain, invoke(builder, "defaultCompanionSource")));
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

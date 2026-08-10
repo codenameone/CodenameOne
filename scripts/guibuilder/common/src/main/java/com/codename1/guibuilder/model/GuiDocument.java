@@ -205,14 +205,34 @@ public final class GuiDocument {
         if (selected == root || delta == 0) return false;
         Element parent = findParent(root, selected);
         if (parent == null) return false;
+        // Among the component siblings, not the raw children. A <command> interleaved with them
+        // meant "move earlier" swapped the selection across the command instead: the operation
+        // reported success and dirtied the history while the generated order did not change, so
+        // it took several clicks before anything moved.
+        List<Element> siblings = componentChildrenOf(parent);
+        int among = siblings.indexOf(selected);
+        int targetAmong = among + delta;
+        if (among < 0 || targetAmong < 0 || targetAmong >= siblings.size()) return false;
         int index = childIndex(parent, selected);
-        int target = index + delta;
-        if (index < 0 || target < 0 || target >= parent.getNumChildren()) return false;
+        int target = childIndex(parent, siblings.get(targetAmong));
+        if (index < 0 || target < 0) return false;
         beforeMutation();
         parent.removeChildAt(index);
         parent.insertChildAt(selected, target);
         modified = true;
         return true;
+    }
+
+    /** The component children of a parent, skipping commands and any other bookkeeping node. */
+    private static List<Element> componentChildrenOf(Element parent) {
+        List<Element> out = new ArrayList<>();
+        for (int i = 0; i < parent.getNumChildren(); i++) {
+            Object child = parent.getChildAt(i);
+            if (child instanceof Element && "component".equals(((Element) child).getTagName())) {
+                out.add(((Element) child));
+            }
+        }
+        return out;
     }
 
     public List<Element> commands() {
