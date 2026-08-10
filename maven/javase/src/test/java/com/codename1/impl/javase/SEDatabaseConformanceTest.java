@@ -228,6 +228,27 @@ public class SEDatabaseConformanceTest {
         db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
     }
 
+    @Test
+    public void aWrappedUriConnectionRegistersTheSameFile() throws Exception {
+        // SQLite's URI form, which this driver accepts. Handing "file:/tmp/app.db" to File reads
+        // it as a relative path under the working directory, so the wrapped handle registered a
+        // key nothing else could match and the check it exists for passed while it held the file.
+        Connection uriConn = java.sql.DriverManager.getConnection(
+                "jdbc:sqlite:file:" + dbFile.getAbsolutePath() + "?mode=rwc");
+        SEDatabase wrapped = new SEDatabase(uriConn);
+        try {
+            boolean refused = false;
+            try {
+                db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException expected) {
+                refused = true;
+            }
+            assertTrue(refused, "the URI-form handle was seen");
+        } finally {
+            wrapped.close();
+        }
+    }
+
     private static Connection openPlain(File f) throws Exception {
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);

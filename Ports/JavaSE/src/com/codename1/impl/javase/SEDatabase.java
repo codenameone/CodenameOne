@@ -120,6 +120,23 @@ public class SEDatabase extends Database {
             // hold and nothing to register.
             return null;
         }
+        if (path.startsWith("file:")) {
+            // SQLite's URI form, which this driver accepts. Handing "file:/tmp/app.db" to File
+            // reads it as a relative path under the working directory, so the same database would
+            // register under a key no other connection could match -- and the check it exists for
+            // would pass while this connection held the file.
+            try {
+                java.net.URI uri = new java.net.URI(path);
+                path = uri.getPath();
+            } catch (java.net.URISyntaxException notAUri) {
+                // Cannot say which file this is, so say nothing: an unregistered handle refuses
+                // its own key change, which is the conservative half of the answer.
+                return null;
+            }
+            if (path == null || path.length() == 0) {
+                return null;
+            }
+        }
         return canonicalDatabaseFileKey(new File(path));
     }
 
@@ -247,6 +264,20 @@ public class SEDatabase extends Database {
             mode = org.sqlite.SQLiteConfig.TransactionMode.EXCLUSIVE;
         }
         setTransactionMode(mode);
+    }
+
+    /// Clears the tracked state when an end failed because there was nothing to end.
+    ///
+    /// A statement with ON CONFLICT ROLLBACK rolls the transaction back as it reports the
+    /// constraint, so the engine has none left while this still believes it does -- and the
+    /// caller's own rollback then fails too, without clearing anything, leaving every later begin
+    /// and key change refused until the connection closes. There is no autocommit query in SQL, so
+    /// the engine saying "no transaction is active" is the report this reads.
+    private void noteEndFailure(SQLException ex) {
+        String message = ex.getMessage();
+        if (message != null && message.toLowerCase().indexOf("no transaction is active") >= 0) {
+            markTransactionEnded();
+        }
     }
 
     /// Ends a transaction the driver does not know it is in.
@@ -400,6 +431,7 @@ public class SEDatabase extends Database {
             markTransactionEnded();
         } catch (SQLException ex) {
             setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
+            noteEndFailure(ex);
             throw new IOException(ex.getMessage(), ex);
         }
     }
