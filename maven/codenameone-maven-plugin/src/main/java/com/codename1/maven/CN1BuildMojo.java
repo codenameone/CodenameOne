@@ -2005,6 +2005,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument(currentKey, props.getProperty(key));
             }
         }
+        applyHardeningRequestArgs(r);
         // Authenticode signing certificate. Configured through settings/properties
         // (codename1.windows.signing.certificate = path to the .p12/.pfx, and
         // codename1.windows.signing.password). This mirrors the cloud build, whose
@@ -2110,6 +2111,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 r.putArgument(currentKey, props.getProperty(key));
             }
         }
+        applyHardeningRequestArgs(r);
         r.setIncludeSource(true);
 
         try {
