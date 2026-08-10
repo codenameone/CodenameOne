@@ -6433,7 +6433,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // The interfaces come across even when the body does not: dropping "implements Observer"
         // silently changed what the class is to every caller and left the carried methods
         // implementing nothing.
-        String withHeader = carryImplements(generated, headerClause(header, "implements"));
+        String withHeader = carryClassAnnotations(existing,
+                carryImplements(generated, headerClause(header, "implements")));
         if (carried.length() == 0) return carriedImports(existing, withHeader);
         String merged = carriedImports(existing, dropStubsAlreadyWritten(withHeader, carried));
         int insert = merged.indexOf(marker);
@@ -6499,6 +6500,76 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (generic >= 0) out = out.substring(0, generic).trim();
         int dot = out.lastIndexOf('.');
         return dot < 0 ? out : out.substring(dot + 1);
+    }
+
+    /**
+     * Carries a legacy class's own annotations onto the regenerated declaration.
+     *
+     * <p>The header is rebuilt from the .gui, so a registration or injection annotation on the old
+     * class disappeared on the first save -- the members all survived while the thing that made the
+     * class visible to a framework did not, which is the kind of change nobody looks for in a diff
+     * of generated code.
+     *
+     * @param existing the legacy companion source
+     * @param generated the source whose declaration is being built
+     * @return the source with those annotations declared
+     */
+    private String carryClassAnnotations(String existing, String generated) {
+        String code = stripComments(existing);
+        int declaration = classDeclaration(existing);
+        if (declaration < 0) return generated;
+        // Annotation spans are blanked before the boundary is looked for. An argument list can
+        // contain braces of its own -- @SuppressWarnings({"a", "b"}) -- and reading those as the
+        // end of a member stopped the walk at the first annotation carrying an array.
+        char[] masked = code.toCharArray();
+        List<int[]> spans = new ArrayList<>();
+        int at = code.indexOf('@');
+        while (at >= 0 && at < declaration) {
+            int end = annotationEnd(code, at);
+            if (end < 0 || end > declaration) break;
+            spans.add(new int[]{at, end});
+            for (int i = at; i < end; i++) masked[i] = ' ';
+            at = code.indexOf('@', end);
+        }
+        if (spans.isEmpty()) return generated;
+        // Back over the modifiers to whatever ends the previous member. Only the annotations after
+        // that point belong to this class.
+        int boundary = declaration;
+        while (boundary > 0) {
+            char c = masked[boundary - 1];
+            if (!Character.isWhitespace(c) && !isIdentifierChar(c)) break;
+            boundary--;
+        }
+        StringBuilder carried = new StringBuilder();
+        for (int i = 0; i < spans.size(); i++) {
+            int[] span = spans.get(i);
+            if (span[0] < boundary) continue;
+            String annotation = existing.substring(span[0], span[1]).trim();
+            if (generated.indexOf(annotation) < 0) carried.append(annotation).append('\n');
+        }
+        if (carried.length() == 0) return generated;
+        int classAt = generated.indexOf("\npublic class ");
+        return classAt < 0 ? generated
+                : generated.substring(0, classAt + 1) + carried + generated.substring(classAt + 1);
+    }
+
+    /**
+     * The index just past an annotation, including any argument list.
+     *
+     * @param code the comment masked source
+     * @param at the index of the {@code @}
+     * @return the index after it, or -1
+     */
+    private static int annotationEnd(String code, int at) {
+        int end = at + 1;
+        while (end < code.length() && (isIdentifierChar(code.charAt(end)) || code.charAt(end) == '.')) end++;
+        if (end == at + 1) return -1;
+        int open = skipSpaces(code, end);
+        if (open < code.length() && code.charAt(open) == '(') {
+            int close = matchingParenthesis(code, open);
+            return close < 0 ? -1 : close + 1;
+        }
+        return end;
     }
 
     /**

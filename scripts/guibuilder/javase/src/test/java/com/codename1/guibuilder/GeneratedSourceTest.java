@@ -759,6 +759,48 @@ class GeneratedSourceTest {
                 "a caret past the end is clamped, then steps back one character");
     }
 
+    @Test
+    void migrationCarriesTheClassAnnotationsTheHeaderRebuildWouldDrop() throws Exception {
+        // The members all survive while the annotation that makes the class visible to a framework
+        // does not -- the kind of change nobody looks for in a diff of generated code.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "@Deprecated\n"
+                + "@SuppressWarnings({\"unchecked\", \"rawtypes\"})\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertTrue(migrated.contains("@Deprecated"), "a class annotation must survive:\n" + migrated);
+        assertTrue(migrated.contains("@SuppressWarnings({\"unchecked\", \"rawtypes\"})"),
+                "including its arguments, commas and all:\n" + migrated);
+        assertTrue(migrated.indexOf("@Deprecated") < migrated.indexOf("public class LoginForm"),
+                "and must precede the declaration:\n" + migrated);
+        compile("LoginForm", migrated, null);
+
+        // An annotation on a member is not the class's.
+        String memberAnnotated = legacy.replace("    public void mine() { }",
+                "    @Deprecated\n    public void mine() { }");
+        String second = migrate(builder, memberAnnotated, invoke(builder, "defaultCompanionSource"));
+        assertEquals(1, countOccurrences(second.substring(0, second.indexOf("public class LoginForm")), "@Deprecated"),
+                "the class keeps one @Deprecated, not the member's as well:\n" + second);
+    }
+
+    private static int countOccurrences(String text, String needle) {
+        int count = 0;
+        int at = text.indexOf(needle);
+        while (at >= 0) {
+            count++;
+            at = text.indexOf(needle, at + needle.length());
+        }
+        return count;
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

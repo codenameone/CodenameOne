@@ -816,9 +816,13 @@ public class EditorView extends Component implements TextInputClient {
     // ---- editing primitives ----
 
     /// This view edits text, so key codes reaching it are characters rather than commands.
+    ///
+    /// Only while it is editable. A read only view declines the insert in `keyReleased`, so
+    /// claiming the code anyway took a colliding soft key away from the menu bar and then did
+    /// nothing with it -- the command was silently lost.
     @Override
     protected boolean consumesRawTextInput() {
-        return true;
+        return isEditableState();
     }
 
     /// Whether the given range may be modified. Subclasses that make part of the document read only
