@@ -1716,6 +1716,41 @@ class GeneratedSourceTest {
                 "saving from the Code pane must reconcile the model as the toolbar does:\n" + written);
     }
 
+    @Test
+    void aGenericConstructorIsStillAConstructor() throws Exception {
+        // "public <T> LoginForm(Resources r)" is legal; the type parameter was read as a return
+        // type, so the constructor was carried into the generated class still calling the
+        // initializer that is gone.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public <T> LoginForm(Resources res) { initGuiBuilderComponents(res); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertFalse(migrated.contains("initGuiBuilderComponents"),
+                "the constructor is recognised and removed:\n" + migrated);
+        assertTrue(migrated.contains("public void mine()"), migrated);
+        compile("LoginForm", migrated, null);
+
+        // A generic return type is still a method, so the same-named method stays.
+        String method = legacy.replace("    public <T> LoginForm(Resources res) { initGuiBuilderComponents(res); }",
+                "    public LoginForm() { initGuiBuilderComponents(); }")
+                .replace("    public void mine() { }",
+                        "    public java.util.List<String> LoginForm(Resources res) { return null; }");
+        String second = migrate(builder, method, invoke(builder, "defaultCompanionSource"));
+        assertNotNull(second, method);
+        assertTrue(second.contains("List<String> LoginForm(Resources res)"),
+                "a generic return type still marks it a method:\n" + second);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

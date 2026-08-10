@@ -3473,18 +3473,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if ("Button".equals(type)) fields.add(booleanProperty("Toggle button", "toggle", false));
         if ("CheckBox".equals(type) || "RadioButton".equals(type)) fields.add(booleanProperty("Selected", "selected", false));
         if ("TextField".equals(type) || "TextArea".equals(type)) {
-            fields.add(propertyField("Columns", "columns", "12"));
-            fields.add(propertyField("Maximum length", "maxSize", "0"));
+            // Validated, like the table sizes: an unrestricted field stored "garbage", the preview
+            // fell back to its previous value and appendIntSetter() emitted nothing, so the canvas
+            // showed 20 while the saved form used the runtime default and Save reported success.
+            fields.add(numericPropertyField("Columns", "columns", "12", 1, 999));
+            fields.add(numericPropertyField("Maximum length", "maxSize", "0", 0, 99999));
             fields.add(booleanProperty("Editable", "editable", true));
             fields.add(booleanProperty("Grow by content", "growByContent", true));
             fields.add(pickerProperty("Input constraint", "constraint",
                     new String[]{"ANY", "EMAILADDR", "PASSWORD", "NUMERIC", "URL"}, "ANY"));
         }
-        if ("TextArea".equals(type)) fields.add(propertyField("Rows", "rows", "3"));
+        if ("TextArea".equals(type)) fields.add(numericPropertyField("Rows", "rows", "3", 1, 999));
         if ("Slider".equals(type)) {
-            fields.add(propertyField("Minimum", "minValue", "0"));
-            fields.add(propertyField("Maximum", "maxValue", "100"));
-            fields.add(propertyField("Progress", "progress", "50"));
+            fields.add(numericPropertyField("Minimum", "minValue", "0", -99999, 99999));
+            fields.add(numericPropertyField("Maximum", "maxValue", "100", -99999, 99999));
+            fields.add(numericPropertyField("Progress", "progress", "50", -99999, 99999));
             fields.add(booleanProperty("Editable", "editable", false));
             fields.add(booleanProperty("Infinite progress", "infinite", false));
         }
@@ -7529,6 +7532,28 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private static final String CONSTRUCTOR_MODIFIERS = "|public|protected|private|final|strictfp|";
 
     /**
+     * The angle bracket that opens the one at {@code closeAt}, counting nesting.
+     *
+     * @param code the comment masked source
+     * @param closeAt the index of the closing bracket
+     * @return the index of the opening bracket, or -1
+     */
+    private static int openingAngle(String code, int closeAt) {
+        int depth = 0;
+        for (int i = closeAt; i >= 0; i--) {
+            char c = code.charAt(i);
+            if (c == '>') depth++;
+            else if (c == '<') {
+                depth--;
+                if (depth == 0) return i;
+            } else if (c == ';' || c == '{' || c == '}') {
+                return -1;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * True when a type precedes the name, which makes it a method rather than a constructor.
      *
      * @param code the comment masked source
@@ -7544,9 +7569,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int end = nameAt;
         while (end > 0 && Character.isWhitespace(code.charAt(end - 1))) end--;
         if (end == 0) return false;
-        // Generics and arrays end a return type without being identifier characters.
+        // Generics and arrays end a return type without being identifier characters -- except that
+        // "<T>" in front of the name is a constructor's own type parameter, which is legal and was
+        // read as a return type, so neither constructor path recognised the declaration.
         char last = code.charAt(end - 1);
-        if (last == '>' || last == ']') return true;
+        if (last == ']') return true;
+        if (last == '>') {
+            int open = openingAngle(code, end - 1);
+            if (open < 0) return true;
+            int before = open;
+            while (before > 0 && Character.isWhitespace(code.charAt(before - 1))) before--;
+            // List<String> has a name in front of the angle; a bare <T> does not.
+            return before > 0 && isIdentifierChar(code.charAt(before - 1));
+        }
         int start = end;
         while (start > 0 && isIdentifierChar(code.charAt(start - 1))) start--;
         if (start == end) return false;

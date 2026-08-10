@@ -159,13 +159,19 @@ EOF
 pkill -f "codenameone-guibuilder-${GUIBUILDER_VERSION}.jar" 2>/dev/null || true
 sleep 1
 echo "==> launching"
+# -Xdock and the eawt exports are macOS only: a Linux JVM refuses to start on the first and warns
+# about the others, so the launch failed 12 seconds later with nothing but a log to show for it.
+# This is the same split OpenGuiBuilderMojo.desktopIdentityArgs() makes.
+IDENTITY_ARGS=(-Dguibuilder.input="$PWD/demo-project/guibuilder.input"
+  -Dsun.awt.application.name="Codename One GUI Builder")
+if [ "$(uname -s)" = "Darwin" ]; then
+  IDENTITY_ARGS+=(-Dapple.awt.application.name="Codename One GUI Builder"
+    -Xdock:name="Codename One GUI Builder"
+    --add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED
+    --add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED)
+fi
 nohup "$JDK21/bin/java" \
-  -Dguibuilder.input="$PWD/demo-project/guibuilder.input" \
-  -Dapple.awt.application.name="Codename One GUI Builder" \
-  -Dsun.awt.application.name="Codename One GUI Builder" \
-  -Xdock:name="Codename One GUI Builder" \
-  --add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED \
-  --add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED \
+  "${IDENTITY_ARGS[@]}" \
   ${CN1_EXTRA_ARGS:-} \
   -jar "$GUIBUILDER_JAR" > /tmp/guibuilder.log 2>&1 &
 sleep 12
