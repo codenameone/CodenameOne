@@ -83,15 +83,17 @@ public class PiiScrubber {
     /// the JavaScript port it is the engine's `Error().stack`. A stricter
     /// application can override this to redact aggressively.
     ///
-    /// The default scrubs emails everywhere, but applies long-digit-run masking
-    /// only to non-frame lines. A frame/location line carries no PII -- it is
-    /// class, method, file and line/column text -- and its numbers are exactly
-    /// what the server needs to symbolicate. In particular a minified
-    /// JavaScript bundle is often one line, so a `Error().stack` frame reads
-    /// `app.js:1:123456` where the six-plus-digit column would otherwise be
-    /// masked to `[num]`, destroying the location. Free-form lines (the leading
-    /// `ExceptionClass: message` line and any non-frame text) are still scrubbed,
-    /// since a message can carry a phone number or long id.
+    /// The default scrubs emails everywhere and applies long-digit-run masking
+    /// UNIFORMLY to every line, frame-shaped or not. It does not try to preserve
+    /// a frame's line/column: `printStackTrace` writes the exception message
+    /// verbatim, and a message can embed an indented, frame-shaped line that is
+    /// indistinguishable from a real frame -- preserving a "coordinate" from such
+    /// a line would let a crafted `:line:column` tail smuggle a long id past the
+    /// digit masking. `scrubMessage` masks only 6-or-more-digit runs, so ordinary
+    /// short line numbers survive, but a large minified-JavaScript column such as
+    /// `app.js:1:123456` is masked to `app.js:1:[num]`. That loses the column for
+    /// this text form; precise coordinates for symbolication come from the
+    /// structured frames (real `StackTraceElement`s), not this scrubbed string.
     ///
     /// #### Parameters
     ///
