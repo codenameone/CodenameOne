@@ -1805,8 +1805,16 @@ public final class Display extends CN1Constants {
     ///
     /// Deliberately phase totals rather than a per-pass log: a trace that prints every
     /// pass changes what it measures, and slow passes are the ones that matter.
-    static final boolean EDT_TRACE =
-            "true".equals(System.getProperty("cn1.edt.trace"));
+    static final String EDT_TRACE_PROPERTY = "cn1.edt.trace";
+
+    /// Enabled either by -Dcn1.edt.trace=true at launch (desktop) or at runtime with
+    /// {@code Display.setProperty("cn1.edt.trace", "true")}, which is the only route
+    /// available on a device.
+    private static boolean edtTrace = "true".equals(System.getProperty(EDT_TRACE_PROPERTY));
+
+    static boolean isEdtTrace() {
+        return edtTrace;
+    }
     private long edtTraceReportTime;
     private int edtTracePasses;
     private long edtTraceIdle;
@@ -1835,7 +1843,7 @@ public final class Display extends CN1Constants {
         if (now - edtTraceReportTime < 1000) {
             return;
         }
-        System.out.println("[edt] passes=" + edtTracePasses
+        Log.p("[edt] passes=" + edtTracePasses
                 + " idle=" + edtTraceIdle + "ms events=" + edtTraceEvents
                 + "ms revalidateQueue=" + edtTraceRevalidate + "ms paintDirty=" + edtTracePaint
                 + "ms animations=" + edtTraceAnimations + "ms serialCalls=" + edtTraceSerial
@@ -1861,7 +1869,7 @@ public final class Display extends CN1Constants {
         long traceAnimations = 0;
         long traceSerial = 0;
         long traceMark = 0;
-        if (EDT_TRACE) {
+        if (edtTrace) {
             tracePassStart = System.currentTimeMillis();
             traceMark = tracePassStart;
         }
@@ -1917,7 +1925,7 @@ public final class Display extends CN1Constants {
             Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
-        if (EDT_TRACE) {
+        if (edtTrace) {
             traceIdle = currentTime - traceMark;
             traceMark = currentTime;
         }
@@ -1974,7 +1982,7 @@ public final class Display extends CN1Constants {
         if (!impl.isInitialized()) {
             return;
         }
-        if (EDT_TRACE) {
+        if (edtTrace) {
             long t = System.currentTimeMillis();
             traceEvents = t - traceMark;
             traceMark = t;
@@ -1986,13 +1994,13 @@ public final class Display extends CN1Constants {
             // before the next paint cycle.
             current.flushRevalidateQueue();
         }
-        if (EDT_TRACE) {
+        if (edtTrace) {
             long t = System.currentTimeMillis();
             traceRevalidate = t - traceMark;
             traceMark = t;
         }
         impl.paintDirty();
-        if (EDT_TRACE) {
+        if (edtTrace) {
             long t = System.currentTimeMillis();
             tracePaint = t - traceMark;
             traceMark = t;
@@ -2035,7 +2043,7 @@ public final class Display extends CN1Constants {
         for (Window each : Desktop.getInstance().getWindows()) {
             each.serviceInputTimers(t, longPressInterval);
         }
-        if (EDT_TRACE) {
+        if (edtTrace) {
             // Not `t`: the main surface's timer clock is already declared above in this
             // scope, and reusing the name here would shadow it.
             long traceNow = System.currentTimeMillis();
@@ -2043,7 +2051,7 @@ public final class Display extends CN1Constants {
             traceMark = traceNow;
         }
         processSerialCalls();
-        if (EDT_TRACE) {
+        if (edtTrace) {
             long t = System.currentTimeMillis();
             traceSerial = t - traceMark;
             edtTraceReport(tracePassStart, traceIdle, traceEvents, traceRevalidate,
@@ -5577,6 +5585,13 @@ public final class Display extends CN1Constants {
     ///
     /// - `value`: the value of the property
     public void setProperty(String key, String value) {
+        if (EDT_TRACE_PROPERTY.equals(key)) {
+            // Runtime switch, because a device cannot be given a -D system property and
+            // "which phase ate the frame" is exactly the question you need answered ON the
+            // device. Costs one string comparison in setProperty.
+            edtTrace = "true".equals(value);
+            return;
+        }
         if ("AppArg".equals(key)) {
             impl.setAppArg(value);
             // Every CN1 port (iOS cn1OpenURL / cn1ContinueUserActivity, Android

@@ -111,13 +111,21 @@ public class GestureOverlayRenderElement extends RenderElement {
 
         @Override
         public void paint(Graphics g) {
-            // paints nothing — pure hit area
+            ink.paint(g, this);
         }
 
         @Override
         public void pointerPressed(int x, int y) {
             suppressTap = false;
+            ink.press(this, x - getAbsoluteX(), y - getAbsoluteY(), inkResponse());
             super.pointerPressed(x, y);
+        }
+
+        @Override
+        public void dragInitiated() {
+            // A drag means the press was a scroll, not a tap: Flutter cancels the splash.
+            super.dragInitiated();
+            ink.cancel(this);
         }
 
         @Override
@@ -134,6 +142,11 @@ public class GestureOverlayRenderElement extends RenderElement {
         public void pointerReleased(int x, int y) {
             boolean wasDrag = isDragActivated();
             super.pointerReleased(x, y);
+            if (wasDrag) {
+                ink.cancel(this);
+            } else {
+                ink.release(this);
+            }
             if (!wasDrag && !suppressTap && contains(x, y)) {
                 GestureDetector g = gesture();
                 if (g != null) {
@@ -143,4 +156,21 @@ public class GestureOverlayRenderElement extends RenderElement {
             suppressTap = false;
         }
     }
+
+    /** The InkWell/InkResponse configuration for this tap area, or null for a plain gesture. */
+    private com.codename1.flutter.material.InkResponse inkResponse() {
+        GestureDetector g = gesture();
+        return g instanceof com.codename1.flutter.material.InkResponse
+                ? (com.codename1.flutter.material.InkResponse) g : null;
+    }
+
+    /**
+     * The Material ink for this tap area: a splash expanding from the touch point plus the
+     * press highlight underneath it.
+     *
+     * <p>Kept on the ELEMENT rather than the component so it survives the component being
+     * re-styled or re-configured, and so a subtree rebuild mid-press cannot strand a
+     * running animation.</p>
+     */
+    private final InkFeedback ink = new InkFeedback();
 }

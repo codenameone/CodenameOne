@@ -8996,6 +8996,27 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    /// iOS renders at 1x, 2x or 3x and nothing else, so the scale follows directly from
+    /// the density bucket getDeviceDensity() already derives from the screen resolution.
+    ///
+    /// The two must not be conflated: the buckets approximate DPI (a 460ppi phone lands in
+    /// DENSITY_560), while UIScreen.scale on that same phone is 3. A caller laying out in
+    /// iOS logical points that used the bucket would size everything 3.5/3 too large.
+    @Override
+    public float getDevicePixelRatio() {
+        switch (getDeviceDensity()) {
+            case Display.DENSITY_560:
+            case Display.DENSITY_HD:
+                return 3f;
+            case Display.DENSITY_VERY_HIGH:
+                return 2f;
+            case Display.DENSITY_MEDIUM:
+                return 1f;
+            default:
+                return 0f;
+        }
+    }
+
     public int getDeviceDensity() {
         // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
         // to the getDeviceDensity() method in the Shooter project or the iOS screenshots

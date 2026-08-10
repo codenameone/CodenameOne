@@ -5181,6 +5181,19 @@ public abstract class CodenameOneImplementation {
     ///
     /// #### Returns
     ///
+    /// The platform's own logical-pixel scale factor: device pixels per logical pixel,
+    /// the number iOS calls `UIScreen.scale` and Android calls `density`.
+    ///
+    /// This is NOT the same question as [#getDeviceDensity], even though the two are
+    /// easily confused. Density is a coarse DPI bucket used to pick artwork and to size
+    /// things in physical units. The scale factor is what the platform itself uses to
+    /// convert its own layout units into pixels, and on iOS it is only ever 1, 2 or 3 --
+    /// never the 3.5 that a 560-dpi bucket would imply. Anything laying out in
+    /// platform-logical units (a Flutter-style `dp`) has to ask this question, not the
+    /// density one, or it renders every dimension off by the ratio between them.
+    ///
+    /// #### Returns
+    ///
     /// pixels per logical pixel, or 0 when the platform does not report one -- callers
     /// should then fall back to deriving it from the density bucket
     public float getDevicePixelRatio() {

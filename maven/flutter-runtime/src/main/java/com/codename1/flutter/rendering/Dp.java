@@ -27,7 +27,16 @@ public final class Dp {
             return 1;
         }
         if (cachedScale <= 0) {
-            cachedScale = bucketScale(Display.getInstance().getDeviceDensity());
+            // Ask the platform for its OWN scale factor first. Flutter's logical pixel is
+            // the platform's logical pixel, so where the platform reports one it is the
+            // right answer by definition - and it is not always what the density bucket
+            // implies. On iOS the bucket for a modern iPhone is DENSITY_560, which maps to
+            // 3.5, while UIScreen.scale is 3: everything rendered 7/6 too large against
+            // native Flutter on the same device.
+            cachedScale = Display.getInstance().getDevicePixelRatio();
+            if (cachedScale <= 0) {
+                cachedScale = bucketScale(Display.getInstance().getDeviceDensity());
+            }
             if (cachedScale <= 0) {
                 // unknown bucket: fall back to physical measurement
                 int px = Display.getInstance().convertToPixels((float) (MM_PER_LP * 100));

@@ -53,4 +53,21 @@ public class InkResponse extends GestureDetector {
     public void containedInkWell(boolean v) {
         this.containedInkWell = v;
     }
+
+    public Color getSplashColor() {
+        return splashColor;
+    }
+
+    public Color getHighlightColor() {
+        return highlightColor;
+    }
+
+    public BorderRadius getBorderRadius() {
+        return borderRadius;
+    }
+
+    /** The explicit splash radius in logical pixels, or null to size it to the box. */
+    public Double getRadius() {
+        return radius;
+    }
 }
