@@ -10,8 +10,30 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCAL_REPO="${CN1_LOCAL_REPO:-/tmp/cn1-local-repo}"
-JDK8="${JAVA8_HOME:-$(/usr/libexec/java_home -v 1.8)}"
-JDK21="${JAVA21_HOME:-$(/usr/libexec/java_home -v 21)}"
+# java_home is macOS only, and under set -e the failed substitution ended the script before any
+# build started -- on Linux or Windows the helper appeared to do nothing at all.
+locate_jdk() {
+  version="$1"
+  home_var="$2"
+  if [ -n "${!home_var:-}" ]; then
+    echo "${!home_var}"
+    return 0
+  fi
+  if [ -x /usr/libexec/java_home ]; then
+    /usr/libexec/java_home -v "$version" 2>/dev/null && return 0
+  fi
+  # The usual Linux layout, newest first so 21 does not pick up 21.0.1 before 21.0.9.
+  for candidate in $(ls -d /usr/lib/jvm/*"${version}"* 2>/dev/null | sort -r); do
+    if [ -x "$candidate/bin/javac" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  echo "Set $home_var to a JDK $version installation; this script could not find one." >&2
+  return 1
+}
+JDK8="$(locate_jdk 1.8 JAVA8_HOME)" || JDK8="$(locate_jdk 8 JAVA8_HOME)"
+JDK21="$(locate_jdk 21 JAVA21_HOME)"
 # Read from the reactor rather than hard coded: maven/update-version.sh moves the project off
 # 8.0-SNAPSHOT at every release, after which a pinned path made the first unzip fail under set -e
 # and took the packaging, launch and process checks with it.

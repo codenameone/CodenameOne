@@ -6232,8 +6232,20 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private static boolean isJavaReserved(String identifier) {
         return JAVA_RESERVED.indexOf("|" + identifier + "|") >= 0;
     }
+    /**
+     * A Java string literal body for an attribute value.
+     *
+     * <p>A carriage return is escaped rather than dropped. The document keeps one -- a TextArea
+     * imported with {@code &#13;} has it -- and the preview shows it, so deleting it here quietly
+     * joined the surrounding text in the running application and nowhere else. Tab too, which had
+     * the same exposure without being reported.
+     *
+     * @param value the attribute value
+     * @return the text to put between the quotes
+     */
     private String javaEscape(String value) {
-        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
     private String ensureHandler(String source, String handler) {

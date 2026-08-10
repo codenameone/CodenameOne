@@ -1570,6 +1570,22 @@ class GeneratedSourceTest {
         assertFalse(names.contains("value"), names.toString());
     }
 
+    @Test
+    void aCarriageReturnInTextSurvivesIntoTheGeneratedLiteral() throws Exception {
+        // The document keeps it and the preview shows it, so dropping it here changed the running
+        // text and nowhere else -- the two lines silently became one.
+        CodenameOneGUIBuilder builder = builderFor("none",
+                "<component type=\"TextArea\" name=\"note\" text=\"first&#13;&#10;second\"/>"
+                + "<component type=\"Label\" name=\"tabbed\" text=\"a&#9;b\"/>");
+
+        String form = invoke(builder, "defaultCompanionSource");
+
+        assertTrue(form.contains("first\\r\\nsecond"),
+                "the carriage return must be escaped, not deleted:\n" + form);
+        assertTrue(form.contains("a\\tb"), "and so must a tab:\n" + form);
+        compile("LoginForm", form, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
