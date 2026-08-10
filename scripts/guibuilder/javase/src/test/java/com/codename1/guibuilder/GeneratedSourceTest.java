@@ -1620,6 +1620,60 @@ class GeneratedSourceTest {
         assertFalse(((Boolean) cannotAsk.invoke(builder)).booleanValue());
     }
 
+    @Test
+    void theDelegateKeepsTheThrowsClauseItsCallersCatch() throws Exception {
+        // A caller with a dedicated catch stopped compiling against a delegate that dropped the
+        // clause -- the same broken-callers problem the delegate exists to prevent.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "import java.io.IOException;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm(Resources res) throws IOException { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertTrue(migrated.contains("Resources resourceObjectInstance) throws IOException"),
+                "the delegate must declare what the original did:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aSamePackageClassShadowsTheWildcardImport() throws Exception {
+        // In "package com.acme; import com.codename1.ui.*;" a com.acme.Form next to this file is
+        // what Form means, and the project has that file to look at.
+        Path project = Files.createTempDirectory("guibuilderShadow");
+        Path java = Files.createDirectories(project.resolve("src/main/java/com/example"));
+        Files.createDirectories(project.resolve("src/main/guibuilder/com/example"));
+        Path guiFile = project.resolve("src/main/guibuilder/com/example/LoginForm.gui");
+        String xml = "<component type=\"Form\" name=\"LoginForm\" layout=\"BoxLayout\"/>";
+        Files.write(guiFile, xml.getBytes(StandardCharsets.UTF_8));
+
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
+                + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
+                + "\ncssFile=" + project.resolve("theme.css") + "\n"));
+        set(builder, "document", GuiDocument.parse(ProjectIO.fsUrl(guiFile.toString()), xml));
+
+        String legacy = "package com.example;\nimport com.codename1.ui.*;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+        assertNotNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "with no such file the wildcard is ours");
+
+        Files.write(java.resolve("Form.java"),
+                "package com.example;\npublic class Form { }\n".getBytes(StandardCharsets.UTF_8));
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a Form in this package is what Form means here");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

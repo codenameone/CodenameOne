@@ -6720,6 +6720,21 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
+     * The {@code throws} clause between a parameter list and a body, ready to append.
+     *
+     * @param code the comment masked source
+     * @param parametersEnd the index of the closing parenthesis
+     * @return the clause with a leading space, or an empty string
+     */
+    private static String constructorThrowsClause(String code, int parametersEnd) {
+        int from = skipSpaces(code, parametersEnd + 1);
+        int end = skipThrowsClause(code, from);
+        if (end == from) return "";
+        String clause = code.substring(from, end).trim();
+        return clause.length() == 0 ? "" : " " + clause;
+    }
+
+    /**
      * A delegating {@code (Resources)} constructor when the legacy file declared one, so callers
      * outside the companion keep compiling after migration.
      *
@@ -6761,8 +6776,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                     setStatus(companionRefusal);
                     return "";
                 }
+                // With the clause the original declared. A caller with a dedicated
+                // catch (IOException) stopped compiling against a delegate that dropped it, which
+                // is the same broken-callers problem the delegate exists to prevent.
+                String throwsClause = constructorThrowsClause(code, close);
                 return "\n    /** Kept so callers of the pre-migration constructor still compile. */\n"
-                        + "    public " + className + "(com.codename1.ui.util.Resources resourceObjectInstance) {\n"
+                        + "    public " + className + "(com.codename1.ui.util.Resources resourceObjectInstance)"
+                        + throwsClause + " {\n"
                         + "        this();\n    }\n";
             }
             at = constructorAt(code, className, at + className.length());
@@ -6999,7 +7019,28 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 else otherWildcard = true;
             }
         }
-        return codenameOneWildcard && !otherWildcard;
+        // A type in the same package beats an on-demand import, so a com.acme.Form next to this
+        // file wins over com.codename1.ui.* -- and the project has that file to look at.
+        if (codenameOneWildcard && !otherWildcard && !samePackageDeclares(existing, simpleName)) return true;
+        return false;
+    }
+
+    /**
+     * Whether the companion's own package holds a source file of that name.
+     *
+     * @param existing the legacy companion source
+     * @param simpleName the type being resolved
+     * @return true when a same-package class would shadow an on-demand import
+     */
+    private boolean samePackageDeclares(String existing, String simpleName) {
+        if (binding == null || binding.sourceDir() == null) return false;
+        String code = stripComments(existing);
+        int at = code.indexOf("package ");
+        int semicolon = at < 0 ? -1 : code.indexOf(';', at);
+        if (at < 0 || semicolon < 0) return false;
+        String packageName = code.substring(at + "package ".length(), semicolon).trim();
+        String directory = packageName.length() == 0 ? "" : "/" + packageName.replace('.', '/');
+        return ProjectIO.exists(binding.sourceDir() + directory + "/" + simpleName + ".java");
     }
 
     /**
