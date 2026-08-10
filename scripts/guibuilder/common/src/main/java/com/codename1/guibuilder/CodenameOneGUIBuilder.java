@@ -6190,6 +6190,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         while (at < code.length()) {
             char c = code.charAt(at);
             if (c == '{' || c == ';') return at;
+            // A Java 8 type-use annotation is legal here: throws @Unchecked RuntimeException.
+            if (c == '@') {
+                int end = annotationEnd(code, at);
+                if (end < 0) return from;
+                at = end;
+                continue;
+            }
             // Names, qualifiers and separators only. Anything else means this was never a throws
             // clause, so the caller should judge the text it already had rather than this guess.
             if (!isIdentifierChar(c) && c != '.' && c != ',' && !Character.isWhitespace(c)) return from;
@@ -6493,17 +6500,53 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return true when the declaration is abstract
      */
     private boolean isAbstractLegacyClass(String existing) {
+        String[] modifiers = modifiersBeforeClass(existing).split("\\s+");
+        for (int i = 0; i < modifiers.length; i++) {
+            if ("abstract".equals(modifiers[i])) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The modifiers between the previous member and the class keyword.
+     *
+     * <p>Annotations are blanked first, so a legal {@code public abstract @Registered class Foo}
+     * does not hide the modifiers behind it -- a backward scan stops dead at the {@code @}.
+     *
+     * @param existing the legacy companion source
+     * @return the modifier text, which may be empty
+     */
+    private String modifiersBeforeClass(String existing) {
         String code = stripComments(existing);
         int declaration = classDeclaration(existing);
-        if (declaration <= 0) return false;
-        // Only the modifiers, which is whatever runs back from the keyword without a separator.
+        if (declaration <= 0) return "";
+        char[] masked = blankAnnotations(code, declaration);
         int at = declaration;
         while (at > 0) {
-            char c = code.charAt(at - 1);
+            char c = masked[at - 1];
             if (!Character.isWhitespace(c) && !isIdentifierChar(c)) break;
             at--;
         }
-        return code.substring(at, declaration).indexOf("abstract") >= 0;
+        return new String(masked, at, declaration - at).trim();
+    }
+
+    /**
+     * A copy of the source with every annotation before {@code limit} replaced by spaces.
+     *
+     * @param code the comment masked source
+     * @param limit the offset to stop at
+     * @return the masked characters, the same length as the source
+     */
+    private static char[] blankAnnotations(String code, int limit) {
+        char[] masked = code.toCharArray();
+        int at = code.indexOf('@');
+        while (at >= 0 && at < limit) {
+            int end = annotationEnd(code, at);
+            if (end < 0 || end > limit) break;
+            for (int i = at; i < end; i++) masked[i] = ' ';
+            at = code.indexOf('@', end);
+        }
+        return masked;
     }
 
     /** The superclass this generator emits for the open document's root type. */
@@ -6584,14 +6627,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // Annotation spans are blanked before the boundary is looked for. An argument list can
         // contain braces of its own -- @SuppressWarnings({"a", "b"}) -- and reading those as the
         // end of a member stopped the walk at the first annotation carrying an array.
-        char[] masked = code.toCharArray();
+        char[] masked = blankAnnotations(code, declaration);
         List<int[]> spans = new ArrayList<>();
         int at = code.indexOf('@');
         while (at >= 0 && at < declaration) {
             int end = annotationEnd(code, at);
             if (end < 0 || end > declaration) break;
             spans.add(new int[]{at, end});
-            for (int i = at; i < end; i++) masked[i] = ' ';
             at = code.indexOf('@', end);
         }
         if (spans.isEmpty()) return generated;
@@ -6697,8 +6739,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private String legacyUserMembers(String existing, int legacyStart, int legacyEnd) {
-        int bodyStart = existing.indexOf('{', classDeclaration(existing));
-        int bodyEnd = existing.lastIndexOf('}');
+        // The brace matching the form's own declaration, not the last one in the file: a helper
+        // class declared after the form owns that one, and carrying to it dragged the form's
+        // closing brace and most of the helper into the regenerated class.
+        String masked = stripComments(existing);
+        int bodyStart = masked.indexOf('{', classDeclaration(existing));
+        int bodyEnd = matchingBrace(masked, bodyStart);
+        if (bodyEnd < 0) bodyEnd = existing.lastIndexOf('}');
         if (bodyStart < 0 || bodyEnd <= bodyStart) return "";
         String body = existing.substring(bodyStart + 1, bodyEnd);
         int offset = bodyStart + 1;

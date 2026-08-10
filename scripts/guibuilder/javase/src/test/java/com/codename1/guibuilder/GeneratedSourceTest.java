@@ -900,6 +900,59 @@ class GeneratedSourceTest {
         assertNotNull(migrate(builder, concrete, invoke(builder, "defaultCompanionSource")));
     }
 
+    @Test
+    void aHelperClassAfterTheFormIsNotDraggedIntoIt() throws Exception {
+        // lastIndexOf('}') found the helper's brace, so the carried region ran past the form's own
+        // closing brace and took most of the helper with it, into the regenerated class.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n"
+                + "class LoginHelper {\n"
+                + "    void help() { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertTrue(migrated.contains("public void mine()"), "the form's own member is carried:\n" + migrated);
+        assertFalse(migrated.contains("class LoginHelper"),
+                "the helper after the form is not part of it:\n" + migrated);
+        assertFalse(migrated.contains("void help()"), migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void anAnnotationBetweenTheModifiersAndTheKeywordDoesNotHideAbstract() throws Exception {
+        // "public abstract @Registered class Foo" is legal; a backward scan stops at the @ and the
+        // modifiers behind it were never read, so the refusal did not fire.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public abstract @SuppressWarnings(\"unchecked\") class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    protected abstract void configure();\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "abstract behind an annotation is still abstract");
+    }
+
+    @Test
+    void aTypeUseAnnotationInAThrowsClauseKeepsTheHandlerVisible() throws Exception {
+        CodenameOneGUIBuilder builder = builder("none");
+        assertTrue(declares(builder,
+                "void onSubmit(ActionEvent event) throws @SuppressWarnings(\"x\") RuntimeException {}", "onSubmit"),
+                "a type-use annotation is part of the clause, not the end of it");
+        assertTrue(declares(builder,
+                "void onSubmit(ActionEvent event) throws @Deprecated RuntimeException {}", "onSubmit"));
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
