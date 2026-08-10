@@ -6391,7 +6391,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // whatever the .gui says, quietly changing what the screen does. The argument-less form is
         // what the compiler would have inserted anyway.
         if (only.startsWith("super(")) return !"super()".equals(withoutSpaces(only));
-        return !only.startsWith("initGuiBuilderComponents") && !only.startsWith("this(");
+        // Same reasoning for the chain: the scaffold wrote this(Resources.getGlobalResources()),
+        // and anything else -- this(createTenantResources()) -- is a choice the developer made
+        // that the generated constructor knows nothing about and would silently drop.
+        if (only.startsWith("this(")) {
+            String call = withoutSpaces(only);
+            return !"this()".equals(call)
+                    && !"this(Resources.getGlobalResources())".equals(call)
+                    && !"this(com.codename1.ui.util.Resources.getGlobalResources())".equals(call);
+        }
+        return !only.startsWith("initGuiBuilderComponents");
     }
 
     /** The statement with its whitespace removed, for comparing against a canonical form. */

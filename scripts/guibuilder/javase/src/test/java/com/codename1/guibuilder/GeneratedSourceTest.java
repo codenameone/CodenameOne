@@ -1078,6 +1078,28 @@ class GeneratedSourceTest {
         compile("LoginForm", migrated, null);
     }
 
+    @Test
+    void aCustomConstructorChainStopsTheMigration() throws Exception {
+        // The scaffold chained through Resources.getGlobalResources(); anything else is a choice
+        // the developer made, and the generated constructor knows nothing about it.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm() { this(createTenantResources()); }\n"
+                + "    private static Resources createTenantResources() { return null; }\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a custom chain is user logic, not scaffolding");
+
+        // The scaffold's own chain is still scaffolding.
+        String scaffold = legacy.replace("this(createTenantResources())", "this(Resources.getGlobalResources())");
+        assertNotNull(migrate(builder, scaffold, invoke(builder, "defaultCompanionSource")));
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
