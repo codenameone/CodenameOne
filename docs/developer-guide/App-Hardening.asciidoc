@@ -113,7 +113,7 @@ Renaming is safe for code the compiler and runtime resolve by symbol. Codename O
 
 If you have a class the build resolves by a name the automatic analysis can't see, add a `harden.keep` rule for it.
 
-Package names are obfuscated along with class names. Codename One's own resource loading uses absolute paths (`Display.getResourceAsStream("/name")`, the theme `.res`), which are unaffected. The one thing renaming can break is a *package-relative* resource lookup -- `getClass().getResourceAsStream("config.properties")`, without a leading slash -- because the runtime resolves it under the class's now-obfuscated package while the resource stays at its original path. Application code rarely does this, but a bundled third-party dependency might; if one loads a resource relative to its own package, add a `harden.keep` rule for that class (or its package) so its package path stays put.
+Package names are obfuscated along with class names. Codename One's own resource loading uses absolute paths (`Display.getResourceAsStream("/name")`, the theme `.res`), which are unaffected. The one thing renaming can break is a *package-relative* resource lookup -- `getClass().getResourceAsStream("config.properties")`, without a leading slash -- because the runtime resolves it under the class's now-obfuscated package while the resource stays at its original path. This is uncommon in application code, but a bundled third-party dependency might do it; if one loads a resource relative to its own package, add a `harden.keep` rule for that class (or its package) so its package path stays put.
 
 === Crash reports from a hardened build
 
