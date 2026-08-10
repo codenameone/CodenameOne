@@ -659,6 +659,21 @@ class GeneratedSourceTest {
         assertEquals("Dialog", dialog.effectiveUiid(dialog.root()));
     }
 
+    @Test
+    void aQualifiedParameterAnnotationDoesNotHideTheHandler() throws Exception {
+        // The annotation name stopped at the first dot, so the argument list was never recognised
+        // and the comma inside it read as a second parameter. The declaration was missed and Save
+        // appended a second method with the same signature.
+        CodenameOneGUIBuilder builder = builder("none");
+        assertTrue(declares(builder,
+                "void onSubmit(@com.example.Foo(a = 1, b = 2) ActionEvent event) {}", "onSubmit"),
+                "a qualified annotation carrying arguments is still just one ActionEvent parameter");
+        assertTrue(declares(builder, "void onSubmit(@Foo ActionEvent event) {}", "onSubmit"));
+        assertFalse(declares(builder,
+                "void onSubmit(@com.example.Foo(a = 1) String other, ActionEvent event) {}", "onSubmit"),
+                "two parameters are still two parameters");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

@@ -74,6 +74,30 @@ class SourceEditingTest {
         System.out.println("PROTECTED-AT-CARET-ZERO: generated region correctly rejects typing at offset 0");
     }
 
+    @Test void typingBetweenTheEndMarkerAndItsNewlineIsRejected() {
+        // A caret just past the marker text but before its newline used to count as outside the
+        // block. One keystroke there turns the standalone marker into ordinary text, and the next
+        // scan then finds no closing marker and protects everything to the end of the file --
+        // including the user's own region, which is the thing the markers exist to keep editable.
+        CodePureEditor editor = new CodePureEditor(new Host(), "java");
+        CodeView view = (CodeView) editor.getView();
+        editor.cmd("setText", SOURCE);
+        editor.cmd("setProtectedMarkers", "// <gui-builder-generated>\n// </gui-builder-generated>");
+        String endMarker = "// </gui-builder-generated>";
+        int justPastMarker = SOURCE.indexOf(endMarker) + endMarker.length();
+
+        view.replaceRange(justPastMarker, justPastMarker, "X");
+
+        assertFalse(editor.query("getText", null).contains(endMarker + "X"),
+                "the rest of the marker line is part of the marker");
+
+        // The line after it is still the user's to type on.
+        int nextLine = justPastMarker + 1;
+        view.replaceRange(nextLine, nextLine, "");
+        assertTrue(editor.query("getText", null).contains(endMarker + "\n"),
+                "the marker line survived intact");
+    }
+
     private static final class Host implements EditorHost {
         @Override
         public boolean isTextInputSupported() {

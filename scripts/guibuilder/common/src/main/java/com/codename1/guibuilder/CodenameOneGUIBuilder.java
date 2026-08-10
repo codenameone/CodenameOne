@@ -812,6 +812,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             if (caret < 0 || caret > text.length()) caret = text.length();
             if (caret == 0) return true;
             area.setText(text.substring(0, caret - 1) + text.substring(caret));
+            // setText leaves the old offset behind, so the caret ended up one character to the
+            // right of the deletion and the next keystroke landed in the wrong place.
+            if (area instanceof TextField) ((TextField) area).setCursorPosition(caret - 1);
             return true;
         }
         return false;
@@ -6047,7 +6050,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 continue;
             }
             at++;
-            while (at < parameters.length() && isIdentifierChar(parameters.charAt(at))) at++;
+            // Dots as well as identifier characters: a qualified @com.example.Foo(a = 1, b = 2)
+            // stopped at the first dot, so its argument list was never recognised and the comma
+            // inside it read as a second parameter -- the declaration was missed and Save appended
+            // a duplicate signature.
+            while (at < parameters.length()
+                    && (isIdentifierChar(parameters.charAt(at)) || parameters.charAt(at) == '.')) {
+                at++;
+            }
             int open = skipSpaces(parameters, at);
             if (open < parameters.length() && parameters.charAt(open) == '(') {
                 int close = matchingParenthesis(parameters, open);

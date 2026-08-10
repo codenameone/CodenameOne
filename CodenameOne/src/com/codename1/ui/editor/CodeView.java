@@ -199,6 +199,21 @@ public class CodeView extends EditorView {
         return -1;
     }
 
+    /// The index of the newline ending the line `at` sits on, or the end of the text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the text being edited
+    /// - `at`: an offset on the line
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the line's newline, or the length of the text
+    private static int endOfLine(String source, int at) {
+        int newline = source.indexOf('\n', at);
+        return newline < 0 ? source.length() : newline;
+    }
+
     private boolean isProtectedEdit(int start, int end) {
         if (protectedStartMarker == null || protectedEndMarker == null) {
             return false;
@@ -213,15 +228,21 @@ public class CodeView extends EditorView {
             int endMarker = markerLine(source, protectedEndMarker,
                     protectedStart + protectedStartMarker.length());
             int protectedEnd = endMarker < 0
-                    ? source.length() : endMarker + protectedEndMarker.length();
-            // protectedEnd is the offset just past the end marker, so a caret sitting exactly there
-            // is already outside the block. Treating it as protected made the first character after
-            // a generated region impossible to type.
-            if ((start == end && start >= protectedStart && start < protectedEnd)
-                    || (start < protectedEnd && end > protectedStart)) {
+                    ? source.length() : endOfLine(source, endMarker + protectedEndMarker.length());
+            // protectedEnd is the newline that ends the marker line, so a caret on the next line is
+            // already outside the block. Treating that caret as protected made the first character
+            // after a generated region impossible to type, and stopping at the marker text instead
+            // let a keystroke land between the marker and its newline -- which turns the marker
+            // into ordinary text, and the next scan then protects everything to the end of the
+            // file, the user's own region included.
+            // Inclusive of protectedEnd, which is the newline itself: a caret between the marker
+            // text and that newline is still on the marker line. The first editable offset is the
+            // start of the next line.
+            if ((start == end && start >= protectedStart && start <= protectedEnd)
+                    || (start <= protectedEnd && end > protectedStart)) {
                 return true;
             }
-            searchFrom = protectedEnd;
+            searchFrom = protectedEnd + 1;
         }
         return false;
     }
