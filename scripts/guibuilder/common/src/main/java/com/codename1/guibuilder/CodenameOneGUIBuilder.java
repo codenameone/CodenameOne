@@ -4702,6 +4702,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String xml = document.toXml();
             String existingCompanion = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
             String companion = companionSourceFor(existingCompanion);
+            if (legacyMigrationBlocked()) return false;
             boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
             String model = rewriteModel ? generatedModelSource() : null;
             if (!rewriteModel && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
@@ -5100,6 +5101,22 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
+    /** Why the open form's legacy companion cannot be migrated, or null when there is no reason. */
+    private String legacyMigrationRefusal;
+
+    /**
+     * True when the companion cannot be regenerated, so a save must fail rather than write the
+     * .gui against Java that will never match it.
+     *
+     * @return true when the caller must abort
+     */
+    private boolean legacyMigrationBlocked() {
+        if (legacyMigrationRefusal == null) return false;
+        ToastBar.showErrorMessage("Save failed: " + legacyMigrationRefusal);
+        setStatus(legacyMigrationRefusal);
+        return true;
+    }
+
     /**
      * Builds the companion source without writing it, so a caller staging several files can decide
      * to write none of them.
@@ -5109,6 +5126,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return the source to write
      */
     private String companionSourceFor(String userSource) {
+        // Cleared on the way in so the answer always describes the file being written now.
+        legacyMigrationRefusal = null;
         String generated = defaultCompanionSource();
         String merged = userSource == null ? generated : mergeGeneratedSource(userSource, generated);
         // buildUI() emits addActionListener(this::handler) for every configured event, so a handler
@@ -5192,7 +5211,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
                 && !ProjectIO.exists(modelPath);
         try {
-            writeTracked(undo, path, companionSourceFor(source));
+            String companion = companionSourceFor(source);
+            if (legacyMigrationBlocked()) {
+                setStatus("Save refused; nothing was written");
+                return;
+            }
+            writeTracked(undo, path, companion);
             // The companion is generated from the in-memory document, so the .gui goes with it.
             // Writing only the Java left the two disagreeing whenever the designer had unsaved
             // structural changes: discarding them afterwards kept a companion describing a
@@ -5996,6 +6020,17 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return true when the method can serve as the handler
      */
     private static boolean isSingleActionEventParameter(String parameters) {
+        return isSingleParameterOfType(parameters, "ActionEvent");
+    }
+
+    /**
+     * True when a parameter list is exactly one parameter of the named type.
+     *
+     * @param parameters the text between the parentheses
+     * @param typeName the simple type name to match
+     * @return true when that is the whole parameter list
+     */
+    private static boolean isSingleParameterOfType(String parameters, String typeName) {
         // Annotations are removed first: their arguments can contain both parentheses and commas,
         // so @Foo("a,b") ActionEvent e would otherwise read as two parameters.
         String only = stripAnnotations(parameters).trim();
@@ -6010,7 +6045,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (dot >= 0) type = type.substring(dot + 1);
         int lastSpace = type.lastIndexOf(' ');
         if (lastSpace >= 0) type = type.substring(lastSpace + 1);
-        return "ActionEvent".equals(type);
+        return typeName.equals(type);
     }
 
     /**
@@ -6144,7 +6179,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         while (at >= 0) {
             int open = code.indexOf('(', at);
             int close = code.indexOf(')', open);
-            if (close > open && code.substring(open + 1, close).indexOf("Resources") >= 0) {
+            // The same test removeConstructors() uses, so the delegate is added exactly when the
+            // constructor it stands in for was taken away.
+            if (close > open && isSingleParameterOfType(code.substring(open + 1, close), "Resources")) {
                 return "\n    /** Kept so callers of the pre-migration constructor still compile. */\n"
                         + "    public " + className + "(com.codename1.ui.util.Resources resourceObjectInstance) {\n"
                         + "        this();\n    }\n";
@@ -6214,8 +6251,13 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String base = headerClause(header, "extends");
         String expected = expectedSuperClass();
         if (base.length() > 0 && !expected.equals(simpleTypeName(base))) {
-            setStatus("Cannot migrate " + className(existing) + ": it extends " + base + " rather than "
-                    + expected + " - the file was left untouched");
+            // Recorded, not just announced. mergeGeneratedSource() reads null as "keep the existing
+            // companion", which is right for a hand-written file and wrong here: the save went on
+            // to write the .gui, mark the document clean and report success while the Java the
+            // application actually runs never changed, so the edits looked saved and were not.
+            legacyMigrationRefusal = "Cannot migrate " + className(existing) + ": it extends " + base
+                    + " rather than " + expected + " - the file was left untouched";
+            setStatus(legacyMigrationRefusal);
             return null;
         }
         String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
@@ -6533,8 +6575,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // legacyResourcesConstructor() re-adds as a delegate, and anything still calling the
             // initGuiBuilderComponents that no longer exists.
             String parameters = out.substring(open + 1, parametersEnd);
+            // Exactly one Resources parameter -- the scaffold's own overload, and the one
+            // legacyResourcesConstructor() re-adds. Any parameter list merely containing the word
+            // took LoginForm(Resources resources, String title) with it and put back a delegate
+            // with a different signature, so the developer's constructor and its body were gone.
             boolean scaffolded = parameters.trim().length() == 0
-                    || parameters.indexOf("Resources") >= 0
+                    || isSingleParameterOfType(parameters, "Resources")
                     || out.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0;
             if (!scaffolded) {
                 from = close + 1;

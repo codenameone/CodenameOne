@@ -25,6 +25,7 @@ package com.codename1.guibuilder;
 
 import com.codename1.guibuilder.model.GuiDocument;
 import com.codename1.guibuilder.project.ProjectBinding;
+import com.codename1.guibuilder.project.ProjectIO;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -505,6 +506,76 @@ class GeneratedSourceTest {
         String custom = head + "public class LoginForm extends BaseForm implements Observer {\n" + body;
         assertNull(migrate(builder, custom, invoke(builder, "defaultCompanionSource")),
                 "a custom base class must stop the migration, leaving the file untouched");
+    }
+
+    @Test
+    void aCustomResourcesOverloadIsNotMistakenForTheScaffoldsOwn() throws Exception {
+        // Exactly one Resources parameter is the scaffold's overload, and the only one
+        // legacyResourcesConstructor() puts back. A list that merely contains the word took the
+        // developer's two-argument constructor with it and replaced it with a different signature.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm(Resources res) {\n        initGuiBuilderComponents();\n    }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm(Resources res, String heading) {\n"
+                + "        this();\n        setTitle(heading);\n    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertTrue(migrated.contains("LoginForm(Resources res, String heading)"),
+                "the developer's overload must survive:\n" + migrated);
+        assertTrue(migrated.contains("Resources resourceObjectInstance"),
+                "the scaffold's one-argument overload is still replaced by the delegate:\n" + migrated);
+        assertFalse(migrated.contains("initGuiBuilderComponents"), migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aRefusedMigrationFailsTheSaveInsteadOfReportingSuccess() throws Exception {
+        // mergeGeneratedSource() reads a refusal as "keep the existing companion", which is right
+        // for a hand-written file. Here it meant the .gui was written and the document marked
+        // clean while the Java the application runs never changed.
+        Path project = Files.createTempDirectory("guibuilderRefusedSave");
+        Path java = Files.createDirectories(project.resolve("src/main/java/com/example"));
+        Path gui = Files.createDirectories(project.resolve("src/main/guibuilder/com/example"));
+        Path guiFile = gui.resolve("LoginForm.gui");
+        String originalXml = "<component type=\"Form\" name=\"LoginForm\" title=\"Login\" layout=\"BoxLayout\">"
+                + "<component type=\"TextField\" name=\"email\" hint=\"Email\"/></component>";
+        Files.write(guiFile, originalXml.getBytes(StandardCharsets.UTF_8));
+        String legacy = "package com.example;\n"
+                + "public class LoginForm extends BaseForm {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+        Path companion = java.resolve("LoginForm.java");
+        Files.write(companion, legacy.getBytes(StandardCharsets.UTF_8));
+
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        set(builder, "binding", ProjectBinding.parse("projectDir=" + project + "\nguiDir="
+                + project.resolve("src/main/guibuilder") + "\nsourceDir=" + project.resolve("src/main/java")
+                + "\ncssFile=" + project.resolve("theme.css") + "\n"));
+        // The fsUrl form, which is what findGuiFiles() hands the builder. A plain path makes
+        // companionSourcePath() strip the wrong prefix length and look for a companion elsewhere.
+        GuiDocument document = GuiDocument.parse(ProjectIO.fsUrl(guiFile.toString()), originalXml);
+        set(builder, "document", document);
+        document.select(document.components().get(1));
+        document.setAttribute("text", "changed");
+        assertTrue(document.isModified(), "fixture: the form must have something to save");
+
+        Method save = CodenameOneGUIBuilder.class.getDeclaredMethod("save");
+        save.setAccessible(true);
+        assertFalse(((Boolean) save.invoke(builder)).booleanValue(), "the save must report failure");
+
+        assertEquals(legacy, new String(Files.readAllBytes(companion), StandardCharsets.UTF_8),
+                "the companion is untouched, which is the whole point of the refusal");
+        assertEquals(originalXml, new String(Files.readAllBytes(guiFile), StandardCharsets.UTF_8),
+                "the .gui must not be written against Java that will never match it");
+        assertTrue(document.isModified(), "the document still holds unsaved changes");
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
