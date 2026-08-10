@@ -191,6 +191,13 @@ public class AndroidDB extends Database {
             // Ending without setTransactionSuccessful is what rolls back.
             db.endTransaction();
         } catch (Exception err) {
+            // A statement with ON CONFLICT ROLLBACK has already rolled the engine back, and the
+            // wrapper pops its own record before sending the end -- so this throws with neither
+            // layer holding a transaction. Reporting it without clearing the flag left every
+            // later begin and key change refused until the connection closed.
+            if (!db.inTransaction()) {
+                markTransactionEnded();
+            }
             throw new IOException(err.getMessage(), err);
         }
         markTransactionEnded();

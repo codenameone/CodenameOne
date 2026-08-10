@@ -219,6 +219,13 @@ class AndroidCipherDB extends Database {
             }
             db.endTransaction();
         } catch (RuntimeException err) {
+            // A statement with ON CONFLICT ROLLBACK has already rolled the engine back, and the
+            // wrapper pops its own record before sending the end -- so this throws with neither
+            // layer holding a transaction. Reporting it without clearing the flag left every
+            // later begin and key change refused until the connection closed.
+            if (!db.inTransaction()) {
+                markTransactionEnded();
+            }
             throw new IOException(err.getMessage(), err);
         }
         markTransactionEnded();
@@ -269,7 +276,8 @@ class AndroidCipherDB extends Database {
         // stored under what is passed here, so re-keying under the raw name would write a second
         // key that the next open, which resolves the file, would not find -- and report as wrong.
         String targetKey = config == null || !config.isEncrypted()
-                ? "" : config.resolveKeyMaterial(openPath);
+                ? "" : config.resolveKeyMaterial(
+                        AndroidImplementation.canonicalDatabaseKey(openPath));
         if (currentKey.length() == 0 || targetKey.length() == 0) {
             // One side is plaintext, which rekey refuses outright.
             migrateThroughExport(targetKey);

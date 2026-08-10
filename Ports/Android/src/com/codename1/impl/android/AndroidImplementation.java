@@ -11034,7 +11034,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // key against data that is perfectly intact.
             opened = open.invoke(null,
                     resolveNativeDatabasePath(databaseName), databaseName,
-                    config.resolveKeyMaterial(nativePath));
+                    config.resolveKeyMaterial(databaseKey(nativePath)));
         } catch (java.lang.reflect.InvocationTargetException err) {
             releaseUnusedDatabaseConnection(nativePath);
             Throwable cause = err.getCause();
@@ -11081,7 +11081,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// same way so two spellings of one database derive one key.
     @Override
     public String databaseManagedKeyIdentity(String databaseName) {
-        return resolveNativeDatabasePath(databaseName);
+        // Canonical, like the connection registry: resolveNativeDatabasePath leaves a custom
+        // spelling as it was given, so "/data/app/./db.sqlite" and "/data/app/db.sqlite" would
+        // otherwise pick different stored keys for one file and report the second open as wrong.
+        return databaseKey(resolveNativeDatabasePath(databaseName));
     }
 
     @Override
@@ -11252,6 +11255,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// Falls back to the absolute path when the file system cannot answer, which still collapses
     /// the relative spellings; a canonical path that cannot be resolved is not a reason to refuse
     /// to open a database.
+    /// The canonical identity of a database file, for callers outside this class.
+    ///
+    /// The cipher package resolves a managed key against it, so that its key change and the next
+    /// open agree on which file they are talking about.
+    public static String canonicalDatabaseKey(String path) {
+        return databaseKey(path);
+    }
+
     private static String databaseKey(String path) {
         if (path == null) {
             return null;
