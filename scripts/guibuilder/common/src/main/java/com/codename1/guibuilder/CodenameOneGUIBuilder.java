@@ -74,6 +74,7 @@ import com.codename1.ui.util.Resources;
 import com.codename1.xml.Element;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
@@ -108,6 +109,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private Container deviceSurface;
     private int themeApplyCount;
     private Hashtable builderTheme;
+    /** The root attributes the generated source applies to the Form rather than its content pane. */
+    private static final Set<String> ROOT_SURFACE_ATTRIBUTES =
+            new LinkedHashSet<>(Arrays.asList("enabled", "visible", "rtl"));
+
     /** The canvas layer carrying the Form or Dialog UIID, or null for a Container root. */
     private Container formSurfacePreview;
 
@@ -639,6 +644,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             formSurface.setUIID(value(document.root(), "uiid", rootType));
             formSurface.setUIManager(previewUIManager);
             formToolbarPreview = buildFormToolbarPreview();
+            ComponentPreviewFactory.applyRootSurfaceAttributes(formSurface, document.root());
             formSurface.add(BorderLayout.NORTH, formToolbarPreview);
             formSurfacePreview = formSurface;
         } else {
@@ -4478,6 +4484,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // -- that is where the rebuild puts it, and setUIID() on the generated class styles the
         // Form rather than its content pane. componentForElement() finds the pane, so a typed UIID
         // styled the wrong layer until something rebuilt the canvas and moved it.
+        // The root's own component properties belong to the Form layer, which is what the
+        // generated source applies them to -- setVisible(false) hides the whole screen at runtime
+        // while the canvas left the surface and its toolbar on show.
+        if (element == document.root() && formSurfacePreview != null && ROOT_SURFACE_ATTRIBUTES.contains(attribute)) {
+            ComponentPreviewFactory.applyRootSurfaceAttributes(formSurfacePreview, element);
+            formSurfacePreview.revalidate();
+            formSurfacePreview.repaint();
+            return;
+        }
         if (element == document.root() && "uiid".equals(attribute) && formSurfacePreview != null) {
             if (value == null || value.length() == 0) {
                 scheduleDesignerRefresh();
@@ -5484,6 +5499,12 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // designer and shown in the preview while the runtime instance kept the defaults.
         if (document.root().getAttribute("uiid") != null) {
             out.append("        setUIID(\"").append(javaEscape(document.root().getAttribute("uiid"))).append("\");\n");
+        }
+        // Descendants are named in appendGeneratedChildren(); the root was named nowhere, so
+        // getName() came back null on the saved screen and an edit to the root's name in the
+        // inspector had no runtime effect at all.
+        if (document.root().getAttribute("name") != null) {
+            out.append("        setName(\"").append(javaEscape(document.root().getAttribute("name"))).append("\");\n");
         }
         appendGeneratedProperties(out, document.root(), "this", rootType, "        ");
         appendGeneratedChildren(out, document.root(), "this", "        ");

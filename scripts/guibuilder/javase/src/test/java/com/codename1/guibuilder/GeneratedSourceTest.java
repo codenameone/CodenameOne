@@ -818,6 +818,17 @@ class GeneratedSourceTest {
                 "a generic companion must refuse rather than produce a class that will not compile");
     }
 
+    @Test
+    void theRootsOwnNameReachesTheGeneratedScreen() throws Exception {
+        // Descendants are named in appendGeneratedChildren(); the root was named nowhere, so
+        // getName() came back null on the saved screen and editing it in the inspector did nothing.
+        CodenameOneGUIBuilder builder = builder("none");
+        String form = invoke(builder, "defaultCompanionSource");
+        assertTrue(form.contains("setName(\"LoginForm\")"),
+                "the root's name must reach the runtime component:\n" + form);
+        compile("LoginForm", form, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

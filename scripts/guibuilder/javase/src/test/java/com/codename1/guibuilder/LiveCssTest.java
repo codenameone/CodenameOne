@@ -296,6 +296,34 @@ class LiveCssTest {
         return null;
     }
 
+    @Test
+    void rootVisibilityAppliesToTheFormLayerRatherThanTheContentPane() throws Exception {
+        // The generated class calls setVisible on itself, so an invisible root hides the whole
+        // screen. Applying it to the content pane left the surface and its toolbar on show.
+        CodenameOneGUIBuilder builder = builderFor("Label { color: #ff0000; }\n");
+        Container surface = builder.formSurfaceForTest();
+        Component styled = find(builder.canvasHostForTest(), builder, "styled");
+        Container pane = styled.getParent();
+        assertTrue(surface.isVisible() && pane.isVisible(), "fixture");
+
+        onEdt(() -> {
+            builder.documentForTest().select(builder.documentForTest().root());
+            builder.updateForTest("visible", "false");
+            return null;
+        });
+        settle();
+
+        assertFalse(builder.formSurfaceForTest().isVisible(),
+                "the whole screen is what the runtime hides");
+        onEdt(() -> {
+            builder.documentForTest().select(builder.documentForTest().root());
+            builder.updateForTest("rtl", "true");
+            return null;
+        });
+        settle();
+        assertTrue(builder.formSurfaceForTest().isRTL(), "and RTL belongs to the same layer");
+    }
+
     private static int foreground(CodenameOneGUIBuilder builder, String name) {
         Component preview = find(builder.canvasHostForTest(), builder, name);
         assertNotNull(preview, name + " does not render");

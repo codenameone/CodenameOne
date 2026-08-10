@@ -423,10 +423,36 @@ public final class ComponentPreviewFactory {
                 || "TextField".equals(type) || "TextArea".equals(type);
     }
 
+    /**
+     * The root attributes that belong to the Form rather than to its content pane.
+     *
+     * <p>The generated class calls these on itself, so a root marked invisible hides the whole
+     * screen at runtime. Applying them to the pane left the canvas showing the form surface and
+     * its toolbar, which is not what saving the form produces.
+     *
+     * @param surface the Form layer of the canvas
+     * @param root the document root
+     */
+    public static void applyRootSurfaceAttributes(Component surface, Element root) {
+        surface.setEnabled(!"false".equals(value(root, "enabled", "true")));
+        surface.setVisible(!"false".equals(value(root, "visible", "true")));
+        surface.setRTL("true".equals(value(root, "rtl", "false")));
+    }
+
+    /** True for the types that are a screen rather than a component. */
+    private static boolean isRootOnly(String type) {
+        return "Form".equals(type) || "Dialog".equals(type);
+    }
+
     private static void applyAttributes(Component component, Element element) {
-        component.setEnabled(!"false".equals(value(element, "enabled", "true")));
-        component.setVisible(!"false".equals(value(element, "visible", "true")));
-        component.setRTL("true".equals(value(element, "rtl", "false")));
+        // A Form or Dialog root is previewed as its content pane, and these three belong to the
+        // Form around it; the canvas applies them there.
+        boolean rootSurfaceOwns = isRootOnly(value(element, "type", "Container"));
+        if (!rootSurfaceOwns) {
+            component.setEnabled(!"false".equals(value(element, "enabled", "true")));
+            component.setVisible(!"false".equals(value(element, "visible", "true")));
+            component.setRTL("true".equals(value(element, "rtl", "false")));
+        }
         if (component instanceof Label) {
             ((Label) component).setGap(integer(element, "gap", ((Label) component).getGap()));
             ((Label) component).setTickerEnabled("true".equals(value(element, "tickerEnabled", "false")));
