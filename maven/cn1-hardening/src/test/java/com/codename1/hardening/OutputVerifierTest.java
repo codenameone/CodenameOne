@@ -75,6 +75,54 @@ public class OutputVerifierTest {
         OutputVerifier.verify(classes, new BytesLoader(resources));   // app/Missing absent; must not throw
     }
 
+    @Test
+    public void genuineErrorIsNotMaskedByAMissingTypeInAnotherMethod() throws Exception {
+        // One method references an absent type (tolerable); another has a genuine data-flow error (returns
+        // an int where a reference is required). Per-method verification must still REJECT the class -- the
+        // missing-type tolerance is scoped to the offending method and must not swallow the real error.
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, "app/Mixed", null, "java/lang/Object", null);
+        MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        ctor.visitCode();
+        ctor.visitVarInsn(Opcodes.ALOAD, 0);
+        ctor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        ctor.visitInsn(Opcodes.RETURN);
+        ctor.visitMaxs(1, 1);
+        ctor.visitEnd();
+        // Tolerable: references an absent type.
+        MethodVisitor good = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "make",
+                "()Lapp/Missing;", null, null);
+        good.visitCode();
+        good.visitTypeInsn(Opcodes.NEW, "app/Missing");
+        good.visitInsn(Opcodes.DUP);
+        good.visitMethodInsn(Opcodes.INVOKESPECIAL, "app/Missing", "<init>", "()V", false);
+        good.visitInsn(Opcodes.ARETURN);
+        good.visitMaxs(2, 0);
+        good.visitEnd();
+        // Genuine defect: returns an int where an object reference is required.
+        MethodVisitor bad = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "bad",
+                "()Ljava/lang/Object;", null, null);
+        bad.visitCode();
+        bad.visitInsn(Opcodes.ICONST_1);
+        bad.visitInsn(Opcodes.ARETURN);
+        bad.visitMaxs(1, 0);
+        bad.visitEnd();
+        cw.visitEnd();
+        byte[] mixed = cw.toByteArray();
+
+        Map<String, byte[]> classes = new LinkedHashMap<String, byte[]>();
+        classes.put("app/Mixed", mixed);
+        Map<String, byte[]> resources = new HashMap<String, byte[]>();
+        resources.put("app/Mixed.class", mixed);
+        boolean rejected = false;
+        try {
+            OutputVerifier.verify(classes, new BytesLoader(resources));
+        } catch (HardeningException expected) {
+            rejected = true;
+        }
+        org.junit.Assert.assertTrue("a genuine data-flow error must still be rejected", rejected);
+    }
+
     /** A class with a method {@code static <absent> make()} that returns {@code new <absent>()}. */
     private static byte[] classReturningNewInstanceOf(String internal, String absentType) {
         ClassWriter cw = new ClassWriter(0);

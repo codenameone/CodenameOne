@@ -22,18 +22,28 @@
  */
 package com.codename1.hardening;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.analysis.Analyzer;
+import org.objectweb.asm.tree.analysis.BasicValue;
+import org.objectweb.asm.tree.analysis.SimpleVerifier;
 import org.objectweb.asm.util.CheckClassAdapter;
 
 /**
  * Verifies every class the engine is about to ship. A transform bug that produces
- * invalid bytecode must fail the build here, not at first launch on a device: the
- * same {@code CheckClassAdapter} data-flow verification the framework already uses
- * elsewhere is run over each output class.
+ * invalid bytecode must fail the build here, not at first launch on a device.
+ * Each class gets a structural check ({@code CheckClassAdapter}, no type loading)
+ * plus per-method data-flow analysis ({@code SimpleVerifier}); the data-flow pass
+ * runs method-by-method so a method that references a target-only type absent from
+ * the supplied jars can be tolerated without masking a genuine error elsewhere in
+ * the same class.
  */
 public final class OutputVerifier {
 
@@ -50,48 +60,56 @@ public final class OutputVerifier {
     public static void verify(Map<String, byte[]> classesByInternalName, ClassLoader hierarchy)
             throws HardeningException {
         for (Map.Entry<String, byte[]> e : classesByInternalName.entrySet()) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            try {
-                CheckClassAdapter.verify(new ClassReader(e.getValue()), hierarchy, false, pw);
-            } catch (Throwable t) {
-                if (isUnresolvedTypeFailure(t)) {
-                    // ASM's data-flow SimpleVerifier LOADS types to resolve the hierarchy and threw
-                    // because one is absent from the supplied jars -- typically an application class whose
-                    // superclass is supplied only by the target platform. That is not a bytecode defect:
-                    // FrameClassWriter already computed this class's frames from the bytes, and the target
-                    // JVM verifies it on-device. Fall back to structural verification here, which needs no
-                    // hierarchy, so a transform that emitted structurally invalid bytecode is still caught.
-                    verifyStructureOnly(e.getKey(), e.getValue());
-                    continue;
-                }
-                throw new HardeningException("Hardened class '" + e.getKey()
-                        + "' failed bytecode verification: " + t.getMessage(), t);
-            }
-            pw.flush();
-            String report = sw.toString();
-            if (report.length() > 0) {
-                if (isUnresolvedTypeReport(report)) {
-                    // Depending on where the load fails, CheckClassAdapter.verify does NOT throw but
-                    // catches the missing-type failure internally and prints its stack trace to the report.
-                    // That is the same absent-target-type case as the catch above (a superclass supplied
-                    // only by the target platform), not a bytecode defect, so take the structural fallback
-                    // instead of rejecting a valid class. Mirrors BytecodeComplianceMojo's report-text check.
-                    verifyStructureOnly(e.getKey(), e.getValue());
-                    continue;
-                }
-                throw new HardeningException("Hardened class '" + e.getKey()
-                        + "' failed bytecode verification:\n" + report);
-            }
+            // Structural checks first (visit order, access flags, names/descriptors); these load no types,
+            // so a structurally-invalid transform output is always caught.
+            verifyStructureOnly(e.getKey(), e.getValue());
+            // Then data-flow, PER METHOD, rather than through CheckClassAdapter.verify's whole-class report.
+            // A method that fails only because an absent target-only type cannot be resolved is tolerated,
+            // but WITHOUT masking a genuine data-flow error in another method of the same class: ASM can
+            // append both diagnostics to one report, where a substring check would misclassify the whole
+            // report as an unresolved-type failure and discard the real error.
+            verifyDataFlow(e.getKey(), e.getValue(), hierarchy);
         }
     }
 
-    /** True when a verifier report's TEXT names only a missing type (ASM printed it instead of throwing). */
-    private static boolean isUnresolvedTypeReport(String report) {
-        return report.contains("ClassNotFoundException")
-                || report.contains("TypeNotPresentException")
-                || report.contains("NoClassDefFoundError")
-                || report.contains(" not present");
+    /**
+     * Data-flow verification, one method at a time, so the missing-type tolerance is scoped to the method
+     * that actually references the absent type. A method whose analysis fails only because a type is absent
+     * from the supplied jars is accepted (FrameClassWriter computed its frames from the bytes and the
+     * target JVM verifies it on-device); any other analyzer failure fails the build, naming the method.
+     */
+    private static void verifyDataFlow(String name, byte[] classBytes, ClassLoader hierarchy)
+            throws HardeningException {
+        ClassNode cn = new ClassNode();
+        new ClassReader(classBytes).accept(cn, 0);
+        Type currentClass = Type.getObjectType(cn.name);
+        Type superClass = cn.superName == null ? null : Type.getObjectType(cn.superName);
+        List<Type> interfaces = new ArrayList<Type>();
+        if (cn.interfaces != null) {
+            for (String i : cn.interfaces) {
+                interfaces.add(Type.getObjectType(i));
+            }
+        }
+        boolean isInterface = (cn.access & Opcodes.ACC_INTERFACE) != 0;
+        if (cn.methods == null) {
+            return;
+        }
+        for (MethodNode m : cn.methods) {
+            if (m.instructions == null || m.instructions.size() == 0) {
+                continue;   // abstract or native: no body to analyze
+            }
+            SimpleVerifier verifier = new SimpleVerifier(currentClass, superClass, interfaces, isInterface);
+            verifier.setClassLoader(hierarchy);
+            try {
+                new Analyzer<BasicValue>(verifier).analyze(cn.name, m);
+            } catch (Throwable t) {
+                if (isUnresolvedTypeFailure(t)) {
+                    continue;
+                }
+                throw new HardeningException("Hardened class '" + name + "' method '" + m.name + m.desc
+                        + "' failed bytecode verification: " + t.getMessage(), t);
+            }
+        }
     }
 
     /**
