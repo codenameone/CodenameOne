@@ -237,7 +237,11 @@ jobs:
           ./scripts/run-ios-native-tests.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 20
+        # 20 was enough while the sample built one app. It declares a watchMain now, so the app
+        # scheme carries an embedded watch app with a ParparVM translation of its own and
+        # xcodebuild builds that before running a single test. The same raise was already applied
+        # to this step in scripts-ios-native.yml; this workflow runs it too and was missed.
+        timeout-minutes: 45
 
       - name: Upload packaging artifacts
         if: always()
