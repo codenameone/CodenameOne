@@ -1203,11 +1203,12 @@ class GeneratedSourceTest {
         assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
                 "a different class with a familiar name is still a different class");
 
-        // The real one, qualified or not, still migrates.
+        // The real one, qualified or imported, still migrates.
         assertNotNull(migrate(builder, legacy.replace("com.acme.Form", "com.codename1.ui.Form"),
                 invoke(builder, "defaultCompanionSource")));
-        assertNotNull(migrate(builder, legacy.replace("com.acme.Form", "Form"),
-                invoke(builder, "defaultCompanionSource")));
+        assertNotNull(migrate(builder, legacy.replace("package com.example;\n",
+                        "package com.example;\nimport com.codename1.ui.Form;\n")
+                .replace("com.acme.Form", "Form"), invoke(builder, "defaultCompanionSource")));
     }
 
     @Test
@@ -1327,6 +1328,30 @@ class GeneratedSourceTest {
         assertFalse(GuiDocument.defaultScrollableY("Container"));
         assertEquals(pane.isScrollableY(), GuiDocument.defaultScrollableY("Form"),
                 "the preview and the inspector answer from one place");
+    }
+
+    @Test
+    void anUnqualifiedSuperclassIsResolvedAgainstTheImports() throws Exception {
+        // "extends Form" says nothing on its own. An import pointing elsewhere makes it a custom
+        // base class, and the regenerated constructor calls super(title, layout) on something that
+        // only ever supported the implicit super().
+        CodenameOneGUIBuilder builder = builder("none");
+        String body = "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+
+        assertNull(migrate(builder, "package com.example;\nimport com.acme.Form;\n" + body,
+                invoke(builder, "defaultCompanionSource")), "an import pointing elsewhere decides it");
+        assertNull(migrate(builder, "package com.example;\n" + body,
+                invoke(builder, "defaultCompanionSource")), "no import at all means a same-package class");
+        assertNull(migrate(builder, "package com.example;\nimport com.acme.*;\nimport com.codename1.ui.*;\n" + body,
+                invoke(builder, "defaultCompanionSource")), "two wildcards cannot be told apart from one file");
+
+        assertNotNull(migrate(builder, "package com.example;\nimport com.codename1.ui.Form;\n" + body,
+                invoke(builder, "defaultCompanionSource")), "the explicit import is ours");
+        assertNotNull(migrate(builder, "package com.example;\nimport com.codename1.ui.*;\n" + body,
+                invoke(builder, "defaultCompanionSource")), "and so is the only wildcard in the file");
     }
 
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {

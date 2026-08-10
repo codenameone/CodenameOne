@@ -6653,8 +6653,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // inherit from it gone without a word.
         boolean qualified = base.indexOf('.') >= 0;
         String comparable = qualified ? base.trim() : simpleTypeName(base);
-        boolean isCodenameOneType = expected.equals(comparable)
-                || ("com.codename1.ui." + expected).equals(comparable);
+        boolean isCodenameOneType = qualified
+                ? ("com.codename1.ui." + expected).equals(comparable)
+                : expected.equals(comparable) && resolvesToCodenameOne(existing, comparable);
         if (base.length() > 0 && !isCodenameOneType) {
             // Recorded, not just announced. mergeGeneratedSource() reads null as "keep the existing
             // companion", which is right for a hand-written file and wrong here: the save went on
@@ -6756,6 +6757,42 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     private String expectedSuperClass() {
         String rootType = value(document.root(), "type", "Form");
         return "Container".equals(rootType) ? "Container" : "Dialog".equals(rootType) ? "Dialog" : "Form";
+    }
+
+    /**
+     * Whether an unqualified superclass name resolves to the Codename One class of that name.
+     *
+     * <p>An explicit import decides it. Failing that a {@code com.codename1.ui.*} import does,
+     * unless another wildcard could supply the name too -- that is genuinely ambiguous from one
+     * file and is treated as custom. No import at all means a class in the same package, which is
+     * also not ours. Comparing the simple name alone accepted {@code import com.acme.Form}, and
+     * the regenerated constructor then called {@code super(title, layout)} on a base class that
+     * had only supported the implicit {@code super()}.
+     *
+     * @param existing the legacy companion source
+     * @param simpleName the superclass name as written
+     * @return true when the name resolves to com.codename1.ui
+     */
+    private boolean resolvesToCodenameOne(String existing, String simpleName) {
+        String header = stripComments(existing).substring(0, Math.max(0, classDeclaration(existing)));
+        boolean codenameOneWildcard = false;
+        boolean otherWildcard = false;
+        for (String line : header.split("\n")) {
+            String statement = line.trim();
+            if (!statement.startsWith("import ")) continue;
+            int semicolon = statement.indexOf(';');
+            if (semicolon < 0) continue;
+            String imported = statement.substring("import ".length(), semicolon).trim();
+            if (imported.startsWith("static ")) continue;
+            if (imported.endsWith("." + simpleName)) {
+                return ("com.codename1.ui." + simpleName).equals(imported);
+            }
+            if (imported.endsWith(".*")) {
+                if ("com.codename1.ui.*".equals(imported)) codenameOneWildcard = true;
+                else otherWildcard = true;
+            }
+        }
+        return codenameOneWildcard && !otherWildcard;
     }
 
     /**
