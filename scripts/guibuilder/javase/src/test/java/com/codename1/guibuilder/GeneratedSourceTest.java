@@ -293,6 +293,98 @@ class GeneratedSourceTest {
         assertEquals(handWritten, merge(builder, handWritten, invoke(builder, "defaultCompanionSource")));
     }
 
+    @Test
+    void legacyAliasesFollowTheOriginalNamesRatherThanTheDisambiguatedFields() throws Exception {
+        // "email" and "Email" produce one pair of accessors, so assignJavaNames() makes the second
+        // field Email2. The alias in the developer's code is still gui_Email -- that is what the
+        // old builder declared -- so deriving the alias from the assigned name searched for
+        // gui_Email2, found nothing, and left the migrated companion referring to gui_Email.
+        CodenameOneGUIBuilder builder = builderFor("none",
+                "<component type=\"TextField\" name=\"email\" hint=\"Email\"/>"
+                + "<component type=\"TextField\" name=\"Email\" hint=\"Second\"/>");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    private com.codename1.ui.TextField gui_email;\n"
+                + "    private com.codename1.ui.TextField gui_Email;\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void describe() {\n"
+                + "        gui_email.setText(gui_Email.getText());\n"
+                + "    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertTrue(migrated.contains("email.setText(Email2.getText())"),
+                "both aliases must be rewritten to the fields the class declares:\n" + migrated);
+        assertFalse(migrated.contains("gui_"), "no legacy alias may survive:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void aCommentDelimiterInsideAStringLiteralDoesNotMaskTheCodeAfterIt() throws Exception {
+        String source = "class A {\n"
+                + "    String glob = \"/*\";\n"
+                + "    String url = \"http://example.com\";\n"
+                + "    char quote = '\\'';\n"
+                + "    public void onSubmit(ActionEvent event) { }\n"
+                + "}\n";
+        String stripped = CodenameOneGUIBuilder.stripComments(source);
+
+        assertEquals(source.length(), stripped.length(), "offsets must survive the masking");
+        assertTrue(stripped.contains("public void onSubmit(ActionEvent event)"),
+                "a comment delimiter inside a literal must not mask the declarations after it:\n" + stripped);
+        assertTrue(stripped.contains("String url ="), "the line after a // inside a literal is code");
+        assertFalse(stripped.contains("example.com"), "the literal body itself is not code");
+        assertTrue(CodenameOneGUIBuilder.stripComments("int a; /* void onSubmit(ActionEvent e) */ int b;")
+                .indexOf("onSubmit") < 0, "a real comment is still masked");
+    }
+
+    @Test
+    void aStringLiteralHoldingACommentDelimiterDoesNotDuplicateAnExistingHandler() throws Exception {
+        // The end of that story: the masked declaration made declaresActionHandler() report the
+        // handler missing, and the migration then carried the developer's method over next to a
+        // freshly generated stub with the same signature.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.events.ActionEvent;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    private String glob = \"/*\";\n"
+                + "    public void onSubmit(ActionEvent event) {\n"
+                + "        setTitle(glob);\n"
+                + "    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        int first = migrated.indexOf("void onSubmit(");
+        assertTrue(first >= 0, "the developer's handler must be carried over:\n" + migrated);
+        assertEquals(-1, migrated.indexOf("void onSubmit(", first + 1),
+                "the stub must be dropped rather than declared a second time:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
+        Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
+        method.setAccessible(true);
+        return (String) method.invoke(builder, existing, generated);
+    }
+
+    /** A builder over a document with the given children, for the cases the fixed one cannot show. */
+    private static CodenameOneGUIBuilder builderFor(String strategy, String children) throws Exception {
+        CodenameOneGUIBuilder builder = new CodenameOneGUIBuilder();
+        set(builder, "binding", ProjectBinding.parse(
+                "projectDir=/tmp/project\nguiDir=/tmp/project/gui\nsourceDir=/tmp/project/java\ncssFile=/tmp/project/theme.css\n"));
+        set(builder, "document", GuiDocument.parse("/tmp/project/gui/com/example/LoginForm.gui",
+                "<component type=\"Form\" name=\"LoginForm\" title=\"Login\" layout=\"BoxLayout\" bindingStrategy=\""
+                + strategy + "\">" + children + "</component>"));
+        return builder;
+    }
+
     private static String merge(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("mergeGeneratedSource", String.class, String.class);
         method.setAccessible(true);

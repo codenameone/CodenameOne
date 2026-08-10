@@ -6050,10 +6050,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private String renameLegacyFieldReferences(String carried) {
         String out = carried;
+        Set<String> rewritten = new LinkedHashSet<>();
         for (Element element : document.components()) {
             if (element == document.root()) continue; //NOPMD CompareObjectsWithEquals
-            String name = javaName(element);
-            out = replaceIdentifier(out, "gui_" + name, name);
+            // The alias in the carried code is gui_ plus the component's own name, which is what
+            // the old builder declared. Deriving it from javaName() searched for the name this
+            // generator settled on instead: controls called "email" and "Email" make the second
+            // field Email2, so migration looked for gui_Email2 while the developer's code says
+            // gui_Email, and the companion was left referring to a field the class does not have.
+            String alias = "gui_" + javaIdentifier(value(element, "name", value(element, "type", "component")));
+            // Two controls sharing a name shared one alias in the old source as well, so there is
+            // nothing to tell them apart; the first wins rather than the last.
+            if (!rewritten.add(alias)) continue;
+            out = replaceIdentifier(out, alias, javaName(element));
         }
         return out;
     }
@@ -6257,30 +6266,77 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * Blanks comment bodies while preserving every offset, so an index found in the result points
      * at the same character in the original.
      *
+     * <p>String, text block and character literals are blanked too, and crucially are recognised
+     * before their contents are read as syntax. A comment delimiter is ordinary text inside a
+     * literal: {@code String glob = "/*";} used to open a block comment that ran to the next
+     * {@code *}{@code /} or to the end of the file, masking the declarations after it -- so
+     * declaresActionHandler() reported an existing handler missing and Save appended a second
+     * method with the same signature, leaving a companion that will not compile. Blanking the
+     * bodies as well is what the callers want in any case: every one of them is looking for a
+     * declaration, and a method name quoted in a string is not one.
+     *
      * @param source the source to mask
-     * @return the source with comment content replaced by spaces
+     * @return the source with comment and literal content replaced by spaces
      */
     static String stripComments(String source) {
         char[] out = source.toCharArray();
-        boolean block = false;
-        boolean line = false;
-        for (int i = 0; i < out.length; i++) {
-            if (line) {
-                if (out[i] == '\n') line = false; else out[i] = ' ';
-            } else if (block) {
-                boolean end = out[i] == '*' && i + 1 < out.length && out[i + 1] == '/';
-                if (out[i] != '\n') out[i] = ' ';
-                if (end) {
-                    out[i + 1] = ' ';
+        int i = 0;
+        while (i < out.length) {
+            char c = out[i];
+            if (c == '/' && i + 1 < out.length && out[i + 1] == '/') {
+                while (i < out.length && out[i] != '\n') {
+                    out[i] = ' ';
                     i++;
-                    block = false;
                 }
-            } else if (out[i] == '/' && i + 1 < out.length && out[i + 1] == '/') {
+            } else if (c == '/' && i + 1 < out.length && out[i + 1] == '*') {
                 out[i] = ' ';
-                line = true;
-            } else if (out[i] == '/' && i + 1 < out.length && out[i + 1] == '*') {
-                out[i] = ' ';
-                block = true;
+                out[i + 1] = ' ';
+                i += 2;
+                while (i < out.length) {
+                    boolean end = out[i] == '*' && i + 1 < out.length && out[i + 1] == '/';
+                    if (out[i] != '\n') out[i] = ' ';
+                    if (end) {
+                        out[i + 1] = ' ';
+                        i += 2;
+                        break;
+                    }
+                    i++;
+                }
+            } else if (c == '"' && i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"') {
+                // A text block spans lines, so it cannot end at the newline an ordinary string does.
+                i += 3;
+                while (i < out.length) {
+                    if (out[i] == '\\' && i + 1 < out.length) {
+                        out[i] = ' ';
+                        if (out[i + 1] != '\n') out[i + 1] = ' ';
+                        i += 2;
+                        continue;
+                    }
+                    if (out[i] == '"' && i + 2 < out.length && out[i + 1] == '"' && out[i + 2] == '"') {
+                        i += 3;
+                        break;
+                    }
+                    if (out[i] != '\n') out[i] = ' ';
+                    i++;
+                }
+            } else if (c == '"' || c == '\'') {
+                // Stops at the newline as well as the closing quote: an unterminated literal is not
+                // legal Java, and running past it would mask the rest of the file over a typo.
+                char quote = c;
+                i++;
+                while (i < out.length && out[i] != quote && out[i] != '\n') {
+                    if (out[i] == '\\' && i + 1 < out.length && out[i + 1] != '\n') {
+                        out[i] = ' ';
+                        out[i + 1] = ' ';
+                        i += 2;
+                        continue;
+                    }
+                    out[i] = ' ';
+                    i++;
+                }
+                if (i < out.length && out[i] == quote) i++;
+            } else {
+                i++;
             }
         }
         return new String(out);
