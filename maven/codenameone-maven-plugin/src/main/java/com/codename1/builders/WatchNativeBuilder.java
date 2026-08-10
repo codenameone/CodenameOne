@@ -1988,7 +1988,20 @@ class WatchNativeBuilder {
         // platforms, or one negating watchOS. Anything else -- a custom flag, a compiler-version
         // test, an expression this cannot evaluate -- is kept, because dropping an import the watch
         // does need is the worse failure of the two and the one that produces no explanation.
+        // Comments first: an import the compiler never sees is not a dependency.
+        //
+        // A documentation example or a commented-out line -- `// import PhoneSDK`, or an ObjC
+        // `/* #import <PhoneSDK/PhoneSDK.h> */` -- still contains the words the import regexes look
+        // for, and an iOS-only product named in one was mirrored onto the watch target over code
+        // that does not exist. Block comments are removed wholesale and a line comment to the end of
+        // its line, which is where an import can legally appear and a comment cannot hide anything
+        // else that matters here.
+        s.append("def cn1_watch_strip_comments(src)\n")
+                .append("  src.gsub(/\\/\\*.*?\\*\\//m, ' ').gsub(/\\/\\/[^\\n]*/, '')\n")
+                .append("end\n");
+
         s.append("def cn1_watch_strip_non_watch(src)\n")
+                .append("  src = cn1_watch_strip_comments(src)\n")
                 .append("  out = []\n")
                 // A STACK per level, and two facts about each: whether this arm is suppressed, and
                 // whether an arm that positively applies to watchOS has already been taken. The
@@ -2020,7 +2033,11 @@ class WatchNativeBuilder {
                 .append("        suppressed[i] = true\n")
                 .append("      else\n")
                 .append("        suppressed[i] = false\n")
-                .append("        decided[i] = true\n")
+                // ONLY a demonstrably watchOS arm closes the branch. Marking an unevaluable
+                // `#elseif FEATURE_B` as decided suppressed the `#else` behind it -- and when both
+                // flags are off that else is the arm the watch compiles, so its import was dropped
+                // and the target failed on a missing module.
+                .append("        decided[i] = true if cn1_watch_selects_watch(t)\n")
                 .append("      end\n")
                 .append("      next\n")
                 .append("    elsif t.start_with?('#endif')\n")

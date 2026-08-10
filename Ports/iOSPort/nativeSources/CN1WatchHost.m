@@ -134,15 +134,40 @@ static CN1WatchHost *sharedHostInstance = nil;
 
 #pragma mark - Input
 
+/// Logical points a container scrolls per unit of crown rotation.
+///
+/// The Swift view asks for crown values `by: 1`, so an ordinary detent arrives as roughly 1.0.
+/// Forwarding that straight through moved a form by ONE POINT per detent, which is a scroll bar
+/// that never visibly moves -- the Android rotary path does not do this, it multiplies by the
+/// platform's own scroll factor. watchOS exposes no equivalent, so this is the line-height-sized
+/// step that factor amounts to elsewhere.
+static const CGFloat CN1_WATCH_CROWN_POINTS_PER_UNIT = 24.0;
+
+/// What was left over after the last whole-point delivery.
+///
+/// The wheel callback takes an int, and truncating each event independently threw away every
+/// rotation smaller than a point -- a slow, deliberate turn produced a stream of zeroes and
+/// scrolled nothing at all. Carrying the remainder makes the small movements add up to the same
+/// distance as one fast turn.
+static CGFloat cn1WatchCrownRemainder = 0;
+
 - (void)crownRotatedBy:(CGFloat)crownDelta {
     // Route the Digital Crown through the cross-platform wheel pipeline so it is the same universal
     // scroll-gesture input as a mouse wheel or trackpad: it scrolls the component under the center
     // of the watch face and is also delivered to any mouse wheel listeners as a WheelEvent. A
     // positive crown delta reveals content above (scrolls down), matching the wheel convention.
+    CGFloat scaled = (-crownDelta * CN1_WATCH_CROWN_POINTS_PER_UNIT) + cn1WatchCrownRemainder;
+    int whole = (int)scaled;
+    cn1WatchCrownRemainder = scaled - (CGFloat)whole;
+    if (whole == 0) {
+        // Nothing to deliver yet, and nothing to repaint: the remainder is holding the movement
+        // until it amounts to a point.
+        return;
+    }
     needsDisplay = YES;
     int cx = _renderingView != nil ? [_renderingView logicalWidth] / 2 : 0;
     int cy = _renderingView != nil ? [_renderingView logicalHeight] / 2 : 0;
-    pointerWheelMovedCallback(cx, cy, 0, (int)(-crownDelta));
+    pointerWheelMovedCallback(cx, cy, 0, whole);
 }
 
 - (void)tapAtX:(int)x y:(int)y {

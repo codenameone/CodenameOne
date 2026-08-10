@@ -724,6 +724,12 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("decided << true") && ruby.contains("decided[i]"),
                 "the taken-arm state is what drops the else of a watch-first branch: " + ruby);
         assertTrue(ruby.contains("cn1_watch_selects_watch"), ruby);
+        // Only a demonstrably watchOS arm closes a branch: marking an unevaluable #elseif as
+        // decided suppressed the #else, which is the arm the watch compiles when the flags are off.
+        assertTrue(ruby.contains("decided[i] = true if cn1_watch_selects_watch(t)"), ruby);
+        // And an import the compiler never sees is not a dependency at all.
+        assertTrue(ruby.contains("cn1_watch_strip_comments"),
+                "a commented-out import must not attach its package to the watch: " + ruby);
         assertTrue(ruby.contains("matches no product name"),
                 "stepping aside has to be logged, or a mirrored iOS-only package looks arbitrary: "
                         + ruby);
