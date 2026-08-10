@@ -4875,7 +4875,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String existingCompanion = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
             String companion = companionSourceFor(existingCompanion);
             if (companionSaveBlocked()) return false;
-            boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
+            boolean rewriteModel = regenerateModelFor == document //NOPMD CompareObjectsWithEquals
+                    || modelHasDivergedFromTheForm(modelPath);
             String model = rewriteModel ? generatedModelSource() : null;
             if (!rewriteModel && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
                     && !ProjectIO.exists(modelPath)) {
@@ -5366,11 +5367,74 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (writeCompanionSource(path, source)) {
             // The file now matches what was written, not the raw buffer: the generated regions were
             // regenerated on the way out, so Close must compare against that.
+            String written = ProjectIO.exists(path) ? readQuietly(path) : null;
+            editorBuffer = written == null ? editorBuffer : written;
             editorBufferOnDisk = editorBuffer;
             setStatus("Saved companion Java source");
             return true;
         }
         return false;
+    }
+
+    /**
+     * Whether the model on disk still describes the form's bindable components.
+     *
+     * <p>Regeneration was armed only by a strategy change, so adding, renaming or deleting a
+     * bindable control left the existing model naming the old ones. UiBinding binds by exact name
+     * and the annotation binder writes the names into the model, so those controls silently
+     * stopped binding -- nothing failed, they just did nothing.
+     *
+     * <p>Only the set of names is compared. The model is generated from them, so a difference is
+     * this generator's business; anything else in the file is the developer's and is not a reason
+     * to overwrite it.
+     *
+     * @param modelPath the model file for this form
+     * @return true when the model must be rewritten
+     */
+    private boolean modelHasDivergedFromTheForm(String modelPath) {
+        if (document == null || "none".equals(value(document.root(), "bindingStrategy", "properties"))) return false;
+        if (!ProjectIO.exists(modelPath)) return false;
+        String existing = readQuietly(modelPath);
+        if (existing == null) return false;
+        String code = stripComments(existing);
+        for (Element element : document.components()) {
+            if (element == document.root() || !isBindable(value(element, "type", ""))) continue; //NOPMD CompareObjectsWithEquals
+            if (!declaresIdentifier(code, javaName(element))) return true;
+        }
+        return false;
+    }
+
+    /** True when the masked source declares the identifier as a whole word. */
+    private static boolean declaresIdentifier(String code, String identifier) {
+        int at = code.indexOf(identifier);
+        while (at >= 0) {
+            int after = at + identifier.length();
+            boolean left = at == 0 || !isIdentifierChar(code.charAt(at - 1));
+            boolean right = after >= code.length() || !isIdentifierChar(code.charAt(after));
+            if (left && right) return true;
+            at = code.indexOf(identifier, after);
+        }
+        return false;
+    }
+
+    /**
+     * True for the component types the binding model carries a property for.
+     *
+     * @param type the {@code type} attribute
+     * @return true when the component binds
+     */
+    private static boolean isBindable(String type) {
+        return "TextField".equals(type) || "TextArea".equals(type)
+                || "CheckBox".equals(type) || "RadioButton".equals(type);
+    }
+
+    /** Reads a file for a comparison that must not fail the operation it belongs to. */
+    private static String readQuietly(String path) {
+        try {
+            return ProjectIO.read(path);
+        } catch (Exception unreadable) {
+            return null;
+        }
     }
 
     private void saveSourceAndModel(String path, String source) {
@@ -5388,7 +5452,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
                 && !ProjectIO.exists(modelPath);
         try {
-            String companion = companionSourceFor(source);
+            final String companion = companionSourceFor(source);
             if (companionSaveBlocked()) {
                 setStatus("Save refused; nothing was written");
                 return;
@@ -5414,8 +5478,16 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // Only once every write has landed. Marking the buffer clean after the companion but
             // before the model meant a failed model write rolled the companion back while Close,
             // form switching and exit all believed there was nothing left unsaved.
-            editorBufferOnDisk = editorBuffer;
+            //
+            // The baseline is what reached the file, not what the buffer held. Editing outside the
+            // markers is allowed and companionSourceFor() regenerates those regions on the way
+            // out, so recording the buffer meant the pane reported a clean save while showing text
+            // that was never written -- and closed without a word about it. The editor is put back
+            // on the saved text, which is also the only honest thing to show.
+            editorBuffer = companion;
+            editorBufferOnDisk = companion;
             if (documentWasModified) document.markSaved();
+            if (activeEditorReopen != null && "source".equals(editorBufferKind)) reopenActiveEditor();
         } catch (IOException ex) {
             restore(undo);
             ToastBar.showErrorMessage("Save failed, nothing was changed: " + ex.getMessage());
@@ -5795,8 +5867,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String strategy = value(document.root(), "bindingStrategy", "properties");
         List<Element> bindable = new ArrayList<>();
         for (Element element : document.components()) {
-            String type = value(element, "type", "");
-            if ("TextField".equals(type) || "TextArea".equals(type) || "CheckBox".equals(type) || "RadioButton".equals(type)) bindable.add(element);
+            if (isBindable(value(element, "type", ""))) bindable.add(element);
         }
         StringBuilder out = new StringBuilder();
         if (packageName.length() > 0) out.append("package ").append(packageName).append(";\n\n");
