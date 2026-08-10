@@ -213,6 +213,41 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         return new File(apk.getParentFile(), apk.getName() + ".cn1hardenkey");
     }
 
+    /**
+     * A stable fingerprint of every effective {@code codename1.arg.harden.*} setting, so a transform,
+     * keep-rule or seed change -- not only a level change -- invalidates the APK cache. Keys are sorted so
+     * the fingerprint is order-independent.
+     */
+    private static String hardeningSettingsFingerprint(Properties settings) {
+        java.util.TreeMap<String, String> hints = new java.util.TreeMap<String, String>();
+        for (String key : settings.stringPropertyNames()) {
+            if (key.startsWith("codename1.arg.harden.")) {
+                hints.put(key, settings.getProperty(key));
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, String> e : hints.entrySet()) {
+            sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
+        }
+        return sha256Hex(sb.toString());
+    }
+
+    /** SHA-256 of {@code s} as lowercase hex (falls back to the string hash if SHA-256 is somehow absent). */
+    private static String sha256Hex(String s) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(s.getBytes(java.nio.charset.Charset.forName("UTF-8")));
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) {
+                sb.append(Character.forDigit((b >> 4) & 0xf, 16));
+                sb.append(Character.forDigit(b & 0xf, 16));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            return Integer.toHexString(s.hashCode());
+        }
+    }
+
     /** Reads a small text file's trimmed content, or {@code null} if it is absent or unreadable. */
     private static String readTextFileOrNull(File f) {
         if (f == null || !f.isFile()) {
@@ -351,10 +386,14 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             hardeningForceOff = false;
         }
         hardeningWillRun = !"off".equalsIgnoreCase(level.trim()) && !r.isForceOff();
-        // The APK's hardening OUTCOME: an unhardened build has one key regardless of the nominal level, so
-        // two off/force-off invocations still hit the cache; a hardened build keys on the level so a
-        // standard->paranoid change also rebuilds. Compared against the marker recorded beside the APK.
-        hardeningCacheKey = hardeningWillRun ? "hardened:" + level.trim().toLowerCase() : "unhardened";
+        // The APK's hardening OUTCOME. An unhardened build has one key regardless of the nominal level, so
+        // two off/force-off invocations still hit the cache. A hardened build fingerprints EVERY effective
+        // harden.* setting -- not just the level -- because harden.strings/rename/controlFlow/keep/seed all
+        // change the produced transforms and mapping, so two hardened:aggressive builds with different seeds
+        // or keep rules must still invalidate the cache. Compared against the marker recorded beside the APK.
+        hardeningCacheKey = hardeningWillRun
+                ? "hardened:" + hardeningSettingsFingerprint(settings)
+                : "unhardened";
         // Publish the compile classpath so the hardening engine can hand it to ProGuard as library
         // jars (so an application method that overrides a framework method is not renamed apart from
         // its superclass). Only needed when hardening will actually run.
