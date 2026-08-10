@@ -53,6 +53,17 @@ class GeneratedSourceTest {
     @BeforeAll
     static void initializeCodenameOneRuntime() {
         if (!com.codename1.ui.Display.isInitialized()) com.codename1.ui.Display.init(new JPanel());
+        // A form with a size, because the save paths here raise a ToastBar and its transition
+        // builds an image from the current form's dimensions. Running this class alone leaves a
+        // form that is 0x0, the transition throws inside the animation manager and the class hangs
+        // rather than fails -- which is how it reached CI as a one hour timeout while passing
+        // locally, where another class had always initialised the display first.
+        com.codename1.ui.Display.getInstance().callSeriallyAndWait(() -> {
+            com.codename1.ui.Form host = new com.codename1.ui.Form("tests");
+            host.setWidth(800);
+            host.setHeight(600);
+            host.show();
+        });
     }
 
     @Test
