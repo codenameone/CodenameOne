@@ -6465,7 +6465,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int open = skipSpaces(code, after);
             if (boundedLeft && open < code.length() && code.charAt(open) == '(') {
                 int close = matchingParenthesis(code, open);
-                if (close > open && isSingleActionEventParameter(code.substring(open + 1, close))) {
+                if (close > open && isSingleActionEventParameter(code.substring(open + 1, close), source)) {
                     // A body follows a declaration; a call is followed by a semicolon or an
                     // operator. Legal formatting puts space before the parenthesis and before the
                     // brace, so "void onClick (ActionEvent event)\n{" is the same declaration, and
@@ -6567,8 +6567,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param parameters the text between the parentheses
      * @return true when the method can serve as the handler
      */
-    private static boolean isSingleActionEventParameter(String parameters) {
-        return isSingleParameterOfType(parameters, "ActionEvent");
+    private boolean isSingleActionEventParameter(String parameters, String source) {
+        return isSingleParameterOfType(parameters, "ActionEvent",
+                "com.codename1.ui.events.ActionEvent", source);
     }
 
     /**
@@ -6578,7 +6579,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param typeName the simple type name to match
      * @return true when that is the whole parameter list
      */
-    private static boolean isSingleParameterOfType(String parameters, String typeName) {
+    private boolean isSingleParameterOfType(String parameters, String typeName, String qualified,
+            String source) {
         // Annotations are removed first: their arguments can contain both parentheses and commas,
         // so @Foo("a,b") ActionEvent e would otherwise read as two parameters.
         String only = stripAnnotations(parameters).trim();
@@ -6589,11 +6591,20 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String type = only.substring(0, space).trim();
         int generic = type.indexOf('<');
         if (generic > 0) type = type.substring(0, generic).trim();
-        int dot = type.lastIndexOf('.');
-        if (dot >= 0) type = type.substring(dot + 1);
         int lastSpace = type.lastIndexOf(' ');
         if (lastSpace >= 0) type = type.substring(lastSpace + 1);
-        return typeName.equals(type);
+        // A qualified name is compared whole: com.acme.ActionEvent is not ours, and treating it as
+        // ours suppressed the handler stub the generated this::handler needs. An unqualified one
+        // is resolved against this file's imports, the same way the superclass is.
+        if (type.indexOf('.') >= 0) return qualified.equals(type);
+        if (!typeName.equals(type)) return false;
+        // Only a source with a header can contradict the simple name. declaresActionHandler() is
+        // also given bare method text -- the carried members, with no package or imports of their
+        // own -- and there is nothing to resolve against there, so the name is taken at face value
+        // rather than rejected for want of an import that was never in scope.
+        boolean hasHeader = source != null
+                && (source.indexOf("import ") >= 0 || source.indexOf("package ") >= 0);
+        return !hasHeader || resolvesTo(source, typeName, qualified);
     }
 
     /**
@@ -6910,7 +6921,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int close = matchingParenthesis(code, open);
             // The same test removeConstructors() uses, so the delegate is added exactly when the
             // constructor it stands in for was taken away.
-            if (close > open && isSingleParameterOfType(code.substring(open + 1, close), "Resources")) {
+            if (close > open && isSingleParameterOfType(code.substring(open + 1, close), "Resources",
+                    "com.codename1.ui.util.Resources", existing)) {
                 // The delegate declares a plain parameter, so an annotation on the original one is
                 // not something it can reproduce either.
                 if (code.substring(open + 1, close).indexOf('@') >= 0) {
@@ -7156,6 +7168,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return true when the name resolves to com.codename1.ui
      */
     private boolean resolvesToCodenameOne(String existing, String simpleName) {
+        return resolvesTo(existing, simpleName, "com.codename1.ui." + simpleName);
+    }
+
+    /**
+     * Whether an unqualified name resolves to a particular type from this file.
+     *
+     * @param existing the source the name appears in
+     * @param simpleName the name as written
+     * @param qualified the fully qualified type it must mean
+     * @return true when the name resolves to that type
+     */
+    private boolean resolvesTo(String existing, String simpleName, String qualified) {
+        String expectedPackage = qualified.substring(0, qualified.lastIndexOf('.') + 1);
         String header = stripComments(existing).substring(0, Math.max(0, classDeclaration(existing)));
         boolean codenameOneWildcard = false;
         boolean otherWildcard = false;
@@ -7167,10 +7192,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String imported = statement.substring("import ".length(), semicolon).trim();
             if (imported.startsWith("static ")) continue;
             if (imported.endsWith("." + simpleName)) {
-                return ("com.codename1.ui." + simpleName).equals(imported);
+                return qualified.equals(imported);
             }
             if (imported.endsWith(".*")) {
-                if ("com.codename1.ui.*".equals(imported)) codenameOneWildcard = true;
+                if ((expectedPackage + "*").equals(imported)) codenameOneWildcard = true;
                 else otherWildcard = true;
             }
         }
@@ -7479,7 +7504,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int cut = (endOfLine < 0 ? existing.length() : endOfLine + 1) - offset;
             body = body.substring(0, legacyStart - offset) + body.substring(Math.min(cut, body.length()));
         }
-        return removeConstructors(body, className(existing)).trim();
+        return removeConstructors(body, className(existing), existing).trim();
     }
 
     /** The class name the open document's companion carries. */
@@ -7738,7 +7763,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * Drops every constructor of the scaffolded class. The generated region declares its own, and
      * the scaffolded ones call an {@code initGuiBuilderComponents} that no longer exists.
      */
-    private String removeConstructors(String body, String className) {
+    private String removeConstructors(String body, String className, String source) {
         if (className.length() == 0) return body;
         String out = body;
         int from = 0;
@@ -7774,7 +7799,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // took LoginForm(Resources resources, String title) with it and put back a delegate
             // with a different signature, so the developer's constructor and its body were gone.
             boolean scaffolded = parameters.trim().length() == 0
-                    || isSingleParameterOfType(parameters, "Resources");
+                    || isSingleParameterOfType(parameters, "Resources",
+                            "com.codename1.ui.util.Resources", source);
             // The signature alone is not enough. A developer who added setup to the scaffolded
             // constructor -- this(resources); setTitle(loadTitle()); -- loses it, because the
             // generated replacement and the delegate know nothing about those statements.

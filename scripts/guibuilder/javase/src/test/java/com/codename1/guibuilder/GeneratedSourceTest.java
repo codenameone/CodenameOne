@@ -1803,6 +1803,50 @@ class GeneratedSourceTest {
         return diagnostic.toString();
     }
 
+    @Test
+    void aForeignActionEventDoesNotSatisfyTheHandler() throws Exception {
+        // com.acme.ActionEvent has the right simple name and the wrong type: treating it as ours
+        // suppressed the stub while buildUI() still emitted this::onSubmit.
+        CodenameOneGUIBuilder builder = builder("none");
+        assertFalse(declares(builder,
+                "import com.acme.ActionEvent;\nclass LoginForm {\n"
+                + "  void onSubmit(ActionEvent event) { }\n}\n", "onSubmit"),
+                "an ActionEvent from another package is not the one the listener needs");
+        assertFalse(declares(builder,
+                "class LoginForm {\n  void onSubmit(com.acme.ActionEvent event) { }\n}\n", "onSubmit"),
+                "written out in full, it is just as foreign");
+        assertTrue(declares(builder,
+                "import com.codename1.ui.events.ActionEvent;\nclass LoginForm {\n"
+                + "  void onSubmit(ActionEvent event) { }\n}\n", "onSubmit"),
+                "the real one still counts");
+        assertTrue(declares(builder,
+                "class LoginForm {\n  void onSubmit(com.codename1.ui.events.ActionEvent event) { }\n}\n",
+                "onSubmit"), "qualified or not");
+    }
+
+    @Test
+    void aForeignResourcesConstructorIsNotTheScaffolds() throws Exception {
+        // The same for the delegate: a com.acme.Resources overload is the developer's, and
+        // replacing it with a Codename One one changes what its callers are passing.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.acme.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm(Resources res) { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertTrue(migrated.contains("LoginForm(Resources res)"),
+                "the developer's overload must survive:\n" + migrated);
+        assertFalse(migrated.contains("resourceObjectInstance"),
+                "and no Codename One delegate stands in for it:\n" + migrated);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
