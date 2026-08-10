@@ -419,4 +419,24 @@ class GuiDocumentTest {
         for (int at = 0; (at = text.indexOf(needle, at)) >= 0; at += needle.length()) count++;
         return count;
     }
+    @Test
+    void pastingAScreenTypeIsRejected() {
+        // Copy on the root and Paste put a cloned Form underneath itself. The canvas substitutes a
+        // content pane for the nested element while the generated source emits new Form(...), so
+        // the preview and the saved application stopped describing the same tree.
+        GuiDocument document = GuiDocument.parse("/tmp/p/gui/com/example/F.gui",
+                "<component type=\"Form\" name=\"F\" layout=\"BoxLayout\">"
+                + "<component type=\"Button\" name=\"ok\"/></component>");
+        document.select(document.root());
+        String copied = document.copySelectedXml();
+
+        assertNull(document.pasteXml(copied), "a Form is a screen, not a child");
+        assertEquals(2, document.components().size(), "and nothing was added: " + document.toXml());
+
+        // An ordinary component still pastes.
+        document.select(document.components().get(1));
+        assertNotNull(document.pasteXml(document.copySelectedXml()));
+        assertEquals(3, document.components().size());
+    }
+
 }

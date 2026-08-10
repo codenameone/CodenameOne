@@ -801,6 +801,23 @@ class GeneratedSourceTest {
         return count;
     }
 
+    @Test
+    void aGenericLegacyClassStopsTheMigration() throws Exception {
+        // Type parameters sit before extends, so the superclass check passes while the generated
+        // class is not generic and carried members mentioning T stop compiling.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm<T> extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    private T payload;\n"
+                + "}\n";
+
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a generic companion must refuse rather than produce a class that will not compile");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

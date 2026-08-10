@@ -498,6 +498,16 @@ public final class GuiDocument {
     }
 
     /**
+     * True for the types that can only be a document root.
+     *
+     * @param type the {@code type} attribute
+     * @return true when the type is a screen rather than a component
+     */
+    public static boolean isRootOnlyType(String type) {
+        return "Form".equals(type) || "Dialog".equals(type);
+    }
+
+    /**
      * @param xml the component XML to paste
      * @return the pasted element, or null when there is nothing to paste or the target parent is a
      *     BorderLayout with no free region
@@ -506,6 +516,11 @@ public final class GuiDocument {
         if (xml == null || xml.length() == 0) return null;
         Element pasted = new XMLParser().parse(new StringReader(xml));
         if (pasted == null || !"component".equals(pasted.getTagName())) return null;
+        // A Form or Dialog is a screen, not a child. Copy on the root and Paste put a cloned screen
+        // underneath itself: the canvas substitutes a content pane container for the nested
+        // element while the generated source emits new Form(...), so the two hierarchies stop matching -- and
+        // the palette cannot legitimately add one either.
+        if (isRootOnlyType(pasted.getAttribute("type"))) return null;
         // Same rule as addComponent(): a sixth child does not stack up in a BorderLayout, it evicts
         // one of the five while the XML keeps both.
         Element target = acceptsChildren(selected) ? selected : findParent(root, selected);

@@ -6405,6 +6405,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // inherit -- is refused instead: returning null leaves the file exactly as it is, which is
         // recoverable, where silently rewriting the declaration is not.
         String header = legacyClassHeader(existing);
+        // Type parameters come before extends, so the superclass check passes while the generated
+        // class is not generic -- carried members that mention T then do not compile.
+        if (header.startsWith("<")) {
+            companionRefusal = "Cannot migrate " + className(existing)
+                    + ": it declares type parameters, which this generator does not produce"
+                    + " - the file was left untouched";
+            setStatus(companionRefusal);
+            return null;
+        }
         String base = headerClause(header, "extends");
         String expected = expectedSuperClass();
         if (base.length() > 0 && !expected.equals(simpleTypeName(base))) {
