@@ -143,6 +143,15 @@ public final class FrameClassWriter extends ClassWriter {
             return type2;
         }
         if (isInterfaceFromBytes(type1) || isInterfaceFromBytes(type2)) {
+            // A merge that involves an interface is java/lang/Object, and -- unlike the class fall-through
+            // below -- this is SOUND even when the interface hierarchy is only partly readable, so it is
+            // deliberately NOT flagged incomplete. The bytecode verifier treats every class as assignable
+            // to every (loadable) interface (JVMS 4.10.1.2 isJavaAssignable: a class is assignable to To
+            // when To is an interface, deferring the real check to the runtime invokeinterface). So an
+            // Object here still verifies wherever the merged value is later used as some interface I --
+            // including a later invokeinterface I -- regardless of whether an intermediate interface such
+            // as a missing target-only J (with J extends I) was readable. Discarding the class here would
+            // only un-harden a class the target verifies fine.
             return "java/lang/Object";
         }
         String c = superNameFromBytes(type1);

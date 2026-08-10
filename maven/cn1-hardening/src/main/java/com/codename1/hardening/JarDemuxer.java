@@ -119,6 +119,19 @@ public final class JarDemuxer {
                         // So there is no rename-vs-source mismatch to guard; a source-text keep scanner
                         // would be dead code. Revisit only if a builder starts compiling unzip's sourceDir
                         // against an engine-renamed classpath.
+                        //
+                        // A resource entry is copied under its ORIGINAL path, so a PACKAGE-RELATIVE
+                        // Class.getResourceAsStream("x.properties") from an engine-renamed class -- which the
+                        // runtime resolves under the class's now-obfuscated package -- would miss it. This is
+                        // a DELIBERATE design choice, not an oversight: Codename One's own resource model
+                        // uses absolute paths (Display.getResourceAsStream("/x"), the theme .res), which are
+                        // unaffected by package renaming, so package names are obfuscated on purpose (see the
+                        // BuiltinKeepRules packageNamesAreNotKept test). The only exposure is a bundled
+                        // third-party dependency that loads a package-relative resource; adapting resource
+                        // paths by the class mapping cannot run here (the mapping does not exist until after
+                        // ProGuard) and would forfeit package obfuscation. Such a dependency uses
+                        // harden.keep to keep its package-relative-resource classes (which keeps their
+                        // package path); this limitation is documented in App-Hardening.asciidoc.
                         nonClass.put(name, data);
                     }
                 }

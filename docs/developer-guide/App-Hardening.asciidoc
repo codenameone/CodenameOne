@@ -113,6 +113,8 @@ Renaming is safe for code the compiler and runtime resolve by symbol. Codename O
 
 If you have a class the build resolves by a name the automatic analysis can't see, add a `harden.keep` rule for it.
 
+Package names are obfuscated along with class names. Codename One's own resource loading uses absolute paths (`Display.getResourceAsStream("/name")`, the theme `.res`), which are unaffected. The one thing renaming can break is a *package-relative* resource lookup -- `getClass().getResourceAsStream("config.properties")`, without a leading slash -- because the runtime resolves it under the class's now-obfuscated package while the resource stays at its original path. Application code rarely does this, but a bundled third-party dependency might; if one loads a resource relative to its own package, add a `harden.keep` rule for that class (or its package) so its package path stays put.
+
 === Crash reports from a hardened build
 
 Hardening and Crash Protection are designed together. The build server retains the obfuscation mapping and symbolicates incoming reports against it, so a crash from a hardened build still lands as a readable, correctly lined GitHub issue -- see <<crash-protection>>. Two consequences follow: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build (whose mapping never reached the server) can't be symbolicated at all, which is why the pre-flight refuses to harden a local target by default.
