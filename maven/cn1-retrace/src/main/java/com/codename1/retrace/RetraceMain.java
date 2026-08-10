@@ -24,7 +24,7 @@ package com.codename1.retrace;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -79,7 +79,11 @@ public final class RetraceMain {
         List<MappingFile> files = new ArrayList<MappingFile>();
         for (int i = 0; i < args.length - 1; i++) {
             if ("--mapping".equals(args[i])) {
-                FileReader fr = new FileReader(new File(args[i + 1]));
+                // Read the mapping as UTF-8 explicitly, not the platform default charset (which would
+                // corrupt Unicode class/method/source-file names on a non-UTF-8 host such as Windows Java
+                // 8). The rest of the pipeline -- MappingWriter.injectSourceFiles -- also reads/writes UTF-8.
+                InputStreamReader fr = new InputStreamReader(
+                        new FileInputStream(new File(args[i + 1])), Charset.forName("UTF-8"));
                 try {
                     files.add(MappingFile.parse(fr));
                 } finally {
