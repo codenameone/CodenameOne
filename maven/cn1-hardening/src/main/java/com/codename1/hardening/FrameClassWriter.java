@@ -156,7 +156,12 @@ public final class FrameClassWriter extends ClassWriter {
         }
         String c = superNameFromBytes(type1);
         Set<String> seen = new LinkedHashSet<String>();
-        while (c != null && seen.add(c)) {
+        // Stop before Object: isAssignableFromBytes(Object, type2) is unconditionally true, so testing it
+        // here would return Object as a "found" common super and skip the incompleteness check below --
+        // masking the case where type2's chain is broken by a missing intermediate that actually extends a
+        // nearer base (type1=A extends Base, type2=B extends an absent Missing extends Base). Reaching
+        // Object in this walk means no CLOSER readable ancestor was found, which is exactly the fall-through.
+        while (c != null && !"java/lang/Object".equals(c) && seen.add(c)) {
             if (isAssignableFromBytes(c, type2)) {
                 return c;
             }

@@ -300,8 +300,14 @@ public final class StringEncryptTransform {
      * {@code GETSTATIC} in {@code classBytes}. A compile-time String constant is normally inlined by
      * javac/kotlinc, so a surviving {@code GETSTATIC} means a non-inlined read whose declaring field's
      * {@code ConstantValue} must be preserved rather than moved into {@code <clinit>}.
+     *
+     * <p>The symbolic owner of a {@code GETSTATIC} may be a SUBCLASS that inherits the field ({@code
+     * GETSTATIC C.X} for a field {@code X} declared by superclass {@code B} is valid). The transform keys
+     * on the DECLARING class, so the owner is resolved to it through {@code hierarchy}; if it cannot be
+     * resolved, the reference owner is recorded as a safe over-approximation.
      */
-    public static void collectGetStaticStringReads(byte[] classBytes, final java.util.Set<String> out) {
+    public static void collectGetStaticStringReads(byte[] classBytes, final java.util.Set<String> out,
+            final ClassLoader hierarchy) {
         new ClassReader(classBytes).accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
             @Override
             public org.objectweb.asm.MethodVisitor visitMethod(int access, String name, String desc,
@@ -310,12 +316,65 @@ public final class StringEncryptTransform {
                     @Override
                     public void visitFieldInsn(int opcode, String owner, String fname, String fdesc) {
                         if (opcode == Opcodes.GETSTATIC && "Ljava/lang/String;".equals(fdesc)) {
-                            out.add(owner + "." + fname);
+                            out.add(resolveDeclaringClass(hierarchy, owner, fname) + "." + fname);
                         }
                     }
                 };
             }
         }, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+    }
+
+    /**
+     * Walks {@code owner}'s superclass chain through {@code hierarchy} to the class that actually declares
+     * a static {@code String} field named {@code fieldName} (JVM field resolution binds an inherited
+     * {@code GETSTATIC} to that class). Returns {@code owner} unchanged when the hierarchy is unavailable
+     * or the declaring class cannot be read.
+     */
+    private static String resolveDeclaringClass(ClassLoader hierarchy, String owner, final String fieldName) {
+        if (hierarchy == null) {
+            return owner;
+        }
+        String c = owner;
+        java.util.Set<String> seen = new java.util.HashSet<String>();
+        while (c != null && seen.add(c)) {
+            final boolean[] declaresHere = {false};
+            final String[] superName = {null};
+            java.io.InputStream in = hierarchy.getResourceAsStream(c + ".class");
+            if (in == null) {
+                break;
+            }
+            try {
+                new ClassReader(in).accept(new org.objectweb.asm.ClassVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visit(int v, int a, String name, String sig, String sup, String[] itf) {
+                        superName[0] = sup;
+                    }
+
+                    @Override
+                    public org.objectweb.asm.FieldVisitor visitField(int access, String name, String desc,
+                            String sig, Object value) {
+                        if ((access & Opcodes.ACC_STATIC) != 0 && fieldName.equals(name)
+                                && "Ljava/lang/String;".equals(desc)) {
+                            declaresHere[0] = true;
+                        }
+                        return null;
+                    }
+                }, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            } catch (Throwable t) {
+                break;
+            } finally {
+                try {
+                    in.close();
+                } catch (Throwable ignore) {
+                    // best effort
+                }
+            }
+            if (declaresHere[0]) {
+                return c;
+            }
+            c = superName[0];
+        }
+        return owner;
     }
 
     /** Count of static-final String constants left plaintext to keep a carried source's compilation valid. */

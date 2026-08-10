@@ -111,6 +111,23 @@ public class FrameClassWriterTest {
     }
 
     @Test
+    public void flagsIncompleteWhenOneReadableChainHidesANearerBaseBehindAMissingIntermediate() {
+        // app/A extends app/Base (fully readable to Object); app/B extends an absent app/Missing that in
+        // reality extends Base. Walking A's chain reaches Object without finding a closer readable ancestor,
+        // but B's chain is broken at the missing intermediate, so the real common base (Base) is hidden. The
+        // merge must be flagged incomplete rather than silently returning the too-weak Object -- even though
+        // A's own chain is intact, the early loop return must not bypass the incomplete-chain check.
+        java.util.Map<String, byte[]> res = new java.util.HashMap<String, byte[]>();
+        res.put("app/A.class", classExtending("app/A", "app/Base"));
+        res.put("app/B.class", classExtending("app/B", "app/Missing"));
+        res.put("app/Base.class", classExtending("app/Base", "java/lang/Object"));
+        FrameClassWriter w = new FrameClassWriter(0, new BytesLoader(res));   // app/Missing absent
+        assertEquals("java/lang/Object", w.getCommonSuperClass("app/A", "app/B"));
+        assertTrue("a nearer base hidden behind a missing intermediate must flag incomplete",
+                w.isHierarchyIncomplete());
+    }
+
+    @Test
     public void resolvedSharedBaseIsNotFlaggedIncomplete() {
         // When the byte walk DOES resolve the shared base (A and B both directly extend the absent Base),
         // the result is Base, not a guess, so the merge must NOT be flagged incomplete -- the class can be

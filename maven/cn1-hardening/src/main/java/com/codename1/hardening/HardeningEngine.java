@@ -251,7 +251,7 @@ public final class HardeningEngine {
             // renamed field names the transform checks.
             final java.util.Set<String> externallyReadStaticFields = new java.util.HashSet<String>();
             for (byte[] cls : renamed.values()) {
-                StringEncryptTransform.collectGetStaticStringReads(cls, externallyReadStaticFields);
+                StringEncryptTransform.collectGetStaticStringReads(cls, externallyReadStaticFields, hierarchy);
             }
             // Pass 1 (from a snapshot of the input bytes): transform every class, tally the counts, and
             // collect the values any class could NOT encrypt (a method too full for the decode call, or a
