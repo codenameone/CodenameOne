@@ -1458,8 +1458,43 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /// Whether a drain is already walking the store.
+    ///
+    /// ONE drain at a time, or the order the app sees is not the order things happened. Two Data
+    /// Layer workers can both reach here: the first claims the oldest key and is descheduled, the
+    /// second skips that in-flight key and queues the NEXT record, and the oldest then arrives
+    /// after it. Sorted keys buy nothing if two threads walk the list at once.
+    ///
+    /// A second thread returns rather than blocking. It is a Data Layer worker with a live event to
+    /// deliver, and the drain it would have run is the one already in progress -- which loops until
+    /// the store is empty, so anything written meanwhile is picked up before it finishes.
+    private static boolean spoolDraining;
+
     /// Replays everything written down, oldest first, forgetting each only once it is delivered.
     static void drainSpool(Context context) {
+        synchronized (SPOOL_LOCK) {
+            if (spoolDraining) {
+                return;
+            }
+            spoolDraining = true;
+        }
+        try {
+            while (drainSpoolPass(context)) {
+                // Again, because a worker that wrote a record while this pass was running returned
+                // without draining it -- this owner is the one that has to pick it up.
+                continue;
+            }
+        } finally {
+            synchronized (SPOOL_LOCK) {
+                spoolDraining = false;
+            }
+        }
+    }
+
+    /// One walk of the store. Returns whether anything was replayed, so the owner knows to look
+    /// again.
+    private static boolean drainSpoolPass(Context context) {
+        boolean replayed = false;
         for (String key : spooledKeys(context)) {
             // ONE record at a time. Charging an attempt to the whole batch up front meant the
             // oldest record crashing the process three times threw away every later message and
@@ -1479,7 +1514,9 @@ public class CN1WearableBridge implements WearableBridge {
                     releaseSpooled(c, claimed);
                 }
             });
+            replayed = true;
         }
+        return replayed;
     }
 
     /// How many launches a single record may be replayed on before it is abandoned.

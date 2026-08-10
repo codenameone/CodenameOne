@@ -1952,12 +1952,52 @@ class WatchNativeBuilder {
                 .append("    end\n")
                 .append("  end\n")
                 .append("end\n")
+                // A product name is not always its module name.
+                //
+                // A package may export product FooKit containing target Foo, and staged code then
+                // says `import Foo` -- which matches no product, so the strict gate concluded FooKit
+                // was unused and the watch failed to compile against a module it does import. The
+                // mapping lives in the package's own Package.swift, which xcodebuild does not
+                // resolve until long after this runs, so it cannot be looked up here.
+                //
+                // What CAN be established is whether the assumption holds for this project: every
+                // module the watch sources import is either a product name or a framework in the
+                // watchOS SDK. When that is true the gate is exact and stays on. When some import
+                // is attributable to neither, product and module names demonstrably differ here, the
+                // gate cannot decide, and it steps aside -- mirroring everything, and saying so.
+                // A package that then fails on watchOS is named by Xcode; a module silently withheld
+                // is not.
+                .append("watch_modules = []\n")
+                .append("if watch_import_text\n")
+                .append("  watch_import_text.scan(/^\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*"
+                        + "(?:(?:public|package|internal|fileprivate|private)\\s+)?import\\s+"
+                        + "(?:typealias|struct|class|enum|protocol|let|var|func)?\\s*"
+                        + "([A-Za-z_]\\w*)/) { |m| watch_modules << m[0] }\n")
+                .append("  watch_import_text.scan(/@import\\s+([A-Za-z_]\\w*)\\s*;/) "
+                        + "{ |m| watch_modules << m[0] }\n")
+                .append("  watch_import_text.scan(/[<\\\"]([A-Za-z_]\\w*)\\//) "
+                        + "{ |m| watch_modules << m[0] }\n")
+                .append("  watch_modules.uniq!\n")
+                .append("end\n")
+                .append("product_names = app_target.package_product_dependencies.to_a"
+                        + ".map { |d| d.respond_to?(:product_name) ? d.product_name : nil }"
+                        + ".compact\n")
+                .append("unattributed = watch_modules.reject { |m| product_names.include?(m) || "
+                        + "watch_fw_dirs.any? { |dirs| dirs.any? { |dd| "
+                        + "File.directory?(File.join(dd, m + '.framework')) } } }\n")
+                .append("strict_products = watch_import_text && unattributed.empty?\n")
+                .append("if watch_import_text && !unattributed.empty?\n")
+                .append("  puts \"[watchNative] linking every Swift package product into the watch "
+                        + "target: #{unattributed.join(' ')} imported by the staged watch sources "
+                        + "matches no product name, so a product's module name differs from it and "
+                        + "the per-product check cannot decide\"\n")
+                .append("end\n")
                 .append("app_target.package_product_dependencies.to_a.each do |dep|\n")
                 .append("  name = dep.respond_to?(:product_name) ? dep.product_name : nil\n")
                 .append("  next unless name\n")
                 // watch_import_text is nil when the watch shares the phone's translation, and then
                 // the watch compiles the phone's sources and needs the phone's packages.
-                .append("  if watch_import_text\n")
+                .append("  if strict_products\n")
                 .append("    q = Regexp.escape(name)\n")
                 // Swift: `import Foo`, `import Foo.Bar`, the declaration-scoped
                 // `import struct Foo.Bar`, and whatever decorates the line in front of it.

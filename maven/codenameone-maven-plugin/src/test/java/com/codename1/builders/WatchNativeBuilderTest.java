@@ -711,6 +711,14 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("(?:@\\w+(?:\\([^)]*\\))?\\s*)*"),
                 "the attribute prefix has to be general: " + ruby);
         assertTrue(ruby.contains("public|package|internal|fileprivate|private"), ruby);
+        // A product name is not always its module name -- package FooKit can export module Foo.
+        // The gate can tell when that is the case here (an import attributable to no product and no
+        // watchOS framework) and steps aside rather than withholding a module the sources import.
+        assertTrue(ruby.contains("strict_products"), ruby);
+        assertTrue(ruby.contains("unattributed"), ruby);
+        assertTrue(ruby.contains("matches no product name"),
+                "stepping aside has to be logged, or a mirrored iOS-only package looks arbitrary: "
+                        + ruby);
         // Both halves are required. Listing the product on the target is what makes Xcode resolve
         // the package for it; the frameworks-phase build file is what links it. Either alone
         // produces a project that still fails, and differently.
