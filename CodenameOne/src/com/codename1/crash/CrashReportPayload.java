@@ -133,6 +133,17 @@ final class CrashReportPayload {
     /// only for the 4-space ParparVM shape and labeled everything else -- including the tab-indented
     /// JVM trace -- as JavaScript; derive from the platform so that never happens.
     static String deriveTraceFormat(List<Frame> frames, String rawStack, String platform) {
+        // A real JVM sets java.vm.name; ParparVM's System.getProperty always returns null. This is the
+        // only reliable way to tell a native ParparVM-C target from a JavaSE desktop app or the simulator,
+        // because JavaSEPort.getPlatformName() returns the SAME mac/win names a native build reports.
+        return deriveTraceFormat(frames, rawStack, platform, System.getProperty("java.vm.name") != null);
+    }
+
+    /// The testable core of {@link #deriveTraceFormat(List, String, String)}: {@code runningOnJvm} is
+    /// supplied explicitly (production derives it from {@code java.vm.name}) so a JVM-hosted unit test can
+    /// exercise both the native ParparVM-C path and the JavaSE-on-mac/win path.
+    static String deriveTraceFormat(List<Frame> frames, String rawStack, String platform,
+            boolean runningOnJvm) {
         if (frames != null && !frames.isEmpty()) {
             return TRACE_STRUCTURED;
         }
@@ -143,11 +154,12 @@ final class CrashReportPayload {
             return TRACE_JS;
         }
         // The "    at <fqcn>.<method>:<line>" text is only produced by ParparVM's own printStackTrace on a
-        // C target. Gate on the platform: an Android/desktop (real-JVM) throwable whose MESSAGE happens to
-        // contain such a line -- the message is echoed into the raw stack by printStackTrace -- must NOT be
-        // labeled parparvm-text, or the server would fabricate a frame from message text or drop a real
-        // cause trace. The shape check still guards against an unexpected stack on a ParparVM-C platform.
-        if (isParparVmTextPlatform(platform)) {
+        // native C target. Gate on the runtime: an Android/desktop/simulator (real-JVM) throwable whose
+        // MESSAGE happens to contain such a line -- the message is echoed into the raw stack by
+        // printStackTrace -- must NOT be labeled parparvm-text, or the server would fabricate a frame from
+        // message text or drop a real cause trace. The shape check still guards an unexpected stack on a
+        // ParparVM-C target.
+        if (isParparVmTextPlatform(platform, runningOnJvm)) {
             // A ParparVM frame line is exactly "    at <fqcn>.<method>:<line>" -- no '(', URL or '@'.
             int at = rawStack.indexOf("    at ");
             if (at >= 0) {
@@ -158,17 +170,20 @@ final class CrashReportPayload {
                 }
             }
         }
-        // Not JavaScript and not a ParparVM-C target's text shape: an ordinary JVM printStackTrace body.
-        // There is no JVM raw parser, so report NONE and let the server keep the text verbatim rather than
-        // misparsing it.
+        // Not JavaScript and not a native ParparVM-C target's text shape: an ordinary JVM printStackTrace
+        // body. There is no JVM raw parser, so report NONE and let the server keep the text verbatim rather
+        // than misparsing it.
         return TRACE_NONE;
     }
 
-    /// The ParparVM-to-C runtime platforms, whose {@code printStackTrace} emits the
-    /// "    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;" text. Matches {@link Display#getPlatformName()};
-    /// {@code and} (Android) and {@code javase} (desktop) run on a real JVM and are deliberately excluded.
-    private static boolean isParparVmTextPlatform(String platform) {
-        if (platform == null) {
+    /// True only on a native ParparVM-to-C runtime, whose {@code printStackTrace} emits the
+    /// "    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;" text. The displayed platform name is NOT enough:
+    /// a skinless JavaSE desktop app returns {@code mac}/{@code win} (Linux falls through to {@code win})
+    /// and the simulator can return {@code ios}, all colliding with the native names. So anything running
+    /// on a real JVM ({@code runningOnJvm}: JavaSE desktop, the simulator, or Android) is excluded, and of
+    /// the remaining native runtimes only the C-target names qualify.
+    private static boolean isParparVmTextPlatform(String platform, boolean runningOnJvm) {
+        if (runningOnJvm || platform == null) {
             return false;
         }
         String p = platform.toLowerCase();

@@ -47,25 +47,31 @@ class TraceFormatTest {
 
     @Test
     void parparVmTextIsRecognized() {
+        // A native ParparVM-C target (not running on a JVM) with the "    at X.Y:N" text.
         assertEquals(CrashReportPayload.TRACE_PARPARVM,
                 CrashReportPayload.deriveTraceFormat(null,
-                        "    at com.foo.Bar.baz:42\n    at com.foo.Bar.qux:7\n", "ios"));
+                        "    at com.foo.Bar.baz:42\n    at com.foo.Bar.qux:7\n", "ios", false));
     }
 
     @Test
     void jvmMessageWithParparvmShapedLineIsNotParparvm() {
-        // A real-JVM (Android/desktop) throwable whose MESSAGE contains a line shaped like a ParparVM frame
-        // ("    at X.Y:N", no parentheses); printStackTrace echoes the message into the raw stack. The
-        // platform gate must keep it NONE so the server does not fabricate a frame from message text.
+        // A real-JVM throwable whose MESSAGE contains a line shaped like a ParparVM frame ("    at X.Y:N",
+        // no parentheses); printStackTrace echoes the message into the raw stack. On a JVM it must stay
+        // NONE so the server does not fabricate a frame from message text.
         String raw = "java.lang.IllegalStateException: bad input:\n    at fake.Type.method:12\n";
         assertEquals(CrashReportPayload.TRACE_NONE,
-                CrashReportPayload.deriveTraceFormat(null, raw, "Android"));
+                CrashReportPayload.deriveTraceFormat(null, raw, "Android", true));
         assertEquals(CrashReportPayload.TRACE_NONE,
-                CrashReportPayload.deriveTraceFormat(null, raw, "SE"));
-        // The very same raw text on an actual ParparVM-C platform IS parparvm-text -- only the platform
-        // distinguishes them, which is the point of the gate.
+                CrashReportPayload.deriveTraceFormat(null, raw, "SE", true));
+        // A skinless JavaSE desktop app on macOS/Windows reports mac/win yet runs on a JVM -- it must still
+        // be NONE, not parparvm, even though the name collides with the native C-target names.
+        assertEquals(CrashReportPayload.TRACE_NONE,
+                CrashReportPayload.deriveTraceFormat(null, raw, "mac", true));
+        assertEquals(CrashReportPayload.TRACE_NONE,
+                CrashReportPayload.deriveTraceFormat(null, raw, "win", true));
+        // The same raw text on a NATIVE ParparVM-C target (not on a JVM) IS parparvm-text.
         assertEquals(CrashReportPayload.TRACE_PARPARVM,
-                CrashReportPayload.deriveTraceFormat(null, raw, "win"));
+                CrashReportPayload.deriveTraceFormat(null, raw, "win", false));
     }
 
     @Test
