@@ -1616,6 +1616,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-09T19:01:12+00:00"
+      },
+      "devto": {
+        "id": 4361786,
+        "url": "https://dev.to/codenameone/a-polyline-is-not-a-route-5fek",
+        "syndicated_at": "2026-08-10T14:43:58+00:00"
       }
     }
   }
