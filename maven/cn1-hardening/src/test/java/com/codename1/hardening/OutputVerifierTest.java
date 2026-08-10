@@ -61,6 +61,44 @@ public class OutputVerifierTest {
         OutputVerifier.verify(classes, getClass().getClassLoader());   // must not throw
     }
 
+    @Test
+    public void unresolvedTypeInsideAMethodBodyIsAcceptedNotRejected() throws Exception {
+        // app/User.make() returns a new instance of an absent app/Missing. Depending on where the load
+        // fails, CheckClassAdapter's data-flow analyzer PRINTS the missing-type failure to the report
+        // instead of throwing; either way the class must be accepted via the structural fallback, not
+        // rejected as invalid bytecode.
+        byte[] u = classReturningNewInstanceOf("app/User", "app/Missing");
+        Map<String, byte[]> classes = new LinkedHashMap<String, byte[]>();
+        classes.put("app/User", u);
+        Map<String, byte[]> resources = new HashMap<String, byte[]>();
+        resources.put("app/User.class", u);
+        OutputVerifier.verify(classes, new BytesLoader(resources));   // app/Missing absent; must not throw
+    }
+
+    /** A class with a method {@code static <absent> make()} that returns {@code new <absent>()}. */
+    private static byte[] classReturningNewInstanceOf(String internal, String absentType) {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, internal, null, "java/lang/Object", null);
+        MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        ctor.visitCode();
+        ctor.visitVarInsn(Opcodes.ALOAD, 0);
+        ctor.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        ctor.visitInsn(Opcodes.RETURN);
+        ctor.visitMaxs(1, 1);
+        ctor.visitEnd();
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "make",
+                "()L" + absentType + ";", null, null);
+        mv.visitCode();
+        mv.visitTypeInsn(Opcodes.NEW, absentType);
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, absentType, "<init>", "()V", false);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(2, 0);
+        mv.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
     private static byte[] classWithSuperCtor(String internal, String superName) {
         ClassWriter cw = new ClassWriter(0);
         cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, internal, null, superName, null);

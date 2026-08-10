@@ -51,8 +51,9 @@ public final class OutputVerifier {
             throws HardeningException {
         for (Map.Entry<String, byte[]> e : classesByInternalName.entrySet()) {
             StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
             try {
-                CheckClassAdapter.verify(new ClassReader(e.getValue()), hierarchy, false, new PrintWriter(sw));
+                CheckClassAdapter.verify(new ClassReader(e.getValue()), hierarchy, false, pw);
             } catch (Throwable t) {
                 if (isUnresolvedTypeFailure(t)) {
                     // ASM's data-flow SimpleVerifier LOADS types to resolve the hierarchy and threw
@@ -67,12 +68,30 @@ public final class OutputVerifier {
                 throw new HardeningException("Hardened class '" + e.getKey()
                         + "' failed bytecode verification: " + t.getMessage(), t);
             }
+            pw.flush();
             String report = sw.toString();
             if (report.length() > 0) {
+                if (isUnresolvedTypeReport(report)) {
+                    // Depending on where the load fails, CheckClassAdapter.verify does NOT throw but
+                    // catches the missing-type failure internally and prints its stack trace to the report.
+                    // That is the same absent-target-type case as the catch above (a superclass supplied
+                    // only by the target platform), not a bytecode defect, so take the structural fallback
+                    // instead of rejecting a valid class. Mirrors BytecodeComplianceMojo's report-text check.
+                    verifyStructureOnly(e.getKey(), e.getValue());
+                    continue;
+                }
                 throw new HardeningException("Hardened class '" + e.getKey()
                         + "' failed bytecode verification:\n" + report);
             }
         }
+    }
+
+    /** True when a verifier report's TEXT names only a missing type (ASM printed it instead of throwing). */
+    private static boolean isUnresolvedTypeReport(String report) {
+        return report.contains("ClassNotFoundException")
+                || report.contains("TypeNotPresentException")
+                || report.contains("NoClassDefFoundError")
+                || report.contains(" not present");
     }
 
     /**
