@@ -724,6 +724,14 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("decided << true") && ruby.contains("decided[i]"),
                 "the taken-arm state is what drops the else of a watch-first branch: " + ruby);
         assertTrue(ruby.contains("cn1_watch_selects_watch"), ruby);
+        // Selection is the only direction that can silence another arm, so it takes the whole
+        // expression being demonstrably true: `os(watchOS) && FEATURE` mentions watchOS and is not
+        // therefore true, and suppressing its #else dropped a package imported only there.
+        assertTrue(ruby.contains("\\Aos\\(\\s*watchOS\\s*\\)\\z"),
+                "only a bare watchOS test may close a branch: " + ruby);
+        // And a disjunction can still be true on the watch through its other operand, so one os()
+        // test inside an || proves nothing.
+        assertTrue(ruby.contains("return false if condition.include?('||')"), ruby);
         // Only a demonstrably watchOS arm closes a branch: marking an unevaluable #elseif as
         // decided suppressed the #else, which is the arm the watch compiles when the flags are off.
         assertTrue(ruby.contains("decided[i] = true if cn1_watch_selects_watch(t)"), ruby);

@@ -87,7 +87,19 @@ public final class WearableConnection {
     /// alongside the handler so the reply decodes onto a real path -- a payload has to have one.
     private static final Map<Integer, PendingReply> pendingReplies =
             new HashMap<Integer, PendingReply>();
-    private static int nextReplyToken = 1;
+    /// Reply tokens, seeded from the clock so a restart cannot reissue the previous run's.
+    ///
+    /// This counted from 1 in every process, and the Android wire path carries nothing but the
+    /// integer -- so a sender killed with request 1 outstanding, restarted, issuing another request
+    /// before the peer answered, could have the STALE reply complete the new request's handler with
+    /// the wrong payload. Nothing downstream can tell the two apart; the token has to.
+    ///
+    /// Seeded rather than randomised, because the clock also moves in one direction: the next
+    /// process starts above the tokens the last one issued unless it issued more of them than
+    /// milliseconds have passed. Wrapped into the positive range because 0 means "no reply wanted"
+    /// and a negative token would be a minus sign in a wire path.
+    private static int nextReplyToken =
+            (int) (System.currentTimeMillis() & 0x3FFFFFFFL) + 1;
 
     /// A request waiting for its answer.
     private static final class PendingReply {
@@ -263,6 +275,11 @@ public final class WearableConnection {
         if (reply != null) {
             synchronized (pendingReplies) {
                 token = nextReplyToken++;
+                if (nextReplyToken <= 0) {
+                    // Wrapped. Back to 1 rather than through 0 and into the negatives: 0 is the
+                    // "no answer wanted" marker every dispatch site tests for.
+                    nextReplyToken = 1;
+                }
                 pendingReplies.put(Integer.valueOf(token),
                         new PendingReply(reply, message.getPath()));
             }

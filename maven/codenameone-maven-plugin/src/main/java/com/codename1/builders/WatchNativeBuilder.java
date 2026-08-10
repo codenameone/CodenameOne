@@ -2050,15 +2050,26 @@ class WatchNativeBuilder {
                 .append("end\n")
                 .append("def cn1_watch_excludes_watch(condition)\n")
                 .append("  return false unless condition.include?('os(')\n")
+                // A DISJUNCTION can still be true on the watch through its other operand, so an
+                // os() test that is only one side of an || proves nothing. A conjunction is safe:
+                // `os(iOS) && FEATURE` is false on the watch whatever FEATURE is.
+                .append("  return false if condition.include?('||')\n")
                 .append("  return true if condition =~ /!\\s*os\\(\\s*watchOS\\s*\\)/\n")
                 .append("  return false if condition.include?('os(watchOS)')\n")
                 .append("  condition =~ /os\\(\\s*(iOS|macOS|tvOS|visionOS|Linux|Windows|Android)"
                         + "\\s*\\)/ ? true : false\n")
                 .append("end\n")
-                /// Positively naming watchOS, which is what lets the other arms be dropped.
+                /// Positively naming watchOS AND nothing else, which is what lets the other arms be
+                /// dropped.
+                ///
+                /// `os(watchOS) && FEATURE` mentions watchOS and is not therefore true: with FEATURE
+                /// off Swift compiles the `#else`, and treating the first arm as selected suppressed
+                /// that else and dropped a package imported only there. Selection is the only
+                /// direction that can silence another arm, so it takes the whole expression being
+                /// demonstrably true -- a bare os(watchOS) test and nothing more.
                 .append("def cn1_watch_selects_watch(condition)\n")
-                .append("  condition.include?('os(watchOS)') && "
-                        + "!(condition =~ /!\\s*os\\(\\s*watchOS\\s*\\)/)\n")
+                .append("  bare = condition.sub(/\\A#(if|elseif)\\b/, '').strip\n")
+                .append("  bare =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/ ? true : false\n")
                 .append("end\n");
 
         // Mirrored only when the WATCH sources actually import the product.
