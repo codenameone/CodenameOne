@@ -1027,6 +1027,57 @@ class GeneratedSourceTest {
         compile("LoginForm", third, null);
     }
 
+    @Test
+    void aCustomSuperCallStopsTheMigration() throws Exception {
+        // The scaffold never wrote a super call, so this one is the developer's: removing the
+        // constructor would replace their title and layout with whatever the .gui says.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.layouts.BorderLayout;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm() {\n"
+                + "        super(\"Runtime title\", new BorderLayout());\n"
+                + "        initGuiBuilderComponents();\n"
+                + "    }\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a custom super call is user logic, not scaffolding");
+
+        // The implicit form is not, so a constructor that only calls the initializer still goes.
+        String plain = legacy.replace("        super(\"Runtime title\", new BorderLayout());\n", "");
+        assertNotNull(migrate(builder, plain, invoke(builder, "defaultCompanionSource")));
+    }
+
+    @Test
+    void aHelperDeclaredBeforeTheFormIsNotMistakenForIt() throws Exception {
+        // The first class in the file used to win, so the helper's body was treated as the form's
+        // user region and the real form was appended after a freshly generated one of that name.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "class LoginHelper {\n    void help() { }\n}\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(); }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void mine() { }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertNotNull(migrated, "this file is migratable:\n" + legacy);
+        assertEquals(1, countOccurrences(migrated, "class LoginForm"),
+                "exactly one form, not a generated one plus the original:\n" + migrated);
+        assertTrue(migrated.contains("public void mine()"), "the form's member is carried:\n" + migrated);
+        assertTrue(migrated.contains("class LoginHelper"),
+                "and the helper in front of it is kept:\n" + migrated);
+        assertFalse(migrated.contains("initGuiBuilderComponents"), migrated);
+        compile("LoginForm", migrated, null);
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

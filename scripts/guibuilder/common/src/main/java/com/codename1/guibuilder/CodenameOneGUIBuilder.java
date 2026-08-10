@@ -6385,10 +6385,23 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String only = statement.trim();
         if (only.length() == 0 || "}".equals(only)) return false;
         while (only.endsWith("}")) only = only.substring(0, only.length() - 1).trim();
-        return only.length() != 0
-                && !only.startsWith("initGuiBuilderComponents")
-                && !only.startsWith("super(")
-                && !only.startsWith("this(");
+        if (only.length() == 0) return false;
+        // A super call with arguments is the developer's: the scaffold never wrote one, and
+        // removing the constructor replaced their super("Runtime title", new BorderLayout()) with
+        // whatever the .gui says, quietly changing what the screen does. The argument-less form is
+        // what the compiler would have inserted anyway.
+        if (only.startsWith("super(")) return !"super()".equals(withoutSpaces(only));
+        return !only.startsWith("initGuiBuilderComponents") && !only.startsWith("this(");
+    }
+
+    /** The statement with its whitespace removed, for comparing against a canonical form. */
+    private static String withoutSpaces(String statement) {
+        StringBuilder out = new StringBuilder(statement.length());
+        for (int i = 0; i < statement.length(); i++) {
+            char c = statement.charAt(i);
+            if (!Character.isWhitespace(c)) out.append(c);
+        }
+        return out.toString();
     }
 
     /**
@@ -6762,11 +6775,72 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private String legacyTrailingDeclarations(String existing) {
         String masked = stripComments(existing);
-        int bodyStart = masked.indexOf('{', classDeclaration(existing));
+        int declaration = classDeclaration(existing);
+        StringBuilder out = new StringBuilder();
+        // Before the form as well as after it. Now that the form is located by name rather than by
+        // being first, a helper can legally precede it, and dropping that one would be the same
+        // bug on the other side. Order among top level declarations does not matter, so both go
+        // after the regenerated class.
+        int leading = legacyDeclarationStart(existing, masked, declaration);
+        int afterHeader = endOfLegacyHeader(masked, leading);
+        if (leading > afterHeader) {
+            String before = existing.substring(afterHeader, leading).trim();
+            if (before.length() > 0) out.append('\n').append(before).append('\n');
+        }
+        int bodyStart = masked.indexOf('{', declaration);
         int bodyEnd = matchingBrace(masked, bodyStart);
-        if (bodyEnd < 0 || bodyEnd + 1 >= existing.length()) return "";
-        String trailing = existing.substring(bodyEnd + 1).trim();
-        return trailing.length() == 0 ? "" : "\n" + trailing + "\n";
+        if (bodyEnd >= 0 && bodyEnd + 1 < existing.length()) {
+            String after = existing.substring(bodyEnd + 1).trim();
+            if (after.length() > 0) out.append('\n').append(after).append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
+     * Where the form's own declaration begins, annotations and modifiers included.
+     *
+     * @param existing the legacy companion source
+     * @param masked the comment masked copy
+     * @param declaration the index of the class keyword
+     * @return the offset the declaration starts at
+     */
+    private int legacyDeclarationStart(String existing, String masked, int declaration) {
+        if (declaration <= 0) return 0;
+        char[] blanked = blankAnnotations(masked, declaration);
+        int at = declaration;
+        while (at > 0) {
+            char c = blanked[at - 1];
+            if (!Character.isWhitespace(c) && !isIdentifierChar(c)) break;
+            at--;
+        }
+        // Back over the annotation run in front of the modifiers, which belongs to the form too.
+        while (at > 0) {
+            int previous = masked.lastIndexOf('@', at - 1);
+            if (previous < 0) break;
+            int end = annotationEnd(masked, previous);
+            if (end < 0 || end > at || masked.substring(end, at).trim().length() != 0) break;
+            at = previous;
+        }
+        return at;
+    }
+
+    /**
+     * The offset just past the package statement and imports.
+     *
+     * @param masked the comment masked source
+     * @param limit where to stop looking
+     * @return the offset after the last header statement
+     */
+    private static int endOfLegacyHeader(String masked, int limit) {
+        int at = 0;
+        int semicolon = masked.indexOf(';');
+        while (semicolon >= 0 && semicolon < limit) {
+            String statement = masked.substring(at, semicolon).trim();
+            if (!statement.startsWith("package ") && !statement.startsWith("import ")) break;
+            at = semicolon + 1;
+            semicolon = masked.indexOf(';', at);
+        }
+        return at;
     }
 
     /**
@@ -6849,8 +6923,46 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @param source the companion source
      * @return the index of the declaration, or 0 when none was found
      */
+    /** The class name the open document's companion carries. */
+    private String expectedCompanionClassName() {
+        if (document == null || document.path() == null) return "";
+        String form = relativeFormName(document.path());
+        int dot = form.lastIndexOf('.');
+        return dot < 0 ? form : form.substring(dot + 1);
+    }
+
+    /**
+     * The {@code class} keyword of the declaration with the given name.
+     *
+     * @param code the comment masked source
+     * @param name the class name to find
+     * @return the index of the keyword, or -1
+     */
+    private static int declarationNamed(String code, String name) {
+        int at = code.indexOf("class");
+        while (at >= 0) {
+            char before = at == 0 ? ' ' : code.charAt(at - 1);
+            int after = at + "class".length();
+            if (!isIdentifierChar(before) && before != '.'
+                    && after < code.length() && Character.isWhitespace(code.charAt(after))) {
+                int start = skipSpaces(code, after);
+                int end = start;
+                while (end < code.length() && isIdentifierChar(code.charAt(end))) end++;
+                if (name.equals(code.substring(start, end))) return at;
+            }
+            at = code.indexOf("class", after);
+        }
+        return -1;
+    }
+
     private int classDeclaration(String source) {
         String code = stripComments(source);
+        // The companion's own class. A legal package-private helper declared before the form used
+        // to win, and its body was then treated as the form's user region while the real form was
+        // appended after a freshly generated class of the same name.
+        String wanted = expectedCompanionClassName();
+        int match = wanted.length() == 0 ? -1 : declarationNamed(code, wanted);
+        if (match >= 0) return match;
         int at = code.indexOf("class");
         while (at >= 0) {
             char before = at == 0 ? ' ' : code.charAt(at - 1);
