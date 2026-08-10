@@ -473,7 +473,7 @@ public final class GuiDocument {
         Element target = selected;
         if (target == null || !"component".equals(target.getTagName())) return null;
         String previous = target.getAttribute("name");
-        String requested = requestedName == null ? "" : requestedName.trim();
+        String requested = sanitizeName(requestedName == null ? "" : requestedName.trim());
         if (requested.length() == 0 || requested.equals(previous)) return previous;
         Set<Element> exclude = new LinkedHashSet<>();
         exclude.add(target);
@@ -491,6 +491,27 @@ public final class GuiDocument {
             endTransaction();
         }
         return unique;
+    }
+
+    /**
+     * Strips the characters the delimited attributes reserve.
+     *
+     * <p>guidedReferences is pipe separated and remapReferences() writes a renamed anchor straight
+     * into it, so a name containing a pipe split into several sides on the next rebuild -- the
+     * anchor stopped resolving and its dependant jumped. Whitespace goes for the same reason:
+     * guidedReferencePositions is space separated.
+     *
+     * @param name the requested name
+     * @return the name with reserved characters removed
+     */
+    static String sanitizeName(String name) {
+        StringBuilder out = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c == '|' || Character.isWhitespace(c)) continue;
+            out.append(c);
+        }
+        return out.toString();
     }
 
     public String copySelectedXml() {

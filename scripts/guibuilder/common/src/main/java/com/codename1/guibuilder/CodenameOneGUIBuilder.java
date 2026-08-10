@@ -6432,6 +6432,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         String header = legacyClassHeader(existing);
         // Type parameters come before extends, so the superclass check passes while the generated
         // class is not generic -- carried members that mention T then do not compile.
+        // The declaration is rebuilt as a concrete public class, so a carried abstract method
+        // would have nothing to sit in. Refused with the type-parameter and superclass cases.
+        if (isAbstractLegacyClass(existing)) {
+            companionRefusal = "Cannot migrate " + className(existing)
+                    + ": it is abstract, and this generator produces a concrete class"
+                    + " - the file was left untouched";
+            setStatus(companionRefusal);
+            return null;
+        }
         if (header.startsWith("<")) {
             companionRefusal = "Cannot migrate " + className(existing)
                     + ": it declares type parameters, which this generator does not produce"
@@ -6475,6 +6484,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         if (insert < 0) return merged;
         insert += marker.length();
         return merged.substring(0, insert) + "\n" + carried + "\n" + merged.substring(insert);
+    }
+
+    /**
+     * True when the legacy class carries the abstract modifier.
+     *
+     * @param existing the legacy companion source
+     * @return true when the declaration is abstract
+     */
+    private boolean isAbstractLegacyClass(String existing) {
+        String code = stripComments(existing);
+        int declaration = classDeclaration(existing);
+        if (declaration <= 0) return false;
+        // Only the modifiers, which is whatever runs back from the keyword without a separator.
+        int at = declaration;
+        while (at > 0) {
+            char c = code.charAt(at - 1);
+            if (!Character.isWhitespace(c) && !isIdentifierChar(c)) break;
+            at--;
+        }
+        return code.substring(at, declaration).indexOf("abstract") >= 0;
     }
 
     /** The superclass this generator emits for the open document's root type. */

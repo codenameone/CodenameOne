@@ -879,6 +879,27 @@ class GeneratedSourceTest {
         compile("LoginForm", migrated, null);
     }
 
+    @Test
+    void anAbstractLegacyClassStopsTheMigration() throws Exception {
+        // The declaration is rebuilt as a concrete public class, so a carried abstract method has
+        // nothing to sit in and the companion stops compiling on the first save.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public abstract class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    protected abstract void configure();\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "an abstract companion must refuse rather than produce a class that will not compile");
+
+        // A concrete one with the same shape still migrates.
+        String concrete = legacy.replace("public abstract class", "public class")
+                .replace("    protected abstract void configure();\n", "    protected void configure() { }\n");
+        assertNotNull(migrate(builder, concrete, invoke(builder, "defaultCompanionSource")));
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

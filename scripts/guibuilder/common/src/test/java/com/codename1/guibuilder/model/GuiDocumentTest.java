@@ -439,4 +439,24 @@ class GuiDocumentTest {
         assertEquals(3, document.components().size());
     }
 
+    @Test
+    void renamingStripsTheCharactersGuidedReferencesReserve() {
+        // guidedReferences is pipe separated and the rename is written straight into it, so a pipe
+        // in a name split into several sides on the next rebuild and the anchor stopped resolving.
+        GuiDocument document = GuiDocument.parse("/tmp/p/gui/com/example/F.gui",
+                "<component type=\"Form\" name=\"F\" layout=\"LayeredLayout\">"
+                + "<component type=\"Label\" name=\"anchor\"/>"
+                + "<component type=\"Button\" name=\"follower\" guidedReferences=\"anchor|-|-|anchor\""
+                + " guidedReferencePositions=\"1 0 0 0\"/></component>");
+        Element anchor = document.components().get(1);
+        Element follower = document.components().get(2);
+        document.select(anchor);
+
+        String applied = document.renameSelected("we|ird name");
+
+        assertEquals("weirdname", applied, "reserved characters are dropped");
+        assertEquals("weirdname|-|-|weirdname", follower.getAttribute("guidedReferences"),
+                "and the reference still has four sides: " + follower.getAttribute("guidedReferences"));
+    }
+
 }
