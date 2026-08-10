@@ -9017,6 +9017,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    @Override
     public int getDeviceDensity() {
         // IMPORTANT:  If you modify this method, you MUST make the equivalent changes
         // to the getDeviceDensity() method in the Shooter project or the iOS screenshots
