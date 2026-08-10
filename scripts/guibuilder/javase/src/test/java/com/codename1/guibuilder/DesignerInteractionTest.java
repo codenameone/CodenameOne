@@ -1552,6 +1552,36 @@ class DesignerInteractionTest {
                         + follower.getAttribute("guidedReferences"));
     }
 
+    @Test
+    void closingAnInlineEditorWithoutAChangeLeavesNothingToUndo() throws Exception {
+        // Every keystroke is already written by the data-change listener, so committing the same
+        // value again snapshotted an empty edit: the next Undo restored identical text and looked
+        // like it had done nothing.
+        GuiDocument document = document("<component type=\"Form\" name=\"Form\" layout=\"BoxLayout\">"
+                + "<component type=\"Label\" name=\"caption\" text=\"before\"/></component>");
+        Element caption = document.components().get(1);
+        CodenameOneGUIBuilder builder = builder(document);
+        // A canvas, so the commit takes its real path instead of failing in the preview lookup --
+        // otherwise removing the guard makes this test error rather than fail its assertion, and
+        // it would be proving nothing about undo.
+        Container canvas = new Container(new LayeredLayout());
+        canvas.add(render(document, 400, 300));
+        set(builder, "canvasHost", canvas);
+
+        document.select(caption);
+        document.setAttribute("text", "after");
+        assertEquals("after", caption.getAttribute("text"));
+
+        // The editor closes carrying the text the listener already committed.
+        builder.commitInlineValue(caption, "text", "after");
+
+        assertTrue(document.undo(), "there is still the real edit to undo");
+        // Re-read from the document: undo restores a parsed tree, so the element captured earlier
+        // is detached and still carries the old value.
+        assertEquals("before", document.components().get(1).getAttribute("text"),
+                "one undo must reach the state before the edit, not an identical snapshot");
+    }
+
     private static String value(Element element, String attribute) {
         String out = element.getAttribute(attribute);
         return out == null ? "" : out;

@@ -4715,6 +4715,14 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // element it does not contain, and the value would then be written into whatever the new
         // form happens to have selected.
         if (!document.containsElement(target)) return;
+        // The data-change listener has already written every keystroke, so by the time the editor
+        // closes this value is usually the one the model holds. Writing it again snapshotted an
+        // edit with nothing in it, and the next Undo restored the same text and looked broken --
+        // worse when Undo is what closed the editor, since the asynchronous completion then landed
+        // after the revert and put the text back.
+        String current = target.getAttribute(attribute);
+        String settled = value == null ? "" : value;
+        if (settled.equals(current == null ? "" : current)) return;
         document.select(target);
         document.setAttribute(attribute, value);
         updatePreviewAttribute(target, attribute, value);
