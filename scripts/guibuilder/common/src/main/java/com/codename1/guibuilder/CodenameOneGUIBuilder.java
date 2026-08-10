@@ -6014,11 +6014,6 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     /**
-     * @param text the text to scan
-     * @param from the index to start at
-     * @return the index of the first character at or after from that is not whitespace
-     */
-    /**
      * Steps over a {@code throws} clause so the caller sees the body brace behind it.
      *
      * @param code the source with comments and literals already masked
@@ -6041,6 +6036,11 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         return from;
     }
 
+    /**
+     * @param text the text to scan
+     * @param from the index to start at
+     * @return the index of the first character at or after from that is not whitespace
+     */
     private static int skipSpaces(String text, int from) {
         int at = from;
         // Line terminators too. The comment at the call site claimed Allman bracing was handled
@@ -6204,6 +6204,20 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         int legacyStart = existing.indexOf(LEGACY_GENERATED_START);
         int legacyEnd = existing.indexOf(LEGACY_GENERATED_END);
         if (legacyStart < 0 || legacyEnd < legacyStart) return null;
+        // Migration rebuilds the header from the .gui, so a companion customised to extend a
+        // project base class would have lost it on the first save, along with whatever that base
+        // class did at runtime and any inherited API the carried methods call. A base class this
+        // generator cannot reproduce -- it emits super(title, layout), which a base class does not
+        // inherit -- is refused instead: returning null leaves the file exactly as it is, which is
+        // recoverable, where silently rewriting the declaration is not.
+        String header = legacyClassHeader(existing);
+        String base = headerClause(header, "extends");
+        String expected = expectedSuperClass();
+        if (base.length() > 0 && !expected.equals(simpleTypeName(base))) {
+            setStatus("Cannot migrate " + className(existing) + ": it extends " + base + " rather than "
+                    + expected + " - the file was left untouched");
+            return null;
+        }
         String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
         // Legacy generated companions named their fields gui_<name>; the new generator uses
         // <name>. Developer methods carried out of the old file legally referenced the old names,
@@ -6214,12 +6228,91 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // delegating one is carried into the user region, where later saves preserve it.
         carried = carried + legacyResourcesConstructor(existing);
         String marker = "// <gui-builder-user-code>";
-        if (carried.length() == 0) return carriedImports(existing, generated);
-        String merged = carriedImports(existing, dropStubsAlreadyWritten(generated, carried));
+        // The interfaces come across even when the body does not: dropping "implements Observer"
+        // silently changed what the class is to every caller and left the carried methods
+        // implementing nothing.
+        String withHeader = carryImplements(generated, headerClause(header, "implements"));
+        if (carried.length() == 0) return carriedImports(existing, withHeader);
+        String merged = carriedImports(existing, dropStubsAlreadyWritten(withHeader, carried));
         int insert = merged.indexOf(marker);
         if (insert < 0) return merged;
         insert += marker.length();
         return merged.substring(0, insert) + "\n" + carried + "\n" + merged.substring(insert);
+    }
+
+    /** The superclass this generator emits for the open document's root type. */
+    private String expectedSuperClass() {
+        String rootType = value(document.root(), "type", "Form");
+        return "Container".equals(rootType) ? "Container" : "Dialog".equals(rootType) ? "Dialog" : "Form";
+    }
+
+    /**
+     * The declaration between a legacy class's name and its body brace, such as
+     * {@code extends BaseForm implements Observer}.
+     *
+     * @param existing the legacy companion source
+     * @return the header text, or an empty string when there is none
+     */
+    private String legacyClassHeader(String existing) {
+        String code = stripComments(existing);
+        int at = classDeclaration(existing);
+        if (at < 0 || at == 0 && !existing.startsWith("class ")) return "";
+        int start = at + "class ".length();
+        while (start < code.length() && isIdentifierChar(code.charAt(start))) start++;
+        int brace = code.indexOf('{', start);
+        return brace < 0 ? "" : code.substring(start, brace).trim();
+    }
+
+    /**
+     * The types listed after {@code extends} or {@code implements} in a class header.
+     *
+     * @param header the text between the class name and the body brace
+     * @param keyword {@code extends} or {@code implements}
+     * @return the types, still comma separated, or an empty string
+     */
+    private static String headerClause(String header, String keyword) {
+        int at = header.indexOf(keyword);
+        // A whole word: "implementsFoo" is a type name, and "extends" cannot follow one either.
+        while (at >= 0
+                && (at > 0 && isIdentifierChar(header.charAt(at - 1))
+                        || at + keyword.length() < header.length()
+                                && isIdentifierChar(header.charAt(at + keyword.length())))) {
+            at = header.indexOf(keyword, at + keyword.length());
+        }
+        if (at < 0) return "";
+        String rest = header.substring(at + keyword.length());
+        int next = "extends".equals(keyword) ? rest.indexOf("implements") : -1;
+        return (next < 0 ? rest : rest.substring(0, next)).trim();
+    }
+
+    /**
+     * The name a type is referred to by, without its package or type arguments.
+     *
+     * @param type the declared type
+     * @return the simple name
+     */
+    private static String simpleTypeName(String type) {
+        String out = type.trim();
+        int generic = out.indexOf('<');
+        if (generic >= 0) out = out.substring(0, generic).trim();
+        int dot = out.lastIndexOf('.');
+        return dot < 0 ? out : out.substring(dot + 1);
+    }
+
+    /**
+     * Puts a legacy class's interfaces back on the regenerated declaration.
+     *
+     * @param generated the freshly generated source
+     * @param interfaces the comma separated list, or an empty string
+     * @return the source with the interfaces declared
+     */
+    private static String carryImplements(String generated, String interfaces) {
+        if (interfaces.length() == 0) return generated;
+        int at = generated.indexOf("\npublic class ");
+        if (at < 0) return generated;
+        int brace = generated.indexOf('{', at);
+        if (brace < 0) return generated;
+        return generated.substring(0, brace) + "implements " + interfaces + " " + generated.substring(brace);
     }
 
     /**
@@ -6425,10 +6518,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             int index = constructorAt(out, className, from);
             if (index < 0) return out;
             char before = index == 0 ? ' ' : out.charAt(index - 1);
+            int open = out.indexOf("(", index);
+            int parametersEnd = matchingParenthesis(out, open);
             int close = matchingBrace(out, out.indexOf(")", index));
             boolean instantiation = index >= 4 && "new ".equals(out.substring(index - 4, index));
-            if (isIdentifierChar(before) || before == '.' || instantiation || close < 0) {
+            if (isIdentifierChar(before) || before == '.' || instantiation || close < 0 || parametersEnd < 0) {
                 from = index + className.length();
+                continue;
+            }
+            // Only the scaffold's own constructors go. Removing every one of them deleted overloads
+            // the developer wrote -- LoginForm(String title) { this(); setTitle(title); } -- on the
+            // first save, silently, and broke their callers. What has to go is what the generated
+            // class will declare or has replaced: the no-arg constructor, the (Resources) one that
+            // legacyResourcesConstructor() re-adds as a delegate, and anything still calling the
+            // initGuiBuilderComponents that no longer exists.
+            String parameters = out.substring(open + 1, parametersEnd);
+            boolean scaffolded = parameters.trim().length() == 0
+                    || parameters.indexOf("Resources") >= 0
+                    || out.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0;
+            if (!scaffolded) {
+                from = close + 1;
                 continue;
             }
             int lineStart = out.lastIndexOf("\n", index);

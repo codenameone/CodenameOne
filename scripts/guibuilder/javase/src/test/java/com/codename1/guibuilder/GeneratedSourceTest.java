@@ -454,6 +454,59 @@ class GeneratedSourceTest {
         return field.get(target);
     }
 
+    @Test
+    void migrationKeepsTheDevelopersOwnConstructors() throws Exception {
+        // The scaffold's constructors go because the generated class declares its own; an overload
+        // the developer added is theirs, and deleting it silently on the first save broke callers
+        // that had nothing to do with the GUI builder.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "    public LoginForm() {\n        initGuiBuilderComponents();\n    }\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm(String heading) {\n"
+                + "        this();\n        setTitle(heading);\n    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder, legacy, invoke(builder, "defaultCompanionSource"));
+
+        assertTrue(migrated.contains("LoginForm(String heading)"),
+                "the developer's overload must survive migration:\n" + migrated);
+        assertFalse(migrated.contains("initGuiBuilderComponents"),
+                "the scaffolded constructor must not:\n" + migrated);
+        int noArg = migrated.indexOf("public LoginForm() {");
+        assertTrue(noArg >= 0 && migrated.indexOf("public LoginForm() {", noArg + 1) < 0,
+                "exactly one no-arg constructor:\n" + migrated);
+        compile("LoginForm", migrated, null);
+    }
+
+    @Test
+    void migrationCarriesInterfacesAndRefusesAnUnknownBaseClass() throws Exception {
+        CodenameOneGUIBuilder builder = builder("none");
+        String head = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import java.util.Observer;\nimport java.util.Observable;\n";
+        String body = "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public void update(Observable o, Object arg) {\n    }\n"
+                + "}\n";
+
+        String migrated = migrate(builder,
+                head + "public class LoginForm extends Form implements Observer {\n" + body,
+                invoke(builder, "defaultCompanionSource"));
+        assertTrue(migrated.contains("implements Observer"),
+                "dropping the interface changes what the class is to every caller:\n" + migrated);
+        compile("LoginForm", migrated, null);
+
+        // A base class this generator cannot reproduce -- it emits super(title, layout), which is
+        // not inherited -- is refused rather than silently replaced.
+        String custom = head + "public class LoginForm extends BaseForm implements Observer {\n" + body;
+        assertNull(migrate(builder, custom, invoke(builder, "defaultCompanionSource")),
+                "a custom base class must stop the migration, leaving the file untouched");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
