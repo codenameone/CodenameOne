@@ -221,12 +221,17 @@ public class CodeView extends EditorView {
         String source = getDocument().getText();
         int searchFrom = 0;
         while (searchFrom < source.length()) {
-            int protectedStart = markerLine(source, protectedStartMarker, searchFrom);
-            if (protectedStart < 0) {
+            int markerAt = markerLine(source, protectedStartMarker, searchFrom);
+            if (markerAt < 0) {
                 return false;
             }
+            // From the start of the marker's line, not the marker text: an insertion in the
+            // indentation before it, or a deletion of the newline that ends the line above, leaves
+            // the marker sharing a line with something else, and markerLine() then cannot find it
+            // at all -- which unprotects the whole generated block behind it.
+            int protectedStart = source.lastIndexOf('\n', markerAt) + 1;
             int endMarker = markerLine(source, protectedEndMarker,
-                    protectedStart + protectedStartMarker.length());
+                    markerAt + protectedStartMarker.length());
             int protectedEnd = endMarker < 0
                     ? source.length() : endOfLine(source, endMarker + protectedEndMarker.length());
             // protectedEnd is the newline that ends the marker line, so a caret on the next line is
@@ -235,11 +240,12 @@ public class CodeView extends EditorView {
             // let a keystroke land between the marker and its newline -- which turns the marker
             // into ordinary text, and the next scan then protects everything to the end of the
             // file, the user's own region included.
-            // Inclusive of protectedEnd, which is the newline itself: a caret between the marker
-            // text and that newline is still on the marker line. The first editable offset is the
-            // start of the next line.
+            // Inclusive at both ends. protectedEnd is the newline itself, so a caret between the
+            // marker text and that newline is still on the marker line; a range ending exactly at
+            // protectedStart is deleting the newline in front of it. The first editable offset is
+            // the start of the line after the block.
             if ((start == end && start >= protectedStart && start <= protectedEnd)
-                    || (start <= protectedEnd && end > protectedStart)) {
+                    || (start <= protectedEnd && end >= protectedStart)) {
                 return true;
             }
             searchFrom = protectedEnd + 1;

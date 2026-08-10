@@ -674,6 +674,50 @@ class GeneratedSourceTest {
                 "two parameters are still two parameters");
     }
 
+    @Test
+    void adamagedUserCodeMarkerRefusesRatherThanWipingTheUserRegion() throws Exception {
+        // The source pane leaves the generated regions editable on purpose, so a stray keystroke on
+        // a marker line is easy. Reading that as "the user region is empty" replaced the file with
+        // the template and every method the developer had written went with it.
+        CodenameOneGUIBuilder builder = builder("none");
+        String generated = invoke(builder, "defaultCompanionSource");
+        String withUserCode = generated.replace("// <gui-builder-user-code>",
+                "// <gui-builder-user-code>\n    public void mine() { }");
+        String damaged = withUserCode.replace("// </gui-builder-user-code>", "// </gui-builder-user-codeX>");
+
+        String merged = merge(builder, damaged, generated);
+
+        assertTrue(merged.contains("public void mine() { }"),
+                "the developer's method must survive a damaged marker:\n" + merged);
+        assertEquals(damaged, merged, "nothing is rewritten while the markers are broken");
+    }
+
+    @Test
+    void aScaffoldSignatureWithExtraSetupStopsTheMigration() throws Exception {
+        // Same signature the scaffold used, but the developer added to it, and neither the
+        // generated constructor nor the delegate puts those statements back.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm() {\n"
+                + "        initGuiBuilderComponents();\n"
+                + "        setTitle(loadTitle());\n"
+                + "    }\n"
+                + "    private String loadTitle() { return \"Login\"; }\n"
+                + "}\n";
+
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "the migration must refuse rather than drop setTitle(loadTitle())");
+
+        // The untouched scaffold is still migrated, or every legacy project would be refused.
+        String plain = legacy.replace("        setTitle(loadTitle());\n", "");
+        assertNotNull(migrate(builder, plain, invoke(builder, "defaultCompanionSource")),
+                "a constructor that only does what the scaffold did is still removable");
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);

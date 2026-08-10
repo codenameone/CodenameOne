@@ -98,6 +98,29 @@ class SourceEditingTest {
                 "the marker line survived intact");
     }
 
+    @Test void theStartMarkerLineIsProtectedFromBothSides() {
+        // Insert into the indentation before a marker, or delete the newline that ends the line
+        // above it, and the marker stops owning its line -- markerLine() then cannot find it and
+        // the generated block behind it becomes freely editable.
+        String indented = "package com.example;\n"
+                + "    // <gui-builder-generated>\n"
+                + "    int generated;\n"
+                + "    // </gui-builder-generated>\n";
+        CodePureEditor editor = new CodePureEditor(new Host(), "java");
+        CodeView view = (CodeView) editor.getView();
+        editor.cmd("setText", indented);
+        editor.cmd("setProtectedMarkers", "// <gui-builder-generated>\n// </gui-builder-generated>");
+        int lineStart = indented.indexOf("    // <gui-builder-generated>");
+
+        view.replaceRange(lineStart, lineStart, "X");
+        assertFalse(editor.query("getText", null).contains("X    // <gui-builder-generated>"),
+                "the indentation in front of a marker is part of its line");
+
+        view.replaceRange(lineStart - 1, lineStart, "");
+        assertTrue(editor.query("getText", null).contains(";\n    // <gui-builder-generated>"),
+                "the newline in front of a marker keeps it on its own line");
+    }
+
     private static final class Host implements EditorHost {
         @Override
         public boolean isTextInputSupported() {

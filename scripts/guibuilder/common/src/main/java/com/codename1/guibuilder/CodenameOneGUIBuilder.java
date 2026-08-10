@@ -4773,7 +4773,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             String xml = document.toXml();
             String existingCompanion = ProjectIO.exists(sourcePath) ? ProjectIO.read(sourcePath) : null;
             String companion = companionSourceFor(existingCompanion);
-            if (legacyMigrationBlocked()) return false;
+            if (companionSaveBlocked()) return false;
             boolean rewriteModel = regenerateModelFor == document; //NOPMD CompareObjectsWithEquals
             String model = rewriteModel ? generatedModelSource() : null;
             if (!rewriteModel && !"none".equals(value(document.root(), "bindingStrategy", "properties"))
@@ -5177,8 +5177,8 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
     }
 
-    /** Why the open form's legacy companion cannot be migrated, or null when there is no reason. */
-    private String legacyMigrationRefusal;
+    /** Why the companion cannot be regenerated, or null when it can. */
+    private String companionRefusal;
 
     /**
      * True when the companion cannot be regenerated, so a save must fail rather than write the
@@ -5186,10 +5186,10 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      *
      * @return true when the caller must abort
      */
-    private boolean legacyMigrationBlocked() {
-        if (legacyMigrationRefusal == null) return false;
-        ToastBar.showErrorMessage("Save failed: " + legacyMigrationRefusal);
-        setStatus(legacyMigrationRefusal);
+    private boolean companionSaveBlocked() {
+        if (companionRefusal == null) return false;
+        ToastBar.showErrorMessage("Save failed: " + companionRefusal);
+        setStatus(companionRefusal);
         return true;
     }
 
@@ -5203,7 +5203,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      */
     private String companionSourceFor(String userSource) {
         // Cleared on the way in so the answer always describes the file being written now.
-        legacyMigrationRefusal = null;
+        companionRefusal = null;
         String generated = defaultCompanionSource();
         String merged = userSource == null ? generated : mergeGeneratedSource(userSource, generated);
         // buildUI() emits addActionListener(this::handler) for every configured event, so a handler
@@ -5288,7 +5288,7 @@ public class CodenameOneGUIBuilder extends Lifecycle {
                 && !ProjectIO.exists(modelPath);
         try {
             String companion = companionSourceFor(source);
-            if (legacyMigrationBlocked()) {
+            if (companionSaveBlocked()) {
                 setStatus("Save refused; nothing was written");
                 return;
             }
@@ -6169,12 +6169,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
     }
 
     private String mergeGeneratedSource(String existing, String generated) {
+        // Each attempt answers for itself. Leaving this to companionSourceFor() meant a refusal
+        // recorded by one merge was still standing for the next, so a file that regenerates
+        // perfectly well was refused because a previous one could not be.
+        companionRefusal = null;
         String startMarker = "// <gui-builder-user-code>";
         String endMarker = "// </gui-builder-user-code>";
         int oldStart = markerLine(existing, startMarker, 0);
         int oldEnd = markerLine(existing, endMarker, oldStart < 0 ? 0 : oldStart);
         if (oldStart < 0 || oldEnd < oldStart) {
-            if (existing.indexOf("// Generated live from ") >= 0) return generated;
+            if (existing.indexOf("// Generated live from ") >= 0) {
+                // One of ours with its markers damaged. The source pane deliberately leaves the
+                // generated regions editable, so a stray keystroke on a marker line is easy, and
+                // reading that as "the user region is empty" replaced the whole file with the
+                // template -- every method the developer had written, gone on the next save.
+                companionRefusal = "Cannot regenerate " + className(existing)
+                        + ": its user-code markers are missing or out of order - restore"
+                        + " // <gui-builder-user-code> and // </gui-builder-user-code>";
+                setStatus(companionRefusal);
+                return existing;
+            }
             String migrated = migrateLegacySource(existing, generated);
             return migrated != null ? migrated : existing;
         }
@@ -6238,6 +6252,47 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             at = end;
         }
         return out.toString();
+    }
+
+    /**
+     * True when a constructor body does more than the old scaffold's did.
+     *
+     * <p>The scaffold only chained and called its initializer, and both are reproduced by the
+     * generated constructor or the delegate. Anything else is the developer's, and nothing puts it
+     * back, so the caller refuses rather than deleting it with the constructor.
+     *
+     * @param body the constructor's text, from its parameter list to its closing brace
+     * @return true when a statement would be lost by removing the constructor
+     */
+    private static boolean hasCustomConstructorBody(String body) {
+        int open = body.indexOf('{');
+        if (open < 0) return false;
+        String statements = stripComments(body.substring(open + 1));
+        int at = 0;
+        int start = 0;
+        int depth = 0;
+        while (at < statements.length()) {
+            char c = statements.charAt(at);
+            if (c == '(' || c == '{') depth++;
+            else if (c == ')' || c == '}') depth--;
+            if (c == ';' && depth <= 0) {
+                if (isCustomStatement(statements.substring(start, at))) return true;
+                start = at + 1;
+            }
+            at++;
+        }
+        return isCustomStatement(statements.substring(Math.min(start, statements.length())));
+    }
+
+    /** True for a statement the scaffold would not have written. */
+    private static boolean isCustomStatement(String statement) {
+        String only = statement.trim();
+        if (only.length() == 0 || "}".equals(only)) return false;
+        while (only.endsWith("}")) only = only.substring(0, only.length() - 1).trim();
+        return only.length() != 0
+                && !only.startsWith("initGuiBuilderComponents")
+                && !only.startsWith("super(")
+                && !only.startsWith("this(");
     }
 
     /**
@@ -6314,6 +6369,9 @@ public class CodenameOneGUIBuilder extends Lifecycle {
      * @return the migrated source, or null when this is not a legacy scaffolded file
      */
     String migrateLegacySource(String existing, String generated) {
+        // Self-contained, like mergeGeneratedSource(): this is reachable on its own, and a refusal
+        // left over from the previous file must not decide this one.
+        companionRefusal = null;
         int legacyStart = existing.indexOf(LEGACY_GENERATED_START);
         int legacyEnd = existing.indexOf(LEGACY_GENERATED_END);
         if (legacyStart < 0 || legacyEnd < legacyStart) return null;
@@ -6331,15 +6389,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // companion", which is right for a hand-written file and wrong here: the save went on
             // to write the .gui, mark the document clean and report success while the Java the
             // application actually runs never changed, so the edits looked saved and were not.
-            legacyMigrationRefusal = "Cannot migrate " + className(existing) + ": it extends " + base
+            companionRefusal = "Cannot migrate " + className(existing) + ": it extends " + base
                     + " rather than " + expected + " - the file was left untouched";
-            setStatus(legacyMigrationRefusal);
+            setStatus(companionRefusal);
             return null;
         }
         String carried = legacyUserMembers(existing, legacyStart, legacyEnd);
         // removeConstructors() refuses here rather than deleting a customised constructor, and the
         // refusal has to stop the migration the same way an unknown base class does.
-        if (legacyMigrationRefusal != null) return null;
+        if (companionRefusal != null) return null;
         // Legacy generated companions named their fields gui_<name>; the new generator uses
         // <name>. Developer methods carried out of the old file legally referenced the old names,
         // so rewriting them here is what keeps the migrated companion compiling.
@@ -6660,15 +6718,26 @@ public class CodenameOneGUIBuilder extends Lifecycle {
             // with a different signature, so the developer's constructor and its body were gone.
             boolean scaffolded = parameters.trim().length() == 0
                     || isSingleParameterOfType(parameters, "Resources");
+            // The signature alone is not enough. A developer who added setup to the scaffolded
+            // constructor -- this(resources); setTitle(loadTitle()); -- loses it, because the
+            // generated replacement and the delegate know nothing about those statements.
+            if (scaffolded && hasCustomConstructorBody(out.substring(parametersEnd, close))) {
+                companionRefusal = "Cannot migrate " + className + ": its "
+                        + (parameters.trim().length() == 0 ? "no-argument" : parameters.trim())
+                        + " constructor does more than the scaffold did, and nothing generated"
+                        + " replaces that - the file was left untouched";
+                setStatus(companionRefusal);
+                return body;
+            }
             // A signature the generated class does not provide, whose body calls the initializer
             // that no longer exists, cannot be deleted and cannot be kept: nothing replaces it, and
             // the call it makes is gone. Recorded so migration refuses, which leaves the file
             // intact -- deleting it took the developer's own logic with the signature.
             if (!scaffolded && out.substring(parametersEnd, close).indexOf("initGuiBuilderComponents") >= 0) {
-                legacyMigrationRefusal = "Cannot migrate " + className + ": its "
+                companionRefusal = "Cannot migrate " + className + ": its "
                         + parameters.trim() + " constructor calls initGuiBuilderComponents, which this"
                         + " generator does not produce - the file was left untouched";
-                setStatus(legacyMigrationRefusal);
+                setStatus(companionRefusal);
                 return body;
             }
             if (!scaffolded) {
