@@ -6461,7 +6461,19 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         // The exact call, not a prefix: initGuiBuilderComponentsExtra() is the developer's helper
         // and would have gone with the constructor.
         int paren = only.indexOf('(');
-        return paren < 0 || !"initGuiBuilderComponents".equals(only.substring(0, paren).trim());
+        if (paren < 0 || !"initGuiBuilderComponents".equals(only.substring(0, paren).trim())) return true;
+        // And only the arguments the scaffold passed. initGuiBuilderComponents(
+        // registerAndGetResources()) runs the developer's helper for its side effects, and
+        // removing the constructor runs nothing at all.
+        int close = only.lastIndexOf(')');
+        if (close < paren) return true;
+        String arguments = withoutSpaces(only.substring(paren + 1, close));
+        return arguments.length() != 0
+                && !"Resources.getGlobalResources()".equals(arguments)
+                && !"com.codename1.ui.util.Resources.getGlobalResources()".equals(arguments)
+                && !"res".equals(arguments)
+                && !"resources".equals(arguments)
+                && !"resourceObjectInstance".equals(arguments);
     }
 
     /** The statement with its whitespace removed, for comparing against a canonical form. */
@@ -6609,7 +6621,15 @@ public class CodenameOneGUIBuilder extends Lifecycle {
         }
         String base = headerClause(header, "extends");
         String expected = expectedSuperClass();
-        if (base.length() > 0 && !expected.equals(simpleTypeName(base))) {
+        // Qualified names are compared whole: "extends com.acme.Form" has the simple name the
+        // generator wants and is a different class, and the rebuilt declaration would resolve Form
+        // out of com.codename1.ui.* instead -- the base class and everything the carried members
+        // inherit from it gone without a word.
+        boolean qualified = base.indexOf('.') >= 0;
+        String comparable = qualified ? base.trim() : simpleTypeName(base);
+        boolean isCodenameOneType = expected.equals(comparable)
+                || ("com.codename1.ui." + expected).equals(comparable);
+        if (base.length() > 0 && !isCodenameOneType) {
             // Recorded, not just announced. mergeGeneratedSource() reads null as "keep the existing
             // companion", which is right for a hand-written file and wrong here: the save went on
             // to write the .gui, mark the document clean and report success while the Java the

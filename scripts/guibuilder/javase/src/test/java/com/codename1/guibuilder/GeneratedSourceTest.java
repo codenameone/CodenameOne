@@ -1189,6 +1189,51 @@ class GeneratedSourceTest {
         compile("LoginForm", form, model);
     }
 
+    @Test
+    void aQualifiedSuperclassWithTheSameSimpleNameIsStillCustom() throws Exception {
+        // "extends com.acme.Form" has the simple name the generator wants; the rebuilt declaration
+        // would resolve Form out of com.codename1.ui.* and the real base class would be gone.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "public class LoginForm extends com.acme.Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a different class with a familiar name is still a different class");
+
+        // The real one, qualified or not, still migrates.
+        assertNotNull(migrate(builder, legacy.replace("com.acme.Form", "com.codename1.ui.Form"),
+                invoke(builder, "defaultCompanionSource")));
+        assertNotNull(migrate(builder, legacy.replace("com.acme.Form", "Form"),
+                invoke(builder, "defaultCompanionSource")));
+    }
+
+    @Test
+    void aCustomInitializerArgumentStopsTheMigration() throws Exception {
+        // initGuiBuilderComponents(registerAndGetResources()) runs the developer's helper for its
+        // side effects; removing the constructor runs nothing at all.
+        CodenameOneGUIBuilder builder = builder("none");
+        String legacy = "package com.example;\n"
+                + "import com.codename1.ui.Form;\n"
+                + "import com.codename1.ui.util.Resources;\n"
+                + "public class LoginForm extends Form {\n"
+                + "//-- DON'T EDIT BELOW THIS LINE!!!\n"
+                + "//-- DON'T EDIT ABOVE THIS LINE!!!\n"
+                + "    public LoginForm() { initGuiBuilderComponents(registerAndGetResources()); }\n"
+                + "    private static Resources registerAndGetResources() { return null; }\n"
+                + "}\n";
+        assertNull(migrate(builder, legacy, invoke(builder, "defaultCompanionSource")),
+                "a custom argument is a call the migration would silently drop");
+
+        // The scaffold's own forms are still scaffolding.
+        for (String argument : new String[]{"", "Resources.getGlobalResources()", "res"}) {
+            String scaffold = legacy.replace("registerAndGetResources()", argument);
+            assertNotNull(migrate(builder, scaffold, invoke(builder, "defaultCompanionSource")),
+                    "initGuiBuilderComponents(" + argument + ") is what the scaffold wrote");
+        }
+    }
+
     private static String migrate(CodenameOneGUIBuilder builder, String existing, String generated) throws Exception {
         Method method = CodenameOneGUIBuilder.class.getDeclaredMethod("migrateLegacySource", String.class, String.class);
         method.setAccessible(true);
