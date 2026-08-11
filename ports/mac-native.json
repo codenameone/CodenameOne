@@ -1,48 +1,48 @@
 {
-  "commit": "aa800d2306a5b59648f8d13c6f9462acb8658c63",
-  "generated_at": "2026-08-11T05:40:54Z",
+  "commit": "b27a2a502decf0910778caed2ac7c210d5411985",
+  "generated_at": "2026-08-11T15:00:14Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 260022000
+        "duration_ns": 374044000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 20390000
+        "duration_ns": 30671000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 54483000
+        "duration_ns": 82721000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 105222000
+        "duration_ns": 130474000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 66162000
+        "duration_ns": 80328000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 285737000
+        "duration_ns": 374021000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 356619000
+        "duration_ns": 424092000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 117084000
+        "duration_ns": 147008000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 142295000
+        "duration_ns": 158274000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 70116000
+        "duration_ns": 79018000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -52,13 +52,13 @@
     "suite_checksum": 0
   },
   "port": "mac-native",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31454718732",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/31500116827",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 1,
+    "fail": 0,
     "not-run": 0,
-    "pass": 165,
+    "pass": 166,
     "skip": 5
   },
   "tests": {
@@ -545,10 +545,7 @@
     },
     "SVGStaticScreenshotTest": {
       "feature": "svg-lottie",
-      "reasons": [
-        "screenshot-different:SVGStatic"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "Scale": {
       "feature": "graphics-2d-transforms",
