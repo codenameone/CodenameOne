@@ -764,20 +764,21 @@ class WatchNativeBuilder {
         }
         int at = 0;
         while (true) {
-            int open = nextMarkup(inject, "<key>", at);
-            if (open < 0) {
+            int content = contentAfterOpenTag(inject, "key", at);
+            if (content < 0) {
                 return out;
             }
-            int close = closeOfElement(inject, open + "<key>".length(), "</key>");
+            int close = closeOfElement(inject, content, "</key>");
             if (close < 0) {
                 return out;
             }
-            String key = plistStringContent(
-                    inject.substring(open + "<key>".length(), close)).trim();
+            String key = plistStringContent(inject.substring(content, close)).trim();
             if (key.length() > 0 && !out.contains(key)) {
                 out.add(key);
             }
-            at = close + "</key>".length();
+            // Past the content, not past a fixed-width end tag: `</key >` is longer than `</key>`
+            // and the scan for the next opening tag skips whatever sits between them anyway.
+            at = close + 1;
         }
     }
 
@@ -795,29 +796,27 @@ class WatchNativeBuilder {
         // different marketing versions, which archive validation rejects.
         int at = 0;
         while (true) {
-            int open = nextMarkup(inject, "<key>", at);
-            if (open < 0) {
+            int content = contentAfterOpenTag(inject, "key", at);
+            if (content < 0) {
                 return null;
             }
-            int close = closeOfElement(inject, open + "<key>".length(), "</key>");
+            int close = closeOfElement(inject, content, "</key>");
             if (close < 0) {
                 return null;
             }
-            at = close + "</key>".length();
-            if (!key.equals(plistStringContent(
-                    inject.substring(open + "<key>".length(), close)).trim())) {
+            at = close + 1;
+            if (!key.equals(plistStringContent(inject.substring(content, close)).trim())) {
                 continue;
             }
-            int valueOpen = nextMarkup(inject, "<string>", at);
-            if (valueOpen < 0) {
+            int valueContent = contentAfterOpenTag(inject, "string", at);
+            if (valueContent < 0) {
                 return null;
             }
-            int valueClose = closeOfString(inject, valueOpen + "<string>".length());
+            int valueClose = closeOfString(inject, valueContent);
             if (valueClose < 0) {
                 return null;
             }
-            return plistStringContent(
-                    inject.substring(valueOpen + "<string>".length(), valueClose));
+            return plistStringContent(inject.substring(valueContent, valueClose));
         }
     }
 
@@ -837,6 +836,49 @@ class WatchNativeBuilder {
     /// ignores it. A raw indexOf did not: the watch took the commented version while the app it is
     /// embedded in kept its real one, and archive validation rejects that mismatch. CDATA is the
     /// same story from the other side: {@code <![CDATA[<key>x</key>]]>} is text, not an element.
+    /// The end of the next real opening tag for an element, or -1.
+    ///
+    /// Returns where its CONTENT starts, because an opening tag is not a fixed width: `<key >` is
+    /// the same element as `<key>` to an XML parser, and the literal search missed it -- the phone
+    /// accepted the override and the watch fell back to its generated version, which is the
+    /// mismatch archive validation rejects.
+    private static int contentAfterOpenTag(String inject, String element, int from) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("<" + element + "(?:\\s[^>]*)?>")
+                .matcher(inject);
+        int i = from;
+        while (i <= inject.length() && m.find(i)) {
+            int at = m.start();
+            int skipped = skipMarkupBefore(inject, at, i);
+            if (skipped == at) {
+                return m.end();
+            }
+            if (skipped < 0) {
+                return -1;
+            }
+            i = skipped;
+        }
+        return -1;
+    }
+
+    /// Where to resume scanning so that `at` is not inside a comment or a CDATA section.
+    ///
+    /// Returns `at` when it is already outside both, the position just past the enclosing
+    /// construct when it is not, and -1 when that construct never ends.
+    private static int skipMarkupBefore(String inject, int at, int from) {
+        int cdata = inject.indexOf(CDATA_OPEN, from);
+        int comment = inject.indexOf(COMMENT_OPEN, from);
+        boolean cdataFirst = cdata >= 0 && (comment < 0 || cdata < comment);
+        int skipFrom = cdataFirst ? cdata : comment;
+        if (skipFrom < 0 || skipFrom > at) {
+            return at;
+        }
+        String opener = cdataFirst ? CDATA_OPEN : COMMENT_OPEN;
+        String closer = cdataFirst ? CDATA_CLOSE : COMMENT_CLOSE;
+        int end = inject.indexOf(closer, skipFrom + opener.length());
+        return end < 0 ? -1 : end + closer.length();
+    }
+
     private static int nextMarkup(String inject, String tag, int from) {
         int i = from;
         while (i <= inject.length()) {
@@ -866,12 +908,18 @@ class WatchNativeBuilder {
 
     /// The end tag that closes an element, skipping over CDATA sections and comments.
     private static int closeOfElement(String inject, int from, String closeTag) {
+        // `</key >` closes the same element as `</key>`, so the tag is matched as a pattern rather
+        // than as literal text -- the same reason the opening tags are.
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile(java.util.regex.Pattern.quote(
+                        closeTag.substring(0, closeTag.length() - 1)) + "\\s*>")
+                .matcher(inject);
         int i = from;
         while (i <= inject.length()) {
-            int close = inject.indexOf(closeTag, i);
-            if (close < 0) {
+            if (!m.find(i)) {
                 return -1;
             }
+            int close = m.start();
             int cdata = inject.indexOf(CDATA_OPEN, i);
             int comment = inject.indexOf(COMMENT_OPEN, i);
             // Whichever construct starts first, if either starts before the candidate end tag.

@@ -899,6 +899,30 @@ class WatchNativeBuilderTest {
                 "the tap-only gesture is what could not express a drag: " + swift);
     }
 
+    /**
+     * Whitespace inside a tag does not make it a different element.
+     *
+     * <p>{@code <key >CFBundleVersion</key >} is the same element to an XML parser, which is what
+     * reads the phone's plist -- so the phone took the override while the watch fell back to its
+     * generated version, and archive validation rejects that mismatch.</p>
+     */
+    @Test
+    void tagsAreMatchedAsElementsNotAsLiteralText(@TempDir Path tmp) throws IOException {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.putArgument("ios.plistInject",
+                "<key >CFBundleVersion</key ><string >42</string >");
+
+        assertEquals("42", WatchNativeBuilder.injectedPlistString(req, "CFBundleVersion"),
+                "a spaced opening tag names the same key an XML parser sees");
+        assertTrue(WatchNativeBuilder.injectedPlistKeys(req).contains("CFBundleVersion"),
+                "and the key scan has to agree with the lookup");
+
+        String plist = writeInfoPlist(req, tmp);
+        assertTrue(plist.contains("<key>CFBundleVersion</key>\n    <string>42</string>"),
+                "the watch takes the injected version: " + plist);
+    }
+
     /// The bootstrap has to call the stub that actually exists in the watch binary.
     @Test
     void theBootstrapEntersTheWatchStub(@TempDir Path tmp) throws Exception {

@@ -37,6 +37,40 @@ import static org.junit.Assert.assertNull;
  * namespace or a cloud build produces no watch app at all.
  */
 public class CN1BuildMojoSecondaryEntryPointTest {
+    /**
+     * A command-line override survives the mirror.
+     *
+     * <p>This runs after overlayCommandLineBuildHints, so a {@code -Dcodename1.arg.watchMain=...}
+     * is already in the properties -- and overwriting it with the project file's value made the
+     * standard build-argument override silently do nothing, sending the cloud the wrong lifecycle
+     * or a companion where a standalone Wear build was asked for.</p>
+     */
+    @Test
+    public void aCommandLineArgumentIsNotOverwrittenByTheProjectFile() {
+        Properties props = new Properties();
+        props.setProperty("codename1.watchMain", "com.acme.FromProjectFile");
+        props.setProperty("codename1.arg.watchMain", "com.acme.FromCommandLine");
+        props.setProperty("codename1.watchStandalone", "false");
+        props.setProperty("codename1.arg.watchStandalone", "true");
+
+        CN1BuildMojo.mirrorSecondaryEntryPointsToBuildArgs(props);
+
+        assertEquals("com.acme.FromCommandLine", props.getProperty("codename1.arg.watchMain"));
+        assertEquals("true", props.getProperty("codename1.arg.watchStandalone"));
+    }
+
+    /** A blank argument is not an override, so the project file still gets mirrored. */
+    @Test
+    public void aBlankArgumentDoesNotSuppressTheMirror() {
+        Properties props = new Properties();
+        props.setProperty("codename1.watchMain", "com.acme.FromProjectFile");
+        props.setProperty("codename1.arg.watchMain", "   ");
+
+        CN1BuildMojo.mirrorSecondaryEntryPointsToBuildArgs(props);
+
+        assertEquals("com.acme.FromProjectFile", props.getProperty("codename1.arg.watchMain"));
+    }
+
 
     @Test
     public void watchMainReachesTheBuildServer() {

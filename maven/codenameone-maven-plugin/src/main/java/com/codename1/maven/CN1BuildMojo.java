@@ -667,9 +667,23 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     static void mirrorSecondaryEntryPointsToBuildArgs(Properties props) {
         for (Map.Entry<String, String> entry : SECONDARY_ENTRY_POINTS.entrySet()) {
             String value = props.getProperty(entry.getKey());
-            if (value != null && value.trim().length() > 0) {
-                props.setProperty("codename1.arg." + entry.getValue(), value.trim());
+            if (value == null || value.trim().length() == 0) {
+                continue;
             }
+            String argKey = "codename1.arg." + entry.getValue();
+            // An existing value WINS. This runs after overlayCommandLineBuildHints, so a
+            // -Dcodename1.arg.watchMain=... passed on the command line is already sitting here --
+            // and overwriting it with the project file's codename1.watchMain made the standard
+            // build-argument override silently do nothing, handing the cloud the wrong lifecycle or
+            // a companion where a standalone Wear build was asked for.
+            //
+            // The mirror exists to carry a project-file setting into the args channel the daemon
+            // reads, which is only needed when nothing has put it there already.
+            String existing = props.getProperty(argKey);
+            if (existing != null && existing.trim().length() > 0) {
+                continue;
+            }
+            props.setProperty(argKey, value.trim());
         }
     }
 
