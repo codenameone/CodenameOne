@@ -72,13 +72,29 @@ public class AndroidDB extends Database {
      * change while something else holds the file.
      *
      * @param db the open connection
+     * @throws IOException if the file is mid-conversion, in which case the supplied connection is
+     * closed rather than handed back
      */
-    public AndroidDB(SQLiteDatabase db) {
-        this.db = db;
+    public AndroidDB(SQLiteDatabase db) throws IOException {
         this.openPath = db == null ? null : db.getPath();
         if (openPath != null) {
-            AndroidImplementation.databaseConnectionOpened(openPath);
+            try {
+                // The reservation, not the bare count: a conversion in progress is rewriting this
+                // file and swapping it under a rename, so a handle taken now reads and writes a
+                // file that is about to be replaced -- and anything it wrote goes with the copy
+                // that is discarded. The count alone does not refuse that.
+                AndroidImplementation.reserveDatabaseConnection(openPath);
+            } catch (IOException midConversion) {
+                // The caller cannot close what it was never given, so this does it.
+                try {
+                    db.close();
+                } catch (RuntimeException alsoFailed) {
+                    // The conversion failure is the one worth reporting.
+                }
+                throw midConversion;
+            }
         }
+        this.db = db;
     }
 
 
