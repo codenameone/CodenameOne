@@ -188,11 +188,30 @@ public abstract class RenderElement extends Element {
 
     /**
      * The subtree must repaint, but every measurement stays valid.
+     *
+     * <p>Repaints the REGION on the host container, not the component on its own.
+     * Codename One repaints a single component by painting its ancestors' backgrounds and
+     * then the component — which is sound in an ordinary tree, where a child is contained
+     * by its parent and siblings do not overlap. This runtime is the opposite: components
+     * are flat, absolutely-positioned siblings that deliberately overlap, so a card's
+     * artwork, the ink overlay on top of it and the gesture target are all peers. Painting
+     * one of them alone erases whichever peers share those pixels, and the frame reaches
+     * the screen carrying only part of what should be there.</p>
+     *
+     * <p>Repainting the region on the container instead redraws every sibling that
+     * intersects it, in order, which is what makes a partial repaint correct here.</p>
      */
     public void markNeedsPaint() {
-        if (component != null) {
-            component.repaint();
+        if (component == null) {
+            return;
         }
+        com.codename1.ui.Container parent = component.getParent();
+        if (parent == null) {
+            component.repaint();
+            return;
+        }
+        parent.repaint(component.getAbsoluteX(), component.getAbsoluteY(),
+                component.getWidth(), component.getHeight());
     }
 
     @Override
