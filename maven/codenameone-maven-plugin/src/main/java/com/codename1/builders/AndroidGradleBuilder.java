@@ -4192,6 +4192,13 @@ public class AndroidGradleBuilder extends Executor {
                     + "                <action android:name=\"com.google.android.gms.wearable.DATA_CHANGED\" />\n"
                     + "                <action android:name=\"com.google.android.gms.wearable.CAPABILITY_CHANGED\" />\n"
                     + "                <data android:scheme=\"wear\" android:host=\"*\" android:pathPrefix=\"/cn1\" />\n"
+                    // The acknowledgement namespace is NOT under /cn1, and a filter that lists only
+                    // that one never woke the sender when a receiver confirmed a delivery. Nothing
+                    // else arms the sender's sweep either -- the bridge registers no DataClient
+                    // listener -- so an acknowledged transfer stayed replicated on both devices
+                    // until the seven-day hard cap, or until the app happened to send another file
+                    // or restart. For a large file that is days of storage nobody is using.
+                    + "                <data android:scheme=\"wear\" android:host=\"*\" android:pathPrefix=\"/cnxk\" />\n"
                     + "            </intent-filter>\n"
                     + "        </service>\n";
         }

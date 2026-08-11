@@ -4406,6 +4406,28 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /// Arms the sender's sweep because a receiver has acknowledged one of our transfers.
+    ///
+    /// The acknowledgement is the only signal that a delivered file may be dropped early; without
+    /// it the sweep runs on the hard cap, days later. Coalesced through expireOwnTransfers like
+    /// every other caller, so a burst of acknowledgements adds no timer entries.
+    ///
+    /// A service process with no bridge yet still gets one: the sweep needs the DataClient, and
+    /// building the bridge here is what a cold acknowledgement-only wake-up is for.
+    static void sweepAfterAcknowledgement(Context context) {
+        CN1WearableBridge live = current;
+        if (live == null && context != null) {
+            try {
+                live = new CN1WearableBridge(context);
+            } catch (Throwable unavailable) {
+                return;
+            }
+        }
+        if (live != null) {
+            live.expireOwnTransfers();
+        }
+    }
+
     /**
      * Gives up the in-memory claim on a transfer that was never delivered.
      *

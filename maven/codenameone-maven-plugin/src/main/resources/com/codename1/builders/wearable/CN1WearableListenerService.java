@@ -232,6 +232,20 @@ public class CN1WearableListenerService extends WearableListenerService {
             // app code fire an extra callback on Android only, so an app that acts on a change
             // processed its own write twice.
             boolean transferItem = CN1WearableBridge.isTransferPath(path);
+            // A receiver's acknowledgement of one of OUR transfers. It is the event that says the
+            // file has been taken and our copy can go, and the sweep it arms is the only thing that
+            // removes that copy before the hard cap -- the bridge registers no DataClient listener
+            // of its own, so without this the sender sat on a delivered file for seven days unless
+            // it happened to send another or restart.
+            //
+            // Never an app-visible callback: it is bookkeeping between the two ports, on a path no
+            // application ever names.
+            if (path != null && CN1WearableBridge.ackedTransferKey(path) != null) {
+                if (isFromAKnownHost(uri) && event.getType() != DataEvent.TYPE_DELETED) {
+                    CN1WearableBridge.sweepAfterAcknowledgement(getApplicationContext());
+                }
+                continue;
+            }
             if (path == null || !isFromAKnownHost(uri)
                     || (!transferItem && !path.startsWith(CN1WearableBridge.pathPrefix()))) {
                 continue;
