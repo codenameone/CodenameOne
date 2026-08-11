@@ -40,8 +40,15 @@ public class TransformRenderElement extends EffectRenderElement {
         Double angle = transform().effectiveAngle();
         Offset offset = transform().effectiveOffset();
 
-        boolean scales = sx != 1.0 || sy != 1.0;
-        boolean rotates = angle != null && angle.doubleValue() != 0.0;
+        // A/B switch, flipped at runtime with
+        // Display.setProperty("cn1.flutter.noTransform","true"). Transform.scale is the
+        // main per-frame difference between the carousel (21-29fps on iOS) and a plain
+        // list (60fps), and a matrix set per card per frame is only measurable on a
+        // device. Same trick as cn1.flutter.noShapeClip.
+        boolean suppressed = "true".equals(com.codename1.ui.Display.getInstance()
+                .getProperty("cn1.flutter.noTransform", "false"));
+        boolean scales = !suppressed && (sx != 1.0 || sy != 1.0);
+        boolean rotates = !suppressed && angle != null && angle.doubleValue() != 0.0;
         boolean translates = offset != null && (offset.dx() != 0 || offset.dy() != 0);
         if (!scales && !rotates && !translates) {
             paintChildren.run();
