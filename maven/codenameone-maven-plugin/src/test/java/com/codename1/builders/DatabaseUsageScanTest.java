@@ -180,6 +180,18 @@ class DatabaseUsageScanTest {
     }
 
     @Test
+    void aPortImplementationCountsWhichIsWhyTheScanRunsBeforeThePortIsStaged() throws IOException {
+        // Not a rule so much as the record of one: a port's own database implementation extends
+        // Database, so a tree that already contains it answers yes for every application ever
+        // built and the gate silently stops gating. Every builder therefore scans the application
+        // tree before it merges its port into it. Reverse that order and this is what it sees.
+        writeClass("com/codename1/impl/html5/database/DatabaseImpl.class",
+                "com/codename1/db/Database");
+        assertTrue(executor.scanForDatabaseUsage(root).usesDatabase(),
+                "a port implementation is indistinguishable from an application that uses one");
+    }
+
+    @Test
     void theFrameworksOwnDatabaseClassesStillDoNotCount() throws IOException {
         writeClass("com/codename1/db/Database.class", "com/codename1/db/DatabaseConfig");
         writeClass("com/codename1/db/ThreadSafeDatabase.class", "com/codename1/db/DatabaseConfig");

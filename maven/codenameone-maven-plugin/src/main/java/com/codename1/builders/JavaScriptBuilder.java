@@ -120,6 +120,12 @@ public class JavaScriptBuilder extends Executor {
             stageSourceJar(sourceZip, stageClasses);
             stageJavaApi(stageClasses);
 
+            // Before the port is staged, and that is the whole point. The port's own
+            // DatabaseImpl extends Database, so once it is merged into this tree every
+            // application looks like a database user and nothing is ever pruned. The iOS,
+            // Windows and Linux builders scan at the same point for the same reason.
+            recordDatabaseUsage(stageClasses);
+
             File portSources = locateJavaScriptPortSources(request);
             File portClassesStaged = stageJavaScriptPort(request, portSources, stageClasses, portClasses);
 
@@ -221,7 +227,8 @@ public class JavaScriptBuilder extends Executor {
      */
     /**
      * True when the application references com.codename1.db, so the SQLite engine has to ship.
-     * Set by {@link #recordDatabaseUsage(File)} before the assets are pruned.
+     * Set by {@link #recordDatabaseUsage(File)} before the port is staged, and read when the
+     * port assets are pruned and when the launcher is written.
      */
     private boolean usesDatabase;
 
@@ -344,7 +351,6 @@ public class JavaScriptBuilder extends Executor {
                         delTree(stagedWebApp, true);
                     }
                     jsPortWebApp = dest;
-                    recordDatabaseUsage(stageClasses);
                     pruneOptionalPortAssets(dest, request);
                 }
                 return stageClasses;
@@ -385,9 +391,6 @@ public class JavaScriptBuilder extends Executor {
             throw new BuildException("Failed to compile JavaScript port sources");
         }
         copyTree(portClasses, stageClasses);
-        // The bundled-jar path above does this too. Without it here, a build from a source
-        // checkout never sets the flag and the compatibility default never applies.
-        recordDatabaseUsage(stageClasses);
         // Source-checkout build: the webapp sits next to the sources at src/main/webapp
         // (portSources is src/main/java). Copied into this build's work directory before it is
         // used, rather than pointed at in place: pruning is a delete, and the directory here

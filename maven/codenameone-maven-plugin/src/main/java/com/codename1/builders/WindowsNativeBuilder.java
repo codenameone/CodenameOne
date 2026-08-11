@@ -222,6 +222,26 @@ public class WindowsNativeBuilder extends Executor {
                     + "(WindowsPort.jar + nativewindows.jar) on its classpath.", ex);
         }
 
+        // The bundled SQLite engine is emitted only for applications that use com.codename1.db,
+        // and its cipher only for those that configure encryption, so nobody else pays for either.
+        // Attributed to the class that makes the reference: the tree scanned below is the
+        // application merged with the framework, and Display alone carries
+        // openOrCreate(String, DatabaseConfig), so a callback that cannot say who referenced what
+        // answers yes for every application ever built.
+        //
+        // Ahead of the stub generation below, which needs the answer: the generated bootstrap
+        // decides there whether to switch the database into compatibility mode, and it can only
+        // do that for an application it knows uses a database. Scanning afterwards would also
+        // read the stub's own reference back and call every application a database user.
+        DatabaseUsage databaseUsage;
+        try {
+            databaseUsage = scanForDatabaseUsage(classesDir);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for database usage", ex);
+        }
+        usesDatabase = databaseUsage.usesDatabase();
+        final boolean usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
+
         // Native interface binding + app bootstrap. Scan the app classes for
         // @NativeInterface implementors and generate, for each, an XxxStub bridge
         // (the NativeLookup target) plus an XxxImplCodenameOne carrying the native
@@ -251,18 +271,6 @@ public class WindowsNativeBuilder extends Executor {
         // path of cn1_windows_ble.c and ship cn1ble.dll next to the exe --
         // the usage-gated approach the iOS builder uses for CoreBluetooth.
         final boolean[] usesBluetoothHolder = {false};
-        // The bundled SQLite engine is emitted only for applications that use com.codename1.db,
-        // and its cipher only for those that configure encryption, so nobody else pays for either.
-        // Attributed to the class that makes the reference: the tree scanned below is the
-        // application merged with the framework, and Display alone carries
-        // openOrCreate(String, DatabaseConfig), so a callback that cannot say who referenced what
-        // answers yes for every application ever built.
-        DatabaseUsage databaseUsage;
-        try {
-            databaseUsage = scanForDatabaseUsage(classesDir);
-        } catch (IOException ex) {
-            throw new BuildException("Failed to scan for database usage", ex);
-        }
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
@@ -284,8 +292,6 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("Failed to scan for Bluetooth usage", ex);
         }
         boolean usesBluetooth = usesBluetoothHolder[0];
-        usesDatabase = databaseUsage.usesDatabase();
-        boolean usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
 
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
