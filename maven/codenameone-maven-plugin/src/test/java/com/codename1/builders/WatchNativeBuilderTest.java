@@ -652,6 +652,12 @@ class WatchNativeBuilderTest {
         // omit the watch lifecycle class, which the phone never reaches and its translation
         // therefore shakes out -- the link then fails on that class's symbols.
         assertTrue(ruby.contains("watch_sources.each"), ruby);
+        // Quoted strings, not a %w[] word list: a translated source named after a class with a
+        // space in it -- `My Bridge.m` -- was split into two words, so the target referenced two
+        // files that do not exist and linked without the symbols the real one carries.
+        assertTrue(ruby.contains("watch_sources = ['"),
+                "the staged names have to be quoted: " + ruby);
+        assertFalse(ruby.contains("watch_sources = %w["), ruby);
         assertTrue(ruby.contains("watch_group_path + '/' + name"), ruby);
     }
 

@@ -1578,18 +1578,24 @@ class WatchNativeBuilder {
                 // Compile the shared ParparVM sources for the watch, minus the
                 // GL/Metal-only files. Reuse the app target's compile sources so
                 // we track exactly what was generated.
+                // A %w[] word list is safe here and only here: EXCLUDED_WATCH_SOURCES is a fixed
+                // constant in this file, so no project-supplied name can carry a space into it.
                 .append("excluded = %w[").append(excluded).append("]\n");
         if (!watchSources.isEmpty()) {
             // The watch compiles its OWN translation, rooted at watchMain and shaken down to what
             // that entry point reaches. Nothing of the phone's tree is added: sharing it is what
             // made the watch binary carry the phone's whole graph, and the phone Stub's main then
             // had to be defined away to stop the two entry points colliding.
+            // Quoted strings, not a %w[] word list. A translated native source is named after the
+            // class it came from, and a project with a space in one -- `My Bridge.m` -- had that
+            // name split into two words, so the watch target referenced two files that do not
+            // exist and linked without the symbols the real one carries.
             StringBuilder names = new StringBuilder();
             for (String name : watchSources) {
                 if (names.length() > 0) {
-                    names.append(' ');
+                    names.append(", ");
                 }
-                names.append(name);
+                names.append('\'').append(IPhoneBuilder.escapeRubyStr(name)).append('\'');
             }
             // The app target's file SET, with the watch translation's CONTENTS.
             //
@@ -1599,7 +1605,7 @@ class WatchNativeBuilder {
             // always taken its file list from the app target, and that list is what belongs on the
             // watch too; only the translated bodies differ. So walk the app target exactly as the
             // shared path does, and swap each file for its watch-src counterpart where one exists.
-            s.append("watch_sources = %w[").append(names).append("]\n")
+            s.append("watch_sources = [").append(names).append("]\n")
                     // Relative to the PROJECT, not to the app's -src folder. Naming only
                     // "watch-src" pointed every reference at a directory that does not exist --
                     // and because most translated files share a basename with the phone's, Xcode

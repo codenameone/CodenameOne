@@ -87,19 +87,53 @@ public final class WearableConnection {
     /// alongside the handler so the reply decodes onto a real path -- a payload has to have one.
     private static final Map<Integer, PendingReply> pendingReplies =
             new HashMap<Integer, PendingReply>();
-    /// Reply tokens, seeded from the clock so a restart cannot reissue the previous run's.
+    /// Where this process's block of reply tokens ends.
     ///
-    /// This counted from 1 in every process, and the Android wire path carries nothing but the
-    /// integer -- so a sender killed with request 1 outstanding, restarted, issuing another request
-    /// before the peer answered, could have the STALE reply complete the new request's handler with
-    /// the wrong payload. Nothing downstream can tell the two apart; the token has to.
+    /// Tokens are handed out from a RESERVED BLOCK, and the next block is recorded before any of it
+    /// is used. Each run therefore issues numbers no other run can, which is what the wire needs:
+    /// the Android path carries nothing but the integer, so a sender killed with a request
+    /// outstanding and restarted could otherwise have the stale reply complete a NEW request's
+    /// handler with the wrong payload.
     ///
-    /// Seeded rather than randomised, because the clock also moves in one direction: the next
-    /// process starts above the tokens the last one issued unless it issued more of them than
-    /// milliseconds have passed. Wrapped into the positive range because 0 means "no reply wanted"
-    /// and a negative token would be a minus sign in a wire path.
-    private static int nextReplyToken =
-            (int) (System.currentTimeMillis() & 0x3FFFFFFFL) + 1;
+    /// A clock seed was the first attempt and is not enough on its own -- twenty requests and a
+    /// restart ten milliseconds later reissues half of them. The reservation is exact instead of
+    /// probabilistic, and it costs one small preference write per process.
+    private static final int REPLY_TOKEN_BLOCK = 4096;
+
+    private static final String REPLY_TOKEN_BASE_KEY = "cn1$wearableReplyTokenBase";
+
+    private static int nextReplyToken;
+
+    private static int replyTokenLimit;
+
+    /// Reserves the next block, recording where the one after it starts before handing any out.
+    ///
+    /// Called with the pendingReplies monitor held. Recording FIRST is the whole point: a process
+    /// that dies mid-run has still moved the stored base past everything it could have issued.
+    ///
+    /// Wraps back to 1 rather than through 0: 0 is the "no answer wanted" marker every dispatch
+    /// site tests for, and a negative token would put a minus sign in a wire path.
+    private static void reserveReplyTokenBlock() {
+        int base;
+        try {
+            base = com.codename1.io.Preferences.get(REPLY_TOKEN_BASE_KEY, 0);
+        } catch (RuntimeException storageUnavailable) {
+            // No storage is not a reason to hand out a colliding token. The clock is a weaker
+            // discriminator than the counter and a better one than starting from 1 again.
+            base = (int) (System.currentTimeMillis() & 0x3FFFFFFFL);
+        }
+        if (base <= 0 || base > Integer.MAX_VALUE - REPLY_TOKEN_BLOCK * 2) {
+            base = 0;
+        }
+        nextReplyToken = base + 1;
+        replyTokenLimit = base + REPLY_TOKEN_BLOCK;
+        try {
+            com.codename1.io.Preferences.set(REPLY_TOKEN_BASE_KEY, replyTokenLimit);
+        } catch (RuntimeException storageUnavailable) {
+            // The block is still unique within this process; only the cross-restart guarantee is
+            // lost, and the next run falls back to the clock above.
+        }
+    }
 
     /// A request waiting for its answer.
     private static final class PendingReply {
@@ -274,12 +308,12 @@ public final class WearableConnection {
         int token = 0;
         if (reply != null) {
             synchronized (pendingReplies) {
-                token = nextReplyToken++;
-                if (nextReplyToken <= 0) {
-                    // Wrapped. Back to 1 rather than through 0 and into the negatives: 0 is the
-                    // "no answer wanted" marker every dispatch site tests for.
-                    nextReplyToken = 1;
+                if (nextReplyToken <= 0 || nextReplyToken > replyTokenLimit) {
+                    // First request of the run, or this block is spent. Either way the next block
+                    // is reserved and recorded before a number out of it is used.
+                    reserveReplyTokenBlock();
                 }
+                token = nextReplyToken++;
                 pendingReplies.put(Integer.valueOf(token),
                         new PendingReply(reply, message.getPath()));
             }
