@@ -72,10 +72,8 @@ public class AndroidDB extends Database {
      * change while something else holds the file.
      *
      * @param db the open connection
-     * @throws IOException if the file is mid-conversion, in which case the supplied connection is
-     * closed rather than handed back
      */
-    public AndroidDB(SQLiteDatabase db) throws IOException {
+    public AndroidDB(SQLiteDatabase db) {
         this.openPath = db == null ? null : db.getPath();
         if (openPath != null) {
             try {
@@ -85,22 +83,33 @@ public class AndroidDB extends Database {
                 // that is discarded. The count alone does not refuse that.
                 AndroidImplementation.reserveDatabaseConnection(openPath);
             } catch (IOException midConversion) {
-                // The caller cannot close what it was never given, so this does it.
+                // Carried rather than thrown: this signature predates the reservation and code
+                // that calls it compiles without a catch. The connection is closed and nothing is
+                // registered, so the object exists but every method on it reports the reason --
+                // a handle that cannot be used cannot write to the file being converted.
+                unusableReason = midConversion.getMessage();
                 try {
                     db.close();
                 } catch (RuntimeException alsoFailed) {
-                    // The conversion failure is the one worth reporting.
+                    // The refusal is the reason worth reporting.
                 }
-                throw midConversion;
+                return;
             }
         }
         this.db = db;
     }
 
 
+    /// Why this handle cannot be used, when it was refused rather than closed.
+    ///
+    /// Only the compatibility constructor sets it, and only when the file was mid-conversion.
+    private String unusableReason;
+
     private void checkOpen() throws IOException {
         if (db == null) {
-            throw new IOException("This database has been closed");
+            throw new IOException(unusableReason != null
+                    ? unusableReason
+                    : "This database has been closed");
         }
     }
 

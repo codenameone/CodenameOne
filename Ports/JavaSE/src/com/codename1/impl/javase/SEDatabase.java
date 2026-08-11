@@ -85,9 +85,24 @@ public class SEDatabase extends Database {
      * -- there is nothing to register, and a key change through this handle is refused rather than
      * performed without knowing what else holds the file.
      */
-    public SEDatabase(java.sql.Connection conn) throws IOException {
+    public SEDatabase(java.sql.Connection conn) {
         String fromUrl = fileFromConnection(conn);
-        reserveConnection(fromUrl);
+        try {
+            reserveConnection(fromUrl);
+        } catch (IOException midConversion) {
+            // No checked exception here, because this signature predates the reservation and code
+            // that calls it compiles without a catch. So the refusal is carried instead of thrown:
+            // the connection is closed, nothing is registered, and every method on this object
+            // reports the reason below. A handle that cannot be used cannot read or write the file
+            // being converted, which is the whole point of refusing it.
+            unusableReason = midConversion.getMessage();
+            try {
+                conn.close();
+            } catch (SQLException alsoFailed) {
+                // The refusal is the reason worth reporting.
+            }
+            return;
+        }
         boolean kept = false;
         try {
             init(conn, null, fromUrl);
@@ -212,9 +227,18 @@ public class SEDatabase extends Database {
         }
     }
 
+    /**
+     * Why this handle cannot be used, when it was refused rather than closed.
+     *
+     * <p>Only the compatibility constructor sets it, and only when the file was mid-conversion.
+     */
+    private String unusableReason;
+
     private void checkOpen() throws IOException {
         if (conn == null) {
-            throw new IOException("This database has been closed");
+            throw new IOException(unusableReason != null
+                    ? unusableReason
+                    : "This database has been closed");
         }
     }
 
