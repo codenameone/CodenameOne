@@ -26,6 +26,9 @@ package com.codename1.ui;
 import com.codename1.ui.editor.CodePureEditor;
 import com.codename1.ui.editor.PureEditor;
 import com.codename1.ui.editor.SyntaxHighlighter;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
 import com.codename1.util.SuccessCallback;
 
 import java.util.Hashtable;
@@ -66,6 +69,7 @@ public class CodeEditor extends AbstractEditorComponent {
     private boolean showLineNumbers = true;
     private int tabSize = 4;
     private CodeCompletionProvider completionProvider;
+    private final EventDispatcher protectedEditListeners = new EventDispatcher();
 
     /// Creates an empty code editor.
     public CodeEditor() {
@@ -219,6 +223,39 @@ public class CodeEditor extends AbstractEditorComponent {
         command("insertText", text);
     }
 
+    /// Protects all text between matching marker lines from editing. This is intended for generated
+    /// source previews that contain explicit user-editable regions. Passing null clears protection.
+    public void setProtectedRegionMarkers(String startMarker, String endMarker) {
+        command("setProtectedMarkers", startMarker == null || endMarker == null
+                ? "" : startMarker + "\n" + endMarker);
+    }
+
+    /// Registers a listener notified when an edit is refused because it falls inside a protected
+    /// region. Without it a protected region is silent, and one covering most of the document is
+    /// indistinguishable from an editor that ignores the keyboard. The event source is this editor
+    /// and the event is fired on the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: invoked once per refused edit
+    public void addProtectedEditListener(ActionListener listener) {
+        protectedEditListeners.addListener(listener);
+    }
+
+    /// Removes a listener added by `#addProtectedEditListener(ActionListener)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener to remove
+    public void removeProtectedEditListener(ActionListener listener) {
+        protectedEditListeners.removeListener(listener);
+    }
+
+    /// Moves the caret to a character offset, clamped by the editor backend to the document bounds.
+    public void setCursorPosition(int offset) {
+        command("setCursor", String.valueOf(Math.max(0, offset)));
+    }
+
     /// Retrieves the current caret character offset. The callback is invoked on the EDT.
     ///
     /// #### Parameters
@@ -301,6 +338,10 @@ public class CodeEditor extends AbstractEditorComponent {
     void onEditorEvent(String type, String value) {
         if ("complete".equals(type)) {
             handleCompletionRequest(value);
+            return;
+        }
+        if ("protectedEdit".equals(type)) {
+            protectedEditListeners.fireActionEvent(new ActionEvent(this));
             return;
         }
         super.onEditorEvent(type, value);

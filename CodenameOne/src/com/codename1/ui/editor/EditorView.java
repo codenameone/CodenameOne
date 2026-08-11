@@ -53,6 +53,7 @@ public class EditorView extends Component implements TextInputClient {
 
     private int caret;
     private int anchor = -1;
+    private boolean multiKeyModeInstalled;
     private int composingStart = -1;
     private int composingEnd = -1;
     // pre-composition snapshot so the finalized composition forms a single undo unit
@@ -814,6 +815,31 @@ public class EditorView extends Component implements TextInputClient {
 
     // ---- editing primitives ----
 
+    /// This view edits text, so key codes reaching it are characters rather than commands.
+    ///
+    /// Only while it is editable. A read only view declines the insert in `keyReleased`, so
+    /// claiming the code anyway took a colliding soft key away from the menu bar and then did
+    /// nothing with it -- the command was silently lost.
+    @Override
+    protected boolean consumesRawTextInput() {
+        return isEditableState();
+    }
+
+    /// Whether the given range may be modified. Subclasses that make part of the document read only
+    /// override this so every mutation path is covered, including input method composition, which
+    /// writes to the document without going through `#replaceRange(int, int, String, boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: inclusive start offset of the edit
+    ///
+    /// - `end`: exclusive end offset of the edit
+    ///
+    /// **Returns:** true when the edit may proceed
+    protected boolean isEditAllowed(int start, int end) {
+        return true;
+    }
+
     /// Replaces the range `[start, end)` with `text`, updating the caret, history and platform input
     /// state.
     ///
@@ -928,7 +954,11 @@ public class EditorView extends Component implements TextInputClient {
         return host;
     }
 
-    private void deleteBackward() {
+    /// Deletes the selection, or the character before the caret when there is none. This is what
+    /// Backspace does, including its handling of a surrogate pair, and it is public so a host that
+    /// has swallowed the keystroke -- a desktop menu accelerator, for instance -- can hand it back
+    /// rather than approximating it with the IME oriented `#deleteSurroundingText(int, int)`.
+    public void deleteBackward() {
         if (!editable) {
             return;
         }
@@ -1032,20 +1062,25 @@ public class EditorView extends Component implements TextInputClient {
 
     // ---- clipboard ----
 
-    protected void copySelection() {
+    /// Copies the selection to the clipboard. Public so a host that owns the platform menu bar can
+    /// route its Copy item here: a menu accelerator consumes the keystroke before the editor sees
+    /// it, so the host has to perform the operation on the editor's behalf.
+    public void copySelection() {
         if (hasSelection()) {
             Display.getInstance().copyToClipboard(doc.substring(getSelectionStart(), getSelectionEnd()));
         }
     }
 
-    private void cutSelection() {
+    /// Cuts the selection to the clipboard. See `#copySelection()` for why this is public.
+    public void cutSelection() {
         if (hasSelection() && editable) {
             copySelection();
             replaceRange(getSelectionStart(), getSelectionEnd(), "", true);
         }
     }
 
-    private void pasteClipboard() {
+    /// Inserts the clipboard contents at the caret. See `#copySelection()` for why this is public.
+    public void pasteClipboard() {
         if (!editable) {
             return;
         }
@@ -1347,6 +1382,17 @@ public class EditorView extends Component implements TextInputClient {
     @Override
     protected void focusGained() {
         super.focusGained();
+        // Typing happens on key release, and Display drops any release whose code does not match
+        // the most recent press. Anyone typing at speed presses the next key before releasing the
+        // last one, so releases were being discarded and characters silently vanished -- always
+        // the same ones, because it depends on which pairs overlap. Multi key mode delivers every
+        // release. Only an editor that found the mode off turns it on, and only that editor turns
+        // it back off on focus loss; an application that runs in multi key mode by choice is left
+        // alone rather than having the mode switched off underneath it.
+        if (!multiKeyModeInstalled && !Display.getInstance().isMultiKeyMode()) {
+            Display.getInstance().setMultiKeyMode(true);
+            multiKeyModeInstalled = true;
+        }
         startInput();
         if (!animRegistered && getComponentForm() != null) {
             getComponentForm().registerAnimated(this);
@@ -1356,9 +1402,22 @@ public class EditorView extends Component implements TextInputClient {
         repaint();
     }
 
+    /// Switches multi key mode back off, and only if this editor is the one that switched it on.
+    /// An editor that found the mode already on, or that was initialized but never focused, must
+    /// not touch it: doing so would switch the mode off underneath whoever does own it, bringing
+    /// back the dropped keystrokes this exists to prevent.
+    private void restoreMultiKeyMode() {
+        if (!multiKeyModeInstalled) {
+            return;
+        }
+        multiKeyModeInstalled = false;
+        Display.getInstance().setMultiKeyMode(false);
+    }
+
     @Override
     protected void focusLost() {
         super.focusLost();
+        restoreMultiKeyMode();
         stopInput();
         if (animRegistered && getComponentForm() != null) {
             getComponentForm().deregisterAnimated(this);
@@ -1375,7 +1434,9 @@ public class EditorView extends Component implements TextInputClient {
         // input session here or the stale handle would block startInput on the next focus
         // gain, leaving the editor deaf until an explicit focus round-trip. The form also
         // drops animation registrations on deinit, so reset the flag to re-register the
-        // caret blink when focus returns.
+        // caret blink when focus returns. Multi key mode is restored here for the same reason:
+        // focusLost never runs on this path and the setting is global.
+        restoreMultiKeyMode();
         stopInput();
         animRegistered = false;
     }
@@ -1800,6 +1861,9 @@ public class EditorView extends Component implements TextInputClient {
         }
         start = doc.clamp(start);
         end = doc.clamp(end);
+        if (!isEditAllowed(start, end)) {
+            return;
+        }
         if (composingStart < 0) {
             // snapshot the pre-composition document so the whole composition (including the
             // selection this first compose replaces) finalizes as a single undo unit in

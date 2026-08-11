@@ -29,6 +29,7 @@ import com.codename1.ui.ComponentSelector.ComponentClosure;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -1094,7 +1095,10 @@ public class SplitPane extends Container {
         @Override
         protected void initComponent() {
             super.initComponent();
-            getComponentForm().setEnableCursors(true);
+            Form form = getComponentForm();
+            if (form != null) {
+                form.setEnableCursors(true);
+            }
         }
 
 

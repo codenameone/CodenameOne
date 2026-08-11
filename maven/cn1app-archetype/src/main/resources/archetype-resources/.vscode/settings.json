@@ -8,6 +8,10 @@
     "command": "\"cn1:settings\" \"-U\" \"-e\""
   },
   {
+    "alias": "Tools > GUI Builder",
+    "command": "\"cn1:guibuilder\" \"-U\" \"-e\""
+  },
+  {
     "alias": "Tools > Certificate Wizard",
     "command": "\"cn1:certificatewizard\" \"-U\" \"-e\""
   },

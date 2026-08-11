@@ -340,6 +340,18 @@ public class LayeredLayout extends Layout {
         return cmp.getY() - cmp.getStyle().getMarginTop();
     }
 
+    /// Returns the text baseline a component reports for the given size, or -1 when the component
+    /// does not describe one. `Component#getBaseline(int, int)` has a non-abstract default that
+    /// returns the bottom content edge rather than a text baseline, so only components that also
+    /// describe their baseline resize behavior take part in `#UNIT_BASELINE` alignment. Everything
+    /// else keeps the historical font-ascent approximation.
+    private static int declaredBaseline(Component cmp, int width, int height) {
+        if (cmp == null || cmp.getBaselineResizeBehavior() == Component.BRB_OTHER) {
+            return -1;
+        }
+        return cmp.getBaseline(width, height);
+    }
+
     
    
     /*
@@ -2989,9 +3001,17 @@ public class LayeredLayout extends Layout {
                         case UNIT_BASELINE: {
                             Style rs = referenceComponent.getStyle();
                             Style s = cmp.getStyle();
-                            preferredValue = baseValue + (referenceComponent.getPreferredH() - cmp.getPreferredH()) / 2
-                                    + (rs.getFont().getAscent() - s.getFont().getAscent())
-                                    + (rs.getPaddingTop() - s.getPaddingTop());
+                            int referenceBaseline = declaredBaseline(referenceComponent,
+                                    referenceComponent.getPreferredW(), referenceComponent.getPreferredH());
+                            int componentBaseline = declaredBaseline(cmp, cmp.getPreferredW(), cmp.getPreferredH());
+                            if (referenceBaseline >= 0 && componentBaseline >= 0) {
+                                preferredValue = baseValue + rs.getMarginTop() + referenceBaseline
+                                        - s.getMarginTop() - componentBaseline;
+                            } else {
+                                preferredValue = baseValue + (referenceComponent.getPreferredH() - cmp.getPreferredH()) / 2
+                                        + (rs.getFont().getAscent() - s.getFont().getAscent())
+                                        + (rs.getPaddingTop() - s.getPaddingTop());
+                            }
                             break;
                         }
                         default:
@@ -3118,14 +3138,21 @@ public class LayeredLayout extends Layout {
                             Component ref = getReferenceComponent();
                             Style rs = ref.getStyle();
                             Style s = cmp.getStyle();
-                            Font rf = rs.getFont();
-                            Font sf = s.getFont();
-                            int ra = rf == null || sf == null ? 0 : rf.getAscent();
-                            int sa = rf == null || sf == null ? 0 : sf.getAscent();
-                            calculatedValue = baseValue + (ref.getHeight() - cmp.getPreferredH()) / 2
-                                    + (rs.getPaddingTop() - s.getPaddingTop())
-                                    + (rs.getMarginTop() - s.getMarginTop())
-                                    + (ra - sa);
+                            int referenceBaseline = declaredBaseline(ref, ref.getWidth(), ref.getHeight());
+                            int componentBaseline = declaredBaseline(cmp, cmp.getPreferredW(), cmp.getPreferredH());
+                            if (referenceBaseline >= 0 && componentBaseline >= 0) {
+                                calculatedValue = baseValue + rs.getMarginTop() + referenceBaseline
+                                        - s.getMarginTop() - componentBaseline;
+                            } else {
+                                Font rf = rs.getFont();
+                                Font sf = s.getFont();
+                                int ra = rf == null || sf == null ? 0 : rf.getAscent();
+                                int sa = rf == null || sf == null ? 0 : sf.getAscent();
+                                calculatedValue = baseValue + (ref.getHeight() - cmp.getPreferredH()) / 2
+                                        + (rs.getPaddingTop() - s.getPaddingTop())
+                                        + (rs.getMarginTop() - s.getMarginTop())
+                                        + (ra - sa);
+                            }
                         }
 
                         break;
@@ -3657,6 +3684,12 @@ public class LayeredLayout extends Layout {
                         } else {
                             Style rs = ref.getStyle();
                             Style cs = cmp.getStyle();
+                            int referenceBaseline = declaredBaseline(ref, ref.getWidth(), ref.getHeight());
+                            int componentBaseline = declaredBaseline(cmp, cmp.getPreferredW(), cmp.getPreferredH());
+                            if (referenceBaseline >= 0 && componentBaseline >= 0) {
+                                return baseValue + rs.getMarginTop() + referenceBaseline
+                                        - cs.getMarginTop() - componentBaseline;
+                            }
                             Font rf = rs.getFont();
                             Font cf = cs.getFont();
                             int ra = rf == null || cf == null ? 0 : rf.getAscent();

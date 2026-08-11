@@ -3159,7 +3159,7 @@ public class Form extends Container {
     @Override
     public void keyPressed(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
-        if (menuBar.handlesKeycode(keyCode)) {
+        if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput(keyCode)) {
             menuBar.keyPressed(keyCode);
             return;
         }
@@ -3224,11 +3224,47 @@ public class Form extends Container {
         menuBar.setMinimizeOnBack(minimizeOnBack);
     }
 
+    /// True when the focused component turns key codes into text, so soft key mapping must not
+    /// intercept keys ahead of it.
+    ///
+    /// A port is free to map a soft key onto any key code, and the desktop port uses the function
+    /// keys: `VK_F1` is 112, which is also the character code of a lowercase `p`. Key codes and
+    /// character codes share one value space here, so a text component would silently never receive
+    /// that character -- one letter of the alphabet simply stopped working.
+    ///
+    /// `Component#handlesInput()` is too broad a test for this: lists, editable sliders and map
+    /// components set it for focus traversal while still expecting the back and menu commands to
+    /// reach the menu bar, so only components that declare themselves raw text editors take
+    /// priority here.
+    ///
+    /// Only a code that could stand for a printable character can collide with a soft key mapping
+    /// in the first place. A port is free to use a negative code for Back or Menu, and those cannot
+    /// be typed, so handing them to the editor would cost the form its back command, pop guard and
+    /// minimize-on-back behaviour for as long as the editor had focus -- and the editor would drop
+    /// them anyway.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyCode`: the code being dispatched
+    private boolean focusedHandlesInput(int keyCode) {
+        if (keyCode < FIRST_PRINTABLE_KEY_CODE || keyCode == DELETE_KEY_CODE) {
+            return false;
+        }
+        return focused != null && focused.consumesRawTextInput() && focused.isEnabled()
+                && focused.getComponentForm() == this; //NOPMD CompareObjectsWithEquals
+    }
+
+    /// Space, the lowest code that stands for a character a text component can receive.
+    private static final int FIRST_PRINTABLE_KEY_CODE = 32;
+
+    /// Delete sits above space in the code space but is not printable.
+    private static final int DELETE_KEY_CODE = 127;
+
     /// {@inheritDoc}
     @Override
     public void keyReleased(int keyCode) {
         int game = Display.getInstance().getGameAction(keyCode);
-        if (menuBar.handlesKeycode(keyCode)) {
+        if (menuBar.handlesKeycode(keyCode) && !focusedHandlesInput(keyCode)) {
             menuBar.keyReleased(keyCode);
             return;
         }

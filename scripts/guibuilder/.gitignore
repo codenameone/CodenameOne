@@ -1,0 +1,7 @@
+target/
+common/target/
+javase/target/
+
+# Written by cn1:guibuilder (and by hand for the demo project); it holds
+# absolute paths for one machine, so it is generated rather than tracked.
+demo-project/guibuilder.input

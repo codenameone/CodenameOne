@@ -25,6 +25,7 @@ package com.codename1.ui.editor;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextInputClient;
 import com.codename1.ui.TextInputConfig;
@@ -130,6 +131,49 @@ class EditorViewSessionTest extends UITestBase {
         assertEquals(1, host.starts);
         v.setEditableState(false);
         assertEquals(1, host.stops);
+    }
+
+    @FormTest
+    void theEditorOnlySwitchesMultiKeyModeOffWhenItSwitchedItOn() {
+        boolean wasMultiKey = Display.getInstance().isMultiKeyMode();
+        try {
+            Display.getInstance().setMultiKeyMode(false);
+            CountingHost host = new CountingHost();
+            EditorView v = show(host, "hello");
+            v.requestFocus();
+            flushSerialCalls();
+            assertTrue(Display.getInstance().isMultiKeyMode(),
+                    "the editor turns multi key mode on so fast typing does not drop key releases");
+
+            form.getContentPane().removeComponent(v);
+            flushSerialCalls();
+            assertFalse(Display.getInstance().isMultiKeyMode(),
+                    "the editor that turned the mode on turns it back off");
+        } finally {
+            Display.getInstance().setMultiKeyMode(wasMultiKey);
+        }
+    }
+
+    @FormTest
+    void anApplicationThatOwnsMultiKeyModeKeepsItAfterTheEditorGoesAway() {
+        boolean wasMultiKey = Display.getInstance().isMultiKeyMode();
+        try {
+            // the application asked for multi key mode itself; the editor is a guest here and must
+            // leave the global setting exactly as it found it
+            Display.getInstance().setMultiKeyMode(true);
+            CountingHost host = new CountingHost();
+            EditorView v = show(host, "hello");
+            v.requestFocus();
+            flushSerialCalls();
+            assertTrue(Display.getInstance().isMultiKeyMode());
+
+            form.getContentPane().removeComponent(v);
+            flushSerialCalls();
+            assertTrue(Display.getInstance().isMultiKeyMode(),
+                    "an editor that found multi key mode on must not switch it off");
+        } finally {
+            Display.getInstance().setMultiKeyMode(wasMultiKey);
+        }
     }
 
     @FormTest

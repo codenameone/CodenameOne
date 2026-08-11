@@ -49,6 +49,7 @@ iapdemo
 ParparVM
 RoboVM
 TeaVM
+DexGuard
 teavm
 teavmdbg
 LWUIT
@@ -560,6 +561,7 @@ transcoder
 # throughout the Crash Protection chapter and standard in the field.
 [Ss]ymbolicated
 [Ss]ymbolicate
+[Ss]ymbolicates
 [Ss]ymbolication
 # Short for "deduplication" -- "dedup the same crash" is how everyone
 # in the crash-reporting space talks. Shows up in CrashReportPayload
@@ -634,3 +636,13 @@ BlueZ
 # App Shield chapter (App-Shield.asciidoc). "quickstart" is the product's own
 # name for the backend integration snippets the build console renders.
 [Qq]uickstarts?
+
+# -----------------------------------------------------------------------------
+# App Hardening (Enterprise) terminology.
+# -----------------------------------------------------------------------------
+unhardened
+unretraceable
+[Dd]eobfuscation
+[Mm]inif(y|ies|ied|ier|ication)
+[Uu]nminif(y|ies|ied|ier|ication)
+[Rr]etrace(d|s|able)?

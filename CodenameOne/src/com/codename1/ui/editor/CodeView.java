@@ -45,6 +45,8 @@ public class CodeView extends EditorView {
     private ThemePalette palette = ThemePalette.LIGHT;
     private boolean showLineNumbers = true;
     private int tabSize = 4;
+    private String protectedStartMarker;
+    private String protectedEndMarker;
 
     private int[] endStates;
     private int validUpTo;
@@ -112,6 +114,143 @@ public class CodeView extends EditorView {
     public void setDiagnostics(List<CodeDiagnostic> diagnostics) {
         this.diagnostics = diagnostics;
         repaint();
+    }
+
+    /// Protects every range delimited by matching marker strings from user edits. Passing null or an
+    /// empty marker clears the protection. Whole-document replacement remains available so generated
+    /// source can still be refreshed by the host.
+    public void setProtectedRegionMarkers(String startMarker, String endMarker) {
+        protectedStartMarker = emptyToNull(startMarker);
+        protectedEndMarker = emptyToNull(endMarker);
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.length() == 0 ? null : value;
+    }
+
+    @Override
+    protected void replaceRange(int start, int end, String text, boolean record) {
+        int clampedStart = getDocument().clamp(start);
+        int clampedEnd = getDocument().clamp(end);
+        if (clampedStart > clampedEnd) {
+            int swap = clampedStart;
+            clampedStart = clampedEnd;
+            clampedEnd = swap;
+        }
+        if (!isEditAllowed(clampedStart, clampedEnd)) {
+            return;
+        }
+        super.replaceRange(clampedStart, clampedEnd, text, record);
+    }
+
+    /// Refuses edits that fall inside a protected region, whichever path they arrive through.
+    /// Input method composition writes to the document directly rather than through
+    /// `#replaceRange(int, int, String, boolean)`, so checking only there let a composing keyboard
+    /// insert provisional text into generated source that is meant to be read only.
+    @Override
+    protected boolean isEditAllowed(int start, int end) {
+        int from = Math.min(start, end);
+        int to = Math.max(start, end);
+        if (!isProtectedEdit(from, to)) {
+            return true;
+        }
+        // Tell the host rather than dropping the edit in silence. A protected region covering
+        // most of the document is indistinguishable from an editor that ignores the keyboard,
+        // so the application needs the chance to explain why nothing happened.
+        host().fireEditorEvent("protectedEdit", String.valueOf(from));
+        return false;
+    }
+
+    /// Finds a marker that stands alone on its line.
+    ///
+    /// The documented contract is that a protected region is delimited by marker *lines*. Matching
+    /// the raw text meant a mention of the marker inside a string or a comment started a protected
+    /// region, and everything through the next end marker silently refused edits.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the text to search
+    ///
+    /// - `marker`: the marker text
+    ///
+    /// - `from`: the offset to search from
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the marker, or -1 when there is none
+    private static int markerLine(String source, String marker, int from) {
+        int at = from;
+        while (at >= 0 && at < source.length()) {
+            at = source.indexOf(marker, at);
+            if (at < 0) {
+                return -1;
+            }
+            int lineStart = source.lastIndexOf('\n', at) + 1;
+            int lineEnd = source.indexOf('\n', at);
+            if (lineEnd < 0) {
+                lineEnd = source.length();
+            }
+            if (source.substring(lineStart, at).trim().length() == 0
+                    && source.substring(at + marker.length(), lineEnd).trim().length() == 0) {
+                return at;
+            }
+            at += marker.length();
+        }
+        return -1;
+    }
+
+    /// The index of the newline ending the line `at` sits on, or the end of the text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the text being edited
+    /// - `at`: an offset on the line
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the line's newline, or the length of the text
+    private static int endOfLine(String source, int at) {
+        int newline = source.indexOf('\n', at);
+        return newline < 0 ? source.length() : newline;
+    }
+
+    private boolean isProtectedEdit(int start, int end) {
+        if (protectedStartMarker == null || protectedEndMarker == null) {
+            return false;
+        }
+        String source = getDocument().getText();
+        int searchFrom = 0;
+        while (searchFrom < source.length()) {
+            int markerAt = markerLine(source, protectedStartMarker, searchFrom);
+            if (markerAt < 0) {
+                return false;
+            }
+            // From the start of the marker's line, not the marker text: an insertion in the
+            // indentation before it, or a deletion of the newline that ends the line above, leaves
+            // the marker sharing a line with something else, and markerLine() then cannot find it
+            // at all -- which unprotects the whole generated block behind it.
+            int protectedStart = source.lastIndexOf('\n', markerAt) + 1;
+            int endMarker = markerLine(source, protectedEndMarker,
+                    markerAt + protectedStartMarker.length());
+            int protectedEnd = endMarker < 0
+                    ? source.length() : endOfLine(source, endMarker + protectedEndMarker.length());
+            // protectedEnd is the newline that ends the marker line, so a caret on the next line is
+            // already outside the block. Treating that caret as protected made the first character
+            // after a generated region impossible to type, and stopping at the marker text instead
+            // let a keystroke land between the marker and its newline -- which turns the marker
+            // into ordinary text, and the next scan then protects everything to the end of the
+            // file, the user's own region included.
+            // Inclusive at both ends. protectedEnd is the newline itself, so a caret between the
+            // marker text and that newline is still on the marker line; a range ending exactly at
+            // protectedStart is deleting the newline in front of it. The first editable offset is
+            // the start of the line after the block.
+            if ((start == end && start >= protectedStart && start <= protectedEnd)
+                    || (start <= protectedEnd && end >= protectedStart)) {
+                return true;
+            }
+            searchFrom = protectedEnd + 1;
+        }
+        return false;
     }
 
     /// Enables or disables the completion popup.

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BoxLayout" boxLayoutAxis="Y" title="Sign in" name="LoginForm" autoLayout="true">
+    <component type="Label" name="welcome" text="Welcome back" uiid="Title" />
+    <component type="SpanLabel" name="intro" text="Sign in to continue to your Codename One project." />
+    <component type="TextField" name="email" hint="Email address" />
+    <component type="TextField" name="password" hint="Password" />
+    <component type="CheckBox" name="remember" text="Remember me" />
+    <component type="Button" name="signIn" text="Sign in" actionEvent="onSignIn" />
+</component>

@@ -15,9 +15,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # The four Central confirmation polls each cover the documented 30-minute
+    # The five Central confirmation polls each cover the documented 30-minute
     # propagation window, and each fires only when its own deploy reported failure,
-    # so the worst case is ~2h of polling on top of the build. Bounded explicitly
+    # so the worst case is ~2.5h of polling on top of the build. Bounded explicitly
     # rather than inheriting the 6h default, so a wedged release fails in a shift
     # rather than overnight.
     timeout-minutes: 240
@@ -62,7 +62,7 @@ jobs:
           export GPG_TTY=$(tty)
           # Once dual publish is off, R2 is the repository and Central must not receive
           # new immutable releases. skipPublishing still stages, so the R2 upload that
-          # follows is unaffected -- same treatment as the three editor deploys.
+          # follows is unaffected -- same treatment as the four editor deploys.
           skip_publishing=true
           if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
             skip_publishing=false
@@ -246,7 +246,7 @@ jobs:
         continue-on-error: true
         # always(): central-publishing stages before it uploads, so the tree exists
         # even when the Central deploy above failed -- which is precisely the case
-        # R2 is here to survive. Metadata is regenerated once, after all three.
+        # R2 is here to survive. Metadata is regenerated once, after all four.
         if: always() && steps.deploy_gamebuilder.conclusion != 'skipped'
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
@@ -335,7 +335,7 @@ jobs:
         continue-on-error: true
         # always(): central-publishing stages before it uploads, so the tree exists
         # even when the Central deploy above failed -- which is precisely the case
-        # R2 is here to survive. Metadata is regenerated once, after all three.
+        # R2 is here to survive. Metadata is regenerated once, after all four.
         if: always() && steps.deploy_certificatewizard.conclusion != 'skipped'
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
@@ -413,7 +413,7 @@ jobs:
         continue-on-error: true
         # always(): central-publishing stages before it uploads, so the tree exists
         # even when the Central deploy above failed -- which is precisely the case
-        # R2 is here to survive. Metadata is regenerated once, after all three.
+        # R2 is here to survive. Metadata is regenerated once, after all four.
         if: always() && steps.deploy_settings.conclusion != 'skipped'
         run: |
           # Each editor is its own reactor, so it stages into its own target dir.
@@ -447,10 +447,88 @@ jobs:
           echo "codenameone-settings ${GITHUB_REF_NAME} never appeared on Maven Central within 30 minutes." >&2
           exit 1
 
+      # --- GUI Builder editor -------------------------------------------------
+      # The cn1:guibuilder goal resolves the standalone Java-17 GUI Builder and
+      # its runtime dependencies from Maven Central, exactly like cn1:settings.
+      - name: Deploy GUI Builder editor to Maven Central
+        id: deploy_guibuilder
+        continue-on-error: true
+        if: >-
+          always() && (steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success' ||
+          steps.r2_core.outcome == 'success')
+        run: |
+          export GPG_TTY=$(tty)
+          # Do not publish this editor to Central unless the core release actually
+          # reached Central. The editor declares core/plugin at this same version, so
+          # publishing it against a core that is not there leaves an immutable Central
+          # release whose dependencies cannot resolve. skipPublishing still stages the
+          # artifacts, so the R2 upload that follows is unaffected.
+          skip_publishing=true
+          if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ] \
+             && { [ "${{ steps.deploy.outcome }}" = "success" ] \
+                  || [ "${{ steps.confirm.outcome }}" = "success" ]; }; then
+            skip_publishing=false
+          else
+            echo "Core release did not reach Central (or dual publish is off):"
+            echo "staging this editor for R2 only."
+          fi
+          cd scripts/guibuilder
+          xvfb-run -a mvn -Pexecutable-jar -Pguibuilder-central deploy \
+            -DskipPublishing=$skip_publishing \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Publish GUI Builder editor to R2
+        id: r2_guibuilder
+        # Non-fatal for the same reason as the core upload: one editor's R2 failure
+        # must not skip the remaining editors' Central deploys.
+        continue-on-error: true
+        # always(): central-publishing stages before it uploads, so the tree exists
+        # even when the Central deploy above failed -- which is precisely the case
+        # R2 is here to survive. Metadata is regenerated once, after all four.
+        if: always() && steps.deploy_guibuilder.conclusion != 'skipped'
+        run: |
+          # Each editor is its own reactor, so it stages into its own target dir.
+          bash maven/scripts/r2/publish-staging-to-r2.sh scripts/guibuilder/target/central-staging
+          url="${R2_BASE_URL}/com/codenameone/codenameone-guibuilder/${GITHUB_REF_NAME}/codenameone-guibuilder-${GITHUB_REF_NAME}.pom?cb=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+          [ "$code" = "200" ] || { echo "MISSING on R2: codenameone-guibuilder (HTTP $code)" >&2; exit 1; }
+          echo "ok: codenameone-guibuilder ${GITHUB_REF_NAME} on R2"
+
+      - name: Confirm GUI Builder editor on Maven Central
+        id: confirm_guibuilder
+        # Runs only to second-guess a failed deploy: central-publishing
+        # reports "Deployment failed while publishing" for bundles it actually accepted,
+        # and Central releases are immutable so a rerun cannot repair that.
+        if: >-
+          always() && vars.CN1_DUAL_PUBLISH == 'true' &&
+          steps.deploy_guibuilder.outcome == 'failure'
+        continue-on-error: true
+        run: |
+          set +e
+          url="https://repo1.maven.org/maven2/com/codenameone/codenameone-guibuilder/${GITHUB_REF_NAME}/codenameone-guibuilder-${GITHUB_REF_NAME}.jar"
+          for i in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" = "200" ]; then
+              echo "Confirmed codenameone-guibuilder ${GITHUB_REF_NAME} on Maven Central"
+              exit 0
+            fi
+            echo "[$i/90] Waiting on Maven Central for codenameone-guibuilder (code=$code)"
+            sleep 20
+          done
+          echo "codenameone-guibuilder ${GITHUB_REF_NAME} never appeared on Maven Central within 30 minutes." >&2
+          exit 1
+
       - name: Mark the R2 release complete
         id: r2_mark_complete
         continue-on-error: true
-        # Only now, once the core reactor and all three editors are up AND the core
+        # Only now, once the core reactor and all four editors are up AND the core
         # artifacts have been observed on R2. This is what makes the tag discoverable:
         # regen refuses to advertise a version without it, on this run and every future
         # one. r2_core_confirm is what verifies the expected artifacts are actually
@@ -465,7 +543,8 @@ jobs:
           steps.r2_core_confirm.outcome == 'success' &&
           steps.r2_gamebuilder.outcome == 'success' &&
           steps.r2_certificatewizard.outcome == 'success' &&
-          steps.r2_settings.outcome == 'success'
+          steps.r2_settings.outcome == 'success' &&
+          steps.r2_guibuilder.outcome == 'success'
         run: bash maven/scripts/r2/mark-release-complete.sh "${GITHUB_REF_NAME}"
 
       - name: Regenerate R2 metadata and archetype catalog
@@ -517,6 +596,7 @@ jobs:
           bad "${{ steps.r2_gamebuilder.outcome }}" && fail "Game Builder -> R2"
           bad "${{ steps.r2_certificatewizard.outcome }}" && fail "Signing Wizard -> R2"
           bad "${{ steps.r2_settings.outcome }}" && fail "Settings -> R2"
+          bad "${{ steps.r2_guibuilder.outcome }}" && fail "GUI Builder -> R2"
           bad "${{ steps.r2_mark_complete.outcome }}" && fail "marking the R2 release complete"
           bad "${{ steps.r2_metadata.outcome }}" && fail "R2 metadata regeneration"
           if [ "${{ vars.CN1_DUAL_PUBLISH }}" = "true" ]; then
@@ -537,6 +617,10 @@ jobs:
             if bad "${{ steps.deploy_settings.outcome }}" \
                && [ "${{ steps.confirm_settings.outcome }}" != "success" ]; then
               fail "Settings -> Maven Central"
+            fi
+            if bad "${{ steps.deploy_guibuilder.outcome }}" \
+               && [ "${{ steps.confirm_guibuilder.outcome }}" != "success" ]; then
+              fail "GUI Builder -> Maven Central"
             fi
           fi
           [ "$status" = "0" ] && echo "  all publications succeeded"

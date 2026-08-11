@@ -5430,8 +5430,9 @@ public abstract class CodenameOneImplementation {
 
     /// Returns true when this platform can bind a `com.codename1.ui.TextInputClient` to a low level text
     /// input source (soft keyboard / IME / hardware keyboard) so a component can capture raw text input
-    /// while rendering the document itself. When false the pure Codename One editors fall back to their
-    /// `BrowserComponent` backend. The default returns false.
+    /// while rendering the document itself. When false the pure Codename One editors read the physical
+    /// keyboard directly through `Component#keyReleased(int)`; there is no browser or HTML backend.
+    /// The default returns false.
     public boolean isTextInputSupported() {
         return false;
     }

@@ -302,4 +302,50 @@ class CodeEditorTest extends UITestBase {
         assertTrue(editor.isEditorReady());
         assertTrue(editor.getComponentAt(0) instanceof com.codename1.ui.editor.EditorView);
     }
+
+    @FormTest
+    void testPureEditorProtectsGeneratedRegionsButAllowsUserRegions() {
+        implementation.setEditorNativePeerSupported(false);
+        String source = "class Form {\n"
+                + "// <gui-builder-generated>\n"
+                + "void generated() {}\n"
+                + "// </gui-builder-generated>\n"
+                + "void userCode() {}\n"
+                + "}";
+        CodeEditor editor = new CodeEditor("java", source);
+        Form form = new Form("code", new BorderLayout());
+        form.add(BorderLayout.CENTER, editor);
+        form.show();
+        pump();
+
+        editor.setProtectedRegionMarkers(
+                "// <gui-builder-generated>", "// </gui-builder-generated>");
+        com.codename1.ui.editor.EditorView view =
+                (com.codename1.ui.editor.EditorView) editor.getComponentAt(0);
+        int generatedOffset = source.indexOf("generated()");
+        view.moveCaret(generatedOffset, false);
+        view.insertText("blocked");
+        assertEquals(source, view.getText(), "generated source must remain locked");
+
+        int userOffset = source.indexOf("userCode");
+        view.moveCaret(userOffset, false);
+        view.insertText("custom");
+        assertTrue(view.getText().contains("void customuserCode() {}"),
+                "the companion user-code region must remain editable");
+    }
+
+    @FormTest
+    void testSetCursorPositionMovesPureEditorCaret() {
+        implementation.setEditorNativePeerSupported(false);
+        CodeEditor editor = new CodeEditor("java", "0123456789");
+        Form form = new Form("code", new BorderLayout());
+        form.add(BorderLayout.CENTER, editor);
+        form.show();
+        pump();
+
+        editor.setCursorPosition(7);
+        AtomicReference<Integer> cursor = new AtomicReference<Integer>();
+        editor.getCursorPosition(cursor::set);
+        assertEquals(Integer.valueOf(7), cursor.get());
+    }
 }

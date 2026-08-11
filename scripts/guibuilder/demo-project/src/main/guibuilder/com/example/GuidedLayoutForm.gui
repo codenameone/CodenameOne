@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<component name="GuidedLayoutForm" type="Form" layout="LayeredLayout" title="Guided Layout">
+	<component name="heroTitle" type="Label" layeredinsets="24px auto auto 24px" text="Guided Layout" uiid="Title" guidedhorizontalsize="preferred" guidedverticalsize="preferred" />
+	<component name="description" type="SpanLabel" layeredinsets="12px 24px auto 0px" guidedreferences="heroTitle|-|-|heroTitle" guidedreferencepositions="1 0 0 0" guidedhorizontalsize="fill" guidedverticalsize="preferred" text="Drag components by their body. Drag the blue edge and corner handles to resize. Snap edges, centers, baselines, and matching sizes to build a responsive arbitrary UI." />
+	<component actionevent="onPrimaryAction" name="primary" type="Button" layeredinsets="24px auto auto 0px" guidedreferences="description|-|-|description" guidedreferencepositions="1 0 0 0" guidedhorizontalsize="fixed" guidedpreferredwidth="300" guidedverticalsize="preferred" text="Primary action" />
+	<component name="secondary" type="Button" layeredinsets="12px 0px auto 0px" guidedreferences="primary|primary|-|primary" guidedreferencepositions="1 0 0 0" guidedhorizontalsize="match" guidedmatchwidth="primary" guidedverticalsize="preferred" text="Same width" />
+	<component name="baselineLabel" type="Label" layeredinsets="18px auto auto 0px" guidedreferences="secondary|-|-|secondary" guidedreferencepositions="1 0 0 0" guidedhorizontalsize="preferred" guidedverticalsize="preferred" text="Baseline aligned" />
+	<component name="baselineAction" type="Button" layeredinsets="baseline auto auto 12px" guidedreferences="baselineLabel|-|-|baselineLabel" guidedreferencepositions="0 0 0 1" guidedhorizontalsize="preferred" guidedverticalsize="preferred" text="Action" />
+</component>

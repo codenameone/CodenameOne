@@ -1,0 +1,114 @@
+name: GUI Builder
+
+# The standalone GUI Builder lives outside the Maven reactor (scripts/guibuilder)
+# and PR CI ignores scripts/**, so nothing else compiles it. It depends on core
+# APIs (CodeEditor protected regions, LayeredLayout baseline units) that can be
+# changed in the same PR, which is exactly how the editor silently stops
+# compiling against a freshly built core.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/guibuilder.yml'
+      - 'scripts/guibuilder/**'
+      - '!scripts/guibuilder/**/*.md'
+      # The editor is an ordinary Codename One app: it renders the design canvas with
+      # Tabs, TableLayout, SplitPane and the rest of the core UI, compiles the project
+      # stylesheet with the CSS compiler, and runs on the JavaSE port. Listing only the
+      # few classes it obviously touches let a core change break it with this job skipped.
+      - 'CodenameOne/src/**'
+      - 'Ports/JavaSE/src/**'
+      - 'maven/css-compiler/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/guibuilder.yml'
+      - 'scripts/guibuilder/**'
+      - '!scripts/guibuilder/**/*.md'
+      # The editor is an ordinary Codename One app: it renders the design canvas with
+      # Tabs, TableLayout, SplitPane and the rest of the core UI, compiles the project
+      # stylesheet with the CSS compiler, and runs on the JavaSE port. Listing only the
+      # few classes it obviously touches let a core change break it with this job skipped.
+      - 'CodenameOne/src/**'
+      - 'Ports/JavaSE/src/**'
+      - 'maven/css-compiler/**'
+      - 'maven/codenameone-maven-plugin/src/main/java/com/codename1/maven/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  guibuilder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+
+      - name: Prepare Codename One binaries
+        # The JavaSE port needs jfxrt.jar from cn1-binaries; without it the
+        # build fails with a large, misleading set of missing javafx.* errors.
+        run: |
+          set -euo pipefail
+          rm -rf maven/target/cn1-binaries
+          mkdir -p maven/target
+          cp -r /opt/cn1-binaries maven/target/cn1-binaries
+
+      - name: Install Codename One artifacts (JDK 8)
+        # JAVA_HOME_8 / JAVA_HOME_17 are container image environment variables,
+        # so they are expanded by the shell rather than the env context.
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="${JAVA_HOME_8}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+          cd maven
+          mvn -B install -Plocal-dev-javase -DskipTests \
+            -Darchetype.test.skip=true -Dmaven.javadoc.skip=true \
+            -Dcn1.binaries="${GITHUB_WORKSPACE}/maven/target/cn1-binaries"
+
+      # Built and tested on JDK 8 so that the editor stays loadable on every JDK a Codename One
+      # project may be built with. A newer JDK here would let a post-8 API through unnoticed.
+      - name: Run standalone GUI Builder tests (JDK 8)
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="${JAVA_HOME_8}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+          cd scripts/guibuilder
+          xvfb-run -a mvn -B -pl javase -am clean test -Dcodename1.platform=javase
+
+      - name: Package the executable GUI Builder (JDK 8)
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="${JAVA_HOME_8}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+          cd scripts/guibuilder
+          xvfb-run -a mvn -B -pl javase -am -Pexecutable-jar package \
+            -Dcodename1.platform=javase -Dmaven.test.skip=true
+          ls javase/target/codenameone-guibuilder-*.jar
+
+      - name: Upload GUI Builder test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: guibuilder-test-reports
+          path: scripts/guibuilder/javase/target/surefire-reports
+          if-no-files-found: warn
+          retention-days: 14

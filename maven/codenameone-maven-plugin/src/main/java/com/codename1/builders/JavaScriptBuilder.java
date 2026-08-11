@@ -90,6 +90,22 @@ public class JavaScriptBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform(BuildRequest request) {
+        return "javascript";
+    }
+
+    /**
+     * The ParparVM-to-JS build unpacks parparvm-java-api.jar into the translated app (see stageJavaApi),
+     * so that runtime's literals must be excluded from encryption to preserve reference equality --
+     * exactly as on the native ParparVM-C targets. hardeningPlatform() is "javascript" here, which the
+     * base class does not treat as ParparVM-C, so opt this builder in explicitly.
+     */
+    @Override
+    protected boolean stagesParparVMRuntime(BuildRequest request) {
+        return true;
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         debug("Request Args: ");
         debug("-----------------");
@@ -447,6 +463,7 @@ public class JavaScriptBuilder extends Executor {
         PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8));
         try {
             pw.println("import com.codename1.impl.html5.ParparVMBootstrap;");
+            pw.println("import com.codename1.ui.Display;");
             pw.println("import " + packageName + "." + mainClass + ";");
             pw.println();
             pw.println("public final class " + launcherName + " {");
@@ -468,7 +485,17 @@ public class JavaScriptBuilder extends Executor {
             // database. Display does not exist yet here, hence the static call.
             pw.print(databaseLegacyStubCall(request, usesDatabase,
                     coreHasLegacySwitch(stageClasses)));
-            pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "());");
+            // Stamp the hardening metadata after Display.init but BEFORE the lifecycle's init/start,
+            // so Hardening.isHardened() and any crash raised during startup already carry the mapping
+            // id / level (parity with iOS and Android). bootstrap(lifecycle, afterInit) invokes the
+            // runnable at exactly that point; a post-bootstrap stamp would miss startup because
+            // bootstrap runs init/start inline. hardeningRuntimeProperties emits
+            // Display.getInstance().setProperty(...) lines.
+            pw.println("        ParparVMBootstrap.bootstrap(new " + mainClass + "(), new Runnable() {");
+            pw.println("            public void run() {");
+            pw.print(hardeningRuntimeProperties(request));
+            pw.println("            }");
+            pw.println("        });");
             pw.println("    }");
             pw.println("}");
         } finally {
