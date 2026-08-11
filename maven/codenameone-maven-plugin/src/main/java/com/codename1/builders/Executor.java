@@ -1218,7 +1218,7 @@ public abstract class Executor {
             Thread t = new Thread() {
                 public void run() {
                     try {
-                        File s = sourceZip;
+                        File s = hardenSourceJar(sourceZip, request);
                         result[0] = build(s, request);
 
                     } catch (Throwable err) {
@@ -2338,6 +2338,548 @@ public abstract class Executor {
             dat[iter] = (byte)(dat[iter] ^ (iter % 254 + 1));
         }
         return Base64.encodeNoNewline(dat);
+    }
+
+    /**
+     * The platform id this builder targets, for the hardening engine ({@code ios}, {@code and},
+     * {@code javascript}, {@code win}, {@code linux}, {@code mac}, ...). Subclasses override.
+     */
+    protected String hardeningPlatform(BuildRequest request) {
+        return "unknown";
+    }
+
+    /**
+     * Extra fully-qualified class names to keep from renaming, beyond the main class, for a slice whose
+     * runtime resolves a class by its ORIGINAL name in generated native code (which the input-jar
+     * scanner cannot discover). Empty by default; the iOS builder adds the watch lifecycle entry.
+     */
+    protected java.util.List<String> extraKeepClasses(BuildRequest request) {
+        return java.util.Collections.emptyList();
+    }
+
+    /**
+     * Java source that stamps the hardening runtime properties ({@code cn1.mappingId},
+     * {@code cn1.hardened}, {@code cn1.hardenLevel}) into {@code Display}, so every port's stub can
+     * emit them the same way. These back {@code Hardening.isHardened()} and the crash report's
+     * mapping id / level. The values are controlled build outputs (a hex id and a fixed level),
+     * so string concatenation into the stub is safe.
+     */
+    protected String hardeningRuntimeProperties(BuildRequest request) {
+        return "        Display.getInstance().setProperty(\"cn1.mappingId\", \"" + resolveMappingId(request) + "\");\n"
+                + "        Display.getInstance().setProperty(\"cn1.hardened\", \"" + request.getArg("cn1.hardened", "false") + "\");\n"
+                + "        Display.getInstance().setProperty(\"cn1.hardenLevel\", \"" + request.getArg("cn1.hardenLevel", "off") + "\");\n";
+    }
+
+    /**
+     * Whether the hardening engine should rename for this platform. Android returns false: R8
+     * remains the sole renamer there, and the engine only encrypts strings and exports keep rules.
+     */
+    protected boolean hardeningRenameSupported() {
+        return true;
+    }
+
+    /**
+     * Library jars the hardening engine passes to ProGuard so it can see inherited framework APIs
+     * and not rename an application method that overrides a framework method (which would break
+     * dispatch at runtime). The caller supplies the compile/platform classpath in the
+     * {@code cn1.hardening.libraryJars} request argument (path-separated); subclasses may add more.
+     */
+    /**
+     * True for the ParparVM-to-C targets (iOS/mac/watch/tv/win/linux), whose app links against the
+     * {@code parparvm-java-api.jar} runtime. A compile-time literal there is a constant-pool object that
+     * ParparVM never interns, so an encrypted app copy of the same value would not be reference-equal to
+     * it; the runtime's literals are therefore excluded from encryption on these targets.
+     */
+    protected boolean isParparVMCPlatform(String platform) {
+        return "ios".equals(platform) || "mac".equals(platform) || "watch".equals(platform)
+                || "tv".equals(platform) || "win".equals(platform) || "linux".equals(platform);
+    }
+
+    /**
+     * Whether this builder's artifact links against the un-interned ParparVM Java runtime, so that
+     * runtime's literals must be excluded from encryption to preserve reference equality. Defaults to the
+     * ParparVM-C platform test, but the platform tag alone is insufficient for the JavaScript port: the
+     * ParparVM-to-JS builder reports {@code javascript} yet unpacks {@code parparvm-java-api.jar} into the
+     * translated app exactly like the native ParparVM-C targets, so {@code JavaScriptBuilder} overrides
+     * this to true. (A TeaVM-based JS build would not link that runtime, but the plugin's local JS builder
+     * is ParparVM-only.)
+     */
+    protected boolean stagesParparVMRuntime(BuildRequest request) {
+        return isParparVMCPlatform(hardeningPlatform(request));
+    }
+
+    /**
+     * The platform tags this one build ships from the SAME hardened jar. The default builder emits a
+     * single slice ({@link #hardeningPlatform(BuildRequest)}); the Apple builder widens it to the iOS app
+     * plus any native-Mac, watch or tv slice. A shared jar cannot be hardened per-slice, so its
+     * {@code harden.<slice>.enabled} opt-outs are combined: hardening runs unless EVERY shipped slice is
+     * opted out (see {@link #writeHardeningConfig}). Kept consistent with the daemon builder.
+     */
+    protected java.util.List<String> effectiveHardeningPlatforms(BuildRequest request) {
+        return java.util.Collections.singletonList(hardeningPlatform(request));
+    }
+
+    /**
+     * True when a {@code harden.*} boolean reads as disabled, matching the engine's tri-state parsing:
+     * {@code false}, {@code 0} and {@code off} all mean off, so a per-slice opt-out is recognized
+     * consistently rather than only as the literal {@code false}.
+     */
+    protected static boolean hardenDisabled(String value) {
+        if (value == null) {
+            return false;
+        }
+        String t = value.trim().toLowerCase();
+        return "false".equals(t) || "0".equals(t) || "off".equals(t);
+    }
+
+    /**
+     * True when at least one of the shipped {@code slices} still wants hardening, i.e. NOT every slice
+     * opted out via {@code harden.<slice>.enabled}. A shared jar is hardened as a whole, so the combined
+     * decision is this OR: hardening runs unless every slice is opted out.
+     */
+    static boolean anySliceHardeningEnabled(java.util.List<String> slices, BuildRequest request) {
+        for (String slice : slices) {
+            if (!hardenDisabled(request.getArg("harden." + slice + ".enabled", "true"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected java.util.List<File> hardeningLibraryJars(BuildRequest request) {
+        java.util.List<File> jars = new java.util.ArrayList<File>();
+        // Always include the Codename One framework jar: every builder receives it, and it carries
+        // the framework superclasses ProGuard must see so it never renames an application override
+        // (e.g. a custom Component.paint) apart from the fixed framework method -- which would break
+        // virtual dispatch. cn1.hardening.libraryJars (below) is only set on the CN1BuildMojo entry
+        // and is absent when hardening runs through buildNoException, so it can't be relied on alone.
+        if (codenameOneJar != null && codenameOneJar.exists()) {
+            jars.add(codenameOneJar);
+        }
+        // On a ParparVM-C target the app also links against the ParparVM Java runtime
+        // (parparvm-java-api.jar -- java.lang.Boolean, java.lang.String, ...), which the builder stages
+        // later and never hardens. Its literals must reach the engine's library-literal exclusion scan,
+        // or an app value like "true" (encrypted then interned) would compare != to a runtime-returned
+        // copy such as Boolean.toString() -- a constant-pool literal ParparVM never interns -- breaking a
+        // reference comparison that held before hardening. It doubles as a -libraryjars entry for ProGuard.
+        if (stagesParparVMRuntime(request)) {
+            try {
+                File runtime = getResourceAsFile("/parparvm-java-api.jar", ".jar");
+                if (runtime != null && runtime.exists() && !jars.contains(runtime)) {
+                    jars.add(runtime);
+                }
+            } catch (IOException ex) {
+                // Best-effort: without the runtime jar the scan simply misses its literals (a rare == edge).
+            }
+        }
+        String raw = request.getArg("cn1.hardening.libraryJars", "");
+        if (raw == null || raw.length() == 0) {
+            // Fallback: the maven plugin publishes the compile classpath here (a single injection
+            // point rather than threading it through every local-build request).
+            raw = System.getProperty("cn1.hardening.libraryJars", "");
+        }
+        if (raw != null && raw.length() > 0) {
+            for (String p : raw.split(java.util.regex.Pattern.quote(File.pathSeparator))) {
+                if (p != null && p.trim().length() > 0) {
+                    File f = new File(p.trim());
+                    if (f.exists() && !jars.contains(f)) {
+                        jars.add(f);
+                    }
+                }
+            }
+        }
+        return jars;
+    }
+
+    private boolean hardeningRanThisBuild;
+    private File lastHardeningMapping;
+    private String lastHardeningMappingId = "";
+    private String lastHardeningR8Keep = "";
+
+    /** The cross-platform obfuscation mapping produced by the last {@link #hardenSourceJar} call, or null. */
+    public File getLastHardeningMapping() {
+        return lastHardeningMapping;
+    }
+
+    /**
+     * The keep rules the engine derived from the input jar (reflective {@code Class.forName}
+     * targets, service providers, name-bound property objects, the app's {@code harden.keep}),
+     * for a downstream renamer the engine does not drive itself -- specifically R8 on Android.
+     * Empty when hardening did not run or emitted no rules.
+     */
+    public String getLastHardeningR8Keep() {
+        return lastHardeningR8Keep;
+    }
+
+    /** The mapping id produced by the last {@link #hardenSourceJar} call, or empty. */
+    public String getLastHardeningMappingId() {
+        return lastHardeningMappingId;
+    }
+
+    /**
+     * Runs the build with hardening applied first: {@code build(hardenSourceJar(sourceZip, request),
+     * request)}. Callers that bypass {@link #buildNoException} (the local build paths in the maven
+     * plugin) invoke this instead of {@code build} directly, so hardening reaches every path.
+     */
+    public boolean runBuild(File sourceZip, BuildRequest request) throws BuildException {
+        return build(hardenSourceJar(sourceZip, request), request);
+    }
+
+    /**
+     * Reads a {@code harden.*} boolean argument with the same tri-state rules the engine's
+     * {@code HardeningConfig.boolTri} applies: {@code true/1/2/3/on} are true, {@code false/0/off}
+     * are false, and anything else (including unset/blank) falls back to {@code def}. Builders must
+     * use this rather than a bare {@code "false".equals(...)} so a documented alias like
+     * {@code harden.rename=off} is not silently misread.
+     */
+    protected boolean hardenBoolArg(BuildRequest request, String key, boolean def) {
+        String v = request.getArg(key, null);
+        if (v == null) {
+            return def;
+        }
+        String t = v.trim().toLowerCase();
+        if (t.length() == 0) {
+            return def;
+        }
+        if ("true".equals(t) || "1".equals(t) || "2".equals(t) || "3".equals(t) || "on".equals(t)) {
+            return true;
+        }
+        if ("false".equals(t) || "0".equals(t) || "off".equals(t)) {
+            return false;
+        }
+        return def;
+    }
+
+    /**
+     * Applies the app-hardening transform to the merged application jar and returns the jar the
+     * build should proceed with. When hardening is not requested (or already applied, or declined
+     * by the engine) the input jar is returned unchanged; when the engine reports the build is not
+     * entitled, the build fails. The engine runs as a forked process so it is single-sourced across
+     * the plugin and the cloud daemon and never shares a classloader with the caller.
+     */
+    public File hardenSourceJar(File sourceZip, BuildRequest request) throws BuildException {
+        // Idempotence FIRST, via a non-forgeable per-instance flag (not an input-jar marker: a
+        // spurious META-INF/CN1-HARDENED resource must not skip the transform). On a second call in
+        // this build -- a nested/delegated invocation -- the verified cn1.hardened / cn1.hardenLevel /
+        // cn1.mappingId from the first run are already in the request, so return WITHOUT touching them.
+        if (hardeningRanThisBuild) {
+            log("cn1-hardening: already hardened in this build; skipping");
+            return sourceZip;
+        }
+        // cn1.hardened / cn1.hardenLevel / cn1.mappingId are engine OUTPUTS, never inputs. Clear any
+        // supplied values so the stubs never stamp a hardened state the engine didn't actually
+        // produce; they are set again below only from a verified hardening run.
+        request.putArgument("cn1.hardened", "false");
+        request.putArgument("cn1.hardenLevel", "off");
+        request.putArgument("cn1.mappingId", "");
+        String level = request.getArg("harden.level", "off");
+        if (level == null || level.trim().length() == 0 || "off".equalsIgnoreCase(level.trim())) {
+            return sourceZip;
+        }
+        // The client-side pre-flight (Check 1) sets this when a local/source target opted into an
+        // unhardened build via harden.allowUnhardenedLocalBuild; honor it as a single point. Prefer the
+        // per-build request arg (the Mojo injects its instance decision there) over the process-wide
+        // System property, which is racy under concurrent module builds -- another platform's build could
+        // clear it between this build's pre-flight and this read. The System property stays as a fallback
+        // for any caller that has not migrated to the request arg.
+        if ("true".equals(request.getArg("cn1.harden.forceOff", null))
+                || "true".equals(System.getProperty("cn1.harden.forceOff"))) {
+            log("cn1-hardening: forced off for this local build; building unhardened");
+            return sourceZip;
+        }
+        try {
+            File engine = getResourceAsFile("/cn1-hardening.jar", ".jar");
+            File workDir = new File(sourceZip.getParentFile(), "cn1-harden-work");
+            workDir.mkdirs();
+            File hardened = new File(workDir, "hardened.jar");
+            File mapping = new File(workDir, "cn1-mapping.txt");
+            File report = new File(workDir, "cn1-harden-report.json");
+            File r8Keep = new File(workDir, "cn1-r8-keep.pro");
+            File config = new File(workDir, "config.properties");
+            writeHardeningConfig(config, request);
+
+            String javaBin = new File(System.getProperty("java.home"), "bin/java").getAbsolutePath();
+            java.util.List<String> cmd = new java.util.ArrayList<String>();
+            cmd.add(javaBin);
+            cmd.add("-jar");
+            cmd.add(engine.getAbsolutePath());
+            cmd.add("harden");
+            cmd.add("--in");
+            cmd.add(sourceZip.getAbsolutePath());
+            cmd.add("--out");
+            cmd.add(hardened.getAbsolutePath());
+            cmd.add("--mapping");
+            cmd.add(mapping.getAbsolutePath());
+            cmd.add("--report");
+            cmd.add(report.getAbsolutePath());
+            cmd.add("--r8keep");
+            cmd.add(r8Keep.getAbsolutePath());
+            cmd.add("--config");
+            cmd.add(config.getAbsolutePath());
+
+            int exit = runForked(cmd, workDir);
+            if (exit == 0) {
+                lastHardeningMapping = mapping.isFile() ? mapping : null;
+                lastHardeningMappingId = readMappingId(mapping);
+                lastHardeningR8Keep = r8Keep.isFile() ? readFileToString(r8Keep) : "";
+                // On Android the engine does not rename (R8 is the sole renamer), so its mapping --
+                // and thus its mapping id -- is empty. Derive a per-build id regardless of
+                // harden.rename: R8 still renames whenever minification is on (independent of the
+                // engine's rename), and when minification is off an identity map is uploaded -- both
+                // need a non-empty id to key the mapping the app carries. An empty id would leave
+                // hardened Android crashes unretraceable.
+                if ((lastHardeningMappingId == null || lastHardeningMappingId.length() == 0)
+                        && !hardeningRenameSupported()) {
+                    lastHardeningMappingId = downstreamMappingId(request, hardened);
+                }
+                // Propagate the mapping id / hardened flag / level into the request BEFORE the
+                // builder generates its stubs, so the stubs stamp them as runtime properties
+                // (Hardening.isHardened(), the crash report's mappingId/hardenLevel).
+                request.putArgument("cn1.mappingId", lastHardeningMappingId);
+                request.putArgument("cn1.hardened", "true");
+                request.putArgument("cn1.hardenLevel", level.trim().toLowerCase());
+                hardeningRanThisBuild = true;
+                log("cn1-hardening: applied, mappingId=" + lastHardeningMappingId);
+                return hardened;
+            }
+            if (exit == 4) {
+                throw new BuildException("App hardening is an Enterprise feature and this build "
+                        + "is not entitled. Upgrade at https://www.codenameone.com/pricing.html "
+                        + "or set codename1.arg.harden.level=off.");
+            }
+            if (exit == 3) {
+                log("cn1-hardening: declined by engine; building unhardened");
+                return sourceZip;
+            }
+            throw new BuildException("App hardening failed (engine exit code " + exit
+                    + "). This build has been stopped rather than shipping a partially hardened binary.");
+        } catch (BuildException be) {
+            throw be;
+        } catch (Exception e) {
+            throw new BuildException("App hardening failed: " + e.getMessage());
+        }
+    }
+
+    private void writeHardeningConfig(File config, BuildRequest request) throws IOException {
+        java.util.Properties p = new java.util.Properties();
+        for (String key : request.getArgs()) {
+            if (key.startsWith("harden.")) {
+                p.setProperty(key, request.getArg(key, ""));
+            }
+        }
+        p.setProperty("cn1.platform", hardeningPlatform(request));
+        // A build can ship several slices from this ONE shared hardened jar (the iOS app plus a
+        // native-Mac/watch/tv slice). The engine reads a single harden.<cn1.platform>.enabled, so a
+        // combined build would otherwise honor only one slice's opt-out and silently ignore the others'.
+        // Coalesce them: hardening runs unless EVERY shipped slice is opted out. A shared jar cannot be
+        // hardened one way for one slice and another for the other, so this is the honest combination.
+        p.setProperty("harden." + hardeningPlatform(request) + ".enabled",
+                Boolean.toString(anySliceHardeningEnabled(effectiveHardeningPlatforms(request), request)));
+        // The keep rule must name the FULLY QUALIFIED main class: getMainClass() is the simple name
+        // (the stubs combine it with getPackageName()), so passing it bare would keep a default-package
+        // class and let ProGuard rename the real application class out from under the generated stub.
+        p.setProperty("cn1.mainClass", fullyQualifiedMainClass(request));
+        // Keep any class a slice resolves by its original name in generated native code (e.g. the
+        // watch lifecycle entry embedded in cn1_watch_runtime_start), which the input-jar scanner
+        // cannot see. Appended as ProGuard -keep rules to harden.keep, the caller-keep channel.
+        java.util.List<String> extraKeeps = extraKeepClasses(request);
+        if (extraKeeps != null && !extraKeeps.isEmpty()) {
+            StringBuilder kb = new StringBuilder(p.getProperty("harden.keep", ""));
+            for (String cls : extraKeeps) {
+                if (cls == null || cls.trim().length() == 0) {
+                    continue;
+                }
+                if (kb.length() > 0) {
+                    kb.append('\n');
+                }
+                kb.append("-keep class ").append(cls.trim()).append(" { *; }");
+            }
+            p.setProperty("harden.keep", kb.toString());
+        }
+        p.setProperty("cn1.renameSupported", Boolean.toString(hardeningRenameSupported()));
+        // Local plugin builds are ungated: the engine is open source and a developer must be able
+        // to reproduce a cloud failure locally. The cloud daemon sets this from the account tier.
+        p.setProperty("cn1.entitled", request.getArg("cn1.entitled", "true"));
+        p.setProperty("cn1.buildKey", resolveBuildKey(request));
+        StringBuilder libs = new StringBuilder();
+        for (File lib : hardeningLibraryJars(request)) {
+            if (lib != null && lib.exists()) {
+                if (libs.length() > 0) {
+                    libs.append(File.pathSeparator);
+                }
+                libs.append(lib.getAbsolutePath());
+            }
+        }
+        p.setProperty("cn1.libraryJars", libs.toString());
+        FileOutputStream fo = new FileOutputStream(config);
+        try {
+            p.store(fo, "Codename One hardening configuration");
+        } finally {
+            fo.close();
+        }
+    }
+
+    /** The fully qualified main class: {@code getPackageName().getMainClass()} unless already qualified. */
+    private String fullyQualifiedMainClass(BuildRequest request) {
+        String main = request.getMainClass();
+        if (main == null || main.trim().length() == 0) {
+            return "";
+        }
+        main = main.trim();
+        if (main.indexOf('.') >= 0) {
+            return main;
+        }
+        String pkg = request.getPackageName();
+        if (pkg == null || pkg.trim().length() == 0) {
+            return main;
+        }
+        return pkg.trim() + "." + main;
+    }
+
+    private int runForked(java.util.List<String> cmd, File workDir) throws IOException, InterruptedException {
+        ProcessBuilder pb = new ProcessBuilder(cmd);
+        pb.directory(workDir);
+        pb.redirectErrorStream(true);
+        Process proc = pb.start();
+        java.io.BufferedReader r = new java.io.BufferedReader(
+                new java.io.InputStreamReader(proc.getInputStream(), StandardCharsets.UTF_8));
+        String line;
+        while ((line = r.readLine()) != null) {
+            log(line);
+        }
+        return proc.waitFor();
+    }
+
+    private boolean isAlreadyHardened(File jar) {
+        if (jar == null || !jar.isFile()) {
+            return false;
+        }
+        java.util.zip.ZipFile zf = null;
+        try {
+            zf = new java.util.zip.ZipFile(jar);
+            return zf.getEntry("META-INF/CN1-HARDENED") != null;
+        } catch (IOException e) {
+            return false;
+        } finally {
+            if (zf != null) {
+                try {
+                    zf.close();
+                } catch (IOException ignore) {
+                    // best effort
+                }
+            }
+        }
+    }
+
+    private String readMappingId(File mapping) {
+        if (mapping == null || !mapping.isFile()) {
+            return "";
+        }
+        java.io.BufferedReader r = null;
+        try {
+            r = new java.io.BufferedReader(new java.io.InputStreamReader(
+                    new FileInputStream(mapping), StandardCharsets.UTF_8));
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith("# mappingId:")) {
+                    return line.substring("# mappingId:".length()).trim();
+                }
+            }
+        } catch (IOException e) {
+            return "";
+        } finally {
+            if (r != null) {
+                try {
+                    r.close();
+                } catch (IOException ignore) {
+                    // best effort
+                }
+            }
+        }
+        return "";
+    }
+
+    /**
+     * The per-build key the cloud stamps into the app and that crash reports echo back so the
+     * server can match a report to its uploaded symbol bundle. The cloud passes it in the
+     * {@code cn1.buildKey} argument; when it is absent (local builds) we fall back to the
+     * literal {@code LOCAL_BUILD}. Historically Android hard-coded {@code "LOCAL_BUILD"} as the
+     * <em>encoded</em> constant and then ran it through {@code d()} / {@code Util.xorDecode},
+     * which is not valid Base64 and decoded to junk -- always encode through this pair.
+     */
+    public String resolveBuildKey(BuildRequest request) {
+        String bk = request.getArg("cn1.buildKey", null);
+        if(bk == null || bk.length() == 0) {
+            bk = "LOCAL_BUILD";
+        }
+        return bk;
+    }
+
+    /**
+     * The {@link #resolveBuildKey(BuildRequest) build key} in the {@code d()}-decodable encoded
+     * form the generated stubs embed, i.e. what a stub assigns to its {@code BUILD_KEY} constant
+     * before stamping {@code Display.setProperty("build_key", d(BUILD_KEY))} at runtime.
+     */
+    public String buildKeyEncoded(BuildRequest request) {
+        return xorEncode(resolveBuildKey(request));
+    }
+
+    /**
+     * Identifier of the obfuscation mapping this build was hardened with, stamped alongside the
+     * build key so a crash report can be tied to the exact mapping even if a rebuilt app reused
+     * the build key. Empty for unhardened builds. Passed by the cloud in {@code cn1.mappingId}.
+     */
+    public String resolveMappingId(BuildRequest request) {
+        return request.getArg("cn1.mappingId", "");
+    }
+
+    /**
+     * A stable mapping id for a build whose rename is produced by a downstream tool (R8 on Android)
+     * rather than the engine, so the engine's own mapping id is empty. Derived from the build key
+     * and platform as a SHA-256 hex string, matching the engine mapping id's format, so a hardened
+     * crash report can be tied to the R8 mapping.txt uploaded for this build+platform.
+     */
+    // The id is necessarily fixed BEFORE R8 runs -- the app carries it as a compile-time constant,
+    // and R8's own mapping.txt does not exist until after the app is compiled, so the id cannot be a
+    // hash of that mapping. It is a per-BUILD nonce (build key + platform + hardened jar bytes + a
+    // unique run stamp), so every build -- even a byte-identical rebuild, or two builds that reuse a
+    // build key but produce different R8 mappings because android.proguardKeep or the R8 version
+    // changed -- gets a distinct id. The daemon uploads that build's R8 mapping.txt keyed by THIS id,
+    // so a crash report's id selects the exact mapping that build shipped and no upload overwrites
+    // another build's mapping in the same slot.
+    private String downstreamMappingId(BuildRequest request, File hardenedJar) {
+        String seed = resolveBuildKey(request) + ":" + hardeningPlatform(request)
+                + ":" + System.nanoTime() + ":" + System.identityHashCode(hardenedJar);
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            md.update(seed.getBytes("UTF-8"));
+            // Fold in the hardened application jar's bytes so two builds that reuse a build key but
+            // differ in code get distinct ids -- resolveMappingId promises to distinguish a rebuilt
+            // app that reused a build key. A byte-identical rebuild keeps the same id, matching its
+            // identical R8 mapping.
+            if (hardenedJar != null && hardenedJar.isFile()) {
+                java.io.InputStream in = new java.io.FileInputStream(hardenedJar);
+                try {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        md.update(buf, 0, n);
+                    }
+                } finally {
+                    in.close();
+                }
+            }
+            byte[] digest = md.digest();
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+                sb.append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            // No SHA-256 (impossible on a supported JDK) -- fall back to a non-empty encoded key.
+            return buildKeyEncoded(request);
+        }
     }
 
     /**

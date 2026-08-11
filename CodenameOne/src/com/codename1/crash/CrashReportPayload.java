@@ -45,6 +45,20 @@ final class CrashReportPayload {
     /// signal handlers are usually compact (~64 frames * ~120 chars),
     /// but a corrupt stack can produce arbitrarily long output.
     static final int MAX_NATIVE_STACK_LEN = 16 * 1024;
+    /// Hard cap on the raw (pre-rendered) Java stack string captured via
+    /// `printStackTrace` -- the verbatim platform rendering plus the cause
+    /// chain. It complements the structured {@link #frames} (populated on
+    /// every port), and on the JS port, where there are no structured
+    /// frames, it carries the JavaScript engine stack. Mirrors
+    /// {@link #MAX_NATIVE_STACK_LEN}.
+    static final int MAX_RAW_STACK_LEN = 16 * 1024;
+
+    /// Trace-format discriminator values. Tells the server how to parse
+    /// {@link #rawStack} for this build.
+    static final String TRACE_STRUCTURED = "structured";
+    static final String TRACE_PARPARVM = "parparvm-text";
+    static final String TRACE_JS = "js-error";
+    static final String TRACE_NONE = "none";
 
     final String eventId;
     final String buildKey;
@@ -56,6 +70,23 @@ final class CrashReportPayload {
     final String exceptionClass;
     final String messageScrubbed;
     final List<Frame> frames;
+    /// The pre-rendered Java stack captured via `printStackTrace`, which
+    /// works identically on every port. On the ParparVM C targets this is
+    /// the only readable Java trace once obfuscated; the server parses it
+    /// with the mapping. `null` when no stack was available.
+    final String rawStack;
+    /// One of {@link #TRACE_STRUCTURED}, {@link #TRACE_PARPARVM},
+    /// {@link #TRACE_JS} or {@link #TRACE_NONE}: how the server should read
+    /// {@link #rawStack}. Derived, never guessed.
+    final String traceFormat;
+    /// SHA-256 of the obfuscation mapping this build was hardened with,
+    /// stamped into the app so a report can be tied to the exact mapping.
+    /// Empty for unhardened builds.
+    final String mappingId;
+    /// The hardening level the build shipped with (`off` / `standard` /
+    /// `aggressive` / `paranoid`); lets the server answer "why can't I
+    /// retrace this?" with the honest reason.
+    final String hardenLevel;
     /// Recent platform-log output captured at crash time. Provides
     /// context the Java stack frame alone can't (NSLog/os_log on iOS,
     /// logcat on Android). `null` if the platform has no readable log
@@ -71,23 +102,101 @@ final class CrashReportPayload {
 
     CrashReportPayload(String eventId, String exceptionClass,
             String messageScrubbed, List<Frame> frames,
-            String nativeLog, String nativeStack) {
+            String nativeLog, String nativeStack, String rawStack) {
         this.eventId = eventId;
         this.exceptionClass = exceptionClass;
         this.messageScrubbed = trim(messageScrubbed, MAX_MESSAGE_LEN);
         this.frames = capFrames(frames);
         this.nativeLog = trim(nativeLog, MAX_NATIVE_LOG_LEN);
         this.nativeStack = trim(nativeStack, MAX_NATIVE_STACK_LEN);
+        this.rawStack = trim(rawStack, MAX_RAW_STACK_LEN);
         Display d = Display.getInstance();
+        this.platform = d.getPlatformName();
+        this.traceFormat = deriveTraceFormat(this.frames, this.rawStack, this.platform);
         this.buildKey = d.getProperty("build_key", "");
         this.packageName = d.getProperty("package_name", "");
         this.appName = d.getProperty("AppName", "");
         this.appVersion = d.getProperty("AppVersion", "");
-        this.platform = d.getPlatformName();
         this.osVersion = d.getProperty("OSVer", "");
+        this.mappingId = d.getProperty("cn1.mappingId", "");
+        this.hardenLevel = d.getProperty("cn1.hardenLevel", "");
         Locale loc = Locale.getDefault();
         this.locale = loc == null ? "" : loc.toString();
         this.clientTs = System.currentTimeMillis();
+    }
+
+    /// Derives the trace format from what we actually have, so the server picks the right parser --
+    /// never a guess. Structured frames win. Otherwise: the JavaScript port's raw stack is a JS engine
+    /// stack; a ParparVM C target's is the "    at <fqcn>.<method>:<line>" text; a JVM target
+    /// (Android/desktop) reaching here has an ordinary JVM printStackTrace (e.g. a stackless throwable
+    /// whose only frames are in its cause) that the JS parser must NOT touch. The old heuristic looked
+    /// only for the 4-space ParparVM shape and labeled everything else -- including the tab-indented
+    /// JVM trace -- as JavaScript; derive from the platform so that never happens.
+    static String deriveTraceFormat(List<Frame> frames, String rawStack, String platform) {
+        // A real JVM sets java.vm.name; ParparVM's System.getProperty always returns null. This is the
+        // only reliable way to tell a native ParparVM-C target from a JavaSE desktop app or the simulator,
+        // because JavaSEPort.getPlatformName() returns the SAME mac/win names a native build reports.
+        return deriveTraceFormat(frames, rawStack, platform, System.getProperty("java.vm.name") != null);
+    }
+
+    /// The testable core of {@link #deriveTraceFormat(List, String, String)}: {@code runningOnJvm} is
+    /// supplied explicitly (production derives it from {@code java.vm.name}) so a JVM-hosted unit test can
+    /// exercise both the native ParparVM-C path and the JavaSE-on-mac/win path.
+    static String deriveTraceFormat(List<Frame> frames, String rawStack, String platform,
+            boolean runningOnJvm) {
+        if (frames != null && !frames.isEmpty()) {
+            return TRACE_STRUCTURED;
+        }
+        if (rawStack == null || rawStack.length() == 0) {
+            return TRACE_NONE;
+        }
+        if (isJavaScriptPlatform(platform)) {
+            return TRACE_JS;
+        }
+        // The "    at <fqcn>.<method>:<line>" text is only produced by ParparVM's own printStackTrace on a
+        // native C target. Gate on the runtime: an Android/desktop/simulator (real-JVM) throwable whose
+        // MESSAGE happens to contain such a line -- the message is echoed into the raw stack by
+        // printStackTrace -- must NOT be labeled parparvm-text, or the server would fabricate a frame from
+        // message text or drop a real cause trace. The shape check still guards an unexpected stack on a
+        // ParparVM-C target.
+        if (isParparVmTextPlatform(platform, runningOnJvm)) {
+            // A ParparVM frame line is exactly "    at <fqcn>.<method>:<line>" -- no '(', URL or '@'.
+            int at = rawStack.indexOf("    at ");
+            if (at >= 0) {
+                int lineEnd = rawStack.indexOf('\n', at);
+                String body = lineEnd < 0 ? rawStack.substring(at + 7) : rawStack.substring(at + 7, lineEnd);
+                if (body.indexOf('(') < 0 && body.indexOf('/') < 0 && body.indexOf('@') < 0) {
+                    return TRACE_PARPARVM;
+                }
+            }
+        }
+        // Not JavaScript and not a native ParparVM-C target's text shape: an ordinary JVM printStackTrace
+        // body. There is no JVM raw parser, so report NONE and let the server keep the text verbatim rather
+        // than misparsing it.
+        return TRACE_NONE;
+    }
+
+    /// True only on a native ParparVM-to-C runtime, whose {@code printStackTrace} emits the
+    /// "    at &lt;fqcn&gt;.&lt;method&gt;:&lt;line&gt;" text. The displayed platform name is NOT enough:
+    /// a skinless JavaSE desktop app returns {@code mac}/{@code win} (Linux falls through to {@code win})
+    /// and the simulator can return {@code ios}, all colliding with the native names. So anything running
+    /// on a real JVM ({@code runningOnJvm}: JavaSE desktop, the simulator, or Android) is excluded, and of
+    /// the remaining native runtimes only the C-target names qualify.
+    private static boolean isParparVmTextPlatform(String platform, boolean runningOnJvm) {
+        if (runningOnJvm || platform == null) {
+            return false;
+        }
+        String p = platform.toLowerCase();
+        return "ios".equals(p) || "mac".equals(p) || "linux".equals(p) || "win".equals(p);
+    }
+
+    /// The JavaScript port's platform name; its raw stack is a JS engine {@code Error().stack}.
+    private static boolean isJavaScriptPlatform(String platform) {
+        if (platform == null) {
+            return false;
+        }
+        String p = platform.toLowerCase();
+        return p.indexOf("html") >= 0 || p.indexOf("javascript") >= 0 || "js".equals(p);
     }
 
     static final class Frame {
@@ -124,6 +233,10 @@ final class CrashReportPayload {
         appendString(b, "locale", locale, false);
         appendString(b, "nativeLog", nativeLog, false);
         appendString(b, "nativeStack", nativeStack, false);
+        appendString(b, "rawStack", rawStack, false);
+        appendString(b, "traceFormat", traceFormat, false);
+        appendString(b, "mappingId", mappingId, false);
+        appendString(b, "hardenLevel", hardenLevel, false);
         b.append(",\"clientTs\":").append(clientTs);
         b.append(",\"frames\":[");
         for (int i = 0; i < frames.size(); i++) {

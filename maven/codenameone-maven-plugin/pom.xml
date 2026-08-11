@@ -257,6 +257,32 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- App-hardening engine 'standalone' (shaded ProGuard + ASM). Declared at runtime
+             scope purely to force the reactor to build cn1-hardening before this module, so
+             the generate-resources step can embed its jar as /cn1-hardening.jar. It is never
+             on the compile classpath and is run as a forked process, like the parparvm bundle
+             above; the engine carries its own ProGuard/ASM. -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>cn1-hardening</artifactId>
+            <version>${project.version}</version>
+            <!-- Unclassified (not the 'standalone' classifier) purely to force the reactor to build
+                 cn1-hardening before this module: maven resolves an unclassified reactor artifact
+                 from the module's target/classes even in a test-only reactor build, whereas the
+                 'standalone' classifier is not attached until cn1-hardening's package/shade. The
+                 shaded jar itself is pulled by maven-dependency-plugin at prepare-package (below).
+                 provided + optional + a wildcard exclusion keep cn1-hardening's classes and its
+                 ProGuard/ASM off this plugin's classpath (the engine is only ever forked). -->
+            <scope>provided</scope>
+            <optional>true</optional>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <!-- WindowsPort 'bundle' (WindowsPort.jar + nativewindows.jar) supplies the
              native Windows platform classes and C/C++ sources to WindowsNativeBuilder
              as classpath resources, the same way the parparvm bundle does. -->
@@ -362,6 +388,44 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <!-- See pluginManagement above for why this is on 3.2.5. -->
                 <version>3.2.5</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <!-- Embed the forked app-hardening engine as a classpath resource
+                         (/cn1-hardening.jar), run as a separate process by Executor. Resolved from
+                         the reactor/local repo (the runtime dependency above forces cn1-hardening
+                         to build first), which works for full and partial/plugin-only builds alike,
+                         unlike copying from a sibling target/ directory. -->
+                    <execution>
+                        <id>embed-hardening-engine</id>
+                        <!-- prepare-package, not generate-resources: the shaded 'standalone' classifier
+                             is attached by cn1-hardening at its package phase, which a partial test-only
+                             reactor build ("-pl codenameone-maven-plugin -am ... test") never reaches for
+                             the upstream module. Copying at prepare-package keeps the plugin-test job
+                             green (it stops at test) while package/install still embed the engine. -->
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.codenameone</groupId>
+                                    <artifactId>cn1-hardening</artifactId>
+                                    <version>${project.version}</version>
+                                    <classifier>standalone</classifier>
+                                    <type>jar</type>
+                                    <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                                    <destFileName>cn1-hardening.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                            <overWriteReleases>true</overWriteReleases>
+                            <overWriteSnapshots>true</overWriteSnapshots>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

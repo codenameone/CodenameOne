@@ -1,0 +1,134 @@
+[[app-hardening]]
+== App Hardening
+
+Every Codename One app is already obfuscated by default. On Android the release build runs through R8, which renames the Java names. On iOS and the other native ports your code is compiled to native machine code through ParparVM, which is hard to reverse engineer on its own -- but the class names, method names and string literals still travel into the binary as readable text, so a reader who can't follow the machine code can still read the labels and the constants.
+
+App Hardening is the Enterprise layer that closes that remaining gap across *all* the ports from one place. It renames classes, methods and fields; encrypts string constants so they're not present as plaintext in the binary; and obfuscates control flow -- and it does this to the merged application before each platform build, so Android, iOS, JavaScript and the native desktop targets are all covered by one transform and one mapping.
+
+This is a tool for apps that face serious security scrutiny -- banking, payments, government and other high-risk targets. It raises the cost of static analysis and tampering; it's one layer, so pair it with <<app-shield>> so the statement your backend trusts is made by hardware the attacker doesn't control.
+
+App Hardening is an *Enterprise* feature. A build that asks for it without an Enterprise subscription *fails with an explanation* rather than producing an unhardened binary that would look protected without being so.
+
+=== What it changes, per port
+
+The transform runs on the merged application jar, at the bytecode level, before any platform-specific build step. That's why one implementation reaches every port: iOS/ParparVM translates the already-hardened bytecode to C (so the C constant pool never sees the plaintext), R8 consumes already-hardened classes on Android, and the JavaScript backend minifies already-hardened classes.
+
+[cols="2,1,4"]
+|===
+|Transform |Ports |Notes
+
+|Class / method / field renaming
+|iOS, JavaScript, Windows, Linux, desktop
+|Android keeps R8 as its sole renamer -- renaming twice would only force a pointless mapping composition. The renamer uses a distinctive name dictionary on purpose: short names such as `a`/`b` are substrings of the ParparVM native identifiers and would defeat the translator's dead-code elimination, so a six-character prefixed name is used instead.
+
+|String constant encryption
+|iOS, Android, Windows, Linux, desktop
+|Both channels are handled: the `LDC` string literals in method bodies *and* the `ConstantValue` attribute of `static final String` fields, which would otherwise leak into the ParparVM C constant pool even after the readers were encrypted. Each distinct literal is decoded once (per class) and interned, so equal encrypted literals stay reference-equal to each other. The decoder is synthesized into each class with a per-class key, so there is no single framework method to hook. Not applied on the JavaScript port, where a string literal can be a live reference into the native bridge.
+
+One caveat: an encrypted app literal is a different object from an equal *un-encrypted* literal elsewhere -- for example a literal of the same value returned by the framework, which isn't hardened. Reference (`==`) comparison of string literals across that boundary can therefore change. Compare strings with `.equals()`, which is unaffected; `==` on distinct string values was never a guarantee to rely on.
+
+One exclusion: a string used as an *annotation value* (or an annotation-method default) is stored by javac in the annotation metadata, not as an `LDC` or a field constant, so it's not encrypted and remains readable in the binary. Codename One has no runtime reflection, so your app can't read that value back anyway -- but don't place a secret in an annotation and expect it hidden.
+
+Another exclusion: string concatenation such as `"prefix=" + value`, compiled by a JDK 9 or newer javac, becomes an `invokedynamic` whose literal fragments live in the concatenation recipe rather than an `LDC` or a field constant, so the encryption can't reach them and they stay readable. The engine counts these sites and the build report lists them, so a build that ships such literals says so rather than claiming complete string encryption. Compiling with `-XDstringConcat=inline` (or an older `-target`) makes javac emit `StringBuilder` calls whose literals the engine does encrypt.
+
+|Control-flow obfuscation
+|Android, desktop
+|An opaque predicate guarded by a value the decompiler can't fold. Left off the ParparVM native ports, where it fights the translator's optimizer and the arithmetic reducer, and off JavaScript, where it inflates the bundle. Never applied to constructors.
+|===
+
+=== Turning it on
+
+Add the level to your `codenameone_settings.properties`:
+
+[source]
+----
+codename1.arg.harden.level=standard
+----
+
+[cols="2,1,4"]
+|===
+|Build hint |Default |Description
+
+|`harden.level`
+|`off`
+|Master switch: `off`, `standard`, `aggressive` or `paranoid`. An unrecognized value *fails the build* rather than being treated as `off`.
+
+|`harden.rename`
+|_(level)_
+|Override renaming on/off independently of the level.
+
+|`harden.strings`
+|_(level)_
+|`off`, `constants`, or `all`.
+
+|`harden.controlFlow`
+|_(level)_
+|Override control-flow obfuscation on/off.
+
+|`harden.keep`
+|_(none)_
+|Keep rules in ProGuard syntax, one rule per line, for classes resolved by name at runtime that the automatic analysis can't see. Same syntax as `android.proguardKeep`, so existing rules port directly. (Rules are separated by newlines only, since a `;` is legal inside a rule body such as `{ *; }`.)
+
+|`harden.<platform>.enabled`
+|`true`
+|Per-port opt-out (`and`, `ios`, `mac`, `linux`, `win`, `javascript`, `javase`), mirroring the Crash Protection opt-outs. Only an explicit `false` disables a platform.
+
+|`harden.requireSymbolUpload`
+|`true`
+|Fail the build if the symbol/mapping upload fails. Losing a hardened build's mapping makes its crash reports permanently unreadable, so this defaults to strict.
+
+|`harden.allowUnhardenedLocalBuild`
+|`false`
+|Escape hatch: allow a local or source-project target to build unhardened instead of failing the pre-flight.
+
+|`harden.seed`
+|_(build id)_
+|Fixes the renaming seed for a reproducible mapping across rebuilds; leave unset for a fresh mapping per build.
+|===
+
+=== Levels
+
+The level is the one decision most projects need to make. The individual switches are overrides on top of it.
+
+[cols="2,1,1,1,1"]
+|===
+| |`off` |`standard` |`aggressive` |`paranoid`
+
+|Class/method/field renaming |-- |yes |yes |yes
+|String encryption |-- |constants |all |all
+|Control-flow obfuscation |-- |-- |yes |yes + opaque predicates
+|Local-variable debug stripping |-- |yes |yes |yes
+|Symbol/mapping upload |-- |required |required |required
+|===
+
+On a renamed build the source file name (`SourceFile`) is stripped, matching DexGuard: the engine-renamed ports drop it, and on a minified Android release R8 drops it too. `LineNumberTable` is kept so a hardened crash still retraces to a line number against the mapping; the retrace reconstructs the file name from the (retraced) class name. Renaming also removes the local-variable and parameter names.
+
+An explicitly *unminified* Android build (`android.enableProguard=false`, which `android.onDeviceDebug` also forces) doesn't rename at all -- only string encryption and control-flow obfuscation apply -- so its class names, and `SourceFile` along with them, remain. That's a debug configuration, not the release artifact hardening targets.
+
+=== Keeping what must not be renamed
+
+Renaming is safe for code the compiler and runtime resolve by symbol. Codename One has no runtime reflection -- `Class.forName` never resolved an obfuscated application class -- so there is no reflective seam to protect, and there is no serialization to keep members for. What must survive is the small set the build resolves by *name*: the main class and its generated stub, the generated router and annotation bootstraps, and each native interface with its generated `Impl`/`Stub` peer. The engine finds the native interfaces in the input and keeps exactly those peers, and keeps the rest of that set automatically.
+
+`PropertyBusinessObject` properties are safe without any special handling: a property's JSON key and database column come from the *string* passed to its `Property`, not from the field name, so renaming the field doesn't change the on-disk schema or the wire format. String encryption decodes those strings back to the same value at runtime.
+
+If you have a class the build resolves by a name the automatic analysis can't see, add a `harden.keep` rule for it.
+
+Package names are obfuscated along with class names. Codename One's own resource loading uses absolute paths (`Display.getResourceAsStream("/name")`, the theme `.res`), which are unaffected. The one thing renaming can break is a *package-relative* resource lookup -- `getClass().getResourceAsStream("config.properties")`, without a leading slash -- because the runtime resolves it under the class's now-obfuscated package while the resource stays at its original path. This is uncommon in application code, but a bundled third-party dependency might do it; if one loads a resource relative to its own package, add a `harden.keep` rule for that class (or its package) so its package path stays put.
+
+=== Crash reports from a hardened build
+
+Hardening and Crash Protection are designed together. The build server retains the obfuscation mapping and symbolicates incoming reports against it, so a crash from a hardened build still lands as a readable, correctly lined GitHub issue -- see <<crash-protection>>. Two consequences follow: a report whose mapping has aged out of retention can no longer be retraced, and a locally hardened build (whose mapping never reached the server) can't be symbolicated at all, which is why the pre-flight refuses to harden a local target by default.
+
+=== Local and source builds aren't hardened
+
+Hardening runs on the Codename One build server, and only there. The engine itself is open source -- it lives in this repository and ships inside the Maven plugin -- so its protection isn't the secrecy of the algorithm. What the server boundary provides is enforcement and custody: the Enterprise entitlement is checked where the account lives (a client can't grant itself the feature), the renaming dictionary and decoder keys are seeded per build so the exact obfuscation differs each time and can't be predicted without the build key, and the obfuscation mapping is retained server-side for symbolication rather than handed to the client.
+
+A local or source-project target (`*-source`, `local-*`) never reaches the server, so its output isn't hardened; the build fails the pre-flight rather than mislead you, unless you set `harden.allowUnhardenedLocalBuild=true`. The simulator is never obfuscated either -- it runs your `target/classes` directly. App code can read `com.codename1.security.hardening.Hardening.isHardened()` to tell a hardened build apart from one of these.
+
+=== Hardening and App Shield
+
+These are two different Enterprise features and you can use either or both. App Hardening protects the *binary* -- it raises the cost of reading and modifying the app on the device. App Shield protects the *app-to-server relationship* -- it gives your backend a cryptographically verifiable statement that a request came from a genuine, unmodified app on an uncompromised device. Hardening makes an attacker work harder to patch out App Shield's checks; App Shield makes patching them out insufficient, because the statement your backend trusts is made by a party the attacker doesn't control.
+
+=== What this doesn't protect against
+
+Hardening raises the cost of static analysis and casual tampering. It doesn't stop a determined attacker with time, it doesn't protect a secret you embed in the client (put it on your server -- see the security chapter), and it's not a substitute for server-side authorization. Treat it as one layer of defense in depth, not a guarantee.

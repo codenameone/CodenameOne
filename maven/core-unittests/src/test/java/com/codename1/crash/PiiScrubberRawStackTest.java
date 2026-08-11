@@ -1,0 +1,319 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crash;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+/** scrubRawStack keeps frame-line coordinates while still scrubbing message PII. */
+class PiiScrubberRawStackTest {
+
+    private final PiiScrubber scrubber = new PiiScrubber();
+
+    @Test
+    void nullPassesThrough() {
+        assertEquals(null, scrubber.scrubRawStack(null));
+    }
+
+    @Test
+    void largeJavaScriptColumnOffsetsAreMaskedShortLineNumbersSurvive() {
+        // A minified bundle's column runs to six-plus digits. Because a message can plant a long id in a
+        // frame-shaped line and no text heuristic can distinguish it, the raw stack is scrubbed uniformly:
+        // the 6+ digit column is masked (precise coordinates come from the structured frames), while an
+        // ordinary short line number is left readable.
+        String stack = "TypeError: undefined is not a function\n"
+                + "    at run (http://host/app.js:1:123456)\n"
+                + "    at go (http://host/app.js:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:42") >= 0, scrubbed);
+    }
+
+    @Test
+    void unindentedFirefoxAtSignFrameIsScrubbedBecauseItIsAmbiguous() {
+        // The Firefox/Safari fn@url:line:col form is emitted WITHOUT indentation, so a message
+        // continuation that reproduces the grammar exactly (user@https://host/app.js:1:123456) is
+        // indistinguishable from a real frame -- no shape check can tell them apart. To avoid leaking a
+        // crafted message's numeric tail, an unindented @ line is treated as a message and its long tail
+        // is masked. (Structured frames carry the coordinate for symbolication; the indented V8
+        // 'at ...:line:col' form still preserves it -- see v8AsyncFrameWithMultiWordLabel...)
+        String stack = "Error: boom\nrun@http://host/app.js:1:123456\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+    }
+
+    @Test
+    void parparVmLineNumbersSurvive() {
+        // An ordinary ParparVM line number is short (< 6 digits), so it is left readable by the uniform
+        // digit-run masking (only 6+ digit runs -- long ids or minified columns -- are masked).
+        String stack = "    at com.foo.Bar.baz:4242\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("baz:4242") >= 0, scrubbed);
+    }
+
+    @Test
+    void messageMentioningAFileIsNotAFrame() {
+        // A free-form message can mention a file and an id; it is not a frame just because it contains
+        // ".js:", so its long id must still be masked. (No terminal :line:column, no leading "at ".)
+        String stack = "Error: account 123456 failed in app.js: retry\n"
+                + "    at run (http://host/app.js:1:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        // ...while the real frame below keeps its coordinate.
+        assertTrue(scrubbed.indexOf("app.js:1:98765") >= 0, scrubbed);
+    }
+
+    @Test
+    void messageLineStartingWithAtIsNotAFrame() {
+        // printStackTrace can wrap a message onto a line that begins with "at " but carries no frame
+        // location; its long id must still be scrubbed. A real JVM frame below keeps its line number.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account 123456 failed to load\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+    }
+
+    @Test
+    void messageWithIncidentalParenthesesIsNotAFrame() {
+        // A message wrapped onto an "at ..." line can carry incidental parentheses that are not a frame
+        // location; its id must still be scrubbed. Real parenthesized locations below survive.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account 123456 failed (retry)\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n"
+                + "\tat com.foo.Qux.run(Native Method)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed (retry)") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("(Native Method)") >= 0, scrubbed);
+    }
+
+    @Test
+    void messageWithAtPrefixAndColonNumberIsNotAFrame() {
+        // A wrapped message can start with "at " AND end in a colon-number or carry a parenthetical
+        // location, yet its identity has spaces, so it is not a frame and its id must be scrubbed.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account 123456 failed:789\n"
+                + "at account 654321 failed (token:12)\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account [num] failed:789") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("654321") < 0, scrubbed);
+        // The real frame keeps its coordinate.
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+    }
+
+    @Test
+    void messageWithWhitespaceFreeIdentityIsNotAFrame() {
+        // A wrapped message with no spaces around its id ("at account123456failed:789") is not a frame:
+        // the bare colon-number form requires a dotted class.method or a URL, and a bare word/word+digits
+        // paren location ("(attempt:123456)") is not a real location either.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account123456failed:789\n"
+                + "at retry (attempt:654321)\n"
+                + "\tat com.foo.Bar.baz(Bar.java:4242)\n"
+                + "    at com.foo.Bar.qux:998877\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account[num]failed:789") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("attempt:[num]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("654321") < 0, scrubbed);
+        // Short numbers (an ordinary line number) survive; a 6+ digit run is masked whether it is a real
+        // coordinate or a planted id, since a message line and a frame line are indistinguishable.
+        assertTrue(scrubbed.indexOf("Bar.java:4242") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("998877") < 0, scrubbed);
+    }
+
+    @Test
+    void frameUrlQueryDataIsScrubbedButCoordinateSurvives() {
+        // A JS frame URL can carry user data in its query; the terminal line:column coordinate must
+        // survive for symbolication, but the identity/URL/query before it still gets scrubbed.
+        String stack = "TypeError: boom\n"
+                + "    at f (https://host/app.js?account=123456:1:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account=[num]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf(":1:42)") >= 0, scrubbed);
+    }
+
+    @Test
+    void coordinateFreeFrameMimicIsScrubbed() {
+        // A message mimicking a coordinate-free frame ("(Native Method)"/"(Unknown Source)") has no
+        // coordinate to protect, so the whole line is scrubbed; a real such frame's dotted identity has
+        // no long digit run and is unchanged.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account123456failed (Native Method)\n"
+                + "at other654321thing (Unknown Source)\n"
+                + "\tat com.foo.Bar.baz(Native Method)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account[num]failed") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("654321") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("com.foo.Bar.baz(Native Method)") >= 0, scrubbed);
+    }
+
+    @Test
+    void onlyTheTerminalTwoCoordinateGroupsArePreserved() {
+        // A frame URL can carry colon-delimited user data before the real :line:column, e.g.
+        // host/account:123456:1:42. Only the terminal two numeric groups (:1:42) are the coordinate;
+        // the earlier :123456 is data and must be scrubbed.
+        String stack = "TypeError: boom\n"
+                + "    at f (https://host/account:123456:1:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("account:[num]:1:42)") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+    }
+
+    @Test
+    void customScrubMessageOverrideReachesRawStack() {
+        // An app that redacts an app-specific token by overriding scrubMessage must have it redacted
+        // in rawStack too, not only in the separately-scrubbed message. Frame lines stay untouched by
+        // the override so coordinates survive.
+        PiiScrubber custom = new PiiScrubber() {
+            public String scrubMessage(String message) {
+                if (message == null) {
+                    return null;
+                }
+                return super.scrubMessage(message).replace("SECRET", "[redacted]");
+            }
+        };
+        String stack = "java.lang.RuntimeException: token SECRET rejected\n"
+                + "    at run (http://host/app.js:1:98765)\n";
+        String scrubbed = custom.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("[redacted]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("SECRET") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:1:98765") >= 0, scrubbed);
+    }
+
+    @Test
+    void messageDigitsAndEmailsStillScrubbed() {
+        // The leading message line is free-form and can carry PII: a long id/phone is masked and an
+        // email is partially redacted, even though frame coordinates below are preserved.
+        String stack = "java.lang.RuntimeException: user 5551234567 test@example.com\n"
+                + "    at com.foo.Bar.baz(Bar.java:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("[num]") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("5551234567") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("tes***@example.com") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:42") >= 0, scrubbed);
+    }
+
+    @Test
+    void unindentedFrameShapedMessageContinuationIsScrubbed() {
+        // A message that wraps onto a line matching the frame grammar EXACTLY -- a dotted identity and a
+        // (File.java:line) location -- is still a message, not a frame: printStackTrace emits it at column
+        // 0 while real frames are indented. Its six-digit tail must be scrubbed, not preserved as a line
+        // number. The genuine indented frame below keeps its coordinate.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "at account.failed(File.java:123456)\n"
+                + "    at com.foo.Bar.baz(Bar.java:42)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:42") >= 0, scrubbed);
+    }
+
+    @Test
+    void atSignLineWithLongTailIsScrubbedWhateverItsSourceShape() {
+        // Every unindented '@' line is treated as a message (the Firefox form is ambiguous, see
+        // unindentedFirefoxAtSignFrame...), so a long numeric tail is masked whether the text after '@'
+        // is a bare host, a dotted host, or a full URL -- none of them is trusted as a frame coordinate.
+        String stack = "java.lang.RuntimeException: verifying\n"
+                + "status@host:1:123456\n"
+                + "status@host.com:1:234567\n"
+                + "renderApp@https://host/app.js:1:345678\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("234567") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("345678") < 0, scrubbed);
+    }
+
+    @Test
+    void scrubFrameOverrideRedactsSyntheticMethodNameInRawStack() {
+        // An app that overrides scrubFrame to strip PII from a synthetic method name must have that
+        // redaction applied to the raw stack too, not only to the structured frames -- else the raw copy
+        // reintroduces the value the app explicitly removed. The frame's coordinate is still preserved.
+        PiiScrubber custom = new PiiScrubber() {
+            public String scrubFrame(String className, String methodName) {
+                return methodName.replace("secret", "[redacted]");
+            }
+        };
+        String stack = "java.lang.RuntimeException: boom\n"
+                + "    at com.foo.Bar.secretMethod(Bar.java:42)\n";
+        String scrubbed = custom.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("secretMethod") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("[redacted]Method") >= 0, scrubbed);
+        assertTrue(scrubbed.indexOf("Bar.java:42") >= 0, scrubbed);
+    }
+
+    @Test
+    void scrubFrameOverrideReturningNullRemovesTheMethodFromRawStack() {
+        // scrubFrame may return null to REMOVE a sensitive synthetic method name (the structured frame
+        // renders it empty). The raw stack must not restore the original: the method is rendered empty.
+        PiiScrubber custom = new PiiScrubber() {
+            public String scrubFrame(String className, String methodName) {
+                return methodName.startsWith("secret") ? null : methodName;
+            }
+        };
+        String stack = "java.lang.RuntimeException: boom\n"
+                + "    at com.foo.Bar.secretHandler(Bar.java:42)\n";
+        String scrubbed = custom.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("secretHandler") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("com.foo.Bar.(Bar.java:42)") >= 0, scrubbed);
+    }
+
+    @Test
+    void indentedMessageContinuationWithArbitraryLabelIsScrubbed() {
+        // An INDENTED message continuation (the message itself contains "\n    at ...") whose text happens
+        // to look like a frame -- an arbitrary multi-word label plus a (File.java:line) location -- must
+        // still be scrubbed: "account failed" is not a V8 label shape (async/new/bound/get/set/[as]), so
+        // its six-digit tail is masked, not preserved. A genuine V8 async frame below keeps its coordinate.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "    at account failed (File.java:123456)\n"
+                + "    at async run (https://host/app.js:2:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:2:98765") >= 0, scrubbed);
+    }
+
+    @Test
+    void v8AccessorAliasWithFreeTextIsScrubbed() {
+        // A real V8 accessor alias is a single property name ([as bar]); an indented continuation that
+        // hides free text inside the brackets -- "    at account [as failed message] (File.java:123456)"
+        // -- is not a frame, so its numeric tail must be scrubbed. A genuine accessor frame below (single
+        // token alias) keeps its coordinate.
+        String stack = "java.lang.RuntimeException: bad\n"
+                + "    at account [as failed message] (File.java:123456)\n"
+                + "    at handler [as onClick] (https://host/app.js:3:98765)\n";
+        String scrubbed = scrubber.scrubRawStack(stack);
+        assertTrue(scrubbed.indexOf("123456") < 0, scrubbed);
+        assertTrue(scrubbed.indexOf("app.js:3:98765") >= 0, scrubbed);
+    }
+
+}

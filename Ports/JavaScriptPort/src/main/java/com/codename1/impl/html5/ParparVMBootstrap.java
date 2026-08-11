@@ -41,9 +41,26 @@ public final class ParparVMBootstrap implements Runnable {
     }
 
     public static void bootstrap(Lifecycle lifecycle) {
+        bootstrap(lifecycle, null);
+    }
+
+    /**
+     * As {@link #bootstrap(Lifecycle)}, but runs {@code afterInit} once {@code Display} is
+     * initialized and before the lifecycle's {@code init}/{@code start} callbacks. The generated
+     * launcher uses this to stamp the app-hardening metadata (so {@code Hardening.isHardened()} and
+     * any crash raised during {@code init}/{@code start} already see the mapping id and level),
+     * which a post-bootstrap stamp would miss because {@code run()} invokes the lifecycle inline.
+     *
+     * @param lifecycle the application lifecycle
+     * @param afterInit code to run after {@code Display.init} and before the lifecycle starts; may be null
+     */
+    public static void bootstrap(Lifecycle lifecycle, Runnable afterInit) {
         com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory());
         ParparVMBootstrap bootstrap = new ParparVMBootstrap(lifecycle);
         Display.init(bootstrap);
+        if (afterInit != null) {
+            afterInit.run();
+        }
         bootstrap.run();
     }
 
