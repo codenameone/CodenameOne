@@ -1,0 +1,453 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+#Constants {
+    includeNativeBool: true;
+    globalToolbarBool: true;
+    defaultSourceDPIInt: 0;
+    centeredPopupBool: true;
+}
+
+Form, BuilderCanvasArea, BuilderStage {
+    background-color: #f4f6fa;
+    color: #182033;
+    font-family: "native:MainRegular";
+}
+
+Toolbar {
+    background-color: #17233b;
+    color: #ffffff;
+    padding: 1mm 2mm;
+    border: none;
+}
+
+Title, TitleCommand {
+    background-color: transparent;
+    color: #ffffff;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+}
+
+BuilderSidebar, BuilderInspector {
+    background-color: #ffffff;
+    border-right: 0.25mm solid #d8deea;
+}
+
+BuilderInspector {
+    border-left: 0.25mm solid #d8deea;
+    border-right: none;
+}
+
+BuilderSectionTitle {
+    background-color: #f8f9fc;
+    color: #65708a;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2mm 2.5mm 1.4mm 2.5mm;
+    border-bottom: 0.25mm solid #e1e5ee;
+}
+
+BuilderFormItem, BuilderFormItemSelected {
+    background-color: transparent;
+    color: #313b52;
+    text-align: left;
+    font-size: 2.55mm;
+    padding: 1.7mm 2mm;
+    margin: 0.4mm 1mm;
+    border: none;
+}
+
+BuilderFormItemSelected {
+    background-color: #eaf1ff;
+    color: #2459b8;
+    border-left: 0.7mm solid #4f8cff;
+}
+
+BuilderHierarchyItem, BuilderHierarchySelected {
+    background-color: transparent;
+    color: #34415a;
+    border: none;
+    text-align: left;
+    font-size: 2.2mm;
+    padding: 1.2mm 1mm;
+    margin: 0.2mm 0.5mm;
+}
+
+BuilderHierarchySelected {
+    background-color: #eaf1ff;
+    color: #2459b8;
+    border-left: 0.6mm solid #4f8cff;
+}
+
+SplitPaneDivider {
+    background-color: #d8deea;
+}
+
+SplitPaneDragHandle {
+    color: #71809e;
+}
+
+BuilderFormIcon, BuilderInlineIcon, BuilderPaletteIcon {
+    color: #71809e;
+    padding: 0 1mm 0 0;
+}
+
+BuilderPalette {
+    background-color: #f8f9fc;
+    border-top: 0.25mm solid #d8deea;
+    padding: 0 1mm 1mm 1mm;
+}
+
+BuilderSearch, BuilderField, BuilderPicker {
+    background-color: #ffffff;
+    color: #182033;
+    border: 0.25mm solid #c7cfdd;
+    border-radius: 1.4mm;
+    padding: 1.4mm 1.6mm;
+    margin: 1mm;
+    font-size: 2.55mm;
+}
+
+BuilderFieldError {
+    background-color: #fff0f0;
+    color: #bd3232;
+    border: 1px solid #d64545;
+    border-radius: 1.4mm;
+    padding: 1.4mm 1.6mm;
+    margin: 1mm;
+    font-size: 2.55mm;
+}
+
+BuilderInlineEditor {
+    background-color: #ffffff;
+    color: #182033;
+    border: 2px solid #20b486;
+    border-radius: 1mm;
+    padding: 1mm;
+    margin: 0;
+    font-size: 2.7mm;
+}
+
+BuilderPaletteItem {
+    background-color: #ffffff;
+    color: #34415a;
+    border: 0.25mm solid #dce1eb;
+    border-radius: 1.5mm;
+    text-align: left;
+    font-size: 2.2mm;
+    padding: 1.8mm 1.2mm;
+    margin: 0.6mm;
+}
+
+BuilderCanvasToolbar {
+    background-color: #ffffff;
+    padding: 0.7mm;
+    border-bottom: 0.25mm solid #d8deea;
+}
+
+BuilderCanvasButton {
+    background-color: transparent;
+    color: #5f6c86;
+    border: none;
+    border-radius: 1.2mm;
+    padding: 1.2mm;
+    margin: 0.3mm;
+}
+
+BuilderCanvasButton.pressed {
+    background-color: #eaf1ff;
+    color: #2459b8;
+}
+
+BuilderCanvasIcon { color: #5f6c86; }
+
+BuilderSelectionActions {
+    background-color: #192437;
+    border: 0.25mm solid #61708a;
+    border-radius: 1.8mm;
+    padding: 0.45mm;
+}
+
+BuilderSelectionAction {
+    background-color: transparent;
+    color: #ffffff;
+    border: none;
+    border-radius: 1mm;
+    padding: 0.8mm;
+    margin: 0.15mm;
+    font-size: 2.2mm;
+}
+
+BuilderSelectionAction.pressed { background-color: #356dcc; }
+
+TooltipDialog {
+    background-color: #192437;
+    border: 0.3mm solid #4f8cff;
+    border-radius: 1.6mm;
+    padding: 0;
+    margin: 0;
+}
+
+Tooltip {
+    background-color: #192437;
+    color: #ffffff;
+    border: none;
+    padding: 1.2mm 2.2mm;
+    font-size: 2.2mm;
+}
+
+BuilderStage {
+    padding: 6mm;
+}
+
+BuilderDevice {
+    background-color: #ffffff;
+    border: 0.35mm solid #bdc6d6;
+    border-radius: 3mm;
+    padding: 4mm 2mm;
+    margin: 2mm;
+}
+
+BuilderDesktopSurface {
+    background-color: #ffffff;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+BuilderFormToolbar {
+    background-color: #17233b;
+    color: #ffffff;
+    padding: 1mm 2mm;
+    border-bottom: 0.25mm solid #0f182b;
+}
+
+BuilderSelection {
+    background-color: #f7faff;
+    padding: 1mm;
+    border: 0.5mm solid #4f8cff;
+}
+
+BuilderDropSpacer {
+    background-color: #20b486;
+    color: #20b486;
+    border: 1px solid #148766;
+    padding: 0;
+    margin: 1px;
+}
+
+BuilderEmptyHint, BuilderEmptyProject {
+    background-color: #f7f9fc;
+    color: #7c879b;
+    border: 0.25mm solid #bdc6d6;
+    padding: 4mm;
+    margin: 1mm;
+    text-align: center;
+}
+
+BuilderInspectorTabs {
+    background-color: #ffffff;
+}
+
+TabsContainer, TabContainer {
+    background-color: #ffffff;
+    border: none;
+}
+
+Tab, TabSelected {
+    background-color: #f8f9fc;
+    color: #68738a;
+    border: none;
+    border-bottom: 0.3mm solid #d8deea;
+    padding: 1.7mm 1mm;
+    font-size: 2.2mm;
+}
+
+TabSelected {
+    background-color: #ffffff;
+    color: #2459b8;
+    border-bottom: 0.7mm solid #4f8cff;
+}
+
+BuilderInspectorFields {
+    background-color: #ffffff;
+    padding: 1.5mm;
+}
+
+BuilderInspectorComponent {
+    background-color: #eef4ff;
+    color: #2459b8;
+    font-family: "native:MainBold";
+    padding: 1.7mm 2mm;
+    margin: 0.7mm;
+    border-radius: 1.4mm;
+}
+
+BuilderCommandCard {
+    background-color: #f7f9fc;
+    border: 0.25mm solid #d8deea;
+    border-radius: 1.5mm;
+    padding: 1mm;
+    margin: 1mm;
+}
+
+BuilderEditorPane {
+    background-color: #ffffff;
+    border-right: 0.25mm solid #d8deea;
+}
+
+BuilderEditorToolbar {
+    background-color: #f8f9fc;
+    border-bottom: 0.25mm solid #d8deea;
+    padding: 0.5mm;
+}
+
+BuilderEditorTitle {
+    color: #34415a;
+    font-family: "native:MainBold";
+    padding: 2mm;
+}
+
+BuilderFieldLabel {
+    background-color: transparent;
+    color: #606c83;
+    font-size: 2.25mm;
+    padding: 1.2mm 1mm 0 1mm;
+}
+
+BuilderCheck, BuilderCheck.selected {
+    background-color: transparent;
+    color: #34415a;
+    border: none;
+    padding: 1.2mm 1mm;
+    font-size: 2.45mm;
+}
+
+BuilderHelp {
+    background-color: #f7f9fc;
+    color: #68738a;
+    font-size: 2.25mm;
+    padding: 2mm;
+    margin: 1mm;
+    border-radius: 1.2mm;
+}
+
+BuilderPrimaryAction, BuilderSecondaryAction, BuilderDangerAction {
+    background-color: #3677e8;
+    color: #ffffff;
+    border: none;
+    border-radius: 1.5mm;
+    padding: 1.7mm 2mm;
+    margin: 1mm;
+    font-size: 2.45mm;
+}
+
+BuilderSecondaryAction {
+    background-color: #eef2f8;
+    color: #34415a;
+}
+
+BuilderDangerAction {
+    background-color: #fff0f0;
+    color: #bd3232;
+}
+
+BuilderDangerIcon { color: #bd3232; }
+
+BuilderStatus {
+    background-color: #17233b;
+    color: #d9e2f4;
+    padding: 1mm 2mm;
+    font-size: 2.1mm;
+}
+
+BuilderWelcome {
+    background-color: #ffffff;
+    border: 0.25mm solid #d8deea;
+    border-radius: 2.5mm;
+    padding: 7mm;
+}
+
+BuilderWelcomeTitle {
+    color: #182033;
+    font-family: "native:MainBold";
+    font-size: 5mm;
+    text-align: center;
+}
+
+BuilderWelcomeCopy {
+    color: #68738a;
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 2mm;
+}
+
+@media (prefers-color-scheme: dark) {
+    Form, BuilderCanvasArea, BuilderStage { background-color: #071B4D; color: #F5F8FF; }
+    Toolbar { background-color: #071B4D; color: #F5F8FF; }
+    Title, TitleCommand { background-color: transparent; color: #F5F8FF; }
+    BuilderSidebar { background-color: #102B66; border-right: 1px solid #36558F; }
+    BuilderInspector { background-color: #102B66; border-left: 1px solid #36558F; border-right: none; }
+    BuilderSectionTitle { background-color: #163575; color: #D8E2F7; border-bottom: 1px solid #36558F; }
+    BuilderFormItem { background-color: transparent; color: #F5F8FF; }
+    BuilderFormItemSelected { background-color: #21478F; color: #F5F8FF; border-left-color: #4D86FF; }
+    BuilderHierarchyItem { background-color: transparent; color: #F5F8FF; }
+    BuilderHierarchySelected { background-color: #21478F; color: #F5F8FF; border-left-color: #4D86FF; }
+    SplitPaneDivider { background-color: #36558F; }
+    SplitPaneDragHandle, BuilderFormIcon, BuilderInlineIcon, BuilderPaletteIcon, BuilderCanvasIcon { color: #A8B8DA; }
+    BuilderPalette { background-color: #163575; border-top: 1px solid #36558F; }
+    BuilderSearch, BuilderField, BuilderPicker { background-color: #0E2A61; color: #F5F8FF; border: 1px solid #5876A9; }
+    BuilderFieldError { background-color: #4B2940; color: #FFC2CC; border: 1px solid #D96A7A; }
+    BuilderInlineEditor { background-color: #0E2A61; color: #F5F8FF; border: 2px solid #41D6A4; }
+    BuilderPaletteItem { background-color: #102B66; color: #F5F8FF; border: 1px solid #36558F; }
+    BuilderCanvasToolbar { background-color: #102B66; border-bottom: 1px solid #36558F; }
+    BuilderCanvasButton { background-color: transparent; color: #A8B8DA; }
+    BuilderCanvasButton.pressed { background-color: #21478F; color: #F5F8FF; }
+    BuilderSelectionActions { background-color: #07132F; border: 1px solid #5876A9; }
+    BuilderSelectionAction { background-color: transparent; color: #F5F8FF; }
+    BuilderSelectionAction.pressed { background-color: #21478F; }
+    BuilderDevice { background-color: #102B66; border: 1px solid #5876A9; }
+    BuilderDesktopSurface { background-color: #071B4D; border: none; }
+    BuilderFormToolbar { background-color: #071B4D; color: #F5F8FF; border-bottom: 1px solid #36558F; }
+    BuilderSelection { background-color: #163575; border: 2px solid #4D86FF; }
+    BuilderDropSpacer { background-color: #41D6A4; color: #41D6A4; border: 1px solid #20B486; }
+    BuilderEmptyHint, BuilderEmptyProject { background-color: #163575; color: #D8E2F7; border: 1px solid #5876A9; }
+    BuilderInspectorTabs, TabsContainer, TabContainer, BuilderInspectorFields { background-color: #102B66; }
+    Tab { background-color: #163575; color: #D8E2F7; border: none; border-bottom: 1px solid #36558F; }
+    TabSelected { background-color: #102B66; color: #F5F8FF; border-bottom-color: #4D86FF; }
+    BuilderInspectorComponent { background-color: #21478F; color: #F5F8FF; }
+    BuilderCommandCard { background-color: #163575; border: 1px solid #36558F; }
+    BuilderEditorPane { background-color: #102B66; border-right: 1px solid #36558F; }
+    BuilderEditorToolbar { background-color: #102B66; border-bottom: 1px solid #36558F; }
+    BuilderEditorTitle { color: #F5F8FF; }
+    BuilderFieldLabel { background-color: transparent; color: #A8B8DA; }
+    BuilderCheck, BuilderCheck.selected { background-color: transparent; color: #F5F8FF; border: none; }
+    BuilderHelp { background-color: #163575; color: #D8E2F7; }
+    BuilderPrimaryAction { background-color: #4D86FF; color: #F5F8FF; }
+    BuilderSecondaryAction { background-color: #163575; color: #F5F8FF; border: 1px solid #36558F; }
+    BuilderDangerAction { background-color: #4B2940; color: #FFC2CC; }
+    BuilderStatus { background-color: #071B4D; color: #F5F8FF; }
+    BuilderWelcome { background-color: #102B66; border: 1px solid #36558F; }
+    BuilderWelcomeTitle { color: #F5F8FF; }
+    BuilderWelcomeCopy { color: #A8B8DA; }
+}

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BorderLayout" title="Guided layout nested in ordinary ones" name="NestedGuidedForm">
+    <component type="Label" name="guidedNestHeader" text="A LayeredLayout container inside a box, and boxes inside it" layoutConstraint="North" />
+    <component type="Container" name="guidedColumns" layout="BoxLayout" boxLayoutAxis="X" layoutConstraint="Center">
+        <component type="Container" name="guidedCanvas" layout="LayeredLayout">
+            <component type="Label" name="guidedTitle" text="Anchored title" layeredInsets="20px auto auto 20px" />
+            <component type="Button" name="guidedPrimary" text="Primary" layeredInsets="90px auto auto 20px" />
+            <component type="Container" name="guidedInnerBox" layout="BoxLayout" boxLayoutAxis="Y" layeredInsets="160px auto auto 20px">
+                <component type="Label" name="innerBoxLabel" text="Box inside guided" />
+                <component type="Button" name="innerBoxButton" text="Inner action" />
+            </component>
+        </component>
+        <component type="Container" name="ordinaryColumn" layout="BoxLayout" boxLayoutAxis="Y">
+            <component type="Label" name="ordinaryLabel" text="Drag between guided and ordinary" />
+            <component type="Button" name="ordinaryAction" text="Ordinary action" />
+        </component>
+    </component>
+</component>

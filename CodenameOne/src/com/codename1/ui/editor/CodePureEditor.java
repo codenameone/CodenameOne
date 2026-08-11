@@ -74,6 +74,13 @@ public class CodePureEditor extends PureEditor {
             codeView.setDiagnostics(parseDiagnostics(arg));
             return;
         }
+        if ("setProtectedMarkers".equals(name)) {
+            int separator = arg == null ? -1 : arg.indexOf('\n');
+            codeView.setProtectedRegionMarkers(
+                    separator < 0 ? null : arg.substring(0, separator),
+                    separator < 0 || separator + 1 >= arg.length() ? null : arg.substring(separator + 1));
+            return;
+        }
         if ("showCompletions".equals(name)) {
             handleShowCompletions(arg);
             return;

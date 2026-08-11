@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BorderLayout" title="Deep nesting - four levels" name="DeepNestingForm">
+    <component type="Label" name="deepHeader" text="Drag deepLeaf out to the title area and back down" layoutConstraint="North" />
+    <component type="Container" name="levelOne" layout="BoxLayout" boxLayoutAxis="X" layoutConstraint="Center">
+        <component type="Container" name="levelTwo" layout="GridLayout" gridLayoutRows="2" gridLayoutColumns="1">
+            <component type="Container" name="levelThree" layout="BoxLayout" boxLayoutAxis="Y">
+                <component type="Button" name="deepLeaf" text="Four levels down" />
+                <component type="Label" name="deepLabel" text="Sibling" />
+            </component>
+            <component type="Container" name="levelThreeSibling" layout="FlowLayout">
+                <component type="Button" name="flowOne" text="Flow 1" />
+                <component type="Button" name="flowTwo" text="Flow 2" />
+            </component>
+        </component>
+        <component type="Container" name="parkingLot" layout="BoxLayout" boxLayoutAxis="Y">
+            <component type="Label" name="parkingHint" text="Park components here" />
+        </component>
+    </component>
+    <component type="Button" name="deepFooter" text="Drag me into any level" layoutConstraint="South" />
+</component>

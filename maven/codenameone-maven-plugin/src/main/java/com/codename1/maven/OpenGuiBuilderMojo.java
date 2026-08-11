@@ -1,268 +1,405 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  */
 package com.codename1.maven;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.UUID;
+import org.apache.commons.io.FileUtils;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
+import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.descriptor.PluginDescriptor;
+import org.apache.maven.project.MavenProject;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.shared.invoker.DefaultInvocationRequest;
-import org.apache.maven.shared.invoker.DefaultInvoker;
-import org.apache.maven.shared.invoker.InvocationRequest;
-import org.apache.maven.shared.invoker.Invoker;
-import org.apache.maven.shared.invoker.MavenInvocationException;
 import org.apache.tools.ant.taskdefs.Java;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 /**
- * Goal to open the gui builder.
- * @author shannah
+ * Opens the modern standalone Codename One GUI Builder for every GUI form in the project.
+ * The editor is resolved from Maven using the same distribution model as Codename One
+ * Settings; no downloaded {@code ~/.codenameone/guibuilder.jar} is used.
+ *
+ * <pre>mvn cn1:guibuilder [-DclassName=com.example.MyForm]</pre>
  */
 @Mojo(name = "guibuilder")
 public class OpenGuiBuilderMojo extends AbstractCN1Mojo {
-    private File guibuilderInput = new File(System.getProperty("user.home") + File.separator + ".guiBuilder" + File.separator + "guibuilder.input");
+    /**
+     * Marks the editor as launched for this reactor. Kept in the plugin context, which Maven scopes
+     * to the session: a JVM-wide system property survived in a long lived Maven -- an IDE Maven
+     * server or mvnd -- so every later invocation returned at the guard and the run configuration
+     * appeared to do nothing until that process was restarted.
+     */
+    private static final String LAUNCHED_KEY = "com.codename1.maven.OpenGuiBuilderMojo.launched";
 
-    @Parameter(property="className", required=true)
+    /** The editor is compiled for this Java release, so an older forked JVM cannot load it. */
+    private static final int REQUIRED_JAVA_VERSION = 8;
+
+    /** {@code --add-exports} is a Java 9 option; passing it to an 8 JVM stops it from starting. */
+    private static final int MODULE_OPTIONS_VERSION = 9;
+
+    /** The invocation the guard belongs to. */
+    @Parameter(defaultValue = "${session}", readonly = true)
+    private MavenSession guardSession;
+
+    /** Identifies this plugin when asking the session for a context shared across the reactor. */
+    @Parameter(defaultValue = "${plugin}", readonly = true)
+    private PluginDescriptor guardPlugin;
+
+    /** Optional fully-qualified form to select initially. */
+    @Parameter(property = "className", required = false)
     private String className;
+
+    @Parameter(property = "guibuilder.spawn", required = false, defaultValue = "true")
+    private boolean spawn;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        if (!isCN1ProjectDir()) {
+        if (alreadyLaunchedInThisSession()) {
+            getLog().debug("Skipping guibuilder: already launched in this Maven invocation");
             return;
         }
-        try {
-            
-
-            File sourceFile = findSourceFile(className);
-            if (!sourceFile.exists()) {
-                throw new MojoExecutionException("Cannot find source file "+sourceFile);
-            }
-            File guiFile = findGuiFile(className);
-            if (!guiFile.exists()) {
-                throw new MojoExecutionException("Cannot find gui fuild "+guiFile);
-            }
-            
-            File resourceFile = getProjectResourceFile();
-            if (!resourceFile.exists()) {
-                if (isCSSProject()) {
-                    // If it is a CSS project, we may simply need to compile the CSS since the theme.res
-                    // will be located in the compiled classes directory
-                    InvocationRequest request = new DefaultInvocationRequest();
-                    //request.setPomFile( new File( "/path/to/pom.xml" ) );
-                    request.setGoals( Collections.singletonList( "cn1:css" ) );
-                    
-
-                    Invoker invoker = new DefaultInvoker();
-                    try {
-                        getLog().info("theme.res file not found.  Trying to compile CSS to generate it now");
-                        invoker.execute( request );
-                    } catch (MavenInvocationException ex) {
-                        getLog().error("Failed to compile CSS");
-                        throw new MojoExecutionException(ex.getMessage(), ex);
-
-                    }
-                    if (!resourceFile.exists()) {
-                        throw new MojoExecutionException("Still cannot find resource file at "+resourceFile+" even after compiling project CSS");
-                                
-                    }
-                } else {
-                    throw new MojoExecutionException("Cannot find project resource file "+resourceFile);
-                }
-            }
-            openInGuiBuilder(project.getName(), sourceFile, resourceFile, guiFile);
-        } catch (IOException ex) {
-            getLog().error("Failed to open form");
-            throw new MojoExecutionException("Failed to open form", ex);
+        if (!isCN1ProjectDir()) {
+            getLog().debug("Skipping guibuilder: not a Codename One project directory");
+            return;
         }
-    }
-    
-    private boolean isCSSProject() {
-        return ("true".equals(properties.getProperty("codename1.cssTheme", null)));
-    }
- 
-    private File getProjectResourceFile() {
-        if (isCSSProject()) {
-            return new File(project.getBuild().getOutputDirectory() + File.separator + "theme.res");
-        }
-        return new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "resources" + File.separator + "theme.res");
-    }
-    
-    private File getGuiBuilderSourcesDir() {
-        return new File(project.getBasedir() + File.separator + "src" + File.separator + "main" + File.separator + "guibuilder");
-    }
-    
-    private File findGuiFile(String fullyQualifiedClassName) {
-        return new File(getGuiBuilderSourcesDir(), fullyQualifiedClassName.replace(".", File.separator) + ".gui");
-    }
-    
-    private File findSourceFile(String fullyQualifiedClassName) {
-        return new File(
-                project.getBasedir() + File.separator + "src" + File.separator + 
-                        "main" + File.separator + "java" + File.separator + 
-                        fullyQualifiedClassName.replace(".", File.separator) + ".java"
-        );
-    }
-    
-    private File getGuiBuilderJar() {
-        File home = new File(System.getProperty("user.home"));
-        File codenameone = new File(home, ".codenameone");
-        File settingsJar = new File(codenameone, "guibuilder.jar");
-        
-        return settingsJar;
-    }
-     
-    
-    
-    static String xmlize(String s) {
-        s = s.replace("&", "&amp;");
-        s = s.replace("<", "&lt;");
-        s = s.replace(">", "&gt;");
-        s = s.replace("\"", "&quot;");
-        int charCount = s.length();
-        for(int iter = 0 ; iter < charCount ; iter++) {
-            char c = s.charAt(iter);
-            if(c > 127) {
-                // we need to localize the string...
-                StringBuilder b = new StringBuilder();
-                for(int counter = 0 ; counter < charCount ; counter++) {
-                    c = s.charAt(counter);
-                    if(c > 127) {
-                        b.append("&#x");
-                        b.append(Integer.toHexString(c));
-                        b.append(";");
-                    } else {
-                        b.append(c);
-                    }
-                }
-                return b.toString();
-            }
-        }
-        return s;
-    }
-    
-    public void openInGuiBuilder(String projectName, final File javaSourceFile, File projectResourceFile, File guiFile) throws IOException, MojoExecutionException {
-        try {
-            File guiBuilderDirectory = new File(System.getProperty("user.home") + File.separator + ".guiBuilder");
-            File cn1Directory = new File(System.getProperty("user.home") + File.separator + ".cn1");
-            File codenameOneDirectory = new File(System.getProperty("user.home") + File.separator + ".codenameone");
-            guiBuilderDirectory.mkdirs();
-            cn1Directory.mkdirs();
-            codenameOneDirectory.mkdirs();
-            if(!guiBuilderDirectory.exists()) {
-                throw new FileNotFoundException("Couldn't find or create the GUI builder directory within your home directory specifically: " + guiBuilderDirectory.getAbsolutePath());
-                
-            }
-            if(!cn1Directory.exists()) {
-                throw new FileNotFoundException("Couldn't find or create the cn1 directory within your home directory specifically: " + cn1Directory.getAbsolutePath());
-                
-            }
-            if(!codenameOneDirectory.exists()) {
-                throw new FileNotFoundException("Couldn't find or create the codename1 directory within your home directory specifically: " + codenameOneDirectory.getAbsolutePath());
-            }
-            String connectionId = UUID.randomUUID().toString();
-            final File runningFile = new File(System.getProperty("user.home") + File.separator + ".guiBuilder" + File.separator +  connectionId);
-            final File outputFile = new File(System.getProperty("user.home") + File.separator + ".guiBuilder" + File.separator +  connectionId + ".ouput");
-            runningFile.getParentFile().mkdirs();
-            FileOutputStream r = new FileOutputStream(runningFile);
-            r.write(0);
-            r.close();
-            FileOutputStream fos = new FileOutputStream(guibuilderInput);
-            String formName = javaSourceFile.getName();
-            formName = formName.substring(0, formName.length() - 5);
-            fos.write(("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                    "<con name=\"" + xmlize(projectName) +
-                    "\" supportsEvents=\"false" + // The we disable the events panel in maven because event handler generation doesn't yet work properly.
-                    "\" formName=\"" + xmlize(formName) +
-                    "\"  file=\"" + xmlize(guiFile.toURI().toURL().toExternalForm()) +
-                    "\" javaFile=\"" + xmlize(javaSourceFile.toURI().toURL().toExternalForm()) +
-                    "\" resFile=\"" + xmlize(projectResourceFile.toURI().toURL().toExternalForm()) +
-                    "\" outputFile=\"" + xmlize(outputFile.toURI().toURL().toExternalForm()) +
-                    "\" running=\"" + xmlize(runningFile.toURI().toURL().toExternalForm()) +
-                    "\" />\n").getBytes(StandardCharsets.UTF_8));
-            fos.close();
-            launchGuiBuilderApp();
+        requireModernJdk();
+        markLaunchedInThisSession();
 
-            new Thread() {
-                private long lastModified = 0;
-                public void run() {
-                    while(runningFile.exists()) {
-                        if(outputFile.exists() && lastModified != outputFile.lastModified()) {
-                            try {
-                                Thread.sleep(100);
-                            } catch(InterruptedException e) {}
-                            try {
-                                FileInputStream fis = new FileInputStream(outputFile);
-                                byte[] data = new byte[(int)outputFile.length()];
-                                new DataInputStream(fis).readFully(data);
-                                fis.close();
-                                lastModified = outputFile.lastModified();
-                                String d = new String(data, StandardCharsets.UTF_8);
-                                if(d.endsWith("DataChangeEvent")) {
-                                    gotoSourceFileLine(javaSourceFile, "void " + d, "\n    public void " + d + "(com.codename1.ui.Component cmp, int type, int index) {\n    }\n");
-                                } else {
-                                    if(d.endsWith("Command")) {
-                                        gotoSourceFileLine(javaSourceFile, "void " + d, "\n    public void " + d + "(com.codename1.ui.events.ActionEvent ev, Command cmd) {\n    }\n");
-                                    } else {
-                                        if(d.endsWith("ListModel")) {
-                                            gotoSourceFileLine(javaSourceFile, "ListModel " + d, "\n    public com.codename1.ui.list.ListModel " + d + "() {\n    }\n");
-                                        } else {
-                                            gotoSourceFileLine(javaSourceFile, "void " + d, "\n    public void " + d + "(com.codename1.ui.events.ActionEvent ev) {\n    }\n");
-                                        }
-                                    }
-                                }
-                                outputFile.delete();
-                            } catch(IOException err) {
-                                err.printStackTrace();
-                            }
-                        }
-                        try {
-                            Thread.sleep(1000);
-                        } catch(InterruptedException e) {}
-                    }
-                }
-            }.start();
+        File projectDir = getCN1ProjectDir();
+        File guiDir = new File(projectDir, "src" + File.separator + "main" + File.separator + "guibuilder");
+        File sourceDir = new File(projectDir, "src" + File.separator + "main" + File.separator + "java");
+        File cssFile = new File(projectDir, "src" + File.separator + "main" + File.separator + "css" + File.separator + "theme.css");
+        guiDir.mkdirs();
 
-        } catch(IOException err) {
-            handleGUIBuilderError(err, "Error launching GUI builder: " + err);
+        File runtimeDir = new File(System.getProperty("user.home"), ".codenameoneGUIBuilder");
+        runtimeDir.mkdirs();
+        File input = new File(runtimeDir, "guibuilder-" + UUID.randomUUID() + ".input");
+        writeBinding(input, projectDir, guiDir, sourceDir, cssFile);
+
+        ToolClasspath classpath = getGuiBuilderClasspath();
+        getLog().info("Launching Codename One GUI Builder bound to " + projectDir);
+        if (shouldSpawn()) {
+            launchDetached(classpath, runtimeDir, input, projectDir);
+            return;
         }
-     
-    }
-       
-         /**
-     * Opens the source file, brings the IDE to the foreground. If methodSig doesn't exist it inserts the method
-     * prototype at the end of the source file before the last curly bracket
-     */
-    public  void gotoSourceFileLine(File javaSource, String methodSig, String methodPrototype) {
-        
-    }
-
-    public  void handleGUIBuilderError(Exception err, String message) {
-        
+        Java java = createJava();
+        java.setFork(true);
+        java.setClassname("com.codename1.guibuilder.CodenameOneGUIBuilderLauncher");
+        java.createClasspath().setPath(joinClasspath(classpath.files));
+        for (String arg : desktopIdentityArgs()) {
+            java.createJvmarg().setValue(arg);
+        }
+        java.createJvmarg().setValue("-Dguibuilder.input=" + input.getAbsolutePath());
+        for (String arg : forwardedGuiBuilderProperties()) {
+            java.createJvmarg().setValue(arg);
+        }
+        java.executeJava();
     }
 
     /**
-     * Launches the actual GUI builder jar executable
-     * @throws org.apache.maven.plugin.MojoExecutionException
+     * The guard's home: one map per Maven invocation, shared by every project in the reactor.
+     *
+     * <p>getPluginContext() is indexed by the current project, and isCN1ProjectDir() accepts both
+     * the aggregator and the app module, so running the goal from a generated multi-module root
+     * gave each execution its own empty map and launched a second editor on the same files.
+     * Keyed on the top level project instead, which is one map for the invocation and still not a
+     * JVM-wide flag -- that was the previous bug, where a long lived Maven never launched again.
+     *
+     * @return the context to record the launch in, or null when there is none
      */
-    public  void launchGuiBuilderApp() throws MojoExecutionException{
-        
-        updateCodenameOne(false, getGuiBuilderJar());
-        Java java = createJava();
-        java.setFork(true);
-        if ("true".equals(System.getProperty("spawn", "true"))) {
-            java.setSpawn(true);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> launchGuardContext() {
+        Map<String, Object> shared = sharedReactorContext();
+        return shared != null ? shared : getPluginContext();
+    }
+
+    /**
+     * The session's context for the top level project, which every project in the reactor resolves
+     * to the same map.
+     *
+     * <p>Its own method so a test can supply one without building a MavenSession.
+     *
+     * @return the shared map, or null when there is no session to ask
+     */
+    Map<String, Object> sharedReactorContext() {
+        if (guardSession == null || guardPlugin == null) return null;
+        MavenProject top = guardSession.getTopLevelProject();
+        return top == null ? null : guardSession.getPluginContext(guardPlugin, top);
+    }
+
+    /**
+     * @return true when this reactor has already opened the editor
+     */
+    private boolean alreadyLaunchedInThisSession() {
+        Map<String, Object> context = launchGuardContext();
+        return context != null && Boolean.TRUE.equals(context.get(LAUNCHED_KEY));
+    }
+
+    private void markLaunchedInThisSession() {
+        Map<String, Object> context = launchGuardContext();
+        if (context != null) context.put(LAUNCHED_KEY, Boolean.TRUE);
+    }
+
+    /**
+     * The GUI Builder is a Java 8 artifact. The spawned process writes only to its log file, so
+     * without this check an older Maven JVM fails with an UnsupportedClassVersionError that never
+     * reaches the console.
+     */
+    private void requireModernJdk() throws MojoFailureException {
+        int version = javaFeatureVersion();
+        if (version >= REQUIRED_JAVA_VERSION) {
+            return;
         }
-        java.setJar(getGuiBuilderJar());
-        java.executeJava();
+        throw new MojoFailureException("The Codename One GUI Builder needs JDK "
+                + REQUIRED_JAVA_VERSION + " or newer, but Maven is running on "
+                + System.getProperty("java.version", String.valueOf(version)) + " ("
+                + System.getProperty("java.home") + ").\n"
+                + "Point JAVA_HOME at a JDK " + REQUIRED_JAVA_VERSION
+                + "+ installation (for example Eclipse Temurin from https://adoptium.net) and run "
+                + "mvn cn1:guibuilder again.");
+    }
+
+    static int javaFeatureVersion() {
+        String version = System.getProperty("java.specification.version", "");
+        if (version.startsWith("1.")) {
+            version = version.substring(2);
+        }
+        int dot = version.indexOf('.');
+        if (dot > 0) {
+            version = version.substring(0, dot);
+        }
+        try {
+            return Integer.parseInt(version.trim());
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    /**
+     * Forwards {@code guibuilder.*} system properties (MCP port, canvas mode, dark mode, initial
+     * selection, editor to open) from the Maven invocation to the editor JVM, so
+     * {@code mvn cn1:guibuilder -Dguibuilder.mcp.port=18349} works. The {@code guibuilder.input}
+     * binding and the {@code guibuilder.spawn} launch flag are owned by this mojo and never
+     * forwarded.
+     */
+    List<String> forwardedGuiBuilderProperties() {
+        List<String> args = new ArrayList<String>();
+        for (String key : System.getProperties().stringPropertyNames()) {
+            if (key.startsWith("guibuilder.")
+                    && !key.equals("guibuilder.input")
+                    && !key.equals("guibuilder.spawn")) {
+                args.add("-D" + key + "=" + System.getProperty(key));
+            }
+        }
+        return args;
+    }
+
+    /**
+     * Names the process for the dock, taskbar and window manager, and opens the JDK packages the
+     * JavaSE port needs on Java 9 and newer, matching cn1:settings and cn1:certificate-wizard.
+     */
+    List<String> desktopIdentityArgs() {
+        List<String> args = new ArrayList<String>();
+        args.add("-Dapple.awt.application.name=Codename One GUI Builder");
+        args.add("-Dcom.apple.mrj.application.apple.menu.about.name=Codename One GUI Builder");
+        args.add("-Dsun.awt.application.name=Codename One GUI Builder");
+        args.add("-Dsun.awt.X11.XWMClass=CodenameOneGUIBuilder");
+        if (javaFeatureVersion() >= MODULE_OPTIONS_VERSION) {
+            // On 8 these packages are already reachable and the option itself is unrecognized,
+            // which stops the forked JVM before it prints anything the user would see.
+            args.add("--add-exports=java.desktop/com.apple.eawt.event=ALL-UNNAMED");
+            args.add("--add-exports=java.desktop/com.apple.eawt=ALL-UNNAMED");
+        }
+        if (isMacOs()) {
+            args.add("-Xdock:name=Codename One GUI Builder");
+        }
+        return args;
+    }
+
+    private static boolean isMacOs() {
+        return System.getProperty("os.name", "").toLowerCase().contains("mac");
+    }
+
+    @Override
+    protected boolean isCN1ProjectDir() {
+        File cn1 = getCN1ProjectDir();
+        if (cn1 == null || project == null || project.getBasedir() == null) return false;
+        try {
+            File current = project.getBasedir().getCanonicalFile();
+            File projectDir = cn1.getCanonicalFile();
+            return projectDir.equals(current) || projectDir.equals(new File(current, "common").getCanonicalFile());
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
+    private boolean shouldSpawn() {
+        String legacy = System.getProperty("spawn");
+        return legacy == null ? spawn : Boolean.parseBoolean(legacy);
+    }
+
+    void writeBinding(File input, File projectDir, File guiDir, File sourceDir, File cssFile)
+            throws MojoExecutionException {
+        StringBuilder content = new StringBuilder();
+        content.append("# Codename One GUI Builder project binding\n");
+        content.append("projectDir=").append(projectDir.getAbsolutePath()).append('\n');
+        content.append("guiDir=").append(guiDir.getAbsolutePath()).append('\n');
+        content.append("sourceDir=").append(sourceDir.getAbsolutePath()).append('\n');
+        content.append("cssFile=").append(cssFile.getAbsolutePath()).append('\n');
+        if (className != null && className.trim().length() > 0) {
+            content.append("initialForm=").append(className.trim()).append('\n');
+        }
+        try {
+            FileUtils.write(input, content.toString(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to write GUI Builder project binding", ex);
+        }
+    }
+
+    private void launchDetached(ToolClasspath classpath, File runtimeDir, File input, File projectDir)
+            throws MojoExecutionException {
+        List<String> command = new ArrayList<String>();
+        command.add(javaExecutable());
+        command.addAll(desktopIdentityArgs());
+        command.add("-Dguibuilder.input=" + input.getAbsolutePath());
+        command.addAll(forwardedGuiBuilderProperties());
+        command.add("-cp");
+        command.add(joinClasspath(classpath.files));
+        command.add("com.codename1.guibuilder.CodenameOneGUIBuilderLauncher");
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(projectDir);
+        builder.redirectErrorStream(true);
+        builder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(runtimeDir, "guibuilder.log")));
+        try {
+            builder.start();
+            getLog().info("GUI Builder launched in the background. Log: " + new File(runtimeDir, "guibuilder.log"));
+        } catch (IOException ex) {
+            throw new MojoExecutionException("Failed to launch Codename One GUI Builder", ex);
+        }
+    }
+
+    private ToolClasspath getGuiBuilderClasspath() throws MojoExecutionException, MojoFailureException {
+        Artifact artifact = getArtifact("com.codenameone", "codenameone-guibuilder");
+        if (artifact == null) {
+            artifact = repositorySystem.createArtifact("com.codenameone", "codenameone-guibuilder", pluginVersion(), "jar");
+        }
+        List<File> files = new ArrayList<File>();
+        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
+                .setLocalRepository(localRepository)
+                .setRemoteRepositories(new ArrayList<ArtifactRepository>(remoteRepositories))
+                .setResolveTransitively(true)
+                // Maven documents -o as "work offline"; the legacy resolver does not read the
+                // session flag by itself, so without this mvn -o cn1:guibuilder still reaches the
+                // network and can refresh a snapshot over the jar this build just produced.
+                .setOffline(offline)
+                .setArtifact(artifact));
+        addArtifact(files, artifact);
+        if (result != null && result.getArtifacts() != null) {
+            for (Artifact resolved : result.getArtifacts()) addArtifact(files, resolved);
+        }
+        // A cached main jar with a missing transitive dependency leaves this list nonempty, and in
+        // detached mode the goal would report a successful launch while the process died in
+        // guibuilder.log with a NoClassDefFoundError nobody goes looking for.
+        String incomplete = resolutionFailure(result);
+        if (incomplete != null) {
+            throw new MojoFailureException("The GUI Builder could not be fully resolved: " + incomplete
+                    + "\nRun mvn -U cn1:guibuilder to refresh it, or drop -o if you are building offline.");
+        }
+        if (files.isEmpty()) {
+            throw new MojoFailureException("Could not resolve the GUI Builder (com.codenameone:codenameone-guibuilder:"
+                    + pluginVersion() + "). It is distributed through Maven Central alongside the Codename One plugin.\n"
+                    + "To work on the editor, run:\n"
+                    + "    cd scripts/guibuilder && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase");
+        }
+        return new ToolClasspath(files);
+    }
+
+    /**
+     * Describes what the resolver could not produce, or null when the result is complete.
+     *
+     * @param result the resolution result to inspect
+     * @return a human readable description of the first problem found
+     */
+    static String resolutionFailure(ArtifactResolutionResult result) {
+        if (result == null) return null;
+        if (result.hasMissingArtifacts()) {
+            return "missing " + result.getMissingArtifacts();
+        }
+        if (result.hasExceptions()) {
+            Exception first = (Exception) result.getExceptions().get(0);
+            return first.getMessage();
+        }
+        return null;
+    }
+
+    private static void addArtifact(List<File> files, Artifact artifact) {
+        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) return;
+        File file = artifact.getFile().getAbsoluteFile();
+        if (file.exists() && !files.contains(file)) files.add(file);
+    }
+
+    private String pluginVersion() {
+        if (pluginArtifacts != null) {
+            for (Artifact artifact : pluginArtifacts) {
+                if ("com.codenameone".equals(artifact.getGroupId())
+                        && "codenameone-maven-plugin".equals(artifact.getArtifactId())) return artifact.getVersion();
+            }
+        }
+        return project.getProperties().getProperty("cn1.plugin.version",
+                project.getProperties().getProperty("cn1.version", "8.0-SNAPSHOT"));
+    }
+
+    private String javaExecutable() {
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        return new File(new File(System.getProperty("java.home"), "bin"), windows ? "javaw.exe" : "java").getAbsolutePath();
+    }
+
+    private static String joinClasspath(List<File> files) {
+        StringBuilder value = new StringBuilder();
+        for (File file : files) {
+            if (value.length() > 0) value.append(File.pathSeparator);
+            value.append(file.getAbsolutePath());
+        }
+        return value.toString();
+    }
+
+    private static final class ToolClasspath {
+        final List<File> files;
+        ToolClasspath(List<File> files) { this.files = files; }
     }
 }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="TableLayout" tableLayoutRows="3" tableLayoutColumns="3" title="Tables inside tables" name="NestedTableForm">
+    <component type="Label" name="outerLabel" text="Outer 0,0" tableRow="0" tableColumn="0" />
+    <component type="Container" name="innerTable" layout="TableLayout" tableLayoutRows="2" tableLayoutColumns="2" tableRow="0" tableColumn="1" tableHorizontalSpan="2">
+        <component type="Button" name="innerA" text="Inner 0,0" tableRow="0" tableColumn="0" />
+        <component type="Button" name="innerB" text="Inner 0,1" tableRow="0" tableColumn="1" />
+        <component type="Button" name="innerC" text="Inner 1,0" tableRow="1" tableColumn="0" />
+    </component>
+    <component type="Button" name="outerMiddle" text="Outer 1,0" tableRow="1" tableColumn="0" />
+    <component type="Container" name="innerBox" layout="BoxLayout" boxLayoutAxis="Y" tableRow="1" tableColumn="1">
+        <component type="Label" name="boxInTable" text="Box in a cell" />
+        <component type="Button" name="boxInTableAction" text="Action" />
+    </component>
+    <component type="Button" name="outerCorner" text="Outer 2,2" tableRow="2" tableColumn="2" />
+</component>
