@@ -658,6 +658,13 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("watch_sources = ['"),
                 "the staged names have to be quoted: " + ruby);
         assertFalse(ruby.contains("watch_sources = %w["), ruby);
+        // An asset catalog is judged by what is in it. Dropping every .xcassets left a project
+        // that keeps its images in a custom catalog with none of them on the watch, so
+        // UIImage(named:) returned nil at runtime with nothing in the build to say why.
+        assertTrue(ruby.contains("cn1_watch_catalog_is_ios_only"), ruby);
+        assertTrue(ruby.contains("appiconset,launchimage"), ruby);
+        assertFalse(ruby.contains("res_skip = %w[.xcassets"),
+                "the blanket catalog filter is what dropped the usable ones: " + ruby);
         assertTrue(ruby.contains("watch_group_path + '/' + name"), ruby);
     }
 

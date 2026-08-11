@@ -2310,11 +2310,35 @@ class WatchNativeBuilder {
         // watchOS widget-extension target, where there is a real archive to verify
         // it against; until then the developer guide tells the reader to add an
         // AppIcon set to the watch target before submitting.
-        s.append("res_skip = %w[.xcassets .storyboard .xib]\n")
+        // An asset catalog is judged by what is IN it, not by its extension.
+        //
+        // Dropping every .xcassets was too broad: a project keeping its images in a custom catalog
+        // had none of them on the watch, so UIImage(named:) from watch-reachable code returned nil
+        // at runtime with nothing in the build to say why. Only a catalog carrying an app icon or a
+        // launch image is iOS-specific -- those are the sets with no watch-applicable content --
+        // and a catalog holding ordinary image and colour sets compiles for watchOS like any other.
+        s.append("def cn1_watch_catalog_is_ios_only(ref)\n")
+                .append("  path = (ref.real_path.to_s rescue nil)\n")
+                // Unreadable: keep the old conservative answer. A missing asset is a runtime nil,
+                // but a catalog that cannot be inspected might be the app's own icon set, and that
+                // is a build error for everybody.
+                .append("  return true unless path && File.directory?(path)\n")
+                .append("  !Dir.glob(File.join(path, '**', '*.{appiconset,launchimage}')).empty?\n")
+                .append("end\n");
+
+        s.append("res_skip = %w[.storyboard .xib]\n")
                 .append("app_target.resources_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path\n")
                 .append("  next if res_skip.any? { |ext| ref.path.to_s.end_with?(ext) }\n")
+                .append("  if ref.path.to_s.end_with?('.xcassets')\n")
+                .append("    if cn1_watch_catalog_is_ios_only(ref)\n")
+                .append("      puts \"[watchNative] not copying #{File.basename(ref.path.to_s)} "
+                        + "into the watch target: it carries an app icon or launch image, which "
+                        + "has no watch-applicable content\"\n")
+                .append("      next\n")
+                .append("    end\n")
+                .append("  end\n")
                 .append("  unless watch_target.resources_build_phase.files_references.include?(ref)\n")
                 .append("    watch_target.resources_build_phase.add_file_reference(ref)\n")
                 .append("  end\n")
