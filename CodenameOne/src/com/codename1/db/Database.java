@@ -1115,6 +1115,16 @@ public abstract class Database {
     /// connection opened a moment later still ends up reading a file that changed underneath it.
     private static final java.util.Hashtable REKEYING_DATABASES = new java.util.Hashtable();
 
+    /// Open connections whose file could not be identified.
+    ///
+    /// A port that cannot say which file a connection holds -- the simulator wrapping a JDBC
+    /// connection whose URL names nothing it can resolve -- has to be counted anyway. Leaving such
+    /// a connection out of the registry only refuses its own key change, while another handle to
+    /// the same file still sees itself as alone and rewrites the file underneath it. Counting
+    /// makes every key change wait until it closes, which is the only answer available without
+    /// knowing what it holds.
+    private static int unidentifiedOpenDatabases;
+
     /// A path reduced to one spelling, for use as an open-database registry key.
     ///
     /// Two names for one file have to reach the registry as one entry, or the claim a key change
@@ -1202,6 +1212,7 @@ public abstract class Database {
     /// - `key`: identifies the file, canonically enough that two spellings of one path agree
     protected static synchronized void registerOpenDatabase(String key) throws IOException {
         if (key == null) {
+            unidentifiedOpenDatabases++;
             return;
         }
         if (REKEYING_DATABASES.containsKey(key)) {
@@ -1224,6 +1235,9 @@ public abstract class Database {
     /// - `key`: the key the connection was registered under
     protected static synchronized void releaseOpenDatabase(String key) {
         if (key == null) {
+            if (unidentifiedOpenDatabases > 0) {
+                unidentifiedOpenDatabases--;
+            }
             return;
         }
         Integer count = (Integer) OPEN_DATABASES.get(key);
@@ -1261,6 +1275,14 @@ public abstract class Database {
                     "This database was opened from a connection rather than by name, so there is no"
                     + " way to tell whether anything else has the same file open. Open it with"
                     + " Database.openOrCreate to change its key.");
+        }
+        if (unidentifiedOpenDatabases > 0) {
+            // Something is open that could not say which file it holds, so it could be this one.
+            // Rewriting the file while it reads through the change is the failure this guard
+            // exists for, and an unidentified connection cannot be ruled out.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "A database opened from a connection is still open, and there is no way to tell"
+                    + " whether it holds this file. Close it before changing this database's key.");
         }
         Integer count = (Integer) OPEN_DATABASES.get(key);
         if (count != null && count.intValue() > 1) {

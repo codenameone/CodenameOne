@@ -249,6 +249,65 @@ public class SEDatabaseConformanceTest {
         }
     }
 
+    @Test
+    public void anOpaqueUriConnectionResolvesToItsFile() throws Exception {
+        // "file:name.db" is opaque to java.net.URI -- its scheme-specific part does not start with
+        // a slash -- so getPath() is null and the handle registered nothing. SQLite reads it as a
+        // name under the working directory, and so does this.
+        File local = new File("cn1-opaque-" + System.nanoTime() + ".db");
+        try {
+            SEDatabase owner = identified(openPlain(local), local);
+            try {
+                Connection uriConn = java.sql.DriverManager.getConnection(
+                        "jdbc:sqlite:file:" + local.getName() + "?mode=rwc");
+                SEDatabase wrapped = new SEDatabase(uriConn);
+                try {
+                    String message = null;
+                    try {
+                        owner.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+                    } catch (java.io.IOException expected) {
+                        message = expected.getMessage();
+                    }
+                    assertNotNull(message, "an opaque-URI handle is still seen");
+                    // The identity refusal, not the "could not say which file" one: this asserts
+                    // the URI resolved, rather than that it fell back to blocking everything.
+                    assertTrue(message.indexOf("open more than once") >= 0,
+                            "refused because it is the same file, not because it is unknown: "
+                            + message);
+                } finally {
+                    wrapped.close();
+                }
+            } finally {
+                owner.close();
+            }
+        } finally {
+            local.delete();
+        }
+    }
+
+    @Test
+    public void aConnectionWithNoIdentifiableFileBlocksEveryRekey() throws Exception {
+        // An in-memory connection names no file, so it cannot be compared against anything. It is
+        // counted rather than ignored: ignoring it refused only its own key change, while another
+        // handle to the same file still believed it was alone.
+        Connection anonymous = java.sql.DriverManager.getConnection("jdbc:sqlite::memory:");
+        SEDatabase wrapped = new SEDatabase(anonymous);
+        try {
+            boolean refused = false;
+            try {
+                db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException expected) {
+                refused = true;
+            }
+            assertTrue(refused, "an unidentified connection blocks the key change");
+        } finally {
+            wrapped.close();
+        }
+
+        // Once it closes, the key change goes through again.
+        db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+    }
+
     private static Connection openPlain(File f) throws Exception {
         SQLiteConfig config = new SQLiteConfig();
         config.enableLoadExtension(true);

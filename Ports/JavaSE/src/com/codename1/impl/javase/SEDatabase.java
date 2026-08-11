@@ -127,11 +127,13 @@ public class SEDatabase extends Database {
             // would pass while this connection held the file.
             try {
                 java.net.URI uri = new java.net.URI(path);
-                path = uri.getPath();
+                // getPath() is null for an opaque URI, and "file:relative.db" -- which SQLite
+                // accepts -- is opaque, since its scheme-specific part does not start with a
+                // slash. The scheme-specific part is the file name in that case, relative to the
+                // working directory, which is where SQLite would look for it too.
+                path = uri.isOpaque() ? uri.getSchemeSpecificPart() : uri.getPath();
             } catch (java.net.URISyntaxException notAUri) {
-                // Cannot say which file this is, so say nothing: an unregistered handle refuses
-                // its own key change, which is the conservative half of the answer.
-                return null;
+                path = null;
             }
             if (path == null || path.length() == 0) {
                 return null;
