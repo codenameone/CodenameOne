@@ -2089,6 +2089,21 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public void removeData(String path) {
+        final String p = path;
+        // On the SAME worker the publications go to, or the two operations race. putData defers its
+        // publication, so `putData(path, value); removeData(path);` could delete first and let the
+        // put land behind it -- leaving the value published after the call that removed it. One
+        // single-threaded worker for every mutation of this namespace means the Data Layer sees
+        // them in the order the application asked for them.
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                deleteData(p);
+            }
+        }, 0);
+    }
+
+    /// Issues one removal, on the worker that owns the ordering.
+    private void deleteData(String path) {
         // Remembered before the delete is issued. removeData targets wear://*/... -- a WILDCARD --
         // so Play services deletes every authority's replica and the resulting buffer can carry
         // tombstones whose authority is a PEER node even though this app initiated the removal.
