@@ -953,6 +953,12 @@ public class CN1WearableBridge implements WearableBridge {
     // --- messages -----------------------------------------------------------
 
     public void sendMessage(final String path, final byte[] payload, final int replyToken) {
+        // CLONED before anything can defer the send. The stale-cache branch below returns while the
+        // node query is still running and hands the caller's array to fanOut from a callback, so a
+        // caller that reuses its buffer -- the natural thing to do with one -- had the peer receive
+        // whatever the array said by then rather than the message it passed. The publication paths
+        // already copy for the same reason; this one is the send that can outlive its call.
+        final byte[] body = payload == null ? null : (byte[]) payload.clone();
         if (System.currentTimeMillis() - cachedNodesStamp > NODE_CACHE_MILLIS) {
             // The cache is empty or stale. Sending now would fan out to a list that predates the
             // current connection state and report "no nearby device" while a watch is sitting right
@@ -983,12 +989,12 @@ public class CN1WearableBridge implements WearableBridge {
                             // stale-but-real node list still addresses the peer, whereas an empty
                             // one silently drops this message (or fails its reply handler) purely
                             // because a refresh happened to time out.
-                            fanOut(path, payload, replyToken);
+                            fanOut(path, body, replyToken);
                         }
                     });
             return;
         }
-        fanOut(path, payload, replyToken);
+        fanOut(path, body, replyToken);
     }
 
     private void fanOut(String path, byte[] payload, final int replyToken) {
