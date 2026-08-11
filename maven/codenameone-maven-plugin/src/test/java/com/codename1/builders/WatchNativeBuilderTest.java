@@ -731,12 +731,18 @@ class WatchNativeBuilderTest {
                 "only a bare watchOS test may close a branch: " + ruby);
         // And a disjunction can still be true on the watch through its other operand, so one os()
         // test inside an || proves nothing.
-        assertTrue(ruby.contains("return false if condition.include?('||')"), ruby);
+        assertTrue(ruby.contains("return false if c.include?('||')"), ruby);
         // Objective-C guards its platforms with TargetConditionals, not Swift os() expressions, and
         // `#if !TARGET_OS_WATCH` around a phone-only @import is the standard spelling.
         assertTrue(ruby.contains("TARGET_OS_WATCH"), ruby);
         assertTrue(ruby.contains("TARGET_OS_\n" ) || ruby.contains("(IOS|OSX|TV|MACCATALYST|VISION)"),
                 "the excluding macros have to be named: " + ruby);
+        // A NEGATED platform test is the opposite answer: `!TARGET_OS_IOS` is true on the watch,
+        // so that arm is the one it compiles and suppressing it dropped a package.
+        assertTrue(ruby.contains("!TARGET_OS_(IOS|OSX|TV|MACCATALYST|VISION)"), ruby);
+        // And `#elif` is the C spelling of `#elseif`; reading only the Swift form left an
+        // Objective-C watch arm suppressed behind an excluded first arm.
+        assertTrue(ruby.contains("t.start_with?('#elif')"), ruby);
         // TARGET_OS_IPHONE is 1 on watchOS, so a block guarded by it DOES compile there and must
         // not be treated as excluding.
         assertFalse(ruby.contains("IPHONE"),

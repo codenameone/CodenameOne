@@ -2072,7 +2072,12 @@ class WatchNativeBuilder {
                 .append("        suppressed << false; decided << false\n")
                 .append("      end\n")
                 .append("      next\n")
-                .append("    elsif t.start_with?('#elseif') || t.start_with?('#else')\n")
+                // `#elif` is the C spelling and `#elseif` the Swift one. Reading only the Swift
+                // form left a suppressed first arm suppressed straight through the watch arm of an
+                // Objective-C `#if TARGET_OS_IOS ... #elif TARGET_OS_WATCH ... #endif`, so a
+                // package imported only there was classified unused.
+                .append("    elsif t.start_with?('#elseif') || t.start_with?('#elif') "
+                        + "|| t.start_with?('#else')\n")
                 .append("      next if suppressed.empty?\n")
                 .append("      i = suppressed.length - 1\n")
                 .append("      if decided[i]\n")
@@ -2097,29 +2102,37 @@ class WatchNativeBuilder {
                 .append("  out.join\n")
                 .append("end\n")
                 .append("def cn1_watch_excludes_watch(condition)\n")
+                // Whitespace after a `!` is legal and would otherwise hide the negation.
+                .append("  c = condition.gsub(/!\\s+/, '!')\n")
+                // A DISJUNCTION can still be true on the watch through its other operand, so an
+                // os() or TARGET_OS_ test that is only one side of an || proves nothing. A
+                // conjunction is safe: `os(iOS) && FEATURE` is false on the watch whatever FEATURE
+                // is.
+                .append("  return false if c.include?('||')\n")
                 // Objective-C guards its platforms with TargetConditionals macros, not Swift's
                 // os() expressions, and `#if !TARGET_OS_WATCH` around a phone-only @import is the
                 // standard spelling. Treating it as unevaluable kept the import, which attached an
                 // iOS-only package to the watch target over code the compiler excludes.
+                .append("  return true if c =~ /!TARGET_OS_WATCH\\b/\n")
+                .append("  unless c =~ /\\bTARGET_OS_WATCH\\b/\n")
+                // NEGATED is the opposite answer. `!TARGET_OS_IOS` is TRUE on watchOS, so that arm
+                // is the one the watch compiles -- suppressing it dropped a package imported only
+                // there. Only a POSITIVE test for another platform excludes the watch.
                 //
-                // TARGET_OS_IPHONE is deliberately NOT in the excluding list: it is 1 on watchOS,
-                // so a block guarded by it does compile there. TARGET_OS_IOS, _OSX, _TV,
-                // _MACCATALYST and _VISION are each 0 on the watch.
-                .append("  unless condition.include?('||')\n")
-                .append("    return true if condition =~ /!\\s*TARGET_OS_WATCH\\b/\n")
-                .append("    unless condition =~ /\\bTARGET_OS_WATCH\\b/\n")
-                .append("      return true if condition =~ /\\bTARGET_OS_"
+                // TARGET_OS_IPHONE is absent from the list on purpose: it is 1 on watchOS, so a
+                // block guarded by it does compile there.
+                .append("    unless c =~ /!TARGET_OS_(IOS|OSX|TV|MACCATALYST|VISION)\\b/\n")
+                .append("      return true if c =~ /\\bTARGET_OS_"
                         + "(IOS|OSX|TV|MACCATALYST|VISION)\\b/\n")
                 .append("    end\n")
                 .append("  end\n")
-                .append("  return false unless condition.include?('os(')\n")
-                // A DISJUNCTION can still be true on the watch through its other operand, so an
-                // os() test that is only one side of an || proves nothing. A conjunction is safe:
-                // `os(iOS) && FEATURE` is false on the watch whatever FEATURE is.
-                .append("  return false if condition.include?('||')\n")
-                .append("  return true if condition =~ /!\\s*os\\(\\s*watchOS\\s*\\)/\n")
-                .append("  return false if condition.include?('os(watchOS)')\n")
-                .append("  condition =~ /os\\(\\s*(iOS|macOS|tvOS|visionOS|Linux|Windows|Android)"
+                .append("  return false unless c.include?('os(')\n")
+                .append("  return true if c =~ /!\\s*os\\(\\s*watchOS\\s*\\)/\n")
+                .append("  return false if c.include?('os(watchOS)')\n")
+                // The same negation rule on the Swift side: `!os(iOS)` is true on the watch.
+                .append("  return false if c =~ /!os\\(\\s*"
+                        + "(iOS|macOS|tvOS|visionOS|Linux|Windows|Android)\\s*\\)/\n")
+                .append("  c =~ /os\\(\\s*(iOS|macOS|tvOS|visionOS|Linux|Windows|Android)"
                         + "\\s*\\)/ ? true : false\n")
                 .append("end\n")
                 /// Positively naming watchOS AND nothing else, which is what lets the other arms be
@@ -2129,9 +2142,9 @@ class WatchNativeBuilder {
                 /// off Swift compiles the `#else`, and treating the first arm as selected suppressed
                 /// that else and dropped a package imported only there. Selection is the only
                 /// direction that can silence another arm, so it takes the whole expression being
-                /// demonstrably true -- a bare os(watchOS) test and nothing more.
+                /// demonstrably true -- a bare watchOS test and nothing more.
                 .append("def cn1_watch_selects_watch(condition)\n")
-                .append("  bare = condition.sub(/\\A#(if|elseif)\\b/, '').strip\n")
+                .append("  bare = condition.sub(/\\A#(if|elseif|elif)\\b/, '').strip\n")
                 .append("  return true if bare =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/\n")
                 // The Objective-C spelling of the same thing. `#ifdef TARGET_OS_WATCH` is NOT it:
                 // TargetConditionals defines every one of those macros as 0 or 1, so the block is

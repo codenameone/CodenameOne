@@ -1680,6 +1680,18 @@ public class CN1WearableBridge implements WearableBridge {
                     SPOOL_IN_FLIGHT.remove(key);
                     return null;
                 }
+                // Before the attempt is charged. A record replayed with no listener registered is
+                // only parked in memory, so its confirmation callback never runs -- and a service
+                // process reclaimed over and over each charged another attempt for a delivery that
+                // never reached application code. Four of those lifetimes deleted the record on the
+                // attempt budget alone, which is precisely the loss the budget was meant to bound.
+                //
+                // A record nobody can take is left exactly as it was, for the launch where someone
+                // can.
+                if (!listenerExistsFor(bodyOf(record))) {
+                    SPOOL_IN_FLIGHT.remove(key);
+                    return null;
+                }
                 int attempts = attemptsOf(record) + 1;
                 android.content.SharedPreferences.Editor edit = prefs.edit();
                 if (attempts > SPOOL_MAX_ATTEMPTS) {
@@ -1723,6 +1735,19 @@ public class CN1WearableBridge implements WearableBridge {
             } catch (Throwable unavailable) {
                 // Same reasoning. It keeps its attempt count and is retried on a later launch.
             }
+        }
+    }
+
+    /// Whether a listener of the kind this record needs is registered right now.
+    private static boolean listenerExistsFor(String body) {
+        try {
+            int bar = body.indexOf('|');
+            String kind = bar < 0 ? body : body.substring(0, bar);
+            return SPOOL_REMOVAL.equals(kind)
+                    ? WearableConnection.hasDataListener()
+                    : WearableConnection.hasMessageListener();
+        } catch (Throwable unavailable) {
+            return false;
         }
     }
 
