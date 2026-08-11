@@ -70,7 +70,7 @@ final class InkFeedback {
         held = true;
         active = true;
         attach(c);
-        repaintRegion(c);
+        c.repaint();
     }
 
     /** The press became a tap: finish growing, then fade out. */
@@ -80,7 +80,7 @@ final class InkFeedback {
         }
         held = false;
         releasedAt = System.currentTimeMillis();
-        repaintRegion(c);
+        c.repaint();
     }
 
     /**
@@ -95,7 +95,7 @@ final class InkFeedback {
         active = false;
         held = false;
         detach(c);
-        repaintRegion(c);
+        c.repaint();
     }
 
     // ------------------------------------------------------------------
@@ -175,7 +175,7 @@ final class InkFeedback {
                     active = false;
                 }
                 if (active) {
-                    // Repaint the REGION on the container, and always return false.
+                    // Repaint the COMPONENT, and always return false.
                     //
                     // Returning true from a registered Animation that is not a Component
                     // makes paintDirty set the flush region to the whole screen, call
@@ -184,11 +184,9 @@ final class InkFeedback {
                     // pushes a buffer this frame never painted into, which is visible as
                     // a full-screen flicker for as long as any ink is running.
                     //
-                    // Repainting the region on the CONTAINER (not the component) queues a
-                    // real dirty region AND redraws every overlapping sibling in it. The
-                    // ink overlay is a flat peer painted on top of the card's artwork, so
-                    // repainting it alone would erase the artwork underneath.
-                    repaintRegion(target);
+                    // Repainting the component instead queues it with a real dirty
+                    // region, so only the tap target is flushed.
+                    target.repaint();
                 } else {
                     detach(target);
                 }
@@ -200,17 +198,6 @@ final class InkFeedback {
             }
         };
         f.registerAnimated(clock);
-    }
-
-    /// Repaints this tap target's rectangle through its container, so the siblings the
-    /// overlay is painted on top of are redrawn with it.
-    private static void repaintRegion(Component c) {
-        com.codename1.ui.Container parent = c.getParent();
-        if (parent == null) {
-            c.repaint();
-            return;
-        }
-        parent.repaint(c.getAbsoluteX(), c.getAbsoluteY(), c.getWidth(), c.getHeight());
     }
 
     private void detach(Component c) {
