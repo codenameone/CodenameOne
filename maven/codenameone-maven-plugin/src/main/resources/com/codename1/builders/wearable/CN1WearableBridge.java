@@ -1194,16 +1194,31 @@ public class CN1WearableBridge implements WearableBridge {
     // --- replicated data ----------------------------------------------------
 
     public void putData(String path, byte[] payload) {
-        // The payload travels inside a DataMap rather than as the item's raw data so it can be
-        // stamped with a publication sequence. Both halves of a pair may publish the same logical
-        // path, which the Data Layer stores as two items under two node authorities; without an
-        // ordering stamp a reader has no way to tell which of them is the newer value.
-        PutDataMapRequest req = PutDataMapRequest.create(dataPath(path));
-        req.getDataMap().putByteArray(PAYLOAD_KEY, payload == null ? new byte[0] : payload);
-        req.getDataMap().putLong(SEQUENCE_KEY, nextSequence());
-        // Urgent: without it the system may sit on the change for minutes, which reads as "my watch
-        // never updated" even though the API did its job.
-        dataClient.putDataItem(req.asPutDataRequest().setUrgent());
+        final String p = path;
+        final byte[] body = payload == null ? new byte[0] : payload;
+        // OFF the caller's thread, because the caller is usually the EDT.
+        //
+        // Allocating the sequence advances the logical-clock floor, and the floor is written with a
+        // synchronous commit() -- so an ordinary UI-triggered putData blocked rendering and input on
+        // storage I/O for as long as that took. The whole publication moves to the transfer worker,
+        // which keeps the two things that matter: the commit still completes before the item is
+        // published, and the worker is single-threaded, so two publications keep the order their
+        // callers made them in -- which is what their sequence stamps are supposed to record.
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                // The payload travels inside a DataMap rather than as the item's raw data so it can
+                // be stamped with a publication sequence. Both halves of a pair may publish the
+                // same logical path, which the Data Layer stores as two items under two node
+                // authorities; without an ordering stamp a reader has no way to tell which of them
+                // is the newer value.
+                PutDataMapRequest req = PutDataMapRequest.create(dataPath(p));
+                req.getDataMap().putByteArray(PAYLOAD_KEY, body);
+                req.getDataMap().putLong(SEQUENCE_KEY, nextSequence());
+                // Urgent: without it the system may sit on the change for minutes, which reads as
+                // "my watch never updated" even though the API did its job.
+                dataClient.putDataItem(req.asPutDataRequest().setUrgent());
+            }
+        }, 0);
     }
 
     /**
@@ -2332,12 +2347,26 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     public void transferFile(String path, String name, byte[] contents) {
+        final String p = path;
+        final String fileName = name == null ? "file" : name;
+        final byte[] body = contents == null ? new byte[0] : contents;
+        // Off the caller's thread for the same reason putData is: allocating the sequence advances
+        // the durable clock floor with a synchronous commit(), and this is called from application
+        // code that is usually on the EDT. The transfer worker is single-threaded, so transfers
+        // keep the order they were requested in.
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                publishTransfer(p, fileName, body);
+            }
+        }, 0);
+    }
+
+    /// Builds and publishes one transfer item, on the transfer worker.
+    private void publishTransfer(String path, String fileName, byte[] body) {
         // A DataItem's inline payload is capped at about 100KB, which a real file routinely
         // exceeds; an Asset is the Data Layer's own answer for bulk and is streamed in the
         // background. The DataItem carries the name and the Asset, so the receiver still gets a
         // WearableMessage rather than raw bytes.
-        String fileName = name == null ? "file" : name;
-        byte[] body = contents == null ? new byte[0] : contents;
         long sequence = nextSequence();
         PutDataMapRequest req = PutDataMapRequest.create(transferPath(path, fileName, sequence));
         req.getDataMap().putString("name", fileName);
