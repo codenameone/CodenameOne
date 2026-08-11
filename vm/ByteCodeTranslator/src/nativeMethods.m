@@ -81,6 +81,13 @@
 
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <mach/mach.h>
+#import <mach/task_info.h>
+#elif defined(__APPLE__)
+// Plain-C Apple target (the clean target emits .c): the same mach and sysctl
+// interfaces are available without Objective-C, and back Runtime.freeMemory().
+#include <mach/mach.h>
+#include <mach/task_info.h>
+#include <sys/sysctl.h>
 #endif
 
 extern _Atomic JAVA_BOOLEAN lowMemoryMode;
@@ -2439,9 +2446,74 @@ void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginIn
     threadStateData->callStackOffset--;
 }
 
+// Bytes this process is metered at. Both Apple branches report phys_footprint
+// rather than resident_size, because that is the figure the kernel actually
+// charges an app against (it is what jetsam kills on, and what Xcode's memory
+// gauge shows). The distinction became load-bearing with the issue-5537 page
+// release: memory handed back with MADV_FREE_REUSABLE leaves phys_footprint
+// immediately but stays in resident_size until the system is under pressure, so
+// a resident_size reading reports a process that has genuinely released memory
+// as though it had not -- and an app calling Runtime.freeMemory() to decide
+// whether it can afford a cache would never see the memory it just got back.
+#if defined(__APPLE__)
+static uint64_t cn1PhysFootprint(void) {
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    if(task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count) == KERN_SUCCESS) {
+        return (uint64_t)info.phys_footprint;
+    }
+    return 0;
+}
+#endif
+
+// Resident set of this process in bytes, read from /proc/self/statm (field 2 is
+// resident pages). Linux has no phys_footprint; RSS is the right metric there
+// because MADV_DONTNEED drops the pages immediately rather than deferring to
+// memory pressure, so a release shows up in RSS the moment it happens.
+#if defined(__linux__)
+static uint64_t cn1LinuxResidentBytes(void) {
+    FILE* f = fopen("/proc/self/statm", "r");
+    if(f == 0) {
+        return 0;
+    }
+    unsigned long total = 0, resident = 0;
+    int n = fscanf(f, "%lu %lu", &total, &resident);
+    fclose(f);
+    if(n != 2) {
+        return 0;
+    }
+    long ps = sysconf(_SC_PAGESIZE);
+    if(ps <= 0) {
+        return 0;
+    }
+    return (uint64_t)resident * (uint64_t)ps;
+}
+#endif
+
 JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
 #if defined(__APPLE__) && defined(__OBJC__)
     return [NSProcessInfo processInfo].physicalMemory;
+#elif defined(__linux__)
+    {
+        long pages = sysconf(_SC_PHYS_PAGES);
+        long ps = sysconf(_SC_PAGESIZE);
+        if(pages > 0 && ps > 0) {
+            return (JAVA_LONG)((uint64_t)pages * (uint64_t)ps);
+        }
+    }
+    return 1024*1024*1024;
+#elif defined(__APPLE__)
+    // Plain-C Apple target (the translator's clean target emits .c, so the
+    // __OBJC__ branch above is unavailable there). sysctl reports the same
+    // figure NSProcessInfo.physicalMemory does.
+    {
+        uint64_t total = 0;
+        size_t len = sizeof(total);
+        if(sysctlbyname("hw.memsize", &total, &len, NULL, 0) == 0 && total > 0) {
+            return (JAVA_LONG)total;
+        }
+    }
+    return 1024*1024*1024;
 #else
     // TODO: implement for other platforms
     return 1024*1024*1024;
@@ -2449,14 +2521,18 @@ JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) 
 }
 
 JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
-#if defined(__APPLE__) && defined(__OBJC__)
-    struct task_basic_info info;
-    mach_msg_type_number_t size = sizeof(info);
-    kern_return_t kerr = task_info(mach_task_self(),
-                                   TASK_BASIC_INFO,
-                                   (task_info_t)&info,
-                                   &size);
-    return [NSProcessInfo processInfo].physicalMemory - info.resident_size;
+#if defined(__APPLE__)
+    {
+        JAVA_LONG total = java_lang_Runtime_totalMemoryImpl___R_long(threadStateData);
+        uint64_t used = cn1PhysFootprint();
+        return used == 0 ? total : total - (JAVA_LONG)used;
+    }
+#elif defined(__linux__)
+    {
+        JAVA_LONG total = java_lang_Runtime_totalMemoryImpl___R_long(threadStateData);
+        uint64_t used = cn1LinuxResidentBytes();
+        return used == 0 ? total : total - (JAVA_LONG)used;
+    }
 #else
     // TODO: implement for other platforms
     return 1024*1024*1024;

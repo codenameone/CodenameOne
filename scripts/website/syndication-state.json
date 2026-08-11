@@ -1573,6 +1573,16 @@
       "medium": {
         "url": "https://medium.com/p/7dc7a4f45437/edit",
         "syndicated_at": "2026-08-08T17:00:47+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/health-data-without-fake-certainty",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a78966ec2a026bbfcbad16a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-09T15:03:05+00:00"
       }
     },
     "on-device-ai-mcp-loopback": {
@@ -1580,6 +1590,53 @@
         "id": 4353762,
         "url": "https://dev.to/codenameone/on-device-ai-and-mcp-on-every-port-9a2",
         "syndicated_at": "2026-08-09T13:43:43+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/0555ea24ec4e/edit",
+        "syndicated_at": "2026-08-09T15:01:51+00:00"
+      },
+      "hashnode": {
+        "url": "https://debugagent.com/on-device-ai-and-mcp-on-every-port",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a78b21c425a35184720d807",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-09T17:01:09+00:00"
+      }
+    },
+    "road-following-map-routing": {
+      "hashnode": {
+        "url": "https://debugagent.com/a-polyline-is-not-a-route",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a78ce418b389bf6d7448474",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-09T19:01:12+00:00"
+      },
+      "devto": {
+        "id": 4361786,
+        "url": "https://dev.to/codenameone/a-polyline-is-not-a-route-5fek",
+        "syndicated_at": "2026-08-10T14:43:58+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/@Codename_One/a-polyline-is-not-a-route-b9d829ec8cdc?postPublishedType=initial",
+        "syndicated_at": "2026-08-10T19:01:26+00:00"
+      }
+    },
+    "maven-central-cloudflare-r2": {
+      "hashnode": {
+        "url": "https://debugagent.com/why-codename-one-is-moving-beyond-maven-central",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a7a03ecce38e6e6be69683a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-10T17:02:26+00:00"
       }
     }
   }
