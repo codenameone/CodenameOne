@@ -54,8 +54,32 @@ public class SECursor extends AbstractDBCursor {
         this.resultSet = resultSet;
     }
 
+    /**
+     * Wraps a result set somebody else executed.
+     *
+     * <p>This is the signature that existed before the statement-aware form, and a library
+     * compiled against it would fail to load without it. Such a cursor can only go forward: the
+     * rewind that backs {@code first()}, {@code position()} and {@code getCount()} re-executes the
+     * statement, and this one does not have it. That was the behaviour of this port before those
+     * methods worked at all, so nothing that used to work stops working.
+     *
+     * @param resultSet the result set to read
+     */
+    public SECursor(ResultSet resultSet) {
+        this.owner = null;
+        this.statement = null;
+        this.resultSet = resultSet;
+    }
+
     @Override
     protected void rewind() throws IOException {
+        if (statement == null) {
+            // Constructed from a bare result set, so there is nothing to run again. Saying so
+            // beats a NullPointerException from a caller that only asked to go back to the start.
+            throw new IOException("This cursor was created from a result set alone, so it cannot "
+                    + "be rewound. Open the query through Database.executeQuery to move backwards "
+                    + "through it.");
+        }
         try {
             if (resultSet != null) {
                 resultSet.close();

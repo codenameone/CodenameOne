@@ -63,6 +63,24 @@ public class AndroidDB extends Database {
         this.openPath = openPath;
     }
 
+    /**
+     * Wraps a connection somebody else opened, taking the file from the connection itself.
+     *
+     * <p>This is the signature that existed before the two-argument form, and a library compiled
+     * against it would fail to load without it. It takes the connection slot rather than skipping
+     * the tracking, so a database reached this way is visible to the check that refuses a key
+     * change while something else holds the file.
+     *
+     * @param db the open connection
+     */
+    public AndroidDB(SQLiteDatabase db) {
+        this.db = db;
+        this.openPath = db == null ? null : db.getPath();
+        if (openPath != null) {
+            AndroidImplementation.databaseConnectionOpened(openPath);
+        }
+    }
+
 
     private void checkOpen() throws IOException {
         if (db == null) {
