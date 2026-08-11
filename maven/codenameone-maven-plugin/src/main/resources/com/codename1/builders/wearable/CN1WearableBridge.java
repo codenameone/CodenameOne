@@ -4244,34 +4244,49 @@ public class CN1WearableBridge implements WearableBridge {
         if (uri == null || !reachedListener) {
             return;
         }
-        String key = uri.getHost() + ":" + uri.getPath();
-        boolean durable;
-        synchronized (transferClaims) {
-            // The persisted form carries a RECEIPT TIME that the in-memory form does not need. The
-            // stamp is a Lamport sequence, and observeSequence deliberately drags that ahead of
-            // wall time whenever a peer's clock is ahead -- so comparing it against a wall-clock
-            // cutoff would keep such a claim until real time caught up with a fabricated future,
-            // and since every transfer gets a unique sequence-suffixed URI the store would grow
-            // without bound. Pruning needs a clock that measures elapsed time; the sequence is not
-            // one.
-            durable = persistClaim(context, key, sequence + "|"
-                    + (uri.getHost() == null ? "" : uri.getHost())
-                    + "|" + System.currentTimeMillis());
-        }
-        if (!durable) {
-            // No acknowledgement without a durable claim. The acknowledgement is what lets the
-            // SENDER retire the item, and retiring it while this device has no claim on disk means
-            // a restart here finds neither the claim nor -- eventually -- the item, so the one-shot
-            // transfer is simply lost. Staying silent costs the sender an item kept until the hard
-            // cap and buys a redelivery this device will accept, which is the recoverable side of
-            // the trade. commit() returning false is rare (a full or unwritable store) and is
-            // exactly when this matters.
-            android.util.Log.w("CN1Wearable", "transfer claim for " + key
-                    + " was not written; withholding the acknowledgement so the sender keeps the"
-                    + " item and can redeliver it");
-            return;
-        }
-        publishTransferAck(context, uri);
+        final String key = uri.getHost() + ":" + uri.getPath();
+        // The persisted form carries a RECEIPT TIME that the in-memory form does not need. The
+        // stamp is a Lamport sequence, and observeSequence deliberately drags that ahead of wall
+        // time whenever a peer's clock is ahead -- so comparing it against a wall-clock cutoff
+        // would keep such a claim until real time caught up with a fabricated future, and since
+        // every transfer gets a unique sequence-suffixed URI the store would grow without bound.
+        // Pruning needs a clock that measures elapsed time; the sequence is not one.
+        final String stamp = sequence + "|"
+                + (uri.getHost() == null ? "" : uri.getHost())
+                + "|" + System.currentTimeMillis();
+        final Context c = context;
+        final Uri item = uri;
+        // OFF the calling thread. This runs from the delivery callback, which the tracked-data path
+        // invokes on the EDT once the listener has had the payload -- and commit() is a synchronous
+        // disk write, so a slow or contended store froze rendering and input for the duration of
+        // every received transfer. The timer is the same single-threaded worker the rest of the
+        // transfer bookkeeping uses, so claims still land in the order they were confirmed.
+        //
+        // The acknowledgement moves with it and stays behind the write: it is what lets the SENDER
+        // retire the item, and publishing it from here while the claim was still queued would put
+        // it back in the window this ordering exists to close.
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                boolean durable;
+                synchronized (transferClaims) {
+                    durable = persistClaim(c, key, stamp);
+                }
+                if (!durable) {
+                    // No acknowledgement without a durable claim. The acknowledgement is what lets
+                    // the SENDER retire the item, and retiring it while this device has no claim on
+                    // disk means a restart here finds neither the claim nor -- eventually -- the
+                    // item, so the one-shot transfer is simply lost. Staying silent costs the
+                    // sender an item kept until the hard cap and buys a redelivery this device will
+                    // accept, which is the recoverable side of the trade. commit() returning false
+                    // is rare (a full or unwritable store) and is exactly when this matters.
+                    android.util.Log.w("CN1Wearable", "transfer claim for " + key
+                            + " was not written; withholding the acknowledgement so the sender"
+                            + " keeps the item and can redeliver it");
+                    return;
+                }
+                publishTransferAck(c, item);
+            }
+        }, 0);
     }
 
     /// Tells the SENDER that this device has handed the transfer to a listener.

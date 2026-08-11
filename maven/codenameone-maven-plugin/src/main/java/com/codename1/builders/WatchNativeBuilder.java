@@ -2097,6 +2097,21 @@ class WatchNativeBuilder {
                 .append("  out.join\n")
                 .append("end\n")
                 .append("def cn1_watch_excludes_watch(condition)\n")
+                // Objective-C guards its platforms with TargetConditionals macros, not Swift's
+                // os() expressions, and `#if !TARGET_OS_WATCH` around a phone-only @import is the
+                // standard spelling. Treating it as unevaluable kept the import, which attached an
+                // iOS-only package to the watch target over code the compiler excludes.
+                //
+                // TARGET_OS_IPHONE is deliberately NOT in the excluding list: it is 1 on watchOS,
+                // so a block guarded by it does compile there. TARGET_OS_IOS, _OSX, _TV,
+                // _MACCATALYST and _VISION are each 0 on the watch.
+                .append("  unless condition.include?('||')\n")
+                .append("    return true if condition =~ /!\\s*TARGET_OS_WATCH\\b/\n")
+                .append("    unless condition =~ /\\bTARGET_OS_WATCH\\b/\n")
+                .append("      return true if condition =~ /\\bTARGET_OS_"
+                        + "(IOS|OSX|TV|MACCATALYST|VISION)\\b/\n")
+                .append("    end\n")
+                .append("  end\n")
                 .append("  return false unless condition.include?('os(')\n")
                 // A DISJUNCTION can still be true on the watch through its other operand, so an
                 // os() test that is only one side of an || proves nothing. A conjunction is safe:
@@ -2117,7 +2132,11 @@ class WatchNativeBuilder {
                 /// demonstrably true -- a bare os(watchOS) test and nothing more.
                 .append("def cn1_watch_selects_watch(condition)\n")
                 .append("  bare = condition.sub(/\\A#(if|elseif)\\b/, '').strip\n")
-                .append("  bare =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/ ? true : false\n")
+                .append("  return true if bare =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/\n")
+                // The Objective-C spelling of the same thing. `#ifdef TARGET_OS_WATCH` is NOT it:
+                // TargetConditionals defines every one of those macros as 0 or 1, so the block is
+                // always compiled and the test says nothing about the platform.
+                .append("  bare =~ /\\ATARGET_OS_WATCH\\z/ ? true : false\n")
                 .append("end\n");
 
         // Mirrored only when the WATCH sources actually import the product.
