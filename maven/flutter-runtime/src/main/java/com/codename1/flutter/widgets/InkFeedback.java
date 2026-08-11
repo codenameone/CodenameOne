@@ -80,6 +80,9 @@ final class InkFeedback {
         }
         held = false;
         releasedAt = System.currentTimeMillis();
+        // The clock may have stopped itself while the press was held (see animate()); the
+        // fade still needs frames, so make sure it is running again.
+        attach(c);
         c.repaint();
     }
 
@@ -170,9 +173,20 @@ final class InkFeedback {
                 // component is actually being painted, so ink on a component that scrolls
                 // away or stops repainting would stay "active" forever and keep this
                 // clock - and its repaint - running for the life of the form.
-                if (active && !held
-                        && System.currentTimeMillis() - releasedAt >= FADE_MS) {
+                long now = System.currentTimeMillis();
+                if (active && !held && now - releasedAt >= FADE_MS) {
                     active = false;
+                }
+                // A held press that never releases would otherwise animate for the life of
+                // the form: the expiry above only fires once the finger is up. A real
+                // finger always lifts, but a press whose release is swallowed - the
+                // component removed by a rebuild mid-press, a cancelled gesture - would
+                // leave this clock repainting forever. Once the splash has fully covered
+                // the target there is nothing left to animate anyway, so stop asking for
+                // frames and let the static ink stand until release.
+                if (active && held && now - startedAt >= SPLASH_MS + HIGHLIGHT_MS) {
+                    detach(target);
+                    return false;
                 }
                 if (active) {
                     // Repaint the COMPONENT, and always return false.
