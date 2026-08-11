@@ -164,6 +164,11 @@ public class WindowsNativeBuilder extends Executor {
     }
 
     @Override
+    protected String hardeningPlatform(BuildRequest request) {
+        return "win";
+    }
+
+    @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
         String arch = normalizeArch(request.getArg("windows.arch", ARCH_X64));
         log("Building native Windows app for arch=" + arch + " (triple " + targetTriple(arch) + ")");
@@ -1193,6 +1198,9 @@ public class WindowsNativeBuilder extends Executor {
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
         src.append("        Display.init(null);\n");
+        // Stamp the hardening metadata so Hardening.isHardened() and crash reports carry the
+        // mapping id / level on this port too (parity with iOS and Android).
+        src.append(hardeningRuntimeProperties(request));
         src.append(svgInstall);
         src.append("        Display.getInstance().callSerially(new Runnable() {\n");
         src.append("            public void run() {\n");

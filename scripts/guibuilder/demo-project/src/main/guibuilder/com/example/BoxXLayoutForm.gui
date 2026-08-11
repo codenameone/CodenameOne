@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BoxLayout" boxLayoutAxis="X" scrollableX="true" title="BoxLayout X — scroll and reorder horizontally" name="BoxXLayoutForm">
+    <component type="Button" name="first" text="First" />
+    <component type="Button" name="second" text="Second" />
+    <component type="Button" name="third" text="Third" />
+    <component type="Button" name="fourth" text="Fourth" />
+    <component type="Button" name="fifth" text="Fifth" />
+    <component type="Button" name="sixth" text="Sixth" />
+    <component type="Button" name="seventh" text="Seventh" />
+    <component type="Button" name="eighth" text="Eighth" />
+    <component type="Button" name="ninth" text="Ninth" />
+    <component type="Button" name="tenth" text="Tenth" />
+</component>

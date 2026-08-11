@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BorderLayout" title="BorderLayout Drop Test" name="BorderDropForm">
+    <component type="Label" name="header" text="NORTH — drop uses actual preferred height" layoutConstraint="North" />
+    <component type="Button" name="navigation" text="WEST" layoutConstraint="West" />
+    <component type="SpanLabel" name="content" text="CENTER has no stored constraint. Drag another component here to swap regions." />
+    <component type="Button" name="actions" text="EAST" layoutConstraint="East" />
+    <component type="Button" name="footer" text="SOUTH" layoutConstraint="South" />
+</component>

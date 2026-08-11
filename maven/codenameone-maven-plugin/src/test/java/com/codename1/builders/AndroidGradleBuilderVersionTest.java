@@ -38,6 +38,80 @@ class AndroidGradleBuilderVersionTest {
     }
 
     @Test
+    void renameHardeningRejectsEveryValueThatLeavesR8Off() {
+        // R8 renames only when android.enableProguard is exactly "true"; every other value leaves it
+        // off. A rename profile must be rejected for all of them, not only the literal "false".
+        for (String off : new String[] {"false", "off", "0", "no", "False", "OFF", "", "yes"}) {
+            assertTrue(AndroidGradleBuilder.r8RenameRequiredButDisabled(true, off),
+                    "rename requested + enableProguard=" + off + " must be rejected");
+        }
+        // Exactly "true" enables R8, so a rename profile is fine.
+        assertFalse(AndroidGradleBuilder.r8RenameRequiredButDisabled(true, "true"));
+        // When rename is not requested, R8 being off is irrelevant.
+        assertFalse(AndroidGradleBuilder.r8RenameRequiredButDisabled(false, "off"));
+        assertFalse(AndroidGradleBuilder.r8RenameRequiredButDisabled(false, "true"));
+    }
+
+    @Test
+    void renameHardeningNeedsAReleaseVariantNotJustEnableProguard() {
+        // R8 minifyEnabled lives in the release buildType, so a debug-only build never renames even
+        // with the default android.enableProguard=true.
+        BuildRequest debugOnly = new BuildRequest();
+        debugOnly.setCertificate(new byte[] {1, 2, 3});
+        debugOnly.putArgument("android.release", "false");
+        debugOnly.putArgument("android.debug", "true");
+        assertFalse(AndroidGradleBuilder.androidReleaseVariantBuilt(debugOnly),
+                "android.release=false + debug builds only assembleDebug");
+
+        // A default (release) build with a certificate does produce a release variant.
+        BuildRequest release = new BuildRequest();
+        release.setCertificate(new byte[] {1, 2, 3});
+        assertTrue(AndroidGradleBuilder.androidReleaseVariantBuilt(release));
+
+        // Neither explicitly selected falls back to building both (release included).
+        BuildRequest both = new BuildRequest();
+        both.setCertificate(new byte[] {1, 2, 3});
+        both.putArgument("android.release", "false");
+        both.putArgument("android.debug", "false");
+        assertTrue(AndroidGradleBuilder.androidReleaseVariantBuilt(both));
+
+        // No signing certificate means only assembleDebug runs, so no release variant.
+        BuildRequest noCert = new BuildRequest();
+        noCert.putArgument("android.release", "true");
+        assertFalse(AndroidGradleBuilder.androidReleaseVariantBuilt(noCert));
+    }
+
+    @Test
+    void forcedOffLocalBuildDoesNotRequireR8() {
+        // harden.allowUnhardenedLocalBuild takes the escape hatch: hardenSourceJar returns the original
+        // jar stamped cn1.hardened=false, so the R8-rename enforcement must NOT fire even though the level
+        // still reads aggressive -- otherwise a local build with R8 off or no release cert is rejected
+        // despite opting out of hardening.
+        BuildRequest forcedOff = new BuildRequest();
+        forcedOff.putArgument("harden.level", "aggressive");
+        forcedOff.putArgument("cn1.hardened", "false");
+        assertFalse(AndroidGradleBuilder.androidRenameHardeningActive(forcedOff, true, true),
+                "cn1.hardened=false (forced-off escape hatch) must not require R8");
+
+        // A build that actually hardened (verified output) with a rename profile DOES require R8.
+        BuildRequest hardened = new BuildRequest();
+        hardened.putArgument("harden.level", "aggressive");
+        hardened.putArgument("cn1.hardened", "true");
+        assertTrue(AndroidGradleBuilder.androidRenameHardeningActive(hardened, true, true),
+                "a verified hardened rename profile requires R8");
+
+        // Even with cn1.hardened=true, harden.level=off or rename opted out needs no R8.
+        BuildRequest offLevel = new BuildRequest();
+        offLevel.putArgument("harden.level", "off");
+        offLevel.putArgument("cn1.hardened", "true");
+        assertFalse(AndroidGradleBuilder.androidRenameHardeningActive(offLevel, true, true));
+        assertFalse(AndroidGradleBuilder.androidRenameHardeningActive(hardened, true, false),
+                "rename opted out needs no R8");
+        assertFalse(AndroidGradleBuilder.androidRenameHardeningActive(hardened, false, true),
+                "harden.and.enabled=false needs no R8");
+    }
+
+    @Test
     void typedPushAutoDetectsBothAndroidProviderConfigurations() {
         assertTrue(AndroidGradleBuilder.usesFcmPush(3, "auto", true));
         assertFalse(AndroidGradleBuilder.usesFcmPush(3, "auto", false));

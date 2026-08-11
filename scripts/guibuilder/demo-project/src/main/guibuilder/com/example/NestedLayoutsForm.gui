@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="Form" layout="BorderLayout" title="Nested hierarchy" name="NestedLayoutsForm">
+    <component type="Label" name="nestedHeader" text="Nested Border → Box X → Grid" layoutConstraint="North" />
+    <component type="Container" name="contentColumns" layout="BoxLayout" boxLayoutAxis="X" layoutConstraint="Center">
+        <component type="Container" name="leftGrid" layout="GridLayout" gridLayoutRows="2" gridLayoutColumns="2">
+            <component type="Button" name="nestedA" text="A" />
+            <component type="Button" name="nestedB" text="B" />
+            <component type="Button" name="nestedC" text="C" />
+            <component type="Button" name="nestedD" text="D" />
+        </component>
+        <component type="Container" name="rightActions" layout="BoxLayout" boxLayoutAxis="Y">
+            <component type="Label" name="nestedDescription" text="Drag components between both nested containers." />
+            <component type="Button" name="nestedAction" text="Action" />
+        </component>
+    </component>
+</component>

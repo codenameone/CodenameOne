@@ -149,7 +149,8 @@ public final class CrashProtection {
                     "Process terminated by native fault",
                     new ArrayList<Frame>(0),
                     null,
-                    pendingNative);
+                    pendingNative,
+                    null);
             persistJson(synthetic.toJson());
         }
         installed = true;
@@ -240,8 +241,91 @@ public final class CrashProtection {
         String message = scrubber.scrubMessage(t.getMessage());
         List<Frame> frames = extractFrames(t);
         String nativeLog = safeNativeLog();
+        String rawStack = scrubber.scrubRawStack(safeRawStack(t));
         return new CrashReportPayload(newEventId(), exClass, message,
-                frames, nativeLog, null);
+                frames, nativeLog, null, rawStack);
+    }
+
+    /// Renders the throwable (and its cause chain) as a pre-rendered stack
+    /// string via `printStackTrace`. This is the one trace API that behaves
+    /// identically on every port, and on the ParparVM C targets -- where
+    /// `getStackTrace()` may return the trace only as a formatted string --
+    /// it is what keeps a Java crash readable, especially once obfuscated.
+    /// Swallows any failure: capturing a crash report must never itself crash.
+    private static String safeRawStack(Throwable t) {
+        try {
+            // Capture the platform's own rendering via printStackTrace(PrintStream) -- PrintStream
+            // (unlike PrintWriter) is in the restricted CLDC core API. This is what preserves the
+            // real trace on the ParparVM ports: the pre-rendered C shadow-call-stack text, or the
+            // JavaScript engine's Error().stack on the JS port (where getStackTrace() has no
+            // structured frames to offer). On the JVM ports it is the standard full trace.
+            //
+            // Render into a BOUNDED buffer that discards bytes past the cap, rather than an unbounded
+            // ByteArrayOutputStream truncated afterwards: a throwable with a huge message or a deep
+            // cause chain could otherwise allocate many times the 16 KiB cap during crash handling and
+            // trigger a second OutOfMemoryError, losing the report. The cap sits a little above
+            // MAX_RAW_STACK_LEN so scrubbing (which only shrinks -- digit runs and emails collapse) and
+            // the final trim still yield a full-length raw stack.
+            BoundedOutputStream bout = new BoundedOutputStream(
+                    CrashReportPayload.MAX_RAW_STACK_LEN + 8192);
+            try {
+                // Encode explicitly as UTF-8 on both ends rather than relying on the platform default
+                // (which SpotBugs flags and which would garble a non-ASCII exception message differently
+                // per device); the PrintStream and the readback share the charset.
+                java.io.PrintStream ps = new java.io.PrintStream(bout, true, "UTF-8");
+                try {
+                    t.printStackTrace(ps);
+                    ps.flush();
+                } finally {
+                    ps.close();
+                }
+                String s = bout.toUtf8();
+                return s.length() == 0 ? null : s;
+            } finally {
+                bout.close();
+            }
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /// A fixed-capacity {@link java.io.OutputStream} that keeps the first {@code cap} bytes and
+    /// silently discards the rest, so rendering a pathologically large stack cannot grow the buffer
+    /// without bound (and cannot itself OOM during crash handling). Not thread-safe; used by a single
+    /// capturing thread.
+    static final class BoundedOutputStream extends OutputStream {
+        private final byte[] buf;
+        private int count;
+
+        BoundedOutputStream(int cap) {
+            buf = new byte[cap];
+        }
+
+        @Override
+        public void write(int b) {
+            if (count < buf.length) {
+                buf[count++] = (byte) b;
+            }
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) {
+            int room = buf.length - count;
+            if (room <= 0) {
+                return;
+            }
+            int n = len < room ? len : room;
+            System.arraycopy(b, off, buf, count, n);
+            count += n;
+        }
+
+        String toUtf8() throws java.io.UnsupportedEncodingException {
+            // Explicit UTF-8 (never the platform default, which SpotBugs flags and which would garble a
+            // non-ASCII message per device). UTF-8 is always available, so this never actually throws;
+            // the checked exception is handled by the single caller's catch-all rather than swallowed
+            // here into a default-encoding String.
+            return new String(buf, 0, count, "UTF-8");
+        }
     }
 
     /// Pulls the platform log snapshot, swallowing any exception the

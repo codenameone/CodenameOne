@@ -743,6 +743,7 @@ This code is shorthand for resource file loading and for the installation of the
 * Localization Bundles
 * Data files
 
+[[working-with-css-themes]]
 ==== Working with CSS themes
 
 Modern Codename One projects ship with a `src/main/css/theme.css` file (or an equivalent stylesheet). Editing this file allows you to define UIIDs using standard CSS syntax together with Codename One–specific extensions such as `cn1-derive` for inheritance and the `#Constants` block for theme constants. Each time you build or run the project, the build tool compiles the CSS into the `theme.res` resource file automatically. Saving the CSS while the simulator is running will also trigger a refresh so you can iterate on styling.
@@ -751,14 +752,14 @@ Because the CSS compiler produces the final resource file, you should treat the 
 
 === GUI builder
 
-The GUI builder allows you to arrange components visually within a UI using drag, property sheets etc. With the GUI builder you can create elaborate, rich UI's without writing the layout code. Forms designed in the builder use auto layout mode by default, which lets you position and resize components on a canvas while using `LayeredLayout` behind the scenes.
+The GUI builder arranges components visually: you drag them onto a canvas, position them, and edit their properties in an inspector, without writing the layout code by hand. It's a desktop application that the Codename One Maven plugin launches, so it works the same way whichever IDE you use for the surrounding Java code. Forms designed in the builder use auto layout mode by default, which positions and resizes components on the canvas using `LayeredLayout` behind the scenes.
 
 ==== Hello world
 
-The GUI builder is invoked through the Codename One Maven plugin and works the same way regardless of which IDE you use to edit the surrounding Java code. Two goals to know about:
+Two goals do the work:
 
-- `cn1:create-gui-form` generates a new GUI form (the `.gui` XML file plus the matching Java source).
-- `cn1:guibuilder` opens the GUI builder so you can edit an existing form.
+- `cn1:create-gui-form` generates a new GUI form: the `.gui` XML file plus the matching Java source.
+- `cn1:guibuilder` opens the GUI builder on the project.
 
 Both goals accept a `className` parameter that points at the fully qualified class name of the form. From the root of a multi-module Codename One project, create a new form like this:
 
@@ -781,205 +782,94 @@ To open the form in the GUI builder:
 include::../demos/common/src/main/snippets/developer-guide/basics.sh[tag=basics-bash-002,indent=0]
 ----
 
+Projects generated from the archetype also carry a ready-made shortcut for this: a *CN1 GUI Builder* run configuration in IntelliJ IDEA, an *Open in GUI Builder* action in NetBeans, a *GUI Builder* launch configuration in Eclipse, and a *Tools > GUI Builder* entry in the Visual Studio Code Maven favorites. They all run the same goal.
+
 The full goal reference, including every parameter, lives in <<create-gui-form>> and <<guibuilder>> in the Maven goals appendix.
 
-===== Basic usage
+TIP: The GUI builder is a Java 8 artifact, so it runs on whichever JDK already builds your project.
 
-Notice that the UI of the GUIBuilder might change in various ways but the basic concepts should remain the
-same.
+==== The workspace
 
-The GUI builder is controlled through its main toolbar, notice that your changes will be applied when you click
-the #Save# button on the right:
+.The GUI builder editing a form created with `cn1:create-gui-form`
+image::img/gui-builder-workspace.png[The GUI builder editing a newly created form,scaledwidth=90%]
 
-.The features of the left toolbar
-image::img/new-gui-builder-left-toolbar.png[The features of the left toolbar,scaledwidth=50%]
+The window has three columns:
 
-.The features of the right toolbar
-image::img/new-gui-builder-right-toolbar.png[The features of the right toolbar,scaledwidth=50%]
+- *Project forms and palette* -- on the left. The upper half lists every `.gui` file in the project under the *Forms* tab, and the component tree of the form you are editing under the *Hierarchy* tab. Picking a component from the tree is often easier than hitting it on the canvas, particularly when it's behind something else. The lower half is the component palette, with a search field for finding a component by name.
 
-The main UI includes four important parts:
+- *Design canvas* -- in the middle. This is a live Codename One rendering of your form, styled by the project's own `theme.css`, so what you see is what the application draws. The buttons above the canvas switch it between phone portrait, phone landscape, tablet, and a full-width desktop canvas.
 
-- #Main Form# -- This is where you place the components of the UI you're building
+- *Inspector* -- on the right. It shows the selected component under three tabs: *Properties*, *Layout*, and *Events*.
 
-- #Component Tree# -- This is a logical representation of the component hierarchy within the #Main Form#. It's often easier to pick a component from the tree rather than the form itself
+The toolbar carries *Save*, *Undo*, *Redo* and *Refresh* on the left, and *CSS* and *Code* on the right. Changes are written to the `.gui` file when you press *Save*.
 
-- #Property Inspector# -- When you select an element in the tree or form you can see its details here. You can then edit the various details of the component in this area
+The two dividers between the columns can be dragged, so you can give the canvas more room while positioning components and give the inspector more room while filling in properties.
 
-- #Palette# -- Components can be dragged from the palette to the #Main Form# and placed in the UI
+==== Designing a form
 
+Drag a component from the palette onto the canvas to add it. As you drag, the builder highlights where the component would land: the container that would receive it, and, in auto layout mode, guides showing the edges it would line up with. Dropping outside a valid target leaves the form unchanged.
 
-.The four parts of the GUI builder
-image::img/new-gui-builder-component-tree-palette-inspector.png[The four parts of the GUI builder,scaledwidth=50%]
+Select a component by clicking it on the canvas or by picking it in the *Hierarchy* tab. A selected component shows resize handles; drag its body to move it, or a handle to resize it. Hold Shift while clicking to select several components at once, which is what the alignment actions in the top-left corner of the canvas operate on: they align edges, centers or baselines, match widths or heights, or disconnect a component from the relationships it has picked up.
 
-You will start by selecting the #Component Palette# and dragging a button into the UI:
+Double-click a component that displays text -- or long-press it -- to edit that text in place, without going to the inspector.
 
-.You can drag any component you want from the palette to the main UI
-image::img/new-gui-builder-drag-button.png[You can drag any component you want from the palette to the main UI,scaledwidth=50%]
+The *Properties* tab holds what the component is: its name, its text, the UIID that connects it to a CSS selector, and the settings that belong to its type, such as the input constraint of a text field or the range of a slider. The *Layout* tab holds where it sits: its position in its parent, the layout manager of a container, and, for auto layout, its alignment reference and its horizontal and vertical size policies. The *Events* tab binds an event, such as a button press, to a method in the companion Java source.
 
-By default the auto layout mode of the GUI builder uses layered layout to position components. Sides can be bound to a component or to the `Form`. You then use distance units to determine the binding behavior. The GUI builder tries to be "smart" and guesses your intention as you drag the components along.
+[[auto-layout-mode]]
+==== Auto layout mode
 
-When you select the component you placed you can edit the properties of that component:
+New forms use auto layout mode. In this mode you place components where you want them rather than accepting the positions a layout manager dictates.
 
-.Properties allow you to customize everything about a component
-image::img/new-gui-builder-property-sheet.png[Properties allow you to customize everything about a component,scaledwidth=50%]
+.All forms designed in auto layout mode use `LayeredLayout`
+NOTE: Auto layout mode is built on the inset support in `LayeredLayout`. Component positioning uses <<insets-and-reference-components,insets and reference components>>, not absolute coordinates.
 
-There are five property sheets per component:
+An inset can be fixed (stated in millimetres, pixels or a percentage) or flexible, and it can be measured from the parent or from a sibling component. That's what makes a form designed on one canvas size still work on another: a component pinned to the bottom of the form stays there on a taller screen, and a component pinned below its neighbor follows that neighbor when it moves.
 
-- #Basic Settings# -- These include the basic configuration for a component for example: name, icon, text etc.
+The builder chooses insets for you as you drag, and it prefers a relationship with a nearby component over a distance from the edge of the form. The *Layout* tab shows the choice it made and lets you change it:
 
-- #Advanced Settings# -- These include features that aren't as common such as icon gap, mask etc.
+- *Alignment reference* -- the component this one is positioned against, or the nearest component if you haven't chosen one.
+- *Horizontal size policy* and *Vertical size policy* -- whether the component keeps its preferred size, keeps a fixed size, fills its parent, or matches the size of its reference component.
 
-- #Events# -- By clicking a button in this tab a method will be added to the source file with a callback matching your component name. This binds an event to a button, text field etc.
+Resize the canvas with the device buttons above it after every few changes. A form that looks right on one canvas can fall apart on another, and switching between phone portrait and desktop is the quickest way to find out before a device does.
 
-- #Layout# -- You can determine the layout of the parent `Container` here. For auto layout this should stay as layered layout, but you can nest other layout types in here
+==== Nested containers and other layouts
 
-- #Style Customization# -- This isn't a theme, if you want to customize the style of a specific component you can do that through this UI. The theme works on a more global/reusable level and this is designed for a specific component
+A form doesn't have to be one flat surface. Drag a *Container* from the palette to group components together, then use the *Container layout* picker in the *Layout* tab to give it whichever layout manager suits that part of the form: box, border, flow, grid, table, or layered again. Components dragged into that container are then arranged by it, and the drop guides change to match -- a box layout shows where in the sequence the component would go, a border layout shows which region would receive it, and a table layout shows the cell.
 
-For things like setting the text on the component you can use a convenient "long click" on the component to
-edit the text in place as such:
+Containers can be nested as far as you need, and a component can be dragged out of one container and into another; the builder rewrites its constraints for the layout it lands in.
 
-.Use the long click to edit the text "in place"
-image::img/gui-builder-in-place-edit.png[Use the long click to edit the text "in place",scaledwidth=50%]
+==== The theme and the companion source
 
-===== Events
+The *CSS* button opens the project stylesheet inside the builder.
 
-IMPORTANT: As of now, the events tab was disabled. https://github.com/codenameone/CodenameOne/issues/3593#issuecomment-1133647486[See issue 3593 for more info.]
+.Editing the project stylesheet; the canvas re-renders as you type
+image::img/gui-builder-css-editor.png[Editing theme.css inside the GUI builder,scaledwidth=90%]
 
-When a component supports broadcasting events you can bind such events by selecting it, then selecting
-the events tab and clicking the button matching the event type
+The stylesheet is compiled and applied to the canvas as you edit it, so a color or a font change is visible immediately on the form you are designing. This is the same `src/main/css/theme.css` the application builds with, described in <<working-with-css-themes,Working with CSS themes>>.
 
-.The events tab is listed below supported event types can be bound above
-image::img/gui-builder-events.png[The events tab is listed below supported event types can be bound above,scaledwidth=50%]
+The *Code* button opens the companion Java source.
 
-Once an event is bound the IDE will open to the event code for example:
+.The companion Java source, generated from the form
+image::img/gui-builder-code-editor.png[The generated companion source,scaledwidth=90%]
 
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava039Snippet.java[tag=basics-java-039,indent=0]
-----
+Everything between the `// <gui-builder-generated>` and `// </gui-builder-generated>` markers is written by the builder from the `.gui` file and is replaced whenever the form is saved. The region between the `// <gui-builder-user-code>` markers is yours: event handlers and anything else you add there is preserved across saves. The editor makes the distinction visible, and the status line reminds you which region takes your changes.
 
-TIP: Some IDEs generate the project source code after you explicitly build the project so if your code needs to access variables etc. try building first
+Forms scaffolded by older versions of `cn1:create-gui-form` used a different marker style. Opening such a form in the builder converts the file to the format above and keeps the methods you had written.
 
-Within the code you can access all the GUI components you defined with the `gui_` prefix for example: `Button_1` from the
-UI is represented as:
+==== What's stored on disk
 
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava040Snippet.java[tag=basics-java-040,indent=0]
-----
+A form is two files that belong together:
 
-===== Underlying XML
+- `common/src/main/guibuilder/<package>/<Name>.gui` -- the XML description of the component tree. This is the file the builder reads and writes, and the one to keep under version control.
+- `common/src/main/java/<package>/<Name>.java` -- the companion Java source.
 
-Saving the project generates an XML file representing the UI into the res directory in the project, the GUI file is created in a matching hierarchy in the project under the `res/guibuilder` directory:
+IMPORTANT: The two files are connected by name. If you rename or move one, rename or move the other to match, or the builder can no longer pair them.
 
-.The java and GUI files in the hierarchy
-image::img/gui-builder-java-and-gui-files.png[The java and GUI files in the hierarchy,scaledwidth=50%]
-
-IMPORTANT: If you refactor (rename or move) the Java file it's connection with the GUI file will break. You need
-to move/rename both
-
-You can edit the GUI file directly but changes won't map into the GUI builder unless you reopen it. These files should be under version control as they're the main files that change. The GUI builder file for the button and label code looks like this:
+The `.gui` file is plain XML and readable enough to review in a diff:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/basics.xml[tag=basics-xml-001,indent=0]
 ----
 
-This format is simple. The file triggers the following Java source file:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava041Snippet.java[tag=basics-java-041,indent=0]
-----
-
-WARNING: Don't touch the code within the don't EDIT comments...
-
-The GUI builder uses the "magic comments" approach where code is generated into those areas to match the XML defined in the GUI builder. Various IDEs generate that code at different times. Some will generate it when you run the app while others will generate it as you save the GUI in the builder.
-
-You can write code within the class both by using the event mechanism, by writing code in the constructors or through overriding functionality in the base class.
-
-[[auto-layout-mode]]
-==== Auto layout mode
-
-New forms created with the GUI Builder use auto layout mode. In this mode you can move and resize your components as you see fit. You aren't constrained to the positions dictated by the form's layout manager.
-
-.All forms designed in auto layout mode use `LayeredLayout`
-NOTE: Auto layout mode is built upon the inset support in LayeredLayout. Component positioning uses <<insets-and-reference-components,insets and reference components>>, not absolute positioning
-
-As an example, drag a button onto a blank form and see what happens. The button will be "selected" initially after adding it, so you'll see its outline and resize handles for adjusting its size and position. You'll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side's inset values and allow you to adjust them.
-
-When a component is selected you can drag it to reposition it or use the resize handles to change its size. The floating inset labels update as you drag so you can fine tune spacing without leaving the canvas.
-
-Press the mouse inside the bounds of the button and drag it around to reposition it. You will notice that the inset labels change to reflect the new inset values. If you drag the button close to the edge of the form, the corresponding inset value will change to millimetres. If you move farther away from the edge, it will change to percentage values.
-
-===== The inset control
-
-Take a closer look at the inset control (the inset controls are the black buttons that appear to the top, bottom, left, and right of the selected component).
-
-.The inset control allows you to change the inset size and units, toggle it between fixed and flexible, and link it to another component.
-image::img/guibuilder-2-inset-control.png[Inset control,scaledwidth=5%]
-
-Each control has three sections:
-
-// vale-skip: Microsoft.Percentages: "percent" is one of the named unit options in the GUI builder dropdown, used here as a unit name on equal footing with "millimetres" and "pixels", not as a quantity.
-1. **The inset value drop-down menu**. This shows the current value of the inset (for example: 0mm, 25%, auto, etc.). If you click on this, it will open a menu that will allow you to change the units. If the inset is in millimetres, it will have options for pixels, and percent. If the inset is in percent, it will have options for pixels and millimetres. Etc. It also includes a text field to enter an inset value explicitly.
-+
-image::img/guibuilder-2-insets-dropdown-menu.png[Inset drop-down menu,scaledwidth=6%]
-2. **The "Link" Button** image:img/guibuilder-2-link-button-unselected.png[Link button,scaledwidth=6%] - If the inset is linked to a reference component, then this button will be highlighted "blue," and hovering over it will highlight the reference component in the UI so that you can see which component it's linked to. Clicking on this button will open a dialog that will allow you to "break" this link. You can drag this button over any component in the form to "link."
-// vale-skip: Microsoft.Percentages: "percent" is a named unit option in the GUI builder dropdown, paired with "millimetres", not a quantity.
-3. **The "Lock" Button"** image:img/guibuilder-2-inset-fixed-button.png[Inset fixed button,scaledwidth=6%] - This button allows you to toggle the inset between "flexible" (that's: auto) and "fixed" (that's: millimetres or percent).
-
-===== Auto snap
-
-Notice the "autosnap" checkbox that appears in the top-right corner of the GUI builder window.
-
-.Autosnap checkbox
-image::img/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Autosnap checkbox,scaledwidth=10%]
-
-Autosnap does what it sounds like: It automatically snaps two components together when you drag them near each other. This is handy for linking components together without having to explicitly link them (using the "link" button). This feature is turned on by default. If autosnap is turned off, you can still start a "snap" by holding down the ALT/Option key on your keyboard during the drag.
-
-===== Smart insets
-
-Beside the "autosnap" checkbox is another checkbox named `Smart Insets`.
-
-.Smart insets checkbox
-image::img/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Smart insets checkbox,scaledwidth=10%]
-
-Smart Inset uses some heuristics during a drag to try to determine how the insets should be linked. The heuristics are basic (it tries to link to the nearest neighbor component usually), but you will be working on improving this for future releases. This feature is turned off by default while it's still being refined. The goal is to improve this to the point where it *always* makes the correct link choices - at which time you will be able to use the GUI builder without having any knowledge of insets or reference components.
-
-===== The widget control pad
-
-.Widget control pad
-image::img/guibuilder-2-widget-control-pad.png[Widget control pad,scaledwidth=10%]
-
-When a component is selected, you should see a black floating panel appear in the lower right of the screen.
-
-This is the widget control pad, and it provides an alternative view of the component's links. It also provides a useful list of incoming links (that's: components that "depend on" this component's positioning). Sometimes, you may want to disconnect incoming links so that you can drag the component without affecting the position of dependent components.
-
-This control pad also includes game-pad-like controls (up, down, left, right), that allow you to "tab" the component to the next guide in that direction. Tab positions exist at component edges in the form. This is useful for aligning components with each other.
-
-===== Keyboard Short-Cuts
-
-1. **Arrow Keys** - Use the up/down/left/right arrow keys to nudge the selected component a little bit at a time. This is a convenient way to move the component to a position that's more precise than can be achieved with a mouse drag.
-2. **Arrow Keys + SHIFT** - Hold down the SHIFT key while pressing an arrow key and it will "tab" the component to the next tab marker. The form has implicit tab markers at the edge of each component on the form.
-3. **ALT/Option Key + Click or Drag** - Holding down the option/alt key while clicking or dragging a component will resulting in "snapping" behaviour even if autosnap is turned off.
-
-===== Sub-Containers
-
-Sometimes, you may need to add sub-containers to your form to aid in grouping your components together. You can drag a container onto your form using the "Container" palette item (under "Core Components"). The default layout the subcontainer will be LayeredLayout so that you're able to position components within the sub-container with precision, like on the root container.
-
-You can also change the layout of subcontainers to another classical layout manager (for example: grid layout, box layout, etc.) and drag components directly into it. This is useful if parts of your form lend themselves to a different layout. As an example, drag a container onto the canvas that uses BoxLayout Y. (You can find this under the "Containers" section of the component palette).
-
-Drag the button (that was earlier on the form) over that container, and you should see a drop-zone become highlighted.
-
-.Dropping container on child container with box layout y
-image::img/guibuilder-2-subcontainer-add-child.png[Dropping container on child container with box layout y,scaledwidth=25%]
-
-You can drop the button directly there. You can As you drag more components into the sub-container, you'll see them automatically laid out vertically.
-
-.Box Layout Y dropping 2nd child
-image::img/guibuilder-2-subcontainer-add-child-2.png[Box Layout Y dropping 2nd child,scaledwidth=25%]
-
-===== The canvas resize tool
-
-When designing a UI with the GUI builder it's ** important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices. Components may appear to be positioned when the canvas is one size, but become out of whack when the container is resized. After every manipulation you perform, it's good practice to drag the canvas resize tool (the button in the lower right corner of the GUI builder) smaller and bigger so you can see how the positions are changed. If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some components so that the resizing behavior matches your expectations.
+You can edit it by hand, but reopen the form afterward: the builder doesn't watch the file while it's running.

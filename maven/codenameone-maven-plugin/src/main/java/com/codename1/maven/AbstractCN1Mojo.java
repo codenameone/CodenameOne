@@ -115,6 +115,15 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     protected List<MavenArtifactRepository> remoteRepositories;
 
     /**
+     * The legacy resolver used by the goals below does not read the session's offline flag by
+     * itself, so {@code mvn -o} still let it reach the network and, worse, install what it found
+     * over an artifact the same build had just produced locally. Every resolution request in this
+     * class passes this through.
+     */
+    @Parameter(required = true, readonly = true, defaultValue = "${settings.offline}")
+    protected boolean offline;
+
+    /**
      * Version of the deprecated Resource Editor that {@code cn1:designer} resolves.
      * It is frozen rather than tracking the framework version, so it does not follow
      * ${cn1.version}. Override with -Dcn1.designer.version to run a different build.
@@ -522,6 +531,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         
         ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
                 
+        .setOffline(offline)
         .setLocalRepository(localRepository)
         .setRemoteRepositories(new ArrayList<>(remoteRepositories))
         .setResolveTransitively(true)
@@ -736,6 +746,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         
         ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
                 
+        .setOffline(offline)
         .setLocalRepository(localRepository)
         .setRemoteRepositories(new ArrayList<>(remoteRepositories))
         .setResolveTransitively(true)
@@ -1003,6 +1014,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         List<File> files = new ArrayList<File>();
         addCssCliJar(files, artifact);
         ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
+                .setOffline(offline)
                 .setLocalRepository(localRepository)
                 .setRemoteRepositories(new ArrayList<>(remoteRepositories))
                 .setResolveTransitively(true)

@@ -68,6 +68,11 @@ public class ByteArrayOutputStream extends java.io.OutputStream{
         return null; //TODO codavaj!!
     }
 
+    /// Converts the buffer's contents into a string, translating bytes into characters according to the named charset.
+    public java.lang.String toString(java.lang.String charsetName) throws java.io.UnsupportedEncodingException {
+        return null; //TODO codavaj!!
+    }
+
     /// Writes len bytes from the specified byte array starting at offset off to this byte array output stream.
     public void write(byte[] b, int off, int len){
         return; //TODO codavaj!!
