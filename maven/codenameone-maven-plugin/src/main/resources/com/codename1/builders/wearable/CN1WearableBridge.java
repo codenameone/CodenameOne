@@ -1444,10 +1444,25 @@ public class CN1WearableBridge implements WearableBridge {
     static void spoolOrDeliverRequest(Context context, String path, byte[] payload,
             int peerToken, String sourceNodeId) {
         if (deliverableNow(context, true)) {
+            // Written down FIRST, then delivered live. The live delivery only queues onto the EDT,
+            // so a process killed in that window used to lose the request entirely -- the sender
+            // times out either way, but the receiver never learned it had been asked. The record
+            // survives that and replays on the next launch as a plain message, which is what the
+            // request has become by then.
+            //
+            // Released by the delivery confirmation below, so the normal case leaves nothing
+            // behind and the app is not handed the same request twice.
+            final Context c = context;
+            final String key = spoolOne(context, SPOOL_MESSAGE, path, payload);
             // The peer's token is unique only on the peer, so trade it for a locally unique one
             // keyed to the node that asked; two watches can otherwise pick the same number.
             int localToken = rememberRequestOrigin(peerToken, sourceNodeId);
-            WearableConnection.deliverMessage(path, payload, localToken);
+            WearableConnection.deliverMessage(path, payload, localToken, key == null ? null
+                    : new Runnable() {
+                        public void run() {
+                            releaseSpooled(c, key);
+                        }
+                    });
             return;
         }
         android.util.Log.w("CN1Wearable", "no listener can answer the request on " + path
@@ -1512,6 +1527,42 @@ public class CN1WearableBridge implements WearableBridge {
     private static boolean spoolBusy() {
         synchronized (SPOOL_LOCK) {
             return spoolDraining || !SPOOL_IN_FLIGHT.isEmpty();
+        }
+    }
+
+    /// Writes one record and returns its key, or null if it could not be written.
+    ///
+    /// The key is what lets a LIVE delivery release its own durable copy once a listener has had
+    /// it. Everything else uses the boolean form below and lets the drain do the releasing.
+    private static String spoolOne(Context context, String kind, String path, byte[] payload) {
+        Context c = spoolContext(context);
+        if (c == null) {
+            return null;
+        }
+        synchronized (SPOOL_LOCK) {
+            try {
+                android.content.SharedPreferences prefs =
+                        c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
+                long seq = prefs.getLong(SPOOL_SEQ_KEY, 0) + 1;
+                String key = spoolKey(seq);
+                android.content.SharedPreferences.Editor edit = prefs.edit();
+                edit.putLong(SPOOL_SEQ_KEY, seq);
+                edit.putString(key, "0|" + kind + "|" + encode(path) + "|"
+                        + (payload == null ? "" : android.util.Base64.encodeToString(
+                                payload, android.util.Base64.NO_WRAP)));
+                trimSpool(prefs, edit);
+                spoolDirty = true;
+                // Claimed on the spot: this record is being delivered live, so the drain must not
+                // pick it up as well and hand the app the same payload twice.
+                SPOOL_IN_FLIGHT.add(key);
+                if (!edit.commit()) {
+                    SPOOL_IN_FLIGHT.remove(key);
+                    return null;
+                }
+                return key;
+            } catch (Throwable unavailable) {
+                return null;
+            }
         }
     }
 
@@ -1959,24 +2010,47 @@ public class CN1WearableBridge implements WearableBridge {
         // kept whichever item the buffer yielded first -- so once resolveValue() gained the
         // publisher tie-break, getData() could return a different value than the listener had just
         // delivered for the same path. One implementation, one answer.
-        String before = deliveredStamp(path);
-        try {
-            ResolvedValue v = resolveValue(context, path);
-            byte[] out = v == null ? null : v.payload;
-            // Only if no delivery moved this path while the query was blocked -- otherwise this
-            // older snapshot would outlive the newer one a delivery has already recorded.
-            rememberValueIfStampUnchanged(path, before, out);
-            return out;
-        } catch (java.io.IOException unavailable) {
-            // A failed query is NOT an empty path, and the two must not collapse into the same
-            // answer: the public getter documents null as "no value here", so returning it after a
-            // timeout invites a caller to clear state for a path that is still published.
-            // resolveValue throws precisely to keep them apart. The last known snapshot is the
-            // honest answer -- it is what this device last saw -- and null only when there is not
-            // even that.
-            return cachedValue(path);
+        // RETRIED, because a cold process has no snapshot to fall back on. A failed query and an
+        // empty path are different facts, and the getter has one value -- null -- for both: the
+        // first call in a new process that happens to time out therefore told the caller "nothing
+        // is published" about an item that is still there, and a caller acting on that discards
+        // valid state. A cached value makes the distinction moot, so the retries are spent only
+        // when there is nothing to fall back on.
+        java.io.IOException lastFailure = null;
+        for (int attempt = 0; attempt < COLD_READ_ATTEMPTS; attempt++) {
+            String before = deliveredStamp(path);
+            try {
+                ResolvedValue v = resolveValue(context, path);
+                byte[] out = v == null ? null : v.payload;
+                // Only if no delivery moved this path while the query was blocked -- otherwise this
+                // older snapshot would outlive the newer one a delivery has already recorded.
+                rememberValueIfStampUnchanged(path, before, out);
+                return out;
+            } catch (java.io.IOException unavailable) {
+                lastFailure = unavailable;
+                byte[] known = cachedValue(path);
+                if (known != null) {
+                    // The last known snapshot is the honest answer -- it is what this device last
+                    // saw -- and it settles the question without another round trip.
+                    return known;
+                }
+            }
         }
+        // Out of attempts with nothing cached. The answer returned here is indistinguishable from
+        // an authoritative absence, which is exactly the problem, so it is at least SAID: a caller
+        // that clears state on null has this line in the log explaining why it was wrong.
+        android.util.Log.w("CN1Wearable", "could not read " + path + " after "
+                + COLD_READ_ATTEMPTS + " attempts (" + lastFailure
+                + "); reporting no value, which is not the same as knowing there is none");
+        return null;
     }
+
+    /// How many times a read is attempted before it gives up with nothing cached.
+    ///
+    /// Only reached when this device has never seen the path: with a snapshot in hand the first
+    /// failure returns it, so the extra round trips are spent solely on the case that would
+    /// otherwise report an absence it cannot vouch for.
+    private static final int COLD_READ_ATTEMPTS = 3;
 
     /// Populates the cache for one path in the background, at most once per path per process.
     ///

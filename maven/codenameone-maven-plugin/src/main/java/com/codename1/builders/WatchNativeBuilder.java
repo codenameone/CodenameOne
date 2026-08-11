@@ -1897,15 +1897,31 @@ class WatchNativeBuilder {
                 .append("    return false\n")
                 .append("  end\n")
                 .append("  return false unless info.is_a?(Hash)\n")
+                // BOTH watch variants, because the target is built for both destinations. A plain
+                // .framework declaring only WatchOS links on a device and fails in the simulator
+                // with no compatible slice, which is the same asymmetry the system-framework check
+                // above already guards against by requiring presence in both SDKs.
                 .append("  platforms = info['CFBundleSupportedPlatforms']\n")
-                .append("  if platforms.is_a?(Array) && platforms.any? { |p| "
-                        + "p.to_s.downcase.start_with?('watch') }\n")
-                .append("    return true\n")
+                .append("  if platforms.is_a?(Array)\n")
+                .append("    names = platforms.map { |p| p.to_s.downcase }\n")
+                .append("    if names.any? { |p| p.start_with?('watch') }\n")
+                .append("      return names.include?('watchos') && "
+                        + "names.include?('watchsimulator')\n")
+                .append("    end\n")
                 .append("  end\n")
+                // An .xcframework lists one entry per platform+variant: the device library has no
+                // Variant, the simulator one carries Variant = 'simulator'. A bundle with only the
+                // device library builds on hardware and breaks every simulator run.
                 .append("  libs = info['AvailableLibraries']\n")
                 .append("  return false unless libs.is_a?(Array)\n")
-                .append("  libs.any? { |l| l.is_a?(Hash) && "
+                .append("  watch = libs.select { |l| l.is_a?(Hash) && "
                         + "l['SupportedPlatform'].to_s.downcase.start_with?('watch') }\n")
+                .append("  return false if watch.empty?\n")
+                .append("  device = watch.any? { |l| "
+                        + "l['SupportedPlatformVariant'].to_s.strip.empty? }\n")
+                .append("  simulator = watch.any? { |l| "
+                        + "l['SupportedPlatformVariant'].to_s.downcase == 'simulator' }\n")
+                .append("  device && simulator\n")
                 .append("end\n")
                 .append("vendored_linked = false\n")
                 .append("watch_sdks = ['watchos', 'watchsimulator'].map { |sdk| "

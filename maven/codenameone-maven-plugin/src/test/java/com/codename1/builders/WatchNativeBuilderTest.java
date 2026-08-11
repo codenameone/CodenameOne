@@ -804,6 +804,11 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("AvailableLibraries"), ruby);
         assertTrue(ruby.contains("cn1_watch_bundle_supports_watchos(ref)"),
                 "a non-SDKROOT reference must be judged by its own bundle: " + ruby);
+        // BOTH watch variants: the target builds for watchos AND watchsimulator, so a bundle
+        // carrying only the device library links on hardware and breaks every simulator run.
+        assertTrue(ruby.contains("SupportedPlatformVariant"), ruby);
+        assertTrue(ruby.contains("device && simulator"), ruby);
+        assertTrue(ruby.contains("names.include?('watchsimulator')"), ruby);
         // Linking alone is not enough. The linker has to be told where the binary lives, and a
         // dynamic framework has to be copied into the watch bundle or it fails at install time.
         assertTrue(ruby.contains("config.build_settings['FRAMEWORK_SEARCH_PATHS'] = paths"), ruby);
