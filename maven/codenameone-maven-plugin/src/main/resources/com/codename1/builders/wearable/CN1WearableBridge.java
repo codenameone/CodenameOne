@@ -1195,7 +1195,10 @@ public class CN1WearableBridge implements WearableBridge {
 
     public void putData(String path, byte[] payload) {
         final String p = path;
-        final byte[] body = payload == null ? new byte[0] : payload;
+        // CLONED, not referenced. Publication is deferred onto the worker below, so a caller that
+        // reuses or refills its buffer after this returns would otherwise have the worker publish
+        // whatever the array says by then rather than what was handed over.
+        final byte[] body = payload == null ? new byte[0] : (byte[]) payload.clone();
         // OFF the caller's thread, because the caller is usually the EDT.
         //
         // Allocating the sequence advances the logical-clock floor, and the floor is written with a
@@ -1402,12 +1405,16 @@ public class CN1WearableBridge implements WearableBridge {
 
     private static final String SPOOL_REMOVAL = "r";
 
-    /// Hands a one-shot message to a live listener, or writes it down for the next process.
+    /// Writes a one-shot message down, then hands it over.
+    ///
+    /// ALWAYS through the spool, even when a listener is registered. Delivering directly looked
+    /// like the fast path and left the same hole the spool exists to close: deliverMessage only
+    /// queues onto the EDT, so a process killed between the queueing and the callback lost a
+    /// message the Data Layer does not retain. Going through the spool means one record, one
+    /// ordering, and a release that happens when the listener has actually had it.
+    ///
+    /// The cost is a small write per message on a Data Layer worker, which is not a UI thread.
     static void spoolOrDeliverMessage(Context context, String path, byte[] payload) {
-        if (deliverableNow(context, true)) {
-            WearableConnection.deliverMessage(path, payload, 0);
-            return;
-        }
         if (!spool(context, SPOOL_MESSAGE, path, payload)) {
             // The spool is the durable half; if it could not be written, the in-memory queue is
             // still better than dropping the message outright.
@@ -1455,10 +1462,6 @@ public class CN1WearableBridge implements WearableBridge {
 
     /// The same for a removal, whose item no longer exists to be replayed from.
     static void spoolOrDeliverRemoval(Context context, String path) {
-        if (deliverableNow(context, false)) {
-            WearableConnection.deliverDataRemoved(path);
-            return;
-        }
         if (!spool(context, SPOOL_REMOVAL, path, null)) {
             WearableConnection.deliverDataRemoved(path);
             return;
@@ -2349,7 +2352,9 @@ public class CN1WearableBridge implements WearableBridge {
     public void transferFile(String path, String name, byte[] contents) {
         final String p = path;
         final String fileName = name == null ? "file" : name;
-        final byte[] body = contents == null ? new byte[0] : contents;
+        // Cloned for the same reason as putData's payload: the bytes are read on the worker, after
+        // this method has returned to a caller that is free to reuse the array.
+        final byte[] body = contents == null ? new byte[0] : (byte[]) contents.clone();
         // Off the caller's thread for the same reason putData is: allocating the sequence advances
         // the durable clock floor with a synchronous commit(), and this is called from application
         // code that is usually on the EDT. The transfer worker is single-threaded, so transfers
