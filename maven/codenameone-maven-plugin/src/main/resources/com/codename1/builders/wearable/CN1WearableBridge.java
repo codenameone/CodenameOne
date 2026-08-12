@@ -724,9 +724,15 @@ public class CN1WearableBridge implements WearableBridge {
     /// about as still present (or still absent) for the rest of the cache lifetime.
     static void peerChanged(Node peer, boolean connected) {
         CN1WearableBridge b = current;
-        if (peer != null && connected) {
-            rememberNode(peer.getId());
-        }
+        // NOT rememberNode. This arrives on a callback of an EXPORTED service with no binding
+        // permission, so any installed app can invoke it with a node id of its choosing -- and
+        // adding that id here put it straight into the provenance allowlist that isKnownNode
+        // consults first, letting the same app then forge a message or data callback under it,
+        // launch this app and reach its listeners.
+        //
+        // Peer notifications are state, not proof of identity. Trust comes only from asking Play
+        // services -- connectedNodeIds, capabilityNodeIds, getLocalNode -- which isKnownNode does
+        // for itself on the first event it cannot already vouch for.
         if (b == null) {
             WearableConnection.notifyStateChanged();
             return;
@@ -749,8 +755,15 @@ public class CN1WearableBridge implements WearableBridge {
                     updated.remove(i);
                 }
             }
+            // A DISCONNECT is applied as it arrives and a CONNECT is not. Removing a node can only
+            // understate what is reachable, which the next query corrects; adding one on the word
+            // of an exported callback would let any installed app conjure a peer into the snapshot
+            // that isPaired() and isReachable() answer from, and that fanOut would then address.
+            //
+            // The connect still does its job -- it is a hint that the picture changed, and the
+            // refresh below asks Play services what actually changed.
             if (connected) {
-                updated.add(peer);
+                refreshConnectedAfterPeerHint();
             }
         }
         cachedNodes = updated;
@@ -760,6 +773,38 @@ public class CN1WearableBridge implements WearableBridge {
         // from undoing this.
         cachedNodesStamp = System.currentTimeMillis();
         nodesGeneration++;
+    }
+
+    /// Re-asks Play services for the connected set after an unverified peer hint.
+    ///
+    /// The hint itself carries no authority, so the answer has to come from the same query the rest
+    /// of the provenance path uses. Off the calling thread because that thread is a Play services
+    /// callback and the query blocks; coalesced by the timer, so a burst of hints costs one round
+    /// trip rather than one each.
+    private void refreshConnectedAfterPeerHint() {
+        transferTimer.schedule(new java.util.TimerTask() {
+            public void run() {
+                try {
+                    List<Node> fresh = Tasks.await(nodeClient.getConnectedNodes(),
+                            TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                    if (fresh == null) {
+                        return;
+                    }
+                    synchronized (nodesLock) {
+                        cachedNodes = fresh;
+                        cachedNodesStamp = System.currentTimeMillis();
+                        nodesGeneration++;
+                    }
+                    // Verified, so these MAY enter the allowlist -- this is the query isKnownNode
+                    // would have made anyway.
+                    rememberAll(fresh);
+                    WearableConnection.notifyStateChanged();
+                } catch (Throwable unavailable) {
+                    // The previous snapshot stands. A hint that could not be confirmed changes
+                    // nothing, which is the point.
+                }
+            }
+        }, 0);
     }
 
     /// The live bridge, so the listener service can push state into it. The service and the bridge
