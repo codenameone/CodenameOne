@@ -1,0 +1,61 @@
+{{- define "main" -}}
+<section class="cn1-not-found-page">
+  <header class="cn1-not-found-hero">
+    <p class="cn1-not-found-code">404</p>
+    <p class="cn1-eyebrow">Page not found</p>
+    <h1>That page isn't here.</h1>
+    <p>The address may be old or the page may have moved. Choose the part of Codename One you need, or search the site.</p>
+    <div class="cn1-action-row">
+      {{ partial "cn1-cta.html" (dict "label" "Search the site" "href" "/search/" "event" "404-search") }}
+      {{ partial "cn1-cta.html" (dict "label" "Go to the homepage" "href" "/" "variant" "secondary") }}
+    </div>
+  </header>
+
+  <nav class="cn1-not-found-grid" aria-label="Popular destinations">
+    <a class="cn1-not-found-card" href="/initializr/" data-cn1-conversion="404-initializr">
+      <span class="cn1-not-found-card__label">Start</span>
+      <strong>Create a project</strong>
+      <span>Generate a current Maven project with Initializr.</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a class="cn1-not-found-card" href="/getting-started/">
+      <span class="cn1-not-found-card__label">Set up</span>
+      <strong>Getting Started</strong>
+      <span>Install the prerequisites, run the simulator, and submit a build.</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a class="cn1-not-found-card" href="/developer-guide/">
+      <span class="cn1-not-found-card__label">Reference</span>
+      <strong>Developer Guide</strong>
+      <span>Find APIs, platform setup, build hints, and implementation details.</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a class="cn1-not-found-card" href="/demos/">
+      <span class="cn1-not-found-card__label">Explore</span>
+      <strong>Demos</strong>
+      <span>Browse working applications, screenshots, and source code.</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a class="cn1-not-found-card" href="/pricing/">
+      <span class="cn1-not-found-card__label">Plans</span>
+      <strong>Pricing</strong>
+      <span>Compare cloud-build limits, services, and support.</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+    <a class="cn1-not-found-card" href="https://github.com/codenameone/CodenameOne/discussions" target="_blank" rel="noopener noreferrer">
+      <span class="cn1-not-found-card__label">Community</span>
+      <strong>GitHub Discussions</strong>
+      <span>Ask a question or find answers from other developers.</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </nav>
+
+  <aside class="cn1-not-found-legacy">
+    <div>
+      <p class="cn1-eyebrow">Following an old download link?</p>
+      <h2>Use the current project or migration path.</h2>
+    </div>
+    <a href="/download/">Open download help <span aria-hidden="true">&rarr;</span></a>
+  </aside>
+</section>
+{{- end -}}
