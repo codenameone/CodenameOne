@@ -3157,9 +3157,10 @@ public class CN1WearableBridge implements WearableBridge {
      * which is the FIFO these call sites were written against.
      *
      * <p>One thread, as before: a core size of one with the executor's unbounded delay queue never
-     * starts a second, so nothing here becomes concurrent with itself. The other difference is
-     * welcome -- an uncaught throwable killed the Timer's thread outright and silently stranded
-     * every later transfer, where this worker survives it.
+     * starts a second, so nothing here becomes concurrent with itself. An uncaught throwable no
+     * longer kills that thread and strands every later transfer, which a Timer did -- but it would
+     * be captured in a Future nobody reads, so {@code afterExecute} logs it. Silently swallowed is
+     * not an improvement on loudly fatal.
      */
     private static final java.util.concurrent.ScheduledThreadPoolExecutor transferTimer =
             newTransferWorker();
@@ -3175,7 +3176,37 @@ public class CN1WearableBridge implements WearableBridge {
                                 t.setDaemon(true);
                                 return t;
                             }
-                        });
+                        }) {
+                    @Override
+                    protected void afterExecute(Runnable r, Throwable t) {
+                        super.afterExecute(r, t);
+                        // A task submitted through schedule() reports its failure into the Future
+                        // it returned, and nothing here keeps those. Without this the worker would
+                        // absorb a bug in a mutation or a retry without a word, where the Timer at
+                        // least took the thread down with it.
+                        if (t == null && r instanceof java.util.concurrent.Future) {
+                            java.util.concurrent.Future<?> f = (java.util.concurrent.Future<?>) r;
+                            if (!f.isDone()) {
+                                return;
+                            }
+                            try {
+                                f.get();
+                            } catch (java.util.concurrent.CancellationException e) {
+                                // An armed deadline that a nearer one replaced. Routine.
+                                return;
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            } catch (java.util.concurrent.ExecutionException e) {
+                                t = e.getCause();
+                            }
+                        }
+                        if (t != null) {
+                            android.util.Log.e("CN1Wearable",
+                                    "a wearable transfer task failed", t);
+                        }
+                    }
+                };
         // Replaces Timer.purge(): a cancelled deadline leaves the queue immediately rather than
         // sitting in it until its time comes.
         worker.setRemoveOnCancelPolicy(true);
