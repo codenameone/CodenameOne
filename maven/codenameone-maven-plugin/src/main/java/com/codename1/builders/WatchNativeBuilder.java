@@ -1876,9 +1876,18 @@ class WatchNativeBuilder {
                 // A thin archive answers nothing to lipo -archs; ask the file itself.
                 .append("  archs = `file \"#{path}\" 2>/dev/null`.scan("
                         + "/arm64_32|armv7k/) if archs.empty?\n")
-                .append("  watch = archs.any? { |a| a == 'arm64_32' || a == 'armv7k' }\n")
+                // A watch DEVICE slice is unambiguous -- arm64_32 and armv7k exist nowhere else --
+                // but the target also builds for watchsimulator, and an archive with only the
+                // device slice fails every simulator run. A simulator slice is x86_64 (Intel) or
+                // arm64 (Apple silicon); arm64 alone cannot be told apart from an iOS device slice
+                // by architecture, so the pair is what is required, and the log names what was
+                // found so a mismatch is attributable rather than mysterious.
+                .append("  device = archs.any? { |a| a == 'arm64_32' || a == 'armv7k' }\n")
+                .append("  simulator = archs.any? { |a| a == 'x86_64' || a == 'arm64' }\n")
+                .append("  watch = device && simulator\n")
                 .append("  puts \"[watchNative] #{File.basename(path)} #{watch ? 'has' : 'has no'}"
-                        + " watchOS slice (#{archs.empty? ? 'unknown' : archs.join(' ')})\"\n")
+                        + " usable watchOS slices (#{archs.empty? ? 'unknown' : archs.join(' ')}; "
+                        + "device=#{device} simulator=#{simulator})\"\n")
                 .append("  watch\n")
                 .append("end\n");
 
@@ -2135,6 +2144,12 @@ class WatchNativeBuilder {
                 // os() expressions, and `#if !TARGET_OS_WATCH` around a phone-only @import is the
                 // standard spelling. Treating it as unevaluable kept the import, which attached an
                 // iOS-only package to the watch target over code the compiler excludes.
+                // A DEFINEDNESS test is not a platform test. TargetConditionals defines every one
+                // of these macros on every platform -- as 0 or 1 -- so `#ifdef TARGET_OS_IOS` and
+                // `#if defined(TARGET_OS_IOS)` are both TRUE on watchOS and the branch compiles
+                // there. Reading them as iOS-only removed an arm the watch does build and dropped
+                // the package imported inside it.
+                .append("  return false if c =~ /\\A#(ifdef|ifndef)\\b/ || c.include?('defined(')\n")
                 .append("  return true if c =~ /!TARGET_OS_WATCH\\b/\n")
                 .append("  unless c =~ /\\bTARGET_OS_WATCH\\b/\n")
                 // NEGATED is the opposite answer. `!TARGET_OS_IOS` is TRUE on watchOS, so that arm

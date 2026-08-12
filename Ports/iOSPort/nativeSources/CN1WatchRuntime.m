@@ -228,6 +228,18 @@ void cn1_watch_runtime_markJavaReady(void) {
 /// is stopped while the watch is in the background, which is exactly when a queued background
 /// transition is waiting, so a foreground arriving next has to flush the backlog itself before
 /// recording anything of its own.
+/// True while a drain is copying and delivering the queue.
+///
+/// Clearing the queue before delivering is necessary -- a delivery runs translated code and must
+/// not be replayed re-entrantly -- but on its own it opened a window: the bootstrap thread could
+/// copy a queued BACKGROUND phase and be descheduled, the main thread's foreground transition then
+/// found an empty queue and delivered itself first, and the older background arrived after it. The
+/// app ends up stopped and minimized while visibly on screen.
+///
+/// So the queue being empty is not the question a new transition should ask. It asks whether a
+/// drain is in flight, and if one is, it queues behind the batch already being delivered.
+static BOOL cn1WatchDraining = NO;
+
 static void cn1WatchReplayPendingPhase(void) {
     if (!cn1WatchJavaReady()) {
         return;
@@ -235,6 +247,12 @@ static void cn1WatchReplayPendingPhase(void) {
     int pending[CN1_WATCH_MAX_PENDING_PHASES];
     int count;
     pthread_mutex_lock(&cn1WatchPhaseLock);
+    if (cn1WatchDraining) {
+        // Another thread owns the batch. Its own loop picks up anything queued meanwhile.
+        pthread_mutex_unlock(&cn1WatchPhaseLock);
+        return;
+    }
+    cn1WatchDraining = YES;
     count = cn1WatchPendingPhaseCount;
     for (int i = 0; i < count; i++) {
         pending[i] = cn1WatchPendingPhases[i];
@@ -243,9 +261,25 @@ static void cn1WatchReplayPendingPhase(void) {
     // a re-entrant call nor the drain thread must replay what is already on its way.
     cn1WatchPendingPhaseCount = 0;
     pthread_mutex_unlock(&cn1WatchPhaseLock);
-    for (int i = 0; i < count; i++) {
-        cn1WatchDeliverPhase(pending[i]);
+    while (count > 0) {
+        for (int i = 0; i < count; i++) {
+            cn1WatchDeliverPhase(pending[i]);
+        }
+        // Again, because a transition that arrived during those deliveries queued behind them
+        // rather than overtaking them -- and this drain is the one that owes it a delivery.
+        pthread_mutex_lock(&cn1WatchPhaseLock);
+        count = cn1WatchPendingPhaseCount;
+        for (int i = 0; i < count; i++) {
+            pending[i] = cn1WatchPendingPhases[i];
+        }
+        cn1WatchPendingPhaseCount = 0;
+        pthread_mutex_unlock(&cn1WatchPhaseLock);
     }
+    // One place to release ownership, reached whether the queue was empty on entry or emptied by
+    // the loop. Anything queued after this point finds no drain in flight and starts its own.
+    pthread_mutex_lock(&cn1WatchPhaseLock);
+    cn1WatchDraining = NO;
+    pthread_mutex_unlock(&cn1WatchPhaseLock);
 }
 
 /// Records or delivers one transition, preserving order against anything still queued.
@@ -308,7 +342,10 @@ static void cn1WatchArmPhaseDrain(void) {
 static void cn1WatchHandlePhase(int phase) {
     cn1WatchReplayPendingPhase();
     pthread_mutex_lock(&cn1WatchPhaseLock);
-    BOOL queued = !cn1WatchJavaReady() || cn1WatchPendingPhaseCount > 0;
+    // cn1WatchDraining, not just a non-empty queue: a drain that has already copied the batch has
+    // emptied the queue while the older phases are still on their way, and delivering directly
+    // into that window is what let a foreground overtake the background before it.
+    BOOL queued = !cn1WatchJavaReady() || cn1WatchDraining || cn1WatchPendingPhaseCount > 0;
     if (queued) {
         cn1WatchQueuePhase(phase);
     }
