@@ -322,17 +322,11 @@ class LinuxDatabase extends Database {
     /// A cursor calls this when a step fails, because the failure may have ended the transaction
     /// underneath the tracking. Separate from the read the execute paths do inline only because a
     /// cursor is not this class and cannot reach the inherited hook itself.
-    void reconcileTransactionState() {
+    void reconcileTransactionState() throws IOException {
         if (peer == 0) {
             return;
         }
-        try {
-            noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
-        } catch (IOException cannotAsk) {
-            // Reached while another failure is already on its way out of the cursor. A connection
-            // that cannot even report whether it is in a transaction has a larger problem than
-            // this, and replacing the caller's error with this one would hide the real cause.
-        }
+        noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
     }
 
     void unregister(CursorImpl cursor) {
@@ -452,13 +446,10 @@ class LinuxDatabase extends Database {
 
         @Override
         protected boolean stepForward() throws IOException {
-            boolean stepped = false;
             try {
-                boolean row = LinuxNative.sqlStmtStep(stmt);
-                stepped = true;
-                return row;
-            } finally {
-                if (!stepped && owner != null) {
+                return LinuxNative.sqlStmtStep(stmt);
+            } catch (IOException failed) {
+                if (owner != null) {
                     // A statement runs its work here, not at prepare: an INSERT ... RETURNING
                     // reached through executeQuery does its insert on this step. A constraint
                     // with ON CONFLICT ROLLBACK therefore ends the transaction as this fails,
@@ -467,6 +458,7 @@ class LinuxDatabase extends Database {
                     // and failing the rollback that would have cleared it.
                     owner.reconcileTransactionState();
                 }
+                throw failed;
             }
         }
 

@@ -740,7 +740,10 @@ public final class IOSNative {
     native void sqlStmtBindLong(long statementPeer, int index, long value);
     native void sqlStmtBindDouble(long statementPeer, int index, double value);
     /** Steps a statement, returning true when it landed on a row. */
-    native boolean sqlStmtStep(long statementPeer);
+    /// Declares what it does: a step that fails raises the SQLite error from the native side,
+    /// so callers can catch it rather than reaching for a finally that runs while the exception
+    /// is already unwinding.
+    native boolean sqlStmtStep(long statementPeer) throws java.io.IOException;
     /** Resets a statement back to before its first row, keeping its bindings. */
     native void sqlStmtReset(long statementPeer);
     native void sqlStmtFinalize(long statementPeer);

@@ -1120,24 +1120,29 @@ public final class DatabaseConformanceSuite {
             db.execute("INSERT INTO conf_tx_unique (id) VALUES (1)");
             db.beginTransaction();
             boolean conflicted = false;
+            // Deliberately flat: the close happens after the catch rather than in a finally,
+            // because a finally runs while the failure is still unwinding and the ports reach
+            // back into the engine there.
+            Cursor conflicting = null;
             try {
-                Cursor conflicting = db.executeQuery(
+                conflicting = db.executeQuery(
                         "INSERT OR ROLLBACK INTO conf_tx_unique (id) VALUES (1)");
-                try {
-                    conflicting.next();
-                } finally {
-                    try {
-                        conflicting.close();
-                    } catch (IOException alsoFailed) {
-                        // The constraint failure is the one under test.
-                    }
-                }
+                conflicting.next();
             } catch (IOException expected) {
                 conflicted = true;
             } catch (RuntimeException unchecked) {
                 conflicted = true;
                 r.check(false, "a constraint failure reached through executeQuery raises "
                         + "IOException rather than " + unchecked.getClass().getName());
+            }
+            if (conflicting != null) {
+                try {
+                    conflicting.close();
+                } catch (IOException alsoFailed) {
+                    // The constraint failure is the one under test.
+                } catch (RuntimeException alsoFailed) {
+                    // Likewise.
+                }
             }
             if (conflicted) {
                 try {

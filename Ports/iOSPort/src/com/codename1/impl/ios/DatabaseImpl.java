@@ -502,13 +502,10 @@ class DatabaseImpl extends Database {
 
         @Override
         protected boolean stepForward() throws IOException {
-            boolean stepped = false;
             try {
-                boolean row = IOSImplementation.nativeInstance.sqlStmtStep(stmt);
-                stepped = true;
-                return row;
-            } finally {
-                if (!stepped && owner != null) {
+                return IOSImplementation.nativeInstance.sqlStmtStep(stmt);
+            } catch (IOException failed) {
+                if (owner != null) {
                     // A statement runs its work here, not at prepare: an INSERT ... RETURNING
                     // reached through executeQuery does its insert on this step. A constraint
                     // with ON CONFLICT ROLLBACK therefore ends the transaction as this fails,
@@ -517,6 +514,7 @@ class DatabaseImpl extends Database {
                     // and failing the rollback that would have cleared it.
                     owner.reconcileTransactionState();
                 }
+                throw failed;
             }
         }
 

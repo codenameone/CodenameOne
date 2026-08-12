@@ -458,8 +458,21 @@ public class SEDatabase extends Database {
         } catch (SQLException ex) {
             setTransactionMode(org.sqlite.SQLiteConfig.TransactionMode.DEFERRED);
             noteEndFailure(ex);
+            if (alreadyRolledBack(ex)) {
+                // Satisfied rather than failed, for the reason given on the Android port: the
+                // engine ended the transaction and discarded its work as the statement failed,
+                // which is what rolling back asks for.
+                return;
+            }
             throw new IOException(ex.getMessage(), ex);
         }
+    }
+
+    /// Whether an end failed because the engine had already rolled the transaction back.
+    private static boolean alreadyRolledBack(SQLException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && message.toLowerCase().indexOf("no transaction is active") >= 0;
     }
 
     @Override

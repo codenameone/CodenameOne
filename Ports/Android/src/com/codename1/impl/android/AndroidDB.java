@@ -211,6 +211,17 @@ public class AndroidDB extends Database {
         db.execSQL("/* not " + keyword + " to the statement classifier */ " + keyword);
     }
 
+    /// Whether an end failed because the engine had already rolled the transaction back.
+    ///
+    /// The engine says so in words and nothing else reports it: SQLite has no way to ask whether
+    /// a transaction is open, and the Android wrapper answers for its own bookkeeping rather than
+    /// for the connection.
+    private static boolean alreadyRolledBack(Exception err) {
+        String message = err.getMessage();
+        return message != null
+                && message.toLowerCase().indexOf("no transaction is active") >= 0;
+    }
+
     private void rollbackQuietly() {
         try {
             db.execSQL("/* not ROLLBACK to the statement classifier */ ROLLBACK");
@@ -240,6 +251,14 @@ public class AndroidDB extends Database {
             // later begin and key change refused until the connection closed.
             if (!db.inTransaction()) {
                 markTransactionEnded();
+                if (alreadyRolledBack(err)) {
+                    // Satisfied, not failed. Rolling back asks for the transaction to end with
+                    // its work discarded, and the engine did exactly that as the statement
+                    // failed. The caller only called this because isInTransaction() still said
+                    // yes -- this port cannot ask the engine directly the way the others can --
+                    // so raising here would punish them for a belief that was ours.
+                    return;
+                }
             }
             throw new IOException(err.getMessage(), err);
         }
