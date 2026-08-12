@@ -42,6 +42,11 @@ public class Stack extends Widget {
         return children;
     }
 
+    /** How non-positioned children are sized; {@code loose} when unset, as in Flutter. */
+    public com.codename1.flutter.StackFit getFit() {
+        return fit == null ? com.codename1.flutter.StackFit.loose : fit;
+    }
+
     @Override
     public Element createElement() {
         return new StackRenderElement(this);

@@ -49,6 +49,76 @@ class StackLayoutTest {
     }
 
     @Test
+    void expandFitForcesNonPositionedChildrenToFillTheStack() {
+        // The gallery's study card: a Stack(fit: expand) over an image that also declares
+        // its own height. Flutter's tight constraints win, so the image covers the card;
+        // loosening instead left it at its own size, framed by the surface behind it.
+        Stack stack = new Stack();
+        stack.fit(StackFit.expand);
+        stack.children(DartList.of((Widget) new ProbeBox(100, 240)));
+
+        RenderElement root = mountAndLayout(stack, BoxConstraints.tight(296, 208));
+        assertEquals(new Size(296, 208), root.size());
+        assertEquals(new Size(296, 208), root.renderChildren().get(0).size(),
+                "expand must override the child's own size");
+    }
+
+    @Test
+    void looseFitLeavesTheChildItsOwnSize() {
+        // Same tree, default fit - the contrast that makes the case above meaningful.
+        Stack stack = new Stack();
+        stack.children(DartList.of((Widget) new ProbeBox(100, 240)));
+
+        RenderElement root = mountAndLayout(stack, BoxConstraints.tight(296, 208));
+        assertEquals(new Size(296, 208), root.size());
+        assertEquals(new Size(100, 208), root.renderChildren().get(0).size());
+    }
+
+    @Test
+    void passthroughFitHandsTheChildTheStacksOwnConstraints() {
+        Stack stack = new Stack();
+        stack.fit(StackFit.passthrough);
+        stack.children(DartList.of((Widget) new ProbeBox(100, 50)));
+
+        // Min constraints reach the child untouched, unlike loose.
+        RenderElement root = mountAndLayout(stack, new BoxConstraints(200, 400, 120, 600));
+        assertEquals(new Size(200, 120), root.renderChildren().get(0).size());
+    }
+
+    @Test
+    void expandUnderAnUnboundedAxisDegradesToLooseRatherThanGoingInfinite() {
+        Stack stack = new Stack();
+        stack.fit(StackFit.expand);
+        stack.children(DartList.of((Widget) new ProbeBox(100, 50)));
+
+        // Unbounded height: there is no biggest to be tight to.
+        RenderElement root = mountAndLayout(stack,
+                new BoxConstraints(0, 400, 0, Double.POSITIVE_INFINITY));
+        assertEquals(new Size(400, 50), root.renderChildren().get(0).size());
+        assertEquals(new Size(400, 50), root.size());
+    }
+
+    @Test
+    void positionedChildrenIgnoreTheFit() {
+        // fit only governs NON-positioned children - a Positioned child still resolves
+        // against its own insets.
+        Stack stack = new Stack();
+        stack.fit(StackFit.expand);
+        Positioned p = new Positioned();
+        p.left(10.0);
+        p.top(20.0);
+        p.child(new ProbeBox(30, 30));
+        stack.children(DartList.of((Widget) p, new ProbeBox(50, 50)));
+
+        RenderElement root = mountAndLayout(stack, BoxConstraints.tight(400, 600));
+        RenderElement positioned = root.renderChildren().get(0);
+        assertEquals(new Size(30, 30), positioned.size());
+        assertEquals(10, positioned.x());
+        assertEquals(20, positioned.y());
+        assertEquals(new Size(400, 600), root.renderChildren().get(1).size());
+    }
+
+    @Test
     void stackWithOnlyPositionedChildrenExpandsToBoundedAxes() {
         Stack stack = new Stack();
         Positioned p = new Positioned();

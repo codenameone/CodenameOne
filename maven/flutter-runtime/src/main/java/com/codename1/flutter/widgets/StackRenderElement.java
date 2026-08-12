@@ -14,12 +14,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Flutter's RenderStack (StackFit.loose subset):
+ * Flutter's RenderStack:
  * <ol>
- *   <li>Non-positioned children are laid out with the loosened incoming
- *       constraints; the stack sizes to the biggest of them (constrained), or
- *       expands to the bounded axes when every child is positioned. Under
- *       tight constraints the stack fills them either way.</li>
+ *   <li>Non-positioned children are laid out against the constraints the
+ *       stack's {@code StackFit} implies - loosened for {@code loose} (the
+ *       default), tight to the stack for {@code expand}, unchanged for
+ *       {@code passthrough}; the stack sizes to the biggest of them
+ *       (constrained), or expands to the bounded axes when every child is
+ *       positioned. Under tight constraints the stack fills them either way.</li>
  *   <li>Non-positioned children are placed by the stack's alignment
  *       (default topLeft).</li>
  *   <li>{@link Positioned} children resolve left/top/right/bottom/width/
@@ -75,7 +77,7 @@ public class StackRenderElement extends RenderElement {
         List<RenderElement> kids = renderChildren();
 
         // Pass 1: size the stack from the non-positioned children.
-        BoxConstraints loose = constraints.loosen();
+        BoxConstraints nonPositioned = nonPositionedConstraints(constraints);
         double maxW = 0;
         double maxH = 0;
         boolean hasNonPositioned = false;
@@ -84,7 +86,7 @@ public class StackRenderElement extends RenderElement {
                 continue;
             }
             hasNonPositioned = true;
-            Size cs = kid.layout(loose);
+            Size cs = kid.layout(nonPositioned);
             maxW = Math.max(maxW, cs.width());
             maxH = Math.max(maxH, cs.height());
         }
@@ -110,6 +112,36 @@ public class StackRenderElement extends RenderElement {
             }
         }
         return self;
+    }
+
+    /**
+     * The constraints a non-positioned child is laid out against — Flutter's
+     * {@code RenderStack.performLayout} switch on {@code StackFit}.
+     *
+     * <p>{@code expand} is not a detail: it is how a Stack tells its children to FILL it,
+     * and a child that also carries its own size gets that size overridden by the tight
+     * constraints. The gallery's study card is exactly that shape - a
+     * {@code Stack(fit: StackFit.expand)} over an image that separately declares
+     * {@code height: 240} - so loosening unconditionally let the image keep its own height
+     * and sit inside the card instead of covering it, framed by a band of the Material
+     * surface behind it.</p>
+     */
+    private BoxConstraints nonPositionedConstraints(BoxConstraints constraints) {
+        com.codename1.flutter.StackFit f = stack().getFit();
+        if (f == com.codename1.flutter.StackFit.passthrough) {
+            return constraints;
+        }
+        if (f == com.codename1.flutter.StackFit.expand) {
+            // Tight to what we have room for. An unbounded axis has no biggest to be tight
+            // to - Flutter asserts here; we loosen that axis instead so an unbounded parent
+            // degrades to the loose behaviour rather than propagating an infinite size.
+            return new BoxConstraints(
+                    constraints.hasBoundedWidth() ? constraints.maxWidth() : 0,
+                    constraints.maxWidth(),
+                    constraints.hasBoundedHeight() ? constraints.maxHeight() : 0,
+                    constraints.maxHeight());
+        }
+        return constraints.loosen();
     }
 
     private void placePositioned(PositionedRenderElement kid, Size self, Alignment a) {
