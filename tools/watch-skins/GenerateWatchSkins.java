@@ -248,10 +248,19 @@ public class GenerateWatchSkins {
         p.append("safePortraitY=").append(inset).append('\n');
         p.append("safePortraitWidth=").append(m.dw - insetX * 2).append('\n');
         p.append("safePortraitHeight=").append(m.dh - inset * 2).append('\n');
-        p.append("safeLandscapeX=").append(inset).append('\n');
-        p.append("safeLandscapeY=").append(insetX).append('\n');
-        p.append("safeLandscapeWidth=").append(m.dh - inset * 2).append('\n');
-        p.append("safeLandscapeHeight=").append(m.dw - insetX * 2).append('\n');
+        // IDENTICAL to the portrait values, not the transpose of them.
+        //
+        // There is no landscape watch. skin_l.png and skin_map_l.png are the portrait artwork and
+        // the portrait coordinate map, because that is the only face the device has -- so swapping
+        // the display dimensions here described a screen that is not the one being drawn or
+        // clicked. A rotated rectangular Apple Watch or Wear Square skin then measured layouts
+        // against a safe area wider than the display it was inset from, and previewed them out of
+        // bounds. The simulator disables rotation for a watch skin as well; these values are what
+        // keeps a persisted or forced landscape state honest rather than merely unreachable.
+        p.append("safeLandscapeX=").append(insetX).append('\n');
+        p.append("safeLandscapeY=").append(inset).append('\n');
+        p.append("safeLandscapeWidth=").append(m.dw - insetX * 2).append('\n');
+        p.append("safeLandscapeHeight=").append(m.dh - inset * 2).append('\n');
 
         File out = new File(outDir, m.file);
         ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(out));

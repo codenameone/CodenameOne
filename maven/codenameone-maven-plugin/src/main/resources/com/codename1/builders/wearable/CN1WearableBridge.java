@@ -782,7 +782,7 @@ public class CN1WearableBridge implements WearableBridge {
     /// callback and the query blocks; coalesced by the timer, so a burst of hints costs one round
     /// trip rather than one each.
     private void refreshConnectedAfterPeerHint() {
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 try {
                     List<Node> fresh = Tasks.await(nodeClient.getConnectedNodes(),
@@ -804,7 +804,7 @@ public class CN1WearableBridge implements WearableBridge {
                     // nothing, which is the point.
                 }
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// The live bridge, so the listener service can push state into it. The service and the bridge
@@ -1258,7 +1258,7 @@ public class CN1WearableBridge implements WearableBridge {
         // which keeps the two things that matter: the commit still completes before the item is
         // published, and the worker is single-threaded, so two publications keep the order their
         // callers made them in -- which is what their sequence stamps are supposed to record.
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 // The payload travels inside a DataMap rather than as the item's raw data so it can
                 // be stamped with a publication sequence. Both halves of a pair may publish the
@@ -1272,7 +1272,7 @@ public class CN1WearableBridge implements WearableBridge {
                 // "my watch never updated" even though the API did its job.
                 dataClient.putDataItem(req.asPutDataRequest().setUrgent());
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -1351,7 +1351,7 @@ public class CN1WearableBridge implements WearableBridge {
     /// the only moment the in-memory clock can be BEHIND what this device itself published -- every
     /// later read raises it through sequenceOf as a matter of course.
     private void reconcileClockFromPublishedItems() {
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 try {
                     DataItemBuffer items = Tasks.await(dataClient.getDataItems(),
@@ -1370,7 +1370,7 @@ public class CN1WearableBridge implements WearableBridge {
                     // item this device reads raises the clock anyway.
                 }
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// A context for a cold service process, where the clock still has to be durable.
@@ -2114,7 +2114,7 @@ public class CN1WearableBridge implements WearableBridge {
                 return;
             }
         }
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 String before = deliveredStamp(path);
                 try {
@@ -2148,7 +2148,7 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 }
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// Enumerates in the background so a cold {@code getDataPaths} is only wrong once.
@@ -2161,7 +2161,7 @@ public class CN1WearableBridge implements WearableBridge {
                 return;
             }
         }
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 try {
                     getDataPaths();
@@ -2177,7 +2177,7 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 }
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// Not a path: paths are prefixed, so this cannot collide with one.
@@ -2218,13 +2218,14 @@ public class CN1WearableBridge implements WearableBridge {
         // On the SAME worker the publications go to, or the two operations race. putData defers its
         // publication, so `putData(path, value); removeData(path);` could delete first and let the
         // put land behind it -- leaving the value published after the call that removed it. One
-        // single-threaded worker for every mutation of this namespace means the Data Layer sees
-        // them in the order the application asked for them.
-        transferTimer.schedule(new java.util.TimerTask() {
+        // single-threaded FIFO worker for every mutation of this namespace means the Data Layer
+        // sees them in the order the application asked for them. FIFO is load-bearing and not
+        // merely a property of having one thread -- see the note on transferTimer.
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 deleteData(p);
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// Issues one removal, on the worker that owns the ordering.
@@ -2499,11 +2500,11 @@ public class CN1WearableBridge implements WearableBridge {
         // the durable clock floor with a synchronous commit(), and this is called from application
         // code that is usually on the EDT. The transfer worker is single-threaded, so transfers
         // keep the order they were requested in.
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 publishTransfer(p, fileName, body);
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// Builds and publishes one transfer item, on the transfer worker.
@@ -2613,35 +2614,43 @@ public class CN1WearableBridge implements WearableBridge {
     /// The absolute time the pending deadline task will fire, or 0 when none is pending.
     private long sweepDeadlineAt;
 
-    private java.util.TimerTask sweepDeadlineTask;
+    private Runnable sweepDeadlineTask;
+
+    private java.util.concurrent.ScheduledFuture<?> sweepDeadlineHandle;
 
     /// Ensures a deadline sweep happens no later than {@code at}.
     ///
     /// An existing task that already fires by then is left alone -- that is what collapses a burst
-    /// of transfers into a single timer entry, since their deadlines only ever move later. A task
+    /// of transfers into a single queue entry, since their deadlines only ever move later. A task
     /// is replaced only when something genuinely needs an EARLIER sweep, which is why the cancelled
-    /// one is purged rather than left to expire in the queue.
+    /// one leaves the queue rather than expiring in it.
     private void armSweepDeadline(long at) {
         synchronized (sweepLock) {
             if (sweepDeadlineTask != null && sweepDeadlineAt <= at) {
                 return;
             }
-            if (sweepDeadlineTask != null) {
-                sweepDeadlineTask.cancel();
-                transferTimer.purge();
+            if (sweepDeadlineHandle != null) {
+                sweepDeadlineHandle.cancel(false);
             }
             sweepDeadlineAt = at;
-            sweepDeadlineTask = new java.util.TimerTask() {
+            sweepDeadlineTask = new Runnable() {
                 public void run() {
                     synchronized (sweepLock) {
-                        sweepDeadlineTask = null;
-                        sweepDeadlineAt = 0;
+                        // Only if this is still the armed task. Cancelling one that has already
+                        // begun does not stop it, and it blocks here behind the arm that replaced
+                        // it -- so an unguarded clear would erase the replacement's bookkeeping and
+                        // leave every later deadline believing a sweep was already pending.
+                        if (sweepDeadlineTask == this) {
+                            sweepDeadlineTask = null;
+                            sweepDeadlineAt = 0;
+                        }
                     }
                     sweepOwnTransfers();
                 }
             };
             long delay = at - System.currentTimeMillis();
-            transferTimer.schedule(sweepDeadlineTask, delay < 0 ? 0 : delay);
+            sweepDeadlineHandle = transferTimer.schedule(sweepDeadlineTask,
+                    delay < 0 ? 0 : delay, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
     }
 
@@ -2654,14 +2663,14 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         deferredSweepScheduled = true;
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 synchronized (sweepLock) {
                     deferredSweepScheduled = false;
                 }
                 sweepOwnTransfers();
             }
-        }, delay < 0 ? 0 : delay + 1000L);
+        }, delay < 0 ? 0 : delay + 1000L, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -2699,7 +2708,7 @@ public class CN1WearableBridge implements WearableBridge {
     private static final long REPLAY_RETRY_CAP_MILLIS = 60 * 1000L;
 
     private void replayOutstandingTransfers(final int attempt, final long startedAt) {
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 boolean replayFailed = false;
                 try {
@@ -2814,7 +2823,7 @@ public class CN1WearableBridge implements WearableBridge {
                     replayOutstandingTransfers(attempt + 1, startedAt);
                 }
             }
-        }, attempt == 1 ? 0 : replayDelay(attempt));
+        }, attempt == 1 ? 0 : replayDelay(attempt), java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// The sweep itself, coalesced. Schedules no follow-up beyond a deferred retry when coalescing
@@ -2858,7 +2867,7 @@ public class CN1WearableBridge implements WearableBridge {
             expected.add(connected.getId());
         }
         expected.remove(localNodeId(context));
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 boolean failed = false;
                 try {
@@ -3015,7 +3024,7 @@ public class CN1WearableBridge implements WearableBridge {
                     }
                 }
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -3133,13 +3142,45 @@ public class CN1WearableBridge implements WearableBridge {
     }
 
     /**
-     * Retries run on their own timer, not on {@link #replyTimer}. A retry blocks on
+     * Retries run on their own worker, not on {@link #replyTimer}. A retry blocks on
      * {@code Tasks.await} and then reads the whole asset stream, and the reply timer is a single
      * thread that also owns every pending 30-second reply deadline -- a slow or large asset would
      * delay those deadlines, so a request that timed out would be reported late or not at all.
+     *
+     * <p>A scheduled executor rather than a {@link java.util.Timer}, because the mutation paths
+     * depend on this worker running same-deadline work in the order it was submitted and a Timer
+     * does not do that. Timer's queue is a heap keyed on the execution time alone, so among tasks
+     * that share a deadline -- which every {@code schedule(task, 0)} in this class does under a
+     * burst -- it pops them in heap order. {@code putData(p, a); removeData(p); putData(p, b)}
+     * could therefore issue the second put before the delete and leave the path absent.
+     * {@code ScheduledThreadPoolExecutor} breaks the same tie on a monotonic submission sequence,
+     * which is the FIFO these call sites were written against.
+     *
+     * <p>One thread, as before: a core size of one with the executor's unbounded delay queue never
+     * starts a second, so nothing here becomes concurrent with itself. The other difference is
+     * welcome -- an uncaught throwable killed the Timer's thread outright and silently stranded
+     * every later transfer, where this worker survives it.
      */
-    private static final java.util.Timer transferTimer =
-            new java.util.Timer("cn1-wearable-transfers", true);
+    private static final java.util.concurrent.ScheduledThreadPoolExecutor transferTimer =
+            newTransferWorker();
+
+    private static java.util.concurrent.ScheduledThreadPoolExecutor newTransferWorker() {
+        java.util.concurrent.ScheduledThreadPoolExecutor worker =
+                new java.util.concurrent.ScheduledThreadPoolExecutor(1,
+                        new java.util.concurrent.ThreadFactory() {
+                            public Thread newThread(Runnable r) {
+                                Thread t = new Thread(r, "cn1-wearable-transfers");
+                                // Daemon for the same reason the Timer was: this worker must never
+                                // be the reason the process stays alive.
+                                t.setDaemon(true);
+                                return t;
+                            }
+                        });
+        // Replaces Timer.purge(): a cancelled deadline leaves the queue immediately rather than
+        // sitting in it until its time comes.
+        worker.setRemoveOnCancelPolicy(true);
+        return worker;
+    }
 
     private static void scheduleTransferRetry(final Context context, final Uri uri, final int attempt) {
         if (uri == null) {
@@ -3159,7 +3200,7 @@ public class CN1WearableBridge implements WearableBridge {
             forgetRetryStart(uri);
             return;
         }
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 try {
                     DataItemBuffer items = Tasks.await(
@@ -3236,7 +3277,7 @@ public class CN1WearableBridge implements WearableBridge {
                     scheduleTransferRetry(context, uri, attempt + 1);
                 }
             }
-        }, retryDelay(attempt));
+        }, retryDelay(attempt), java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -4464,7 +4505,7 @@ public class CN1WearableBridge implements WearableBridge {
         // The acknowledgement moves with it and stays behind the write: it is what lets the SENDER
         // retire the item, and publishing it from here while the claim was still queued would put
         // it back in the window this ordering exists to close.
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 boolean durable;
                 synchronized (transferClaims) {
@@ -4485,7 +4526,7 @@ public class CN1WearableBridge implements WearableBridge {
                 }
                 publishTransferAck(c, item);
             }
-        }, 0);
+        }, 0, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /// Tells the SENDER that this device has handed the transfer to a listener.
@@ -4599,7 +4640,7 @@ public class CN1WearableBridge implements WearableBridge {
             }
             claimPruneScheduled = true;
         }
-        transferTimer.schedule(new java.util.TimerTask() {
+        transferTimer.schedule(new Runnable() {
             public void run() {
                 synchronized (transferClaims) {
                     claimPruneScheduled = false;
@@ -4624,7 +4665,7 @@ public class CN1WearableBridge implements WearableBridge {
                     scheduleClaimPrune(app);
                 }
             }
-        }, TRANSFER_RETENTION_MILLIS + 1000L);
+        }, TRANSFER_RETENTION_MILLIS + 1000L, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** Preference store for durable transfer claims; see {@link #claimTransfer}. */

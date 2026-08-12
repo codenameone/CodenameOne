@@ -164,6 +164,42 @@ public class WatchSkinCoordinateMapTest {
     private static final int DISPLAY_CORNER_RADIUS = 28;
 
     /**
+     * The landscape metadata has to describe the artwork the skin actually ships.
+     *
+     * <p>There is no landscape watch, so {@code skin_l.png} and {@code skin_map_l.png} are the
+     * portrait image and the portrait coordinate map -- the assertions above check both maps
+     * against the same declared display for exactly that reason. The safe-area properties were
+     * nonetheless emitted as the transpose, {@code safeLandscapeWidth} taking the display's
+     * HEIGHT. Rotating a rectangular skin then measured layouts against a screen wider than the
+     * one being drawn and clicked, and previewed them out of bounds. The simulator also disables
+     * rotation for a watch skin; this keeps the metadata honest if that state is reached
+     * anyway.</p>
+     */
+    @Test
+    public void watchSkinsDescribeOneOrientationBecauseTheyShipOneImage() throws Exception {
+        for (String skinName : SKINS) {
+            ZipFile zip = new ZipFile(locate(skinName));
+            try {
+                Properties props = new Properties();
+                InputStream in = zip.getInputStream(entry(zip, skinName, "skin.properties"));
+                try {
+                    props.load(in);
+                } finally {
+                    in.close();
+                }
+                for (String key : new String[] {"X", "Y", "Width", "Height"}) {
+                    assertEquals(props.getProperty("safePortrait" + key),
+                            props.getProperty("safeLandscape" + key),
+                            skinName + " safeLandscape" + key + " must match safePortrait" + key
+                                    + ": the landscape artwork IS the portrait artwork");
+                }
+            } finally {
+                zip.close();
+            }
+        }
+    }
+
+    /**
      * The black region of the map has to be exactly the display the properties declare -- that
      * rectangle is what the simulator draws the app into, and a map disagreeing with the
      * properties puts the safe-area insets against different pixels than the frame.

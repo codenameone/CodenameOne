@@ -5578,7 +5578,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void update() {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             boolean desktopSkin = pref.getBoolean("desktopSkin", false);
-            setEnabled(!desktopSkin);
+            // A watch does not rotate, and offering it here did not merely show something no
+            // device does. The watch skins ship one set of artwork -- skin_l.png IS the portrait
+            // image, because there is no landscape watch to draw -- so rotating paired that
+            // portrait picture and its portrait coordinate map with a landscape safe area, and
+            // every layout preview taken in that state was measured against a screen the skin
+            // does not have.
+            setEnabled(!desktopSkin && !watch);
             Boolean selected = (Boolean)getValue(SELECTED_KEY);
             if (selected == null) {
                 selected = false;

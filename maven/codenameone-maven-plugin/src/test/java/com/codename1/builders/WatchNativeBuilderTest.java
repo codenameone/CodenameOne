@@ -661,7 +661,7 @@ class WatchNativeBuilderTest {
         // An asset catalog is judged by what is in it. Dropping every .xcassets left a project
         // that keeps its images in a custom catalog with none of them on the watch, so
         // UIImage(named:) returned nil at runtime with nothing in the build to say why.
-        assertTrue(ruby.contains("cn1_watch_catalog_is_ios_only"), ruby);
+        assertTrue(ruby.contains("cn1_watch_catalog_for_watch"), ruby);
         assertTrue(ruby.contains("appiconset,launchimage"), ruby);
         assertFalse(ruby.contains("res_skip = %w[.xcassets"),
                 "the blanket catalog filter is what dropped the usable ones: " + ruby);
@@ -990,5 +990,152 @@ class WatchNativeBuilderTest {
             throw new AssertionError("Expected generated file was not written: " + f);
         }
         return new String(Files.readAllBytes(f.toPath()));
+    }
+
+    /**
+     * Runs the generated Ruby predicates instead of matching their source text.
+     *
+     * <p>Every other assertion in this file checks that a helper is <em>mentioned</em>, which is
+     * all a Java test can see -- and three separate bugs lived through exactly that check. The
+     * catalog filter said "contains an app icon" and skipped whole mixed catalogs; the archive
+     * filter called any {@code arm64} slice watch-simulator-compatible when it is equally an
+     * iPhone's; and the conditional-arm reader recognized {@code #if os(watchOS)} but not the
+     * parenthesized spelling, so a phone-only import was mirrored into the watch target. All three
+     * are behaviour of the emitted script, so the only test that can catch them runs it.</p>
+     *
+     * <p>Skipped where there is no ruby: the generator's own output is unaffected by whether this
+     * machine can execute it, and the interpreter is not a build dependency of this module.</p>
+     */
+    @Test
+    void theGeneratedPredicatesDecideCorrectly(@TempDir Path tmp) throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(rubyAvailable(), "no ruby on this machine");
+
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        String ruby = parse(req).buildXcodeScript(req, tmp.toFile(), "1.0",
+                java.util.Arrays.asList("MyAppWatchStub.m"));
+
+        StringBuilder defs = new StringBuilder("require 'fileutils'\n");
+        for (String name : new String[] {"cn1_watch_balanced", "cn1_watch_normalize_condition",
+                "cn1_watch_excludes_watch", "cn1_watch_selects_watch",
+                "cn1_watch_catalog_for_watch"}) {
+            defs.append(definitionOf(ruby, name)).append('\n');
+        }
+
+        // The reported failure and its neighbours: redundant parentheses are valid Swift and say
+        // nothing about the platform, so they must not change which arm is selected or excluded.
+        StringBuilder driver = new StringBuilder(defs);
+        driver.append("Ref = Struct.new(:real_path)\n")
+                .append("def chk(l, g, w); puts(g == w ? \"ok #{l}\" : "
+                        + "\"FAIL #{l}: got #{g.inspect} want #{w.inspect}\"); end\n")
+                .append("chk('paren selects', cn1_watch_selects_watch('#if (os(watchOS))'), true)\n")
+                .append("chk('spaced paren selects', "
+                        + "cn1_watch_selects_watch('#if ( os(watchOS) )'), true)\n")
+                .append("chk('bare selects', cn1_watch_selects_watch('#if os(watchOS)'), true)\n")
+                .append("chk('paren objc selects', "
+                        + "cn1_watch_selects_watch('#if (TARGET_OS_WATCH)'), true)\n")
+                // A conjunction is still not a selection, parenthesized or not: with the feature
+                // off Swift compiles the #else, and suppressing it drops what that arm imports.
+                .append("chk('paren conjunction does not select', "
+                        + "cn1_watch_selects_watch('#if (os(watchOS)) && FEATURE'), false)\n")
+                .append("chk('paren other platform excludes', "
+                        + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
+                .append("chk('paren negated watch excludes', "
+                        + "cn1_watch_excludes_watch('#if !(os(watchOS))'), true)\n")
+                .append("chk('paren watch not excluded', "
+                        + "cn1_watch_excludes_watch('#if (os(watchOS))'), false)\n")
+                // Only REDUNDANT parentheses go. A disjunction can still be true on the watch
+                // through its other operand, and wrapping one operand must not hide that.
+                .append("chk('parenthesized disjunction still proves nothing', "
+                        + "cn1_watch_excludes_watch('#if (os(iOS)) || FEATURE'), false)\n")
+                // Definedness is not a platform test: TargetConditionals defines every macro on
+                // every platform, so the watch compiles this arm.
+                .append("chk('ifdef is not a platform test', "
+                        + "cn1_watch_excludes_watch('#ifdef TARGET_OS_IOS'), false)\n")
+                // A mixed catalog keeps its usable sets. Skipping the container cost the watch
+                // every image in it.
+                .append("mixed = cn1_watch_catalog_for_watch(Ref.new('")
+                .append(IPhoneBuilder.escapeRubyStr(catalog(tmp, "Assets", true, true)))
+                .append("'), '").append(IPhoneBuilder.escapeRubyStr(
+                        tmp.resolve("stage").toString())).append("')\n")
+                .append("chk('mixed catalog is staged', !mixed.nil?, true)\n")
+                .append("chk('staged keeps the imageset', "
+                        + "File.directory?(File.join(mixed.to_s, 'logo.imageset')), true)\n")
+                .append("chk('staged drops the app icon', "
+                        + "File.exist?(File.join(mixed.to_s, 'AppIcon.appiconset')), false)\n")
+                // Icon-only is still skipped -- there is nothing in it the watch can use, and
+                // staging an empty catalog helps nobody.
+                .append("chk('icon-only catalog is skipped', cn1_watch_catalog_for_watch(Ref.new('")
+                .append(IPhoneBuilder.escapeRubyStr(catalog(tmp, "IconOnly", true, false)))
+                .append("'), '").append(IPhoneBuilder.escapeRubyStr(
+                        tmp.resolve("stage").toString())).append("'), nil)\n")
+                // No icon at all: shared as it stands, with no copy made.
+                .append("plain = '")
+                .append(IPhoneBuilder.escapeRubyStr(catalog(tmp, "Plain", false, true)))
+                .append("'\n")
+                .append("chk('plain catalog is shared as-is', "
+                        + "cn1_watch_catalog_for_watch(Ref.new(plain), '")
+                .append(IPhoneBuilder.escapeRubyStr(tmp.resolve("stage").toString()))
+                .append("'), plain)\n");
+
+        Path script = tmp.resolve("predicates.rb");
+        Files.write(script, driver.toString().getBytes("UTF-8"));
+        Process p = new ProcessBuilder("ruby", script.toString())
+                .redirectErrorStream(true).start();
+        String out = new String(readFully(p.getInputStream()), "UTF-8");
+        p.waitFor();
+        assertFalse(out.contains("FAIL"), out);
+        assertTrue(out.contains("ok mixed catalog is staged"),
+                "the driver did not run to completion: " + out);
+    }
+
+    /** The {@code def NAME ... end} block for one generated helper. */
+    private static String definitionOf(String ruby, String name) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^def " + name + "\\(.*?^end$", java.util.regex.Pattern.MULTILINE
+                        | java.util.regex.Pattern.DOTALL)
+                .matcher(ruby);
+        assertTrue(m.find(), "the generated script no longer defines " + name);
+        return m.group();
+    }
+
+    /** A catalog on disk, optionally carrying an app icon and optionally ordinary sets. */
+    private static String catalog(Path tmp, String name, boolean icon, boolean images)
+            throws IOException {
+        Path root = tmp.resolve(name + ".xcassets");
+        Files.createDirectories(root);
+        Files.write(root.resolve("Contents.json"), "{}".getBytes("UTF-8"));
+        if (icon) {
+            Files.createDirectories(root.resolve("AppIcon.appiconset"));
+            Files.write(root.resolve("AppIcon.appiconset").resolve("Contents.json"),
+                    "{}".getBytes("UTF-8"));
+        }
+        if (images) {
+            Files.createDirectories(root.resolve("logo.imageset"));
+            Files.write(root.resolve("logo.imageset").resolve("Contents.json"),
+                    "{}".getBytes("UTF-8"));
+        }
+        return root.toString();
+    }
+
+    private static byte[] readFully(java.io.InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int r;
+        while ((r = in.read(buf)) > 0) {
+            out.write(buf, 0, r);
+        }
+        return out.toByteArray();
+    }
+
+    private static boolean rubyAvailable() {
+        try {
+            Process p = new ProcessBuilder("ruby", "-e", "exit 0")
+                    .redirectErrorStream(true).start();
+            readFully(p.getInputStream());
+            return p.waitFor() == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

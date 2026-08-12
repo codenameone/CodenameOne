@@ -253,33 +253,39 @@ static void cn1WatchReplayPendingPhase(void) {
         return;
     }
     cn1WatchDraining = YES;
-    count = cn1WatchPendingPhaseCount;
-    for (int i = 0; i < count; i++) {
-        pending[i] = cn1WatchPendingPhases[i];
-    }
-    // Cleared BEFORE delivering, and under the lock: a delivery runs translated code, and neither
-    // a re-entrant call nor the drain thread must replay what is already on its way.
-    cn1WatchPendingPhaseCount = 0;
-    pthread_mutex_unlock(&cn1WatchPhaseLock);
-    while (count > 0) {
-        for (int i = 0; i < count; i++) {
-            cn1WatchDeliverPhase(pending[i]);
-        }
-        // Again, because a transition that arrived during those deliveries queued behind them
-        // rather than overtaking them -- and this drain is the one that owes it a delivery.
-        pthread_mutex_lock(&cn1WatchPhaseLock);
+    // Invariant for the loop below: the lock is held on entry to every iteration. That is what
+    // makes "the queue is empty" and "ownership is released" one indivisible decision.
+    //
+    // Testing the queue, releasing the lock, and THEN clearing ownership left a window of exactly
+    // the length of that gap. A transition arriving inside it was queued by cn1WatchHandlePhase --
+    // correctly, a drain was still in flight -- and then declined a drain thread of its own,
+    // because this drain's thread had not finished either. Ownership was cleared a moment later
+    // with the phase still sitting in the queue and nothing left to deliver it. In the background
+    // case that is unrecoverable on its own: the paint pump is stopped, so no later paint comes to
+    // notice, and the app stays logically foregrounded for the whole suspension.
+    for (;;) {
         count = cn1WatchPendingPhaseCount;
         for (int i = 0; i < count; i++) {
             pending[i] = cn1WatchPendingPhases[i];
         }
+        // Cleared BEFORE delivering, and under the lock: a delivery runs translated code, and
+        // neither a re-entrant call nor the drain thread must replay what is already on its way.
         cn1WatchPendingPhaseCount = 0;
+        if (count == 0) {
+            // Nothing queued, observed under the same lock that now hands ownership back. A
+            // transition can only arrive after this unlock, and it finds no drain in flight.
+            cn1WatchDraining = NO;
+            pthread_mutex_unlock(&cn1WatchPhaseLock);
+            return;
+        }
         pthread_mutex_unlock(&cn1WatchPhaseLock);
+        for (int i = 0; i < count; i++) {
+            cn1WatchDeliverPhase(pending[i]);
+        }
+        // Round again, because a transition that arrived during those deliveries queued behind
+        // them rather than overtaking them -- and this drain is the one that owes it a delivery.
+        pthread_mutex_lock(&cn1WatchPhaseLock);
     }
-    // One place to release ownership, reached whether the queue was empty on entry or emptied by
-    // the loop. Anything queued after this point finds no drain in flight and starts its own.
-    pthread_mutex_lock(&cn1WatchPhaseLock);
-    cn1WatchDraining = NO;
-    pthread_mutex_unlock(&cn1WatchPhaseLock);
 }
 
 /// Records or delivers one transition, preserving order against anything still queued.

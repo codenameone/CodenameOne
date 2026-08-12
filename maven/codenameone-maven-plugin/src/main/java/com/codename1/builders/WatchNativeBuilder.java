@@ -469,6 +469,15 @@ class WatchNativeBuilder {
     /// Where the staged watch translation lives, relative to the app's -src directory.
     static final String WATCH_SRC_DIR = "watch-src";
 
+    /**
+     * Where a mixed asset catalog's watch-compatible copy is staged, beside the project.
+     *
+     * <p>Beside rather than inside the app's {@code -src} folder because the catalog filter runs
+     * whether or not the watch has a translation of its own, and the {@code watch-src} tree only
+     * exists in the separately-rooted case.</p>
+     */
+    static final String WATCH_ASSET_STAGING_DIR = "cn1-watch-assets";
+
     /// The watch slice's prefix header, which must sit INSIDE the staged tree.
     static String watchPrefixHeader(String mainClass) {
         return translationRoot(mainClass) + "-Prefix.pch";
@@ -1562,6 +1571,8 @@ class WatchNativeBuilder {
         StringBuilder s = new StringBuilder();
         s.append("#!/usr/bin/env ruby\n")
                 .append("require 'xcodeproj'\n")
+                // For staging a watch copy of a mixed asset catalog.
+                .append("require 'fileutils'\n")
                 .append("project_file = '").append(IPhoneBuilder.escapeRubyStr(projectFile)).append("'\n")
                 .append("xcproj = Xcodeproj::Project.open(project_file)\n")
                 .append("app_target = xcproj.targets.find { |t| t.name == '")
@@ -1869,6 +1880,29 @@ class WatchNativeBuilder {
         // device slice with no ambiguity to resolve -- unlike arm64, which is an iPhone and an
         // Apple silicon watch simulator at once. An archive that names neither cannot link into a
         // watch device build, and saying so by name beats a link error listing its symbols.
+        // The Mach-O platform of one slice, which is the only thing that distinguishes an Apple
+        // silicon watch Simulator object from an iPhone one -- they share an architecture name.
+        //
+        // LC_BUILD_VERSION records it as a number: 2 is iOS, 4 watchOS, 7 iOS Simulator, 9 watchOS
+        // Simulator. Some otool versions print the symbolic name instead, so both spellings are
+        // accepted. Objects old enough to predate LC_BUILD_VERSION carry LC_VERSION_MIN_WATCHOS
+        // instead, and on an architecture no watch has ever shipped as hardware that can only be
+        // the simulator.
+        //
+        // Unreadable is answered NO, matching the plist helper below: an archive left out costs a
+        // link error naming it, where one wrongly linked in costs a platform mismatch deep in a
+        // build that had no reason to involve it.
+        s.append("def cn1_watch_slice_is_watch_simulator(path, arch)\n")
+                .append("  out = `otool -l -arch #{arch} \"#{path}\" 2>/dev/null`\n")
+                .append("  return false if out.nil? || out.strip.empty?\n")
+                .append("  out.scan(/^\\s*platform\\s+(\\S+)\\s*$/).each do |m|\n")
+                .append("    v = m[0].to_s.downcase\n")
+                .append("    return true if v == '9' || v == 'watchossimulator'\n")
+                .append("  end\n")
+                .append("  return false if out.include?('LC_BUILD_VERSION')\n")
+                .append("  out.include?('LC_VERSION_MIN_WATCHOS')\n")
+                .append("end\n");
+
         s.append("def cn1_watch_archive_has_watch_slice(ref)\n")
                 .append("  path = (ref.real_path.to_s rescue nil)\n")
                 .append("  return false unless path && File.exist?(path)\n")
@@ -1883,7 +1917,14 @@ class WatchNativeBuilder {
                 // by architecture, so the pair is what is required, and the log names what was
                 // found so a mismatch is attributable rather than mysterious.
                 .append("  device = archs.any? { |a| a == 'arm64_32' || a == 'armv7k' }\n")
-                .append("  simulator = archs.any? { |a| a == 'x86_64' || a == 'arm64' }\n")
+                // Which is more than the architecture can answer. A fat archive carrying an
+                // iOS-device arm64 next to a watch-device arm64_32 -- an ordinary shape for a
+                // library vending a phone slice and a watch slice -- passed an architecture-only
+                // test and was linked into the Apple silicon watch Simulator against objects built
+                // for iOS, failing on a platform mismatch. The slice itself records what it was
+                // built for, so ask it.
+                .append("  simulator = archs.any? { |a| (a == 'x86_64' || a == 'arm64') && "
+                        + "cn1_watch_slice_is_watch_simulator(path, a) }\n")
                 .append("  watch = device && simulator\n")
                 .append("  puts \"[watchNative] #{File.basename(path)} #{watch ? 'has' : 'has no'}"
                         + " usable watchOS slices (#{archs.empty? ? 'unknown' : archs.join(' ')}; "
@@ -2132,9 +2173,49 @@ class WatchNativeBuilder {
                 .append("  end\n")
                 .append("  out.join\n")
                 .append("end\n")
+                // Parentheses that change nothing, removed before anything reads the expression.
+                //
+                // `#if (os(watchOS))` is as valid and as common as the bare spelling, and the
+                // tests below are written against the bare one. The parenthesized arm was
+                // therefore not recognized as selected, its `#else` survived, and an
+                // `import PhoneSDK` meant only for the phone was mirrored into the watch target --
+                // where an iOS-only product breaks watchOS package resolution outright.
+                //
+                // Only REDUNDANT parentheses go: a pair enclosing the whole expression, and a pair
+                // around a single atom. `(os(iOS)) || FEATURE` keeps its structure, because the
+                // balance check refuses to strip a pair that is not in fact enclosing.
+                .append("def cn1_watch_balanced(s)\n")
+                .append("  depth = 0\n")
+                .append("  s.each_char do |ch|\n")
+                .append("    depth += 1 if ch == '('\n")
+                .append("    depth -= 1 if ch == ')'\n")
+                .append("    return false if depth < 0\n")
+                .append("  end\n")
+                .append("  depth == 0\n")
+                .append("end\n")
+                .append("def cn1_watch_normalize_condition(condition)\n")
+                .append("  c = condition.to_s.sub("
+                        + "/\\A#\\s*(ifdef|ifndef|elseif|elif|if)\\b/, '').strip\n")
+                .append("  loop do\n")
+                .append("    before = c\n")
+                .append("    if c =~ /\\A\\((.*)\\)\\z/m && cn1_watch_balanced($1)\n")
+                .append("      c = $1.strip\n")
+                .append("    end\n")
+                .append("    c = c.gsub(/\\(\\s*(!?\\s*os\\(\\s*[A-Za-z0-9_]+\\s*\\))\\s*\\)/) "
+                        + "{ $1.gsub(/\\s+/, '') }\n")
+                .append("    c = c.gsub(/\\(\\s*(!?\\s*TARGET_OS_[A-Za-z0-9_]+)\\s*\\)/) "
+                        + "{ $1.gsub(/\\s+/, '') }\n")
+                .append("    break if c == before\n")
+                .append("  end\n")
+                .append("  c\n")
+                .append("end\n")
                 .append("def cn1_watch_excludes_watch(condition)\n")
-                // Whitespace after a `!` is legal and would otherwise hide the negation.
-                .append("  c = condition.gsub(/!\\s+/, '!')\n")
+                // Whitespace after a `!` is legal and would otherwise hide the negation. The
+                // directive keyword is kept in front, because the two tests below are about the
+                // directive itself and normalizing removes it.
+                .append("  directive = condition.to_s[/\\A#\\s*\\w+/].to_s\n")
+                .append("  c = (directive + ' ' + cn1_watch_normalize_condition(condition))"
+                        + ".strip.gsub(/!\\s+/, '!')\n")
                 // A DISJUNCTION can still be true on the watch through its other operand, so an
                 // os() or TARGET_OS_ test that is only one side of an || proves nothing. A
                 // conjunction is safe: `os(iOS) && FEATURE` is false on the watch whatever FEATURE
@@ -2181,7 +2262,7 @@ class WatchNativeBuilder {
                 /// direction that can silence another arm, so it takes the whole expression being
                 /// demonstrably true -- a bare watchOS test and nothing more.
                 .append("def cn1_watch_selects_watch(condition)\n")
-                .append("  bare = condition.sub(/\\A#(if|elseif|elif)\\b/, '').strip\n")
+                .append("  bare = cn1_watch_normalize_condition(condition)\n")
                 .append("  return true if bare =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/\n")
                 // The Objective-C spelling of the same thing. `#ifdef TARGET_OS_WATCH` is NOT it:
                 // TargetConditionals defines every one of those macros as 0 or 1, so the block is
@@ -2348,30 +2429,80 @@ class WatchNativeBuilder {
         // at runtime with nothing in the build to say why. Only a catalog carrying an app icon or a
         // launch image is iOS-specific -- those are the sets with no watch-applicable content --
         // and a catalog holding ordinary image and colour sets compiles for watchOS like any other.
-        s.append("def cn1_watch_catalog_is_ios_only(ref)\n")
+        //
+        // Nor is a catalog all one thing. The standard Assets.xcassets holds the app icon AND the
+        // project's ordinary image and colour sets, so answering "does it contain an icon set"
+        // skipped the whole catalog and took every compatible asset with it -- the same runtime
+        // nil from watch-reachable UIImage(named:) that dropping all .xcassets caused, reached by
+        // a narrower route. What is iOS-specific is the individual set, not its container, so a
+        // mixed catalog is staged as a copy with the incompatible sets removed and the watch gets
+        // that. Set names are what lookups use and they are unchanged by the copy, so the same
+        // UIImage(named:) resolves.
+        s.append("def cn1_watch_catalog_for_watch(ref, staging)\n")
                 .append("  path = (ref.real_path.to_s rescue nil)\n")
                 // Unreadable: keep the old conservative answer. A missing asset is a runtime nil,
                 // but a catalog that cannot be inspected might be the app's own icon set, and that
                 // is a build error for everybody.
-                .append("  return true unless path && File.directory?(path)\n")
-                .append("  !Dir.glob(File.join(path, '**', '*.{appiconset,launchimage}')).empty?\n")
+                .append("  return nil unless path && File.directory?(path)\n")
+                .append("  incompatible = Dir.glob("
+                        + "File.join(path, '**', '*.{appiconset,launchimage}'))\n")
+                // The common case, and it costs nothing: no icon or launch set means the catalog
+                // is compatible as it stands, and the watch shares the reference.
+                .append("  return path if incompatible.empty?\n")
+                // A catalog that is ONLY the app icon has nothing to preserve, so the old skip is
+                // still the right answer -- and it avoids staging an empty catalog.
+                .append("  usable = Dir.glob(File.join(path, '**', '*')).reject do |e|\n")
+                .append("    !File.directory?(e) || e =~ /\\.(appiconset|launchimage)(\\/|\\z)/ || "
+                        + "File.extname(e).empty?\n")
+                .append("  end\n")
+                .append("  return nil if usable.empty?\n")
+                .append("  dest = File.join(staging, File.basename(path))\n")
+                .append("  begin\n")
+                .append("    FileUtils.rm_rf(dest)\n")
+                .append("    FileUtils.mkdir_p(File.dirname(dest))\n")
+                .append("    FileUtils.cp_r(path, dest)\n")
+                .append("    Dir.glob(File.join(dest, '**', '*.{appiconset,launchimage}'))"
+                        + ".each { |d| FileUtils.rm_rf(d) }\n")
+                .append("  rescue StandardError => e\n")
+                // Staging failed: fall back to the conservative skip rather than referencing a
+                // half-written catalog, which fails the build for everybody instead of one image.
+                .append("    puts \"[watchNative] could not stage a watch copy of "
+                        + "#{File.basename(path)} (#{e}); leaving it out of the watch target\"\n")
+                .append("    return nil\n")
+                .append("  end\n")
+                .append("  dest\n")
                 .append("end\n");
 
         s.append("res_skip = %w[.storyboard .xib]\n")
+                .append("proj_dir = File.dirname(xcproj.path.to_s)\n")
+                .append("watch_asset_staging = File.join(proj_dir, '"
+                        + IPhoneBuilder.escapeRubyStr(WATCH_ASSET_STAGING_DIR) + "')\n")
                 .append("app_target.resources_build_phase.files.to_a.each do |bf|\n")
                 .append("  ref = bf.file_ref\n")
                 .append("  next unless ref && ref.path\n")
                 .append("  next if res_skip.any? { |ext| ref.path.to_s.end_with?(ext) }\n")
+                .append("  watch_ref = ref\n")
                 .append("  if ref.path.to_s.end_with?('.xcassets')\n")
-                .append("    if cn1_watch_catalog_is_ios_only(ref)\n")
+                .append("    use = cn1_watch_catalog_for_watch(ref, watch_asset_staging)\n")
+                .append("    if use.nil?\n")
                 .append("      puts \"[watchNative] not copying #{File.basename(ref.path.to_s)} "
-                        + "into the watch target: it carries an app icon or launch image, which "
-                        + "has no watch-applicable content\"\n")
+                        + "into the watch target: it carries nothing but an app icon or launch "
+                        + "image, which has no watch-applicable content\"\n")
                 .append("      next\n")
                 .append("    end\n")
+                // A staged copy is a NEW reference: the original still belongs to the phone with
+                // its icon set intact, and only the watch sees the filtered one.
+                .append("    if use != (ref.real_path.to_s rescue nil)\n")
+                .append("      puts \"[watchNative] staging #{File.basename(ref.path.to_s)} for "
+                        + "the watch without its app icon or launch image; the phone keeps the "
+                        + "original\"\n")
+                .append("      rel = use.sub(/\\A#{Regexp.escape(proj_dir)}\\/?/, '')\n")
+                .append("      watch_ref = xcproj.main_group.new_reference(rel)\n")
+                .append("    end\n")
                 .append("  end\n")
-                .append("  unless watch_target.resources_build_phase.files_references.include?(ref)\n")
-                .append("    watch_target.resources_build_phase.add_file_reference(ref)\n")
+                .append("  unless watch_target.resources_build_phase.files_references"
+                        + ".include?(watch_ref)\n")
+                .append("    watch_target.resources_build_phase.add_file_reference(watch_ref)\n")
                 .append("  end\n")
                 .append("end\n");
 
