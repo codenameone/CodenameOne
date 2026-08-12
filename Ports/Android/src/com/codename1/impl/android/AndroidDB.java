@@ -52,10 +52,18 @@ public class AndroidDB extends Database {
     private final String openPath;
 
     /**
+     * Wraps a connection whose slot in the registry the caller has already taken.
+     *
+     * <p>Package-private on purpose. It is the one entry point that does not reserve, because
+     * {@code AndroidImplementation} reserves before it opens; handing it to code outside this
+     * package would let a handle exist that no conversion can see, while {@code close()} still
+     * gives back a slot it never took -- releasing somebody else's. Code outside the port uses
+     * the one-argument constructor, which reserves.
+     *
      * @param db the open connection
      * @param openPath the file it is open on, whose connection slot the caller already took
      */
-    public AndroidDB(SQLiteDatabase db, String openPath) {
+    AndroidDB(SQLiteDatabase db, String openPath) {
         this.db = db;
         // The slot is taken by the implementation before the engine opens anything, so that a
         // conversion reading the count during the open has to see this connection. Registering

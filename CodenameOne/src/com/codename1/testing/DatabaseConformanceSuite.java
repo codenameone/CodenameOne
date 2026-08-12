@@ -1175,6 +1175,58 @@ public final class DatabaseConformanceSuite {
             }
             db.execute("DROP TABLE IF EXISTS conf_tx_unique");
 
+            // ---- the engine's own compile-time defaults are the same everywhere
+            // Neither of these can be changed on the ports that use somebody else's engine: the
+            // Android platform build and the simulator's JDBC driver are compiled as they are,
+            // and DQS has no pragma at all. So the engine Codename One bundles has to keep
+            // SQLite's defaults, or the same SQL would mean different things per port -- and on
+            // iOS it would change meaning when encryption was switched on, since that is what
+            // swaps Apple's engine for the bundled one.
+            boolean doubleQuotedStringWorks = false;
+            Cursor quoted = null;
+            try {
+                quoted = db.executeQuery("SELECT \"conf_dqs\" AS v");
+                doubleQuotedStringWorks = quoted.next()
+                        && "conf_dqs".equals(quoted.getRow().getString(0));
+            } catch (IOException rejected) {
+                doubleQuotedStringWorks = false;
+            }
+            if (quoted != null) {
+                try {
+                    quoted.close();
+                } catch (IOException ignored) {
+                    // The answer above is what is under test.
+                }
+            }
+            // Reported, not asserted. SQLITE_DQS is a compile-time setting with no pragma, so it
+            // cannot be made uniform: the Android and Apple engines accept a double quoted string
+            // literal and the simulator's driver rejects it, and neither is ours to rebuild. The
+            // engine Codename One does build keeps SQLite's default so that turning encryption on
+            // never changes what a statement means. Recorded on every port so the difference is
+            // visible in a run rather than discovered in an application.
+            r.info(doubleQuotedStringWorks
+                    ? "double quoted string literals are accepted by this engine; they are "
+                        + "rejected in the simulator, so single quotes are the portable form"
+                    : "double quoted string literals are rejected by this engine, as SQL requires "
+                        + "-- use single quotes for strings and this is portable everywhere");
+
+            db.execute("DROP TABLE IF EXISTS conf_fk_off_child");
+            db.execute("DROP TABLE IF EXISTS conf_fk_off_parent");
+            db.execute("CREATE TABLE conf_fk_off_parent (id INTEGER PRIMARY KEY)");
+            db.execute("CREATE TABLE conf_fk_off_child (id INTEGER PRIMARY KEY, parent INTEGER "
+                    + "REFERENCES conf_fk_off_parent(id))");
+            boolean foreignKeysIgnoredUntilAskedFor = true;
+            try {
+                db.execute("INSERT INTO conf_fk_off_child (id, parent) VALUES (1, 404)");
+            } catch (IOException enforced) {
+                foreignKeysIgnoredUntilAskedFor = false;
+            }
+            r.check(foreignKeysIgnoredUntilAskedFor,
+                    "foreign keys are enforced only once PRAGMA foreign_keys = ON asks for it, "
+                    + "which is SQLite's default and the only setting every port here shares");
+            db.execute("DROP TABLE IF EXISTS conf_fk_off_child");
+            db.execute("DROP TABLE IF EXISTS conf_fk_off_parent");
+
             // ---- nesting is rejected
             db.beginTransaction();
             boolean nestedThrew = false;

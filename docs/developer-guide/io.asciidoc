@@ -421,6 +421,28 @@ The flag doesn't cover defects, nor capabilities that used to throw and now work
 parameters, binding null inside a `String[]`, or the existence of a database at all on the native
 Windows and Linux ports. No application can depend on those.
 
+==== Two settings the contract can't reach
+
+Everything above is behaviour Codename One implements, so it can be made the same everywhere.
+Two things are decided when the SQLite engine itself is compiled, and Codename One only compiles
+one of those engines -- Android uses the platform's, the simulator uses the JDBC driver's, and iOS
+uses Apple's unless the application encrypts:
+
+* *Double quoted string literals*. `SELECT "value"` isn't valid SQL -- the double quotes make it
+an identifier -- but SQLite has a compatibility mode that turns an unknown identifier into a
+string, and whether it's on is fixed at compile time with no pragma to change it. The Android
+and Apple engines accept it; the simulator's driver rejects it with a message that tells you to
+use single quotes. Write string literals in single quotes and the question never arises. The
+engine Codename One bundles for Windows, Linux and encrypted iOS keeps SQLite's default, so
+switching encryption on never changes what a statement means.
+* *Foreign keys*. SQLite ignores declared foreign keys unless asked, and one driver enables them
+on its own. Codename One puts every port on SQLite's default so a violation behaves the same in
+the simulator as on a device; run `PRAGMA foreign_keys = ON` after opening if you want them
+enforced, which works everywhere.
+
+`DatabaseConformanceSuite` reports what the engine under it does with both, so a run on a device
+says which side that platform is on.
+
 
 === Network manager & connection request
 

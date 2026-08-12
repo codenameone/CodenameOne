@@ -68,13 +68,22 @@
  * application cannot be talked into loading one. */
 #define SQLITE_OMIT_LOAD_EXTENSION 1
 
-/* Reject double quoted string literals. They are a MySQL habit that SQLite tolerates by turning
- * an unknown identifier into a string, which silently converts a typo into a working query that
- * returns the wrong rows. */
-#define SQLITE_DQS 0
-
-/* Declared foreign keys are enforced. SQLite's default of ignoring them surprises everyone. */
-#define SQLITE_DEFAULT_FOREIGN_KEYS 1
+/*
+ * Deliberately NOT set here: SQLITE_DQS and SQLITE_DEFAULT_FOREIGN_KEYS.
+ *
+ * Both are compile-time only, and this engine is not the only one Codename One runs. Android uses
+ * the platform's SQLite and the simulator uses the JDBC driver's, and neither can be told to
+ * change either setting -- there is no pragma for DQS at all. So setting them here would not make
+ * applications stricter; it would make the same SQL behave differently depending on the port, and
+ * on iOS depending on whether encryption is switched on, since that is what replaces Apple's
+ * engine with this one. `SELECT "value"` would work everywhere except where this build runs, and
+ * a declared foreign key would be enforced only there.
+ *
+ * A portable database is the point of this whole exercise, so this build keeps SQLite's defaults
+ * and applications ask for what they want: `PRAGMA foreign_keys = ON` works on every port, and
+ * DatabaseConformanceSuite pins both behaviours so a future divergence is a test failure rather
+ * than a surprise in somebody's app.
+ */
 
 /* Column metadata is what Cursor.getColumnName and getColumnIndex report. */
 #define SQLITE_ENABLE_COLUMN_METADATA 1

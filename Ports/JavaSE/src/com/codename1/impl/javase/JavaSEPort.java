@@ -16726,6 +16726,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
 
             conn = DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath(), properties);
+            // Set rather than left to the driver. Measured: this driver enforces declared foreign
+            // keys as soon as a connection opens, and the one the simulator used before it did
+            // not -- nor do the Android and Apple engines, which is what an application actually
+            // ships against. A default that only bites in the simulator turns a violation into a
+            // failure that cannot be reproduced on a device, and a default that only bites on a
+            // device is worse. Applications that want enforcement ask for it with
+            // "PRAGMA foreign_keys = ON", which works on every port.
+            disableForeignKeyEnforcement(conn);
 
             if (config != null && config.isEncrypted()) {
                 probeKey(conn);
@@ -16913,6 +16921,28 @@ public class JavaSEPort extends CodenameOneImplementation {
      * of 0 is a different scheme that no other Codename One platform, and no SQLCipher tool, can
      * read.
      */
+    /// Puts a fresh connection on SQLite's own foreign-key default, whatever the driver's is.
+    ///
+    /// Best effort: a driver that will not accept the pragma leaves the connection as it was, and
+    /// the conformance suite reports the difference rather than this failing an open over it.
+    private static void disableForeignKeyEnforcement(java.sql.Connection c) {
+        Statement s = null;
+        try {
+            s = c.createStatement();
+            s.execute("PRAGMA foreign_keys = OFF");
+        } catch (SQLException cannotSet) {
+            // Reported by the conformance suite, which checks the behaviour rather than the call.
+        } finally {
+            if (s != null) {
+                try {
+                    s.close();
+                } catch (SQLException ignored) {
+                    // Nothing useful to do with a failed close of a pragma statement.
+                }
+            }
+        }
+    }
+
     private static java.util.Properties sqlCipherProperties(String key) {
         java.util.Properties p = new java.util.Properties();
         p.setProperty("config_class_name", "org.sqlite.mc.SQLiteMCConfig");
