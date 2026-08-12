@@ -18,6 +18,8 @@
 /files/JavaSE.jar https://download.codenameone.com/files/JavaSE.jar 302
 
 # High-priority legacy URL redirects (Cloudflare)
+/download.html /download/ 301
+/download.html/ /download/ 301
 /videos.html /videos/ 301
 /videos.html/ /videos/ 301
 /video.html /videos/ 301

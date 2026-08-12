@@ -1,0 +1,70 @@
+{{- define "main" -}}
+<div class="cn1-gs-page">
+  <section class="cn1-gs-hero">
+    <div>
+      <nav class="cn1-gs-breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span><span>Download</span></nav>
+      <p class="cn1-eyebrow">Current setup</p>
+      <h1>Looking for a Codename One download?</h1>
+      <p>Current Codename One projects use Maven, so there is no separate IDE plugin to install. Generate a project and open it in IntelliJ IDEA, NetBeans, Eclipse, VS Code, or another Maven-capable IDE.</p>
+      <div class="cn1-action-row">
+        {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "legacy-download-project") }}
+        {{ partial "cn1-cta.html" (dict "label" "Follow the setup guide" "href" "/getting-started/" "variant" "secondary") }}
+      </div>
+      <p class="cn1-gs-hero__note">If an older IDE plugin or archived link sent you here, use the migration path below.</p>
+    </div>
+    <aside class="cn1-gs-progress" aria-label="Choose a setup path">
+      <p>Choose your path</p>
+      <ol>
+        <li><a href="#new-project"><span>1</span>Start a new project</a></li>
+        <li><a href="#existing-project"><span>2</span>Migrate an older project</a></li>
+        <li><a href="#help"><span>3</span>Get setup help</a></li>
+      </ol>
+    </aside>
+  </section>
+
+  <section class="cn1-gs-prereqs">
+    <strong>What changed</strong>
+    <ul>
+      <li>New projects use one Maven structure across supported IDEs.</li>
+      <li>You no longer need the legacy NetBeans, IntelliJ IDEA, or Eclipse plugin to create a project.</li>
+      <li>Existing Ant-based Codename One projects can be migrated to Maven.</li>
+    </ul>
+  </section>
+
+  <div class="cn1-gs-steps">
+    <section class="cn1-gs-step" id="new-project">
+      <div class="cn1-gs-step__number">New project</div>
+      <div class="cn1-gs-step__body">
+        <p class="cn1-eyebrow">Generate</p>
+        <h2>Create a Maven project with Initializr.</h2>
+        <p>Choose Java, enter the project names, and download the generated project. Open its root directory in your IDE and run the included simulator target.</p>
+        <div class="cn1-action-row">
+          {{ partial "cn1-cta.html" (dict "label" "Open Initializr" "href" "/initializr/" "variant" "secondary" "event" "legacy-download-initializr") }}
+          {{ partial "cn1-cta.html" (dict "label" "Read Getting Started" "href" "/getting-started/" "variant" "text") }}
+        </div>
+      </div>
+    </section>
+
+    <section class="cn1-gs-step" id="existing-project">
+      <div class="cn1-gs-step__number">Existing project</div>
+      <div class="cn1-gs-step__body">
+        <p class="cn1-eyebrow">Keep your source</p>
+        <h2>Move an older Ant project to Maven.</h2>
+        <p>The migration tool generates the current Maven project structure from an existing Codename One application or library project. Review the migration steps before changing the original project.</p>
+        <div class="cn1-action-row">
+          {{ partial "cn1-cta.html" (dict "label" "Read the migration guide" "href" "/blog/migrating-your-project-to-maven/" "variant" "secondary" "event" "legacy-download-migration") }}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="cn1-gs-help" id="help">
+    <div><p class="cn1-eyebrow">Need help?</p><h2>Use the current setup documentation.</h2></div>
+    <p>The Getting Started guide covers the supported JDK, Maven project generation, simulator, account, and first native build.</p>
+    <div class="cn1-action-row">
+      {{ partial "cn1-cta.html" (dict "label" "Open Getting Started" "href" "/getting-started/" "variant" "secondary") }}
+      {{ partial "cn1-cta.html" (dict "label" "Ask in GitHub Discussions" "href" "https://github.com/codenameone/CodenameOne/discussions" "variant" "text" "external" true) }}
+    </div>
+  </section>
+</div>
+{{- end -}}
