@@ -722,13 +722,28 @@ public abstract class Database {
         for (String statement : SQLStatementSplitter.split(sql)) {
             String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
+                if (inTransaction && isLegacyBehavior() && supportsNestedTransactions()) {
+                    // Android's wrapper intercepts transaction control in SQL and ref-counts it
+                    // exactly as it counts beginTransaction(), so a BEGIN inside a transaction
+                    // nests rather than replacing it. Counting it as a fresh one would lose the
+                    // outer transaction's depth and end the tracking a level early.
+                    transactionDepth++;
+                    continue;
+                }
                 inTransaction = true;
                 transactionDepth = 1;
                 forgetSavepoints();
                 continue;
             }
             if (keyword != null) {
-                endTransactionCompletely();
+                // Ends one level, not all of them. Where the engine ref-counts -- Android under
+                // the legacy hint, which is the only place nesting is allowed -- a COMMIT in SQL
+                // is intercepted by the same wrapper and ends only the innermost transaction.
+                // Clearing here would report no transaction while the outer one still held
+                // uncommitted rows, and a key change is allowed on that answer: it would copy
+                // them into the replacement database. Everywhere else the depth is never above
+                // one, so this ends the transaction as it always did.
+                markTransactionEnded();
                 continue;
             }
             noteSavepointControl(statement);

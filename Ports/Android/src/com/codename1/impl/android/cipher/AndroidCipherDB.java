@@ -225,10 +225,22 @@ class AndroidCipherDB extends Database {
             // later begin and key change refused until the connection closed.
             if (!db.inTransaction()) {
                 markTransactionEnded();
+                if (alreadyRolledBack(err)) {
+                    // Satisfied, not failed -- the same rule as the plaintext port. Recovery must
+                    // not depend on whether the database is encrypted.
+                    return;
+                }
             }
             throw new IOException(err.getMessage(), err);
         }
         markTransactionEnded();
+    }
+
+    /// Whether an end failed because the engine had already rolled the transaction back.
+    private static boolean alreadyRolledBack(RuntimeException err) {
+        String message = err.getMessage();
+        return message != null
+                && message.toLowerCase().indexOf("no transaction is active") >= 0;
     }
 
     @Override

@@ -452,17 +452,42 @@ class ScriptTransactionTrackingTest {
     }
 
     @Test
-    void aScriptCommitEndsEveryNestedBegin() throws IOException {
-        // A COMMIT in a script ends the transaction outright, whatever the count says: the engine
-        // has ended it, so holding the flag would block every key change until the connection
-        // closed.
+    void aScriptCommitEndsOneNestedBeginWhereTheEngineCounts() throws IOException {
+        // Only where nesting exists at all, which is Android under the legacy hint. Its session
+        // layer classifies a statement by its first three characters and turns a bare COMMIT into
+        // its own endTransaction() -- the same interception the port works around with a leading
+        // comment when it needs SQLite to see the statement. So a COMMIT in a script ends the
+        // innermost transaction, not the stack: reading it as the end of everything reported no
+        // transaction while the outer one still held uncommitted rows, and that is the answer
+        // changeKey() acts on, copying them into the replacement database.
         NestingDatabase nesting = new NestingDatabase();
         Database.setLegacyBehavior(true);
         try {
             nesting.beginTransaction();
             nesting.beginTransaction();
             nesting.ran("COMMIT");
-            assertFalse(nesting.isInTransaction(), "the engine ended it, count or no count");
+            assertTrue(nesting.isInTransaction(), "the outer transaction is still open");
+            nesting.ran("COMMIT");
+            assertFalse(nesting.isInTransaction(), "and the outer COMMIT ends it");
+        } finally {
+            Database.setLegacyBehavior(false);
+        }
+    }
+
+    @Test
+    void aScriptBeginInsideATransactionNestsWhereTheEngineCounts() throws IOException {
+        // The other half: the same classifier turns a BEGIN into beginTransaction(), so it nests
+        // rather than replacing what is open. Counting it as a fresh transaction would drop the
+        // outer level and end the tracking one commit early.
+        NestingDatabase nesting = new NestingDatabase();
+        Database.setLegacyBehavior(true);
+        try {
+            nesting.beginTransaction();
+            nesting.ran("BEGIN");
+            nesting.commitTransaction();
+            assertTrue(nesting.isInTransaction(), "two levels were open, so one is left");
+            nesting.commitTransaction();
+            assertFalse(nesting.isInTransaction());
         } finally {
             Database.setLegacyBehavior(false);
         }
