@@ -9005,12 +9005,40 @@ void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_
 }
 
 /*
- * SQLCipher-compatible keying. These are provided by the bundled SQLite build; the declarations
- * are written out here rather than relying on the header, so that this file compiles unchanged
- * against a plain system SQLite where the symbols simply are not referenced at runtime.
+ * SQLCipher-compatible keying, declared here rather than taken from a header so this file
+ * compiles unchanged whether or not the bundled engine was emitted.
+ *
+ * These are strong references and they stay strong on purpose: Apple's own libsqlite3 exports
+ * them, so a build without the bundled engine still links. Verified against Xcode 26.2 rather
+ * than assumed -- usr/lib/libsqlite3.tbd lists _sqlite3_key, _sqlite3_key_v2 and _sqlite3_rekey
+ * in both the iPhoneOS and iPhoneSimulator SDKs, and a binary calling sqlite3_key links against
+ * -lsqlite3 with no undefined symbol. What Apple's copy does NOT do is encrypt: it answers
+ * SQLITE_MISUSE and leaves the file plaintext, which is why availability is decided by
+ * cn1SqlCipherAvailable below and never by whether these symbols resolved.
  */
 extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
 extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
+
+/**
+ * Whether the engine behind this connection can actually encrypt.
+ *
+ * Asked with `PRAGMA cipher_version`, because an unknown pragma is not an error in SQLite: it is
+ * parsed, ignored, and reports success. `PRAGMA cipher = 'sqlcipher'` therefore returns SQLITE_OK
+ * on Apple's system SQLite too, so a guard written on that result passes on exactly the build it
+ * was meant to catch. A row comes back only from a cipher-capable engine.
+ */
+static JAVA_BOOLEAN cn1SqlCipherAvailable(sqlite3* db) {
+    sqlite3_stmt* stmt = NULL;
+    JAVA_BOOLEAN available = JAVA_FALSE;
+    if (sqlite3_prepare_v2(db, "PRAGMA cipher_version", -1, &stmt, NULL) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const unsigned char* text = sqlite3_column_text(stmt, 0);
+            available = (text != NULL && text[0] != 0) ? JAVA_TRUE : JAVA_FALSE;
+        }
+        sqlite3_finalize(stmt);
+    }
+    return available;
+}
 
 /**
  * Selects the SQLCipher 4 on-disk format. Without this the bundled engine would use its own
@@ -9109,26 +9137,25 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable__(CN1_THREA
         }
         return JAVA_FALSE;
     }
-    // An unknown pragma is silently ignored by SQLite rather than raising an error, so the
-    // presence of a result row is what distinguishes a cipher-capable build.
-    sqlite3_stmt* stmt = NULL;
-    JAVA_BOOLEAN available = JAVA_FALSE;
-    if (sqlite3_prepare_v2(db, "PRAGMA cipher_version", -1, &stmt, NULL) == SQLITE_OK) {
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            const unsigned char* text = sqlite3_column_text(stmt, 0);
-            available = (text != NULL && text[0] != 0) ? JAVA_TRUE : JAVA_FALSE;
-        }
-        sqlite3_finalize(stmt);
-    }
+    JAVA_BOOLEAN available = cn1SqlCipherAvailable(db);
     sqlite3_close_v2(db);
     return available;
 }
 
 void com_codename1_impl_ios_IOSNative_sqlDbRekey___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {
     sqlite3* db = (sqlite3*)dbPeer;
-    if (cn1SqlApplyCipherProfile(db) != SQLITE_OK) {
+    if (!cn1SqlCipherAvailable(db)) {
+        // Asked of the engine, not of the pragma that configures it: a build without the cipher
+        // accepts "PRAGMA cipher" silently and would have fallen through to sqlite3_rekey, where
+        // Apple's copy answers SQLITE_MISUSE and the caller would read a bare engine error
+        // instead of being told that this build cannot encrypt anything.
         cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG
                 "This build does not support encrypted databases");
+        return;
+    }
+    if (cn1SqlApplyCipherProfile(db) != SQLITE_OK) {
+        cn1ThrowSqlMessage(CN1_THREAD_STATE_PASS_ARG
+                "The SQLCipher 4 format could not be selected on this database");
         return;
     }
     int rc;
