@@ -510,7 +510,13 @@ public abstract class Executor {
          * entitlement the phone's provisioning profile does not carry fails release signing.
          * Recording the caller lets a per-root walk decide which target actually did it.</p>
          *
-         * @param internalName the caller's internal name, slashes and all
+         * <p>Null means the scanner could not name the class it is about to read -- the
+         * non-ASM fallback parser reports it that way when the constant pool will not resolve.
+         * A consumer must treat that as "no attribution" and DISCARD whatever it was holding:
+         * keeping the previous class would credit this one's calls to an unrelated one, which is
+         * worse than not attributing them at all.</p>
+         *
+         * @param internalName the caller's internal name, slashes and all, or null when unknown
          */
         public default void scanningClass(String internalName) {
         }
