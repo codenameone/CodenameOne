@@ -227,7 +227,15 @@ jobs:
           ./scripts/run-ios-native-tests.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 20
+        # The reuse above is partial: run-ios-native-tests.sh injects the test target into the
+        # pbxproj before building, and Xcode rebuilds the app target after a project change even
+        # though the objects are there. So this step still pays a near-full native build --
+        # 6m55s of the 8m13s it takes on a fast runner, leaving little of a 20-minute budget for
+        # a slow one. Measured on the same commit, a slow runner spent 4m31s on simulator boot
+        # alone (a fast one: 1m15s) and 13 minutes on that build, and the cap fired while the
+        # tests had not started. The real fix is to inject before the UI-smoke step so this build
+        # is genuinely incremental; until then the budget has to cover the build it actually does.
+        timeout-minutes: 40
 
       - name: Upload packaging artifacts
         if: always()

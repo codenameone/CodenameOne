@@ -1106,6 +1106,70 @@ public final class DatabaseConformanceSuite {
             db.execute("DROP TABLE IF EXISTS conf_fk_child");
             db.execute("DROP TABLE IF EXISTS conf_fk_parent");
 
+            // ---- a failure that surfaces from a cursor step is reconciled too
+            // executeQuery runs its statement lazily on the ports that prepare and step: an
+            // INSERT reached this way does its insert on the first step, not at prepare. A
+            // constraint with ON CONFLICT ROLLBACK ends the transaction as it fails, so a port
+            // that reads the engine back only in execute() keeps a flag over a transaction that
+            // is gone -- and then the rollback that would have cleared it fails too, with "no
+            // transaction", leaving every later begin and key change refused until close.
+            // What is asserted is recovery, not which engine ends what: after the failure the
+            // database has to be usable again.
+            db.execute("DROP TABLE IF EXISTS conf_tx_unique");
+            db.execute("CREATE TABLE conf_tx_unique (id INTEGER PRIMARY KEY)");
+            db.execute("INSERT INTO conf_tx_unique (id) VALUES (1)");
+            db.beginTransaction();
+            boolean conflicted = false;
+            try {
+                Cursor conflicting = db.executeQuery(
+                        "INSERT OR ROLLBACK INTO conf_tx_unique (id) VALUES (1)");
+                try {
+                    conflicting.next();
+                } finally {
+                    try {
+                        conflicting.close();
+                    } catch (IOException alsoFailed) {
+                        // The constraint failure is the one under test.
+                    }
+                }
+            } catch (IOException expected) {
+                conflicted = true;
+            } catch (RuntimeException unchecked) {
+                conflicted = true;
+                r.check(false, "a constraint failure reached through executeQuery raises "
+                        + "IOException rather than " + unchecked.getClass().getName());
+            }
+            if (conflicted) {
+                try {
+                    if (db.isInTransaction()) {
+                        db.rollbackTransaction();
+                    }
+                    boolean reusable = true;
+                    try {
+                        db.beginTransaction();
+                        db.rollbackTransaction();
+                    } catch (IOException err) {
+                        reusable = false;
+                    }
+                    r.check(reusable, "a new transaction can be started after a constraint "
+                            + "failure reached through executeQuery");
+                } catch (IOException stuck) {
+                    r.check(false, "after a constraint failure reached through executeQuery the "
+                            + "transaction the port still believes is open cannot be ended: "
+                            + stuck.getMessage());
+                } catch (RuntimeException stuck) {
+                    r.check(false, "after a constraint failure reached through executeQuery the "
+                            + "transaction cannot be ended: " + stuck.getClass().getName());
+                }
+            } else {
+                r.info("this engine accepted the conflicting insert, so the cursor-step "
+                        + "reconciliation path was not exercised");
+                if (db.isInTransaction()) {
+                    db.rollbackTransaction();
+                }
+            }
+            db.execute("DROP TABLE IF EXISTS conf_tx_unique");
+
             // ---- nesting is rejected
             db.beginTransaction();
             boolean nestedThrew = false;

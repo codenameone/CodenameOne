@@ -356,6 +356,19 @@ class DatabaseImpl extends Database {
         return cursor;
     }
 
+
+    /// Re-reads the transaction state from the engine.
+    ///
+    /// A cursor calls this when a step fails, because the failure may have ended the transaction
+    /// underneath the tracking. Separate from the read the execute paths do inline only because a
+    /// cursor is not this class and cannot reach the inherited hook itself.
+    void reconcileTransactionState() {
+        if (peer == 0) {
+            return;
+        }
+        noteEngineTransactionState(IOSImplementation.nativeInstance.sqlDbInTransaction(peer));
+    }
+
     void unregister(CursorImpl cursor) {
         openCursors.removeElement(cursor);
     }
@@ -489,7 +502,22 @@ class DatabaseImpl extends Database {
 
         @Override
         protected boolean stepForward() throws IOException {
-            return IOSImplementation.nativeInstance.sqlStmtStep(stmt);
+            boolean stepped = false;
+            try {
+                boolean row = IOSImplementation.nativeInstance.sqlStmtStep(stmt);
+                stepped = true;
+                return row;
+            } finally {
+                if (!stepped && owner != null) {
+                    // A statement runs its work here, not at prepare: an INSERT ... RETURNING
+                    // reached through executeQuery does its insert on this step. A constraint
+                    // with ON CONFLICT ROLLBACK therefore ends the transaction as this fails,
+                    // and without reading the engine back the flag would stay set over a
+                    // transaction that is gone -- refusing every later begin and key change,
+                    // and failing the rollback that would have cleared it.
+                    owner.reconcileTransactionState();
+                }
+            }
         }
 
         @Override

@@ -316,6 +316,25 @@ class LinuxDatabase extends Database {
         return cursor;
     }
 
+
+    /// Re-reads the transaction state from the engine.
+    ///
+    /// A cursor calls this when a step fails, because the failure may have ended the transaction
+    /// underneath the tracking. Separate from the read the execute paths do inline only because a
+    /// cursor is not this class and cannot reach the inherited hook itself.
+    void reconcileTransactionState() {
+        if (peer == 0) {
+            return;
+        }
+        try {
+            noteEngineTransactionState(LinuxNative.sqlDbInTransaction(peer));
+        } catch (IOException cannotAsk) {
+            // Reached while another failure is already on its way out of the cursor. A connection
+            // that cannot even report whether it is in a transaction has a larger problem than
+            // this, and replacing the caller's error with this one would hide the real cause.
+        }
+    }
+
     void unregister(CursorImpl cursor) {
         openCursors.remove(cursor);
     }
@@ -433,7 +452,22 @@ class LinuxDatabase extends Database {
 
         @Override
         protected boolean stepForward() throws IOException {
-            return LinuxNative.sqlStmtStep(stmt);
+            boolean stepped = false;
+            try {
+                boolean row = LinuxNative.sqlStmtStep(stmt);
+                stepped = true;
+                return row;
+            } finally {
+                if (!stepped && owner != null) {
+                    // A statement runs its work here, not at prepare: an INSERT ... RETURNING
+                    // reached through executeQuery does its insert on this step. A constraint
+                    // with ON CONFLICT ROLLBACK therefore ends the transaction as this fails,
+                    // and without reading the engine back the flag would stay set over a
+                    // transaction that is gone -- refusing every later begin and key change,
+                    // and failing the rollback that would have cleared it.
+                    owner.reconcileTransactionState();
+                }
+            }
         }
 
         @Override
