@@ -9240,8 +9240,13 @@ void com_codename1_impl_ios_IOSNative_sqlStmtBindText___long_int_byte_1ARRAY(CN1
     // a Java string may hold a zero character and SQLite stores it, so a C string would drop that
     // character and everything after it.
     JAVA_ARRAY arr = (JAVA_ARRAY)value;
+    // An empty array has no storage behind it -- allocArray leaves data at 0 when the length is
+    // zero -- and sqlite3_bind_text reads a null pointer as SQL NULL whatever length it is given.
+    // So "" would arrive as NULL: read back as null, and rejected outright by a NOT NULL column.
+    // Any non-null pointer with a length of zero is an empty string to SQLite.
     cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
-            sqlite3_bind_text((sqlite3_stmt*)statementPeer, index, (const char*)arr->data,
+            sqlite3_bind_text((sqlite3_stmt*)statementPeer, index,
+                    arr->length > 0 ? (const char*)arr->data : "",
                     arr->length, SQLITE_TRANSIENT), index);
 }
 
@@ -9253,9 +9258,12 @@ void com_codename1_impl_ios_IOSNative_sqlStmtBindBlob___long_int_byte_1ARRAY(CN1
     }
     JAVA_ARRAY byteArray = (JAVA_ARRAY)value;
     JAVA_ARRAY_BYTE* data = (JAVA_ARRAY_BYTE*)byteArray->data;
+    // Same as the text bind above: a zero length array carries a null pointer, and that is how
+    // SQL NULL is spelled to sqlite3_bind_blob. An empty blob is a pointer that is not null.
     cn1CheckSqlBind(CN1_THREAD_STATE_PASS_ARG
-            sqlite3_bind_blob((sqlite3_stmt*)statementPeer, index, data, byteArray->length,
-                    SQLITE_TRANSIENT), index);
+            sqlite3_bind_blob((sqlite3_stmt*)statementPeer, index,
+                    byteArray->length > 0 ? (const void*)data : (const void*)"",
+                    byteArray->length, SQLITE_TRANSIENT), index);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlStmtBindLong___long_int_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG statementPeer, JAVA_INT index, JAVA_LONG value) {

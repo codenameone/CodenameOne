@@ -476,6 +476,47 @@ public final class DatabaseConformanceSuite {
             } else {
                 r.info("legacy: no blob was written, since every parameter is stringified here");
             }
+
+            // ---- an empty value is empty, not null
+            // The ports that bind through the C API hand SQLite a pointer and a length, and an
+            // empty Java array has no storage behind it: the pointer is null, which is exactly
+            // how SQL NULL is spelled to sqlite3_bind_text and sqlite3_bind_blob. So "" arrives
+            // as NULL, reads back as null, and is refused outright by a NOT NULL column -- with
+            // nothing to say it happened.
+            db.execute("DELETE FROM conf_stmt");
+            db.execute("INSERT INTO conf_stmt (id, t) VALUES (7, ?)", new Object[] {""});
+            Cursor emptyCur = db.executeQuery("SELECT t, typeof(t) FROM conf_stmt WHERE id = 7");
+            try {
+                emptyCur.next();
+                Row emptyRow = emptyCur.getRow();
+                String stored = emptyRow.getString(0);
+                r.check("".equals(stored), "an empty string is stored as an empty string, got "
+                        + (stored == null ? "null" : "\"" + stored + "\""));
+                r.check("text".equals(emptyRow.getString(1)),
+                        "and it is TEXT rather than NULL, got " + emptyRow.getString(1));
+            } finally {
+                closeQuietly(emptyCur);
+            }
+
+            if (blobWriteSupported) {
+                db.execute("DELETE FROM conf_stmt");
+                db.execute("INSERT INTO conf_stmt (id, b) VALUES (8, ?)",
+                        new Object[] {new byte[0]});
+                Cursor emptyBlobCur =
+                        db.executeQuery("SELECT b, typeof(b) FROM conf_stmt WHERE id = 8");
+                try {
+                    emptyBlobCur.next();
+                    Row emptyBlobRow = emptyBlobCur.getRow();
+                    byte[] readBack = emptyBlobRow.getBlob(0);
+                    r.check(readBack != null && readBack.length == 0,
+                            "an empty blob is stored as an empty blob, got "
+                            + (readBack == null ? "null" : readBack.length + " bytes"));
+                    r.check("blob".equals(emptyBlobRow.getString(1)),
+                            "and it is BLOB rather than NULL, got " + emptyBlobRow.getString(1));
+                } finally {
+                    closeQuietly(emptyBlobCur);
+                }
+            }
         }
 
         // ---- null handling
@@ -1314,8 +1355,19 @@ public final class DatabaseConformanceSuite {
                 }
                 r.check(beforeFirstWorks, "beforeFirst() on a cursor that has not been stepped is "
                         + "a no-op, including over a statement that writes");
-                r.check(rowCount(db, "conf_returning") == 3,
-                        "and each of them inserted its row once, like the walk before them");
+                // How many rows that left is a port difference rather than a contract: the ports
+                // that prepare and step have not run the statement at all, because nothing
+                // stepped the cursor, while the simulator's driver runs it when the query is
+                // executed. Both are three at most, and neither is two inserts from one
+                // statement, which is what this section is really about.
+                int afterUntouched = rowCount(db, "conf_returning");
+                r.info("a writing statement whose cursor was never stepped left "
+                        + afterUntouched + " row(s): this engine runs it "
+                        + (afterUntouched == 3 ? "when the query is executed" : "only when the "
+                            + "cursor is stepped"));
+                r.check(afterUntouched <= 3,
+                        "and no statement here inserted more than the one row it describes");
+
             }
             db.execute("DROP TABLE IF EXISTS conf_returning");
 
