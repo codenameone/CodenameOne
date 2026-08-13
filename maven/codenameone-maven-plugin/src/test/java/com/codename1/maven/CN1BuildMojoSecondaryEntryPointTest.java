@@ -37,6 +37,46 @@ import static org.junit.Assert.assertNull;
  * namespace or a cloud build produces no watch app at all.
  */
 public class CN1BuildMojoSecondaryEntryPointTest {
+
+    /**
+     * The local path honours the same override the cloud path does.
+     *
+     * <p>Reading only the unprefixed project setting made one invocation build two different
+     * products: {@code -Dcodename1.arg.watchMain=...} reached the daemon, because the mirror
+     * leaves an existing value alone, and was ignored on the developer's own machine. An override
+     * that works in one place and silently does nothing in the other is worse than one that works
+     * nowhere, because nothing about the local build says the flag was dropped.</p>
+     */
+    @Test
+    public void theLocalRequestPrefersTheOverlaidArgument() throws Exception {
+        Properties props = new Properties();
+        props.setProperty("codename1.watchMain", "com.acme.FromProjectFile");
+        props.setProperty("codename1.arg.watchMain", "com.acme.FromCommandLine");
+        assertEquals("com.acme.FromCommandLine", localArgument(props, "watchMain"));
+
+        // With no override the project file is still what decides.
+        Properties plain = new Properties();
+        plain.setProperty("codename1.watchMain", "com.acme.FromProjectFile");
+        assertEquals("com.acme.FromProjectFile", localArgument(plain, "watchMain"));
+
+        // And an override with no project setting at all enables the target, where before the
+        // absent unprefixed value simply turned the watch build off.
+        Properties overrideOnly = new Properties();
+        overrideOnly.setProperty("codename1.arg.watchStandalone", "true");
+        assertEquals("true", localArgument(overrideOnly, "watchStandalone"));
+    }
+
+    /** Runs the local helper and reports what it put on the request. */
+    private static String localArgument(Properties props, String argName) throws Exception {
+        com.codename1.builders.BuildRequest request = new com.codename1.builders.BuildRequest();
+        java.lang.reflect.Method m = CN1BuildMojo.class.getDeclaredMethod(
+                "putSecondaryEntryPointArguments",
+                com.codename1.builders.BuildRequest.class, Properties.class);
+        m.setAccessible(true);
+        m.invoke(null, request, props);
+        return request.getArg(argName, null);
+    }
+
     /**
      * A command-line override survives the mirror.
      *

@@ -1124,7 +1124,18 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      */
     private static void putSecondaryEntryPointArguments(BuildRequest r, Properties props) {
         for (Map.Entry<String, String> entry : SECONDARY_ENTRY_POINTS.entrySet()) {
-            String value = props.getProperty(entry.getKey());
+            // The overlaid build argument first, exactly as the cloud mirror resolves it.
+            //
+            // Reading only the unprefixed project setting made the two paths disagree about the
+            // same invocation: -Dcodename1.arg.watchMain=... reached the daemon, because the
+            // mirror leaves an existing value alone, and was ignored locally -- so the standard
+            // override built one product in the cloud and a different one, or none, on the
+            // developer's machine. An override that works in one place and silently does nothing
+            // in the other is worse than one that works nowhere.
+            String value = props.getProperty("codename1.arg." + entry.getValue());
+            if (value == null || value.trim().length() == 0) {
+                value = props.getProperty(entry.getKey());
+            }
             if (value != null && value.trim().length() > 0) {
                 r.putArgument(entry.getValue(), value.trim());
             }
