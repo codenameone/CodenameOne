@@ -401,10 +401,10 @@ public class AndroidDB extends Database {
                 // without this the same query behaves differently depending only on the declared
                 // type of the array it was handed.
                 return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql,
-                        null, null));
+                        null, null), sql);
             }
             android.database.Cursor c = db.rawQuery(sql, params);
-            return wrap(c);
+            return wrap(c, sql);
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
@@ -437,7 +437,7 @@ public class AndroidDB extends Database {
             // androidx.sqlite uses, and it is the only one that carries a blob as well.
             android.database.Cursor c = db.rawQueryWithFactory(
                     new BlobBindingCursorFactory(params), sql, null, null);
-            return wrap(c);
+            return wrap(c, sql);
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
@@ -448,7 +448,7 @@ public class AndroidDB extends Database {
         return executeQuery(sql, (String[]) null);
     }
 
-    private Cursor wrap(android.database.Cursor c) throws IOException {
+    private Cursor wrap(android.database.Cursor c, String sql) throws IOException {
         if (!isLegacyBehavior()) {
             // rawQuery is lazy: without running the query here, malformed SQL surfaces from the
             // first next() instead of from executeQuery.
@@ -475,6 +475,10 @@ public class AndroidDB extends Database {
             }
         }
         final AndroidCursor cursor = new AndroidCursor(c);
+        // The platform cursor refills its window by running the query again, which for a
+        // statement that writes repeats the writes. The cursor refuses to leave the window it
+        // holds when that is what the statement does.
+        cursor.statementWrites(SQLStatementSplitter.writesData(sql));
         cursor.setCloseListener(new AndroidCursor.CloseListener() {
             @Override
             public void cursorClosed(AndroidCursor closing) {

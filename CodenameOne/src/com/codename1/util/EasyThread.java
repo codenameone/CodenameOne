@@ -166,6 +166,7 @@ public final class EasyThread {
     /// - `t`: object is passed to the success callback
     public <T> void run(RunnableWithResult<T> r, SuccessCallback<T> t) {
         synchronized (LOCK) {
+            requireAccepting();
             queue.add(r);
             queue.add(t);
             LOCK.notifyAll();
@@ -179,6 +180,7 @@ public final class EasyThread {
     /// - `r`: the runnable
     public void run(Runnable r) {
         synchronized (LOCK) {
+            requireAccepting();
             queue.add(r);
             LOCK.notifyAll();
         }
@@ -230,8 +232,12 @@ public final class EasyThread {
     /// A stop that has been asked for is enough: `#kill()` drops whatever is queued behind the
     /// task it interrupts, and `#killWhenIdle()` may already have found the queue empty and
     /// decided to leave. Both leave a caller waiting for a callback that never arrives, so the
-    /// answer is given here instead. Callers of the fire and forget `#run(Runnable)` are not
-    /// waiting on anything and are left alone.
+    /// answer is given here instead.
+    ///
+    /// The fire and forget calls refuse too. Nobody is blocked on those, but a task accepted and
+    /// then never run is a silent loss -- and the one that takes a `SuccessCallback` does have
+    /// somebody waiting, just asynchronously. Saying no beats acknowledging work that will not
+    /// happen.
     ///
     /// Must be called while holding `LOCK`.
     private void requireAccepting() {

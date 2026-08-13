@@ -59,9 +59,66 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         void cursorClosed(AndroidCursor cursor);
     }
 
+    /// True when the statement behind this cursor changes the database, so moving off the window
+    /// it already holds would run those changes again.
+    private boolean statementWrites;
+
     public AndroidCursor(android.database.Cursor c) {
         this.c = c;
         this.last_read_column_index = -1;
+    }
+
+    /// Records that the statement behind this cursor writes.
+    ///
+    /// The platform cursor holds one window of rows and fills another by running its query a
+    /// second time. For a SELECT that is a repeated read; for an INSERT, UPDATE or DELETE with
+    /// RETURNING it is a repeated write, and an ordinary walk off the end of the window would do
+    /// it without anybody asking. Rows outside the window are refused instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writes`: true when running the statement changes the database
+    ///
+    /// Public for the same reason CloseListener is: the SQLCipher-backed database lives in a
+    /// sub-package, because it is deleted at build time for applications that never encrypt.
+    public void statementWrites(boolean writes) {
+        statementWrites = writes;
+    }
+
+    /// Refuses a move that the platform would satisfy by running the statement again.
+    ///
+    /// Only for a statement that writes, and only for a position the current window does not
+    /// hold: everything inside it is served from memory. A cursor that is not windowed answers no
+    /// window at all, and nothing here can tell whether a move would refill it -- that is the
+    /// SQLCipher build, whose cursor is the same AOSP class, so in practice the check applies
+    /// there too.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the position being moved to
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if reaching that row would re-run a statement that writes
+    private void requireInWindow(int row) throws IOException {
+        if (!statementWrites || row < 0) {
+            return;
+        }
+        if (c instanceof android.database.AbstractWindowedCursor) {
+            android.database.CursorWindow window =
+                    ((android.database.AbstractWindowedCursor) c).getWindow();
+            if (window != null) {
+                int start = window.getStartPosition();
+                if (row >= start && row < start + window.getNumRows()) {
+                    return;
+                }
+            }
+        }
+        throw new IOException("This cursor is over a statement that changes the database, and the "
+                + "row asked for is outside the rows already read. Reaching it would run the "
+                + "statement again and repeat those changes, so it is refused: read the rows this "
+                + "cursor returns as it returns them, or run the statement with execute() and "
+                + "query for what you need afterwards.");
     }
 
     public void setCloseListener(CloseListener listener) {
@@ -97,6 +154,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public boolean first() throws IOException {
         checkOpen();
+        requireInWindow(0);
         last_read_column_index = -1;
         return c.moveToFirst();
     }
@@ -104,6 +162,12 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public boolean last() throws IOException {
         checkOpen();
+        // The last row is only reachable through the window that holds it, and finding out which
+        // one that is means counting -- which is a refill of its own on a result set larger than
+        // a window. Refused outright for a statement that writes.
+        if (statementWrites) {
+            requireInWindow(Integer.MAX_VALUE);
+        }
         last_read_column_index = -1;
         return c.moveToLast();
     }
@@ -111,6 +175,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public boolean next() throws IOException {
         checkOpen();
+        requireInWindow(c.getPosition() + 1);
         last_read_column_index = -1;
         return c.moveToNext();
     }
@@ -118,6 +183,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public boolean prev() throws IOException {
         checkOpen();
+        requireInWindow(c.getPosition() - 1);
         last_read_column_index = -1;
         return c.moveToPrevious();
     }
@@ -132,6 +198,12 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public int getCount() throws IOException {
         checkOpen();
+        // Counting walks the whole result set, which past the first window means running the
+        // statement again -- and repeating what it writes. The rows this cursor has already
+        // returned are the ones it can answer for.
+        if (statementWrites) {
+            requireInWindow(Integer.MAX_VALUE);
+        }
         return c.getCount();
     }
 
@@ -184,6 +256,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
             c.moveToPosition(-1);
             return false;
         }
+        requireInWindow(row);
         return c.moveToPosition(row);
     }
 

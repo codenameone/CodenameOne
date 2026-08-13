@@ -752,9 +752,9 @@ class AndroidCipherDB extends Database {
                 // rawQuery binds through bindString, which rejects null outright rather than
                 // storing SQL NULL. See AndroidDB for the full reasoning.
                 return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql,
-                        null, null));
+                        null, null), sql);
             }
-            return wrap(db.rawQuery(sql, params));
+            return wrap(db.rawQuery(sql, params), sql);
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
@@ -784,7 +784,7 @@ class AndroidCipherDB extends Database {
             // Bind through a cursor factory rather than stringifying: the contract is that a
             // parameter binds by its runtime type, so a Long has to reach SQLite as INTEGER or
             // "SELECT ? = 42" and typeof(?) both answer wrongly.
-            return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql, null, null));
+            return wrap(db.rawQueryWithFactory(new BlobBindingCursorFactory(params), sql, null, null), sql);
         } catch (Exception e) {
             throw new IOException(e.getMessage(), e);
         }
@@ -795,7 +795,7 @@ class AndroidCipherDB extends Database {
         return executeQuery(sql, (String[]) null);
     }
 
-    private Cursor wrap(android.database.Cursor c) throws IOException {
+    private Cursor wrap(android.database.Cursor c, String sql) throws IOException {
         if (!isLegacyBehavior()) {
             // Eager, so malformed SQL is reported from executeQuery rather than from next().
             // moveToFirst rather than getCount, for the reason given on the plaintext port: both
@@ -814,6 +814,10 @@ class AndroidCipherDB extends Database {
             }
         }
         final AndroidCursor cursor = new AndroidCursor(c);
+        // The platform cursor refills its window by running the query again, which for a
+        // statement that writes repeats the writes. The cursor refuses to leave the window it
+        // holds when that is what the statement does.
+        cursor.statementWrites(SQLStatementSplitter.writesData(sql));
         cursor.setCloseListener(new AndroidCursor.CloseListener() {
             @Override
             public void cursorClosed(AndroidCursor closing) {
