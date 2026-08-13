@@ -305,17 +305,27 @@ public class ThreadSafeDatabase extends Database {
                 return;
             }
             closed = true;
-            underlying.close();
-            // Asked to stop once its queue is empty, rather than killed. kill() stops the worker
-            // after the current task -- which is this one -- and everything behind it is dropped,
-            // including a call from a thread that took dispatchLock and passed checkOpen before
-            // the flag above was set. That caller waits for an answer that never comes.
-            //
-            // Draining instead runs those calls, which fail against the closed database, and the
-            // thread then ends. One that arrives after the thread has gone is refused by
-            // EasyThread rather than queued for nobody, and the refusal is turned into the same
-            // "closed" IOException the check above raises.
-            et.killWhenIdle();
+            try {
+                underlying.close();
+            } finally {
+                // In a finally, because a close can fail -- the browser port reports a failed
+                // OPFS flush that way -- and the wrapper is closed either way. Leaving the worker
+                // alive there would keep the thread and everything it retains for the life of the
+                // process, and getThread() would still hand callers a thread that services work
+                // against a database that is gone.
+                //
+                // Asked to stop once its queue is empty, rather than killed. kill() stops the
+                // worker after the current task -- which is this one -- and everything behind it
+                // is dropped, including a call from a thread that took dispatchLock and passed
+                // checkOpen before the flag above was set. That caller waits for an answer that
+                // never comes.
+                //
+                // Draining instead runs those calls, which fail against the closed database, and
+                // the thread then ends. One that arrives after the thread has gone is refused by
+                // EasyThread rather than queued for nobody, and the refusal is turned into the
+                // same "closed" IOException the check above raises.
+                et.killWhenIdle();
+            }
             return;
         }
         synchronized (dispatchLock) {

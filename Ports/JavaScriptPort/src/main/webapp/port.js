@@ -7206,18 +7206,29 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnBlob_long_
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble_long_int_R_double", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnDouble___long_int_R_double"],
   function(stmtId, col) {
     return cn1SqliteGuard(function() {
-      // A REAL column is a Number. Routing it through the exact-long conversion would truncate the
-      // fractional part and hand back the wrong bridge type.
-      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-      return v === null || v === undefined ? 0 : Number(v);
+      // Asked of the engine for the same reason columnLong is: a value stored as TEXT is read by
+      // SQLite as the number its leading characters spell, and Number() makes NaN of anything
+      // with a non-numeric tail. sqlite3_column_double answers 0.0 for a null column, which is
+      // what a double getter has to return anyway.
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      return cn1Sqlite.capi.sqlite3_column_double(stmt.pointer, col | 0);
     }, 0);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong_long_int_R_long", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnLong___long_int_R_long"],
   function(stmtId, col) {
     return cn1SqliteGuard(function() {
-      // Exact: Number() would round an INTEGER past 2^53 on the way back to a Java long.
-      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
-      return v === null || v === undefined ? cn1SqliteFromBigInt(0n) : cn1SqliteFromBigInt(v);
+      // Asked of the engine as an integer, which is what the ports that call
+      // sqlite3_column_int64 get. Reading the column's own type and converting here does not
+      // agree with them on a value stored as TEXT: SQLite reads as many leading digits as it
+      // finds, so '123abc' is 123 and 'abc' is 0, while Number() makes NaN of both -- and BigInt
+      // then throws, which this guard would report as 0 for one and 0 for the other. A decimal
+      // too large for a long clamps to its limit there and wraps here.
+      // No null check either: sqlite3_column_int64 answers 0 for a NULL column, which is what a
+      // long getter returns for one anyway, and what the native ports return through the same
+      // call.
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      return cn1SqliteFromBigInt(
+        cn1Sqlite.capi.sqlite3_column_int64(stmt.pointer, col | 0));
     }, 0);
   });
