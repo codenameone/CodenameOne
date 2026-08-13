@@ -966,14 +966,10 @@ public final class WearableConnection {
     /// The platform starts an app to hand it a payload, so the payload routinely arrives before the
     /// app has finished wiring itself up. Parking rather than dropping is what makes it safe to
     /// register listeners in `init()`.
-    private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue) {
-        return deliver(delivery, listeners, queue, null, false);
-    }
-
-    /// Runs a delivery on the EDT, or parks it until a listener exists.
     ///
     /// `oneShot` marks a delivery whose payload has no other copy in this process -- a file
-    /// transfer. It changes only what the cap evicts.
+    /// transfer, or a message a port is holding in a durable spool. It changes only what the cap
+    /// evicts, and it is what makes `onDropped` reachable.
     private static boolean deliver(Runnable delivery, List<?> listeners, List<Runnable> queue,
             Runnable onDropped, boolean oneShot) {
         return deliver(delivery, listeners, queue, onDropped, oneShot, null);
