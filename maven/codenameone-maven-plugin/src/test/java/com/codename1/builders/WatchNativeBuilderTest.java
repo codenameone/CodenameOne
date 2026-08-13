@@ -1023,7 +1023,8 @@ class WatchNativeBuilderTest {
         for (String name : new String[] {"cn1_watch_balanced", "cn1_watch_normalize_condition",
                 "cn1_watch_excludes_watch", "cn1_watch_atom_selects_watch",
                 "cn1_watch_or_operands", "cn1_watch_selects_watch",
-                "cn1_watch_catalog_stage_name", "cn1_watch_catalog_for_watch"}) {
+                "cn1_watch_catalog_stage_name", "cn1_watch_catalog_for_watch",
+                "cn1_watch_sdk_module_names"}) {
             defs.append(definitionOf(ruby, name)).append('\n');
         }
 
@@ -1093,6 +1094,18 @@ class WatchNativeBuilderTest {
                         + "cn1_watch_excludes_watch('#if os(iOS) || os(watchOS)'), false)\n")
                 .append("chk('the objc spelling too', "
                         + "cn1_watch_excludes_watch('#if TARGET_OS_IOS || TARGET_OS_OSX'), true)\n")
+                // Read from the SDK's own module maps. Probing usr/lib/swift/<M>.swiftmodule
+                // found the Swift overlays and missed 66 of the 78 C modules the shared
+                // usr/include/module.modulemap declares -- SQLite3, zlib, MachO among them -- and
+                // one unattributed import switches strict package filtering off entirely.
+                .append("sdk_names = cn1_watch_sdk_module_names(["
+                        + "`xcrun --sdk watchos --show-sdk-path 2>/dev/null`.strip].reject("
+                        + "&:empty?))\n")
+                .append("chk('a shared-modulemap C module is attributed', "
+                        + "sdk_names.key?('SQLite3') || sdk_names.empty?, true)\n")
+                .append("chk('so is a swift overlay', "
+                        + "sdk_names.key?('Darwin') || sdk_names.empty?, true)\n")
+                .append("chk('a real package is not', sdk_names.key?('Alamofire'), false)\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "

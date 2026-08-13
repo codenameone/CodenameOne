@@ -2573,21 +2573,53 @@ class WatchNativeBuilder {
                 // strict filtering off wholesale, and then an iOS-only package the phone happens
                 // to carry is mirrored into the watch target and can break its package
                 // resolution, over an import the watch code never made of anything shippable.
-                .append("def cn1_watch_sdk_provides_module(sdks, m)\n")
-                // The Swift standard modules have no file of their own to point at under every
-                // toolchain layout, and no package will ever be named for them.
-                .append("  return true if %w[Swift _Concurrency _StringProcessing Builtin]"
-                        + ".include?(m)\n")
-                .append("  sdks.any? do |sdk|\n")
-                .append("    File.exist?(File.join(sdk, 'usr/lib/swift', m + '.swiftmodule')) ||\n")
-                .append("      File.exist?(File.join(sdk, 'usr/lib/swift', m + '.swiftinterface'))"
-                        + " ||\n")
-                .append("      File.directory?(File.join(sdk, 'usr/include', m)) ||\n")
-                .append("      File.exist?(File.join(sdk, 'usr/include', m, 'module.modulemap'))"
-                        + " ||\n")
-                .append("      Dir.glob(File.join(sdk, 'usr/lib/swift', m + '.swiftmodule',"
-                        + " '*')).any?\n")
+                // Read from the SDK's module maps rather than guessed at by path.
+                //
+                // Probing usr/lib/swift/<M>.swiftmodule and usr/include/<M> found the Swift
+                // overlays -- Darwin, Dispatch, ObjectiveC all have one -- and missed almost
+                // everything else. Apple declares its C modules in shared maps, so of the 78
+                // modules the watchOS SDK's usr/include/module.modulemap names, 66 matched no
+                // path: SQLite3, zlib, MachO, notify, os_object among them. Any staged source
+                // importing one was called unattributed, which switches strict filtering off and
+                // mirrors every phone package product into the watch target.
+                //
+                // Parsed once and memoised: ~2800 names in about a second, measured against the
+                // watchOS 26.2 SDKs, most of it the toolchain glob rather than the 45 map files.
+                // Once per build, against an Xcode build measured in minutes.
+                .append("def cn1_watch_sdk_module_names(sdks)\n")
+                .append("  $cn1_watch_sdk_modules ||= begin\n")
+                .append("    found = {}\n")
+                // The Swift standard modules are built into the compiler and have no map entry.
+                .append("    %w[Swift _Concurrency _StringProcessing Builtin]"
+                        + ".each { |n| found[n] = true }\n")
+                .append("    sdks.each do |sdk|\n")
+                .append("      Dir.glob(File.join(sdk, 'usr/include/**/*.modulemap')).each do |mm|\n")
+                .append("        begin\n")
+                // `module X`, and the extern/explicit/framework spellings in front of it.
+                .append("          File.read(mm).scan("
+                        + "/^\\s*(?:extern\\s+|explicit\\s+|framework\\s+)*module"
+                        + "\\s+([A-Za-z_]\\w*)/) { |n| found[n[0]] = true }\n")
+                .append("        rescue StandardError\n")
+                // An unreadable map costs its own modules, not the whole answer.
+                .append("        end\n")
+                .append("      end\n")
+                .append("      Dir.glob(File.join(sdk, 'usr/lib/swift/*.swiftmodule')).each "
+                        + "{ |d| found[File.basename(d, '.swiftmodule')] = true }\n")
+                .append("      Dir.glob(File.join(sdk, 'usr/lib/swift/*.swiftinterface')).each "
+                        + "{ |d| found[File.basename(d, '.swiftinterface')] = true }\n")
+                .append("    end\n")
+                // Swift overlays the toolchain ships rather than the SDK, wherever it keeps them.
+                .append("    toolchain = `xcrun --find swift 2>/dev/null`.strip\n")
+                .append("    unless toolchain.empty?\n")
+                .append("      root = File.expand_path('../..', toolchain)\n")
+                .append("      Dir.glob(File.join(root, 'lib/swift/**/*.swiftmodule')).each "
+                        + "{ |d| found[File.basename(d, '.swiftmodule')] = true }\n")
+                .append("    end\n")
+                .append("    found\n")
                 .append("  end\n")
+                .append("end\n")
+                .append("def cn1_watch_sdk_provides_module(sdks, m)\n")
+                .append("  cn1_watch_sdk_module_names(sdks).key?(m)\n")
                 .append("end\n")
                 .append("unattributed = watch_modules.reject { |m| product_names.include?(m) || "
                         + "watch_fw_dirs.any? { |dirs| dirs.any? { |dd| "
