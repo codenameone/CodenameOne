@@ -707,6 +707,9 @@ public class SEDatabase extends Database {
             }
             ResultSet resultSet = s.executeQuery();
             SECursor cursor = new SECursor(this, s, resultSet);
+            // Rewinding here re-runs the prepared statement, so a statement that writes must not
+            // be rewound: getCount() and last() would run the writes a second time.
+            cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
             registerCursor(cursor);
             return cursor;
         } catch (SQLException ex) {
@@ -732,6 +735,9 @@ public class SEDatabase extends Database {
             bind(s, params);
             ResultSet resultSet = s.executeQuery();
             SECursor cursor = new SECursor(this, s, resultSet);
+            // Rewinding here re-runs the prepared statement, so a statement that writes must not
+            // be rewound: getCount() and last() would run the writes a second time.
+            cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
             registerCursor(cursor);
             return cursor;
         } catch (SQLException ex) {
@@ -753,6 +759,9 @@ public class SEDatabase extends Database {
             checkParameterCount(s, 0);
             ResultSet resultSet = s.executeQuery();
             SECursor cursor = new SECursor(this, s, resultSet);
+            // Rewinding here re-runs the prepared statement, so a statement that writes must not
+            // be rewound: getCount() and last() would run the writes a second time.
+            cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
             registerCursor(cursor);
             return cursor;
         } catch (SQLException ex) {

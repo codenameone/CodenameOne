@@ -279,6 +279,22 @@ public final class DatabaseConformanceSuite {
             r.info("custom database paths are supported here");
         }
 
+        // ---- deleting a database somebody still holds is refused
+        // Every platform here unlinks an open file quite happily, and the handle keeps working on
+        // a file with no name: reopening the name makes a different database, and whatever the
+        // old handle writes goes away with it. Refusing is the only answer that does not lose
+        // writes silently.
+        Database stillOpen = Database.openOrCreate(databaseName);
+        boolean refusedWhileOpen = false;
+        try {
+            Database.delete(databaseName);
+        } catch (IOException expected) {
+            refusedWhileOpen = true;
+        }
+        r.check(refusedWhileOpen, "delete() is refused while a connection to the database is open");
+        stillOpen.close();
+        r.check(Database.exists(databaseName), "and the refused delete left the database alone");
+
         Database.delete(databaseName);
         r.check(!Database.exists(databaseName), "exists() is false after delete()");
     }
@@ -1174,6 +1190,56 @@ public final class DatabaseConformanceSuite {
                 }
             }
             db.execute("DROP TABLE IF EXISTS conf_tx_unique");
+
+            // ---- a cursor over a writing statement never runs it twice
+            // executeQuery prepares and steps, so an INSERT ... RETURNING does its insert while
+            // the cursor is walked. Anything that rewinds -- getCount(), last(), going backwards
+            // -- re-executes the statement on the ports that step, which would write the rows a
+            // second time without saying so. The count afterwards is what proves it.
+            db.execute("DROP TABLE IF EXISTS conf_returning");
+            // No explicit key: a second execution has to be able to succeed, or a duplicate write
+            // would collide with the first and the check would pass without proving anything.
+            db.execute("CREATE TABLE conf_returning (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "v TEXT)");
+            Cursor returning = null;
+            boolean returningSupported = true;
+            try {
+                returning = db.executeQuery(
+                        "INSERT INTO conf_returning (v) VALUES ('a') RETURNING id");
+                returning.next();
+            } catch (IOException unsupported) {
+                // RETURNING arrived in SQLite 3.35. An engine without it has nothing to test.
+                returningSupported = false;
+            }
+            if (returningSupported && returning != null) {
+                try {
+                    Database.count(returning);
+                    r.info("this port answers getCount() on a writing statement without "
+                            + "re-running it");
+                } catch (IOException refused) {
+                    r.info("this port refuses to rewind a writing statement, which is how it "
+                            + "avoids running the write twice");
+                }
+                try {
+                    returning.close();
+                } catch (IOException ignored) {
+                    // The row count below is the assertion.
+                }
+                r.check(rowCount(db, "conf_returning") == 1,
+                        "an INSERT ... RETURNING walked through a cursor inserts its row once, "
+                        + "however the cursor was navigated");
+            } else {
+                if (returning != null) {
+                    try {
+                        returning.close();
+                    } catch (IOException ignored) {
+                        // Nothing was established either way.
+                    }
+                }
+                r.info("this engine does not support RETURNING, so a writing cursor could not "
+                        + "be exercised");
+            }
+            db.execute("DROP TABLE IF EXISTS conf_returning");
 
             // ---- the engine's own compile-time defaults are the same everywhere
             // Neither of these can be changed on the ports that use somebody else's engine: the

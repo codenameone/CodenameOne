@@ -168,7 +168,42 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         onRow = false;
     }
 
+    /// Whether the statement behind this cursor changes the database.
+    ///
+    /// Set by the port that created the cursor, since only it holds the SQL text.
+    private boolean statementWrites;
+
+    /// Records that the statement behind this cursor writes, so it is never re-executed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writes`: true when running the statement changes the database
+    protected void noteStatementWrites(boolean writes) {
+        statementWrites = writes;
+    }
+
+    /// Whether this cursor refuses to move backwards because its statement writes.
+    ///
+    /// #### Returns
+    ///
+    /// true when only forward movement is allowed
+    protected boolean statementWrites() {
+        return statementWrites;
+    }
+
     private void rewindInternal() throws IOException {
+        if (statementWrites) {
+            // Rewinding re-executes the statement, which is fine for a query and a second set of
+            // writes for anything else. An INSERT ... RETURNING reached through executeQuery does
+            // its insert while the cursor is stepped, so a getCount() or a last() -- both of which
+            // rewind -- would insert the rows again, and quietly: the caller asked how many rows
+            // there were, not for them to be written twice. Refused instead, because there is no
+            // answer to give that does not involve running the statement a second time.
+            throw new IOException("This cursor is over a statement that changes the database, so "
+                    + "it can only move forward: rewinding would run the statement again. Read "
+                    + "the rows with next(), or run the statement with execute() and query for "
+                    + "what you need afterwards.");
+        }
         rewind();
         position = -1;
         onRow = false;

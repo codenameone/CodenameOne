@@ -428,9 +428,9 @@ Two things are decided when the SQLite engine itself is compiled, and Codename O
 one of those engines -- Android uses the platform's, the simulator uses the JDBC driver's, and iOS
 uses Apple's unless the application encrypts:
 
-* *Double quoted string literals*. `SELECT "value"` isn't valid SQL -- the double quotes make it
+* *Double-quoted string literals*. `SELECT "value"` isn't valid SQL -- the double quotes make it
 an identifier -- but SQLite has a compatibility mode that turns an unknown identifier into a
-string, and whether it's on is fixed at compile time with no pragma to change it. The Android
+string, and that mode is fixed when the engine is compiled, with no pragma to change it. The Android
 and Apple engines accept it; the simulator's driver rejects it with a message that tells you to
 use single quotes. Write string literals in single quotes and the question never arises. The
 engine Codename One bundles for Windows, Linux and encrypted iOS keeps SQLite's default, so

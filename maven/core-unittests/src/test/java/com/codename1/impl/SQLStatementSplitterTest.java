@@ -263,6 +263,27 @@ class SQLStatementSplitterTest {
     }
 
     @Test
+    void readsWhetherAStatementWrites() {
+        // Decides whether a cursor may re-execute its statement to move backwards. A write read as
+        // a query is run twice by an ordinary getCount(), so the wrong answer here costs data.
+        assertFalse(SQLStatementSplitter.writesData("SELECT * FROM t"));
+        assertFalse(SQLStatementSplitter.writesData(
+                "SELECT * FROM (SELECT id FROM t WHERE v = 'insert')"));
+        assertFalse(SQLStatementSplitter.writesData("WITH c AS (SELECT 1) SELECT * FROM c"));
+        assertFalse(SQLStatementSplitter.writesData("SELECT 'delete from t'"));
+        assertFalse(SQLStatementSplitter.writesData("SELECT \"update\" FROM t"));
+        assertFalse(SQLStatementSplitter.writesData("SELECT 1 -- insert into t\n"));
+
+        assertTrue(SQLStatementSplitter.writesData(
+                "INSERT INTO t (v) VALUES ('a') RETURNING id"));
+        assertTrue(SQLStatementSplitter.writesData("update t set v = 1 returning id"));
+        assertTrue(SQLStatementSplitter.writesData("DELETE FROM t RETURNING *"));
+        assertTrue(SQLStatementSplitter.writesData(
+                "WITH c AS (SELECT id FROM src) INSERT INTO t SELECT * FROM c RETURNING id"));
+        assertTrue(SQLStatementSplitter.writesData("CREATE TABLE t (id INTEGER)"));
+    }
+
+    @Test
     void treatsAStandaloneColonAsOrdinarySyntax() {
         // A colon with no name after it is not a parameter, so this stays countable.
         assertEquals(1, SQLStatementSplitter.countParameters(

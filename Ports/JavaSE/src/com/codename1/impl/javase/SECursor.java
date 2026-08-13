@@ -71,6 +71,12 @@ public class SECursor extends AbstractDBCursor {
         this.resultSet = resultSet;
     }
 
+    /// Lets the database that created this cursor pass on what the SQL does. The hook it
+    /// forwards to is protected, so only a subclass can reach it.
+    void statementWrites(boolean writes) {
+        noteStatementWrites(writes);
+    }
+
     @Override
     protected void rewind() throws IOException {
         if (statement == null) {

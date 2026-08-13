@@ -304,6 +304,113 @@ public final class SQLStatementSplitter {
         return largest;
     }
 
+    /// Keywords that make a statement change the database, at the top level of one statement.
+    ///
+    /// SQLite has no other way to say it from Java, and the answer decides whether a cursor over
+    /// the statement may re-execute it.
+    private static final String[] WRITING_KEYWORDS = {
+        "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "DROP", "ALTER", "VACUUM",
+        "REINDEX", "ATTACH", "DETACH", "ANALYZE"
+    };
+
+    /// Whether running this statement changes the database.
+    ///
+    /// Answered by scanning for one of the keywords above at bracket depth zero, outside quotes,
+    /// identifiers and comments -- so `SELECT ... FROM (SELECT ...)` is a read and
+    /// `WITH c AS (SELECT ...) INSERT INTO t SELECT * FROM c` is a write, because the INSERT is
+    /// the statement's own verb while everything inside the CTE is nested. A string that merely
+    /// contains the word, as in `SELECT 'insert'`, is skipped with the quotes.
+    ///
+    /// Wrong in the safe direction if it is wrong at all: a statement mistaken for a write loses
+    /// the ability to move backwards through its rows, while a write mistaken for a read would be
+    /// run a second time by an ordinary `getCount()`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: a single statement
+    ///
+    /// #### Returns
+    ///
+    /// true if the statement writes
+    public static boolean writesData(String sql) {
+        if (sql == null) {
+            return false;
+        }
+        int depth = 0;
+        int length = sql.length();
+        int iter = 0;
+        while (iter < length) {
+            char c = sql.charAt(iter);
+            if (c == '\'' || c == '"' || c == '`') {
+                iter = skipQuoted(sql, iter, c);
+                continue;
+            }
+            if (c == '[') {
+                iter = skipUntil(sql, iter + 1, ']');
+                continue;
+            }
+            if (c == '-' && iter + 1 < length && sql.charAt(iter + 1) == '-') {
+                iter = skipLineComment(sql, iter + 2);
+                continue;
+            }
+            if (c == '/' && iter + 1 < length && sql.charAt(iter + 1) == '*') {
+                iter = skipBlockComment(sql, iter + 2);
+                continue;
+            }
+            if (c == '(') {
+                depth++;
+                iter++;
+                continue;
+            }
+            if (c == ')') {
+                if (depth > 0) {
+                    depth--;
+                }
+                iter++;
+                continue;
+            }
+            if (isWordStart(c)) {
+                int end = iter;
+                while (end < length && isWordPart(sql.charAt(end))) {
+                    end++;
+                }
+                if (depth == 0 && isWritingKeyword(sql, iter, end)) {
+                    return true;
+                }
+                iter = end;
+                continue;
+            }
+            iter++;
+        }
+        return false;
+    }
+
+    /// Case insensitive over ASCII only, which is what SQLite folds for keywords.
+    private static boolean isWritingKeyword(String sql, int start, int end) {
+        int length = end - start;
+        for (int iter = 0; iter < WRITING_KEYWORDS.length; iter++) {
+            String keyword = WRITING_KEYWORDS[iter];
+            if (keyword.length() != length) {
+                continue;
+            }
+            boolean same = true;
+            for (int c = 0; c < length; c++) {
+                char actual = sql.charAt(start + c);
+                if (actual >= 'a' && actual <= 'z') {
+                    actual = (char) (actual - ('a' - 'A'));
+                }
+                if (actual != keyword.charAt(c)) {
+                    same = false;
+                    break;
+                }
+            }
+            if (same) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Whether a parameter name has already been seen.
     ///
     /// Names are compared exactly, including the leading sigil: SQLite treats `:x` and `@x` as

@@ -311,7 +311,7 @@ class WindowsDatabase extends Database {
             WindowsNative.sqlStmtFinalize(stmt);
             throw err;
         }
-        return register(new CursorImpl(stmt));
+        return register(new CursorImpl(stmt), sql);
     }
 
     @Override
@@ -320,7 +320,7 @@ class WindowsDatabase extends Database {
         requireSingleStatement(sql);
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         bindText(stmt, params);
-        return register(new CursorImpl(stmt));
+        return register(new CursorImpl(stmt), sql);
     }
 
     @Override
@@ -335,11 +335,15 @@ class WindowsDatabase extends Database {
         requireSingleStatement(sql);
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         bind(stmt, params);
-        return register(new CursorImpl(stmt));
+        return register(new CursorImpl(stmt), sql);
     }
 
-    private Cursor register(CursorImpl cursor) {
+    private Cursor register(CursorImpl cursor, String sql) {
         cursor.owner = this;
+        // A statement that writes must never be re-executed to move backwards: this cursor is
+        // stepped to run it, so a getCount() or last() would write again. The cursor refuses
+        // rather than doing it twice.
+        cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
         openCursors.add(cursor);
         return cursor;
     }
@@ -465,6 +469,12 @@ class WindowsDatabase extends Database {
                 }
             }
             invalidate();
+        }
+
+        /// Lets the database that created this cursor pass on what the SQL does. The hook it
+        /// forwards to is protected, so only a subclass can reach it.
+        void statementWrites(boolean writes) {
+            noteStatementWrites(writes);
         }
 
         @Override

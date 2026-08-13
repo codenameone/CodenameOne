@@ -306,7 +306,7 @@ class DatabaseImpl extends Database {
         requireSingleStatement(sql);
         long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
         bindText(stmt, params);
-        return register(new CursorImpl(stmt));
+        return register(new CursorImpl(stmt), sql);
     }
 
     @Override
@@ -324,7 +324,7 @@ class DatabaseImpl extends Database {
         }
         long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
         bind(stmt, params);
-        return register(new CursorImpl(stmt));
+        return register(new CursorImpl(stmt), sql);
     }
 
     @Override
@@ -333,7 +333,7 @@ class DatabaseImpl extends Database {
         requireSingleStatement(sql);
         if (isLegacyBehavior()) {
             return register(new CursorImpl(
-                    IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null)));
+                    IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null)), sql);
         }
         // Prepared rather than handed to sqlDbExecQuery, which binds nothing when given a null
         // argument array: a statement with placeholders would run with every slot left as NULL
@@ -347,11 +347,15 @@ class DatabaseImpl extends Database {
             IOSImplementation.nativeInstance.sqlStmtFinalize(stmt);
             throw err;
         }
-        return register(new CursorImpl(stmt));
+        return register(new CursorImpl(stmt), sql);
     }
 
-    private Cursor register(CursorImpl cursor) {
+    private Cursor register(CursorImpl cursor, String sql) {
         cursor.owner = this;
+        // A statement that writes must never be re-executed to move backwards: this cursor is
+        // stepped to run it, so a getCount() or last() would write again. The cursor refuses
+        // rather than doing it twice.
+        cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
         openCursors.addElement(cursor);
         return cursor;
     }
@@ -493,6 +497,12 @@ class DatabaseImpl extends Database {
                 }
             }
             invalidate();
+        }
+
+        /// Lets the database that created this cursor pass on what the SQL does. The hook it
+        /// forwards to is protected, so only a subclass can reach it.
+        void statementWrites(boolean writes) {
+            noteStatementWrites(writes);
         }
 
         @Override

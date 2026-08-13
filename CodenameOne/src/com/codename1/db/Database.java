@@ -237,7 +237,61 @@ public abstract class Database {
     /// - `IOException`: if database cannot be deleted
     public static void delete(String databaseName) throws IOException {
         validateDatabaseNameArgument(databaseName);
+        refuseDeleteWhileOpen(databaseName);
         Display.getInstance().delete(databaseName);
+    }
+
+    /// Refuses to delete a database something still has open.
+    ///
+    /// Deleting an open file succeeds on every platform with POSIX semantics -- iOS, Android and
+    /// the simulator all unlink it and leave the open handle attached to a file with no name. The
+    /// connection then reads and writes a database nobody can find, reopening the name creates a
+    /// different one, and everything written through the old handle goes away with it when it
+    /// closes. Nothing reports any of that.
+    ///
+    /// Checked here rather than in each port so the answer is the same everywhere, and against the
+    /// registry the ports already maintain for key changes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or path being deleted
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a connection to that database is still open
+    private static void refuseDeleteWhileOpen(String databaseName) throws IOException {
+        String key;
+        try {
+            key = normalizeDatabasePathKey(Display.getInstance().getDatabasePath(databaseName));
+        } catch (RuntimeException cannotResolve) {
+            // A port that will not resolve a name to a path cannot be checked this way; its own
+            // delete answers for it. The JavaScript port is the one that does this, and it counts
+            // its open databases itself.
+            return;
+        }
+        if (openDatabaseCount(key) > 0) {
+            throw new IOException("The database " + databaseName + " is still open. Close it "
+                    + "before deleting it: deleting an open database leaves the connection "
+                    + "attached to a file that no longer has a name, and everything written "
+                    + "through it afterwards is lost when it closes.");
+        }
+    }
+
+    /// How many connections are open on a registry key, for callers that only want to look.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: a normalized path, or null
+    ///
+    /// #### Returns
+    ///
+    /// the number of open connections, or 0 when the key is unknown
+    protected static synchronized int openDatabaseCount(String key) {
+        if (key == null) {
+            return 0;
+        }
+        Integer count = (Integer) OPEN_DATABASES.get(key);
+        return count == null ? 0 : count.intValue();
     }
 
     /// Returns the file path of the Database if exists and if supported on
