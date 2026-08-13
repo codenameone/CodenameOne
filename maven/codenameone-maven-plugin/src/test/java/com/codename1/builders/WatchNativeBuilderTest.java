@@ -1129,6 +1129,57 @@ class WatchNativeBuilderTest {
                 "the driver did not run to completion: " + out);
     }
 
+
+    /**
+     * The watch target gets an app icon of its own.
+     *
+     * <p>An iOS AppIcon set declares iPhone and iPad idioms, so it is filtered out of the catalog
+     * staged for the watch -- and nothing replaced it, which left every watch product iconless.
+     * Building, running and testing are unaffected; App Store submission is not, and that is the
+     * one place it cannot be worked around.</p>
+     */
+    @Test
+    void theWatchTargetCarriesItsOwnAppIcon(@TempDir Path tmp) throws Exception {
+        BuildRequest req = request();
+        req.putArgument("watchMain", WATCH_MAIN);
+        req.setIcon(pngBytes(96));
+        WatchNativeBuilder b = parse(req);
+        File appSrc = tmp.toFile();
+
+        b.writeWatchAppIcon(req, appSrc);
+        File set = new File(appSrc, "WatchImages.xcassets/AppIcon.appiconset");
+        assertTrue(new File(set, "AppIcon.png").isFile(), "the scaled icon is written");
+        String contents = new String(Files.readAllBytes(
+                new File(set, "Contents.json").toPath()), "UTF-8");
+        // The single-size form, not the per-device idiom list: that one has to enumerate every
+        // watch size ever shipped and needs a new entry for each new one.
+        assertTrue(contents.contains("\"platform\" : \"watchos\""), contents);
+        assertTrue(contents.contains("1024x1024"), contents);
+        assertTrue(new File(appSrc, "WatchImages.xcassets/Contents.json").isFile(),
+                "actool only treats the directory as a catalog when it has one");
+
+        String ruby = b.buildXcodeScript(req, tmp.toFile(), "1.0",
+                java.util.Arrays.asList("MyAppWatchStub.m"));
+        // Compiling the catalog is not enough. actool promotes a set to the app icon only when the
+        // target names it, and nothing named one for the watch.
+        assertTrue(ruby.contains("ASSETCATALOG_COMPILER_APPICON_NAME"), ruby);
+        assertTrue(ruby.contains("WatchImages.xcassets"), ruby);
+    }
+
+
+    /** A square PNG, so the icon scaler has something real to read. */
+    private static byte[] pngBytes(int size) throws IOException {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        g.setColor(java.awt.Color.BLUE);
+        g.fillRect(0, 0, size, size);
+        g.dispose();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "png", out);
+        return out.toByteArray();
+    }
+
     /** The {@code def NAME ... end} block for one generated helper. */
     private static String definitionOf(String ruby, String name) {
         java.util.regex.Matcher m = java.util.regex.Pattern

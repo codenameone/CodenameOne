@@ -478,6 +478,15 @@ class WatchNativeBuilder {
      */
     static final String WATCH_ASSET_STAGING_DIR = "cn1-watch-assets";
 
+    /**
+     * The watch target's own asset catalog, holding the app icon it cannot inherit.
+     *
+     * <p>Separate from the phone's Images.xcassets on purpose: that one carries the iOS AppIcon
+     * set, whose idioms mean nothing to watchOS, and the filter that keeps it off the watch is why
+     * the watch had no icon at all.</p>
+     */
+    static final String WATCH_ICON_CATALOG = "WatchImages.xcassets";
+
     /// The watch slice's prefix header, which must sit INSIDE the staged tree.
     static String watchPrefixHeader(String mainClass) {
         return translationRoot(mainClass) + "-Prefix.pch";
@@ -1290,6 +1299,7 @@ class WatchNativeBuilder {
                     new RuntimeException("watch health usage string unset"));
         }
         writeWatchEntitlements(request, appSrcDir, watchHealth);
+        writeWatchAppIcon(request, appSrcDir);
         File plist = new File(appSrcDir, request.getMainClass() + "-Watch-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
     }
@@ -1339,6 +1349,64 @@ class WatchNativeBuilder {
         }
         return distinctWatchMain
                 ? owner.watchRootWritesHealthData() : owner.phoneWritesHealthData();
+    }
+
+
+    /**
+     * Writes the watch target's app icon.
+     *
+     * <p>The watch cannot use the phone's. An iOS {@code AppIcon.appiconset} declares iPhone and
+     * iPad idioms, which is why it is filtered out of the catalog staged for the watch -- and
+     * nothing replaced it, so every watch product built here had no icon. That does not affect
+     * building, running or testing; it fails App Store submission, which is the one place it
+     * cannot be worked around, and it made the standalone watch product unshippable without
+     * hand-editing the generated project.</p>
+     *
+     * <p>One 1024x1024 image, in the single-size form Xcode has accepted since 14. The per-device
+     * idiom list it replaced had to enumerate every watch size ever shipped and needed a new entry
+     * for each new one; this form does not, and the deployment floor here is watchOS
+     * {@value #MIN_DEPLOYMENT_TARGET}, well past where it became valid.</p>
+     *
+     * <p>Scaled from the project's own icon, as the phone's is. A developer who wants a distinct
+     * watch icon replaces the set in the generated project, exactly as on iOS.</p>
+     */
+    void writeWatchAppIcon(BuildRequest request, File appSrcDir) throws java.io.IOException {
+        byte[] source = request.getIcon();
+        if (source == null || source.length == 0) {
+            // Nothing to scale. The phone build has already reported this; adding a second
+            // complaint about the watch would only bury it.
+            return;
+        }
+        File iconSet = new File(new File(appSrcDir, WATCH_ICON_CATALOG), "AppIcon.appiconset");
+        if (!iconSet.mkdirs() && !iconSet.isDirectory()) {
+            throw new java.io.IOException("could not create " + iconSet);
+        }
+        java.awt.image.BufferedImage icon = javax.imageio.ImageIO.read(
+                new java.io.ByteArrayInputStream(source));
+        // A source the decoder cannot read is the phone build's complaint to make, not ours.
+        if (icon == null) {
+            return;
+        }
+        owner.createIconFile(new File(iconSet, "AppIcon.png"), icon, 1024, 1024);
+        owner.createFile(new File(iconSet, "Contents.json"),
+                ("{\n"
+                + "  \"images\" : [\n"
+                + "    {\n"
+                + "      \"filename\" : \"AppIcon.png\",\n"
+                + "      \"idiom\" : \"universal\",\n"
+                + "      \"platform\" : \"watchos\",\n"
+                + "      \"size\" : \"1024x1024\"\n"
+                + "    }\n"
+                + "  ],\n"
+                + "  \"info\" : {\n"
+                + "    \"author\" : \"xcode\",\n"
+                + "    \"version\" : 1\n"
+                + "  }\n"
+                + "}\n").getBytes(StandardCharsets.UTF_8));
+        // The catalog itself needs one too, or actool does not treat the directory as a catalog.
+        owner.createFile(new File(appSrcDir, WATCH_ICON_CATALOG + "/Contents.json"),
+                ("{\n  \"info\" : {\n    \"author\" : \"xcode\",\n"
+                + "    \"version\" : 1\n  }\n}\n").getBytes(StandardCharsets.UTF_8));
     }
 
     /** The value with surrounding space removed, or null when empty. */
@@ -1771,7 +1839,12 @@ class WatchNativeBuilder {
                 // Build settings for the watch slice.
                 .append("watch_target.build_configurations.each do |config|\n")
                 .append("  bs = config.build_settings\n")
-                .append("  bs['SDKROOT'] = 'watchos'\n");
+                .append("  bs['SDKROOT'] = 'watchos'\n")
+                // Without this the catalog compiles and its icon is still not the app's -- actool
+                // only promotes a set to the app icon when the target names it. Nothing named one
+                // for the watch, so every watch product built here shipped iconless and could not
+                // be submitted.
+                .append("  bs['ASSETCATALOG_COMPILER_APPICON_NAME'] = 'AppIcon'\n");
         s                // arm64_32 is the watchOS *device* ABI; the watch *simulator*
                 // on Apple Silicon is arm64 (and x86_64 on Intel). Set the arch
                 // per-SDK so the simulator build doesn't try arm64_32 (whose
@@ -2650,6 +2723,20 @@ class WatchNativeBuilder {
                 .append("    return nil\n")
                 .append("  end\n")
                 .append("  dest\n")
+                .append("end\n");
+
+        // The watch's own catalog, carrying the icon it cannot take from the phone. Added before
+        // the phone's resources are walked so a project with no catalog at all still gets one.
+        s.append("watch_icon_rel = '")
+                .append(IPhoneBuilder.escapeRubyStr(WATCH_ICON_CATALOG)).append("'\n")
+                .append("watch_icon_dir = File.join(File.dirname(xcproj.path.to_s), "
+                        + "watch_icon_rel)\n")
+                .append("if File.directory?(watch_icon_dir)\n")
+                .append("  icon_ref = xcproj.main_group.new_reference(watch_icon_rel)\n")
+                .append("  unless watch_target.resources_build_phase.files_references"
+                        + ".include?(icon_ref)\n")
+                .append("    watch_target.resources_build_phase.add_file_reference(icon_ref)\n")
+                .append("  end\n")
                 .append("end\n");
 
         s.append("res_skip = %w[.storyboard .xib]\n")
