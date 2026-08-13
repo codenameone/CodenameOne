@@ -1513,6 +1513,13 @@ public class CN1WearableBridge implements WearableBridge {
                         public void run() {
                             releaseSpooled(c, key);
                         }
+                    }, key == null ? null
+                    : new Runnable() {
+                        public void run() {
+                            // The cap discarded it. The spooled copy is still the truth, so only
+                            // the in-process claim is dropped and a later drain replays it.
+                            unclaimSpooled(c, key);
+                        }
                     });
             return;
         }
@@ -1767,6 +1774,13 @@ public class CN1WearableBridge implements WearableBridge {
                 public void run() {
                     releaseSpooled(c, claimed);
                 }
+            }, new Runnable() {
+                public void run() {
+                    // EVICTED, not delivered. The record stays on disk -- nothing received it --
+                    // but the in-flight claim has to go, or no drain in this process can pick it
+                    // up again and it waits for a restart. See deliverMessage's dropped callback.
+                    unclaimSpooled(c, claimed);
+                }
             });
             replayed = true;
         }
@@ -1904,6 +1918,45 @@ public class CN1WearableBridge implements WearableBridge {
         }
     }
 
+    /// Gives a claimed record back, undelivered, so a later drain can take it.
+    ///
+    /// The opposite end of {@link #releaseSpooled}: that one is told the listeners have HAD the
+    /// record and deletes it. This one is told the queue cap threw the delivery away before any
+    /// listener ran, so the record must survive -- only the in-process claim goes.
+    ///
+    /// The attempt is refunded with it. The budget bounds a record that keeps killing the process,
+    /// and an eviction is the opposite of that: it is an observed, reported event on a process that
+    /// is plainly still alive, and the delivery never reached application code. Charging for it let
+    /// a burst past the queue cap spend a record's whole budget and delete it having never once
+    /// been seen -- the loss the budget was written to bound, caused by the budget.
+    private static void unclaimSpooled(Context context, String key) {
+        Context c = spoolContext(context);
+        if (c == null) {
+            return;
+        }
+        synchronized (SPOOL_LOCK) {
+            try {
+                android.content.SharedPreferences prefs =
+                        c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
+                String record = prefs.getString(key, null);
+                if (record != null) {
+                    int attempts = attemptsOf(record) - 1;
+                    if (attempts < 0) {
+                        attempts = 0;
+                    }
+                    prefs.edit().putString(key, attempts + "|" + bodyOf(record)).commit();
+                }
+                // Released whether or not the refund landed. Leaving it claimed is the one
+                // outcome that strands the record for the life of the process.
+                SPOOL_IN_FLIGHT.remove(key);
+                // So the owner looks again rather than finishing on a stale count.
+                spoolDirty = true;
+            } catch (Throwable unavailable) {
+                SPOOL_IN_FLIGHT.remove(key);
+            }
+        }
+    }
+
     /// Whether a listener of the kind this record needs is registered right now.
     private static boolean listenerExistsFor(String body) {
         try {
@@ -1944,7 +1997,7 @@ public class CN1WearableBridge implements WearableBridge {
         return record.substring(bar + 1);
     }
 
-    private static void replaySpooled(String record, Runnable delivered) {
+    private static void replaySpooled(String record, Runnable delivered, Runnable dropped) {
         int first = record.indexOf('|');
         int second = first < 0 ? -1 : record.indexOf('|', first + 1);
         if (first < 0 || second < 0) {
@@ -1955,12 +2008,12 @@ public class CN1WearableBridge implements WearableBridge {
         String encoded = record.substring(second + 1);
         try {
             if (SPOOL_REMOVAL.equals(kind)) {
-                WearableConnection.deliverDataRemoved(path, delivered);
+                WearableConnection.deliverDataRemoved(path, delivered, dropped);
                 return;
             }
             byte[] payload = encoded.length() == 0 ? new byte[0]
                     : android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP);
-            WearableConnection.deliverMessage(path, payload, 0, delivered);
+            WearableConnection.deliverMessage(path, payload, 0, delivered, dropped);
         } catch (Throwable unreadable) {
             // A record this build cannot parse is dropped rather than retried forever.
         }

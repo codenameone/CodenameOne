@@ -583,6 +583,37 @@ public final class WearableConnection {
     /// - `delivered`: run after the listeners have seen it, or null
     public static void deliverMessage(final String path, final byte[] payload,
             final int replyToken, final Runnable delivered) {
+        deliverMessage(path, payload, replyToken, delivered, null);
+    }
+
+    /// The same, telling the port when the cap discarded the delivery instead of running it.
+    ///
+    /// A durable message needs BOTH callbacks or neither is safe. `delivered` says the listeners
+    /// saw it, so the record can go; `dropped` says the queue cap evicted it, so the record must
+    /// stay AND the port's in-process claim has to be released, or nothing will ever claim that
+    /// record again in this process.
+    ///
+    /// Without `dropped` the message was parked as an ordinary runnable, which is what
+    /// [#evictOne] discards first and silently. A spool drain that queued more than the cap while
+    /// a listener existed -- and then lost that listener before the EDT ran the batch, an app
+    /// deregistering on pause -- had every re-parked message reach that path: evicted with no
+    /// callback of any kind, so the record stayed on disk marked in-flight, unclaimable until the
+    /// process restarted, having burned an attempt from its budget for a delivery no application
+    /// code ever saw.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path the message arrived on
+    /// - `payload`: the encoded payload
+    /// - `replyToken`: a positive token when the peer is waiting for an answer, otherwise 0
+    /// - `delivered`: run after the listeners have seen it, or null
+    /// - `dropped`: run when the cap evicted this delivery undelivered, or null
+    public static void deliverMessage(final String path, final byte[] payload,
+            final int replyToken, final Runnable delivered, final Runnable dropped) {
+        // A message the port has written down is a one-shot by definition: this process holds the
+        // only in-memory copy, and the durable record behind it is claimed. Marking it so is what
+        // moves it to the BACK of the eviction order, behind everything replaceable.
+        final boolean durable = delivered != null || dropped != null;
         deliver(new Runnable() {
             @Override
             public void run() {
@@ -596,7 +627,10 @@ public final class WearableConnection {
                     // run through: nobody received the message, so the port must NOT be told it
                     // was delivered. It would release its durable record on that word and the
                     // one-shot would be gone, which is the failure the record exists to prevent.
-                    deliver(this, messageListeners, pendingMessages);
+                    // Re-parked with its one-shot marking and its dropped callback intact.
+                    // Handing it back as a plain runnable stripped both, so the cap discarded it
+                    // first and told nobody -- see the note on the dropped parameter.
+                    deliver(this, messageListeners, pendingMessages, dropped, durable);
                     return;
                 }
                 // Isolated per listener, as every other dispatch here is. A live message cannot be
@@ -638,7 +672,7 @@ public final class WearableConnection {
                     throw failure;
                 }
             }
-        }, messageListeners, pendingMessages);
+        }, messageListeners, pendingMessages, dropped, durable);
     }
 
     /// Framework/port entry point: hands the peer's answer to the waiting reply handler. Called by
@@ -814,6 +848,23 @@ public final class WearableConnection {
     /// - `path`: the path whose value was removed
     /// - `delivered`: run after the listeners have seen it, or null
     public static void deliverDataRemoved(final String path, final Runnable delivered) {
+        deliverDataRemoved(path, delivered, null);
+    }
+
+    /// The same, telling the port when the cap discarded the removal instead of running it.
+    ///
+    /// See [#deliverMessage(String,byte[],int,Runnable,Runnable)]. The listener side of an evicted
+    /// removal is already covered -- the drain re-announces it by path -- but a port holding the
+    /// removal in a durable spool is not: that re-announcement carries no callback, so its record
+    /// stays claimed and undeliverable for the life of the process.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path whose value was removed
+    /// - `delivered`: run after the listeners have seen it, or null
+    /// - `dropped`: run when the cap evicted this delivery undelivered, or null
+    public static void deliverDataRemoved(final String path, final Runnable delivered,
+            final Runnable dropped) {
         deliverTagged(path, new Runnable() {
             @Override
             public void run() {
@@ -821,7 +872,7 @@ public final class WearableConnection {
                 if (copy.length == 0) {
                     // Same gap as deliverDataChanged, and worse for a removal: the item is gone, so
                     // there is nothing left for any later enumeration to find. Park it.
-                    deliverTagged(path, this, true);
+                    deliverTagged(path, this, true, dropped);
                     return;
                 }
                 // Isolated per listener, as the tracked delivery is, and for a sharper reason: a
@@ -846,7 +897,7 @@ public final class WearableConnection {
                     throw failure;
                 }
             }
-        }, true);
+        }, true, dropped);
     }
 
     /// Framework/port entry point: reports that reachability, pairing or peer-app installation
@@ -902,7 +953,12 @@ public final class WearableConnection {
     }
 
     private static void deliverTagged(String path, Runnable delivery, boolean removal) {
-        deliver(delivery, dataListeners, pendingData, null, false, path, removal, true);
+        deliverTagged(path, delivery, removal, null);
+    }
+
+    private static void deliverTagged(String path, Runnable delivery, boolean removal,
+            Runnable onDropped) {
+        deliver(delivery, dataListeners, pendingData, onDropped, false, path, removal, true);
     }
 
     /// Runs a delivery on the EDT, or parks it until a listener exists.
@@ -963,7 +1019,8 @@ public final class WearableConnection {
                     }
                 }
                 queue.add(oneShot ? new OneShot(delivery, onDropped)
-                        : (path != null ? new Replicated(delivery, path, removal) : delivery));
+                        : (path != null ? new Replicated(delivery, path, removal, onDropped)
+                                : delivery));
                 if (path != null) {
                     // Any recovery record for THIS path is now obsolete: the delivery just parked
                     // is a newer statement about it than the one that was discarded.
@@ -1018,7 +1075,9 @@ public final class WearableConnection {
                 if (parked instanceof Replicated
                         && incomingPath.equals(((Replicated) parked).path)) {
                     queue.remove(i);
-                    return null;
+                    // Superseded is still not delivered. A port with a durable copy has to hear
+                    // so, or its claim outlives the delivery it was taken for.
+                    return ((Replicated) parked).onDropped;
                 }
             }
         }
@@ -1038,6 +1097,7 @@ public final class WearableConnection {
                     } else {
                         droppedPaths.add(r.path);
                     }
+                    return r.onDropped;
                 }
                 return null;
             }
@@ -1052,11 +1112,20 @@ public final class WearableConnection {
         final String path;
         /// Whether this parked delivery was a removal rather than a value change.
         final boolean removal;
+        /// Releases the port's in-process claim when the cap discards this one, or null.
+        ///
+        /// A removal is re-announced after an eviction, so the LISTENER recovers -- but a port
+        /// holding the removal in a durable spool does not. Its confirmation runs only when
+        /// listeners actually see the delivery, and the re-announcement goes through the plain
+        /// entry point carrying no callback, so the record stayed on disk still marked in flight:
+        /// unclaimable for the life of the process.
+        final Runnable onDropped;
 
-        Replicated(Runnable delivery, String path, boolean removal) {
+        Replicated(Runnable delivery, String path, boolean removal, Runnable onDropped) {
             this.delivery = delivery;
             this.path = path;
             this.removal = removal;
+            this.onDropped = onDropped;
         }
 
         @Override
