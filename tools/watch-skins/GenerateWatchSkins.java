@@ -47,11 +47,22 @@ import javax.imageio.ImageIO;
  *   java  -cp /tmp/wskin GenerateWatchSkins path/to/iPhoneX.skin outDir Themes/AndroidMaterialTheme.res
  */
 public class GenerateWatchSkins {
-    /// Corner radius of the drawn display on a non-circular face, in pixels.
+    /// Corner radius of the drawn display on a non-circular face, as a fraction of the short edge.
+    ///
+    /// A ratio rather than a pixel count, because the skins are no longer all in one coordinate
+    /// space: the Apple models are in logical points and the Wear ones in pixels, and a constant
+    /// 28 meant one of the two got a corner twice the size it should be. The same ratio is used by
+    /// CN1WatchHost to derive the device's safe area, so the simulator and the watch agree about
+    /// where the curve is.
+    static final double DISPLAY_CORNER_RADIUS_RATIO = 0.0707;
+
+    /// The drawn corner radius for one model, in that model's own units.
     ///
     /// Named because two things depend on it and they must not drift: the artwork that draws the
     /// rounded display, and the safe-area inset that keeps content inside it.
-    static final int DISPLAY_CORNER_RADIUS = 28;
+    static int cornerRadius(int dw, int dh) {
+        return (int) Math.round(DISPLAY_CORNER_RADIUS_RATIO * Math.min(dw, dh));
+    }
 
     static class Model {
         final String file, label;
@@ -99,10 +110,14 @@ public class GenerateWatchSkins {
         byte[] androidTheme = readFully(androidThemeFile);
 
         Model[] models = new Model[] {
-            // Apple Watch logical point resolutions.
-            new Model("AppleWatch41mm.skin", "Apple Watch 41mm", 352, 430, false,
+            // Apple Watch LOGICAL POINTS, which is what the watch host reports as the CN1
+            // display size: scaleValue is 1 on the watch slice, so getDisplayWidthImpl returns
+            // CN1WatchRenderingView.logicalWidth() unscaled. These were the Retina pixel
+            // dimensions -- 352x430 and 396x484 -- so the simulator offered twice the space on
+            // each axis and a layout that fitted here could reflow or clip on the device.
+            new Model("AppleWatch41mm.skin", "Apple Watch 41mm", 176, 215, false,
                     "ios", "watch,ios,applewatch", IOS_THEME),
-            new Model("AppleWatch45mm.skin", "Apple Watch 45mm", 396, 484, false,
+            new Model("AppleWatch45mm.skin", "Apple Watch 45mm", 198, 242, false,
                     "ios", "watch,ios,applewatch", IOS_THEME),
             // Wear OS. The round face is the one worth designing against: it is what most Wear
             // hardware ships and it is where a layout that assumes a rectangle falls apart.
@@ -119,8 +134,12 @@ public class GenerateWatchSkins {
     }
 
     static void generate(Model m, byte[] themeRes, File outDir) throws Exception {
-        // Bezel margins around the display; the crown sits on the right edge.
-        int marginX = 70, marginTop = 90, marginBottom = 90;
+        // Bezel margins around the display; the crown sits on the right edge. Proportional, not
+        // fixed: 70/90 was chosen against a 396-wide model, and once the Apple models moved to
+        // points that same border was a third of the image.
+        int marginX = Math.max(24, Math.round(m.dw * 0.177f));
+        int marginTop = Math.max(30, Math.round(m.dh * 0.186f));
+        int marginBottom = marginTop;
         int imgW = m.dw + marginX * 2;
         int imgH = m.dh + marginTop + marginBottom;
         int displayX = marginX;
@@ -157,8 +176,8 @@ public class GenerateWatchSkins {
         if (m.circular) {
             g.fillOval(displayX, displayY, m.dw, m.dh);
         } else {
-            g.fill(new RoundRectangle2D.Float(displayX, displayY, m.dw, m.dh,
-                    DISPLAY_CORNER_RADIUS * 2, DISPLAY_CORNER_RADIUS * 2));
+            int r = cornerRadius(m.dw, m.dh);
+            g.fill(new RoundRectangle2D.Float(displayX, displayY, m.dw, m.dh, r * 2, r * 2));
         }
         g.dispose();
 
@@ -218,7 +237,7 @@ public class GenerateWatchSkins {
         // shipped size, and shrinking it to the geometric minimum would hand back margin that the
         // bezel curve does not actually leave usable.
         int cornerInset = m.circular ? 0
-                : (int) Math.ceil(DISPLAY_CORNER_RADIUS * (1.0 - 1.0 / Math.sqrt(2.0)));
+                : (int) Math.ceil(cornerRadius(m.dw, m.dh) * (1.0 - 1.0 / Math.sqrt(2.0)));
         int inset = Math.max(cornerInset, Math.round(m.dh * (m.circular ? 0.15f : 0.06f)));
         int insetX = m.circular ? Math.round(m.dw * 0.15f) : cornerInset;
         StringBuilder p = new StringBuilder();
@@ -228,9 +247,16 @@ public class GenerateWatchSkins {
         p.append("smallFontSize=").append(Math.round(m.dw * 0.045f)).append('\n');
         p.append("mediumFontSize=").append(Math.round(m.dw * 0.06f)).append('\n');
         p.append("largeFontSize=").append(Math.round(m.dw * 0.08f)).append('\n');
-        p.append("systemFontFamily=Helvetica Neue\n");
-        p.append("proportionalFontFamily=Helvetica Neue\n");
-        p.append("monospaceFontFamily=Courier\n");
+        // Helvetica is what makes JavaSEPort.loadSkinFile set its internal isIOS flag, whatever
+        // platformName says -- so a Wear skin declaring it resolved native:* faces through the iOS
+        // font candidates and previewed Wear text in Apple typography, with Apple metrics, against
+        // an archive carrying the Android Material theme.
+        boolean android = ANDROID_THEME.equals(m.themeEntry);
+        p.append("systemFontFamily=").append(android ? "Roboto" : "Helvetica Neue").append('\n');
+        p.append("proportionalFontFamily=").append(android ? "Roboto" : "Helvetica Neue")
+                .append('\n');
+        p.append("monospaceFontFamily=").append(android ? "Droid Sans Mono" : "Courier")
+                .append('\n');
         p.append("keyboardType=3\n");
         p.append("softbuttonCount=0\n");
         p.append("platformName=").append(m.platformName).append('\n');

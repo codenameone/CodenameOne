@@ -146,22 +146,31 @@ public class WatchSkinCoordinateMapTest {
      */
     private void assertCornersInsideRoundedRect(String skinName, int dw, int dh,
             int x, int y, int w, int h) {
+        final int radius = cornerRadius(dw, dh);
         int[][] insets = {{x, y}, {dw - (x + w), y}, {x, dh - (y + h)},
             {dw - (x + w), dh - (y + h)}};
         for (int[] i : insets) {
             double dx = i[0];
             double dy = i[1];
-            boolean inside = dx >= DISPLAY_CORNER_RADIUS || dy >= DISPLAY_CORNER_RADIUS
-                    || Math.pow(DISPLAY_CORNER_RADIUS - dx, 2)
-                            + Math.pow(DISPLAY_CORNER_RADIUS - dy, 2)
-                        <= DISPLAY_CORNER_RADIUS * DISPLAY_CORNER_RADIUS + 0.01;
+            boolean inside = dx >= radius || dy >= radius
+                    || Math.pow(radius - dx, 2) + Math.pow(radius - dy, 2)
+                        <= radius * radius + 0.01;
             assertTrue(inside, skinName + " safe area corner inset (" + i[0] + "," + i[1]
-                    + ") falls outside the rounded display, radius " + DISPLAY_CORNER_RADIUS);
+                    + ") falls outside the rounded display, radius " + radius);
         }
     }
 
-    /** Mirrors GenerateWatchSkins.DISPLAY_CORNER_RADIUS -- the radius the artwork is drawn with. */
-    private static final int DISPLAY_CORNER_RADIUS = 28;
+    /**
+     * Mirrors GenerateWatchSkins.cornerRadius -- the radius the artwork is drawn with.
+     *
+     * <p>Derived per skin rather than fixed. The skins are not all in one coordinate space: the
+     * Apple models are in logical points, which is what the watch host reports as the display
+     * size, and the Wear ones are in pixels. A single constant gave one of the two a corner twice
+     * the size it is drawn with.</p>
+     */
+    private static int cornerRadius(int dw, int dh) {
+        return (int) Math.round(0.0707 * Math.min(dw, dh));
+    }
 
     /**
      * The landscape metadata has to describe the artwork the skin actually ships.

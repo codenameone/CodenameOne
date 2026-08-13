@@ -44,8 +44,13 @@ public class CN1WearableListenerService extends WearableListenerService {
     /**
      * The service has to be exported for Play services to bind it, and there is no binding
      * permission that would narrow that to Play services alone. So rather than trust the caller,
-     * every event is checked against the nodes the Data Layer has actually reported: a crafted intent
-     * from another app on the device carries a source node that was never among them and is dropped.
+     * every event is checked against the nodes the Data Layer has actually reported.
+     *
+     * <p>This narrows who can be impersonated; it does not authenticate anyone. A node id is not a
+     * secret -- any app on the device can list the local and connected nodes through its own Data
+     * Layer client and then present one here. What cannot be faked is the item itself, so a data
+     * CHANGE is additionally confirmed to exist in our namespace; see {@code dataItemExists} for
+     * what that covers and what it does not.
      *
      * <p>The check is against a recent snapshot rather than a fresh query, so a peer that drops off
      * between Play services queueing the callback and the check running does not cost us a message
@@ -62,6 +67,50 @@ public class CN1WearableListenerService extends WearableListenerService {
      */
     private boolean isFromAKnownHost(android.net.Uri uri) {
         return uri != null && isFromAKnownNode(uri.getHost());
+    }
+
+    /**
+     * Whether this data item is really in our Data Layer, rather than merely claimed to be.
+     *
+     * <p>A node id authenticates nothing. It is not a secret: any app on this device can open its
+     * own Data Layer client, list the local and connected nodes, and then bind this exported
+     * service and hand it a forged event carrying an id {@link #isFromAKnownNode} accepts. The
+     * membership check narrows who can be impersonated; it cannot establish who is calling, and
+     * there is no bind permission Play services holds that would.</p>
+     *
+     * <p>The item itself can be checked, though, and that is a real answer. Data Layer items live
+     * in the writing package's namespace, so nothing outside this app -- on this device or a paired
+     * one -- can put one at this uri. Reading it back through OUR client and finding it there is
+     * proof the event describes something that actually happened, whoever delivered the news.</p>
+     *
+     * <p>A deletion has nothing left to read, so it cannot be confirmed this way and falls back to
+     * the membership check. So does a message: {@code MessageClient} is transient by design and
+     * leaves no record to verify against. Both remain forgeable by a hostile app already installed
+     * on the device, and the app-facing consequence is a spurious callback -- which is why this
+     * one is worth closing and why the limit of the other two is written down here rather than
+     * left to be rediscovered.</p>
+     */
+    private boolean dataItemExists(android.net.Uri uri) {
+        if (uri == null) {
+            return false;
+        }
+        try {
+            com.google.android.gms.wearable.DataItemBuffer items =
+                    com.google.android.gms.tasks.Tasks.await(
+                            com.google.android.gms.wearable.Wearable.getDataClient(this)
+                                    .getDataItems(uri),
+                            10, java.util.concurrent.TimeUnit.SECONDS);
+            try {
+                return items.getCount() > 0;
+            } finally {
+                items.release();
+            }
+        } catch (Throwable unavailable) {
+            // The query failed rather than answered. Falling back to the membership check keeps a
+            // genuine event from being dropped because Play services was briefly unavailable --
+            // this is defence in depth over that check, not a replacement for it.
+            return true;
+        }
     }
 
     /**
@@ -241,13 +290,21 @@ public class CN1WearableListenerService extends WearableListenerService {
             // Never an app-visible callback: it is bookkeeping between the two ports, on a path no
             // application ever names.
             if (path != null && CN1WearableBridge.ackedTransferKey(path) != null) {
-                if (isFromAKnownHost(uri) && event.getType() != DataEvent.TYPE_DELETED) {
+                if (isFromAKnownHost(uri) && event.getType() != DataEvent.TYPE_DELETED
+                        && dataItemExists(uri)) {
                     CN1WearableBridge.sweepAfterAcknowledgement(getApplicationContext());
                 }
                 continue;
             }
             if (path == null || !isFromAKnownHost(uri)
                     || (!transferItem && !path.startsWith(CN1WearableBridge.pathPrefix()))) {
+                continue;
+            }
+            // And, for a change, that the item is really there. See dataItemExists: the node id in
+            // the event is not a secret and does not authenticate anyone, but nothing outside this
+            // app can put an item at this uri, so reading it back is proof the change happened. A
+            // deletion has nothing left to read and keeps the membership check alone.
+            if (event.getType() != DataEvent.TYPE_DELETED && !dataItemExists(uri)) {
                 continue;
             }
             // Computed AFTER the provenance check, not before it. isFromAKnownHost retries the
