@@ -310,7 +310,23 @@ public final class SQLStatementSplitter {
     /// the statement may re-execute it.
     private static final String[] WRITING_KEYWORDS = {
         "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "DROP", "ALTER", "VACUUM",
-        "REINDEX", "ATTACH", "DETACH", "ANALYZE"
+        "REINDEX", "ATTACH", "DETACH", "ANALYZE", "PRAGMA"
+    };
+
+    /// The pragmas that only report, and so may be walked backwards like any query.
+    ///
+    /// PRAGMA is counted as a write above because most of them are one -- `incremental_vacuum`
+    /// moves pages, `wal_checkpoint` writes the log back, `optimize` builds statistics, and any
+    /// `PRAGMA x = y` sets something. Running one of those a second time because a cursor was
+    /// asked for its row count is exactly the hazard this rule exists for. The list below is the
+    /// other kind: schema and diagnostic readers an application does iterate, which lose nothing
+    /// by being run again. An unlisted pragma is treated as a write, which costs backward
+    /// movement rather than data.
+    private static final String[] READING_PRAGMAS = {
+        "TABLE_INFO", "TABLE_XINFO", "TABLE_LIST", "INDEX_INFO", "INDEX_XINFO", "INDEX_LIST",
+        "FOREIGN_KEY_LIST", "FOREIGN_KEY_CHECK", "DATABASE_LIST", "COLLATION_LIST",
+        "FUNCTION_LIST", "MODULE_LIST", "PRAGMA_LIST", "COMPILE_OPTIONS", "INTEGRITY_CHECK",
+        "QUICK_CHECK", "FREELIST_COUNT", "PAGE_COUNT", "DATA_VERSION", "CIPHER_VERSION"
     };
 
     /// Whether running this statement changes the database.
@@ -375,6 +391,9 @@ public final class SQLStatementSplitter {
                     end++;
                 }
                 if (depth == 0 && isWritingKeyword(sql, iter, end)) {
+                    if (isPragmaKeyword(sql, iter, end)) {
+                        return !readsOnly(sql, end);
+                    }
                     return true;
                 }
                 iter = end;
@@ -385,30 +404,76 @@ public final class SQLStatementSplitter {
         return false;
     }
 
-    /// Case insensitive over ASCII only, which is what SQLite folds for keywords.
-    private static boolean isWritingKeyword(String sql, int start, int end) {
-        int length = end - start;
-        for (int iter = 0; iter < WRITING_KEYWORDS.length; iter++) {
-            String keyword = WRITING_KEYWORDS[iter];
-            if (keyword.length() != length) {
-                continue;
+    /// Whether the word just read is PRAGMA.
+    private static boolean isPragmaKeyword(String sql, int start, int end) {
+        return end - start == 6 && matchesKeyword(sql, start, end, "PRAGMA");
+    }
+
+    /// Whether a PRAGMA only reports, judged from the name that follows it.
+    ///
+    /// A pragma with a value assigned to it sets something, whatever its name, so `= ` anywhere
+    /// after the name settles it before the list is consulted.
+    private static boolean readsOnly(String sql, int afterPragma) {
+        int length = sql.length();
+        int iter = afterPragma;
+        while (iter < length && (sql.charAt(iter) == ' ' || sql.charAt(iter) == '\t'
+                || sql.charAt(iter) == '\n' || sql.charAt(iter) == '\r')) {
+            iter++;
+        }
+        // An optional schema prefix: "PRAGMA main.page_count" names the same pragma.
+        int nameStart = iter;
+        while (iter < length && isWordPart(sql.charAt(iter))) {
+            iter++;
+        }
+        if (iter < length && sql.charAt(iter) == '.') {
+            iter++;
+            nameStart = iter;
+            while (iter < length && isWordPart(sql.charAt(iter))) {
+                iter++;
             }
-            boolean same = true;
-            for (int c = 0; c < length; c++) {
-                char actual = sql.charAt(start + c);
-                if (actual >= 'a' && actual <= 'z') {
-                    actual = (char) (actual - ('a' - 'A'));
-                }
-                if (actual != keyword.charAt(c)) {
-                    same = false;
-                    break;
-                }
-            }
-            if (same) {
+        }
+        int nameEnd = iter;
+        while (iter < length && (sql.charAt(iter) == ' ' || sql.charAt(iter) == '\t'
+                || sql.charAt(iter) == '\n' || sql.charAt(iter) == '\r')) {
+            iter++;
+        }
+        if (iter < length && sql.charAt(iter) == '=') {
+            return false;
+        }
+        for (String pragma : READING_PRAGMAS) {
+            if (pragma.length() == nameEnd - nameStart
+                    && matchesKeyword(sql, nameStart, nameEnd, pragma)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /// Case insensitive over ASCII only, which is what SQLite folds for keywords.
+    private static boolean isWritingKeyword(String sql, int start, int end) {
+        for (String keyword : WRITING_KEYWORDS) {
+            if (keyword.length() == end - start && matchesKeyword(sql, start, end, keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Compares a slice of the statement with a keyword, folding ASCII case as SQLite does.
+    private static boolean matchesKeyword(String sql, int start, int end, String keyword) {
+        if (keyword.length() != end - start) {
+            return false;
+        }
+        for (int c = 0; c < keyword.length(); c++) {
+            char actual = sql.charAt(start + c);
+            if (actual >= 'a' && actual <= 'z') {
+                actual = (char) (actual - ('a' - 'A'));
+            }
+            if (actual != keyword.charAt(c)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// Whether a parameter name has already been seen.

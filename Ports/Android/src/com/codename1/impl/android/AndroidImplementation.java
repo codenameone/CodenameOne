@@ -11378,7 +11378,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// How many connections are open on a database file, encrypted or not.
-    public static synchronized int openDatabaseConnections(String rawPath) {
+    public static synchronized int connectionsOpenOn(String rawPath) {
         Integer count = OPEN_DATABASE_CONNECTIONS.get(databaseKey(rawPath));
         return count == null ? 0 : count.intValue();
     }
@@ -11731,6 +11731,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
 
+
+    /// How many connections this port has open on a database, for the delete guard in core.
+    ///
+    /// This port counts connections in its own registry rather than the base class's, because the
+    /// conversion that consults them runs here. Answering from it is what makes
+    /// `Database.delete(String)` refuse on Android as it does everywhere else.
+    @Override
+    public int openDatabaseConnections(String databaseName) {
+        try {
+            return connectionsOpenOn(resolveNativeDatabasePath(databaseName));
+        } catch (RuntimeException cannotResolve) {
+            // An unresolvable name cannot be matched against the registry. Reporting none leaves
+            // the delete to the checks below rather than refusing something that may be fine.
+            return 0;
+        }
+    }
 
     @Override
     public void deleteDB(String databaseName) throws IOException {

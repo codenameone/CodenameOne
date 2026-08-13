@@ -462,9 +462,33 @@ public class SEDatabase extends Database {
                 // Satisfied rather than failed, for the reason given on the Android port: the
                 // engine ended the transaction and discarded its work as the statement failed,
                 // which is what rolling back asks for.
+                //
+                // The driver is a layer above that engine and does not know any of it happened:
+                // its autocommit flag is still false, so without this the connection stays
+                // outside autocommit forever. The next beginTransaction() would set a flag that
+                // is already set and report a transaction the engine never opened, and
+                // changeKey() reads getAutoCommit() directly and would refuse for good.
+                restoreAutoCommit();
                 return;
             }
             throw new IOException(ex.getMessage(), ex);
+        }
+    }
+
+    /// Puts the connection back into autocommit after the engine ended a transaction on its own.
+    ///
+    /// Best effort: this runs while a failure is already being handled, and a connection that
+    /// will not take the flag back has a problem no exception from here would describe better.
+    private void restoreAutoCommit() {
+        if (isLegacyBehavior()) {
+            // Under the hint the connection is left outside autocommit, which is what this port
+            // used to do after a rollback.
+            return;
+        }
+        try {
+            conn.setAutoCommit(true);
+        } catch (SQLException cannotRestore) {
+            // The next statement will report the connection's real state.
         }
     }
 

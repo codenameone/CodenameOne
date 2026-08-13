@@ -284,6 +284,25 @@ class SQLStatementSplitterTest {
     }
 
     @Test
+    void readsWhichPragmasWrite() {
+        // A cursor may only re-run its statement if running it again changes nothing. Most
+        // pragmas change something -- these are the ones that report.
+        assertFalse(SQLStatementSplitter.writesData("PRAGMA table_info(t)"));
+        assertFalse(SQLStatementSplitter.writesData("pragma main.page_count"));
+        assertFalse(SQLStatementSplitter.writesData("PRAGMA integrity_check"));
+        assertFalse(SQLStatementSplitter.writesData("PRAGMA foreign_key_list(t)"));
+
+        assertTrue(SQLStatementSplitter.writesData("PRAGMA incremental_vacuum(1)"));
+        assertTrue(SQLStatementSplitter.writesData("PRAGMA wal_checkpoint(FULL)"));
+        assertTrue(SQLStatementSplitter.writesData("PRAGMA optimize"));
+        assertTrue(SQLStatementSplitter.writesData("PRAGMA user_version = 4"));
+        assertTrue(SQLStatementSplitter.writesData("PRAGMA main.journal_mode = WAL"));
+        // Unknown to the list, so treated as a write: losing backward movement beats running it
+        // a second time.
+        assertTrue(SQLStatementSplitter.writesData("PRAGMA something_new_in_sqlite"));
+    }
+
+    @Test
     void treatsAStandaloneColonAsOrdinarySyntax() {
         // A colon with no name after it is not a parameter, so this stays countable.
         assertEquals(1, SQLStatementSplitter.countParameters(

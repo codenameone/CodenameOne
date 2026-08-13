@@ -6120,6 +6120,19 @@ public final class Display extends CN1Constants {
         return impl.databaseManagedKeyIdentity(databaseName);
     }
 
+    /// See `com.codename1.impl.CodenameOneImplementation#openDatabaseConnections(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or path being deleted
+    ///
+    /// #### Returns
+    ///
+    /// the number of connections the port has open on it
+    public int openDatabaseConnections(String databaseName) {
+        return impl.openDatabaseConnections(databaseName);
+    }
+
     public int isDatabaseFileEncrypted(String databaseName) {
         return impl.isDatabaseFileEncrypted(databaseName);
     }

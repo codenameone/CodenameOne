@@ -269,7 +269,11 @@ public abstract class Database {
             // its open databases itself.
             return;
         }
-        if (openDatabaseCount(key) > 0) {
+        // Both registries. A port that keeps its own count -- Android, whose implementation
+        // tracks connections for the conversion it runs outside this class -- would otherwise be
+        // checked against a table it never writes to, and the check would pass every time.
+        if (openDatabaseCount(key) > 0
+                || Display.getInstance().openDatabaseConnections(databaseName) > 0) {
             throw new IOException("The database " + databaseName + " is still open. Close it "
                     + "before deleting it: deleting an open database leaves the connection "
                     + "attached to a file that no longer has a name, and everything written "

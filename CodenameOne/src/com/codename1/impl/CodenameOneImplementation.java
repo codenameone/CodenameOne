@@ -9664,6 +9664,24 @@ public abstract class CodenameOneImplementation {
         return databaseName;
     }
 
+    /// How many connections this port has open on a database.
+    ///
+    /// `Database#delete(String)` asks before unlinking, because deleting a file something still
+    /// holds succeeds on every platform here and leaves that connection writing to a file with no
+    /// name. The base class keeps its own registry, and ports that register there need not
+    /// override; a port that counts connections somewhere of its own says so here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or path the caller asked to delete
+    ///
+    /// #### Returns
+    ///
+    /// the number of open connections this port knows about
+    public int openDatabaseConnections(String databaseName) {
+        return 0;
+    }
+
     public int isDatabaseFileEncrypted(String databaseName) {
         return DATABASE_ENCRYPTION_UNKNOWN;
     }
