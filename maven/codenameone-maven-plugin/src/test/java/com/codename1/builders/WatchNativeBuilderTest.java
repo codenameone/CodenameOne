@@ -1163,7 +1163,12 @@ class WatchNativeBuilderTest {
         // Compiling the catalog is not enough. actool promotes a set to the app icon only when the
         // target names it, and nothing named one for the watch.
         assertTrue(ruby.contains("ASSETCATALOG_COMPILER_APPICON_NAME"), ruby);
-        assertTrue(ruby.contains("WatchImages.xcassets"), ruby);
+        // Referenced under <Main>-src, where writeWatchAppIcon actually put it. The project sits
+        // one level up in dist, so a bare "WatchImages.xcassets" resolved to nothing: the script's
+        // directory test failed silently and the catalog never joined the resources phase, leaving
+        // the build setting naming a set the target did not contain.
+        assertTrue(ruby.contains("MyApp-src/WatchImages.xcassets"),
+                "the icon catalog has to be addressed the way the watch plist is: " + ruby);
     }
 
 

@@ -55,19 +55,29 @@ name — is derived. The one other recognized setting is
 `codename1.watchStandalone=true`, which ships the watch app on its own instead of
 embedding it in the phone app.
 
-**Important - current bootstrap reality (do NOT assume watchMain tree-shaking):**
-The watch target compiles the SAME single ParparVM translation as the phone and
-boots the **regular main class's** generated `Stub.main` (see
-`cn1_watch_app_main` in the generated `CN1WatchBootstrap.m`, which calls
-`<pkg>_<Main>Stub_main___...`). So the watch binary contains the FULL app code -
-it is NOT separately tree-shaken to a watch-only API surface, and `watchMain`
-(`HelloCodenameOneWatch`) is currently NOT the entry point used by the
-screenshot build (it isn't even guaranteed to be translated, since nothing
-roots it from the phone main). A future enhancement could run a second ParparVM
-pass rooted at `watchMain` for a smaller, watch-specific binary; until then both
-"apps" are the same translated code, entered through the regular main. This
-matters when diagnosing watch rendering: missing/incorrect output is a
-Core-Graphics-backend issue, not absent code.
+**Bootstrap reality - which translation the watch runs:**
+It depends on whether `watchMain` names a different class from the phone main,
+which is what `WatchNativeBuilder.needsOwnTranslation()` decides.
+
+*Different classes* (the usual case, and what the screenshot build does --
+`hellocodenameone` declares `HelloCodenameOneWatch` against a `HelloCodenameOne`
+main): a SECOND ParparVM pass runs, rooted at the watch stub, into
+`<Main>-src/watch-src`. `stageWatchTranslation()` stages that tree and the watch
+target compiles it instead of the phone's, so the watch binary contains what the
+watch lifecycle reaches and nothing else. `writeWatchEntry()` generates the stub
+it boots, and `cn1_watch_app_main` in `CN1WatchBootstrap.m` enters the **watch**
+class, not the phone's.
+
+*Same class*: one translation, shared. Both entry points reach the same code, so
+a second pass would emit the same binary twice. The watch then boots the phone
+lifecycle and `CN.isWatch()` is what selects what it shows.
+
+Two consequences when diagnosing a watch build. Missing output is not
+automatically a Core Graphics problem any more: with separate roots it can be
+code the watch translation legitimately shook out, so check whether the watch
+root reaches it before looking at the backend. And watch UI belongs in the
+`watchMain` lifecycle -- putting it in the phone's will not run on the watch when
+the two differ.
 
 `WatchNativeBuilder.writeWatchEntry` generates the watch target's entry point:
 - `CN1WatchApp.swift` - the SwiftUI `@main` shell that starts `CN1WatchHost`

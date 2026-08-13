@@ -2727,8 +2727,14 @@ class WatchNativeBuilder {
 
         // The watch's own catalog, carrying the icon it cannot take from the phone. Added before
         // the phone's resources are walked so a project with no catalog at all still gets one.
+        // Under <Main>-src, where writeWatchAppIcon puts it -- the same convention the watch
+        // Info.plist and the staged watch sources use. The project itself sits one level up, in
+        // dist, so a reference relative to the project directory alone pointed at nothing: the
+        // directory test failed silently and the catalog was never added to the watch's resources,
+        // leaving ASSETCATALOG_COMPILER_APPICON_NAME naming a set that was not in the target.
         s.append("watch_icon_rel = '")
-                .append(IPhoneBuilder.escapeRubyStr(WATCH_ICON_CATALOG)).append("'\n")
+                .append(IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + WATCH_ICON_CATALOG))
+                .append("'\n")
                 .append("watch_icon_dir = File.join(File.dirname(xcproj.path.to_s), "
                         + "watch_icon_rel)\n")
                 .append("if File.directory?(watch_icon_dir)\n")
@@ -2839,14 +2845,14 @@ class WatchNativeBuilder {
 
         s.append("xcproj.save\n");
         if (isStandalone()) {
-            // Said out loud at build time. The target is detached from the phone app and
-            // installable, but the archive step still selects the phone scheme, so the IPA this
-            // build returns is the phone app -- and a developer who asked for a watch-only product
-            // would otherwise discover that by inspecting the artifact.
-            owner.log("[watchNative] NOTE: codename1.watchStandalone builds " + watchTargetName
-                    + " as a detached, installable product, but this build archives the phone "
-                    + "scheme. To submit the watch app, open the generated Xcode project and "
-                    + "archive the " + watchTargetName + " scheme directly.");
+            // The cloud builder archives this scheme itself now. Said out loud anyway, because
+            // an ios-source build hands the developer the project rather than an artifact, and
+            // which of the two schemes to archive is the one thing about a watch-only product
+            // that is not obvious from looking at it.
+            owner.log("[watchNative] codename1.watchStandalone builds " + watchTargetName
+                    + " as a detached, installable product. A cloud build archives that scheme;"
+                    + " from an ios-source build, archive " + watchTargetName + " rather than the"
+                    + " phone scheme.");
         }
         return s.toString();
     }
