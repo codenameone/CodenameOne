@@ -1263,8 +1263,30 @@ public final class DatabaseConformanceSuite {
                 }
                 r.check(firstWorks, "first() reaches the row of a statement that writes, which "
                         + "asks for no re-execution");
-                r.check(rowCount(db, "conf_returning") == 2,
-                        "and it inserted its row once, like the walk before it");
+                // The other side of the same coin, and the one prev() and position(-1) reach:
+                // a cursor that has not been stepped is already before its first row, so asking
+                // to go back there is a no-op rather than a rewind.
+                boolean beforeFirstWorks = false;
+                Cursor untouched = null;
+                try {
+                    untouched = db.executeQuery(
+                            "INSERT INTO conf_returning (v) VALUES ('c') RETURNING id");
+                    Database.beforeFirst(untouched);
+                    beforeFirstWorks = true;
+                } catch (IOException refused) {
+                    beforeFirstWorks = false;
+                }
+                if (untouched != null) {
+                    try {
+                        untouched.close();
+                    } catch (IOException ignored) {
+                        // The answer above is what is under test.
+                    }
+                }
+                r.check(beforeFirstWorks, "beforeFirst() on a cursor that has not been stepped is "
+                        + "a no-op, including over a statement that writes");
+                r.check(rowCount(db, "conf_returning") == 3,
+                        "and each of them inserted its row once, like the walk before them");
             }
             db.execute("DROP TABLE IF EXISTS conf_returning");
 

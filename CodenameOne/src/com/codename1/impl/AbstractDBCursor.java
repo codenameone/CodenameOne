@@ -321,6 +321,14 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
     @Override
     public void beforeFirst() throws IOException {
         checkOpen();
+        if (position < 0 && !onRow) {
+            // Already there. A cursor that has not been stepped is before its first row by
+            // definition, so this asks for nothing -- and running it through the rewind below
+            // would re-execute the statement to arrive where it already is, which for one that
+            // writes is refused outright. prev() and position(-1) come through here too.
+            lastReadWasNull = false;
+            return;
+        }
         // The count goes with the pass that established it. Rewinding re-executes the statement,
         // and outside a transaction the new pass can see rows another connection has written
         // since -- so a remembered count would answer for a result set that no longer exists, and
