@@ -798,8 +798,11 @@ class AndroidCipherDB extends Database {
     private Cursor wrap(android.database.Cursor c) throws IOException {
         if (!isLegacyBehavior()) {
             // Eager, so malformed SQL is reported from executeQuery rather than from next().
+            // moveToFirst rather than getCount, for the reason given on the plaintext port: both
+            // run the statement, and only one of them walks the whole result set to do it.
             try {
-                c.getCount();
+                c.moveToFirst();
+                c.moveToPosition(-1);
             } catch (RuntimeException err) {
                 // Never handed out and never registered, so this is the only chance to release it.
                 try {

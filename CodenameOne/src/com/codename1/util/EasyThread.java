@@ -66,12 +66,8 @@ public final class EasyThread {
                                 }
                                 queue.remove(0);
                             } else if (stopWhenDrained) {
-                                // Asked to stop, and there is nothing left to run. Recorded
-                                // before the loop ends so that anything arriving afterwards is
-                                // refused rather than queued for a thread that has gone.
+                                // Asked to stop, and there is nothing left to run.
                                 running = false;
-                                finished = true;
-                                LOCK.notifyAll();
                             } else {
                                 Util.wait(LOCK);
                             }
@@ -89,6 +85,14 @@ public final class EasyThread {
                     }
                     current = null;
                     resultCallback = null;
+                }
+                synchronized (LOCK) {
+                    // Every way out of that loop, not only the drained one: kill() ends it too,
+                    // and a thread that has ended must not be handed work that will never run.
+                    // Recorded here so the guards on the blocking calls refuse rather than wait
+                    // for a worker that is gone.
+                    finished = true;
+                    LOCK.notifyAll();
                 }
             }
         }, name);

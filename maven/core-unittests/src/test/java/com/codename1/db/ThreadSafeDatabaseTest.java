@@ -109,4 +109,29 @@ public class ThreadSafeDatabaseTest extends UITestBase {
                     "the message should say the database is closed: " + expected.getMessage());
         }
     }
+
+    @FormTest
+    public void killedThreadReportsItselfFinished() throws Exception {
+        // kill() ends the loop through a different door than killWhenIdle(), and the flag the
+        // blocking calls consult was set on only one of them: a thread killed this way looked
+        // alive, so run() accepted work and waited for a worker that had gone.
+        com.codename1.util.EasyThread et = com.codename1.util.EasyThread.start("test-kill-flag");
+        Assertions.assertFalse(et.isFinished(), "a running thread is not finished");
+        et.kill();
+        long deadline = System.currentTimeMillis() + 5000;
+        while (!et.isFinished() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        Assertions.assertTrue(et.isFinished(), "a killed thread reports itself finished");
+        try {
+            et.runAndWait(new Runnable() {
+                public void run() {
+                }
+            });
+            Assertions.fail("work handed to a thread that has ended has to be refused");
+        } catch (IllegalStateException expected) {
+            Assertions.assertTrue(expected.getMessage().indexOf("stopped") >= 0,
+                    "the message should say the thread was stopped: " + expected.getMessage());
+        }
+    }
 }

@@ -450,10 +450,18 @@ public class AndroidDB extends Database {
 
     private Cursor wrap(android.database.Cursor c) throws IOException {
         if (!isLegacyBehavior()) {
-            // rawQuery is lazy: without forcing the window fill here, malformed SQL surfaces from
-            // the first next() instead of from executeQuery.
+            // rawQuery is lazy: without running the query here, malformed SQL surfaces from the
+            // first next() instead of from executeQuery.
+            //
+            // moveToFirst rather than getCount. Both compile and run the statement, which is what
+            // this is for, but getCount walks the entire result set to count it -- so a query
+            // over a large table stopped being lazy at all and blocked the caller, on the EDT
+            // included, until every matching row had been visited. Filling the first window is
+            // bounded, and the position is put back so the cursor is handed out where the caller
+            // expects it: before the first row.
             try {
-                c.getCount();
+                c.moveToFirst();
+                c.moveToPosition(-1);
             } catch (RuntimeException err) {
                 // Compiling or filling failed, so this cursor is never handed out and never
                 // registered - closing it here is the only chance to release the query and the
