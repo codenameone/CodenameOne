@@ -1674,12 +1674,21 @@ public class CN1WearableBridge implements WearableBridge {
     private static boolean spoolDirty;
 
     /// Replays everything written down, oldest first, forgetting each only once it is delivered.
+    /// Set when a pass left a record on disk purely because its kind of listener is not
+    /// registered. Guarded by {@link #SPOOL_LOCK}.
+    private static boolean spoolAwaitingListener;
+
+    /// The key the listener-registration callback is registered under. Constant, so an app that
+    /// registers several listeners re-arms one waiter rather than accumulating one per drain.
+    private static final String SPOOL_WAIT_KEY = "cn1$wearableSpool";
+
     static void drainSpool(Context context) {
         synchronized (SPOOL_LOCK) {
             if (spoolDraining) {
                 return;
             }
             spoolDraining = true;
+            spoolAwaitingListener = false;
         }
         try {
             while (true) {
@@ -1691,7 +1700,7 @@ public class CN1WearableBridge implements WearableBridge {
                         // before this check -- and the loop continues -- or it is still waiting to
                         // take the lock, and will find spoolDraining false and drain for itself.
                         spoolDraining = false;
-                        return;
+                        break;
                     }
                     spoolDirty = false;
                 }
@@ -1701,6 +1710,38 @@ public class CN1WearableBridge implements WearableBridge {
                 spoolDraining = false;
             }
             throw failed;
+        }
+        awaitListenerForSpool(context);
+    }
+
+    /// Asks to be called back when a listener finally registers, if this drain left anything.
+    ///
+    /// The constructor drains before the application has run its init(), so a cold launch finds no
+    /// listener and claimSpooled correctly leaves every record where it is. Nothing then re-ran the
+    /// drain: only inbound traffic calls it, so on a launch where none arrives the one-shot
+    /// messages and removals of the previous run stayed on disk indefinitely -- exactly the loss
+    /// the spool exists to prevent, deferred by one launch at a time.
+    ///
+    /// Registration is the event worth waiting for, and it is the only one. Deliberately NOT
+    /// requestReplayAfterDrain: that runs inline when a delivery could reach a listener, so a
+    /// spooled MESSAGE record on a process that has registered only a DATA listener would drain,
+    /// find nothing deliverable, re-arm, and run again without bound.
+    private static void awaitListenerForSpool(final Context context) {
+        synchronized (SPOOL_LOCK) {
+            if (!spoolAwaitingListener) {
+                return;
+            }
+            spoolAwaitingListener = false;
+        }
+        try {
+            WearableConnection.runWhenListenerRegisters(SPOOL_WAIT_KEY, new Runnable() {
+                public void run() {
+                    drainSpool(context);
+                }
+            });
+        } catch (Throwable notInitialized) {
+            // Display is not up yet, so there is no core to hold the request. The next inbound
+            // event drains the spool, and failing that the next launch does.
         }
     }
 
@@ -1810,6 +1851,11 @@ public class CN1WearableBridge implements WearableBridge {
                 // can.
                 if (!listenerExistsFor(bodyOf(record))) {
                     SPOOL_IN_FLIGHT.remove(key);
+                    // Noted, so the drain can ask to be woken when one registers instead of
+                    // waiting for traffic that may never come.
+                    synchronized (SPOOL_LOCK) {
+                        spoolAwaitingListener = true;
+                    }
                     return null;
                 }
                 int attempts = attemptsOf(record) + 1;

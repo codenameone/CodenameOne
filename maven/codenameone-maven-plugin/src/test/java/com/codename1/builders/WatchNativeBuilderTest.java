@@ -1017,7 +1017,8 @@ class WatchNativeBuilderTest {
 
         StringBuilder defs = new StringBuilder("require 'fileutils'\n");
         for (String name : new String[] {"cn1_watch_balanced", "cn1_watch_normalize_condition",
-                "cn1_watch_excludes_watch", "cn1_watch_selects_watch",
+                "cn1_watch_excludes_watch", "cn1_watch_atom_selects_watch",
+                "cn1_watch_or_operands", "cn1_watch_selects_watch",
                 "cn1_watch_catalog_for_watch"}) {
             defs.append(definitionOf(ruby, name)).append('\n');
         }
@@ -1038,6 +1039,31 @@ class WatchNativeBuilderTest {
                 // off Swift compiles the #else, and suppressing it drops what that arm imports.
                 .append("chk('paren conjunction does not select', "
                         + "cn1_watch_selects_watch('#if (os(watchOS)) && FEATURE'), false)\n")
+                // A definedness test never selects, and only the DIRECTIVE says so. Normalizing
+                // first left the bare macro behind, so #ifndef TARGET_OS_WATCH -- which is FALSE
+                // on the watch, whose arm is the #else -- read as a positive watch test and the
+                // watch's own arm was suppressed.
+                .append("chk('ifndef does not select', "
+                        + "cn1_watch_selects_watch('#ifndef TARGET_OS_WATCH'), false)\n")
+                .append("chk('ifdef does not select', "
+                        + "cn1_watch_selects_watch('#ifdef TARGET_OS_WATCH'), false)\n")
+                .append("chk('plain objc macro still selects', "
+                        + "cn1_watch_selects_watch('#if TARGET_OS_WATCH'), true)\n")
+                // A disjunction with a watchOS operand IS unconditionally true on the watch, so
+                // the arm is selected however the other operand evaluates. Left undecided, its
+                // #else survived and mirrored an iOS-only product into the watch target.
+                .append("chk('disjunction with a watch operand selects', "
+                        + "cn1_watch_selects_watch('#if os(watchOS) || FEATURE'), true)\n")
+                .append("chk('the operand may come second', "
+                        + "cn1_watch_selects_watch('#if FEATURE || os(watchOS)'), true)\n")
+                .append("chk('and may be parenthesized', "
+                        + "cn1_watch_selects_watch('#if (os(watchOS)) || FEATURE'), true)\n")
+                // && binds tighter, so this is (os(watchOS) && F) || X -- neither operand is
+                // unconditionally true on the watch.
+                .append("chk('a conjunction inside a disjunction does not', "
+                        + "cn1_watch_selects_watch('#if os(watchOS) && F || X'), false)\n")
+                .append("chk('nor a disjunction nested in a conjunction', "
+                        + "cn1_watch_selects_watch('#if (os(watchOS) || F) && G'), false)\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "

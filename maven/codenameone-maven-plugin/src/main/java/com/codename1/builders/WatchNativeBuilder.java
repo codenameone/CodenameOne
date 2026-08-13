@@ -2261,13 +2261,68 @@ class WatchNativeBuilder {
                 /// that else and dropped a package imported only there. Selection is the only
                 /// direction that can silence another arm, so it takes the whole expression being
                 /// demonstrably true -- a bare watchOS test and nothing more.
+                // One operand that is unconditionally true on the watch.
+                .append("def cn1_watch_atom_selects_watch(atom)\n")
+                .append("  a = atom.strip\n")
+                .append("  return true if a =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/\n")
+                // The Objective-C spelling of the same thing. Reached only for `#if`, never for
+                // `#ifdef`/`#ifndef` -- see the guard in the caller.
+                .append("  a =~ /\\ATARGET_OS_WATCH\\z/ ? true : false\n")
+                .append("end\n")
+                // Splits on `||` at the TOP level only, so a disjunction inside parentheses or
+                // inside a nested expression is left as the single operand it is.
+                .append("def cn1_watch_or_operands(expr)\n")
+                .append("  parts = []\n")
+                .append("  depth = 0\n")
+                .append("  current = ''\n")
+                .append("  i = 0\n")
+                .append("  while i < expr.length\n")
+                .append("    ch = expr[i, 1]\n")
+                .append("    if ch == '('\n")
+                .append("      depth += 1\n")
+                .append("    elsif ch == ')'\n")
+                .append("      depth -= 1\n")
+                .append("    elsif depth == 0 && ch == '|' && expr[i + 1, 1] == '|'\n")
+                .append("      parts << current\n")
+                .append("      current = ''\n")
+                .append("      i += 2\n")
+                .append("      next\n")
+                .append("    end\n")
+                .append("    current += ch\n")
+                .append("    i += 1\n")
+                .append("  end\n")
+                .append("  parts << current\n")
+                .append("  parts\n")
+                .append("end\n")
                 .append("def cn1_watch_selects_watch(condition)\n")
-                .append("  bare = cn1_watch_normalize_condition(condition)\n")
-                .append("  return true if bare =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/\n")
-                // The Objective-C spelling of the same thing. `#ifdef TARGET_OS_WATCH` is NOT it:
-                // TargetConditionals defines every one of those macros as 0 or 1, so the block is
-                // always compiled and the test says nothing about the platform.
-                .append("  bare =~ /\\ATARGET_OS_WATCH\\z/ ? true : false\n")
+                // A DEFINEDNESS test never selects, and the directive is the only thing that says
+                // so -- which is why it is read here, before normalization strips it.
+                //
+                // TargetConditionals defines every one of these macros on every platform, as 0 or
+                // 1. `#ifdef TARGET_OS_WATCH` is therefore true everywhere and says nothing about
+                // the platform, and `#ifndef TARGET_OS_WATCH` is FALSE on the watch -- the arm the
+                // watch compiles is the `#else`. Normalizing first left the bare macro behind and
+                // read the ifndef as a positive watch test, so the watch arm was suppressed and a
+                // package imported only there went missing from the target.
+                .append("  raw = condition.to_s\n")
+                .append("  return false if raw =~ /\\A#\\s*(ifdef|ifndef)\\b/ "
+                        + "|| raw.include?('defined(')\n")
+                .append("  bare = cn1_watch_normalize_condition(raw)\n")
+                .append("  return true if cn1_watch_atom_selects_watch(bare)\n")
+                // A DISJUNCTION with a watchOS operand is unconditionally true on the watch,
+                // whatever the other operand does. `#if os(watchOS) || FEATURE` left the branch
+                // undecided, so its `#else` survived and the iOS-only product imported there was
+                // mirrored into the watch target.
+                //
+                // Not the mirror of the exclusion rule, which rejects disjunctions: there, one
+                // operand being false proves nothing, because the other may still be true. Here
+                // one operand being TRUE settles the whole expression.
+                .append("  operands = cn1_watch_or_operands(bare)\n")
+                .append("  return false if operands.length < 2\n")
+                // Each operand normalized in turn, so `(os(watchOS)) || FEATURE` is recognized on
+                // the same terms as the unparenthesized spelling.
+                .append("  operands.any? { |o| cn1_watch_atom_selects_watch("
+                        + "cn1_watch_normalize_condition(o)) }\n")
                 .append("end\n");
 
         // Mirrored only when the WATCH sources actually import the product.

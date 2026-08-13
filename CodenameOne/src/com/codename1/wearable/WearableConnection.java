@@ -452,6 +452,10 @@ public final class WearableConnection {
         if (added) {
             activate();
             drainPending(pendingMessages, false);
+            // A port waiting for SOMEONE to listen is waiting for this too. The Android spool
+            // holds one-shot messages, and a message listener is the only thing that makes them
+            // deliverable -- the data queue's own replay hand-off never sees them.
+            runListenerWaiters();
         }
     }
 
@@ -491,6 +495,7 @@ public final class WearableConnection {
         if (added) {
             activate();
             drainPending(pendingData, true);
+            runListenerWaiters();
         }
     }
 
@@ -1461,6 +1466,66 @@ public final class WearableConnection {
 
     private static boolean rescanRequested;
 
+    /// Actions a port asked to run the next time ANY listener registers, keyed so repeated
+    /// requests for the same operation collapse into one.
+    private static final java.util.LinkedHashMap<String, Runnable> listenerWaiters =
+            new java.util.LinkedHashMap<String, Runnable>();
+
+    /// Framework/port entry point: runs `action` the next time a listener of any kind registers.
+    ///
+    /// Distinct from [#requestReplayAfterDrain(String,Runnable)], which asks "run this as soon as
+    /// a delivery can reach a listener" and therefore runs immediately when one already can. A
+    /// port holding a DURABLE record cannot use that: the Android bridge spools a one-shot message
+    /// and a data removal to disk, and its startup drain leaves behind whatever kind of listener
+    /// is not registered yet. Asked through the other method, a spooled MESSAGE record with a data
+    /// listener already registered would run the drain immediately, find the message listener
+    /// still absent, ask again, and run again -- unbounded recursion. And nothing else re-triggers
+    /// that drain: only inbound traffic does, so after a cold launch with no new traffic the
+    /// records sat on disk indefinitely.
+    ///
+    /// This one never runs the action inline. It fires on the registration itself, which is the
+    /// event the port is actually waiting for, and a request re-armed from inside a waiter is
+    /// simply held for the next registration.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: identifies the operation; a later request with the same key supersedes this one
+    /// - `action`: what to run once someone is listening
+    public static void runWhenListenerRegisters(String key, Runnable action) {
+        if (action == null) {
+            return;
+        }
+        synchronized (listenerWaiters) {
+            listenerWaiters.put(key == null ? action.toString() : key, action);
+        }
+    }
+
+    /// Runs and clears the waiters. Called after a registration has drained its own queue, so a
+    /// port re-offering what it holds finds the backlog already dispatched.
+    private static void runListenerWaiters() {
+        List<Runnable> waiters;
+        synchronized (listenerWaiters) {
+            if (listenerWaiters.isEmpty()) {
+                return;
+            }
+            // Copied and cleared together, so a waiter that re-arms itself -- the spool drain does,
+            // when a record still needs the other kind of listener -- is held for the NEXT
+            // registration rather than being wiped by this pass.
+            waiters = new ArrayList<Runnable>(listenerWaiters.values());
+            listenerWaiters.clear();
+        }
+        for (Runnable waiter : waiters) {
+            // Isolated, for the same reason every other port callback in this file is: one
+            // failing must not cost the others their run.
+            try {
+                waiter.run();
+            } catch (Throwable portFailed) {
+                com.codename1.io.Log.p("Wearable: a listener-registration action failed");
+                com.codename1.io.Log.e(portFailed);
+            }
+        }
+    }
+
     /// Actions a port asked to run once deliveries can actually reach a listener, keyed so repeated
     /// requests for the same operation collapse into one.
     private static final java.util.LinkedHashMap<String, Runnable> replayRequests =
@@ -1478,7 +1543,20 @@ public final class WearableConnection {
     /// covers any number of evictions, and queueing one per evicted payload would both grow this
     /// map past the delivery cap and rescan the whole backlog once per eviction.
     ///
-    /// Runs immediately when a data listener is already registered.
+    /// Runs immediately only when a listener exists AND nothing is parked or draining.
+    ///
+    /// A registered listener is not on its own enough for a delivery to reach one. While a drain
+    /// is in flight everything parks -- that is what keeps a re-offer behind the batch already on
+    /// its way -- so running the replay here put it straight back into the queue it was evicted
+    /// from. With more than MAX_PENDING transfers tracked, filling the queue evicted another
+    /// one-shot, which asked for a replay, which this method ran immediately because the listener
+    /// was still registered: the same durable backlog rescanned and re-evicted itself one stack
+    /// frame deeper each time, until the process overflowed or stalled.
+    ///
+    /// So the question is not "is there a listener" but "can a delivery reach one right now". A
+    /// nonempty queue answers no for the same reason a drain does, and both are cases the keyed
+    /// request already handles -- the next drain pass takes it, and drainPending will not finish
+    /// while one is outstanding.
     ///
     /// #### Parameters
     ///
@@ -1489,7 +1567,7 @@ public final class WearableConnection {
             return;
         }
         synchronized (pendingData) {
-            if (dataListeners.isEmpty()) {
+            if (dataListeners.isEmpty() || drainingData > 0 || !pendingData.isEmpty()) {
                 replayRequests.put(key == null ? replay.toString() : key, replay);
                 return;
             }
@@ -1510,7 +1588,16 @@ public final class WearableConnection {
         for (;;) {
             drainPendingOnce(queue, dataQueue);
             synchronized (queue) {
-                if (queue.isEmpty()) {
+                // An outstanding replay request counts as work, not just a nonempty queue.
+                //
+                // A replay deferred DURING this drain -- which is now what an eviction inside a
+                // replay produces, rather than an immediate recursive re-offer -- lands in
+                // replayRequests after the pass that would have taken it. If that replay parked
+                // nothing, the queue is empty and returning here would leave the request sitting
+                // until some later listener registration, which for a single-listener app never
+                // comes. This is the same stranding the loop itself exists to prevent, reached
+                // through the other collection.
+                if (queue.isEmpty() && (!dataQueue || replayRequests.isEmpty())) {
                     return;
                 }
             }
