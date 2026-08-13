@@ -11303,13 +11303,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// Database files a conversion currently owns exclusively.
-    /// Files this port is unlinking right now, so an open landing mid-delete is refused.
-    ///
-    /// The base class keeps the same claim for the ports that register their connections there.
-    /// This port counts its own, so it holds its own claim rather than reading that one.
-    private static final java.util.Set<String> DELETING_DATABASES =
-            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
-
     private static final java.util.Set<String> MIGRATING_DATABASES =
             new java.util.HashSet<String>();
 
@@ -11342,6 +11335,28 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     + "conversion would be accepted and then lost.");
         }
         MIGRATING_DATABASES.add(path);
+    }
+
+    /// Takes the conversion claim for a recovery, or reports that a conversion already holds it.
+    ///
+    /// Recovery moves the same three files a conversion does, so the two must not overlap. The
+    /// claim is the conversion's own, so a conversion starting while recovery runs is refused by
+    /// `#beginDatabaseMigration(String)` exactly as a second conversion would be.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rawPath`: the database file
+    ///
+    /// #### Returns
+    ///
+    /// true when the claim was taken and must be given back
+    private static synchronized boolean claimDatabaseForRecovery(String rawPath) {
+        String path = databaseKey(rawPath);
+        if (path == null || MIGRATING_DATABASES.contains(path)) {
+            return false;
+        }
+        MIGRATING_DATABASES.add(path);
+        return true;
     }
 
     /// Whether a conversion currently owns a database file.
@@ -11377,11 +11392,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// - `IOException`: if a conversion currently owns the file
     public static synchronized void reserveDatabaseConnection(String rawPath) throws IOException {
         String path = databaseKey(rawPath);
-        if (path != null && DELETING_DATABASES.contains(path)) {
-            // A delete checked that nothing was open and is now unlinking the file. Letting this
-            // open through would hand back a connection to a file about to lose its name, which
-            // is exactly what that check was for -- and it cannot see this one, because it ran
-            // before this call.
+        if (path != null && com.codename1.db.Database.isDatabaseBeingDeleted(path)) {
+            // The claim the delete holds, not one of this port's: it is taken before the count
+            // this method increments is read, so an open arriving mid-delete is refused here and
+            // an open that got in first is seen by that count. A claim of our own, taken when
+            // the delete reached this port, would have been too late -- the count had already
+            // been read by then, and an open landing in between would have been handed a file
+            // about to lose its name.
             throw new IOException("The database " + path + " is being deleted and cannot be "
                     + "opened.");
         }
@@ -11766,21 +11783,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void deleteDB(String databaseName) throws IOException {
         String deletePath = resolveNativeDatabasePath(databaseName);
-        String claim = databaseKey(deletePath);
-        if (claim != null) {
-            DELETING_DATABASES.add(claim);
-        }
-        try {
-            deleteDBImpl(databaseName, deletePath);
-        } finally {
-            if (claim != null) {
-                DELETING_DATABASES.remove(claim);
-            }
-        }
-    }
-
-    /// The delete itself, with the file claimed so nothing can open it partway through.
-    private void deleteDBImpl(String databaseName, String deletePath) throws IOException {
         if (isDatabaseBeingConverted(deletePath)) {
             // A conversion owns the file and its working copies. Deleting either underneath it
             // would strand the data in whichever one the conversion has not installed yet.
@@ -11805,7 +11807,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // reporting "does not exist" there would refuse a retry of encrypt or decrypt - the one
         // operation that could put it right.
         String path = resolveNativeDatabasePath(databaseName);
-        if (isDatabaseBeingConverted(path)) {
+        // The claim, not a look at it. Asking whether a conversion is running and then recovering
+        // are two steps, and a conversion starting in between would find recovery already moving
+        // its marker, target and backup around: depending on how far it had got, recovery would
+        // delete the export it was writing, restore the backup during the swap, or -- the worst
+        // of the three -- remove the backup before the converted file had been validated, which
+        // is the copy the conversion falls back to when the reopen fails.
+        if (!claimDatabaseForRecovery(path)) {
             // A conversion is mid-flight and owns both the live file and its working copies.
             // Recovering underneath it would act on a half-installed state, so this answers from
             // what the conversion has not yet consumed instead.
@@ -11817,6 +11825,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // The data is still in the migration directory, so the database does exist even
             // though it could not be moved back. Say so; the open will report the real problem.
             return hasRecoverableDatabaseBackup(path);
+        } finally {
+            endDatabaseMigration(path);
         }
         if (databaseName.startsWith("file://")) {
             return exists(databaseName);

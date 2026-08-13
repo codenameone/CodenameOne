@@ -266,7 +266,7 @@ public abstract class Database {
     /// #### Throws
     ///
     /// - `IOException`: if a connection is open, or another delete is already running
-    private static synchronized String claimForDelete(String databaseName) throws IOException {
+    private static String claimForDelete(String databaseName) throws IOException {
         String key;
         try {
             // The identity the ports register under, which is not the same string as the path
@@ -280,24 +280,42 @@ public abstract class Database {
             // open databases itself.
             return null;
         }
-        // Both registries. A port that keeps its own count -- Android, whose implementation
-        // tracks connections for the conversion it runs outside this class -- would otherwise be
-        // checked against a table it never writes to, and the check would pass every time.
-        if (openDatabaseCount(key) > 0
-                || Display.getInstance().openDatabaseConnections(databaseName) > 0) {
+        if (key != null) {
+            if (isDatabaseBeingDeleted(key)) {
+                throw new IOException("The database " + databaseName + " is already being "
+                        + "deleted.");
+            }
+            takeDeleteClaim(key);
+        }
+        // Counted after the claim is taken, and deliberately not while holding this class's lock.
+        //
+        // A port with its own registry -- Android, whose implementation tracks connections for
+        // the conversion it runs outside this class -- answers from its own monitor, and an open
+        // running there checks this claim from ours. Asking it while holding ours would have the
+        // two threads take the same pair of locks in opposite orders, which deadlocks. Claiming
+        // first and counting afterwards needs neither thread to hold both: an open that got in
+        // before the claim has already incremented the count this reads, and one that arrives
+        // after it is refused by the claim.
+        boolean open;
+        try {
+            open = openDatabaseCount(key) > 0
+                    || Display.getInstance().openDatabaseConnections(databaseName) > 0;
+        } catch (RuntimeException cannotCount) {
+            releaseDeleteClaim(key);
+            throw cannotCount;
+        }
+        if (open) {
+            releaseDeleteClaim(key);
             throw new IOException("The database " + databaseName + " is still open. Close it "
                     + "before deleting it: deleting an open database leaves the connection "
                     + "attached to a file that no longer has a name, and everything written "
                     + "through it afterwards is lost when it closes.");
         }
-        if (key != null) {
-            if (DELETING_DATABASES.containsKey(key)) {
-                throw new IOException("The database " + databaseName + " is already being "
-                        + "deleted.");
-            }
-            DELETING_DATABASES.put(key, Boolean.TRUE);
-        }
         return key;
+    }
+
+    private static synchronized void takeDeleteClaim(String key) {
+        DELETING_DATABASES.put(key, Boolean.TRUE);
     }
 
     private static synchronized void releaseDeleteClaim(String key) {
