@@ -1117,6 +1117,15 @@ class WatchNativeBuilderTest {
                 .append("  chk('so is a swift overlay', sdk_names.key?('Darwin'), true)\n")
                 .append("  chk('a real package is not', sdk_names.key?('Alamofire'), false)\n")
                 .append("end\n")
+                // `== 1` and `!= 0` say what the bare macro says. Accepting only the bare form
+                // left `#if TARGET_OS_WATCH == 1` undecided, so its #else survived and the
+                // phone-only package in there reached the watch target.
+                .append("chk('a true comparison selects', "
+                        + "cn1_watch_selects_watch('#if TARGET_OS_WATCH == 1'), true)\n")
+                .append("chk('so does != 0', "
+                        + "cn1_watch_selects_watch('#if TARGET_OS_WATCH != 0'), true)\n")
+                .append("chk('but == 0 does not', "
+                        + "cn1_watch_selects_watch('#if TARGET_OS_WATCH == 0'), false)\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "

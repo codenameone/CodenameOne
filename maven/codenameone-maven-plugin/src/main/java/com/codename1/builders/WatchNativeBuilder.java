@@ -2434,9 +2434,15 @@ class WatchNativeBuilder {
                 .append("def cn1_watch_atom_selects_watch(atom)\n")
                 .append("  a = atom.strip\n")
                 .append("  return true if a =~ /\\Aos\\(\\s*watchOS\\s*\\)\\z/\n")
-                // The Objective-C spelling of the same thing. Reached only for `#if`, never for
-                // `#ifdef`/`#ifndef` -- see the guard in the caller.
-                .append("  a =~ /\\ATARGET_OS_WATCH\\z/ ? true : false\n")
+                // The Objective-C spelling of the same thing, bare or compared against a truth.
+                // `== 1` and `!= 0` say exactly what the bare macro says, and accepting only the
+                // bare form left `#if TARGET_OS_WATCH == 1` undecided -- so its `#else` survived
+                // and the phone-only package in there was mirrored into the watch target. The
+                // mirror of the `== 0` reading in cn1_watch_excludes_watch.
+                //
+                // Reached only for `#if`, never for `#ifdef`/`#ifndef` -- see the caller's guard.
+                .append("  a =~ /\\ATARGET_OS_WATCH\\s*(==\\s*1|!=\\s*0)?\\z/ "
+                        + "? true : false\n")
                 .append("end\n")
                 // Splits on `||` at the TOP level only, so a disjunction inside parentheses or
                 // inside a nested expression is left as the single operand it is.
