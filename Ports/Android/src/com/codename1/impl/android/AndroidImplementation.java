@@ -10989,8 +10989,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // One connection is allowed to be open here, and it is the reservation taken above.
             // Anything beyond that is somebody else's handle -- including one taken through the
             // constructor that wraps an already-open connection -- and recovery moves the file
-            // out from under it. When that is the case the marker is left for the next open that
-            // has the file to itself, and this open proceeds against the file as it stands.
+            // out from under it. When that is the case and a conversion is waiting to be
+            // finished, this open is refused rather than handing back a file recovery is going
+            // to replace; with nothing waiting there is nothing to recover and the open goes
+            // ahead as before.
             recoverIfSoleConnection(nativePath);
             if (databaseName.startsWith("file://")) {
                 db = SQLiteDatabase.openOrCreateDatabase(
@@ -11366,7 +11368,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             } finally {
                 endDatabaseMigration(rawPath);
             }
+            return;
         }
+        if (hasInterruptedDatabaseMigration(rawPath)) {
+            // Recovery could not run and there is work waiting for it, which means the file this
+            // open would hand back is one recovery is going to replace. Two handles writing to it
+            // in the meantime would both be told their writes succeeded, and the next open with
+            // the file to itself would restore the backup over the top of them. Refusing is the
+            // only answer that does not accept writes it cannot keep.
+            throw new IOException("The database " + rawPath + " has a conversion that was "
+                    + "interrupted, and it cannot be finished while another connection holds the "
+                    + "file. Close the other connections and open it again; the data is intact "
+                    + "and will be put back then.");
+        }
+    }
+
+    /// Whether a conversion of this database was interrupted and still has work waiting.
+    ///
+    /// A marker this port wrote is the record of that. One written by something else is not ours
+    /// to read, and recovery leaves it alone for the same reason.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rawPath`: the database file
+    ///
+    /// #### Returns
+    ///
+    /// true when recovery has something to do
+    private static boolean hasInterruptedDatabaseMigration(String rawPath) {
+        File marker = databaseMigrationMarker(rawPath);
+        return marker != null && marker.isFile() && ownsDatabaseMigrationMarker(rawPath);
     }
 
     /// Takes the conversion claim for a recovery, or reports that a conversion already holds it.
