@@ -21,7 +21,6 @@
  * need additional information or have any questions.
  */
 package com.codename1.db;
-package com.codename1.db;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
