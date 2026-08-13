@@ -294,7 +294,14 @@ public abstract class AbstractDBCursor implements Cursor, CursorExt, Row, RowExt
         if (onRow && position == row) {
             return true;
         }
-        if (!onRow || row < position) {
+        // Only when this cursor has somewhere to go back from. A cursor that has not been
+        // stepped is already before the first row, and one left before the first row by
+        // beforeFirst() is too -- stepping forward from there reaches the row asked for without
+        // running the statement again, which is what lets first() and position(0) work on a
+        // cursor over a statement that writes. Being off a row is not by itself a reason to
+        // rewind: the case that is, exhaustion, is a position past the last row and is covered
+        // by the comparison.
+        if (row < position || (!onRow && isExhausted())) {
             if (newPass) {
                 knownCount = -1;
             }

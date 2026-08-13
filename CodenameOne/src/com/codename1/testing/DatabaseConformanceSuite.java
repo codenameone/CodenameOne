@@ -1239,6 +1239,33 @@ public final class DatabaseConformanceSuite {
                 r.info("this engine does not support RETURNING, so a writing cursor could not "
                         + "be exercised");
             }
+            // ---- and first() on one still works, because it needs no re-execution
+            // The cursor has not been stepped, so the first row is reached by stepping forward
+            // like any other. A guard that refused every backward move without noticing that
+            // would break ordinary navigation over rows next() hands back quite happily. Asked
+            // of a cursor nothing has touched, which is the only state where it is a question.
+            if (returningSupported) {
+                Cursor fresh = null;
+                boolean firstWorks = false;
+                try {
+                    fresh = db.executeQuery(
+                            "INSERT INTO conf_returning (v) VALUES ('b') RETURNING id");
+                    firstWorks = fresh.first();
+                } catch (IOException refused) {
+                    firstWorks = false;
+                }
+                if (fresh != null) {
+                    try {
+                        fresh.close();
+                    } catch (IOException ignored) {
+                        // The answer above is what is under test.
+                    }
+                }
+                r.check(firstWorks, "first() reaches the row of a statement that writes, which "
+                        + "asks for no re-execution");
+                r.check(rowCount(db, "conf_returning") == 2,
+                        "and it inserted its row once, like the walk before it");
+            }
             db.execute("DROP TABLE IF EXISTS conf_returning");
 
             // ---- the engine's own compile-time defaults are the same everywhere
