@@ -171,22 +171,23 @@ public class ThreadSafeDatabase extends Database {
             requireLiveWorker();
             try {
                 err = et.run(new RunnableWithResultSync<Object>() {
-                @Override
-                @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-                public Object run() {
-                    try {
-                        r.run();
-                        return null;
-                    } catch (Throwable err) {
-                        // Throwable, not IOException. Anything escaping this callback is caught by
-                        // the worker's own loop, which never delivers a result, so the caller waits
-                        // forever holding dispatchLock and every later call queues behind it. An
-                        // unchecked exception from the engine -- Android raises
-                        // CursorIndexOutOfBoundsException for a bad column, for one -- is enough to
-                        // wedge the whole wrapper. Carrying it back keeps that a thrown error.
-                        return err;
+                    @Override
+                    @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
+                    public Object run() {
+                        try {
+                            r.run();
+                            return null;
+                        } catch (Throwable err) {
+                            // Throwable, not IOException. Anything escaping this callback is
+                            // caught by the worker's own loop, which never delivers a result, so
+                            // the caller waits forever holding dispatchLock and every later call
+                            // queues behind it. An unchecked exception from the engine -- Android
+                            // raises CursorIndexOutOfBoundsException for a bad column, for one --
+                            // is enough to wedge the whole wrapper. Carrying it back keeps that a
+                            // thrown error.
+                            return err;
+                        }
                     }
-                }
                 });
             } catch (IllegalStateException refused) {
                 throw closedDuringHandoff(refused);
@@ -228,16 +229,16 @@ public class ThreadSafeDatabase extends Database {
             requireLiveWorker();
             try {
                 ret = et.run(new RunnableWithResultSync<Object>() {
-                @Override
-                @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-                public Object run() {
-                    try {
-                        return r.run();
-                    } catch (Throwable err) {
-                        // See invokeWithException above: an escape here wedges the wrapper.
-                        return new Failure(err);
+                    @Override
+                    @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
+                    public Object run() {
+                        try {
+                            return r.run();
+                        } catch (Throwable err) {
+                            // See invokeWithException above: an escape here wedges the wrapper.
+                            return new Failure(err);
+                        }
                     }
-                }
                 });
             } catch (IllegalStateException refused) {
                 throw closedDuringHandoff(refused);

@@ -63,6 +63,13 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     /// it already holds would run those changes again.
     private boolean statementWrites;
 
+    /// Whether the last move landed on a row.
+    ///
+    /// Tracked here rather than asked of the platform cursor, which answers that question by
+    /// counting -- and counting past the first window refills it by running the statement again.
+    /// For a statement that writes, that is a repeated write triggered by reading a value.
+    private boolean onRow;
+
     public AndroidCursor(android.database.Cursor c) {
         this.c = c;
         this.last_read_column_index = -1;
@@ -156,7 +163,8 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         requireInWindow(0);
         last_read_column_index = -1;
-        return c.moveToFirst();
+        onRow = c.moveToFirst();
+        return onRow;
     }
 
     @Override
@@ -169,7 +177,8 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
             requireInWindow(Integer.MAX_VALUE);
         }
         last_read_column_index = -1;
-        return c.moveToLast();
+        onRow = c.moveToLast();
+        return onRow;
     }
 
     @Override
@@ -177,7 +186,8 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         requireInWindow(c.getPosition() + 1);
         last_read_column_index = -1;
-        return c.moveToNext();
+        onRow = c.moveToNext();
+        return onRow;
     }
 
     @Override
@@ -185,13 +195,15 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         requireInWindow(c.getPosition() - 1);
         last_read_column_index = -1;
-        return c.moveToPrevious();
+        onRow = c.moveToPrevious();
+        return onRow;
     }
 
     @Override
     public void beforeFirst() throws IOException {
         checkOpen();
         last_read_column_index = -1;
+        onRow = false;
         c.moveToPosition(-1);
     }
 
@@ -240,8 +252,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public Row getRow() throws IOException {
         checkOpen();
-        int position = c.getPosition();
-        if (position < 0 || position >= c.getCount()) {
+        if (!onRow) {
             throw new IOException("The cursor is not on a row. Call next(), first(), last() or "
                     + "position(int) and check that it returned true before calling getRow().");
         }
@@ -253,11 +264,13 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         last_read_column_index = -1;
         if (row < 0) {
+            onRow = false;
             c.moveToPosition(-1);
             return false;
         }
         requireInWindow(row);
-        return c.moveToPosition(row);
+        onRow = c.moveToPosition(row);
+        return onRow;
     }
 
     @Override
@@ -335,11 +348,10 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     /// that with an unchecked CursorIndexOutOfBoundsException, where the portable contract promises
     /// an IOException and every other port raises one.
     private void checkOnARow() throws IOException {
-        int position = c.getPosition();
-        int count = c.getCount();
-        if (position < 0 || position >= count) {
-            throw new IOException("This cursor is not on a row. Its position is " + position
-                    + " and it has " + count + (count == 1 ? " row" : " rows"));
+        if (!onRow) {
+            throw new IOException("This cursor is not on a row. Its position is "
+                    + c.getPosition() + "; move onto a row and check that the move returned true "
+                    + "before reading a value.");
         }
     }
 
