@@ -512,7 +512,11 @@ public class CodenameOneSettings extends Lifecycle {
 
     private void renderBasic() {
         page.add(pageTitle("Basic", "Core application settings - title, version, package and icon."));
-        Container grid = new Container(new GridLayout(4, 2));
+        // FIVE rows for the nine fields below, not four. GridLayout sizes itself from the declared
+        // row count, so a fifth row forced at layout time contributes nothing to the preferred
+        // height -- adding the watch main, the standalone switch and the TV main to a four-row
+        // grid left the last row compressed or clipped.
+        Container grid = new Container(new GridLayout(5, 2));
         grid.setUIID(uiid("SettingsFieldGrid"));
         grid.add(textFieldGroup("Title", "codename1.displayName", false));
         grid.add(textFieldGroup("Description", "codename1.description", false));

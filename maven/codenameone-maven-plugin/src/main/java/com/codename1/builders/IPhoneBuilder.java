@@ -597,6 +597,32 @@ public class IPhoneBuilder extends Executor {
         return (usesHealthRead || usesHealthWrite || usesHealthWorkout) && watchRootReachesHealth;
     }
 
+    /// Whether the detected usage READS from the store, per root.
+    ///
+    /// Collapsing the direction to "uses HealthKit" was enough to decide the entitlement, and not
+    /// enough to decide the purpose string. Apple wants the one matching the operation: a bundle
+    /// that only reads and declares only NSHealthUpdateUsageDescription is refused at
+    /// authorization exactly as if it had declared nothing. The phone plist pass already keeps them
+    /// apart; the watch pass had one boolean and accepted either string.
+    boolean phoneReadsHealthData() {
+        return usesHealthRead && phoneRootReachesHealth;
+    }
+
+    /// Whether the detected usage WRITES to the store, per root. A workout writes: it saves the
+    /// session and the samples it was fed.
+    boolean phoneWritesHealthData() {
+        return (usesHealthWrite || usesHealthWorkout) && phoneRootReachesHealth;
+    }
+
+    /// The same two questions answered against the watch translation root.
+    boolean watchRootReadsHealthData() {
+        return usesHealthRead && watchRootReachesHealth;
+    }
+
+    boolean watchRootWritesHealthData() {
+        return (usesHealthWrite || usesHealthWorkout) && watchRootReachesHealth;
+    }
+
     /// HealthKit asked for explicitly, by any of its spellings.
     private boolean healthCapabilityDeclared(BuildRequest request) {
         return

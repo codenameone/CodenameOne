@@ -1265,22 +1265,26 @@ class WatchNativeBuilder {
                 owner.watchRootUsesHealthData(request));
         boolean workoutProcessing =
                 "true".equalsIgnoreCase(workoutProcessingHint);
+        // Direction, not just presence. Taken from the same root the entitlement decision uses, so
+        // a watch with its own lifecycle is judged on what IT reaches.
+        boolean detectedRead = watchDetectedHealthRead();
+        boolean detectedWrite = watchDetectedHealthWrite() || workoutProcessing;
         if (needsPurposeString(watchHealth, healthShare, healthUpdate,
-                workoutProcessing)) {
+                workoutProcessing, detectedRead, detectedWrite)) {
             // Entitled but with no purpose string in its own Info.plist,
             // which builds cleanly and then fails the moment the watch asks
             // for authorization. Apple requires a specific string and this
             // build never invents one, so the developer has to supply it.
-            owner.error("This app enables HealthKit on the watch"
-                    + " (watchNative.health), but declares neither"
-                    + " ios.NSHealthShareUsageDescription nor"
-                    + " ios.NSHealthUpdateUsageDescription. The watch has"
+            owner.error("This app enables HealthKit on the watch, but its"
+                    + " Info.plist is missing "
+                    + missingPurposeStrings(healthShare, healthUpdate,
+                            detectedRead, detectedWrite)
+                    + ". The watch has"
                     + " its own Info.plist, and watchOS refuses a HealthKit"
                     + " authorization request from a bundle with no purpose"
-                    + " string. Set the one that matches what the watch"
-                    + " does"
+                    + " string for the operation it performs"
                     + (workoutProcessing
-                        ? " -- a workout saves its session, so that is"
+                        ? " -- a workout saves its session, so it needs"
                             + " ios.NSHealthUpdateUsageDescription."
                         : "."),
                     new RuntimeException("watch health usage string unset"));
@@ -1288,6 +1292,53 @@ class WatchNativeBuilder {
         writeWatchEntitlements(request, appSrcDir, watchHealth);
         File plist = new File(appSrcDir, request.getMainClass() + "-Watch-Info.plist");
         owner.createFile(plist, sb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+
+    /// Names the string or strings this build is waiting for.
+    ///
+    /// "declares neither X nor Y" was accurate only while nothing was detected. With a direction
+    /// known it named the wrong remedy: a read-only watch that had already supplied the update
+    /// string was told to supply either one, and supplying the one it had changed nothing.
+    static String missingPurposeStrings(String healthShare, String healthUpdate,
+            boolean detectedRead, boolean detectedWrite) {
+        if (!detectedRead && !detectedWrite) {
+            return "ios.NSHealthShareUsageDescription and"
+                    + " ios.NSHealthUpdateUsageDescription (either will do)";
+        }
+        boolean needShare = detectedRead && healthShare == null;
+        boolean needUpdate = detectedWrite && healthUpdate == null;
+        if (needShare && needUpdate) {
+            return "ios.NSHealthShareUsageDescription (it reads) and"
+                    + " ios.NSHealthUpdateUsageDescription (it writes)";
+        }
+        if (needShare) {
+            return "ios.NSHealthShareUsageDescription, the one this watch needs"
+                    + " because its code reads from the store";
+        }
+        return "ios.NSHealthUpdateUsageDescription, the one this watch needs"
+                + " because its code writes to the store";
+    }
+
+    /// Whether the SCAN saw the watch bundle reading from the store.
+    ///
+    /// Follows watchUsesHealth's choice of root exactly: the watch inherits the phone's answer
+    /// only when it runs the phone's code. An explicit watchNative.health does not suppress this
+    /// -- that hint ADDS usage the scan cannot see, it does not deny what the scan did see.
+    boolean watchDetectedHealthRead() {
+        if ("false".equalsIgnoreCase(healthHint)) {
+            return false;
+        }
+        return distinctWatchMain ? owner.watchRootReadsHealthData() : owner.phoneReadsHealthData();
+    }
+
+    /// The same for writes.
+    boolean watchDetectedHealthWrite() {
+        if ("false".equalsIgnoreCase(healthHint)) {
+            return false;
+        }
+        return distinctWatchMain
+                ? owner.watchRootWritesHealthData() : owner.phoneWritesHealthData();
     }
 
     /** The value with surrounding space removed, or null when empty. */
@@ -1311,7 +1362,37 @@ class WatchNativeBuilder {
     static boolean needsPurposeString(boolean watchUsesHealth,
             String healthShare, String healthUpdate,
             boolean workoutProcessing) {
+        return needsPurposeString(watchUsesHealth, healthShare, healthUpdate, workoutProcessing,
+                false, false);
+    }
+
+    /// The same, told which direction the scan actually saw.
+    ///
+    /// Apple wants the string that matches the OPERATION. A watch that only reads and declares
+    /// only NSHealthUpdateUsageDescription is refused at authorization exactly as if it had
+    /// declared nothing, and the reverse holds too -- so accepting either string whenever one was
+    /// present emitted an entitled bundle missing the disclosure for what it does. The phone pass
+    /// keeps the two apart; this one had collapsed them into a single boolean.
+    ///
+    /// `detectedRead` and `detectedWrite` are both false when nothing was detected and the answer
+    /// came from `watchNative.health` alone. That hint says the bundle uses HealthKit and nothing
+    /// about which way, so there is no direction to require and either string is still evidence
+    /// that somebody thought about what it does.
+    static boolean needsPurposeString(boolean watchUsesHealth,
+            String healthShare, String healthUpdate,
+            boolean workoutProcessing, boolean detectedRead, boolean detectedWrite) {
         if (!watchUsesHealth) {
+            return false;
+        }
+        if (detectedRead && healthShare == null) {
+            return true;
+        }
+        if (detectedWrite && healthUpdate == null) {
+            return true;
+        }
+        if (detectedRead || detectedWrite) {
+            // Direction known and every string it calls for is present. A workout adds no
+            // requirement here: it writes, which detectedWrite already covers.
             return false;
         }
         if (workoutProcessing) {
@@ -2239,7 +2320,12 @@ class WatchNativeBuilder {
                 //
                 // TARGET_OS_IPHONE is absent from the list on purpose: it is 1 on watchOS, so a
                 // block guarded by it does compile there.
-                .append("    unless c =~ /!TARGET_OS_(IOS|OSX|TV|MACCATALYST|VISION)\\b/\n")
+                // `== 0` is the same statement as `!`. `#if TARGET_OS_IOS == 0` is TRUE on
+                // watchOS, so that arm is the one the watch compiles -- reading the bare macro as
+                // a positive iOS test suppressed it and dropped whatever it imported.
+                .append("    unless c =~ /!TARGET_OS_(IOS|OSX|TV|MACCATALYST|VISION)\\b/"
+                        + " || c =~ /\\bTARGET_OS_(IOS|OSX|TV|MACCATALYST|VISION)\\s*"
+                        + "(==\\s*0|!=\\s*1)\\b/\n")
                 .append("      return true if c =~ /\\bTARGET_OS_"
                         + "(IOS|OSX|TV|MACCATALYST|VISION)\\b/\n")
                 .append("    end\n")
@@ -2396,9 +2482,34 @@ class WatchNativeBuilder {
                 .append("product_names = app_target.package_product_dependencies.to_a"
                         + ".map { |d| d.respond_to?(:product_name) ? d.product_name : nil }"
                         + ".compact\n")
+                // A module the SDK itself vends is attributed, not unknown.
+                //
+                // Only .framework directories were checked, so a staged source importing an SDK
+                // module that is NOT a framework -- Darwin, Dispatch, ObjectiveC, the Swift
+                // standard library -- matched nothing and was called unattributed. That switches
+                // strict filtering off wholesale, and then an iOS-only package the phone happens
+                // to carry is mirrored into the watch target and can break its package
+                // resolution, over an import the watch code never made of anything shippable.
+                .append("def cn1_watch_sdk_provides_module(sdks, m)\n")
+                // The Swift standard modules have no file of their own to point at under every
+                // toolchain layout, and no package will ever be named for them.
+                .append("  return true if %w[Swift _Concurrency _StringProcessing Builtin]"
+                        + ".include?(m)\n")
+                .append("  sdks.any? do |sdk|\n")
+                .append("    File.exist?(File.join(sdk, 'usr/lib/swift', m + '.swiftmodule')) ||\n")
+                .append("      File.exist?(File.join(sdk, 'usr/lib/swift', m + '.swiftinterface'))"
+                        + " ||\n")
+                .append("      File.directory?(File.join(sdk, 'usr/include', m)) ||\n")
+                .append("      File.exist?(File.join(sdk, 'usr/include', m, 'module.modulemap'))"
+                        + " ||\n")
+                .append("      Dir.glob(File.join(sdk, 'usr/lib/swift', m + '.swiftmodule',"
+                        + " '*')).any?\n")
+                .append("  end\n")
+                .append("end\n")
                 .append("unattributed = watch_modules.reject { |m| product_names.include?(m) || "
                         + "watch_fw_dirs.any? { |dirs| dirs.any? { |dd| "
-                        + "File.directory?(File.join(dd, m + '.framework')) } } }\n")
+                        + "File.directory?(File.join(dd, m + '.framework')) } } || "
+                        + "cn1_watch_sdk_provides_module(watch_sdks, m) }\n")
                 .append("strict_products = watch_import_text && unattributed.empty?\n")
                 .append("if watch_import_text && !unattributed.empty?\n")
                 .append("  puts \"[watchNative] linking every Swift package product into the watch "
@@ -2493,6 +2604,13 @@ class WatchNativeBuilder {
         // mixed catalog is staged as a copy with the incompatible sets removed and the watch gets
         // that. Set names are what lookups use and they are unchanged by the copy, so the same
         // UIImage(named:) resolves.
+        // A staging directory name that is unique per SOURCE catalog, and still recognizable.
+        s.append("def cn1_watch_catalog_stage_name(path)\n")
+                .append("  require 'digest'\n")
+                .append("  \"#{File.basename(path, '.xcassets')}-"
+                        + "#{Digest::MD5.hexdigest(path)[0, 8]}.xcassets\"\n")
+                .append("end\n");
+
         s.append("def cn1_watch_catalog_for_watch(ref, staging)\n")
                 .append("  path = (ref.real_path.to_s rescue nil)\n")
                 // Unreadable: keep the old conservative answer. A missing asset is a runtime nil,
@@ -2511,7 +2629,13 @@ class WatchNativeBuilder {
                         + "File.extname(e).empty?\n")
                 .append("  end\n")
                 .append("  return nil if usable.empty?\n")
-                .append("  dest = File.join(staging, File.basename(path))\n")
+                // Keyed by the catalog's own path, not its basename. Two brands each keeping a
+                // BrandA/Assets.xcassets and a BrandB/Assets.xcassets staged to the same
+                // destination: the second wiped and replaced the first, and BOTH watch references
+                // then pointed at that one directory, so the first brand's images silently
+                // vanished at runtime. The digest keeps the readable name and makes it unique.
+                .append("  dest = File.join(staging, "
+                        + "cn1_watch_catalog_stage_name(path))\n")
                 .append("  begin\n")
                 .append("    FileUtils.rm_rf(dest)\n")
                 .append("    FileUtils.mkdir_p(File.dirname(dest))\n")

@@ -9960,6 +9960,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                     String f = System.getProperty("skin");
                     if (f != null) {
                         loadSkinFile(f, window);
+                        if (isWatchCompanionProcess()) {
+                            // Forced for the FIRST load only. The property is how the companion is
+                            // guaranteed to come up on a watch skin at all -- CN.isWatch() and the
+                            // "watch" override layer both depend on it -- but a reload runs this
+                            // same code in the same JVM, and a permanent property outranks the
+                            // preference the skin menu writes. Selecting Apple Watch 41mm, Wear
+                            // Round or Wear Square therefore saved the choice, reloaded, and came
+                            // straight back up on 45mm, which made every other watch form factor
+                            // unusable in the companion.
+                            //
+                            // Clearing it is enough: loadSkinFile has just written this skin to the
+                            // preference, so a reload with no choice made still finds a watch skin,
+                            // and dskin remains set so hasSkins() is unaffected.
+                            System.clearProperty("skin");
+                        }
                     } else {
                         String d = System.getProperty("dskin");
                         f = pref.get("skin", d);

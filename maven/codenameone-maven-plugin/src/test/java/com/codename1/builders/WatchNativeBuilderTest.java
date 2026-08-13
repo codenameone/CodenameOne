@@ -1019,7 +1019,7 @@ class WatchNativeBuilderTest {
         for (String name : new String[] {"cn1_watch_balanced", "cn1_watch_normalize_condition",
                 "cn1_watch_excludes_watch", "cn1_watch_atom_selects_watch",
                 "cn1_watch_or_operands", "cn1_watch_selects_watch",
-                "cn1_watch_catalog_for_watch"}) {
+                "cn1_watch_catalog_stage_name", "cn1_watch_catalog_for_watch"}) {
             defs.append(definitionOf(ruby, name)).append('\n');
         }
 
@@ -1064,6 +1064,20 @@ class WatchNativeBuilderTest {
                         + "cn1_watch_selects_watch('#if os(watchOS) && F || X'), false)\n")
                 .append("chk('nor a disjunction nested in a conjunction', "
                         + "cn1_watch_selects_watch('#if (os(watchOS) || F) && G'), false)\n")
+                // `== 0` is the same statement as `!`, and TRUE on the watch -- reading the bare
+                // macro as a positive iOS test suppressed the arm the watch actually compiles.
+                .append("chk('a zero comparison does not exclude', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_IOS == 0'), false)\n")
+                .append("chk('but a one comparison still does', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_IOS == 1'), true)\n")
+                // Two catalogs sharing a basename must not share a staging directory: the second
+                // replaced the first and both watch references resolved to it.
+                .append("chk('same basename stages distinctly', "
+                        + "cn1_watch_catalog_stage_name('/p/A/Assets.xcassets') != "
+                        + "cn1_watch_catalog_stage_name('/p/B/Assets.xcassets'), true)\n")
+                .append("chk('and the same catalog is stable', "
+                        + "cn1_watch_catalog_stage_name('/p/A/Assets.xcassets') == "
+                        + "cn1_watch_catalog_stage_name('/p/A/Assets.xcassets'), true)\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "

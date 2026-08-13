@@ -206,6 +206,62 @@ public class WatchHealthEntitlementTest {
                 "a watch that does not use HealthKit needs nothing");
     }
 
+
+    /**
+     * The string has to match the direction the scan actually saw.
+     *
+     * <p>Apple wants the disclosure for the operation performed. A watch whose code only reads and
+     * declares only {@code NSHealthUpdateUsageDescription} is refused at authorization exactly as
+     * if it had declared nothing -- and the reverse holds. Collapsing the detected usage to one
+     * boolean accepted the unrelated string and emitted an entitled bundle that fails at runtime,
+     * which is the failure this gate exists to prevent, reached by a third route.</p>
+     */
+    @Test
+    void aDetectedDirectionRequiresItsOwnString() {
+        // Reads: only the share string will do.
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, null, "Writes", false, true, false),
+                "a read-only watch is not disclosed by the update string");
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, "Reads", null, false, true, false));
+
+        // Writes: only the update string will do.
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, "Reads", null, false, false, true),
+                "a write-only watch is not disclosed by the share string");
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, null, "Writes", false, false, true));
+
+        // Both directions detected: both strings are required.
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, "Reads", null, false, true, true));
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, null, "Writes", false, true, true));
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, "Reads", "Writes", false,
+                true, true));
+
+        // Nothing detected -- watchNative.health alone, which says nothing about direction. Either
+        // string remains evidence that somebody thought about it, as before.
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, null, "Writes", false,
+                false, false));
+        assertFalse(WatchNativeBuilder.needsPurposeString(true, "Reads", null, false,
+                false, false));
+        assertTrue(WatchNativeBuilder.needsPurposeString(true, null, null, false, false, false));
+
+        // Still nothing to disclose when the watch does not use HealthKit at all.
+        assertFalse(WatchNativeBuilder.needsPurposeString(false, null, null, false, true, true));
+    }
+
+    /** The message names the string that is actually missing, not both of them. */
+    @Test
+    void theErrorNamesTheStringTheWatchNeeds() {
+        assertTrue(WatchNativeBuilder.missingPurposeStrings(null, "Writes", true, false)
+                .contains("NSHealthShareUsageDescription"));
+        assertFalse(WatchNativeBuilder.missingPurposeStrings(null, "Writes", true, false)
+                .contains("NSHealthUpdateUsageDescription"),
+                "naming the string it already supplied is the wrong remedy");
+        assertTrue(WatchNativeBuilder.missingPurposeStrings("Reads", null, false, true)
+                .contains("NSHealthUpdateUsageDescription"));
+        // Direction unknown: both are named, either will do.
+        String either = WatchNativeBuilder.missingPurposeStrings(null, null, false, false);
+        assertTrue(either.contains("NSHealthShareUsageDescription"), either);
+        assertTrue(either.contains("NSHealthUpdateUsageDescription"), either);
+    }
+
     /** The explicit hint settles it in both directions. */
     @Test
     void theExplicitHintWins() {
