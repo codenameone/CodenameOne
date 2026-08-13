@@ -1781,6 +1781,12 @@ public class CN1WearableBridge implements WearableBridge {
                     // up again and it waits for a restart. See deliverMessage's dropped callback.
                     unclaimSpooled(c, claimed);
                 }
+            }, new Runnable() {
+                public void run() {
+                    // Unreadable, so deleting it IS the resolution: the same delete-and-unclaim a
+                    // delivery gets, because there is nothing left to deliver.
+                    releaseSpooled(c, claimed);
+                }
             });
             replayed = true;
         }
@@ -1997,10 +2003,27 @@ public class CN1WearableBridge implements WearableBridge {
         return record.substring(bar + 1);
     }
 
-    private static void replaySpooled(String record, Runnable delivered, Runnable dropped) {
+    /// Hands one stored record back to the application, or discards it if it cannot be read.
+    ///
+    /// Every exit has to run exactly one of the three callbacks. A record is claimed before it gets
+    /// here, and a claim is only ever cleared by one of them -- so returning without calling any
+    /// left the key in SPOOL_IN_FLIGHT for the life of the process. That is worse than losing the
+    /// record: spoolBusy() stays true for ever, and deliverableNow answers no to every later
+    /// request, so reply-bearing requests are downgraded to plain spooled messages and their
+    /// senders sit out the full timeout. One truncated entry disabled live requests entirely.
+    ///
+    /// @param delivered the listeners have had it, so the record can go
+    /// @param dropped the queue cap discarded it undelivered, so the record must STAY
+    /// @param malformed it can never be read, so the record must go unread
+    private static void replaySpooled(String record, Runnable delivered, Runnable dropped,
+            Runnable malformed) {
         int first = record.indexOf('|');
         int second = first < 0 ? -1 : record.indexOf('|', first + 1);
         if (first < 0 || second < 0) {
+            // Truncated: a store written by an interrupted commit, or by a build that framed these
+            // differently. No amount of retrying makes it parse.
+            android.util.Log.w("CN1Wearable", "discarding a spooled record with no framing");
+            runQuietly(malformed);
             return;
         }
         String kind = record.substring(0, first);
@@ -2015,7 +2038,22 @@ public class CN1WearableBridge implements WearableBridge {
                     : android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP);
             WearableConnection.deliverMessage(path, payload, 0, delivered, dropped);
         } catch (Throwable unreadable) {
-            // A record this build cannot parse is dropped rather than retried forever.
+            // A record this build cannot parse is discarded rather than retried for ever -- but
+            // discarded means DELETED and unclaimed, not merely abandoned where it sits.
+            android.util.Log.w("CN1Wearable", "discarding an unreadable spooled record on " + path);
+            runQuietly(malformed);
+        }
+    }
+
+    /// Runs a spool completion callback without letting it escape into the drain.
+    private static void runQuietly(Runnable action) {
+        if (action == null) {
+            return;
+        }
+        try {
+            action.run();
+        } catch (Throwable failed) {
+            android.util.Log.w("CN1Wearable", "a spool completion callback failed");
         }
     }
 

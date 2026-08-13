@@ -243,6 +243,15 @@ public class CodenameOneView {
         } else if (Build.VERSION.SDK_INT >= VERSION_CODE_M) {
             rootView.post(new Runnable() {
                 public void run() {
+                    // Remembered before anything is written, because this branch runs LATE and has
+                    // to answer the same question the API 28 branch answers inline: did the safe
+                    // area actually move? A round watch is the case where it always does -- the
+                    // system reports no inset at all, so the whole rectangle comes from
+                    // applyRoundScreenInset below.
+                    int wasTop = rect.top;
+                    int wasLeft = rect.left;
+                    int wasRight = rect.right;
+                    int wasBottom = rect.bottom;
                     WindowInsets insets = rootView.getRootWindowInsets();
                     if (insets != null) {
                         rect.top = insets.getSystemWindowInsetTop();
@@ -259,6 +268,19 @@ public class CodenameOneView {
                     // here -- applying it at the end of updateSafeArea would run first and be
                     // overwritten by the four assignments above.
                     applyRoundScreenInset(rect);
+                    if (rect.top != wasTop || rect.left != wasLeft
+                            || rect.right != wasRight || rect.bottom != wasBottom) {
+                        // Nothing else will ask for it. The form is laid out before this callback
+                        // runs, and the surface callback that would otherwise re-lay it returns
+                        // early when the constructor already recorded these dimensions -- so a
+                        // round Wear form stayed laid out against zero insets, with its corners
+                        // under the bezel, until some unrelated change forced a pass.
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                AndroidImplementation.getInstance().revalidate();
+                            }
+                        });
+                    }
                 }
             });
         } else {
