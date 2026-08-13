@@ -2370,11 +2370,21 @@ class WatchNativeBuilder {
                 .append("  directive = condition.to_s[/\\A#\\s*\\w+/].to_s\n")
                 .append("  c = (directive + ' ' + cn1_watch_normalize_condition(condition))"
                         + ".strip.gsub(/!\\s+/, '!')\n")
-                // A DISJUNCTION can still be true on the watch through its other operand, so an
-                // os() or TARGET_OS_ test that is only one side of an || proves nothing. A
-                // conjunction is safe: `os(iOS) && FEATURE` is false on the watch whatever FEATURE
-                // is.
-                .append("  return false if c.include?('||')\n")
+                // A DISJUNCTION is true on the watch if ANY operand is, so one os() or TARGET_OS_
+                // test on one side of an || proves nothing on its own. A conjunction is safe:
+                // `os(iOS) && FEATURE` is false on the watch whatever FEATURE is.
+                //
+                // But every operand rejecting the watch settles it. `#if os(iOS) || os(macOS)` is
+                // false on watchOS, so the compiler excludes that arm -- and returning "cannot
+                // tell" kept the import inside it, which mirrored an iOS/macOS-only package into
+                // the watch target and could fail its dependency resolution over source the watch
+                // never compiles. Asked recursively, so a nested disjunction answers the same way.
+                .append("  if c.include?('||')\n")
+                .append("    parts = cn1_watch_or_operands("
+                        + "c.sub(/\\A#\\s*\\w+/, '').strip)\n")
+                .append("    return false if parts.length < 2\n")
+                .append("    return parts.all? { |o| cn1_watch_excludes_watch('#if ' + o.strip) }\n")
+                .append("  end\n")
                 // Objective-C guards its platforms with TargetConditionals macros, not Swift's
                 // os() expressions, and `#if !TARGET_OS_WATCH` around a phone-only @import is the
                 // standard spelling. Treating it as unevaluable kept the import, which attached an

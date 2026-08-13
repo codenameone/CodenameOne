@@ -158,6 +158,16 @@ public class CodenameOneView {
         final Activity activity = CodenameOneView.this.implementation.getActivity();
         final Rect rect = this.safeArea;
         final View rootView = activity.getWindow().getDecorView();
+        // Snapshotted for the single change test at the end. Each branch used to answer that
+        // question for itself, and the round inset is applied AFTER all of them -- so on an API 28+
+        // round watch reporting no cutout and no system bars, the branch decided nothing had
+        // changed, applyRoundScreenInset then changed all four, and no revalidation was asked for.
+        // The form stayed sized to the full rectangle with its corners under the bezel until some
+        // unrelated change forced a pass, which is the same fault the API 23-27 branch had.
+        final int wasTop = rect.top;
+        final int wasLeft = rect.left;
+        final int wasRight = rect.right;
+        final int wasBottom = rect.bottom;
         if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
             try {
                 Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
@@ -215,22 +225,14 @@ public class CodenameOneView {
 
                     // Only apply if at least one is non-zero
                     if (left != 0 || top != 0 || right != 0 || bottom != 0) {
-                        boolean isChanged = rect.left != left
-                                || rect.right != right
-                                || rect.top != top
-                                || rect.bottom != bottom;
+                        // Assigned and left at that. Whether anything actually moved is decided
+                        // once, at the end of the method, after the round inset has also been
+                        // applied -- this branch cannot see that half, and testing in both places
+                        // would schedule the same pass twice.
                         rect.left = left;
                         rect.top = top;
                         rect.right = right;
                         rect.bottom = bottom;
-
-                        if (isChanged) {
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    AndroidImplementation.getInstance().revalidate();
-                                }
-                            });
-                        }
                     }
                 }
             } catch (Throwable e) {
@@ -248,10 +250,10 @@ public class CodenameOneView {
                     // area actually move? A round watch is the case where it always does -- the
                     // system reports no inset at all, so the whole rectangle comes from
                     // applyRoundScreenInset below.
-                    int wasTop = rect.top;
-                    int wasLeft = rect.left;
-                    int wasRight = rect.right;
-                    int wasBottom = rect.bottom;
+                    int postedTop = rect.top;
+                    int postedLeft = rect.left;
+                    int postedRight = rect.right;
+                    int postedBottom = rect.bottom;
                     WindowInsets insets = rootView.getRootWindowInsets();
                     if (insets != null) {
                         rect.top = insets.getSystemWindowInsetTop();
@@ -268,8 +270,8 @@ public class CodenameOneView {
                     // here -- applying it at the end of updateSafeArea would run first and be
                     // overwritten by the four assignments above.
                     applyRoundScreenInset(rect);
-                    if (rect.top != wasTop || rect.left != wasLeft
-                            || rect.right != wasRight || rect.bottom != wasBottom) {
+                    if (rect.top != postedTop || rect.left != postedLeft
+                            || rect.right != postedRight || rect.bottom != postedBottom) {
                         // Nothing else will ask for it. The form is laid out before this callback
                         // runs, and the surface callback that would otherwise re-lay it returns
                         // early when the constructor already recorded these dimensions -- so a
@@ -291,6 +293,18 @@ public class CodenameOneView {
             rect.bottom = 0;
         }
         applyRoundScreenInset(rect);
+        // One test, after every contributor has had its say -- the platform insets above and the
+        // round inset just applied. A round face is the case that needs it: the system reports no
+        // inset at all there, so the whole safe area comes from applyRoundScreenInset and every
+        // branch above concludes nothing changed.
+        if (rect.top != wasTop || rect.left != wasLeft
+                || rect.right != wasRight || rect.bottom != wasBottom) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    AndroidImplementation.getInstance().revalidate();
+                }
+            });
+        }
     }
 
     /**

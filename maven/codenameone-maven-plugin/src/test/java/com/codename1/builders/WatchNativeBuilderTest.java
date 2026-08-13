@@ -742,9 +742,13 @@ class WatchNativeBuilderTest {
         // therefore true, and suppressing its #else dropped a package imported only there.
         assertTrue(ruby.contains("\\Aos\\(\\s*watchOS\\s*\\)\\z"),
                 "only a bare watchOS test may close a branch: " + ruby);
-        // And a disjunction can still be true on the watch through its other operand, so one os()
-        // test inside an || proves nothing.
-        assertTrue(ruby.contains("return false if c.include?('||')"), ruby);
+        // A disjunction is decided operand by operand: one os() test inside an || proves nothing
+        // on its own, but every operand rejecting the watch does settle it. The behaviour is
+        // asserted by running the predicate in theGeneratedPredicatesDecideCorrectly; this only
+        // checks the emitter still splits rather than bailing out on the first pipe it sees.
+        assertTrue(ruby.contains("cn1_watch_or_operands"), ruby);
+        assertFalse(ruby.contains("return false if c.include?('||')"),
+                "an || no longer ends the question: " + ruby);
         // Objective-C guards its platforms with TargetConditionals, not Swift os() expressions, and
         // `#if !TARGET_OS_WATCH` around a phone-only @import is the standard spelling.
         assertTrue(ruby.contains("TARGET_OS_WATCH"), ruby);
@@ -1078,6 +1082,17 @@ class WatchNativeBuilderTest {
                 .append("chk('and the same catalog is stable', "
                         + "cn1_watch_catalog_stage_name('/p/A/Assets.xcassets') == "
                         + "cn1_watch_catalog_stage_name('/p/A/Assets.xcassets'), true)\n")
+                // Every arm rejecting the watch settles a disjunction: `#if os(iOS) || os(macOS)`
+                // is false on watchOS, so the compiler excludes that arm and the import inside it
+                // must not reach the watch target.
+                .append("chk('a disjunction of non-watch platforms excludes', "
+                        + "cn1_watch_excludes_watch('#if os(iOS) || os(macOS)'), true)\n")
+                .append("chk('one undecidable arm is enough to keep it', "
+                        + "cn1_watch_excludes_watch('#if os(iOS) || FEATURE'), false)\n")
+                .append("chk('and a watchOS arm certainly is', "
+                        + "cn1_watch_excludes_watch('#if os(iOS) || os(watchOS)'), false)\n")
+                .append("chk('the objc spelling too', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_IOS || TARGET_OS_OSX'), true)\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "
