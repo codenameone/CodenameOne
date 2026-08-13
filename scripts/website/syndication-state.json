@@ -1647,6 +1647,18 @@
         "url": "https://medium.com/p/aeddd59c189c/edit",
         "syndicated_at": "2026-08-11T15:01:55+00:00"
       }
+    },
+    "app-shield-server-attestation": {
+      "hashnode": {
+        "url": "https://debugagent.com/app-shield-your-server-should-not-trust-the-app-calling-it",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a7df82189de856bbfaa0c61",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-08-13T17:01:17+00:00"
+      }
     }
   }
 }
