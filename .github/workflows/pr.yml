@@ -10,6 +10,12 @@ on:
       - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - '!scripts/setup-workspace.sh'
+      # The database checks below live in scripts/ and are run from this workflow and nowhere
+      # else, so ignoring the whole directory let a change to one of them merge without ever
+      # running it. Listed after the directory because the last matching pattern decides.
+      - '!scripts/ci/db-cipher-interop.sh'
+      - '!scripts/ci/check-android-cipher-package-compiles.sh'
+      - '!scripts/ci/check-js-sqlite-wasm.sh'
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
@@ -25,6 +31,12 @@ on:
       - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - '!scripts/setup-workspace.sh'
+      # The database checks below live in scripts/ and are run from this workflow and nowhere
+      # else, so ignoring the whole directory let a change to one of them merge without ever
+      # running it. Listed after the directory because the last matching pattern decides.
+      - '!scripts/ci/db-cipher-interop.sh'
+      - '!scripts/ci/check-android-cipher-package-compiles.sh'
+      - '!scripts/ci/check-js-sqlite-wasm.sh'
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
