@@ -648,12 +648,37 @@ class AndroidCipherDB extends Database {
     }
 
     private SQLiteDatabase openAt(String path, String key) throws IOException {
+        SQLiteDatabase opened;
         try {
-            return SQLiteDatabase.openOrCreateDatabase(new File(path), key, null, null);
+            opened = SQLiteDatabase.openOrCreateDatabase(new File(path), key, null, null);
         } catch (RuntimeException err) {
             throw new IOException("The converted database could not be reopened: "
                     + err.getMessage(), err);
         }
+        // Read something before calling this open a success, the way AndroidCipherFactory does.
+        // SQLCipher applies the key lazily, so a file it cannot decrypt or cannot read opens
+        // without complaint and fails at the first real query. Here that would be worse than
+        // late: the caller treats a successful open as proof the conversion worked, records it,
+        // and deletes the backup -- so the failure would surface from an ordinary application
+        // query with the only readable copy already gone.
+        try {
+            android.database.Cursor probe =
+                    opened.rawQuery("SELECT count(*) FROM sqlite_master", null);
+            try {
+                probe.moveToFirst();
+            } finally {
+                probe.close();
+            }
+        } catch (RuntimeException unreadable) {
+            try {
+                opened.close();
+            } catch (RuntimeException alsoFailed) {
+                // The read failure is the one worth reporting.
+            }
+            throw new IOException("The converted database at " + path + " opened but could not be "
+                    + "read: " + unreadable.getMessage(), unreadable);
+        }
+        return opened;
     }
 
     @Override

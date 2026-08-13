@@ -69,6 +69,12 @@ public class SEDatabase extends Database {
     /** The resolved file this connection holds, as the open-database registry knows it. */
     private String openKey;
 
+    /// Whether this wrapper took a claim in the open-database registry, and so owes it back.
+    ///
+    /// False only for a connection that names no file: an in-memory database has nothing another
+    /// connection can hold, so it neither takes a claim nor gives one back.
+    private boolean registered = true;
+
     /**
      * Cursors created from this connection. Closing the database has to invalidate them, because
      * their statements belong to the connection and are gone once it closes.
@@ -87,8 +93,16 @@ public class SEDatabase extends Database {
      */
     public SEDatabase(java.sql.Connection conn) {
         String fromUrl = fileFromConnection(conn);
+        // A connection on ":memory:" holds no file, which is not the same as a connection whose
+        // file could not be worked out. Registering it as the latter -- which is what a null key
+        // means -- made every unidentified-connection check see it: while one in-memory database
+        // was open, no other database could be deleted or re-keyed, because none of them could be
+        // proved not to be this one. There is nothing here for those checks to protect.
+        registered = fromUrl != null || !namesNoFile(conn);
         try {
-            reserveConnection(fromUrl);
+            if (registered) {
+                reserveConnection(fromUrl);
+            }
         } catch (IOException midConversion) {
             // No checked exception here, because this signature predates the reservation and code
             // that calls it compiles without a catch. So the refusal is carried instead of thrown:
@@ -108,10 +122,47 @@ public class SEDatabase extends Database {
             init(conn, null, fromUrl);
             kept = true;
         } finally {
-            if (!kept) {
+            if (!kept && registered) {
                 releaseConnection(fromUrl);
             }
         }
+    }
+
+    /// Whether this connection's URL names no file at all, as opposed to one this cannot read.
+    ///
+    /// The difference decides whether the connection is counted as unidentified, and that count
+    /// blocks deleting or re-keying every other database while it stands.
+    ///
+    /// #### Parameters
+    ///
+    /// - `conn`: the connection handed to this wrapper
+    ///
+    /// #### Returns
+    ///
+    /// true for an in-memory database, false when the URL could not be read or names a file
+    private static boolean namesNoFile(java.sql.Connection conn) {
+        String url;
+        try {
+            url = conn.getMetaData().getURL();
+        } catch (SQLException cannotAsk) {
+            // Not knowing is exactly the case that has to stay conservative.
+            return false;
+        }
+        if (url == null || !url.startsWith(SQLITE_URL_PREFIX)) {
+            return false;
+        }
+        String rest = url.substring(SQLITE_URL_PREFIX.length());
+        String path = rest;
+        int query = rest.indexOf('?');
+        if (query >= 0) {
+            path = rest.substring(0, query);
+            // The URI form of the same thing: file:name?mode=memory is an in-memory database
+            // whose path looks like a file.
+            if (rest.indexOf("mode=memory") >= 0) {
+                return true;
+            }
+        }
+        return path.length() == 0 || path.startsWith(":");
     }
 
     /// The database file a JDBC connection is open on, canonicalized, or null.
@@ -535,7 +586,9 @@ public class SEDatabase extends Database {
             // Last, not first: until the driver has let the file go this connection still holds
             // and locks it, and giving the claim back sooner lets another connection start
             // rewriting it underneath a rollback that has not finished.
-            releaseOpenDatabase(openKey);
+            if (registered) {
+                releaseOpenDatabase(openKey);
+            }
         }
     }
 

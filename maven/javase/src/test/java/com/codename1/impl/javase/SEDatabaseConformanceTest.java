@@ -286,12 +286,11 @@ public class SEDatabaseConformanceTest {
     }
 
     @Test
-    public void aConnectionWithNoIdentifiableFileBlocksEveryRekey() throws Exception {
-        // An in-memory connection names no file, so it cannot be compared against anything. It is
-        // counted rather than ignored: ignoring it refused only its own key change, while another
-        // handle to the same file still believed it was alone.
-        Connection anonymous = java.sql.DriverManager.getConnection("jdbc:sqlite::memory:");
-        SEDatabase wrapped = new SEDatabase(anonymous);
+    public void aConnectionWhoseFileCannotBeIdentifiedBlocksEveryRekey() throws Exception {
+        // A connection that will not say what it is open on could be open on this file, and a key
+        // change rewrites the file underneath whoever holds it. Not knowing has to read as yes.
+        Connection unreadable = unreadableConnection();
+        SEDatabase wrapped = new SEDatabase(unreadable);
         try {
             boolean refused = false;
             try {
@@ -299,13 +298,60 @@ public class SEDatabaseConformanceTest {
             } catch (java.io.IOException expected) {
                 refused = true;
             }
-            assertTrue(refused, "an unidentified connection blocks the key change");
+            assertTrue(refused, "a connection with no identifiable file blocks the key change");
         } finally {
             wrapped.close();
         }
 
         // Once it closes, the key change goes through again.
         db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+    }
+
+    @Test
+    public void anInMemoryConnectionBlocksNothing() throws Exception {
+        // ":memory:" names no file, which is not the same as a file that could not be worked out.
+        // There is nothing for another connection to hold and nothing for a key change to rewrite,
+        // so counting it as unidentified stopped every unrelated database being deleted or
+        // re-keyed for as long as it stayed open.
+        Connection memory = java.sql.DriverManager.getConnection("jdbc:sqlite::memory:");
+        SEDatabase wrapped = new SEDatabase(memory);
+        try {
+            db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+        } finally {
+            wrapped.close();
+        }
+    }
+
+    /// A connection that refuses to say which URL it is open on, which is the case the registry
+    /// has to treat as "could be anything".
+    private static Connection unreadableConnection() {
+        return (Connection) java.lang.reflect.Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class[] {Connection.class},
+                new java.lang.reflect.InvocationHandler() {
+                    @Override
+                    public Object invoke(Object proxy, java.lang.reflect.Method method,
+                            Object[] args) throws Throwable {
+                        String name = method.getName();
+                        if ("getMetaData".equals(name)) {
+                            throw new java.sql.SQLException("this connection will not say");
+                        }
+                        if ("getAutoCommit".equals(name)) {
+                            return Boolean.TRUE;
+                        }
+                        if ("isClosed".equals(name)) {
+                            return Boolean.FALSE;
+                        }
+                        Class<?> returns = method.getReturnType();
+                        if (returns == boolean.class) {
+                            return Boolean.FALSE;
+                        }
+                        if (returns == int.class) {
+                            return Integer.valueOf(0);
+                        }
+                        return null;
+                    }
+                });
     }
 
     private static Connection openPlain(File f) throws Exception {
