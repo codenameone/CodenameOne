@@ -124,6 +124,23 @@ public class ThreadSafeDatabase extends Database {
         }
     }
 
+    /// The same answer, for a refusal that arrives from the hand-off rather than from the check.
+    ///
+    /// Between reading that the worker is still accepting work and handing it some, the worker
+    /// can decide to leave. EasyThread says so rather than queueing for a thread that has gone,
+    /// and this is that refusal in the wrapper's own terms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `refused`: what EasyThread raised
+    ///
+    /// #### Returns
+    ///
+    /// the error to throw
+    private static IOException closedDuringHandoff(IllegalStateException refused) {
+        return new IOException("This database has been closed", refused);
+    }
+
     private void checkOpen() throws IOException {
         if (closed) {
             throw new IOException("This database has been closed");
@@ -146,11 +163,14 @@ public class ThreadSafeDatabase extends Database {
         }
         synchronized (dispatchLock) {
             checkOpen();
-            // A worker that has drained and ended refuses new work rather than queueing it for
+            // A worker that has been asked to stop refuses new work rather than queueing it for
             // nobody. That can only be reached by a caller which passed the check above before
-            // close() set the flag, and the answer it deserves is the one the check gives.
+            // close() set the flag, and the answer it deserves is the one the check gives. The
+            // refusal can also arrive from the hand-off itself, a moment later, which is why the
+            // call below is wrapped as well.
             requireLiveWorker();
-            err = et.run(new RunnableWithResultSync<Object>() {
+            try {
+                err = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
                 public Object run() {
@@ -167,7 +187,10 @@ public class ThreadSafeDatabase extends Database {
                         return err;
                     }
                 }
-            });
+                });
+            } catch (IllegalStateException refused) {
+                throw closedDuringHandoff(refused);
+            }
         }
         rethrow(err);
     }
@@ -203,7 +226,8 @@ public class ThreadSafeDatabase extends Database {
         synchronized (dispatchLock) {
             checkOpen();
             requireLiveWorker();
-            ret = et.run(new RunnableWithResultSync<Object>() {
+            try {
+                ret = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
                 public Object run() {
@@ -214,7 +238,10 @@ public class ThreadSafeDatabase extends Database {
                         return new Failure(err);
                     }
                 }
-            });
+                });
+            } catch (IllegalStateException refused) {
+                throw closedDuringHandoff(refused);
+            }
         }
         if (ret instanceof Failure) {
             rethrow(((Failure) ret).cause);

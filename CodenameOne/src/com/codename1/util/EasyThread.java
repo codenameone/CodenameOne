@@ -66,8 +66,15 @@ public final class EasyThread {
                                 }
                                 queue.remove(0);
                             } else if (stopWhenDrained) {
-                                // Asked to stop, and there is nothing left to run.
+                                // Asked to stop, and there is nothing left to run. Both flags go
+                                // under this one lock: a caller that read "not finished" and then
+                                // queued would wait on a thread that had already decided to
+                                // leave, so the decision and the refusal have to be the same
+                                // moment. The loop sets it again on its way out, for the paths
+                                // that end it from elsewhere.
                                 running = false;
+                                finished = true;
+                                LOCK.notifyAll();
                             } else {
                                 Util.wait(LOCK);
                             }
@@ -194,12 +201,7 @@ public final class EasyThread {
         final SuccessCallback<T> sc = new RunSuccessCallback<T>(flag, result);
         RunnableWithResult<T> rr = new RunCallbackRunnableWithResult<T>(sc, r);
         synchronized (LOCK) {
-            // A thread that has ended will never take this, and this call blocks until it does.
-            // Saying so beats waiting for an answer that cannot arrive.
-            if (finished) {
-                throw new IllegalStateException("This thread has been stopped and cannot run "
-                        + "anything else");
-            }
+            requireAccepting();
             queue.add(rr);
             queue.add(sc);
             LOCK.notifyAll();
@@ -216,15 +218,27 @@ public final class EasyThread {
     public void runAndWait(final Runnable r) {
         final boolean[] flag = new boolean[1];
         synchronized (LOCK) {
-            // See run(RunnableWithResultSync): this call waits for the thread to run the task.
-            if (finished) {
-                throw new IllegalStateException("This thread has been stopped and cannot run "
-                        + "anything else");
-            }
+            requireAccepting();
             queue.add(new InQueueRunnable(r, flag));
             LOCK.notifyAll();
         }
         Display.getInstance().invokeAndBlock(new RunAndWaitRunnable(flag));
+    }
+
+    /// Refuses work that this thread will not run, for the calls that block until it does.
+    ///
+    /// A stop that has been asked for is enough: `#kill()` drops whatever is queued behind the
+    /// task it interrupts, and `#killWhenIdle()` may already have found the queue empty and
+    /// decided to leave. Both leave a caller waiting for a callback that never arrives, so the
+    /// answer is given here instead. Callers of the fire and forget `#run(Runnable)` are not
+    /// waiting on anything and are left alone.
+    ///
+    /// Must be called while holding `LOCK`.
+    private void requireAccepting() {
+        if (finished || !running || stopWhenDrained) {
+            throw new IllegalStateException("This thread has been stopped and cannot run "
+                    + "anything else");
+        }
     }
 
     /// Stops the thread once everything already queued has run.

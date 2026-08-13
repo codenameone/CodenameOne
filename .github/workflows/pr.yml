@@ -5,45 +5,55 @@ on:
   pull_request:
     branches:
       - master
-    paths-ignore:
-      - '.github/workflows/scripts-android.yml'
-      - '.github/workflows/scripts-ios.yml'
-      - 'scripts/**'
-      - '!scripts/setup-workspace.sh'
-      # The database checks below live in scripts/ and are run from this workflow and nowhere
-      # else, so ignoring the whole directory let a change to one of them merge without ever
-      # running it. Listed after the directory because the last matching pattern decides.
-      - '!scripts/ci/db-cipher-interop.sh'
-      - '!scripts/ci/check-android-cipher-package-compiles.sh'
-      - '!scripts/ci/check-js-sqlite-wasm.sh'
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/workflows/developer-guide-docs.yml'
-      - '.github/workflows/website-docs.yml'
-      - '.github/workflows/initializr-cn1-version-pr.yml'
-      - 'CodenameOneDesigner/**'
-      - 'Ports/IOSPort/**'
+    # paths rather than paths-ignore, because this list both excludes and re-includes and only
+    # this form supports that: a "!" entry in paths-ignore is not a re-inclusion, so the entries
+    # for setup-workspace.sh and the database check scripts below never took effect there. The
+    # last matching pattern decides, so this reads as "everything, except these, except these".
+    paths:
+      - '**'
+      - '!.github/workflows/scripts-android.yml'
+      - '!.github/workflows/scripts-ios.yml'
+      - '!scripts/**'
+      - 'scripts/setup-workspace.sh'
+      # Run from this workflow and nowhere else, so ignoring the whole directory meant a change
+      # to one of them -- including one that breaks the check itself -- merged without it ever
+      # running.
+      - 'scripts/ci/db-cipher-interop.sh'
+      - 'scripts/ci/check-android-cipher-package-compiles.sh'
+      - 'scripts/ci/check-js-sqlite-wasm.sh'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/developer-guide-docs.yml'
+      - '!.github/workflows/website-docs.yml'
+      - '!.github/workflows/initializr-cn1-version-pr.yml'
+      - '!CodenameOneDesigner/**'
+      - '!Ports/IOSPort/**'
   push:
     branches:
       - master
-    paths-ignore:
-      - '.github/workflows/scripts-android.yml'
-      - '.github/workflows/scripts-ios.yml'
-      - 'scripts/**'
-      - '!scripts/setup-workspace.sh'
-      # The database checks below live in scripts/ and are run from this workflow and nowhere
-      # else, so ignoring the whole directory let a change to one of them merge without ever
-      # running it. Listed after the directory because the last matching pattern decides.
-      - '!scripts/ci/db-cipher-interop.sh'
-      - '!scripts/ci/check-android-cipher-package-compiles.sh'
-      - '!scripts/ci/check-js-sqlite-wasm.sh'
-      - 'docs/**'
-      - '**/*.md'
-      - '.github/workflows/developer-guide-docs.yml'
-      - '.github/workflows/website-docs.yml'
-      - '.github/workflows/initializr-cn1-version-pr.yml'
-      - 'CodenameOneDesigner/**'
-      - 'Ports/IOSPort/**'
+    # paths rather than paths-ignore, because this list both excludes and re-includes and only
+    # this form supports that: a "!" entry in paths-ignore is not a re-inclusion, so the entries
+    # for setup-workspace.sh and the database check scripts below never took effect there. The
+    # last matching pattern decides, so this reads as "everything, except these, except these".
+    paths:
+      - '**'
+      - '!.github/workflows/scripts-android.yml'
+      - '!.github/workflows/scripts-ios.yml'
+      - '!scripts/**'
+      - 'scripts/setup-workspace.sh'
+      # Run from this workflow and nowhere else, so ignoring the whole directory meant a change
+      # to one of them -- including one that breaks the check itself -- merged without it ever
+      # running.
+      - 'scripts/ci/db-cipher-interop.sh'
+      - 'scripts/ci/check-android-cipher-package-compiles.sh'
+      - 'scripts/ci/check-js-sqlite-wasm.sh'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/developer-guide-docs.yml'
+      - '!.github/workflows/website-docs.yml'
+      - '!.github/workflows/initializr-cn1-version-pr.yml'
+      - '!CodenameOneDesigner/**'
+      - '!Ports/IOSPort/**'
 
 permissions:
   contents: write
