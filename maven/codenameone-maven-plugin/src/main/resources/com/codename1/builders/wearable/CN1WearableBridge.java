@@ -2999,9 +2999,29 @@ public class CN1WearableBridge implements WearableBridge {
         // exactly the case a single acknowledgement would get wrong. Never ourselves -- our own
         // items are echoed back, and waiting for an acknowledgement this device will never write
         // would pin every transfer to the cap.
+        // CAPABILITY peers only. bondedNodeIds() asks the capability client, so it lists the peers
+        // that actually run this app; connectedNodes() is the unscoped Data Layer list and includes
+        // any watch paired to the phone. Adding those back put devices in the quorum that cannot
+        // publish an acknowledgement even in principle -- no app, no listener, nothing to write it
+        // -- so allTook never became true and a file every real recipient had taken stayed
+        // published until the seven-day hard cap.
         final java.util.Set<String> expected = new java.util.HashSet<String>(bondedNodeIds());
-        for (Node connected : connectedNodes()) {
-            expected.add(connected.getId());
+        // Not asked yet is not the same as nobody has it. This sweep runs on the transfer worker,
+        // which is allowed to block, so bondedNodeIds() above has just made the blocking query --
+        // and if it still has no answer the query failed or timed out. Deciding on an empty quorum
+        // then would retire a transfer nothing has acknowledged. Leave it, and let the deferred
+        // sweep look again once the capability list is real.
+        if (!bondedKnown) {
+            android.util.Log.w("CN1Wearable", "deferring the transfer sweep: the capability list"
+                    + " is not known yet, so there is no quorum to judge against");
+            synchronized (sweepLock) {
+                // Released before the deferral is armed, or the sweep it schedules finds one still
+                // in progress and returns. scheduleDeferredSweep requires this monitor held, which
+                // is why both happen here rather than around a bare call.
+                sweepScheduled = false;
+                scheduleDeferredSweep(SWEEP_MIN_INTERVAL_MILLIS);
+            }
+            return;
         }
         expected.remove(localNodeId(context));
         transferTimer.schedule(new Runnable() {
