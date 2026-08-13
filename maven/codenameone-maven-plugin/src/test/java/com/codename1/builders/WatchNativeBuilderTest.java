@@ -808,10 +808,15 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("AvailableLibraries"), ruby);
         assertTrue(ruby.contains("cn1_watch_bundle_supports_watchos(ref)"),
                 "a non-SDKROOT reference must be judged by its own bundle: " + ruby);
-        // BOTH watch variants: the target builds for watchos AND watchsimulator, so a bundle
-        // carrying only the device library links on hardware and breaks every simulator run.
+        // EITHER watch variant, not both. This generator hands the developer an Xcode project
+        // and cannot know which destination they will build for, so a bundle or archive carrying
+        // only the device slice is usable -- requiring both rejected it and the framework phase
+        // then skipped it, failing the watch target on undefined symbols. The cloud builder does
+        // know its destination and asks for exactly the matching one.
         assertTrue(ruby.contains("SupportedPlatformVariant"), ruby);
-        assertTrue(ruby.contains("device && simulator"), ruby);
+        assertTrue(ruby.contains("device || simulator"), ruby);
+        assertFalse(ruby.contains("device && simulator"),
+                "requiring both slices is what rejected a valid device-only archive: " + ruby);
         assertTrue(ruby.contains("names.include?('watchsimulator')"), ruby);
         // Linking alone is not enough. The linker has to be told where the binary lives, and a
         // dynamic framework has to be copied into the watch bundle or it fails at install time.

@@ -2079,7 +2079,17 @@ class WatchNativeBuilder {
                 // built for, so ask it.
                 .append("  simulator = archs.any? { |a| (a == 'x86_64' || a == 'arm64') && "
                         + "cn1_watch_slice_is_watch_simulator(path, a) }\n")
-                .append("  watch = device && simulator\n")
+                // EITHER slice, not both.
+                //
+                // Demanding both rejected a valid watchOS-only archive, and the framework phase
+                // then skipped it and the watch target failed on undefined symbols -- over a
+                // simulator slice that a device build was never going to load.
+                //
+                // Either, rather than a specific one, because this generator hands the developer
+                // an Xcode project and does not know which destination they will build for. The
+                // cloud builder does know -- it selects the SDK itself -- and requires exactly the
+                // slice that destination links against.
+                .append("  watch = device || simulator\n")
                 .append("  puts \"[watchNative] #{File.basename(path)} #{watch ? 'has' : 'has no'}"
                         + " usable watchOS slices (#{archs.empty? ? 'unknown' : archs.join(' ')}; "
                         + "device=#{device} simulator=#{simulator})\"\n")
@@ -2101,15 +2111,15 @@ class WatchNativeBuilder {
                 .append("    return false\n")
                 .append("  end\n")
                 .append("  return false unless info.is_a?(Hash)\n")
-                // BOTH watch variants, because the target is built for both destinations. A plain
-                // .framework declaring only WatchOS links on a device and fails in the simulator
-                // with no compatible slice, which is the same asymmetry the system-framework check
-                // above already guards against by requiring presence in both SDKs.
+                // EITHER watch variant. Requiring both rejected a bundle that declares only
+                // WatchOS, which links perfectly well on a device -- and this generator does not
+                // know which destination the developer will pick, so it cannot require the other.
+                // The cloud builder selects the SDK itself and asks for the matching one.
                 .append("  platforms = info['CFBundleSupportedPlatforms']\n")
                 .append("  if platforms.is_a?(Array)\n")
                 .append("    names = platforms.map { |p| p.to_s.downcase }\n")
                 .append("    if names.any? { |p| p.start_with?('watch') }\n")
-                .append("      return names.include?('watchos') && "
+                .append("      return names.include?('watchos') || "
                         + "names.include?('watchsimulator')\n")
                 .append("    end\n")
                 .append("  end\n")
@@ -2125,7 +2135,7 @@ class WatchNativeBuilder {
                         + "l['SupportedPlatformVariant'].to_s.strip.empty? }\n")
                 .append("  simulator = watch.any? { |l| "
                         + "l['SupportedPlatformVariant'].to_s.downcase == 'simulator' }\n")
-                .append("  device && simulator\n")
+                .append("  device || simulator\n")
                 .append("end\n")
                 .append("vendored_linked = false\n")
                 .append("watch_sdks = ['watchos', 'watchsimulator'].map { |sdk| "
