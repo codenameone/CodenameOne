@@ -615,13 +615,25 @@ class AndroidCipherDB extends Database {
         try {
             AndroidImplementation.writeDatabaseMigrationMarker(path, backup, null);
         } catch (IOException cannotRecord) {
-            // The conversion is done and the database is open under its new key. The backup is
-            // still there and still named by a marker that calls the installed file unproven, so
-            // the next open puts the original back -- report that rather than leaving the caller
-            // believing a conversion that is about to be undone.
+            // The conversion is done and the database is open under its new key, but the marker
+            // still calls the installed file unproven, so the next open puts the original back.
+            // Anything written through this handle before then goes with it, and a caller that
+            // catches this and carries on has no way to know that. Closing it is the only honest
+            // answer: writes that cannot be kept must not be accepted.
+            SQLiteDatabase unproven = db;
+            db = null;
+            if (unproven != null) {
+                try {
+                    unproven.close();
+                } catch (RuntimeException alsoFailed) {
+                    // The recording failure is the one worth reporting.
+                }
+            }
             throw new IOException("The database was converted but the state could not be "
                     + "recorded, so the next open will restore the original from " + backup
-                    + " and undo it: " + cannotRecord.getMessage(), cannotRecord);
+                    + " and undo it. The converted database was closed rather than left open to "
+                    + "accept writes that would go with it: " + cannotRecord.getMessage(),
+                    cannotRecord);
         }
         // The backup is the database in its previous form. After an encrypt that means a
         // plaintext copy of what is now an encrypted database, sitting at a predictable name --

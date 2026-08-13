@@ -11632,6 +11632,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         + "never shown to open, and there is nowhere to move it aside to. The "
                         + "original is intact at " + backup + "; nothing was overwritten.");
             }
+            // Named in the marker before the first rename, in the slot an export is named in.
+            // The two renames below are not one step: a process dying between them leaves the
+            // converted file under a name nothing knows about, and the recovery after that takes
+            // the branch above -- restores the backup, deletes the marker, and leaves that file
+            // beside the database for good. After a failed decryption it is a plaintext copy.
+            // Recorded first, the next recovery finds it exactly where it finds an abandoned
+            // export, and discards it the same way.
+            try {
+                markDatabaseMigrationUnvalidated(path, backup, displaced);
+            } catch (IOException cannotRecord) {
+                throw new IOException("The database " + path + " holds a converted file that was "
+                        + "never shown to open, and where it is about to be moved could not be "
+                        + "recorded. The original is intact at " + backup + "; nothing was moved.",
+                        cannotRecord);
+            }
             if (!live.renameTo(displaced) || !backup.renameTo(live)) {
                 throw new IOException("The database " + path + " holds a converted file that was "
                         + "never shown to open, and the original at " + backup + " could not be "
