@@ -10985,7 +10985,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             // A plaintext open of a database mid-conversion would create an empty one over the
             // top of the real data, which nothing afterwards could undo.
-            recoverInterruptedDatabaseMigration(nativePath);
+            //
+            // One connection is allowed to be open here, and it is the reservation taken above.
+            // Anything beyond that is somebody else's handle -- including one taken through the
+            // constructor that wraps an already-open connection -- and recovery moves the file
+            // out from under it. When that is the case the marker is left for the next open that
+            // has the file to itself, and this open proceeds against the file as it stands.
+            recoverIfSoleConnection(nativePath);
             if (databaseName.startsWith("file://")) {
                 db = SQLiteDatabase.openOrCreateDatabase(
                         FileSystemStorage.getInstance().toNativePath(databaseName), null,
@@ -11337,6 +11343,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         MIGRATING_DATABASES.add(path);
     }
 
+    /// Recovers an interrupted conversion, but only for an open that has the file to itself.
+    ///
+    /// Called from the open paths, plaintext and encrypted, each of which has already reserved
+    /// its own connection -- so one open connection is this caller and anything beyond it is
+    /// somebody else's handle, including one taken through the constructor that wraps an
+    /// already-open connection. Recovery renames the live file aside and puts a backup back, and
+    /// a connection attached to the displaced file keeps accepting writes that go nowhere, so it
+    /// is left for the next open that has the file alone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rawPath`: the database file
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the recovery itself fails
+    public static void recoverIfSoleConnection(String rawPath) throws IOException {
+        if (claimDatabaseForRecovery(rawPath, 1)) {
+            try {
+                recoverInterruptedDatabaseMigration(rawPath);
+            } finally {
+                endDatabaseMigration(rawPath);
+            }
+        }
+    }
+
     /// Takes the conversion claim for a recovery, or reports that a conversion already holds it.
     ///
     /// Recovery moves the same three files a conversion does, so the two must not overlap. The
@@ -11350,9 +11382,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// #### Returns
     ///
     /// true when the claim was taken and must be given back
-    private static synchronized boolean claimDatabaseForRecovery(String rawPath) {
+    private static synchronized boolean claimDatabaseForRecovery(String rawPath,
+            int connectionsOfOurOwn) {
         String path = databaseKey(rawPath);
         if (path == null || MIGRATING_DATABASES.contains(path)) {
+            return false;
+        }
+        Integer count = OPEN_DATABASE_CONNECTIONS.get(path);
+        if (count != null && count.intValue() > connectionsOfOurOwn) {
+            // Somebody else holds the file. Recovery renames the live file aside and puts a
+            // backup back, and a connection already attached to the displaced file keeps
+            // accepting writes that go nowhere -- worst of all for a conversion whose converted
+            // file was never validated, where the backup is what recovery installs. Refusing
+            // leaves the marker in place for the next open that has the file to itself.
             return false;
         }
         MIGRATING_DATABASES.add(path);
@@ -11813,7 +11855,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // delete the export it was writing, restore the backup during the swap, or -- the worst
         // of the three -- remove the backup before the converted file had been validated, which
         // is the copy the conversion falls back to when the reopen fails.
-        if (!claimDatabaseForRecovery(path)) {
+        if (!claimDatabaseForRecovery(path, 0)) {
             // A conversion is mid-flight and owns both the live file and its working copies.
             // Recovering underneath it would act on a half-installed state, so this answers from
             // what the conversion has not yet consumed instead.

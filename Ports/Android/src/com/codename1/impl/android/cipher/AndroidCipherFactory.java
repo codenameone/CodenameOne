@@ -105,9 +105,10 @@ public class AndroidCipherFactory {
             parent.mkdirs();
         }
         // Shared with the plaintext open path, which needs it just as much: the migration
-        // leaves the live name missing for an instant either way.
-        com.codename1.impl.android.AndroidImplementation.recoverInterruptedDatabaseMigration(
-                file.getPath());
+        // leaves the live name missing for an instant either way. Only when this open has the
+        // file to itself, though -- recovery moves the live file aside, and a connection already
+        // attached to it would go on accepting writes that end up discarded.
+        com.codename1.impl.android.AndroidImplementation.recoverIfSoleConnection(file.getPath());
         SQLiteDatabase db = null;
         try {
             db = SQLiteDatabase.openOrCreateDatabase(file, key, null, null);

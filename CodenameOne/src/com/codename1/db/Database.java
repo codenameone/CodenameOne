@@ -280,12 +280,12 @@ public abstract class Database {
             // open databases itself.
             return null;
         }
-        if (key != null) {
-            if (isDatabaseBeingDeleted(key)) {
-                throw new IOException("The database " + databaseName + " is already being "
-                        + "deleted.");
-            }
-            takeDeleteClaim(key);
+        if (key != null && !takeDeleteClaim(key)) {
+            // One call, not a look followed by a claim: two deletes of the same database would
+            // both pass the look before either claimed it, and the first to finish would release
+            // the entry while the second was still unlinking -- reopening the door this exists
+            // to hold shut.
+            throw new IOException("The database " + databaseName + " is already being deleted.");
         }
         // Counted after the claim is taken, and deliberately not while holding this class's lock.
         //
@@ -314,8 +314,21 @@ public abstract class Database {
         return key;
     }
 
-    private static synchronized void takeDeleteClaim(String key) {
+    /// Claims a file for deletion, unless a delete already holds it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the identity the ports register connections under
+    ///
+    /// #### Returns
+    ///
+    /// true if this call took the claim and must give it back
+    private static synchronized boolean takeDeleteClaim(String key) {
+        if (DELETING_DATABASES.containsKey(key)) {
+            return false;
+        }
         DELETING_DATABASES.put(key, Boolean.TRUE);
+        return true;
     }
 
     private static synchronized void releaseDeleteClaim(String key) {
