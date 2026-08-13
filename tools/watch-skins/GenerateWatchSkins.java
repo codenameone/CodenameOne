@@ -243,7 +243,15 @@ public class GenerateWatchSkins {
         StringBuilder p = new StringBuilder();
         p.append("# ").append(m.label).append(" - Codename One simulator skin (placeholder art)\n");
         p.append("touch=true\n");
-        p.append("ppi=326\n");
+        // The density that matches the units this model's dimensions are in.
+        //
+        // JavaSEPort turns ppi into pixelMilliRatio = ppi / 25.4, which is what every
+        // millimetre-based size is converted through. The Apple models are in logical points, so
+        // the physical Retina 326 made every convertToPixels() result twice the size it is on the
+        // device -- where IOSImplementation.getDeviceDensity() sees a display narrower than 500
+        // and answers DENSITY_MEDIUM, the ~163 logical density. The Wear models are in pixels and
+        // keep the physical figure.
+        p.append("ppi=").append(ANDROID_THEME.equals(m.themeEntry) ? 326 : 163).append('\n');
         p.append("smallFontSize=").append(Math.round(m.dw * 0.045f)).append('\n');
         p.append("mediumFontSize=").append(Math.round(m.dw * 0.06f)).append('\n');
         p.append("largeFontSize=").append(Math.round(m.dw * 0.08f)).append('\n');
