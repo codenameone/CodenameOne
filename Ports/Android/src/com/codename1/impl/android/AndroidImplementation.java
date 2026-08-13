@@ -11497,6 +11497,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         writeMarker(path, backup, null, true);
     }
 
+    /// The same, for a conversion whose export has not been installed yet.
+    ///
+    /// The export has to stay named while it still exists under its own name, or recovery cannot
+    /// find it to clean it up -- and a conversion interrupted here leaves a complete copy of the
+    /// database in the migration directory, which after a decryption is a plaintext one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the live database
+    /// - `backup`: the file the original was moved to
+    /// - `target`: the export, while it is still under its own name
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the record cannot be written
+    public static void markDatabaseMigrationUnvalidated(String path, File backup, File target)
+            throws IOException {
+        writeMarker(path, backup, target, true);
+    }
+
     public static void writeDatabaseMigrationMarker(String path, File backup, File target)
             throws IOException {
         writeMarker(path, backup, target, false);

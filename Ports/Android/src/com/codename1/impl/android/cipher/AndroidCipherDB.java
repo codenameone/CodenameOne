@@ -533,6 +533,32 @@ class AndroidCipherDB extends Database {
             throw new IOException("The database " + path + " could not be moved aside, so it was "
                     + "left as it was and not converted." + surviving);
         }
+        // Recorded before the install, not after it fails to open. A process that dies between
+        // the rename below and the reopen after it leaves both files present with nothing thrown
+        // and nobody to record anything -- and recovery reads a live file plus a backup as a
+        // completed conversion and deletes the backup. If the installed file is unreadable or was
+        // never durably flushed, that was the last usable copy. Written first, the state on disk
+        // says "installed but not yet proven" for the whole window, and recovery puts the backup
+        // back instead.
+        try {
+            // The export stays named while it is still under its own name: recovery cleans up an
+            // export it can find, and a conversion interrupted here leaves a complete copy of the
+            // database behind -- after a decryption, a plaintext one.
+            AndroidImplementation.markDatabaseMigrationUnvalidated(path, backup, target);
+        } catch (IOException cannotRecord) {
+            String surviving = discardExport(target);
+            if (backup.renameTo(original)) {
+                marker.delete();
+                db = openAt(path, currentKey);
+                throw new IOException("The conversion could not be marked as unproven, so it was "
+                        + "not installed and the original was put back: "
+                        + cannotRecord.getMessage() + surviving, cannotRecord);
+            }
+            throw new IOException("The conversion could not be marked as unproven and the "
+                    + "original could not be put back either. The original is intact at " + backup
+                    + " -- do not delete it: " + cannotRecord.getMessage() + surviving,
+                    cannotRecord);
+        }
         if (!target.renameTo(original)) {
             if (!backup.renameTo(original)) {
                 // The marker stays: the backup still holds the data and recovery has to find it.
@@ -572,19 +598,8 @@ class AndroidCipherDB extends Database {
                         + "original was put back and nothing was converted: "
                         + cannotOpenConverted.getMessage(), cannotOpenConverted);
             }
-            // The converted file is installed and will not open, and it could not be taken back
-            // out to make room for the original. Both files exist, which recovery would otherwise
-            // read as a completed conversion and act on by deleting the backup -- the last
-            // readable copy. Recording that the installed file was never validated is what makes
-            // recovery put the backup back instead.
-            try {
-                AndroidImplementation.markDatabaseMigrationUnvalidated(path, backup);
-            } catch (IOException cannotRecord) {
-                throw new IOException("The converted database at " + path + " could not be opened, "
-                        + "the original could not be put back, and the state could not be recorded "
-                        + "either. The original is intact at " + backup + " -- do not delete it: "
-                        + cannotRecord.getMessage(), cannotOpenConverted);
-            }
+            // Nothing to record here: the marker has said the installed file was unproven since
+            // before it was installed, which is what makes recovery put the backup back.
             // Do not reopen, for the reason given where the two renames fail.
             throw new IOException("The converted database at " + path + " could not be opened and "
                     + "the original could not be put back either. The original is intact at "
@@ -593,6 +608,21 @@ class AndroidCipherDB extends Database {
                     + cannotOpenConverted.getMessage(), cannotOpenConverted);
         }
         currentKey = targetKey;
+        // Proven now, and said so before the backup is dropped. Left unproven, a process death
+        // between here and the marker's removal would have recovery put the backup back and undo
+        // a conversion that worked -- which after an encrypt means quietly restoring the
+        // plaintext copy of a database the application was told is encrypted.
+        try {
+            AndroidImplementation.writeDatabaseMigrationMarker(path, backup, null);
+        } catch (IOException cannotRecord) {
+            // The conversion is done and the database is open under its new key. The backup is
+            // still there and still named by a marker that calls the installed file unproven, so
+            // the next open puts the original back -- report that rather than leaving the caller
+            // believing a conversion that is about to be undone.
+            throw new IOException("The database was converted but the state could not be "
+                    + "recorded, so the next open will restore the original from " + backup
+                    + " and undo it: " + cannotRecord.getMessage(), cannotRecord);
+        }
         // The backup is the database in its previous form. After an encrypt that means a
         // plaintext copy of what is now an encrypted database, sitting at a predictable name --
         // which defeats the encryption entirely, so its removal is checked rather than assumed.
