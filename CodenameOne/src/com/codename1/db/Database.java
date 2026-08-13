@@ -296,6 +296,17 @@ public abstract class Database {
         // first and counting afterwards needs neither thread to hold both: an open that got in
         // before the claim has already incremented the count this reads, and one that arrives
         // after it is refused by the claim.
+        if (unidentifiedConnectionsOpen()) {
+            // Something is open that could not say which file it holds, so it could be this one.
+            // A connection taken by SEDatabase(Connection) whose URL names no file counts here
+            // and nowhere else, and unlinking underneath it loses everything it writes from then
+            // on. Refusing is the only safe reading of "I do not know", which is what a key
+            // change does with the same counter.
+            releaseDeleteClaim(key);
+            throw new IOException("A database opened from a connection is still open, and there "
+                    + "is no way to tell whether it holds " + databaseName + ". Close it before "
+                    + "deleting this database.");
+        }
         boolean open;
         try {
             open = openDatabaseCount(key) > 0
@@ -324,11 +335,69 @@ public abstract class Database {
     ///
     /// true if this call took the claim and must give it back
     private static synchronized boolean takeDeleteClaim(String key) {
-        if (DELETING_DATABASES.containsKey(key)) {
+        if (DELETING_DATABASES.containsKey(key) || CONVERTING_DATABASES.containsKey(key)
+                || REKEYING_DATABASES.containsKey(key)) {
+            // A conversion holds the file from before it checks the database exists until the
+            // rewrite is over. Deleting inside that window is what lets encrypt() report success
+            // over a database that is no longer there.
             return false;
         }
         DELETING_DATABASES.put(key, Boolean.TRUE);
         return true;
+    }
+
+    /// Whether any connection is open that could not say which file it holds.
+    private static synchronized boolean unidentifiedConnectionsOpen() {
+        return unidentifiedOpenDatabases > 0;
+    }
+
+    /// Files a conversion is working on, from the existence check to the end of the rewrite.
+    ///
+    /// `REKEYING_DATABASES` covers the rewrite itself, which is claimed once the database is
+    /// open. This one is taken before that, because `#encrypt(String, DatabaseConfig)` checks
+    /// that the database exists and then opens it, and the open creates one where a delete
+    /// landing in between removed it -- so the conversion would re-key an empty database and
+    /// report success.
+    private static final java.util.Hashtable CONVERTING_DATABASES = new java.util.Hashtable();
+
+    /// Claims a database for a conversion, so a delete cannot run underneath it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name being converted
+    ///
+    /// #### Returns
+    ///
+    /// the claimed key, or null when this port could not identify the file
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database is being deleted, or already being converted
+    private static synchronized String claimForConversion(String databaseName) throws IOException {
+        String key;
+        try {
+            key = Display.getInstance().databaseManagedKeyIdentity(databaseName);
+        } catch (RuntimeException cannotResolve) {
+            return null;
+        }
+        if (key == null) {
+            return null;
+        }
+        if (DELETING_DATABASES.containsKey(key)) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + databaseName + " is being deleted.");
+        }
+        if (CONVERTING_DATABASES.put(key, Boolean.TRUE) != null) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                    "The database " + databaseName + " is already being converted.");
+        }
+        return key;
+    }
+
+    private static synchronized void releaseConversionClaim(String key) {
+        if (key != null) {
+            CONVERTING_DATABASES.remove(key);
+        }
     }
 
     private static synchronized void releaseDeleteClaim(String key) {
@@ -539,12 +608,20 @@ public abstract class Database {
         // Not openOrCreate: on Android the system SQLite has no cipher, so a database opened
         // through it could never be re-keyed. The platform decides which engine can do this.
         validateDatabaseNameArgument(databaseName);
-        requireExistingDatabase(databaseName, "encrypt");
-        Database db = Display.getInstance().openOrCreateForRekey(databaseName);
+        // Claimed before the database is even looked for, and held until the rewrite is done:
+        // the open below creates what it does not find, so a delete landing between the check
+        // and the open would leave this re-keying an empty database and reporting success.
+        String conversion = claimForConversion(databaseName);
         try {
-            db.changeKey(config);
+            requireExistingDatabase(databaseName, "encrypt");
+            Database db = Display.getInstance().openOrCreateForRekey(databaseName);
+            try {
+                db.changeKey(config);
+            } finally {
+                db.close();
+            }
         } finally {
-            db.close();
+            releaseConversionClaim(conversion);
         }
     }
 
@@ -564,12 +641,20 @@ public abstract class Database {
             throw new IllegalArgumentException("decrypt() requires the config that currently opens the database");
         }
         validateDatabaseNameArgument(databaseName);
-        requireExistingDatabase(databaseName, "decrypt");
-        Database db = openOrCreate(databaseName, config);
+        // Claimed before the database is even looked for, and held until the rewrite is done:
+        // the open below creates what it does not find, so a delete landing between the check
+        // and the open would leave this re-keying an empty database and reporting success.
+        String conversion = claimForConversion(databaseName);
         try {
-            db.changeKey(DatabaseConfig.plain());
+            requireExistingDatabase(databaseName, "decrypt");
+            Database db = openOrCreate(databaseName, config);
+            try {
+                db.changeKey(DatabaseConfig.plain());
+            } finally {
+                db.close();
+            }
         } finally {
-            db.close();
+            releaseConversionClaim(conversion);
         }
     }
 

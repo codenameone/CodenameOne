@@ -3941,7 +3941,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             this.name = name;
         }
 
-        void markOpen() {
+        void markOpen() throws IOException {
+            // Registered the way a real port registers, because part of the contract these tests
+            // exercise is enforced from that registry: a delete refuses while a connection is
+            // open, and a double that never registered would make the check pass on nothing.
+            registerOpenDatabase(normalizeDatabaseKey(name));
             closed = false;
         }
 
@@ -4017,6 +4021,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         @Override
         public void close() throws IOException {
+            if (!closed) {
+                releaseOpenDatabase(Database.normalizeDatabaseKey(name));
+            }
             closed = true;
         }
 
