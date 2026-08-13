@@ -716,6 +716,7 @@ public class SEDatabase extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
@@ -747,11 +748,13 @@ public class SEDatabase extends Database {
         if (params == null || params.length == 0) {
             if (params != null) {
                 requireSingleStatement(sql);
+                requireQueryStatement(sql);
             }
             return executeQuery(sql);
         }
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);
@@ -774,6 +777,7 @@ public class SEDatabase extends Database {
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         PreparedStatement s = null;
         try {
             s = conn.prepareStatement(sql);

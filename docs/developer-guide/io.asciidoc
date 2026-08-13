@@ -414,6 +414,7 @@ The hint works in the simulator too, so you can test either mode without a devic
 | Malformed SQL surfaces from `next()` rather than from `executeQuery` | Android
 | `rollbackTransaction` leaves the connection outside autocommit | Simulator
 | `getColumnName` reports the table column rather than the result set label | Simulator
+| `executeQuery` accepts a transaction control statement such as `BEGIN` | all
 |====
 
 The flag doesn't cover defects, nor capabilities that used to throw and now work:

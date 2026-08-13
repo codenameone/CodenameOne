@@ -745,6 +745,7 @@ class AndroidCipherDB extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         checkParameterCount(sql, params == null ? 0 : params.length);
         try {
             if (params != null && !isLegacyBehavior() && hasNull(params)) {
@@ -764,11 +765,13 @@ class AndroidCipherDB extends Database {
         if (params == null || params.length == 0) {
             if (params != null) {
                 requireSingleStatement(sql);
+                requireQueryStatement(sql);
             }
             return executeQuery(sql);
         }
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         checkParameterCount(sql, params.length);
         if (isLegacyBehavior() && !hasBlob(params)) {
             // rawQuery can only carry text, which is what this port used to do to every query

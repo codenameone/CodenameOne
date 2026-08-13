@@ -1191,6 +1191,35 @@ public final class DatabaseConformanceSuite {
             }
             db.execute("DROP TABLE IF EXISTS conf_tx_unique");
 
+            // ---- transaction control is not something executeQuery will run
+            // A cursor runs its statement when it is stepped, so a BEGIN reached this way opens a
+            // transaction nothing recorded: isInTransaction() then answers false over an open one
+            // and a key change is allowed across live work. Refused, and the check is that the
+            // refusal happened AND no transaction was left behind by it.
+            boolean queryControlRefused = false;
+            Cursor control = null;
+            try {
+                control = db.executeQuery("BEGIN");
+            } catch (IOException expected) {
+                queryControlRefused = true;
+            }
+            if (control != null) {
+                try {
+                    control.close();
+                } catch (IOException ignored) {
+                    // The refusal above is what is under test.
+                }
+            }
+            // Note for whoever reads a failure here: the simulator routes transaction control
+            // through the driver from executeQuery as well, so it satisfies this whether or not
+            // the refusal is in place. The ports that prepare and step are the ones this is for,
+            // and they only run the statement when the cursor is stepped.
+            r.check(queryControlRefused, "executeQuery refuses a transaction control statement");
+            r.check(!db.isInTransaction(), "and it did not leave a transaction open");
+            if (db.isInTransaction()) {
+                db.rollbackTransaction();
+            }
+
             // ---- a cursor over a writing statement never runs it twice
             // executeQuery prepares and steps, so an INSERT ... RETURNING does its insert while
             // the cursor is walked. Anything that rewinds -- getCount(), last(), going backwards

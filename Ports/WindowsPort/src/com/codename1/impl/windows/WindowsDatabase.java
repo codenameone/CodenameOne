@@ -299,6 +299,7 @@ class WindowsDatabase extends Database {
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         // A statement with placeholders and no arguments would otherwise run with every slot left
         // as NULL rather than reporting the missing parameters. The check is a no-op in legacy
@@ -318,6 +319,7 @@ class WindowsDatabase extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         bindText(stmt, params);
         return register(new CursorImpl(stmt), sql);
@@ -328,11 +330,13 @@ class WindowsDatabase extends Database {
         if (params == null || params.length == 0) {
             if (params != null) {
                 requireSingleStatement(sql);
+                requireQueryStatement(sql);
             }
             return executeQuery(sql);
         }
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = WindowsNative.sqlStmtPrepare(peer, sql);
         bind(stmt, params);
         return register(new CursorImpl(stmt), sql);

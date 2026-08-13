@@ -310,7 +310,12 @@ public final class SQLStatementSplitter {
     /// the statement may re-execute it.
     private static final String[] WRITING_KEYWORDS = {
         "INSERT", "UPDATE", "DELETE", "REPLACE", "CREATE", "DROP", "ALTER", "VACUUM",
-        "REINDEX", "ATTACH", "DETACH", "ANALYZE", "PRAGMA"
+        "REINDEX", "ATTACH", "DETACH", "ANALYZE", "PRAGMA",
+        // Transaction control changes the connection rather than the data, and re-running it is
+        // just as wrong: a cursor rewound over a BEGIN opens a second transaction, and over a
+        // COMMIT ends one that is no longer there. executeQuery refuses these outright, so this
+        // is the second answer to the same question rather than the only one.
+        "BEGIN", "COMMIT", "END", "ROLLBACK", "SAVEPOINT", "RELEASE"
     };
 
     /// The pragmas that only report, and so may be walked backwards like any query.

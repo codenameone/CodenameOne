@@ -1218,6 +1218,42 @@ public abstract class Database {
     /// opens a transaction, and reading the keyword as empty would leave this believing none was
     /// opened. The Android port relies on the same fact deliberately, prefixing a comment to a
     /// ROLLBACK to get it past a statement classifier that reads the first three characters.
+    /// Refuses transaction control handed to `executeQuery`.
+    ///
+    /// A cursor runs its statement when it is stepped, so `executeQuery("BEGIN")` opens a real
+    /// transaction that nothing here recorded: `#isInTransaction()` answers false over an open
+    /// one, a typed commit fails, and a key change is allowed across live work. Navigating the
+    /// cursor could run the control statement a second time on top of that.
+    ///
+    /// The tracked ways in are `#beginTransaction()` and `execute`, both of which record what
+    /// they ran. This is not a capability being withdrawn: a transaction control statement
+    /// returns no rows, so asking for a cursor over one was never useful.
+    ///
+    /// Skipped under the legacy hint, which restores what each port used to do with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the statement handed to executeQuery
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the statement is transaction control
+    protected void requireQueryStatement(String sql) throws IOException {
+        if (isLegacyBehavior() || sql == null) {
+            return;
+        }
+        String keyword = leadingKeyword(sql);
+        if ("BEGIN".equals(keyword) || "COMMIT".equals(keyword) || "END".equals(keyword)
+                || "ROLLBACK".equals(keyword) || "SAVEPOINT".equals(keyword)
+                || "RELEASE".equals(keyword)) {
+            throw new IOException("Transaction control cannot be run through executeQuery: a "
+                    + "cursor runs its statement when it is stepped, so the transaction would be "
+                    + "opened or closed without this database knowing. Use beginTransaction(), "
+                    + "commitTransaction(), rollbackTransaction(), or execute(\"" + keyword
+                    + " ...\").");
+        }
+    }
+
     private static String leadingKeyword(String statement) {
         int start = skipLeadingTrivia(statement, 0);
         int length = statement.length();

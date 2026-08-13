@@ -304,6 +304,7 @@ class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = IOSImplementation.nativeInstance.sqlStmtPrepare(peer, sql);
         bindText(stmt, params);
         return register(new CursorImpl(stmt), sql);
@@ -314,11 +315,13 @@ class DatabaseImpl extends Database {
         if (params == null || params.length == 0) {
             if (params != null) {
                 requireSingleStatement(sql);
+                requireQueryStatement(sql);
             }
             return executeQuery(sql);
         }
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         if (isLegacyBehavior()) {
             return executeQuery(sql, coerceToText(params, "executeQuery"));
         }
@@ -331,6 +334,7 @@ class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         if (isLegacyBehavior()) {
             return register(new CursorImpl(
                     IOSImplementation.nativeInstance.sqlDbExecQuery(peer, sql, null)), sql);

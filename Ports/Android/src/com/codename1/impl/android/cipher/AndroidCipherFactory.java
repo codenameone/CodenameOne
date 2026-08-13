@@ -130,7 +130,17 @@ public class AndroidCipherFactory {
             // SQLCipher applies the key lazily, so without reading something now a wrong key
             // would not surface until some later and apparently unrelated query. This read is the
             // only failure here that actually means the key is wrong.
-            db.rawQuery("SELECT count(*) FROM sqlite_master", null).close();
+            //
+            // Stepped, not just opened. rawQuery hands back a cursor that has run nothing yet, so
+            // creating one and closing it reads no page and proves no key -- the open would look
+            // like a success and the wrong key would surface later as a plain IOException from
+            // whatever query the application ran next, with WRONG_KEY never reported.
+            android.database.Cursor probe = db.rawQuery("SELECT count(*) FROM sqlite_master", null);
+            try {
+                probe.moveToFirst();
+            } finally {
+                probe.close();
+            }
             return new AndroidCipherDB(db, databaseName, key);
         } catch (RuntimeException err) {
             try {

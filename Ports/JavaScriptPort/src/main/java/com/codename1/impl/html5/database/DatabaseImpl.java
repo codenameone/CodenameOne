@@ -304,6 +304,7 @@ public class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
         checkPrepared(stmt);
         // A statement with placeholders and no arguments would otherwise run with every slot left
@@ -324,6 +325,7 @@ public class DatabaseImpl extends Database {
     public Cursor executeQuery(String sql, String[] params) throws IOException {
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
         checkPrepared(stmt);
         bindText(stmt, params);
@@ -335,11 +337,13 @@ public class DatabaseImpl extends Database {
         if (params == null || params.length == 0) {
             if (params != null) {
                 requireSingleStatement(sql);
+                requireQueryStatement(sql);
             }
             return executeQuery(sql);
         }
         checkOpen();
         requireSingleStatement(sql);
+        requireQueryStatement(sql);
         long stmt = SQLiteNative.prepare(peer, sql);
         checkPrepared(stmt);
         bind(stmt, params);
