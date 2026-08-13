@@ -203,8 +203,13 @@ jobs:
           # than with a function and splatting, because that shape is already proven
           # on these runners and this is not the place to find out about a quoting
           # difference.
+          # Five attempts out to five minutes rather than three out to ninety seconds: a run
+          # that took all three still ended on "status code: 429, reason phrase: Too Many
+          # Requests" two minutes after it started, which is a rate limit that had not lifted
+          # yet rather than a blip. This step only downloads and builds, so waiting longer costs
+          # time and cannot turn a failing test green.
           $ok = $false
-          foreach ($delay in 0, 30, 90) {
+          foreach ($delay in 0, 30, 90, 180, 300) {
             if ($delay -gt 0) {
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
@@ -219,7 +224,7 @@ jobs:
           # a gate is for, and worse than the flake it was hiding.
           $resolutionFailure = 'status: (403|429|50[0-9])|Could not transfer artifact|Unresolveable build extension|Non-resolvable import POM|Could not resolve dependencies'
           $ok = $false
-          foreach ($delay in 0, 30, 90) {
+          foreach ($delay in 0, 30, 90, 180, 300) {
             if ($delay -gt 0) {
               Write-Host "mvn failed on a dependency-resolution error; retrying in $delay s..."
               Start-Sleep -Seconds $delay

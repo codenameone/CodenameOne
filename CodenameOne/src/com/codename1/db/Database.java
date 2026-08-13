@@ -237,37 +237,48 @@ public abstract class Database {
     /// - `IOException`: if database cannot be deleted
     public static void delete(String databaseName) throws IOException {
         validateDatabaseNameArgument(databaseName);
-        refuseDeleteWhileOpen(databaseName);
-        Display.getInstance().delete(databaseName);
+        String claimed = claimForDelete(databaseName);
+        try {
+            Display.getInstance().delete(databaseName);
+        } finally {
+            releaseDeleteClaim(claimed);
+        }
     }
 
-    /// Refuses to delete a database something still has open.
+    /// Files being deleted right now.
     ///
-    /// Deleting an open file succeeds on every platform with POSIX semantics -- iOS, Android and
-    /// the simulator all unlink it and leave the open handle attached to a file with no name. The
-    /// connection then reads and writes a database nobody can find, reopening the name creates a
-    /// different one, and everything written through the old handle goes away with it when it
-    /// closes. Nothing reports any of that.
-    ///
-    /// Checked here rather than in each port so the answer is the same everywhere, and against the
-    /// registry the ports already maintain for key changes.
+    /// Checking that nothing is open and then unlinking are two steps, and an open that lands
+    /// between them gets a connection to a file that is about to lose its name -- an outcome
+    /// neither order of the two operations produces. The claim closes that window the way
+    /// `REKEYING_DATABASES` closes it for a rewrite.
+    private static final java.util.Hashtable DELETING_DATABASES = new java.util.Hashtable();
+
+    /// Refuses the delete if anything holds the database, and claims it if nothing does.
     ///
     /// #### Parameters
     ///
     /// - `databaseName`: the name or path being deleted
     ///
+    /// #### Returns
+    ///
+    /// the claimed key, or null when this port could not identify the file
+    ///
     /// #### Throws
     ///
-    /// - `IOException`: if a connection to that database is still open
-    private static void refuseDeleteWhileOpen(String databaseName) throws IOException {
+    /// - `IOException`: if a connection is open, or another delete is already running
+    private static synchronized String claimForDelete(String databaseName) throws IOException {
         String key;
         try {
-            key = normalizeDatabasePathKey(Display.getInstance().getDatabasePath(databaseName));
+            // The identity the ports register under, which is not the same string as the path
+            // reported to an application: a custom "file://" name is handed back unchanged by
+            // getDatabasePath, while the connection was registered under the native path it
+            // resolves to. Checking the URL would find nothing and unlink the file anyway.
+            key = Display.getInstance().databaseManagedKeyIdentity(databaseName);
         } catch (RuntimeException cannotResolve) {
-            // A port that will not resolve a name to a path cannot be checked this way; its own
-            // delete answers for it. The JavaScript port is the one that does this, and it counts
-            // its open databases itself.
-            return;
+            // A port that will not resolve a name cannot be checked this way; its own delete
+            // answers for it. The JavaScript port is the one that does this, and it counts its
+            // open databases itself.
+            return null;
         }
         // Both registries. A port that keeps its own count -- Android, whose implementation
         // tracks connections for the conversion it runs outside this class -- would otherwise be
@@ -279,6 +290,33 @@ public abstract class Database {
                     + "attached to a file that no longer has a name, and everything written "
                     + "through it afterwards is lost when it closes.");
         }
+        if (key != null) {
+            if (DELETING_DATABASES.containsKey(key)) {
+                throw new IOException("The database " + databaseName + " is already being "
+                        + "deleted.");
+            }
+            DELETING_DATABASES.put(key, Boolean.TRUE);
+        }
+        return key;
+    }
+
+    private static synchronized void releaseDeleteClaim(String key) {
+        if (key != null) {
+            DELETING_DATABASES.remove(key);
+        }
+    }
+
+    /// Whether a delete is running on this file, for a port that opens outside this class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the identity the port registers connections under
+    ///
+    /// #### Returns
+    ///
+    /// true while a delete holds the file
+    public static synchronized boolean isDatabaseBeingDeleted(String key) {
+        return key != null && DELETING_DATABASES.containsKey(key);
     }
 
     /// How many connections are open on a registry key, for callers that only want to look.
@@ -1287,6 +1325,13 @@ public abstract class Database {
         if (key == null) {
             unidentifiedOpenDatabases++;
             return;
+        }
+        if (DELETING_DATABASES.containsKey(key)) {
+            // The file is being unlinked. A connection opened now would be attached to it as it
+            // loses its name, which is the outcome the delete guard exists to prevent -- and it
+            // cannot see this connection, because it checked before this call.
+            throw new IOException("The database " + key + " is being deleted. Opening it now "
+                    + "would return a connection to a file that is about to be removed.");
         }
         if (REKEYING_DATABASES.containsKey(key)) {
             // A key change is a file rewrite, and it is not over when the claim is taken -- it is

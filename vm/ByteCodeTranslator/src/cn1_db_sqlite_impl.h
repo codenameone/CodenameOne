@@ -56,6 +56,23 @@
  * both branches below, so it sits above the gate. */
 #include "java_io_IOException.h"
 
+/*
+ * The engine builds its ciphers only when the translator emitted the marker below, so the keying
+ * entry points have to agree: without it sqlite3_key and sqlite3_rekey are not in the binary at
+ * all, and referencing them would fail the link of every plaintext application.
+ */
+#if defined(__has_include)
+#  if __has_include("cn1_sqlite3_cipher.h")
+#    define CN1_DB_CIPHER_PRESENT 1
+#  endif
+#endif
+
+#ifdef CN1_DB_CIPHER_PRESENT
+#define CN1_DB_CIPHER_AVAILABLE JAVA_TRUE
+#else
+#define CN1_DB_CIPHER_AVAILABLE JAVA_FALSE
+#endif
+
 #ifdef CN1_DB_ENGINE_PRESENT
 #include "cn1_sqlite3.h"
 #include <string.h>
@@ -67,10 +84,30 @@
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 
 /*
- * SQLCipher compatible keying, provided by the bundled engine.
+ * SQLCipher compatible keying, provided by the bundled engine -- and only when it was built with
+ * a cipher. Declaring these unconditionally would not help: with the ciphers compiled out the
+ * symbols do not exist, so the reference fails at link rather than at run time. The shims below
+ * stand in for them so the rest of this file compiles unchanged, and the entry points that would
+ * have used them report that this build cannot encrypt.
  */
+#ifdef CN1_DB_CIPHER_PRESENT
 extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
 extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
+#else
+static int sqlite3_key(sqlite3 *db, const void *pKey, int nKey) {
+    (void)db;
+    (void)pKey;
+    (void)nKey;
+    return SQLITE_ERROR;
+}
+
+static int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey) {
+    (void)db;
+    (void)pKey;
+    (void)nKey;
+    return SQLITE_ERROR;
+}
+#endif /* CN1_DB_CIPHER_PRESENT */
 
 /** Raises java.io.IOException with an explicit message. */
 static void cn1DbThrow(CODENAME_ONE_THREAD_STATE, const char* message) {
@@ -348,10 +385,16 @@ JAVA_VOID PREFIX##_sqlDbRekey___long_java_lang_String(CODENAME_ONE_THREAD_STATE,
 }                                                                                                   \
                                                                                                    \
 JAVA_BOOLEAN PREFIX##_sqlDbIsCipherAvailable__(CODENAME_ONE_THREAD_STATE) {                         \
-    return JAVA_TRUE;                                                                               \
+    /* A compile-time fact for this engine, not something to ask it. SQLite3MC has no pragma     \
+     * that reports whether a cipher was built -- cipher_version is SQLCipher's, and an unknown  \
+     * pragma answers success with no row, so probing for it says "no cipher" on every build.    \
+     * The marker header the translator emits is the thing that decides, and it is the same      \
+     * marker the engine itself compiled against. */                                             \
+    (void)threadStateData;                                                                        \
+    return CN1_DB_CIPHER_AVAILABLE;                                                               \
 }                                                                                                   \
 JAVA_BOOLEAN PREFIX##_sqlDbIsCipherAvailable___R_boolean(CODENAME_ONE_THREAD_STATE) {               \
-    return JAVA_TRUE;                                                                               \
+    return PREFIX##_sqlDbIsCipherAvailable__(threadStateData);                                    \
 }                                                                                                   \
                                                                                                    \
 JAVA_VOID PREFIX##_sqlDbClose___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG dbPeer) {                 \

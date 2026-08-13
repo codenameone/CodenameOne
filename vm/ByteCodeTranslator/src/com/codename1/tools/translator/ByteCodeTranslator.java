@@ -295,6 +295,16 @@ public class ByteCodeTranslator {
             File sqliteUnity = new File(srcRoot, "cn1_sqlite3.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"), Files.newOutputStream(sqliteUnity.toPath()));
             replaceInFile(sqliteUnity, "//#define CN1_INCLUDE_SQLITE", "#define CN1_INCLUDE_SQLITE");
+            if (isBundledSqliteCipherEnabled()) {
+                // A marker, not a define: the engine, the shared bindings and IOSNative.m are
+                // three translation units that all have to agree on whether a cipher exists, and
+                // __has_include is the only thing they can agree on without per-target compiler
+                // flags. Emitted only for an application that configures encryption, so everyone
+                // else compiles the engine as plain SQLite and links no keying code at all.
+                File sqliteCipherMarker = new File(srcRoot, "cn1_sqlite3_cipher.h");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_cipher.h"),
+                        Files.newOutputStream(sqliteCipherMarker.toPath()));
+            }
             File sqliteHeader = new File(srcRoot, "cn1_sqlite3.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.h"), Files.newOutputStream(sqliteHeader.toPath()));
             File sqliteAmalgamation = new File(srcRoot, "cn1_sqlite3_amalgamation.h");
@@ -640,6 +650,16 @@ public class ByteCodeTranslator {
             File sqliteUnity = new File(srcRoot, "cn1_sqlite3.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.c"), Files.newOutputStream(sqliteUnity.toPath()));
             replaceInFile(sqliteUnity, "//#define CN1_INCLUDE_SQLITE", "#define CN1_INCLUDE_SQLITE");
+            if (isBundledSqliteCipherEnabled()) {
+                // A marker, not a define: the engine, the shared bindings and IOSNative.m are
+                // three translation units that all have to agree on whether a cipher exists, and
+                // __has_include is the only thing they can agree on without per-target compiler
+                // flags. Emitted only for an application that configures encryption, so everyone
+                // else compiles the engine as plain SQLite and links no keying code at all.
+                File sqliteCipherMarker = new File(srcRoot, "cn1_sqlite3_cipher.h");
+                copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3_cipher.h"),
+                        Files.newOutputStream(sqliteCipherMarker.toPath()));
+            }
             File sqliteHeader = new File(srcRoot, "cn1_sqlite3.h");
             copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_sqlite3.h"), Files.newOutputStream(sqliteHeader.toPath()));
             File sqliteAmalgamation = new File(srcRoot, "cn1_sqlite3_amalgamation.h");

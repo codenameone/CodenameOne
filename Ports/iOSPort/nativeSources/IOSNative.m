@@ -9019,25 +9019,33 @@ void com_codename1_impl_ios_IOSNative_sqlDbDelete___java_lang_String(CN1_THREAD_
 extern int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
 extern int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
 
-/**
- * Whether the engine behind this connection can actually encrypt.
+/*
+ * Whether this build can encrypt at all.
  *
- * Asked with `PRAGMA cipher_version`, because an unknown pragma is not an error in SQLite: it is
- * parsed, ignored, and reports success. `PRAGMA cipher = 'sqlcipher'` therefore returns SQLITE_OK
- * on Apple's system SQLite too, so a guard written on that result passes on exactly the build it
- * was meant to catch. A row comes back only from a cipher-capable engine.
+ * Decided by the marker header the translator emits beside this file for an application that
+ * configures encryption -- the same marker the bundled engine compiles its ciphers against, so
+ * the two cannot disagree. Without it the process is linked against Apple's libsqlite3, which
+ * exports sqlite3_key and answers SQLITE_MISUSE from it.
+ *
+ * There is deliberately no runtime probe here. This was written as `PRAGMA cipher_version`,
+ * which is SQLCipher's pragma and not one SQLite3MC implements: an unknown pragma is not an
+ * error in SQLite, so it reported "no cipher" on the cipher build as well, and iOS answered that
+ * encryption was unsupported for every application. The conformance suite recorded it as a skip
+ * rather than a failure, which is how it went unnoticed.
  */
+#if defined(__has_include)
+#  if __has_include("cn1_sqlite3_cipher.h")
+#    define CN1_DB_CIPHER_PRESENT 1
+#  endif
+#endif
+
 static JAVA_BOOLEAN cn1SqlCipherAvailable(sqlite3* db) {
-    sqlite3_stmt* stmt = NULL;
-    JAVA_BOOLEAN available = JAVA_FALSE;
-    if (sqlite3_prepare_v2(db, "PRAGMA cipher_version", -1, &stmt, NULL) == SQLITE_OK) {
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            const unsigned char* text = sqlite3_column_text(stmt, 0);
-            available = (text != NULL && text[0] != 0) ? JAVA_TRUE : JAVA_FALSE;
-        }
-        sqlite3_finalize(stmt);
-    }
-    return available;
+    (void)db;
+#ifdef CN1_DB_CIPHER_PRESENT
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
 }
 
 /**
@@ -9130,16 +9138,7 @@ JAVA_INT com_codename1_impl_ios_IOSNative_sqlDbApplyKeyStatus___long_java_lang_S
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_sqlDbIsCipherAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
-    sqlite3* db = NULL;
-    if (sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL) != SQLITE_OK) {
-        if (db != NULL) {
-            sqlite3_close_v2(db);
-        }
-        return JAVA_FALSE;
-    }
-    JAVA_BOOLEAN available = cn1SqlCipherAvailable(db);
-    sqlite3_close_v2(db);
-    return available;
+    return cn1SqlCipherAvailable(NULL);
 }
 
 void com_codename1_impl_ios_IOSNative_sqlDbRekey___long_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG dbPeer, JAVA_OBJECT key) {

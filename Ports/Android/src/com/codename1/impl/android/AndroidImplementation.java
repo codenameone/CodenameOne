@@ -11303,6 +11303,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     /// Database files a conversion currently owns exclusively.
+    /// Files this port is unlinking right now, so an open landing mid-delete is refused.
+    ///
+    /// The base class keeps the same claim for the ports that register their connections there.
+    /// This port counts its own, so it holds its own claim rather than reading that one.
+    private static final java.util.Set<String> DELETING_DATABASES =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+
     private static final java.util.Set<String> MIGRATING_DATABASES =
             new java.util.HashSet<String>();
 
@@ -11370,6 +11377,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// - `IOException`: if a conversion currently owns the file
     public static synchronized void reserveDatabaseConnection(String rawPath) throws IOException {
         String path = databaseKey(rawPath);
+        if (path != null && DELETING_DATABASES.contains(path)) {
+            // A delete checked that nothing was open and is now unlinking the file. Letting this
+            // open through would hand back a connection to a file about to lose its name, which
+            // is exactly what that check was for -- and it cannot see this one, because it ran
+            // before this call.
+            throw new IOException("The database " + path + " is being deleted and cannot be "
+                    + "opened.");
+        }
         if (path != null && MIGRATING_DATABASES.contains(path)) {
             throw new IOException("The database " + path + " is being converted and cannot be "
                     + "opened until that finishes.");
@@ -11751,6 +11766,21 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public void deleteDB(String databaseName) throws IOException {
         String deletePath = resolveNativeDatabasePath(databaseName);
+        String claim = databaseKey(deletePath);
+        if (claim != null) {
+            DELETING_DATABASES.add(claim);
+        }
+        try {
+            deleteDBImpl(databaseName, deletePath);
+        } finally {
+            if (claim != null) {
+                DELETING_DATABASES.remove(claim);
+            }
+        }
+    }
+
+    /// The delete itself, with the file claimed so nothing can open it partway through.
+    private void deleteDBImpl(String databaseName, String deletePath) throws IOException {
         if (isDatabaseBeingConverted(deletePath)) {
             // A conversion owns the file and its working copies. Deleting either underneath it
             // would strand the data in whichever one the conversion has not installed yet.

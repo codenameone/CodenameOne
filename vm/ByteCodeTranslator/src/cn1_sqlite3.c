@@ -39,7 +39,36 @@
  */
 //#define CN1_INCLUDE_SQLITE
 
+/*
+ * The ciphers are built only for an application that configures encryption, which the translator
+ * says by emitting cn1_sqlite3_cipher.h beside this file. The engine is SQLite3MC and carries
+ * several cipher implementations; an application that never encrypts has no use for any of them,
+ * and with them compiled out this is plain SQLite -- measured at about 950KB smaller on an arm64
+ * object. Tested with __has_include rather than a define so the shared bindings and IOSNative.m,
+ * which are other translation units, can reach the same answer.
+ */
+#if defined(__has_include)
+#  if __has_include("cn1_sqlite3_cipher.h")
+#    define CN1_INCLUDE_SQLCIPHER 1
+#  endif
+#endif
+
 #ifdef CN1_INCLUDE_SQLITE
+
+#ifndef CN1_INCLUDE_SQLCIPHER
+/*
+ * No cipher was asked for, so none is built. SQLite3MC reads these before it compiles each
+ * cipher, and with every one off it produces an engine that behaves exactly like upstream
+ * SQLite -- which is what an application that only stores plaintext should be carrying.
+ */
+#define HAVE_CIPHER_AES_128_CBC 0
+#define HAVE_CIPHER_AES_256_CBC 0
+#define HAVE_CIPHER_CHACHA20 0
+#define HAVE_CIPHER_SQLCIPHER 0
+#define HAVE_CIPHER_RC4 0
+#define HAVE_CIPHER_ASCON128 0
+#define HAVE_CIPHER_AEGIS 0
+#endif /* CN1_INCLUDE_SQLCIPHER */
 
 /*
  * The precompiled prefix header on iOS pulls cn1_globals.h into every translation unit, and that
