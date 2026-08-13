@@ -2790,6 +2790,15 @@ public class IPhoneBuilder extends Executor {
             // rooted here rather than at the phone stub, which is what finally makes watchMain the
             // watch's entry point and lets the watch binary be shaken down to what that entry
             // point actually reaches.
+            // No separate "reflective keep roots" channel is passed to the watch pass, and this
+            // has been raised: the stub IS that channel. svgRegistryInstall and the route and
+            // annotation install snippets below are the same ones the phone stub gets, so the
+            // watch stub calls SVGRegistry.installGlobal() too and the generated classes it names
+            // are hard references the translator follows out of the watch root. Verified on the
+            // watch suite, which builds a distinct watchMain: SVGStatic and SVGAnimated render
+            // real transcoded SVG and match their goldens every run. (Lottie is blank there, and
+            // equally blank in the PHONE golden from the single-translation build, so the rooting
+            // is not what produces it.)
             if (watchNativeBuilder.needsOwnTranslation()) {
                 watchNativeBuilder.writeWatchStubSource(request, stubSource, buildVersion,
                         nativeRegistrationsReachableFrom(

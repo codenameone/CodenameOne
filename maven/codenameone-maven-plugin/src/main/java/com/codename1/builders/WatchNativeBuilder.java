@@ -1732,6 +1732,17 @@ class WatchNativeBuilder {
                 .append("watch_name = '").append(IPhoneBuilder.escapeRubyStr(watchTargetName)).append("'\n")
                 .append("watch_target = xcproj.targets.find { |t| t.name == watch_name }\n")
                 .append("if watch_target.nil?\n")
+                // :application, NOT :watch2_app -- deliberately, and this has been raised.
+                //
+                // com.apple.product-type.application.watchapp2 is the LEGACY WatchKit App, valid
+                // only paired with a separate watchkit2-extension target that carries the code.
+                // What this generates is the modern single-target watch app that replaced it:
+                // WKApplication in the plist, SwiftUI @main with @WKApplicationDelegateAdaptor,
+                // a watchOS 10 floor, one target. Xcode's own watchOS App.xctemplate declares
+                // com.apple.product-type.application and never mentions watchapp2; the only
+                // watchapp2 in that template directory is the legacy iOS *container*. Setting it
+                // here would put a single-target app on the paired product type with no extension
+                // beside it.
                 .append("  watch_target = xcproj.new_target(:application, watch_name, :watchos, '")
                 .append(IPhoneBuilder.escapeRubyStr(MIN_DEPLOYMENT_TARGET)).append("')\n")
                 .append("end\n")
