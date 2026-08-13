@@ -1098,14 +1098,25 @@ class WatchNativeBuilderTest {
                 // found the Swift overlays and missed 66 of the 78 C modules the shared
                 // usr/include/module.modulemap declares -- SQLite3, zlib, MachO among them -- and
                 // one unattributed import switches strict package filtering off entirely.
-                .append("sdk_names = cn1_watch_sdk_module_names(["
-                        + "`xcrun --sdk watchos --show-sdk-path 2>/dev/null`.strip].reject("
-                        + "&:empty?))\n")
-                .append("chk('a shared-modulemap C module is attributed', "
-                        + "sdk_names.key?('SQLite3') || sdk_names.empty?, true)\n")
-                .append("chk('so is a swift overlay', "
-                        + "sdk_names.key?('Darwin') || sdk_names.empty?, true)\n")
-                .append("chk('a real package is not', sdk_names.key?('Alamofire'), false)\n")
+                //
+                // Only where there IS a watchOS SDK. These plugin tests also run on Linux, where
+                // there is no xcrun to ask -- and an emptiness guard does not cover that, because
+                // the helper always seeds the Swift standard names and so never returns empty.
+                .append("sdk_paths = begin\n")
+                .append("  [`xcrun --sdk watchos --show-sdk-path 2>/dev/null`.strip]"
+                        + ".reject(&:empty?)\n")
+                .append("rescue StandardError\n")
+                .append("  []\n")
+                .append("end\n")
+                .append("if sdk_paths.empty?\n")
+                .append("  puts 'ok no watchOS SDK on this host, SDK attribution not exercised'\n")
+                .append("else\n")
+                .append("  sdk_names = cn1_watch_sdk_module_names(sdk_paths)\n")
+                .append("  chk('a shared-modulemap C module is attributed', "
+                        + "sdk_names.key?('SQLite3'), true)\n")
+                .append("  chk('so is a swift overlay', sdk_names.key?('Darwin'), true)\n")
+                .append("  chk('a real package is not', sdk_names.key?('Alamofire'), false)\n")
+                .append("end\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "
