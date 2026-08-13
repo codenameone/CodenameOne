@@ -121,6 +121,14 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
                 }
             }
         }
+        // Past the end is not a refill. The platform answers a position at or beyond the row
+        // count from the count it already holds, without touching the statement -- and it holds
+        // one, because the first fill counts the whole result set. This is the move that ends
+        // every while (next()) loop, and refusing it made the loop throw instead of finishing,
+        // for a single row statement as much as for one that returned none.
+        if (row >= c.getCount()) {
+            return;
+        }
         throw new IOException("This cursor is over a statement that changes the database, and the "
                 + "row asked for is outside the rows already read. Reaching it would run the "
                 + "statement again and repeat those changes, so it is refused: read the rows this "
@@ -170,11 +178,10 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public boolean last() throws IOException {
         checkOpen();
-        // The last row is only reachable through the window that holds it, and finding out which
-        // one that is means counting -- which is a refill of its own on a result set larger than
-        // a window. Refused outright for a statement that writes.
+        // The last row of a writing statement is only reachable through the window that holds
+        // it, which is this one or none.
         if (statementWrites) {
-            requireInWindow(Integer.MAX_VALUE);
+            requireInWindow(c.getCount() - 1);
         }
         last_read_column_index = -1;
         onRow = c.moveToLast();
@@ -210,12 +217,8 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public int getCount() throws IOException {
         checkOpen();
-        // Counting walks the whole result set, which past the first window means running the
-        // statement again -- and repeating what it writes. The rows this cursor has already
-        // returned are the ones it can answer for.
-        if (statementWrites) {
-            requireInWindow(Integer.MAX_VALUE);
-        }
+        // Free, whatever the statement does: the count was established by the first fill and is
+        // held from then on, so asking for it does not run anything again.
         return c.getCount();
     }
 

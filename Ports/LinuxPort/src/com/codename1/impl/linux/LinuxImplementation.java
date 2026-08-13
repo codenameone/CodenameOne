@@ -3196,7 +3196,11 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (databaseName.startsWith("file://")) {
             return com.codename1.io.FileSystemStorage.getInstance().toNativePath(databaseName);
         }
-        return LinuxNative.storageDir() + "/database/" + databaseName;
+        // Under this application's own directory, not storageDir() alone: that one names the
+        // Codename One directory shared by every CN1 application under this user account, so two
+        // applications opening "app.db" opened one file -- each able to read the other's rows and
+        // overwrite them. getAppHomePath() adds the per-application component for the same reason.
+        return LinuxNative.storageDir() + "/" + appHomeDirName() + "/database/" + databaseName;
     }
 
     @Override

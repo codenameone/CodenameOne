@@ -3105,14 +3105,21 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     /**
      * Resolves a database name to an absolute path. Bare names live in a "database" directory
-     * under the application's storage directory; a file:// URL is resolved through
+     * under this application's own directory; a file:// URL is resolved through
      * FileSystemStorage, matching the other ports that support custom paths.
+     *
+     * <p>Under appHomeDirName(), not storageDir() alone. storageDir() names the Codename One
+     * directory shared by every CN1 application under this user account, so two applications
+     * that opened "app.db" opened one file: each could read the other's rows and overwrite
+     * them, and on the plaintext path there is nothing to stop it. getAppHomePath() adds the
+     * per-application component for exactly this reason.
      */
     private String resolveDatabasePath(String databaseName) {
         if (databaseName.startsWith("file://")) {
             return com.codename1.io.FileSystemStorage.getInstance().toNativePath(databaseName);
         }
-        return WindowsNative.storageDir() + "\\database\\" + databaseName;
+        return WindowsNative.storageDir() + "\\" + appHomeDirName() + "\\database\\"
+                + databaseName;
     }
 
     @Override

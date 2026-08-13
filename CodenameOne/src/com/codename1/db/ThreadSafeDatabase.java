@@ -391,7 +391,13 @@ public class ThreadSafeDatabase extends Database {
             // The worker is shut down either way. A close that failed still leaves this wrapper
             // closed, so there is nothing to retry - but the caller has to be told, because on
             // some ports a failing close means the data never reached storage.
-            et.kill();
+            //
+            // Drained rather than killed, as on the worker's own path. Anything handed to the
+            // worker through getThread() while the close above was running has been accepted, and
+            // kill() would end the loop with those tasks still in it: a synchronous caller would
+            // wait for a result that never comes, and an asynchronous one would lose its work
+            // without being told.
+            et.killWhenIdle();
             if (failure instanceof Failure) {
                 rethrow(((Failure) failure).cause);
             }
