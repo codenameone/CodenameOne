@@ -5694,9 +5694,25 @@ public class IPhoneBuilder extends Executor {
             }
         }
         if (!anyIosSurface) {
-            log("[surfaces] Every declared kind is a watch complication family, so no iOS "
-                    + "extension is generated and the iOS surface lowering is skipped entirely "
-                    + "-- no app group, no widget support compiled into the app.");
+            // Said HERE, and in full. Turning the flag off is what stops widgetExtensionBuilder
+            // from ever being created, and the watch-only notice at the extension-generation site
+            // is guarded on that builder existing -- so the one case the notice was written for
+            // was the one case it could not reach. The build then discarded every declared surface
+            // while reporting only that the iOS lowering had been skipped.
+            StringBuilder names = new StringBuilder();
+            for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+                if (names.length() > 0) {
+                    names.append(", ");
+                }
+                names.append(kind.getId());
+            }
+            log("[surfaces] NOTE: these kinds declare only watch complication families and will "
+                    + "NOT appear on any device in this build: " + names + ". The watchOS widget "
+                    + "extension target and the Wear OS complication data source are not generated "
+                    + "yet, so nothing emits them. Declare a phone family alongside them if you "
+                    + "need a surface today.");
+            log("[surfaces] No iOS extension is generated and the iOS surface lowering is skipped "
+                    + "entirely -- no app group, no widget support compiled into the app.");
             surfacesExtensionEnabled = false;
             // Nothing further to prepare, and in particular no xcodeproj gem to require: that
             // check exists for wiring an extension into the project, and there is no extension.
