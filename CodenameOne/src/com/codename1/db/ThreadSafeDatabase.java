@@ -108,6 +108,22 @@ public class ThreadSafeDatabase extends Database {
     /// cleanup order -- blocked forever instead of throwing.
     ///
     /// Call only while holding `#dispatchLock`, and queue the work it guards without releasing it.
+    /// Refuses a hand-off to a worker that has already finished.
+    ///
+    /// `close()` from the worker itself asks it to stop once its queue drains, so a call that
+    /// passed `#checkOpen()` a moment earlier can arrive after it has gone. EasyThread reports
+    /// that rather than accepting work nothing will run; this turns it into the error the caller
+    /// would have had a moment later.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the worker has stopped
+    private void requireLiveWorker() throws IOException {
+        if (et.isFinished()) {
+            throw new IOException("This database has been closed");
+        }
+    }
+
     private void checkOpen() throws IOException {
         if (closed) {
             throw new IOException("This database has been closed");
@@ -130,6 +146,10 @@ public class ThreadSafeDatabase extends Database {
         }
         synchronized (dispatchLock) {
             checkOpen();
+            // A worker that has drained and ended refuses new work rather than queueing it for
+            // nobody. That can only be reached by a caller which passed the check above before
+            // close() set the flag, and the answer it deserves is the one the check gives.
+            requireLiveWorker();
             err = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -182,6 +202,7 @@ public class ThreadSafeDatabase extends Database {
         }
         synchronized (dispatchLock) {
             checkOpen();
+            requireLiveWorker();
             ret = et.run(new RunnableWithResultSync<Object>() {
                 @Override
                 @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
@@ -284,18 +305,17 @@ public class ThreadSafeDatabase extends Database {
                 return;
             }
             closed = true;
-            // The worker is deliberately left running, and not killed here or through a queued
-            // task. Its loop tests the running flag before taking work, so anything queued behind
-            // a kill is never serviced -- and a thread that took dispatchLock, passed checkOpen
-            // and had not yet handed over its callback can still queue one after this point. That
-            // caller would wait for an answer that never comes.
-            //
-            // What can arrive after this is bounded: a later call fails checkOpen and never
-            // reaches the worker, so only the calls already past that check remain. They run
-            // against a closed database and fail with it, which is an answer. The worker then
-            // parks with nothing to do until the process exits -- one idle thread on a path
-            // nothing takes routinely, against a caller blocked for good.
             underlying.close();
+            // Asked to stop once its queue is empty, rather than killed. kill() stops the worker
+            // after the current task -- which is this one -- and everything behind it is dropped,
+            // including a call from a thread that took dispatchLock and passed checkOpen before
+            // the flag above was set. That caller waits for an answer that never comes.
+            //
+            // Draining instead runs those calls, which fail against the closed database, and the
+            // thread then ends. One that arrives after the thread has gone is refused by
+            // EasyThread rather than queued for nobody, and the refusal is turned into the same
+            // "closed" IOException the check above raises.
+            et.killWhenIdle();
             return;
         }
         synchronized (dispatchLock) {

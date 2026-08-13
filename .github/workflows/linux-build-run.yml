@@ -187,9 +187,15 @@ jobs:
       # plugin -- so this step works on arm64 too. The suite classes the translator
       # also needs come from the prepare-suite artifact below.
       - name: Build core + Linux port (JDK 8)
+        # Retried for the same reason as the two steps above, which this one was left out of:
+        # Maven Central answers 429 from the runner CDN edge and Maven treats it as a permanent
+        # resolution failure, so the job dies at plugin download with nothing built. See
+        # scripts/ci/retry.sh; this step only builds, so a blanket retry cannot turn a flaky test
+        # into a pass.
         run: |
           cd maven
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh \
+            mvn -B -pl linux -am \
             -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
 
       - name: Download suite classes
@@ -271,7 +277,7 @@ jobs:
           echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope >/dev/null 2>&1 || true
           mkdir -p /tmp/cn1-cores
           rc=0
-          mvn -B clean package -pl JavaAPI -am -DskipTests
+          bash "$GITHUB_WORKSPACE/scripts/ci/retry.sh" mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am \
             '-Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux' \
             '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?

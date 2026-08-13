@@ -41,6 +41,14 @@ public final class EasyThread {
     private List<ErrorListener> errorListenenrs;
     private boolean running = true;
 
+    /// Set by `#killWhenIdle()`: the thread stops once its queue is empty, rather than dropping
+    /// whatever is still in it the way `#kill()` does.
+    private boolean stopWhenDrained;
+
+    /// Set by the thread itself as it leaves its loop, so work is never handed to a thread that
+    /// will not run it. Read and written under `LOCK` only.
+    private boolean finished;
+
     private EasyThread(String name) {
         t = Display.getInstance().startThread(new Runnable() {
             @Override
@@ -57,6 +65,13 @@ public final class EasyThread {
                                     queue.remove(0);
                                 }
                                 queue.remove(0);
+                            } else if (stopWhenDrained) {
+                                // Asked to stop, and there is nothing left to run. Recorded
+                                // before the loop ends so that anything arriving afterwards is
+                                // refused rather than queued for a thread that has gone.
+                                running = false;
+                                finished = true;
+                                LOCK.notifyAll();
                             } else {
                                 Util.wait(LOCK);
                             }
@@ -175,6 +190,12 @@ public final class EasyThread {
         final SuccessCallback<T> sc = new RunSuccessCallback<T>(flag, result);
         RunnableWithResult<T> rr = new RunCallbackRunnableWithResult<T>(sc, r);
         synchronized (LOCK) {
+            // A thread that has ended will never take this, and this call blocks until it does.
+            // Saying so beats waiting for an answer that cannot arrive.
+            if (finished) {
+                throw new IllegalStateException("This thread has been stopped and cannot run "
+                        + "anything else");
+            }
             queue.add(rr);
             queue.add(sc);
             LOCK.notifyAll();
@@ -191,10 +212,39 @@ public final class EasyThread {
     public void runAndWait(final Runnable r) {
         final boolean[] flag = new boolean[1];
         synchronized (LOCK) {
+            // See run(RunnableWithResultSync): this call waits for the thread to run the task.
+            if (finished) {
+                throw new IllegalStateException("This thread has been stopped and cannot run "
+                        + "anything else");
+            }
             queue.add(new InQueueRunnable(r, flag));
             LOCK.notifyAll();
         }
         Display.getInstance().invokeAndBlock(new RunAndWaitRunnable(flag));
+    }
+
+    /// Stops the thread once everything already queued has run.
+    ///
+    /// `#kill()` stops it after the current task, which drops whatever is behind that task -- and
+    /// a caller blocked on one of those never hears back. This one lets the queue drain first, so
+    /// the thread ends without abandoning work that was handed to it. Anything offered after it
+    /// has ended is refused rather than accepted and forgotten.
+    public void killWhenIdle() {
+        synchronized (LOCK) {
+            stopWhenDrained = true;
+            LOCK.notifyAll();
+        }
+    }
+
+    /// Whether the thread has ended and will not run anything else.
+    ///
+    /// #### Returns
+    ///
+    /// true once the thread has left its loop
+    public boolean isFinished() {
+        synchronized (LOCK) {
+            return finished;
+        }
     }
 
     /// Stops the thread once the current task completes
