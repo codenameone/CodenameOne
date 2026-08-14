@@ -92,13 +92,17 @@ public class SEDatabase extends Database {
      * performed without knowing what else holds the file.
      */
     public SEDatabase(java.sql.Connection conn) {
-        String fromUrl = fileFromConnection(conn);
-        // A connection on ":memory:" holds no file, which is not the same as a connection whose
-        // file could not be worked out. Registering it as the latter -- which is what a null key
-        // means -- made every unidentified-connection check see it: while one in-memory database
-        // was open, no other database could be deleted or re-keyed, because none of them could be
-        // proved not to be this one. There is nothing here for those checks to protect.
-        registered = fromUrl != null || !namesNoFile(conn);
+        // Asked first, and it decides. A connection on ":memory:" holds no file, which is not the
+        // same as a connection whose file could not be worked out: registering it as the latter --
+        // which is what a null key means -- made every unidentified-connection check see it, so
+        // while one in-memory database was open nothing else could be deleted or re-keyed. And
+        // the URI spellings of an in-memory database, "file:name?mode=memory" and "file::memory:",
+        // do produce a path when read as a filename, so deriving the key first and asking
+        // afterwards registered them against a file they have nothing to do with -- refusing a
+        // delete or a key change on whatever real database happened to sit at that path.
+        boolean noFile = namesNoFile(conn);
+        String fromUrl = noFile ? null : fileFromConnection(conn);
+        registered = !noFile;
         try {
             if (registered) {
                 reserveConnection(fromUrl);
@@ -161,6 +165,11 @@ public class SEDatabase extends Database {
             if (rest.indexOf("mode=memory") >= 0) {
                 return true;
             }
+        }
+        if (path.startsWith("file:")) {
+            // "file::memory:" is the URI spelling of ":memory:", and the scheme has to come off
+            // before the rest is recognisable as one.
+            path = path.substring("file:".length());
         }
         return path.length() == 0 || path.startsWith(":");
     }

@@ -322,6 +322,35 @@ public class SEDatabaseConformanceTest {
         }
     }
 
+    @Test
+    public void inMemoryUrlsInEverySpellingBlockNothing() throws Exception {
+        // The URI spellings read as a filename produce a path, so deriving the registry key first
+        // and asking whether the connection names a file afterwards registered them against a
+        // file they have nothing to do with -- and then refused a delete or a key change on the
+        // real database that happened to be there.
+        // The URI name is deliberately the file of the database under test: that is the shape
+        // that bites, because the derived key then matches the very database whose key change is
+        // about to be refused. A name that collided with nothing would pass whether or not the
+        // no-file answer is authoritative, which is no test at all.
+        String[] urls = {
+            "jdbc:sqlite::memory:",
+            "jdbc:sqlite:file::memory:",
+            "jdbc:sqlite:file:" + dbFile.getCanonicalPath() + "?mode=memory&cache=shared",
+        };
+        for (String url : urls) {
+            Connection memory = java.sql.DriverManager.getConnection(url);
+            SEDatabase wrapped = new SEDatabase(memory);
+            try {
+                db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException refused) {
+                fail(url + " should not block anything, but the key change was refused: "
+                        + refused.getMessage());
+            } finally {
+                wrapped.close();
+            }
+        }
+    }
+
     /// A connection that refuses to say which URL it is open on, which is the case the registry
     /// has to treat as "could be anything".
     private static Connection unreadableConnection() {
