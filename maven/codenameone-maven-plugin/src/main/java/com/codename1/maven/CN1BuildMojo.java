@@ -155,6 +155,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // of silently succeeding with the cached artifact.
         applyHardeningPreflight();
 
+        // Signing problems that are visible in the .mobileprovision on disk should not cost a
+        // cloud build slot to discover. See applyIOSProvisioningPreflight.
+        applyIOSProvisioningPreflight();
+
         if (platform.contains("android")) {
             if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 File apkFile = androidApkFile();
@@ -323,6 +327,58 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // is newer than the sources (getSourcesModificationTime does not account for build hints).
         overlayCommandLineBuildHints(settings);
         applyHardeningPreflight(settings);
+    }
+
+    /**
+     * Refuses an iOS device build whose provisioning profile makes signing impossible, before
+     * the build is packaged and sent.
+     *
+     * <p>These failures used to be discoverable only on a build server: an unreadable profile
+     * surfaced as an XML parser stack trace that never named the profile, and a profile of the
+     * wrong kind surfaced as an {@code exportArchive} error minutes into the build, after the
+     * whole app had already been compiled and archived. Both are decided by a file sitting in
+     * the project.
+     *
+     * <p>Only cloud iOS device builds are checked. A local Xcode-project generation signs
+     * later (or not at all), and the native-Mac targets ride the same platform with a different
+     * signing identity, so neither is this check's business.
+     */
+    private void applyIOSProvisioningPreflight() throws MojoFailureException {
+        if (platform == null || !platform.contains("ios") || buildTarget == null
+                || !buildTarget.startsWith("ios-device")) {
+            return;
+        }
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream fis = new FileInputStream(settingsFile)) {
+                settings.load(fis);
+            } catch (IOException ex) {
+                getLog().debug("Could not read codenameone_settings.properties for the iOS provisioning pre-flight", ex);
+                return;
+            }
+        } else {
+            return;
+        }
+        overlayCommandLineBuildHints(settings);
+
+        boolean release = buildTarget.contains("release");
+        List<IOSProvisioningPreflight.Problem> problems =
+                IOSProvisioningPreflight.check(settings, release, new Date());
+        String fatal = null;
+        for (IOSProvisioningPreflight.Problem problem : problems) {
+            if (problem.fatal) {
+                getLog().error(problem.message);
+                if (fatal == null) {
+                    fatal = problem.message;
+                }
+            } else {
+                getLog().warn(problem.message);
+            }
+        }
+        if (fatal != null) {
+            throw new MojoFailureException(fatal);
+        }
     }
 
     /**
