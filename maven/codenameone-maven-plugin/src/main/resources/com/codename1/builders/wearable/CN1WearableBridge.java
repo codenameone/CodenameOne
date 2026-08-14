@@ -2057,19 +2057,29 @@ public class CN1WearableBridge implements WearableBridge {
     /// @param malformed it can never be read, so the record must go unread
     private static void replaySpooled(String record, Runnable delivered, Runnable dropped,
             Runnable malformed) {
-        int first = record.indexOf('|');
-        int second = first < 0 ? -1 : record.indexOf('|', first + 1);
-        if (first < 0 || second < 0) {
-            // Truncated: a store written by an interrupted commit, or by a build that framed these
-            // differently. No amount of retrying makes it parse.
-            android.util.Log.w("CN1Wearable", "discarding a spooled record with no framing");
-            runQuietly(malformed);
-            return;
-        }
-        String kind = record.substring(0, first);
-        String path = decode(record.substring(first + 1, second));
-        String encoded = record.substring(second + 1);
+        // The WHOLE body, not just the delivery. Every step here is a parse of bytes some earlier
+        // build wrote, and each one can throw: the framing search, the substrings, the percent
+        // decode, the Base64. Guarding only the ones that had been seen to fail meant the next
+        // unguarded one leaked the claim again -- decode() calls Integer.parseInt on the two bytes
+        // after a '%', so a single `%zzzz` in a stored path threw straight past all three
+        // callbacks. One try around everything makes the contract above hold by construction
+        // rather than by remembering to extend the block.
+        String path = "";
         try {
+            int first = record.indexOf('|');
+            int second = first < 0 ? -1 : record.indexOf('|', first + 1);
+            if (first < 0 || second < 0) {
+                // Truncated: a store written by an interrupted commit, or by a build that framed
+                // these differently. No amount of retrying makes it parse.
+                android.util.Log.w("CN1Wearable", "discarding a spooled record with no framing");
+                runQuietly(malformed);
+                return;
+            }
+            String kind = record.substring(0, first);
+            // Held RAW first so the handler can name the record even when decoding is what failed.
+            path = record.substring(first + 1, second);
+            String encoded = record.substring(second + 1);
+            path = decode(path);
             if (SPOOL_REMOVAL.equals(kind)) {
                 WearableConnection.deliverDataRemoved(path, delivered, dropped);
                 return;
@@ -2080,6 +2090,9 @@ public class CN1WearableBridge implements WearableBridge {
         } catch (Throwable unreadable) {
             // A record this build cannot parse is discarded rather than retried for ever -- but
             // discarded means DELETED and unclaimed, not merely abandoned where it sits.
+            //
+            // Both delivery calls QUEUE rather than run the listeners inline, so one throwing has
+            // not already spent `delivered` or `dropped`, and this stays exactly one callback.
             android.util.Log.w("CN1Wearable", "discarding an unreadable spooled record on " + path);
             runQuietly(malformed);
         }
@@ -5167,14 +5180,43 @@ public class CN1WearableBridge implements WearableBridge {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < path.length(); i++) {
             char c = path.charAt(i);
-            if (c == '%' && i + 4 < path.length()) {
-                sb.append((char) Integer.parseInt(path.substring(i + 1, i + 5), 16));
+            // A '%' NOT followed by four hex digits is literal text, not a broken escape.
+            // Integer.parseInt threw NumberFormatException on it instead, and this runs on stored
+            // spool records and on peer-published item paths alike, so one corrupt byte took out a
+            // whole replay or a whole path enumeration -- callers that have no business parsing.
+            // encode() escapes every character outside [A-Za-z0-9_-] and always writes four hex
+            // digits, so no value it produces can reach the lenient branch.
+            int value = c == '%' ? hexQuadAt(path, i + 1) : -1;
+            if (value >= 0) {
+                sb.append((char) value);
                 i += 4;
             } else {
                 sb.append(c);
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * The value of the four hex digits starting at {@code from}.
+     *
+     * @param s the encoded path
+     * @param from the index just past the {@code '%'}
+     * @return the decoded character, or -1 when there are not four hex digits there
+     */
+    private static int hexQuadAt(String s, int from) {
+        if (from + 4 > s.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            int digit = Character.digit(s.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = (value << 4) | digit;
+        }
+        return value;
     }
 
     /** The wire path prefixes, shared with the listener service. */
