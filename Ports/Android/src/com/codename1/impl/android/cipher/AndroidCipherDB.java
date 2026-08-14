@@ -778,6 +778,7 @@ class AndroidCipherDB extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         checkParameterCount(sql, params == null ? 0 : params.length);
+        validateQuery(sql);
         try {
             if (params != null && !isLegacyBehavior() && hasNull(params)) {
                 // rawQuery binds through bindString, which rejects null outright rather than
@@ -804,6 +805,7 @@ class AndroidCipherDB extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         checkParameterCount(sql, params.length);
+        validateQuery(sql);
         if (isLegacyBehavior() && !hasBlob(params)) {
             // rawQuery can only carry text, which is what this port used to do to every query
             // argument whatever its type. A blob still goes through the factory even here: blob
@@ -826,24 +828,39 @@ class AndroidCipherDB extends Database {
         return executeQuery(sql, (String[]) null);
     }
 
-    private Cursor wrap(android.database.Cursor c, String sql) throws IOException {
-        if (!isLegacyBehavior()) {
-            // Eager, so malformed SQL is reported from executeQuery rather than from next().
-            // moveToFirst rather than getCount, for the reason given on the plaintext port: both
-            // run the statement, and only one of them walks the whole result set to do it.
-            try {
-                c.moveToFirst();
-                c.moveToPosition(-1);
-            } catch (RuntimeException err) {
-                // Never handed out and never registered, so this is the only chance to release it.
-                try {
-                    c.close();
-                } catch (RuntimeException ignored) {
-                    // The compile failure is the one worth reporting.
-                }
-                throw err;
+    /// Reports malformed SQL from executeQuery, without reading anything.
+    ///
+    /// The same as AndroidDB.validateQuery and for the same reasons, which are written out there:
+    /// every move on a platform cursor asks getCount() first, so validating through the cursor
+    /// walks the entire result set before executeQuery returns. A prepare compiles the statement
+    /// and steps nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the statement about to be handed to rawQuery
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the statement does not compile
+    private void validateQuery(String sql) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
+        SQLiteStatement prepared = null;
+        try {
+            prepared = db.compileStatement(sql);
+        } catch (RuntimeException doesNotCompile) {
+            throw new IOException(doesNotCompile.getMessage(), doesNotCompile);
+        } finally {
+            if (prepared != null) {
+                prepared.close();
             }
         }
+    }
+
+    private Cursor wrap(android.database.Cursor c, String sql) throws IOException {
+        // Nothing is read from the cursor here; see AndroidDB.wrap. It is handed back as the
+        // platform made it, unexecuted and before its first row.
         final AndroidCursor cursor = new AndroidCursor(c);
         // The platform cursor refills its window by running the query again, which for a
         // statement that writes repeats the writes. The cursor refuses to leave the window it

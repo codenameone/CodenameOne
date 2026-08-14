@@ -402,6 +402,7 @@ public class AndroidDB extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         checkParameterCount(sql, params == null ? 0 : params.length);
+        validateQuery(sql);
         try {
             if (params != null && !isLegacyBehavior() && hasNull(params)) {
                 // rawQuery binds through bindString, which rejects null outright rather than
@@ -431,6 +432,7 @@ public class AndroidDB extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         checkParameterCount(sql, params.length);
+        validateQuery(sql);
         if (isLegacyBehavior() && !hasBlob(params)) {
             // rawQuery can only carry text, which is what this port used to do to every query
             // argument whatever its type. A blob still goes through the factory even here: blob
@@ -456,32 +458,63 @@ public class AndroidDB extends Database {
         return executeQuery(sql, (String[]) null);
     }
 
-    private Cursor wrap(android.database.Cursor c, String sql) throws IOException {
-        if (!isLegacyBehavior()) {
-            // rawQuery is lazy: without running the query here, malformed SQL surfaces from the
-            // first next() instead of from executeQuery.
-            //
-            // moveToFirst rather than getCount. Both compile and run the statement, which is what
-            // this is for, but getCount walks the entire result set to count it -- so a query
-            // over a large table stopped being lazy at all and blocked the caller, on the EDT
-            // included, until every matching row had been visited. Filling the first window is
-            // bounded, and the position is put back so the cursor is handed out where the caller
-            // expects it: before the first row.
-            try {
-                c.moveToFirst();
-                c.moveToPosition(-1);
-            } catch (RuntimeException err) {
-                // Compiling or filling failed, so this cursor is never handed out and never
-                // registered - closing it here is the only chance to release the query and the
-                // database reference it holds.
-                try {
-                    c.close();
-                } catch (RuntimeException ignored) {
-                    // The compile failure is the one worth reporting.
-                }
-                throw err;
+    /// Reports malformed SQL from executeQuery rather than from the first next().
+    ///
+    /// By preparing the statement and throwing it away. Nothing here touches a cursor, and that
+    /// is the point: every navigation method on the platform cursor goes through
+    /// AbstractCursor.moveToPosition, which asks getCount() before it moves, and SQLiteCursor
+    /// answers that by filling its window with countAllRows set -- a walk of every matching row
+    /// before executeQuery returns. moveToFirst() is not cheaper than getCount(); it is
+    /// getCount() with a move on the end. A prepare compiles the statement against the schema,
+    /// which is the whole of what this check is for, and steps nothing: no rows are read, and a
+    /// statement that writes does not write.
+    ///
+    /// compileStatement only compiles here; it is never executed. The platform documents its
+    /// execute methods as rejecting statements that return rows, and that restriction is on
+    /// executing, not on compiling -- a SELECT prepares perfectly well, which is all this needs.
+    ///
+    /// Deliberately not left to rawQuery, which in the current platform sources prepares in the
+    /// SQLiteProgram constructor and would raise the same error on its own. That is an
+    /// implementation detail of one Android version; the contract that malformed SQL arrives from
+    /// executeQuery is ours, so it is enforced here rather than inherited. The cost is one extra
+    /// prepare per query, against a row scan that this replaces.
+    ///
+    /// Not reached for transaction control -- requireQueryStatement refuses that first -- which
+    /// matters because the platform's statement classifier skips the prepare for BEGIN, COMMIT
+    /// and ROLLBACK, so this would validate nothing for exactly those.
+    ///
+    /// Skipped under the legacy hint, where an error surfacing from next() is the behaviour an
+    /// application was written against.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the statement about to be handed to rawQuery
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the statement does not compile
+    private void validateQuery(String sql) throws IOException {
+        if (isLegacyBehavior()) {
+            return;
+        }
+        SQLiteStatement prepared = null;
+        try {
+            prepared = db.compileStatement(sql);
+        } catch (RuntimeException doesNotCompile) {
+            throw new IOException(doesNotCompile.getMessage(), doesNotCompile);
+        } finally {
+            if (prepared != null) {
+                prepared.close();
             }
         }
+    }
+
+    private Cursor wrap(android.database.Cursor c, String sql) throws IOException {
+        // Nothing is read from the cursor here. It is handed back exactly as the platform made
+        // it: unexecuted, before its first row. The query runs when the caller first asks for
+        // data, which is where an unwrapped Android application would run it too. That first
+        // access does count the whole result set -- the platform fills its first window with
+        // countAllRows set -- and this port neither adds to that nor can remove it.
         final AndroidCursor cursor = new AndroidCursor(c);
         // The platform cursor refills its window by running the query again, which for a
         // statement that writes repeats the writes. The cursor refuses to leave the window it

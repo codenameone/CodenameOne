@@ -63,6 +63,19 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     /// it already holds would run those changes again.
     private boolean statementWrites;
 
+    // The invariant this class keeps, written once so the next change to it has something to
+    // check against: a statement runs exactly once per cursor. The platform runs it when data is
+    // first asked for and counts the whole result set as it fills its first window; a position
+    // outside that window is served by running the statement AGAIN, which for a query is a
+    // repeated read and for an INSERT, UPDATE or DELETE with RETURNING is a repeated write. So
+    // for a statement that writes, every move that would leave the window is refused, and
+    // nothing on the way in -- validation included -- touches the cursor at all, because every
+    // move asks getCount() first and that is the walk this is trying not to do.
+    //
+    // Deliberately not fixed here: the first access counting the whole result set. That is the
+    // platform's own behaviour, identical for an application using android.database directly,
+    // and there is no public API that fills a window without it.
+
     /// Whether the last move landed on a row.
     ///
     /// Tracked here rather than asked of the platform cursor, which answers that question by
