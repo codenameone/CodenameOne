@@ -17,7 +17,7 @@ One Enterprise build hint enables the policy:
 
 `codename1.arg.harden.level=standard`
 
-The engine renames classes and members, encrypts eligible application strings, and applies control-flow transforms where the target can support them. Android keeps R8 as its renamer. JavaScript skips string encryption. ParparVM skips control-flow changes that would fight its optimizer.
+The engine renames classes and members, encrypts eligible application strings, and applies control-flow transforms where the target can support them. Android keeps R8 as its renaming tool. JavaScript skips string encryption. ParparVM skips control-flow changes that would fight its optimizer.
 
 The mapping stays connected to Crash Protection, so a hardened production crash still returns a readable stack trace. A build fails if the required mapping upload fails.
 

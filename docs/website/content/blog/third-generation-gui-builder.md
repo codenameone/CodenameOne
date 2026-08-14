@@ -13,15 +13,15 @@ series: ["release-2026-08-14"]
 
 We have rebuilt the Codename One GUI Builder again. This is its third generation. The interesting part is not another drag-and-drop surface. It is what we kept, what Maven broke, and why a visual editor must understand the whole project instead of opening one generated form at a time.
 
-This is a smaller rewrite than the second generation Steve Hannah built. His guided layout work remains the foundation. [PR #5523](https://github.com/codenameone/CodenameOne/pull/5523) replaces the shell around it with a Maven-first Codename One application that moves between forms, CSS, and Java without leaving the workspace.
+This is a smaller rewrite than the second generation Steve Hannah built. His guided layout work remains the foundation. [PR #5523](https://github.com/codenameone/CodenameOne/pull/5523) replaces the surrounding shell with a Maven-first Codename One application that moves between forms, CSS, and Java without leaving the workspace.
 
 ## This week in one page
 
 - [The third-generation GUI Builder](#three-builders-three-different-projects) is now a project workspace launched with `mvn cn1:guibuilder`.
-- [App Hardening](/blog/app-hardening-cross-platform/) applies renaming, string encryption, and selected control-flow transforms before the platform builds split. The follow-up publishes Saturday.
+- {{< post-link path="/blog/app-hardening-cross-platform" text="App Hardening" >}} applies renaming, string encryption, and selected control-flow transforms before the platform builds split. The follow-up publishes Saturday.
 - [The iOS on-device debugger](#a-breakpoint-no-longer-dereferences-a-random-local) no longer crashes when a reused local slot is mistaken for an object.
 - [Port status and Linux video](#a-skipped-test-is-not-a-pass) now report skipped tests instead of counting them as passes. The same work fixed three GStreamer defects.
-- [Google Sign-In](#google-sign-in-now-runs-in-an-arm64-simulator) moved to version 7.1 so Apple silicon simulators get a real arm64 simulator slice.
+- [Google Sign-In](#google-sign-in-now-runs-in-an-arm64-simulator) moved to version 7.1 so Apple Silicon simulators get a real arm64 simulator slice.
 - [ParparVM memory reclamation](#small-object-pages-can-return-to-the-os) now returns surplus BiBOP pages to the operating system after a small-object peak.
 - [Missing and legacy URLs](#a-retired-url-now-has-somewhere-useful-to-go) now lead to recovery pages instead of a bare 404.
 
@@ -155,9 +155,9 @@ The `.gui` file remains plain XML. You can review it in a pull request and recov
 
 [PR #5527](https://github.com/codenameone/CodenameOne/pull/5527) adds an open-source hardening engine that runs on the merged application before it becomes Android, iOS, JavaScript, Windows, Linux, or JavaSE output. The goal is DexGuard-class resistance without protecting one port and leaving the others exposed.
 
-The policy is intentionally port-aware. Android keeps R8 as its sole renamer. JavaScript skips string encryption because its native bridge can hold live string references. ParparVM skips control-flow transforms that would fight its optimizer. The common pipeline still gives one build hint, one report, and a build-specific mapping connected to Crash Protection.
+The policy is intentionally port-aware. Android keeps R8 as its sole renaming tool. JavaScript skips string encryption because its native bridge can hold live string references. ParparVM skips control-flow transforms that would fight its optimizer. The common pipeline still gives one build hint, one report, and a build-specific mapping connected to Crash Protection.
 
-Saturday's [App Hardening deep dive](/blog/app-hardening-cross-platform/) covers the exact port matrix, string-encryption exclusions, keep rules, retrace lifecycle, and local-build boundary. It also separates hardening from App Shield and the encrypted database work still under review.
+Saturday's {{< post-link path="/blog/app-hardening-cross-platform" text="App Hardening deep dive" >}} covers the exact port matrix, string-encryption exclusions, keep rules, retrace lifecycle, and local-build boundary. It also separates hardening from App Shield and the encrypted database work still under review.
 
 ## A breakpoint no longer dereferences a random local
 
@@ -173,11 +173,11 @@ The PR added 66 tests around the generated C and JDWP proxy. It did not include 
 
 Correcting that mapping exposed 11 hidden skips on watchOS, six on tvOS, and two or three on every other port. An unknown marker now fails the reporting contract instead of disappearing.
 
-The same investigation fixed Linux `VideoIO`. The CI image lacked the codec plugins it claimed to test. GStreamer returned a partial pipeline plus an error for a missing element, but the port ignored the error. The reader also asked a paused pipeline for a normal sample when the decoded frame was still the preroll buffer. Linux now installs the codecs, rejects partial pipelines, pulls preroll correctly, and reports only encoders and decoders present in the GStreamer registry.
+The same investigation fixed Linux `VideoIO`. The CI image lacked the codec plugins it claimed to test. GStreamer returned a partial pipeline plus an error for a missing element, but the port ignored the error. The reader also asked a paused pipeline for a normal sample when the decoded frame was still the pre-roll buffer. Linux now installs the codecs, rejects partial pipelines, pulls the pre-roll frame correctly, and reports only encoders and decoders present in the GStreamer registry.
 
 ## Google Sign-In now runs in an arm64 simulator
 
-[PR #5544](https://github.com/codenameone/CodenameOne/pull/5544) moves the iOS Google Sign-In integration from the old 5.x vendored framework to `GoogleSignIn` 7.1. The old framework had an arm64 device slice but no arm64 simulator slice. On an Apple silicon Mac, the linker selected the device slice and rejected it.
+[PR #5544](https://github.com/codenameone/CodenameOne/pull/5544) moves the iOS Google Sign-In integration from the old bundled 5.x framework to `GoogleSignIn` 7.1. The old framework had an arm64 device slice but no arm64 simulator slice. On an Apple Silicon Mac, the linker selected the device slice and rejected it.
 
 Version 7.1 builds from source for the selected SDK. The native bridge now uses completion handlers and the current token API. We stopped at 7.1 because later versions introduce Swift dependencies that would force modular headers into every generated Podfile, including projects unrelated to Google Sign-In.
 
@@ -201,7 +201,7 @@ Initializr now generates projects on Codename One 7.0.265 through [PR #5533](htt
 
 The GUI Builder rewrite is about keeping control close to the artifact you ship. Forms, CSS, generated Java, and responsive behavior now share one inspectable workspace. The debugger, port reports, memory allocator, login bridge, and recovery pages all remove places where the toolchain previously hid the real state.
 
-Security follows the same direction. Last week [App Shield](/blog/app-shield-server-attestation/) moved the final trust decision from the phone to the backend. Saturday's [App Hardening post](/blog/app-hardening-cross-platform/) covers the binary layer. The open [portable encrypted database PR](https://github.com/codenameone/CodenameOne/pull/5526) addresses data at rest and is still under review.
+Security follows the same direction. Last week [App Shield](/blog/app-shield-server-attestation/) moved the final trust decision from the phone to the backend. Saturday's {{< post-link path="/blog/app-hardening-cross-platform" text="App Hardening post" >}} covers the binary layer. The open [portable encrypted database PR](https://github.com/codenameone/CodenameOne/pull/5526) addresses data at rest and is still under review.
 
 These controls solve different problems. Together they move Codename One toward a secure default at each boundary: readable code in the binary, modified clients calling a server, and plaintext data on disk. That is a more useful security lead than one large checkbox with an impressive name.
 
