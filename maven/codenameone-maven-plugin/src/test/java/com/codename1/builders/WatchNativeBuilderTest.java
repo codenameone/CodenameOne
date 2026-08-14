@@ -29,6 +29,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -853,19 +858,29 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("elsif ref.source_tree == 'SDKROOT'"),
                 "a raw library from the SDK is declared, a vendored one is inspected: " + ruby);
         assertTrue(ruby.contains("watch_unavailable = %w["), ruby);
-        assertTrue(ruby.contains("OpenGLES.framework") && ruby.contains("CarPlay.framework"),
+        // Downcased in the script -- IPhoneBuilder spells one of these "JavascriptCore.framework",
+        // which only resolves because macOS is case-insensitive, so the match is too.
+        assertTrue(ruby.contains("opengles.framework") && ruby.contains("carplay.framework"),
                 "the declared list has to reach the script: " + ruby);
+        assertTrue(ruby.contains("present = !watch_unavailable.include?(base.downcase)"),
+                "casing must not decide whether a framework reaches the watch link: " + ruby);
         // The three ByteCodeTranslator puts in every project's link phase that watchOS does not
         // have. Their headers are already #if !TARGET_OS_WATCH guarded, so the watch target
         // compiles and then fails at the link with "framework 'SystemConfiguration' not found" --
         // an absent framework cannot be weak-linked, only left out.
-        for (String absent : new String[] {"SystemConfiguration.framework",
-                "AudioToolbox.framework", "QuickLook.framework"}) {
+        // Every framework watchOS lacks that this builder can put on the app target. Vision and
+        // the rest of the conditional ones are added by IPhoneBuilder's API scan, so they only
+        // reach the watch link in a project that uses the feature -- which is why they outlived
+        // the first audit of the translator's base list.
+        for (String absent : new String[] {"systemconfiguration.framework",
+                "audiotoolbox.framework", "quicklook.framework", "vision.framework",
+                "coreimage.framework", "corenfc.framework", "coretelephony.framework",
+                "javascriptcore.framework", "adsupport.framework"}) {
             assertTrue(ruby.contains(absent),
                     absent + " is absent on watchOS and must not reach the watch link phase: "
                             + ruby);
         }
-        assertTrue(ruby.contains("present = !watch_unavailable.include?(base)"), ruby);
+        assertTrue(ruby.contains("present = !watch_unavailable.include?(base.downcase)"), ruby);
         assertFalse(ruby.contains("watch_fw_dirs"),
                 "the SDK directory probe is gone: " + ruby);
         assertTrue(ruby.contains("cn1_watch_archive_has_watch_slice(ref)"), ruby);
@@ -1189,6 +1204,19 @@ class WatchNativeBuilderTest {
                 // `!(os(iOS))` is TRUE on the watch, so that arm is the one it compiles.
                 .append("chk('a negated group stays undecidable', "
                         + "cn1_watch_excludes_watch('#if !(os(iOS) || os(macOS))'), false)\n")
+                // `== 0` and `!= 1` are the unary `!` written out. The same reading exists for
+                // the other platforms, where it means the opposite -- there a false test is the
+                // arm the watch DOES compile.
+                .append("chk('TARGET_OS_WATCH == 0 excludes', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_WATCH == 0'), true)\n")
+                .append("chk('TARGET_OS_WATCH != 1 excludes', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_WATCH != 1'), true)\n")
+                .append("chk('the true forms still do not', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_WATCH == 1'), false)\n")
+                .append("chk('nor does a bare macro', "
+                        + "cn1_watch_excludes_watch('#if TARGET_OS_WATCH'), false)\n")
+                .append("chk('== 0 does not select either', "
+                        + "cn1_watch_selects_watch('#if TARGET_OS_WATCH == 0'), false)\n")
                 .append("chk('a contradiction excludes', "
                         + "cn1_watch_excludes_watch('#if os(watchOS) && os(iOS)'), true)\n")
                 .append("chk('either order', "
@@ -1351,5 +1379,50 @@ class WatchNativeBuilderTest {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /**
+     * Every framework IPhoneBuilder can put on the app target is classified for the watch.
+     *
+     * <p>The watch target mirrors the app target's frameworks phase and drops what
+     * WATCH_OPTIONAL_FRAMEWORKS names. That is a DENY list, so it is silent about the framework
+     * nobody thought of: an unclassified one is kept, and if watchOS does not have it the watch
+     * link fails with "framework 'X' not found". It happened three times in a row, one framework
+     * per CI round -- SystemConfiguration, then AudioToolbox and QuickLook, then Vision -- because
+     * each was only reachable in a project that used the feature that adds it.
+     *
+     * <p>This asserts the two lists PARTITION what the builder can emit, so the commit that adds a
+     * framework fails here rather than in an iOS job forty minutes later. It cannot see
+     * ios.add_libs (a project's own hint) or ByteCodeTranslator's base list, which lives in
+     * another module -- the base list is audited in WATCH_OPTIONAL_FRAMEWORKS' comment.
+     */
+    @Test
+    public void everyEmittedFrameworkIsClassifiedForTheWatch() throws Exception {
+        File src = new File(System.getProperty("basedir", "."),
+                "src/main/java/com/codename1/builders/IPhoneBuilder.java");
+        assertTrue(src.isFile(), "cannot find IPhoneBuilder to scan: " + src.getAbsolutePath());
+        String source = new String(Files.readAllBytes(src.toPath()), "UTF-8");
+
+        Set<String> classified = new HashSet<String>();
+        for (String s : (WatchNativeBuilder.WATCH_OPTIONAL_FRAMEWORKS + ";"
+                + WatchNativeBuilder.WATCH_LINKABLE_FRAMEWORKS).split(";")) {
+            classified.add(s.trim().toLowerCase());
+        }
+
+        // Quoted literals only, so "-Doptional.frameworks=" and the like are not mistaken for one.
+        // Case-insensitive throughout: IPhoneBuilder writes "JavascriptCore.framework".
+        Matcher m = Pattern.compile("\"([A-Za-z][A-Za-z0-9_]*\\.framework)\"").matcher(source);
+        Set<String> unclassified = new TreeSet<String>();
+        while (m.find()) {
+            if (!classified.contains(m.group(1).toLowerCase())) {
+                unclassified.add(m.group(1));
+            }
+        }
+        assertTrue(unclassified.isEmpty(),
+                "IPhoneBuilder can link " + unclassified + " but WatchNativeBuilder classifies "
+                + "neither as unavailable on watchOS nor as linkable there. Check each against "
+                + "`ls \"$(xcrun --sdk watchos --show-sdk-path)/System/Library/Frameworks\"` and "
+                + "add it to WATCH_OPTIONAL_FRAMEWORKS (absent, or present but unused by the "
+                + "watch) or WATCH_LINKABLE_FRAMEWORKS (present and wanted).");
     }
 }

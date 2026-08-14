@@ -501,25 +501,6 @@ public abstract class Executor {
                 String method, Boolean value) {
         }
 
-        /**
-         * Names the class whose bytecode the following callbacks come from.
-         *
-         * <p>Every other callback describes what is being CALLED, which answers "does this app do
-         * X" and nothing about where. That is the same question until a project has two translation
-         * roots: a flag raised by the watch lifecycle then entitles the phone too, and an
-         * entitlement the phone's provisioning profile does not carry fails release signing.
-         * Recording the caller lets a per-root walk decide which target actually did it.</p>
-         *
-         * <p>Null means the scanner could not name the class it is about to read -- the
-         * non-ASM fallback parser reports it that way when the constant pool will not resolve.
-         * A consumer must treat that as "no attribution" and DISCARD whatever it was holding:
-         * keeping the previous class would credit this one's calls to an unrelated one, which is
-         * worse than not attributing them at all.</p>
-         *
-         * @param internalName the caller's internal name, slashes and all, or null when unknown
-         */
-        public default void scanningClass(String internalName) {
-        }
 
         /**
          * Reports a call together with the descriptor of the method it

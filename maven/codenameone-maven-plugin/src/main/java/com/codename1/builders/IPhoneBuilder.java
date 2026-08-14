@@ -155,20 +155,6 @@ public class IPhoneBuilder extends Executor {
     /// them the generated factory can actually construct.
     private final HealthListenerScan healthScan = new HealthListenerScan();
 
-    /// Whether this project uses HealthKit -- scanner-detected calls, or a capability the project
-    /// asked for explicitly.
-    ///
-    /// The privacy strings are deliberately NOT evidence: a project can retain an
-    /// `ios.NSHealth*UsageDescription` hint long after the code that needed it is gone, and
-    /// entitling on that basis fails codesigning against an App ID with no HealthKit capability.
-    /// The capability hints ARE evidence, because asking for background delivery or recalibrated
-    /// estimates is asking for HealthKit -- and they are how a project whose health access lives in
-    /// native code declares it at all, where the bytecode scan sees nothing.
-    ///
-    /// This is what both the phone entitlement decision and the watch target's
-    /// CODE_SIGN_ENTITLEMENTS read, so the two slices of one app cannot disagree about whether the
-    /// app uses HealthKit.
-
     /// The listener bindings each root gets, resolved once where the stubs are written and read
     /// again where the factory sources are generated.
     private java.util.Map<String, String> phoneHealthListeners =
@@ -177,41 +163,6 @@ public class IPhoneBuilder extends Executor {
     private java.util.Map<String, String> watchHealthListeners =
             java.util.Collections.emptyMap();
 
-
-
-
-
-
-
-    /// The interface named by one `NativeLookup.register(...)` line, or null if it is not one.
-    private String registeredInterfaceName(String line) {
-        final String open = "NativeLookup.register(";
-        int start = line.indexOf(open);
-        if (start < 0) {
-            return null;
-        }
-        start += open.length();
-        int end = line.indexOf(".class", start);
-        if (end <= start) {
-            return null;
-        }
-        return line.substring(start, end).trim();
-    }
-
-
-    /// The listener bindings one translation root can actually reach.
-    ///
-    /// The scan that produced `all` walked the whole classes directory, so it answers "this app
-    /// declares these background listeners". The generated factory names every one of them in a
-    /// `new` expression, and that is a reference the translator follows -- so handing the app-wide
-    /// map to both roots pulls each target's listeners, and their whole transitive graph, into the
-    /// other target's binary. A watch that can never be relaunched for the phone's listener has no
-    /// business carrying it.
-    ///
-    /// Dropping a listener the root DOES need would be the dangerous direction, and cannot happen
-    /// here: `subscribe(request, MyListener.class)` puts the listener in its caller's constant pool,
-    /// and this walk is a strict over-approximation of what the translator keeps -- anything that
-    /// survives translation was reached by the walk first.
     /// Writes one root's generated factory, if that root binds anything.
     private void writeHealthBindings(File stubSource,
             java.util.Map<String, String> listeners, String classSuffix)

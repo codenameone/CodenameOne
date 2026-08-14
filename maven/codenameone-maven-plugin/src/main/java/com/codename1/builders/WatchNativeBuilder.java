@@ -110,7 +110,7 @@ class WatchNativeBuilder {
     // The absences below were all verified that way. The port's own sources are already
     // #if !TARGET_OS_WATCH guarded around each of them -- this list is the link half of the same
     // conditional-system-library arrangement, and it is the half that silently lags.
-    private static final String WATCH_OPTIONAL_FRAMEWORKS =
+    static final String WATCH_OPTIONAL_FRAMEWORKS =
             "OpenGLES.framework;GLKit.framework;Metal.framework;"
             + "MapKit.framework;MediaPlayer.framework;MessageUI.framework;"
             + "AddressBookUI.framework;AddressBook.framework;"
@@ -125,7 +125,34 @@ class WatchNativeBuilder {
             + "CarPlay.framework;"
             // ARKit and SceneKit are absent on watchOS; they are linked on the iOS slice when the
             // app references com.codename1.ar, so weak-link them for the watch slice.
-            + "ARKit.framework;SceneKit.framework";
+            + "ARKit.framework;SceneKit.framework;"
+            // The CONDITIONAL ones -- added by IPhoneBuilder's API scan rather than by the
+            // translator, so they appear only in projects that use the feature. That is why they
+            // outlived two rounds of this list: a build that never touches Vision never links it,
+            // and the watch link only fails for the app that does.
+            + "AdSupport.framework;CoreImage.framework;CoreNFC.framework;"
+            + "CoreTelephony.framework;JavaScriptCore.framework;Vision.framework";
+
+    /**
+     * Frameworks the watch target MAY link, so that every framework this builder can emit is
+     * classified one way or the other and {@code WatchNativeBuilderTest} can prove it.
+     *
+     * <p>Nothing reads this at build time. It exists because the list above is a deny list, and a
+     * deny list is silent about the thing nobody thought of: a framework added to
+     * {@code IPhoneBuilder} and classified nowhere is simply kept, and if watchOS does not have it
+     * the watch link fails -- three separate times, one framework per CI round, before this pair
+     * was written. The test turns that into a failing assertion on the commit that adds it.</p>
+     */
+    static final String WATCH_LINKABLE_FRAMEWORKS =
+            "Accelerate.framework;AuthenticationServices.framework;AVFoundation.framework;"
+            + "AVKit.framework;BackgroundTasks.framework;CoreBluetooth.framework;"
+            + "CoreLocation.framework;CoreMedia.framework;CoreML.framework;"
+            + "CoreMotion.framework;CoreText.framework;CoreVideo.framework;"
+            + "DeviceCheck.framework;EventKit.framework;GameKit.framework;"
+            + "HealthKit.framework;LocalAuthentication.framework;MobileCoreServices.framework;"
+            + "NaturalLanguage.framework;NetworkExtension.framework;PhotosUI.framework;"
+            + "QuartzCore.framework;Security.framework;UserNotifications.framework;"
+            + "WatchConnectivity.framework";
 
     WatchNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;
@@ -2184,8 +2211,13 @@ class WatchNativeBuilder {
                 // ParparVM weak-links through -Doptional.frameworks, so the declaration that keeps
                 // the iOS slice linking and the one that keeps the watch target's phase honest
                 // cannot drift apart.
+                // Downcased on both sides. IPhoneBuilder writes "JavascriptCore.framework" with a
+                // lowercase s, which resolves only because macOS filesystems are case-insensitive;
+                // an exact match against Apple's spelling would have missed it and linked a
+                // framework watchOS does not have. Casing is not a meaningful difference here, so
+                // it is not allowed to be one.
                 .append("watch_unavailable = %w[")
-                .append(WATCH_OPTIONAL_FRAMEWORKS.replace(';', ' '))
+                .append(WATCH_OPTIONAL_FRAMEWORKS.toLowerCase().replace(';', ' '))
                 .append("]\n")
                 .append("already = watch_target.frameworks_build_phase.files_references"
                         + ".map { |r| r.path && File.basename(r.path) }.compact\n")
@@ -2220,7 +2252,7 @@ class WatchNativeBuilder {
                 // dropped a device-only framework like BackgroundTasks from a device archive, and
                 // requiring it in only the active one makes the project depend on which
                 // destination generated it. The declaration has neither problem and is reviewable.
-                .append("      present = !watch_unavailable.include?(base)\n")
+                .append("      present = !watch_unavailable.include?(base.downcase)\n")
                 .append("    else\n")
                 // Vendored: the bundle's own declaration decides, and a yes means the search paths
                 // and any embed phase have to follow it below.
@@ -2231,8 +2263,9 @@ class WatchNativeBuilder {
                 .append("    present = cn1_watch_archive_has_watch_slice(ref)\n")
                 .append("    vendored_linked ||= present\n")
                 .append("  elsif ref.source_tree == 'SDKROOT'\n")
-                // A dylib or text-based stub the SDK vends: declared, like the frameworks above.
-                .append("    present = !watch_unavailable.include?(base)\n")
+                // A dylib or text-based stub the SDK vends: declared, like the frameworks above,
+                // and downcased for the same reason.
+                .append("    present = !watch_unavailable.include?(base.downcase)\n")
                 .append("  else\n")
                 // A VENDORED one, where the declaration says nothing -- it lists what the port
                 // links, not what a developer dropped into the project. The same distinction the
@@ -2488,7 +2521,14 @@ class WatchNativeBuilder {
                 // there. Reading them as iOS-only removed an arm the watch does build and dropped
                 // the package imported inside it.
                 .append("  return false if c =~ /\\A#(ifdef|ifndef)\\b/ || c.include?('defined(')\n")
-                .append("  return true if c =~ /!TARGET_OS_WATCH\\b/\n")
+                // `== 0` and `!= 1` say the same thing as the unary `!`, and the reading already
+                // exists a few lines down for the OTHER platforms -- where it means the opposite,
+                // because there a false test is the arm the watch DOES compile. Recognizing only
+                // the unary spelling here let `#if TARGET_OS_WATCH == 0` read as a positive watch
+                // test, so an arm that cannot compile on the watch was kept and the iOS-only
+                // package it imports was mirrored into the watch target.
+                .append("  return true if c =~ /!TARGET_OS_WATCH\\b/"
+                        + " || c =~ /\\bTARGET_OS_WATCH\\s*(==\\s*0|!=\\s*1)\\b/\n")
                 .append("  unless c =~ /\\bTARGET_OS_WATCH\\b/\n")
                 // NEGATED is the opposite answer. `!TARGET_OS_IOS` is TRUE on watchOS, so that arm
                 // is the one the watch compiles -- suppressing it dropped a package imported only
