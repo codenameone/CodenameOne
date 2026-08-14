@@ -519,6 +519,11 @@ public class AndroidDB extends Database {
         // The platform cursor refills its window by running the query again, which for a
         // statement that writes repeats the writes. The cursor refuses to leave the window it
         // holds when that is what the statement does.
+        //
+        // Deliberately not gated by the compatibility flag. What the flag restores is behaviour an
+        // application could depend on, and the behaviour here was a backward seek quietly running
+        // an INSERT or an UPDATE a second time. Nothing can depend on that: the rows it wrote were
+        // never asked for, and the caller had no way to see it happen.
         cursor.statementWrites(SQLStatementSplitter.writesData(sql));
         cursor.setCloseListener(new AndroidCursor.CloseListener() {
             @Override

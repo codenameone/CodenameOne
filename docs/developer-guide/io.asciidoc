@@ -419,8 +419,9 @@ The hint works in the simulator too, so you can test either mode without a devic
 
 The flag doesn't cover defects, nor capabilities that used to throw and now work:
 `last()`, `prev()` and `position(int)` on iOS and the simulator, reading blobs on iOS, blob query
-parameters, binding null inside a `String[]`, or the existence of a database at all on the native
-Windows and Linux ports. No application can depend on those.
+parameters, binding null inside a `String[]`, the existence of a database at all on the native
+Windows and Linux ports, or seeking backwards through a statement that writes, which used to run
+that statement a second time and repeat what it wrote. No application can depend on those.
 
 ==== Two settings the contract can't reach
 
