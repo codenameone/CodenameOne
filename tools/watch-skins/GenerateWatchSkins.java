@@ -238,7 +238,19 @@ public class GenerateWatchSkins {
         // bezel curve does not actually leave usable.
         int cornerInset = m.circular ? 0
                 : (int) Math.ceil(cornerRadius(m.dw, m.dh) * (1.0 - 1.0 / Math.sqrt(2.0)));
-        int inset = Math.max(cornerInset, Math.round(m.dh * (m.circular ? 0.15f : 0.06f)));
+        // UNIFORM on a rounded rectangle, and equal to the geometric corner inset -- the same
+        // value CN1WatchHost publishes on the device, on all four sides.
+        //
+        // The vertical axis used to take max(cornerInset, 6% of the height), which on the Apple
+        // models is 13 or 15 points against the host's 4 or 5. Three times the inset, on the axis
+        // watch layouts are tightest on: a layout that honours the safe area reflowed in the
+        // simulator and fitted on the device, which is the simulator lying about the device in the
+        // direction that wastes the most time. Nothing on a rounded-rectangle face intrudes
+        // vertically beyond the corner arc, so there was never anything for the extra to model.
+        //
+        // A CIRCULAR face is different and keeps its own rule: inscribing a rectangle in a circle
+        // costs about 15% on both axes, and that is a real geometric loss, not a margin.
+        int inset = m.circular ? Math.round(m.dh * 0.15f) : cornerInset;
         int insetX = m.circular ? Math.round(m.dw * 0.15f) : cornerInset;
         StringBuilder p = new StringBuilder();
         p.append("# ").append(m.label).append(" - Codename One simulator skin (placeholder art)\n");

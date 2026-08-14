@@ -123,6 +123,50 @@ public class WatchSkinCoordinateMapTest {
         }
     }
 
+
+    /**
+     * The Apple skins advertise the safe area the watch host actually publishes.
+     *
+     * <p>{@code CN1WatchHost.cn1PublishWatchSafeArea} derives one geometric inset from the corner
+     * radius and applies it to all four sides. The skins used to take the vertical inset as 6% of
+     * the display height instead -- 13 or 15 points against the host's 4 or 5 -- so a layout
+     * honouring the safe area reflowed in the simulator and fitted on the device. Nothing on a
+     * rounded-rectangle face intrudes vertically beyond the corner arc, so the extra modelled
+     * nothing; it just made the simulator wrong on the axis a watch layout is tightest on.</p>
+     *
+     * <p>Mirrors the host's formula rather than hard-coding 4 and 5, so a change to the corner
+     * ratio has to move both sides together or this fails.</p>
+     */
+    @Test
+    public void appleSkinsPublishTheSameSafeAreaAsTheWatchHost() throws Exception {
+        for (String skinName : new String[] {"AppleWatch41mm.skin", "AppleWatch45mm.skin"}) {
+            ZipFile zip = new ZipFile(locate(skinName));
+            try {
+                Properties props = new Properties();
+                InputStream in = zip.getInputStream(entry(zip, skinName, "skin.properties"));
+                try {
+                    props.load(in);
+                } finally {
+                    in.close();
+                }
+                int dw = Integer.parseInt(props.getProperty("displayWidth"));
+                int dh = Integer.parseInt(props.getProperty("displayHeight"));
+                // CN1WatchHost: ceil(radius * (1 - 1/sqrt(2))), radius = ratio * min(w, h).
+                int host = (int) Math.ceil(cornerRadius(dw, dh) * (1.0 - 1.0 / Math.sqrt(2.0)));
+                for (String edge : new String[] {"X", "Y", "Width", "Height"}) {
+                    int expected = "X".equals(edge) || "Y".equals(edge) ? host
+                            : ("Width".equals(edge) ? dw : dh) - host * 2;
+                    assertEquals(expected,
+                            Integer.parseInt(props.getProperty("safePortrait" + edge)),
+                            skinName + " safePortrait" + edge
+                                    + " must match what CN1WatchHost publishes on the device");
+                }
+            } finally {
+                zip.close();
+            }
+        }
+    }
+
     /** Every corner of the safe rectangle inside the inscribed circle of a round face. */
     private void assertCornersInsideCircle(String skinName, int dw, int dh,
             int x, int y, int w, int h) {
