@@ -356,6 +356,12 @@
                         <configuration>
                             <sources>
                                 <source>${project.basedir}/../../../vm/benchmarks/common/src/main/java</source>
+                                <!-- The port conformance suite. It lives under tests/ rather than in
+                                     the framework: it is our check on the ports, not API for
+                                     applications, and shipping it put 2000 lines of assertions in
+                                     com.codename1.testing beside the user-facing test classes, in
+                                     every application ever built. -->
+                                <source>${project.basedir}/../../../tests/conformance/java</source>
                             </sources>
                         </configuration>
                     </execution>

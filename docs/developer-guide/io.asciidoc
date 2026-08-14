@@ -442,8 +442,9 @@ on its own. Codename One puts every port on SQLite's default so a violation beha
 the simulator as on a device; run `PRAGMA foreign_keys = ON` after opening if you want them
 enforced, which works everywhere.
 
-`DatabaseConformanceSuite` reports what the engine under it does with both, so a run on a device
-says which side that platform is on.
+Both are easy to settle for yourself: `SELECT "value"` either returns the string or reports an
+error, and `PRAGMA foreign_keys` reports whether they're on. Codename One's own port conformance
+run reports both for every platform it covers.
 
 
 === Network manager & connection request

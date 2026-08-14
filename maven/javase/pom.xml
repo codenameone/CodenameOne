@@ -240,6 +240,26 @@
         </resources>
         <plugins>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-database-conformance-suite</id>
+                        <phase>generate-test-sources</phase>
+                        <goals><goal>add-test-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <!-- Shared with the on-device harness, which adds the same
+                                     directory as a main source. Test scope here, so it compiles
+                                     for SEDatabaseConformanceTest and never enters the port jar. -->
+                                <source>${project.basedir}/../../tests/conformance/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <executions>
                     <execution>

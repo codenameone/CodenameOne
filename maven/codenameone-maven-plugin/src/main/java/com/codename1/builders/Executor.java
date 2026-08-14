@@ -759,6 +759,11 @@ public abstract class Executor {
         "com/codename1/orm/Dao",
         "com/codename1/orm/EntityManager",
         "com/codename1/properties/SQLMap",
+        // Not framework code any more -- it lives under tests/ and is compiled only into the
+        // conformance harness -- but the harness does carry it, and it is our check on the ports
+        // rather than that application's own use of the database. Named here so it keeps counting
+        // for nothing, and so an application that shipped against an older core, which did carry
+        // it, is unaffected.
         "com/codename1/testing/DatabaseConformanceSuite",
         "com/codename1/ui/Display",
         // The database package itself. Listed by name rather than skipped as a directory: the
