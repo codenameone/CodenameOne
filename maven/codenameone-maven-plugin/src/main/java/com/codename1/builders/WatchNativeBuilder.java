@@ -2062,6 +2062,24 @@ class WatchNativeBuilder {
                 .append("  out.include?('LC_VERSION_MIN_WATCHOS')\n")
                 .append("end\n");
 
+        // Whether a text-based stub names a watch platform.
+        //
+        // Unreadable is answered NO, as the plist and archive checks are: leaving a library out
+        // costs a link error naming it, where linking one built for another platform costs a
+        // mismatch deep in a build that had no reason to involve it.
+        s.append("def cn1_watch_tbd_supports_watchos(ref)\n")
+                .append("  path = (ref.real_path.to_s rescue nil)\n")
+                .append("  return false unless path && File.exist?(path)\n")
+                .append("  begin\n")
+                .append("    text = File.read(path)\n")
+                .append("  rescue StandardError\n")
+                .append("    return false\n")
+                .append("  end\n")
+                // v4 target triples (arm64_32-watchos, arm64-watchos-simulator) and the older
+                // platform lines both carry the word, and nothing else in a tbd does.
+                .append("  text =~ /watchos/i ? true : false\n")
+                .append("end\n");
+
         s.append("def cn1_watch_archive_has_watch_slice(ref)\n")
                 .append("  path = (ref.real_path.to_s rescue nil)\n")
                 .append("  return false unless path && File.exist?(path)\n")
@@ -2196,9 +2214,25 @@ class WatchNativeBuilder {
                 .append("  elsif base.end_with?('.a')\n")
                 .append("    present = cn1_watch_archive_has_watch_slice(ref)\n")
                 .append("    vendored_linked ||= present\n")
-                .append("  else\n")
-                // Same rule for a system dylib or text-based stub: declared, not probed.
+                .append("  elsif ref.source_tree == 'SDKROOT'\n")
+                // A dylib or text-based stub the SDK vends: declared, like the frameworks above.
                 .append("    present = !watch_unavailable.include?(base)\n")
+                .append("  else\n")
+                // A VENDORED one, where the declaration says nothing -- it lists what the port
+                // links, not what a developer dropped into the project. The same distinction the
+                // .framework branch above draws, which this branch was missing: it accepted any
+                // raw library whose basename happened not to be in the list, so an iOS-only dylib
+                // was weak-linked into the watch target, and weak linkage does not save a
+                // platform mismatch at link time.
+                .append("    if base.end_with?('.dylib')\n")
+                // Mach-O, so the slice test the static archives use answers this too.
+                .append("      present = cn1_watch_archive_has_watch_slice(ref)\n")
+                .append("    else\n")
+                // A .tbd is text: it names its platforms, so read them. TBD v4 lists
+                // `targets: [ arm64-ios, ... ]`, v2 and v3 a `platform:` line.
+                .append("      present = cn1_watch_tbd_supports_watchos(ref)\n")
+                .append("    end\n")
+                .append("    vendored_linked ||= present\n")
                 .append("  end\n")
                 .append("  unless present\n")
                 .append("    puts \"[watchNative] not linking #{base} into the watch target: "

@@ -845,6 +845,13 @@ class WatchNativeBuilderTest {
         // are #ifdef'd around them, which is how conditional system libraries work on every other
         // platform here. Probing the SDK directories asked which destination the build targets, a
         // question a generated project should not depend on.
+        // A VENDORED raw library is inspected, not assumed. The declared list names what the
+        // PORT links, so it says nothing about a developer's own dylib -- accepting one because
+        // its basename happened not to be in the list weak-linked an iOS-only binary into the
+        // watch target, and weak linkage does not save a platform mismatch at link time.
+        assertTrue(ruby.contains("cn1_watch_tbd_supports_watchos"), ruby);
+        assertTrue(ruby.contains("elsif ref.source_tree == 'SDKROOT'"),
+                "a raw library from the SDK is declared, a vendored one is inspected: " + ruby);
         assertTrue(ruby.contains("watch_unavailable = %w["), ruby);
         assertTrue(ruby.contains("OpenGLES.framework") && ruby.contains("CarPlay.framework"),
                 "the declared list has to reach the script: " + ruby);
