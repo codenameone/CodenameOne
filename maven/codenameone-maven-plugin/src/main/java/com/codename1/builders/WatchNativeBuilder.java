@@ -2475,6 +2475,19 @@ class WatchNativeBuilder {
                 .append("  end\n")
                 .append("  return false unless c.include?('os(')\n")
                 .append("  return true if c =~ /!\\s*os\\(\\s*watchOS\\s*\\)/\n")
+                // A CONJUNCTION is false on the watch as soon as one operand is, so
+                // `#if os(watchOS) && os(iOS)` is false everywhere -- nothing is both -- and that
+                // arm never compiles, on the watch least of all. Returning "not excluded" on the
+                // strength of os(watchOS) being present kept an unreachable arm and mirrored the
+                // iOS-only package it imports into the watch target.
+                //
+                // The dual of the disjunction rule above: there EVERY operand had to exclude,
+                // here ANY one does. Asked recursively, so each operand gets the whole test.
+                .append("  conj = cn1_watch_or_operands(c.sub(/\\A#\\s*\\w+/, '').strip, '&')\n")
+                .append("  if conj.length > 1\n")
+                .append("    return true if conj.any? { |o| "
+                        + "cn1_watch_excludes_watch('#if ' + o.strip) }\n")
+                .append("  end\n")
                 .append("  return false if c.include?('os(watchOS)')\n")
                 // The same negation rule on the Swift side: `!os(iOS)` is true on the watch.
                 .append("  return false if c =~ /!os\\(\\s*"
@@ -2506,7 +2519,7 @@ class WatchNativeBuilder {
                 .append("end\n")
                 // Splits on `||` at the TOP level only, so a disjunction inside parentheses or
                 // inside a nested expression is left as the single operand it is.
-                .append("def cn1_watch_or_operands(expr)\n")
+                .append("def cn1_watch_or_operands(expr, op = '|')\n")
                 .append("  parts = []\n")
                 .append("  depth = 0\n")
                 .append("  current = ''\n")
@@ -2517,7 +2530,7 @@ class WatchNativeBuilder {
                 .append("      depth += 1\n")
                 .append("    elsif ch == ')'\n")
                 .append("      depth -= 1\n")
-                .append("    elsif depth == 0 && ch == '|' && expr[i + 1, 1] == '|'\n")
+                .append("    elsif depth == 0 && ch == op && expr[i + 1, 1] == op\n")
                 .append("      parts << current\n")
                 .append("      current = ''\n")
                 .append("      i += 2\n")

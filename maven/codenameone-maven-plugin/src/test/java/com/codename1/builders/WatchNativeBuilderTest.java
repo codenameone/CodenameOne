@@ -1158,6 +1158,17 @@ class WatchNativeBuilderTest {
                         + "cn1_watch_selects_watch('#if TARGET_OS_WATCH != 0'), true)\n")
                 .append("chk('but == 0 does not', "
                         + "cn1_watch_selects_watch('#if TARGET_OS_WATCH == 0'), false)\n")
+                // A conjunction is false on the watch as soon as one operand is, so
+                // `os(watchOS) && os(iOS)` is false everywhere -- nothing is both -- and that arm
+                // never compiles. The dual of the disjunction rule: there every operand had to
+                // exclude, here any one does.
+                .append("chk('a contradiction excludes', "
+                        + "cn1_watch_excludes_watch('#if os(watchOS) && os(iOS)'), true)\n")
+                .append("chk('either order', "
+                        + "cn1_watch_excludes_watch('#if os(iOS) && os(watchOS)'), true)\n")
+                // Still satisfiable on the watch when the other operand is merely unknown.
+                .append("chk('a feature flag beside it does not', "
+                        + "cn1_watch_excludes_watch('#if os(watchOS) && FEATURE'), false)\n")
                 .append("chk('paren other platform excludes', "
                         + "cn1_watch_excludes_watch('#if (os(iOS))'), true)\n")
                 .append("chk('paren negated watch excludes', "
