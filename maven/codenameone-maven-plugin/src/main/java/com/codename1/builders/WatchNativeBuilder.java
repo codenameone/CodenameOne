@@ -1522,17 +1522,24 @@ class WatchNativeBuilder {
     /**
      * Whether the watch bundle itself uses HealthKit.
      *
-     * <p>The phone's privacy strings are evidence about the phone. When
-     * the watch shares the phone's main class it runs the same code, so
-     * they are evidence about the watch too. When the watch has its own
-     * {@code watchMain} it shakes from its own root and the phone's usage
-     * says nothing -- entitling that bundle anyway made codesigning fail
-     * for an ordinary non-health watch app whose App ID has no HealthKit
-     * capability, with nothing in the output to explain it.</p>
+     * <p>The answer is APP-WIDE, for the watch as for the phone, and
+     * {@code watchNative.health} overrides it in either direction.</p>
      *
-     * <p>{@code watchNative.health} settles it either way, and
-     * {@code watchNative.health.workoutProcessing} implies it: a workout
-     * session is HealthKit.</p>
+     * <p>It used to be per-root: a distinct {@code watchMain} got its own
+     * class walk, on the reasoning that entitling a non-health watch app
+     * fails codesigning against an App ID without the capability. That is
+     * a real failure and this is still the answer to it -- by hint rather
+     * than by inference. The walk was deleted because it did not work:
+     * see {@code IPhoneBuilder.phoneUsesHealthData}. It also cost hundreds
+     * of lines to guess at something the project can simply state, and a
+     * wrong guess in the other direction -- omitting the entitlement from
+     * a watch app that does use HealthKit -- fails at runtime instead,
+     * which is worse and harder to diagnose.</p>
+     *
+     * <p>So: a watch app that does not use HealthKit in a project whose
+     * phone does sets {@code watchNative.health=false}.
+     * {@code watchNative.health.workoutProcessing} implies true, because a
+     * workout session is HealthKit.</p>
      */
     boolean watchUsesHealth(boolean appUsesHealth) {
         if ("true".equalsIgnoreCase(healthHint)) {
