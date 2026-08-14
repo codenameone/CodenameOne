@@ -340,9 +340,7 @@ public class CN1WearableBridge implements WearableBridge {
                             .getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (info != null) {
-                for (Node n : info.getNodes()) {
-                    out.add(n.getId());
-                }
+                out = peerIds(info.getNodes(), localNodeId(context));
             }
         } catch (Throwable unavailable) {
             // Nothing established. Reported as null so the caller can tell "could not ask" from
@@ -404,6 +402,35 @@ public class CN1WearableBridge implements WearableBridge {
             }
             return true;
         }
+    }
+
+    /**
+     * The ids in a capability set, minus this device.
+     *
+     * <p>Both halves of the pair declare {@code cn1_wearable} -- the build writes the same
+     * {@code android_wear_capabilities} resource into every module -- so the local node satisfies
+     * the query it issues, and {@code FILTER_ALL} is documented as an unfiltered set. Keeping our
+     * own id would make {@link #isPaired()} and {@link #isCompanionAppInstalled()} answer true on a
+     * device with no counterpart at all, purely on the strength of seeing ourselves.
+     *
+     * <p>Applied at every point the cache is written rather than at the point each question is
+     * asked, so there is one rule instead of one per caller. The local node is never a peer under
+     * any of them, so the filter is correct whichever way Play services answers.
+     *
+     * @param nodes the capability set as reported
+     * @param local this device's node id, or null when it could not be resolved
+     * @return the peer ids
+     */
+    private static List<String> peerIds(Iterable<Node> nodes, String local) {
+        List<String> out = new ArrayList<String>();
+        for (Node n : nodes) {
+            String id = n.getId();
+            if (local != null && local.equals(id)) {
+                continue;
+            }
+            out.add(id);
+        }
+        return out;
     }
 
     /// This device's own node id, cached: the Data Layer echoes our own published values back to us
@@ -588,14 +615,14 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (bondedLock) {
             startedAt = bondedGeneration;
         }
-        List<String> out = new ArrayList<String>();
+        List<String> out;
         try {
             CapabilityInfo info = Tasks.await(
                     capabilityClient.getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL),
                     TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            for (Node n : info.getNodes()) {
-                out.add(n.getId());
-            }
+            // Blocking is allowed here -- the latency-sensitive callers were sent down the async
+            // path above -- so the local id can simply be resolved rather than read from cache.
+            out = peerIds(info.getNodes(), localNodeId(context));
         } catch (Throwable unavailable) {
             // Keep the previous snapshot, as every other refresh path does. Falling through to the
             // assignments below would replace a valid companion set with an empty one and stamp it
@@ -692,10 +719,9 @@ public class CN1WearableBridge implements WearableBridge {
             }
             return;
         }
-        List<String> out = new ArrayList<String>();
-        for (Node n : info.getNodes()) {
-            out.add(n.getId());
-        }
+        // Play services delivers this on a WearableListenerService background thread, the same one
+        // the data-event path already resolves the local id on, so blocking here is in keeping.
+        List<String> out = peerIds(info.getNodes(), localNodeId(b.context));
         boolean changed;
         synchronized (b.bondedLock) {
             changed = !sameIds(b.cachedBonded, out);
@@ -820,10 +846,19 @@ public class CN1WearableBridge implements WearableBridge {
         synchronized (bondedLock) {
             startedAt = bondedGeneration;
         }
-        capabilityClient.getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL)
-                .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<CapabilityInfo>() {
-                    public void onComplete(com.google.android.gms.tasks.Task<CapabilityInfo> task) {
-                        if (!task.isSuccessful() || task.getResult() == null) {
+        final com.google.android.gms.tasks.Task<CapabilityInfo> caps =
+                capabilityClient.getCapability(CAPABILITY_NAME, CapabilityClient.FILTER_ALL);
+        // Asked ALONGSIDE the capability set, not resolved inside the callback: this listener runs
+        // on the main thread unless given an executor, and a blocking getLocalNode() there is an
+        // ANR -- the same trap bondedNodeIds() routes latency-sensitive callers around. Both tasks
+        // have completed by the time the combined listener runs, so reading them does not block.
+        final com.google.android.gms.tasks.Task<Node> self = nodeClient.getLocalNode();
+        com.google.android.gms.tasks.Tasks.whenAllComplete(caps, self)
+                .addOnCompleteListener(new com.google.android.gms.tasks.OnCompleteListener<
+                        List<com.google.android.gms.tasks.Task<?>>>() {
+                    public void onComplete(com.google.android.gms.tasks.Task<
+                            List<com.google.android.gms.tasks.Task<?>>> both) {
+                        if (!caps.isSuccessful() || caps.getResult() == null) {
                             // A transient failure is not evidence the companion was uninstalled.
                             // Overwriting a good cache with an empty result -- and stamping it fresh
                             // -- would make isCompanionAppInstalled(), isPaired() and isReachable()
@@ -831,10 +866,15 @@ public class CN1WearableBridge implements WearableBridge {
                             refreshingBonded = false;
                             return;
                         }
-                        List<String> out = new ArrayList<String>();
-                        for (Node n : task.getResult().getNodes()) {
-                            out.add(n.getId());
+                        if (self.isSuccessful() && self.getResult() != null) {
+                            // Warms the cache the blocking paths share, so this is the last query
+                            // that has to ask.
+                            localNode = self.getResult().getId();
                         }
+                        // A null id only means the identity query failed this round: the set is
+                        // then unfiltered until a refresh resolves it, which is the same
+                        // conservative direction the rest of the cache takes on a failed query.
+                        List<String> out = peerIds(caps.getResult().getNodes(), localNode);
                         boolean changed;
                         synchronized (bondedLock) {
                             if (bondedGeneration != startedAt) {
@@ -3023,7 +3063,9 @@ public class CN1WearableBridge implements WearableBridge {
             }
             return;
         }
-        expected.remove(localNodeId(context));
+        // No local-node removal here: bondedNodeIds() no longer reports this device, so the quorum
+        // is peers only by construction. Filtering after the fact meant every other reader of the
+        // cache -- isPaired(), isCompanionAppInstalled(), getConnectedNodes() -- still saw us.
         transferTimer.schedule(new Runnable() {
             public void run() {
                 boolean failed = false;

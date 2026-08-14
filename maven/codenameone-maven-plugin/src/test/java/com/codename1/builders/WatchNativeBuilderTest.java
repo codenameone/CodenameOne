@@ -1054,7 +1054,7 @@ class WatchNativeBuilderTest {
         StringBuilder defs = new StringBuilder("require 'fileutils'\n");
         for (String name : new String[] {"cn1_watch_balanced", "cn1_watch_normalize_condition",
                 "cn1_watch_excludes_watch", "cn1_watch_atom_selects_watch",
-                "cn1_watch_or_operands", "cn1_watch_selects_watch",
+                "cn1_watch_or_operands", "cn1_watch_unwrap", "cn1_watch_selects_watch",
                 "cn1_watch_catalog_stage_name", "cn1_watch_catalog_for_watch",
                 "cn1_watch_sdk_module_names"}) {
             defs.append(definitionOf(ruby, name)).append('\n');
@@ -1162,6 +1162,23 @@ class WatchNativeBuilderTest {
                 // `os(watchOS) && os(iOS)` is false everywhere -- nothing is both -- and that arm
                 // never compiles. The dual of the disjunction rule: there every operand had to
                 // exclude, here any one does.
+                // A parenthesized disjunction is not nesting, it is punctuation: the top-level
+                // `||` split saw one operand and settled the condition before the conjunction rule
+                // could observe the group is false on the watch.
+                .append("chk('paren disjunction in a conjunction excludes', "
+                        + "cn1_watch_excludes_watch('#if (os(iOS) || os(macOS)) && FEATURE'), "
+                        + "true)\n")
+                .append("chk('either side of the conjunction', "
+                        + "cn1_watch_excludes_watch('#if FEATURE && (os(iOS) || os(macOS))'), "
+                        + "true)\n")
+                // Unwrapping must not swallow a real top-level operator.
+                .append("chk('unwrap keeps a top-level conjunction', "
+                        + "cn1_watch_excludes_watch('#if (FEATURE) && (OTHER)'), false)\n")
+                // Reaching the rest of the function instead of returning makes negated groups
+                // reachable, and every scan below reads a positive platform mention as exclusion.
+                // `!(os(iOS))` is TRUE on the watch, so that arm is the one it compiles.
+                .append("chk('a negated group stays undecidable', "
+                        + "cn1_watch_excludes_watch('#if !(os(iOS) || os(macOS))'), false)\n")
                 .append("chk('a contradiction excludes', "
                         + "cn1_watch_excludes_watch('#if os(watchOS) && os(iOS)'), true)\n")
                 .append("chk('either order', "

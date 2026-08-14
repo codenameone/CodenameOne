@@ -2430,6 +2430,14 @@ class WatchNativeBuilder {
                 .append("  directive = condition.to_s[/\\A#\\s*\\w+/].to_s\n")
                 .append("  c = (directive + ' ' + cn1_watch_normalize_condition(condition))"
                         + ".strip.gsub(/!\\s+/, '!')\n")
+                // A NEGATED GROUP inverts every platform test inside it, and the scans below all
+                // read a positive mention of another platform as proof the watch is excluded.
+                // `#if !(os(iOS) || os(macOS))` is TRUE on watchOS -- that arm is precisely the one
+                // the watch compiles -- so answering from the os(iOS) inside it dropped the arm and
+                // whatever it imports. Left undecidable, which keeps the arm; the fall-through
+                // below makes the rest of the function reachable for these, so it has to be said
+                // here rather than relied on by accident.
+                .append("  return false if c.include?('!(')\n")
                 // A DISJUNCTION is true on the watch if ANY operand is, so one os() or TARGET_OS_
                 // test on one side of an || proves nothing on its own. A conjunction is safe:
                 // `os(iOS) && FEATURE` is false on the watch whatever FEATURE is.
@@ -2439,11 +2447,20 @@ class WatchNativeBuilder {
                 // tell" kept the import inside it, which mirrored an iOS/macOS-only package into
                 // the watch target and could fail its dependency resolution over source the watch
                 // never compiles. Asked recursively, so a nested disjunction answers the same way.
+                //
+                // A single top-level operand FALLS THROUGH rather than answering "cannot tell":
+                // in `(os(iOS) || os(macOS)) && FEATURE` the disjunction is parenthesized, so the
+                // top-level split by `||` yields one operand and returning here settled the whole
+                // condition before the conjunction rule below could see that the parenthesized
+                // group is false on the watch. That kept an arm the compiler drops and mirrored
+                // its iOS/macOS-only package into the watch target.
                 .append("  if c.include?('||')\n")
                 .append("    parts = cn1_watch_or_operands("
                         + "c.sub(/\\A#\\s*\\w+/, '').strip)\n")
-                .append("    return false if parts.length < 2\n")
-                .append("    return parts.all? { |o| cn1_watch_excludes_watch('#if ' + o.strip) }\n")
+                .append("    if parts.length > 1\n")
+                .append("      return parts.all? { |o| "
+                        + "cn1_watch_excludes_watch('#if ' + o.strip) }\n")
+                .append("    end\n")
                 .append("  end\n")
                 // Objective-C guards its platforms with TargetConditionals macros, not Swift's
                 // os() expressions, and `#if !TARGET_OS_WATCH` around a phone-only @import is the
@@ -2517,9 +2534,36 @@ class WatchNativeBuilder {
                 .append("  a =~ /\\ATARGET_OS_WATCH\\s*(==\\s*1|!=\\s*0)?\\z/ "
                         + "? true : false\n")
                 .append("end\n")
-                // Splits on `||` at the TOP level only, so a disjunction inside parentheses or
-                // inside a nested expression is left as the single operand it is.
+                // Strips parentheses that wrap the WHOLE expression, so `(a || b)` splits into the
+                // two operands it has rather than the one the depth counter sees. Balance-checked
+                // as it goes, or `(a) && (b)` would be mistaken for a wrapped expression by its
+                // first and last characters alone and lose its `&&`.
+                .append("def cn1_watch_unwrap(expr)\n")
+                .append("  s = expr.to_s.strip\n")
+                .append("  while s.length > 1 && s[0, 1] == '(' && s[-1, 1] == ')'\n")
+                .append("    depth = 0\n")
+                .append("    wraps = true\n")
+                .append("    i = 0\n")
+                .append("    while i < s.length\n")
+                .append("      ch = s[i, 1]\n")
+                .append("      depth += 1 if ch == '('\n")
+                .append("      depth -= 1 if ch == ')'\n")
+                .append("      if depth == 0 && i < s.length - 1\n")
+                .append("        wraps = false\n")
+                .append("        break\n")
+                .append("      end\n")
+                .append("      i += 1\n")
+                .append("    end\n")
+                .append("    break unless wraps\n")
+                .append("    s = s[1, s.length - 2].strip\n")
+                .append("  end\n")
+                .append("  s\n")
+                .append("end\n")
+                // Splits on `||` at the TOP level only, so a disjunction nested inside another
+                // operand is left as the single operand it is -- but see cn1_watch_unwrap: a pair
+                // of parentheses around the entire expression is not nesting, it is punctuation.
                 .append("def cn1_watch_or_operands(expr, op = '|')\n")
+                .append("  expr = cn1_watch_unwrap(expr)\n")
                 .append("  parts = []\n")
                 .append("  depth = 0\n")
                 .append("  current = ''\n")
