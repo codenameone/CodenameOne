@@ -134,4 +134,39 @@ public class ThreadSafeDatabaseTest extends UITestBase {
                     "the message should say the thread was stopped: " + expected.getMessage());
         }
     }
+
+    @FormTest
+    public void closingAfterTheWorkerHasGoneStaysQuiet() throws Exception {
+        // Two closes can race: one arriving on the worker through getThread(), one from anywhere
+        // else. The worker's own path closes the database and then asks the thread to drain, and
+        // the other caller can already have passed its closed check by then -- so its hand-off
+        // reaches a thread that has stopped and is refused, unchecked. close() is idempotent by
+        // contract, so that refusal must not reach the caller.
+        //
+        // Reached here through getThread().killWhenIdle() rather than by trying to lose a race.
+        // That is the state the race produces -- a stopped worker and a wrapper that does not
+        // know it yet -- and it is also a call any caller can make, since getThread() is public.
+        Database db = TestCodenameOneImplementation.getInstance()
+                .openOrCreateDB("test_threadsafe_close_after_worker.db");
+        ThreadSafeDatabase tsDb = new ThreadSafeDatabase(db);
+        tsDb.getThread().killWhenIdle();
+        long deadline = System.currentTimeMillis() + 5000;
+        while (!tsDb.getThread().isFinished() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        Assertions.assertTrue(tsDb.getThread().isFinished(), "the worker has to have stopped");
+
+        tsDb.close();
+
+        // And the database really is closed, rather than the close having been quietly skipped:
+        // there is no worker left to run it, so it has to have been closed directly. Asserted on
+        // the state rather than on a later call being refused, because this test double answers
+        // work whether it is open or not, so a refusal is not something this could observe.
+        Assertions.assertTrue(
+                ((TestCodenameOneImplementation.TestDatabase) db).isClosed(),
+                "the underlying database has to have been closed, not just abandoned");
+
+        // Still idempotent afterwards.
+        tsDb.close();
+    }
 }

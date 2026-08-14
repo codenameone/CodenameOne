@@ -780,6 +780,38 @@ public final class DatabaseConformanceSuite {
             closeQuietly(cur);
         }
 
+        // ---- a statement that counts as writing can still be read
+        // A port that protects a writing statement from being run twice has to tell "run again"
+        // apart from "already here". Android reads rows through a window and refuses one outside
+        // it, and a fresh cursor has no window at all, so the very first row was refused for a
+        // statement that had already run -- reporting a failure for work that had happened, and
+        // inviting a retry that would repeat it.
+        //
+        // A pragma is the shape that reaches this without needing RETURNING, which not every
+        // platform's SQLite is new enough to have: most pragmas change something, so a port that
+        // classifies statements at all classifies this one as writing, and journal_mode answers
+        // with a row.
+        Cursor pragma = null;
+        try {
+            pragma = db.executeQuery("PRAGMA journal_mode");
+        } catch (IOException notThroughAQuery) {
+            r.info("this port does not take a pragma through executeQuery: "
+                    + notThroughAQuery.getMessage());
+        }
+        if (pragma != null) {
+            try {
+                r.check(pragma.next(), "the first row of a statement that counts as writing "
+                        + "is readable");
+                r.check(pragma.getRow().getString(0) != null,
+                        "and its value can be read");
+            } catch (IOException refused) {
+                r.check(false, "reading the first row of a statement that counts as writing was "
+                        + "refused: " + refused.getMessage());
+            } finally {
+                closeQuietly(pragma);
+            }
+        }
+
         // ---- positions
         cur = db.executeQuery("SELECT id, name FROM conf_cur ORDER BY id");
         try {

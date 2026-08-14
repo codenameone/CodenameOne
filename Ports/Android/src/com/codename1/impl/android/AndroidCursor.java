@@ -171,6 +171,30 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         statementWrites = writes;
     }
 
+    /// Whether the platform cursor already holds this row in memory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the position being asked about
+    ///
+    /// #### Returns
+    ///
+    /// true if reading that row needs no work from the statement
+    private boolean inWindow(int row) {
+        if (!(c instanceof android.database.AbstractWindowedCursor)) {
+            // A cursor that is not windowed answers no window at all, and nothing here can tell
+            // whether a move would refill it.
+            return false;
+        }
+        android.database.CursorWindow window =
+                ((android.database.AbstractWindowedCursor) c).getWindow();
+        if (window == null) {
+            return false;
+        }
+        int start = window.getStartPosition();
+        return row >= start && row < start + window.getNumRows();
+    }
+
     /// Refuses a move that the platform would satisfy by running the statement again.
     ///
     /// Only for a statement that writes, and only for a position the current window does not
@@ -190,15 +214,8 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         if (!statementWrites || row < 0) {
             return;
         }
-        if (c instanceof android.database.AbstractWindowedCursor) {
-            android.database.CursorWindow window =
-                    ((android.database.AbstractWindowedCursor) c).getWindow();
-            if (window != null) {
-                int start = window.getStartPosition();
-                if (row >= start && row < start + window.getNumRows()) {
-                    return;
-                }
-            }
+        if (inWindow(row)) {
+            return;
         }
         // Past the end is not a refill. The platform answers a position at or beyond the row
         // count from the count it already holds, without touching the statement -- and it holds
@@ -206,6 +223,15 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         // every while (next()) loop, and refusing it made the loop throw instead of finishing,
         // for a single row statement as much as for one that returned none.
         if (row >= counted()) {
+            return;
+        }
+        // Asked again, because the count above is what runs the statement the first time and
+        // fills the first window with it. A fresh cursor has no window at all, so the first move
+        // onto row zero reaches here having just brought row zero into memory, and refusing it
+        // then reported a failure for a statement that had already run -- inviting a retry that
+        // would run it a second time. This is not a second execution: the window is inspected,
+        // not refilled.
+        if (inWindow(row)) {
             return;
         }
         throw new IOException("This cursor is over a statement that changes the database, and the "

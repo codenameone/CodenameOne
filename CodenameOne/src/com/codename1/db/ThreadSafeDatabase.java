@@ -369,25 +369,24 @@ public class ThreadSafeDatabase extends Database {
             // Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
             // return while the database was still open, and a delete() on the next line would race
             // it and fail with the file still in use.
-            Object failure = et.run(new RunnableWithResultSync<Object>() {
-                @Override
-                public Object run() {
-                    try {
-                        underlying.close();
-                        return null;
-                    } catch (Exception err) {
-                        return new Failure(err);
-                    } catch (Error err) {
-                        // Wrapped, and caught in two clauses rather than as Throwable with an
-                        // instanceof test, because PMD forbids both that and returning a caught
-                        // local directly. Letting either escape is far worse than reporting it:
-                        // the worker's own loop would swallow it without delivering a result,
-                        // and this call is synchronous and holds dispatchLock, so close() would
-                        // block forever and never reach et.kill().
-                        return new Failure(err);
-                    }
-                }
-            });
+            Object failure;
+            try {
+                failure = handOffClose();
+            } catch (IllegalStateException refused) {
+                // The worker has already stopped, which means another close got there first: the
+                // worker's own path closes the database before it asks the thread to drain, and
+                // this call arrived after the thread had gone. Every other entry point turns this
+                // refusal into "this database has been closed", but close() is idempotent by
+                // contract, so here it is not an error to report.
+                //
+                // Closed directly rather than assumed closed, because a stopped worker is all
+                // this can observe and a worker can also stop without having closed anything --
+                // getThread() is public, and killWhenIdle() on it is a call anybody can make.
+                // There is no thread left to race with once it has stopped, so the call is safe
+                // from here, and closing an already closed database does nothing.
+                underlying.close();
+                return;
+            }
             // The worker is shut down either way. A close that failed still leaves this wrapper
             // closed, so there is nothing to retry - but the caller has to be told, because on
             // some ports a failing close means the data never reached storage.
@@ -402,6 +401,41 @@ public class ThreadSafeDatabase extends Database {
                 rethrow(((Failure) failure).cause);
             }
         }
+    }
+
+    /// Closes the underlying database on the worker and reports what happened.
+    ///
+    /// Synchronous on purpose. EasyThread.run(Runnable) is fire and forget, so this used to
+    /// return while the database was still open, and a delete() on the next line would race it
+    /// and fail with the file still in use.
+    ///
+    /// #### Returns
+    ///
+    /// null, or a Failure carrying what the close threw
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: if the worker has already stopped and cannot take the work
+    private Object handOffClose() {
+        return et.run(new RunnableWithResultSync<Object>() {
+            @Override
+            public Object run() {
+                try {
+                    underlying.close();
+                    return null;
+                } catch (Exception err) {
+                    return new Failure(err);
+                } catch (Error err) {
+                    // Wrapped, and caught in two clauses rather than as Throwable with an
+                    // instanceof test, because PMD forbids both that and returning a caught
+                    // local directly. Letting either escape is far worse than reporting it:
+                    // the worker's own loop would swallow it without delivering a result,
+                    // and this call is synchronous and holds dispatchLock, so close()
+                    // would block forever and never shut the worker down.
+                    return new Failure(err);
+                }
+            }
+        });
     }
 
     @Override
