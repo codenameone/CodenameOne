@@ -76,6 +76,72 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     // platform's own behaviour, identical for an application using android.database directly,
     // and there is no public API that fills a window without it.
 
+    /// The moves this wrapper makes, for the one place that makes them.
+    private static final int FIRST = 0;
+    private static final int LAST = 1;
+    private static final int NEXT = 2;
+    private static final int PREVIOUS = 3;
+    private static final int ABSOLUTE = 4;
+
+    /// Moves the platform cursor and reports a failure the way this API promises to.
+    ///
+    /// The query runs when the cursor is first stepped, not when executeQuery returns -- so a
+    /// statement that compiles and then fails, a constraint violation reached through
+    /// executeQuery being the plain case, reports itself from here. The platform raises that as
+    /// an unchecked SQLiteException, and every port in this API answers with an IOException, so
+    /// the caller can catch one thing rather than a different unchecked type per platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `move`: which move to make
+    /// - `row`: the target row, for an absolute move
+    ///
+    /// #### Returns
+    ///
+    /// true if the cursor landed on a row
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the engine reports a failure
+    private boolean moved(int move, int row) throws IOException {
+        try {
+            switch (move) {
+                case FIRST:
+                    return c.moveToFirst();
+                case LAST:
+                    return c.moveToLast();
+                case NEXT:
+                    return c.moveToNext();
+                case PREVIOUS:
+                    return c.moveToPrevious();
+                default:
+                    return c.moveToPosition(row);
+            }
+        } catch (RuntimeException failed) {
+            throw new IOException(failed.getMessage(), failed);
+        }
+    }
+
+    /// Asks the platform cursor for its row count, reporting a failure as this API promises to.
+    ///
+    /// The same reason the moves do: asked before anything has been read, this is what runs the
+    /// statement, and the engine reports a failure from it as an unchecked SQLiteException.
+    ///
+    /// #### Returns
+    ///
+    /// the number of rows
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the engine reports a failure
+    private int counted() throws IOException {
+        try {
+            return c.getCount();
+        } catch (RuntimeException failed) {
+            throw new IOException(failed.getMessage(), failed);
+        }
+    }
+
     /// Whether the last move landed on a row.
     ///
     /// Tracked here rather than asked of the platform cursor, which answers that question by
@@ -139,7 +205,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         // one, because the first fill counts the whole result set. This is the move that ends
         // every while (next()) loop, and refusing it made the loop throw instead of finishing,
         // for a single row statement as much as for one that returned none.
-        if (row >= c.getCount()) {
+        if (row >= counted()) {
             return;
         }
         throw new IOException("This cursor is over a statement that changes the database, and the "
@@ -184,7 +250,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         requireInWindow(0);
         last_read_column_index = -1;
-        onRow = c.moveToFirst();
+        onRow = moved(FIRST, 0);
         return onRow;
     }
 
@@ -194,10 +260,10 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         // The last row of a writing statement is only reachable through the window that holds
         // it, which is this one or none.
         if (statementWrites) {
-            requireInWindow(c.getCount() - 1);
+            requireInWindow(counted() - 1);
         }
         last_read_column_index = -1;
-        onRow = c.moveToLast();
+        onRow = moved(LAST, 0);
         return onRow;
     }
 
@@ -206,7 +272,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         requireInWindow(c.getPosition() + 1);
         last_read_column_index = -1;
-        onRow = c.moveToNext();
+        onRow = moved(NEXT, 0);
         return onRow;
     }
 
@@ -215,7 +281,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         requireInWindow(c.getPosition() - 1);
         last_read_column_index = -1;
-        onRow = c.moveToPrevious();
+        onRow = moved(PREVIOUS, 0);
         return onRow;
     }
 
@@ -230,9 +296,11 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public int getCount() throws IOException {
         checkOpen();
-        // Free, whatever the statement does: the count was established by the first fill and is
-        // held from then on, so asking for it does not run anything again.
-        return c.getCount();
+        // Free after the first data access: the count is established by the first fill and held
+        // from then on. Asked before it, this is what runs the statement -- once, which is what
+        // the platform would do on the first move anyway -- so it reports a failure the way the
+        // moves do.
+        return counted();
     }
 
     @Override
@@ -281,11 +349,11 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         last_read_column_index = -1;
         if (row < 0) {
             onRow = false;
-            c.moveToPosition(-1);
+            moved(ABSOLUTE, -1);
             return false;
         }
         requireInWindow(row);
-        onRow = c.moveToPosition(row);
+        onRow = moved(ABSOLUTE, row);
         return onRow;
     }
 

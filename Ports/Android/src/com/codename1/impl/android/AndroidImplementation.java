@@ -11166,6 +11166,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// rewritten once the original has been moved aside, so which files exist depends on how far
     /// the conversion got.
     ///
+    /// What this does NOT defend against, deliberately: an actor who can write in the migration
+    /// directory can still write a marker naming files inside it. The magic line is in the
+    /// source, so it authenticates nothing -- and there is no secret this port could sign a
+    /// marker with that the same actor could not read out of the application. The damage is
+    /// bounded to that one directory, which that actor can already write to and delete from
+    /// directly, so the check earns its keep by keeping the names inside it rather than by
+    /// pretending the file is trusted.
+    ///
+    /// A rejected marker is treated as somebody else's file: recovery leaves it alone and a
+    /// conversion refuses to start rather than overwriting it, with a message naming the file. A
+    /// crafted marker therefore stops conversions of that one database until it is removed, which
+    /// is the outcome to prefer over acting on it.
+    ///
     /// @return the two names, either element null, or null if this is not our marker
     private static String[] readDatabaseMigrationMarker(String path) {
         File marker = databaseMigrationMarker(path);
@@ -11182,9 +11195,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             String backup = reader.readLine();
             String target = reader.readLine();
             String state = reader.readLine();
+            String backupName = backup == null || backup.length() == 0 ? null : backup;
+            String targetName = target == null || target.length() == 0 ? null : target;
+            // The names this port writes are basenames createTempFile produced in the migration
+            // directory, and they are read back as files to truncate, delete and rename over. A
+            // marker is a plain text file beside the database, so where the database sits
+            // somewhere another actor can write -- which a custom path can -- an entry like
+            // "../../../files/secret" would be resolved against that directory and handed to the
+            // cleanup, which truncates and deletes what it is given. Anything that is not a
+            // simple name inside this directory means the file is not one of ours, which is the
+            // answer that stops every caller: recovery leaves it alone and a conversion refuses
+            // to overwrite it rather than starting.
+            File dir = databaseMigrationDir(path);
+            if ((backupName != null && !isMigrationEntryName(backupName, dir))
+                    || (targetName != null && !isMigrationEntryName(targetName, dir))) {
+                return null;
+            }
             return new String[] {
-                backup == null || backup.length() == 0 ? null : backup,
-                target == null || target.length() == 0 ? null : target,
+                backupName,
+                targetName,
                 state == null || state.length() == 0 ? null : state,
             };
         } catch (IOException unreadable) {
@@ -11197,6 +11226,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     // Nothing useful to do.
                 }
             }
+        }
+    }
+
+    /// Whether a name a marker carries is one this port could have written there.
+    ///
+    /// A generated basename, and a file that really is a direct child of the migration directory:
+    /// the first rejects a path that climbs out of it, the second rejects a name inside it that
+    /// is a link to somewhere else. Both are checked because either alone can be walked around --
+    /// a name with no separator can still be a symlink, and a canonical check on its own would
+    /// accept "sub/dir/../file".
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the entry read from the marker
+    /// - `directory`: the migration directory the marker lives in
+    ///
+    /// #### Returns
+    ///
+    /// true if the name is safe to resolve against that directory
+    private static boolean isMigrationEntryName(String name, File directory) {
+        if (directory == null || name.length() == 0 || ".".equals(name) || "..".equals(name)) {
+            return false;
+        }
+        if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0 || name.indexOf('\u0000') >= 0) {
+            return false;
+        }
+        try {
+            File resolved = new File(directory, name).getCanonicalFile();
+            File parent = resolved.getParentFile();
+            return parent != null && parent.equals(directory.getCanonicalFile());
+        } catch (IOException cannotResolve) {
+            // A name that cannot be resolved is not one that gets acted on.
+            return false;
         }
     }
 
