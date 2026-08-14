@@ -140,6 +140,21 @@ public class CN1WearableBridge implements WearableBridge {
      * what lets the Codename One reply handler work identically on both platforms.
      */
     private static final String REPLY_PATH = PATH_PREFIX + "/reply/";
+    /**
+     * Answers a request this device cannot serve, so the sender fails NOW rather than at its
+     * timeout.
+     *
+     * <p>Distinct from {@link #REPLY_PATH} because a reply is an opaque payload with no room to
+     * say "no" -- the receiving side turns this one into the error arm of
+     * {@code WearableConnection.deliverReply}.
+     *
+     * <p>Only ever travels between two devices running this bridge: the Data Layer pairs Android
+     * with Wear, and the Apple side answers requests through WatchConnectivity's reply handler
+     * instead. A peer on an older build does not match the path, ignores the message, and waits
+     * out its timeout exactly as it does today -- so this degrades to the previous behaviour
+     * rather than breaking.</p>
+     */
+    private static final String REPLY_UNAVAILABLE_PATH = PATH_PREFIX + "/replyerr/";
     private static final String REQUEST_PATH = PATH_PREFIX + "/request/";
     private static final String MESSAGE_PATH = PATH_PREFIX + "/message";
 
@@ -1168,6 +1183,31 @@ public class CN1WearableBridge implements WearableBridge {
         messageClient.sendMessage(req.nodeId, REPLY_PATH + req.peerToken, payload);
     }
 
+    /// Answers a request this device cannot serve, so the sender's reply handler fails now
+    /// instead of at its timeout.
+    ///
+    /// Best effort by nature: if this cannot be sent the sender still has its deadline, which is
+    /// exactly the behaviour that existed before. Addressed with the PEER's token, the one it
+    /// allocated and is waiting on -- the same token sendReply() answers with.
+    ///
+    /// @param context any context
+    /// @param nodeId the node that asked
+    /// @param peerToken the token the asking node allocated
+    /// @param reason what to report to the caller's reply handler
+    static void declineRequest(Context context, String nodeId, int peerToken, String reason) {
+        if (context == null || nodeId == null || nodeId.length() == 0) {
+            return;
+        }
+        try {
+            Wearable.getMessageClient(context.getApplicationContext())
+                    .sendMessage(nodeId, REPLY_UNAVAILABLE_PATH + peerToken,
+                            reason.getBytes("UTF-8"));
+        } catch (Throwable unavailable) {
+            android.util.Log.w("CN1Wearable", "could not decline a request; the peer will wait out"
+                    + " its timeout instead");
+        }
+    }
+
     /// Records which node sent a request, so its answer can be routed back to it. Called by
     /// {@link CN1WearableListenerService} as the request arrives.
     static int rememberRequestOrigin(int peerToken, String nodeId) {
@@ -1566,7 +1606,20 @@ public class CN1WearableBridge implements WearableBridge {
             return;
         }
         android.util.Log.w("CN1Wearable", "no listener can answer the request on " + path
-                + " right now; spooling it as a plain message, and the peer will time out");
+                + " right now; spooling it as a plain message and declining the request");
+        // TELL the peer, rather than letting it discover this by waiting.
+        //
+        // ensureAppRunning() cannot help here: a background startActivity() is refused from
+        // Android 10 on, so a cold process has no Display and no registered listener, and nothing
+        // will change that until the user opens the app. The request is still kept -- it replays
+        // as a plain message on the next launch, which is what it has become by then -- but the
+        // SENDER was being made to sit out the full reply timeout for an answer that provably was
+        // not coming. It now fails immediately with a reason it can act on.
+        //
+        // Sent before the spool write, so a process killed mid-write still frees the sender.
+        declineRequest(context, sourceNodeId, peerToken,
+                "The peer app is not running and cannot answer requests until it is opened. The "
+                + "request was delivered as a one-way message instead.");
         if (!spool(context, SPOOL_MESSAGE, path, payload)) {
             int localToken = rememberRequestOrigin(peerToken, sourceNodeId);
             WearableConnection.deliverMessage(path, payload, localToken);
@@ -5228,6 +5281,10 @@ public class CN1WearableBridge implements WearableBridge {
 
     static String requestPath() {
         return REQUEST_PATH;
+    }
+
+    static String replyUnavailablePath() {
+        return REPLY_UNAVAILABLE_PATH;
     }
 
     static String replyPath() {

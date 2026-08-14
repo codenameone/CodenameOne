@@ -170,6 +170,30 @@ public class CN1WearableListenerService extends WearableListenerService {
         // node can still send something this process cannot act on -- a reply whose requester died,
         // a malformed request path, a path from a different build -- and launching first brought
         // the UI forward for a message that is discarded a few lines later.
+        if (path.startsWith(CN1WearableBridge.replyUnavailablePath())) {
+            // The peer says it cannot answer -- it is installed and reachable, but has no listener
+            // and no permitted way to get one (see CN1WearableBridge.declineRequest). Failing the
+            // request now is the whole point, so the deadline goes with it.
+            //
+            // NOT ensureAppRunning(): this is a failure notice for a request THIS process made, so
+            // if a handler is still waiting the app is already up, and if it is not there is
+            // nothing to show the user.
+            String token = path.substring(CN1WearableBridge.replyUnavailablePath().length());
+            try {
+                int replyToken = Integer.parseInt(token);
+                CN1WearableBridge.cancelReplyTimeout(replyToken);
+                byte[] reason = event.getData();
+                WearableConnection.deliverReply(replyToken, null,
+                        reason == null || reason.length == 0
+                                ? "The peer could not answer the request"
+                                : new String(reason, "UTF-8"));
+            } catch (NumberFormatException malformed) {
+                // Not ours, or a peer running a different build.
+            } catch (java.io.UnsupportedEncodingException never) {
+                // UTF-8 is required of every JVM.
+            }
+            return;
+        }
         if (path.startsWith(CN1WearableBridge.replyPath())) {
             // An answer to a request we sent. The token rides in the path.
             String token = path.substring(CN1WearableBridge.replyPath().length());
