@@ -168,21 +168,6 @@ public class IPhoneBuilder extends Executor {
     /// This is what both the phone entitlement decision and the watch target's
     /// CODE_SIGN_ENTITLEMENTS read, so the two slices of one app cannot disagree about whether the
     /// app uses HealthKit.
-    /// Whether each translation root reaches com.codename1.health.
-    ///
-    /// Both default to true so a project with one translation behaves exactly as before: the
-    /// question only has two different answers when the watch is translated from its own root.
-    private boolean phoneRootReachesHealth = true;
-
-    private boolean watchRootReachesHealth = true;
-
-    /// What each root reaches, kept so the listener registry can be filtered by it too.
-    ///
-    /// Null means one translation, and null is what tells every consumer below to filter nothing:
-    /// with a single root the app-wide answer and the per-root answer are the same question.
-    private java.util.Set<String> phoneReachableClasses;
-
-    private java.util.Set<String> watchReachableClasses;
 
     /// The listener bindings each root gets, resolved once where the stubs are written and read
     /// again where the factory sources are generated.
@@ -192,290 +177,11 @@ public class IPhoneBuilder extends Executor {
     private java.util.Map<String, String> watchHealthListeners =
             java.util.Collections.emptyMap();
 
-    /// Internal names of every class reachable from a root, following constant-pool class
-    /// references.
-    ///
-    /// Deliberately an OVER-approximation: it follows references, not calls, so a type named only
-    /// in a signature counts as reached. That is the safe direction for what this is used for --
-    /// it can only leave a target entitled that might not have needed it, never strip the
-    /// entitlement from one that does.
-    ///
-    /// Roots are searched in order, which is how the isolated stubs are found: after the two entry
-    /// points are separated each stub lives in a directory of its own and no longer in classesDir.
-    java.util.Set<String> reachableClasses(java.util.List<File> roots, String rootInternal) {
-        return reachableClasses(roots,
-                java.util.Collections.singletonList(rootInternal));
-    }
 
-    /// The same, seeded from several roots at once.
-    ///
-    /// A translation has more entry points than its lifecycle class: each generated stub installs
-    /// the route dispatcher and the annotation bootstraps, and those registries name every target
-    /// they can dispatch to. A screen reached only by route string is therefore retained by the
-    /// translation while being invisible to a walk that starts at the lifecycle -- so a HealthKit
-    /// screen behind a route lost its target's entitlement and was refused at runtime.
-    java.util.Set<String> reachableClasses(java.util.List<File> roots,
-            java.util.Collection<String> rootInternals) {
-        java.util.Set<String> seen = new java.util.HashSet<String>();
-        if (rootInternals == null) {
-            return seen;
-        }
-        java.util.LinkedList<String> pending = new java.util.LinkedList<String>();
-        for (String rootInternal : rootInternals) {
-            if (rootInternal == null || rootInternal.length() == 0) {
-                continue;
-            }
-            if (seen.add(rootInternal)) {
-                pending.add(rootInternal);
-            }
-        }
-        while (!pending.isEmpty()) {
-            String name = pending.removeFirst();
-            File classFile = null;
-            for (File root : roots) {
-                if (root == null) {
-                    continue;
-                }
-                File candidate = new File(root, name.replace('/', File.separatorChar) + ".class");
-                if (candidate.isFile()) {
-                    classFile = candidate;
-                    break;
-                }
-            }
-            if (classFile == null) {
-                // A JDK class, or something the app references without shipping. Neither is on the
-                // path to com.codename1.health and neither is ours to walk.
-                continue;
-            }
-            for (String referenced : classReferences(classFile)) {
-                if (seen.add(referenced)) {
-                    pending.add(referenced);
-                }
-            }
-        }
-        return seen;
-    }
 
-    /// The class names a single class file names, read straight out of its constant pool.
-    ///
-    /// Reads only as far as the pool, which is all this needs, and answers an empty set for
-    /// anything it cannot parse -- an unreadable class must not silently narrow reachability, and
-    /// the callers treat "not reached" as the less-entitled answer.
-    private java.util.List<String> classReferences(File classFile) {
-        java.util.List<String> out = new java.util.ArrayList<String>();
-        DataInputStream in = null;
-        try {
-            in = new DataInputStream(new java.io.BufferedInputStream(
-                    new FileInputStream(classFile)));
-            if (in.readInt() != 0xCAFEBABE) {
-                return out;
-            }
-            in.readUnsignedShort();
-            in.readUnsignedShort();
-            int cpCount = in.readUnsignedShort();
-            String[] utf8 = new String[cpCount];
-            int[] classRefs = new int[cpCount];
-            for (int i = 1; i < cpCount; i++) {
-                int tag = in.readUnsignedByte();
-                switch (tag) {
-                    case 1:
-                        utf8[i] = in.readUTF();
-                        break;
-                    case 7:
-                    case 8:
-                    case 16:
-                    case 19:
-                    case 20:
-                        int index = in.readUnsignedShort();
-                        if (tag == 7) {
-                            classRefs[i] = index;
-                        }
-                        break;
-                    case 15:
-                        in.readUnsignedByte();
-                        in.readUnsignedShort();
-                        break;
-                    case 3:
-                    case 4:
-                    case 9:
-                    case 10:
-                    case 11:
-                    case 12:
-                    case 17:
-                    case 18:
-                        in.readInt();
-                        break;
-                    case 5:
-                    case 6:
-                        in.readLong();
-                        // A long or double takes two pool slots; the second is unusable.
-                        i++;
-                        break;
-                    default:
-                        // An unknown tag makes every following offset meaningless, so stop rather
-                        // than read garbage as class names.
-                        return out;
-                }
-            }
-            for (int i = 1; i < cpCount; i++) {
-                if (classRefs[i] == 0) {
-                    continue;
-                }
-                String name = classRefs[i] < cpCount ? utf8[classRefs[i]] : null;
-                if (name == null || name.length() == 0 || name.charAt(0) == '[') {
-                    // An array type names its component elsewhere in the pool; there is no
-                    // "[Lcom/foo/Bar;.class" on disk to walk.
-                    continue;
-                }
-                out.add(name);
-            }
-        } catch (Throwable unreadable) {
-            return out;
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignored) {
-                    // Nothing to do; the pool is already read or already lost.
-                }
-            }
-        }
-        return out;
-    }
 
-    /// Whether the class graph rooted here reaches the health API at all.
-    boolean reachesHealth(java.util.Set<String> reachable) {
-        for (String name : reachable) {
-            // The SAME distinction the scanner draws, and for the same reason. The umbrella
-            // package is not evidence of HealthKit: com.codename1.health.sensors is pure BLE, and
-            // the shared model types (a HealthSample, a QuantitySample) are named by sensor code
-            // that never touches the store. Counting those here marked a BLE-only phone root as
-            // health-reaching and re-entitled it -- the exact release-signing failure this
-            // attribution exists to prevent.
-            if (!name.startsWith("com/codename1/health/")) {
-                continue;
-            }
-            if (name.startsWith("com/codename1/health/sensors/")) {
-                // Normally BLE and nothing more. The exception is a sensor session told to write
-                // its samples through to the store, and then the sensors package IS a route into
-                // HealthKit -- excluding it unconditionally stripped the entitlement from whichever
-                // target does the writing, the same failure from the other direction.
-                //
-                // Decided below, from the CALLER of that method rather than from the app-wide flag.
-                // The flag said only "somebody writes through", so a watch lifecycle switching it on
-                // made the phone reach health the moment its own code touched any sensors class,
-                // and entitling the phone against a profile without HealthKit fails release
-                // signing.
-                continue;
-            }
-            if (!"com/codename1/health/Health".equals(name)
-                    && !isSharedHealthModel(name)) {
-                return true;
-            }
-        }
-        // The sensors package, decided per root: this graph reaches health through it only when it
-        // reaches a class that actually asked for write-through.
-        for (String caller : sensorWriteThroughCallers) {
-            if (reachable.contains(caller)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
-    /// Decides, once the stubs are separated, which target actually reaches the health API.
-    ///
-    /// The permission scan walks all of classesDir, so it answers "this app uses HealthKit"
-    /// and not "this TARGET does". With one translation that is the same question. With a distinct
-    /// watchMain it is not, and reading the flat answer entitled the phone for health code only the
-    /// watch contains -- release signing then fails against an App ID without the capability --
-    /// while the watch, which explicitly ignored those flags for a distinct root, went unentitled
-    /// and its authorization request was refused at runtime.
-    void resolveHealthUsagePerRoot(BuildRequest request, File classesDir) {
-        if (!watchNativeBuilder.needsOwnTranslation()) {
-            return;
-        }
-        // Rooted at the LIFECYCLE classes, not the generated stubs, and run before either stub is
-        // written.
-        //
-        // A stub is not evidence about the app: it installs the registries the app might need, and
-        // the health bindings among them reference HealthStore and every listener the app-wide scan
-        // found. Walking from the stubs therefore made both roots reach health code no matter which
-        // lifecycle actually used it, which is this whole attribution answering its own question.
-        // The lifecycle class is the honest root -- it is the code the developer wrote.
-        String pkg = request.getPackageName() == null ? "" : request.getPackageName().replace('.', '/');
-        String prefix = pkg.length() == 0 ? "" : pkg + "/";
-        java.util.List<File> roots = java.util.Arrays.asList(classesDir);
-        // origMainClass, not request.getMainClass(). generateUnitTestFiles has already swapped the
-        // main class for CodenameOneUnitTestExecutor, which is not compiled into classesDir yet --
-        // so the walk found no root at all, answered "does not reach health", and stripped the
-        // phone's entitlement and its listener registry from a test build whose executor runs the
-        // very lifecycle that uses HealthKit.
-        String phoneRoot = origMainClass != null && origMainClass.length() > 0
-                ? origMainClass : request.getMainClass();
-        // The registries BOTH stubs install are roots too. Each one names every class it can
-        // dispatch to, so the translation retains them -- a screen reached only by route string, or
-        // a mapper reached only through the bootstrap, is live code that a lifecycle-rooted walk
-        // cannot see. Reading it as unreachable stripped the entitlement from the target that
-        // retains the screen, and the authorization request was then refused at runtime.
-        //
-        // The health binding factory is deliberately NOT among them: it names every listener, so
-        // rooting the walk there would make both targets reach health whatever their lifecycle
-        // does, which is the circularity this attribution was built to break. It does not exist
-        // yet at this point either -- the answer here is what decides its contents.
-        java.util.List<String> registryRoots = installedRegistryRoots(classesDir);
-        java.util.List<String> phoneRoots = new java.util.ArrayList<String>(registryRoots);
-        phoneRoots.add(prefix + phoneRoot);
-        java.util.List<String> watchRoots = new java.util.ArrayList<String>(registryRoots);
-        watchRoots.add(watchNativeBuilder.getWatchMain().replace('.', '/'));
-        phoneReachableClasses = reachableClasses(roots, phoneRoots);
-        watchReachableClasses = reachableClasses(roots, watchRoots);
-        phoneRootReachesHealth = reachesHealth(phoneReachableClasses);
-        watchRootReachesHealth = reachesHealth(watchReachableClasses);
-        log("[watchNative] HealthKit reachability: phone=" + phoneRootReachesHealth
-                + ", watch=" + watchRootReachesHealth);
-    }
 
-    /// The native-interface registrations one translation root can reach.
-    ///
-    /// Every `NativeLookup.register(X.class, XStub.class)` is a hard reference and XStub holds one
-    /// to the generated implementation, so a stub installing the app-wide list roots every native
-    /// implementation in its own translation. With a distinct watchMain that meant a phone-only
-    /// native interface had its Objective-C staged and compiled for watchOS, where a UIKit import
-    /// or an iOS-only SDK is a build failure in code the watch never calls.
-    ///
-    /// The walk is complete for this question: the app zip, iOSPort.jar and the ParparVM Java API
-    /// are all unzipped into classesDir before anything here runs, so the whole translation
-    /// classpath is on disk in one directory and nothing is invisible to it.
-    ///
-    /// FRAMEWORK natives are kept regardless. com.codename1 plumbing is reached in ways a
-    /// constant-pool walk cannot always see -- a runtime lookup behind an interface, an
-    /// implementation picked at Display.init -- and an absent registration there does not fail the
-    /// build, it silently disables a service at runtime, which is far harder to attribute than the
-    /// compile error this exists to prevent. Only APP natives are shaken out, and they are the
-    /// whole of the case: the developer's own Objective-C is what imports an iOS-only SDK.
-    String nativeRegistrationsReachableFrom(String registrations,
-            java.util.Set<String> reachable) {
-        if (reachable == null || registrations == null || registrations.length() == 0) {
-            return registrations;
-        }
-        StringBuilder out = new StringBuilder();
-        for (String line : registrations.split("\n")) {
-            String registered = registeredInterfaceName(line);
-            String internal = registered == null ? null : registered.replace('.', '/');
-            // A line that registers nothing is passed through untouched rather than guessed at.
-            boolean keep = internal == null
-                    || internal.startsWith("com/codename1/")
-                    || reachable.contains(internal);
-            if (keep) {
-                out.append(line).append('\n');
-            } else {
-                log("[watchNative] not registering " + registered + " in the watch stub: the watch"
-                        + " translation root does not reach it");
-            }
-        }
-        return out.toString();
-    }
 
     /// The interface named by one `NativeLookup.register(...)` line, or null if it is not one.
     private String registeredInterfaceName(String line) {
@@ -492,32 +198,6 @@ public class IPhoneBuilder extends Executor {
         return line.substring(start, end).trim();
     }
 
-    /// The generated registries a stub installs, as internal names, limited to the ones this
-    /// project actually produced.
-    ///
-    /// Kept in step with routeDispatcherInstallSource and annotationFrameworksInstallSource: those
-    /// decide what the stub instantiates, and this decides what the walk starts from. A registry
-    /// the project does not have is simply absent from classesDir and contributes nothing.
-    java.util.List<String> installedRegistryRoots(File classesDir) {
-        String[] candidates = {
-            "com/codename1/router/generated/Routes",
-            "com/codename1/generated/svg/SVGRegistry",
-            "cn1app/MapperBootstrap",
-            "cn1app/BinderBootstrap",
-            "cn1app/DaoBootstrap",
-            "cn1app/RestClientBootstrap",
-            "cn1app/ProtoBootstrap",
-            "cn1app/GrpcClientBootstrap",
-            "cn1app/GraphQLClientBootstrap",
-        };
-        java.util.List<String> out = new java.util.ArrayList<String>();
-        for (String name : candidates) {
-            if (new File(classesDir, name.replace('/', File.separatorChar) + ".class").isFile()) {
-                out.add(name);
-            }
-        }
-        return out;
-    }
 
     /// The listener bindings one translation root can actually reach.
     ///
@@ -561,41 +241,20 @@ public class IPhoneBuilder extends Executor {
         return statement == null ? "" : "            " + statement;
     }
 
-    java.util.Map<String, String> healthListenersReachableFrom(
-            java.util.Map<String, String> all, java.util.Set<String> reachable) {
-        if (reachable == null || all == null || all.isEmpty()) {
-            return all;
-        }
-        java.util.Map<String, String> out = new java.util.TreeMap<String, String>();
-        for (java.util.Map.Entry<String, String> e : all.entrySet()) {
-            // Binary name to internal name. Only the dots separating packages become slashes; a
-            // nested class keeps its dollar, which is exactly what the walk recorded.
-            if (reachable.contains(e.getKey().replace('.', '/'))) {
-                out.put(e.getKey(), e.getValue());
-            }
-        }
-        return out;
-    }
 
     boolean phoneUsesHealthData(BuildRequest request) {
-        // The scan is app-wide; the entitlement is per target. A distinct watchMain means the flags
-        // can describe code only the WATCH contains, and entitling the phone for it fails release
-        // signing against an App ID with no HealthKit capability.
-        return ((usesHealthRead || usesHealthWrite || usesHealthWorkout) && phoneRootReachesHealth)
+        // App-wide, which is the grain the API scan works at and the grain this answer is
+        // reported at. A per-root reachability walk used to narrow it per target; it was deleted
+        // because the thing it protected against does not exist. ParparVM copies every non-class
+        // file on the classpath into its output verbatim, so a native .m is staged and compiled
+        // for whichever target lists it whether or not any Java stub references it -- the walk
+        // never prevented the build failure it was written for. A native that cannot compile for
+        // watchOS is guarded with TARGET_OS_WATCH in its own source, as the port guards its own in
+        // 71 files, and watchNative.health overrides this answer when the scan is wrong.
+        return usesHealthRead || usesHealthWrite || usesHealthWorkout
                 || healthCapabilityDeclared(request);
     }
 
-    /// The same question for the watch bundle, answered against the watch translation root.
-    ///
-    /// SCANNED evidence only, deliberately. The ios.health.* capabilities and the
-    /// com.apple.developer.healthkit entitlement are statements about the iOS app -- they say
-    /// nothing about which lifecycle uses HealthKit -- and entitling a watch bundle on their
-    /// strength fails codesigning for an ordinary watch app whose App ID has no HealthKit
-    /// capability. A watch whose health access lives in native code, where the scan sees nothing,
-    /// declares it with watchNative.health, which settles the question before this is consulted.
-    boolean watchRootUsesHealthData(BuildRequest request) {
-        return (usesHealthRead || usesHealthWrite || usesHealthWorkout) && watchRootReachesHealth;
-    }
 
     /// Whether the detected usage READS from the store, per root.
     ///
@@ -605,23 +264,15 @@ public class IPhoneBuilder extends Executor {
     /// authorization exactly as if it had declared nothing. The phone plist pass already keeps them
     /// apart; the watch pass had one boolean and accepted either string.
     boolean phoneReadsHealthData() {
-        return usesHealthRead && phoneRootReachesHealth;
+        return usesHealthRead;
     }
 
     /// Whether the detected usage WRITES to the store, per root. A workout writes: it saves the
     /// session and the samples it was fed.
     boolean phoneWritesHealthData() {
-        return (usesHealthWrite || usesHealthWorkout) && phoneRootReachesHealth;
+        return usesHealthWrite || usesHealthWorkout;
     }
 
-    /// The same two questions answered against the watch translation root.
-    boolean watchRootReadsHealthData() {
-        return usesHealthRead && watchRootReachesHealth;
-    }
-
-    boolean watchRootWritesHealthData() {
-        return (usesHealthWrite || usesHealthWorkout) && watchRootReachesHealth;
-    }
 
     /// HealthKit asked for explicitly, by any of its spellings.
     private boolean healthCapabilityDeclared(BuildRequest request) {
@@ -662,17 +313,6 @@ public class IPhoneBuilder extends Executor {
     /// into HealthKit for the root that reaches it.
     boolean sensorWriteThrough;
 
-    /// The classes that actually made that call, by internal name.
-    ///
-    /// The flag alone is app-wide, and app-wide is the wrong grain the moment there are two
-    /// translation roots: a watch lifecycle switching write-through on made the PHONE reach health
-    /// as soon as its own code touched any sensors class, and entitling the phone for HealthKit
-    /// against a profile without the capability fails release signing. A root reaches health
-    /// through the sensors package only when it reaches one of THESE.
-    final java.util.Set<String> sensorWriteThroughCallers = new java.util.HashSet<String>();
-
-    /// The class the scanner is currently reading, so the callbacks above can be attributed.
-    private String scanningClassInternal;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
     private boolean usesCn1Vision;
@@ -1830,16 +1470,9 @@ public class IPhoneBuilder extends Executor {
                         usesHealthStore = true;
                         usesHealthWrite = true;
                         sensorWriteThrough = true;
-                        if (scanningClassInternal != null) {
-                            sensorWriteThroughCallers.add(scanningClassInternal);
-                        }
                     }
                 }
 
-                @Override
-                public void scanningClass(String internalName) {
-                    scanningClassInternal = internalName;
-                }
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
@@ -2538,20 +2171,16 @@ public class IPhoneBuilder extends Executor {
         // Before the stubs are written, because what goes INTO each stub depends on the answer:
         // installing the health bindings in a stub whose lifecycle never touches health would both
         // entitle that target and make it reach health code, which is the question being asked.
-        resolveHealthUsagePerRoot(request, classesDir);
-
-        // Per target, because the registry is a hard reference to HealthStore and to every listener
-        // it names. Installing it in a stub whose lifecycle never touches health pulls HealthKit
-        // into that slice and entitles it -- release signing then fails against an App ID without
-        // the capability -- and installing the app-wide registry in BOTH stubs drags each target's
-        // listeners into the other. So each root gets a registry of its own, holding only the
-        // listeners that root reaches, and gets it only if it reaches health at all.
-        phoneHealthListeners = phoneRootReachesHealth
-                ? healthListenersReachableFrom(healthScan.resolve(), phoneReachableClasses)
-                : java.util.Collections.<String, String>emptyMap();
-        watchHealthListeners = watchRootReachesHealth
-                ? healthListenersReachableFrom(healthScan.resolve(), watchReachableClasses)
-                : java.util.Collections.<String, String>emptyMap();
+        // The same registry for both targets, from the app-wide scan.
+        //
+        // This used to be filtered per translation root by a class walk, so each stub named only
+        // the listeners its own root reached. The walk is gone: the compile failure it was written
+        // to prevent happens regardless of what the stub names, because ParparVM copies every
+        // non-class file on the classpath into its output verbatim. What is left is a size
+        // difference in the watch binary, which is not worth a bytecode walk to own -- and
+        // watchNative.health turns the whole thing off for a watch that should not have it.
+        phoneHealthListeners = healthScan.resolve();
+        watchHealthListeners = healthScan.resolve();
         String phoneHealthBindingsInstall = healthBindingsInstall(phoneHealthListeners, "");
         String watchHealthBindingsInstall = watchNativeBuilder.needsOwnTranslation()
                 ? healthBindingsInstall(watchHealthListeners,
@@ -2764,16 +2393,9 @@ public class IPhoneBuilder extends Executor {
                     + "    }\n\n"
                     + "    public static void main(String[] argv) {\n"
                     + "        if(!(argv != null && argv.length > 0 && argv[0].equals(\"ignoreNative\"))) {\n"
-                    // Filtered by the PHONE root for the same reason the watch stub is filtered by
-                    // its own: with two translations the app-wide list roots every native
-                    // implementation in both, so a watch-only NativeInterface whose Objective-C
-                    // imports WatchKit broke the phone target -- the mirror image of the failure
-                    // the watch filter fixes.
-                    + nativeRegistrationsReachableFrom(
-                            registerNativeImplementationsAndCreateStubs(
-                                    new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
-                                    stubSource, classesDir),
-                            phoneReachableClasses)
+                    + registerNativeImplementationsAndCreateStubs(
+                              new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
+                              stubSource, classesDir)
                     + "        }\n"
                     + "        " + request.getMainClass() + "Stub stub = new " + request.getMainClass() + "Stub();\n"
                     + "        com.codename1.impl.ios.IOSImplementation.setMainClass(stub.i);\n"
@@ -2801,11 +2423,9 @@ public class IPhoneBuilder extends Executor {
             // is not what produces it.)
             if (watchNativeBuilder.needsOwnTranslation()) {
                 watchNativeBuilder.writeWatchStubSource(request, stubSource, buildVersion,
-                        nativeRegistrationsReachableFrom(
-                                registerNativeImplementationsAndCreateStubs(
+                        registerNativeImplementationsAndCreateStubs(
                                         new URLClassLoader(new URL[]{codenameOneJar.toURI().toURL()}),
                                         stubSource, classesDir),
-                                watchReachableClasses),
                         iosMode, svgRegistryInstall, watchHealthBindingsInstall,
                         routeDispatcherInstallSource(sourceZip, "        "),
                         annotationFrameworksInstallSource(sourceZip, "        "));

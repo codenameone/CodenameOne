@@ -326,6 +326,29 @@ from the phone.
 
 None of this affects building, running or testing on the simulator or a device.
 
+==== Native Code and the Watch Slice
+[[watch-native-code]]
+
+Your Objective-C is compiled for the watch as well as the phone. The translator
+copies native sources through to every slice it produces, so a `.m` that imports
+UIKit, or an iOS-only SDK, is a build error on watchOS even when no watch code
+calls it.
+
+Guard it the way the framework guards its own -- there are several hundred such
+guards across the iOS port:
+
+....
+#if !TARGET_OS_WATCH
+#import <UIKit/UIKit.h>
+// ... the iOS-only implementation
+#endif
+....
+
+The same applies in reverse to a native interface only the watch uses. There is
+no build hint for this and no attempt to infer it: which of your native sources
+can compile for watchOS is a question about that source, and the preprocessor is
+where it's answered.
+
 ==== Supported and Unsupported APIs on watchOS
 [[watch-supported-apis]]
 

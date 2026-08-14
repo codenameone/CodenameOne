@@ -557,16 +557,25 @@ class WatchNativeBuilderTest {
                             .contains("CODE_SIGN_ENTITLEMENTS"),
                     hint + " must entitle the watch target as it does the phone");
 
-            // A watch with its OWN root shakes from that root, so the phone's usage says nothing
-            // about it -- entitling it anyway fails codesigning for an ordinary watch app whose
-            // App ID has no HealthKit capability. Unchanged by this fix, and worth pinning next
-            // to it so the two rules are not confused for each other.
+            // A distinct watchMain is entitled the same way. This used to be the opposite -- the
+            // watch was judged against its own translation root by a class walk -- and that walk
+            // is gone: it protected against a compile failure that happens regardless of what any
+            // stub names. The declaration is app-wide, so it entitles the app, and a watch that
+            // should NOT carry HealthKit says so with watchNative.health=false.
             BuildRequest distinct = request();
             distinct.putArgument("watchMain", WATCH_MAIN);
             distinct.putArgument(hint, "true");
+            assertTrue(parse(distinct).watchEntitlementsSetting(distinct, distinct.getMainClass())
+                            .contains("CODE_SIGN_ENTITLEMENTS"),
+                    hint + " entitles the watch as it does the phone");
+
+            BuildRequest optedOut = request();
+            optedOut.putArgument("watchMain", WATCH_MAIN);
+            optedOut.putArgument(hint, "true");
+            optedOut.putArgument("watchNative.health", "false");
             assertEquals("",
-                    parse(distinct).watchEntitlementsSetting(distinct, distinct.getMainClass()),
-                    hint + " must not entitle a watch app with its own lifecycle class");
+                    parse(optedOut).watchEntitlementsSetting(optedOut, optedOut.getMainClass()),
+                    "watchNative.health=false is how a watch opts out of " + hint);
         }
         BuildRequest none = request();
         none.putArgument("watchMain", "com.mycompany.myapp.MyApp");

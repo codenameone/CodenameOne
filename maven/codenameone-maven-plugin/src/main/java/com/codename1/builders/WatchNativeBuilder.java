@@ -1270,8 +1270,7 @@ class WatchNativeBuilder {
         // touches HealthKit -- which then failed codesigning against an App ID without the
         // capability, with nothing in the output to say why. Same rule, same accessor, as the
         // BuildDaemon mirror: a cloud build and a local build must reach the same verdict.
-        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData(request),
-                owner.watchRootUsesHealthData(request));
+        boolean watchHealth = watchUsesHealth(owner.phoneUsesHealthData(request));
         boolean workoutProcessing =
                 "true".equalsIgnoreCase(workoutProcessingHint);
         // Direction, not just presence. Taken from the same root the entitlement decision uses, so
@@ -1339,7 +1338,7 @@ class WatchNativeBuilder {
         if ("false".equalsIgnoreCase(healthHint)) {
             return false;
         }
-        return distinctWatchMain ? owner.watchRootReadsHealthData() : owner.phoneReadsHealthData();
+        return owner.phoneReadsHealthData();
     }
 
     /// The same for writes.
@@ -1347,8 +1346,7 @@ class WatchNativeBuilder {
         if ("false".equalsIgnoreCase(healthHint)) {
             return false;
         }
-        return distinctWatchMain
-                ? owner.watchRootWritesHealthData() : owner.phoneWritesHealthData();
+        return owner.phoneWritesHealthData();
     }
 
 
@@ -1493,7 +1491,7 @@ class WatchNativeBuilder {
      * {@code watchNative.health.workoutProcessing} implies it: a workout
      * session is HealthKit.</p>
      */
-    boolean watchUsesHealth(boolean phoneUsesHealth, boolean watchRootUsesHealth) {
+    boolean watchUsesHealth(boolean appUsesHealth) {
         if ("true".equalsIgnoreCase(healthHint)) {
             return true;
         }
@@ -1503,15 +1501,11 @@ class WatchNativeBuilder {
         if ("true".equalsIgnoreCase(workoutProcessingHint)) {
             return true;
         }
-        // Inherited when the two lifecycles are the same code. When they are not, the answer is
-        // whether the WATCH root reaches the health API -- which is the question the phone's flat
-        // scan cannot answer. Refusing outright, as this used to, left a watch app whose own code
-        // calls HealthKit unentitled and its authorization request refused, unless the project
-        // happened to set watchNative.health.
-        if (!distinctWatchMain) {
-            return phoneUsesHealth;
-        }
-        return watchRootUsesHealth;
+        // The app-wide answer, for the watch as for the phone. This used to ask whether the WATCH
+        // root reached health, from a per-root class walk that has since been deleted -- see
+        // IPhoneBuilder.phoneUsesHealthData for why that walk protected nothing. When the scan is
+        // wrong in either direction, watchNative.health says so and is checked above.
+        return appUsesHealth;
     }
 
     /**
@@ -1609,7 +1603,7 @@ class WatchNativeBuilder {
         // description supplied through ios.plistInject produced a bundle that declared HealthKit
         // and was signed without the entitlement, so authorization failed on device.
         boolean phoneUsesHealth = owner.phoneUsesHealthData(request);
-        if (!watchUsesHealth(phoneUsesHealth, owner.watchRootUsesHealthData(request))) {
+        if (!watchUsesHealth(phoneUsesHealth)) {
             return "";
         }
         return "  bs['CODE_SIGN_ENTITLEMENTS'] = '"

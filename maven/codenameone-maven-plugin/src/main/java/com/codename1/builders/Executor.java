@@ -633,7 +633,6 @@ public abstract class Executor {
                         public void visit(int i, int accessFlags, String string, String string1, String superName, String[] interfaces) {
                             scannedName = string;
                             scannedSuper = superName;
-                            scanner.scanningClass(string);
                             // ACC_PUBLIC 0x0001, ACC_INTERFACE 0x0200,
                             // ACC_ABSTRACT 0x0400. A class the generated
                             // bindings construct from another package has
