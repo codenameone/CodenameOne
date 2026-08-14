@@ -354,15 +354,19 @@ public class SEDatabaseConformanceTest {
     @Test
     public void aFileWhoseNameStartsWithAColonIsStillAFile() throws Exception {
         // SQLite reserves the leading colon and advises against it, but ":name.db" is a file
-        // called ":name.db" -- only ":memory:" itself is the in-memory database. Reading every
-        // colon-prefixed name as memory left such a file unregistered, so another connection
-        // could re-key or delete it without seeing this one.
+        // called ":name.db" -- only ":memory:" itself is the in-memory database.
+        //
+        // Both halves are asserted, because a connection registered under no file at all refuses
+        // the key change below too, and an assertion that only watched for a refusal would pass
+        // either way. What separates them is the unrelated database: a connection of unknown file
+        // blocks that one as well, and a connection registered against its own file does not.
         File odd = new File(":cn1-conformance-colon.db").getAbsoluteFile();
         Connection relative = java.sql.DriverManager.getConnection(
                 "jdbc:sqlite::cn1-conformance-colon.db");
         SEDatabase wrapped = new SEDatabase(relative);
         SEDatabase second = null;
         try {
+            // Half one: it is visible on its own file.
             second = identified(java.sql.DriverManager.getConnection(
                     "jdbc:sqlite:" + odd.getCanonicalPath()), odd);
             boolean refused = false;
@@ -373,12 +377,60 @@ public class SEDatabaseConformanceTest {
             }
             assertTrue(refused, "the connection on the colon-named file has to be visible to a "
                     + "key change on that same file");
+
+            // Half two: and it is visible as that file rather than as a file nobody could work
+            // out, so it holds nothing else up.
+            try {
+                db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException refusedUnrelated) {
+                fail("a connection on a colon-named file must not block an unrelated database, "
+                        + "but the key change was refused: " + refusedUnrelated.getMessage());
+            }
         } finally {
             if (second != null) {
                 second.close();
             }
             wrapped.close();
             odd.delete();
+        }
+    }
+
+    @Test
+    public void aUriFormConnectionRegistersUnderTheFileOnDisk() throws Exception {
+        // The URI form names a real file, and resolving it is what makes the key match the one
+        // the ordinary open path derives. Read as a plain filename, "file:/tmp/app.db" is a
+        // relative path under the working directory, so the two spellings of one database would
+        // register apart and neither would see the other. A percent escape is in the name because
+        // a URI may carry them and the file on disk does not.
+        File spaced = new File(dbFile.getParentFile(), "cn1 uri form.db").getAbsoluteFile();
+        spaced.delete();
+        Connection uri = java.sql.DriverManager.getConnection("jdbc:sqlite:file:"
+                + spaced.getAbsolutePath().replace(" ", "%20"));
+        SEDatabase wrapped = new SEDatabase(uri);
+        SEDatabase second = null;
+        try {
+            second = identified(java.sql.DriverManager.getConnection(
+                    "jdbc:sqlite:" + spaced.getCanonicalPath()), spaced);
+            boolean refused = false;
+            try {
+                second.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException expected) {
+                refused = true;
+            }
+            assertTrue(refused, "the URI-form connection has to register under the file on disk, "
+                    + "so a key change on that same file sees it");
+            try {
+                db.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException refusedUnrelated) {
+                fail("a URI-form connection must not block an unrelated database, but the key "
+                        + "change was refused: " + refusedUnrelated.getMessage());
+            }
+        } finally {
+            if (second != null) {
+                second.close();
+            }
+            wrapped.close();
+            spaced.delete();
         }
     }
 

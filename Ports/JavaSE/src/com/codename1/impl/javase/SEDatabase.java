@@ -145,32 +145,24 @@ public class SEDatabase extends Database {
     ///
     /// true for an in-memory database, false when the URL could not be read or names a file
     private static boolean namesNoFile(java.sql.Connection conn) {
-        String url;
-        try {
-            url = conn.getMetaData().getURL();
-        } catch (SQLException cannotAsk) {
+        String rest = sqliteUrlBody(conn);
+        if (rest == null) {
             // Not knowing is exactly the case that has to stay conservative.
             return false;
         }
-        if (url == null || !url.startsWith(SQLITE_URL_PREFIX)) {
-            return false;
-        }
-        String rest = url.substring(SQLITE_URL_PREFIX.length());
-        String path = rest;
         int query = rest.indexOf('?');
-        if (query >= 0) {
-            path = rest.substring(0, query);
-            // The URI form of the same thing: file:name?mode=memory is an in-memory database
-            // whose path looks like a file. Read as a parameter rather than as a substring, so a
-            // file genuinely called "mode=memoryish" is not mistaken for one.
-            if (hasMemoryMode(rest.substring(query + 1))) {
-                return true;
-            }
+        // The URI form of the same thing: file:name?mode=memory is an in-memory database whose
+        // path looks like a file. Read as a parameter rather than as a substring, so a file
+        // genuinely called "mode=memoryish" is not mistaken for one.
+        if (query >= 0 && hasMemoryMode(rest.substring(query + 1))) {
+            return true;
         }
-        if (path.startsWith("file:")) {
-            // "file::memory:" is the URI spelling of ":memory:", and the scheme has to come off
-            // before the rest is recognisable as one.
-            path = path.substring("file:".length());
+        String name = fileNameFromUrlBody(rest);
+        if (name == null) {
+            // A URL this could not resolve to a name. Conservative again: it is counted as a
+            // connection whose file is unknown, which is what fileNameFromUrlBody returning null
+            // makes of it below, so the two answers stay consistent.
+            return false;
         }
         // The exact names, not every name that starts like one. SQLite reserves the leading colon
         // and advises against it, but ":customer.db" is still a file called ":customer.db" -- and
@@ -178,7 +170,7 @@ public class SEDatabase extends Database {
         // delete or re-key it without seeing this one. An empty name is SQLite's private
         // temporary database, which no other connection can name and none of those checks can
         // protect.
-        return path.length() == 0 || ":memory:".equals(path);
+        return name.length() == 0 || ":memory:".equals(name);
     }
 
     /// Whether a query string turns this URI into an in-memory database.
@@ -201,6 +193,27 @@ public class SEDatabase extends Database {
 
     /// The database file a JDBC connection is open on, canonicalized, or null.
     private static String fileFromConnection(java.sql.Connection conn) {
+        String rest = sqliteUrlBody(conn);
+        if (rest == null) {
+            return null;
+        }
+        String name = fileNameFromUrlBody(rest);
+        if (name == null || name.length() == 0) {
+            return null;
+        }
+        return canonicalDatabaseFileKey(new File(name));
+    }
+
+    /// Everything after the "jdbc:sqlite:" prefix of this connection's URL, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `conn`: the connection handed to this wrapper
+    ///
+    /// #### Returns
+    ///
+    /// the body of the URL, or null when it cannot be read or is not a SQLite URL
+    private static String sqliteUrlBody(java.sql.Connection conn) {
         String url;
         try {
             url = conn.getMetaData().getURL();
@@ -210,36 +223,53 @@ public class SEDatabase extends Database {
         if (url == null || !url.startsWith(SQLITE_URL_PREFIX)) {
             return null;
         }
-        String path = url.substring(SQLITE_URL_PREFIX.length());
+        return url.substring(SQLITE_URL_PREFIX.length());
+    }
+
+    /// The file name a URL body names, with the query string off and SQLite's URI form resolved.
+    ///
+    /// The one place a URL becomes a name, so that what counts as naming no file and what gets
+    /// registered are decided from the same string. They were worked out separately before, and
+    /// drifted: a file called ":customer.db" was recognised as a file by one and discarded as
+    /// though it were ":memory:" by the other, which registered a real database as a connection
+    /// of unknown file -- blocking a delete or a key change on every other database for as long as
+    /// it stayed open, and on its own file for good.
+    ///
+    /// The in-memory names are deliberately left in here rather than filtered out: this answers
+    /// what the URL names, and whether that is a file is the caller's question. ":memory:" comes
+    /// back as the name ":memory:", and namesNoFile is the single place that recognises it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rest`: everything after the "jdbc:sqlite:" prefix
+    ///
+    /// #### Returns
+    ///
+    /// the name, empty for SQLite's private temporary database, or null if it does not resolve
+    private static String fileNameFromUrlBody(String rest) {
+        String path = rest;
         int query = path.indexOf('?');
         if (query >= 0) {
             path = path.substring(0, query);
         }
-        if (path.length() == 0 || path.startsWith(":")) {
-            // ":memory:" and the like name no file, so there is nothing for another connection to
-            // hold and nothing to register.
+        if (!path.startsWith("file:")) {
+            return path;
+        }
+        // SQLite's URI form, which this driver accepts. Handing "file:/tmp/app.db" to File reads
+        // it as a relative path under the working directory, so the same database would register
+        // under a key no other connection could match -- and the check it exists for would pass
+        // while this connection held the file. Resolving it here also decodes the percent escapes
+        // a URI may carry, so a name with a space in it registers under the name on disk.
+        try {
+            java.net.URI uri = new java.net.URI(path);
+            // getPath() is null for an opaque URI, and "file:relative.db" -- which SQLite accepts
+            // -- is opaque, since its scheme-specific part does not start with a slash. The
+            // scheme-specific part is the file name in that case, relative to the working
+            // directory, which is where SQLite would look for it too.
+            return uri.isOpaque() ? uri.getSchemeSpecificPart() : uri.getPath();
+        } catch (java.net.URISyntaxException notAUri) {
             return null;
         }
-        if (path.startsWith("file:")) {
-            // SQLite's URI form, which this driver accepts. Handing "file:/tmp/app.db" to File
-            // reads it as a relative path under the working directory, so the same database would
-            // register under a key no other connection could match -- and the check it exists for
-            // would pass while this connection held the file.
-            try {
-                java.net.URI uri = new java.net.URI(path);
-                // getPath() is null for an opaque URI, and "file:relative.db" -- which SQLite
-                // accepts -- is opaque, since its scheme-specific part does not start with a
-                // slash. The scheme-specific part is the file name in that case, relative to the
-                // working directory, which is where SQLite would look for it too.
-                path = uri.isOpaque() ? uri.getSchemeSpecificPart() : uri.getPath();
-            } catch (java.net.URISyntaxException notAUri) {
-                path = null;
-            }
-            if (path == null || path.length() == 0) {
-                return null;
-            }
-        }
-        return canonicalDatabaseFileKey(new File(path));
     }
 
     /**
