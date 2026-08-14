@@ -196,11 +196,17 @@ class DatabaseImpl extends Database {
         }
         long closing = peer;
         peer = 0;
-        IOSImplementation.nativeInstance.sqlDbClose(closing);
-        // Last, not first: until the native handle is gone this connection still holds and locks
-        // the file, and giving the claim back sooner lets another connection start rewriting it
-        // underneath a rollback that has not finished.
-        releaseOpenDatabase(openKey);
+        try {
+            IOSImplementation.nativeInstance.sqlDbClose(closing);
+        } finally {
+            // Last, not first: until the native handle is gone this connection still holds and
+            // locks the file, and giving the claim back sooner lets another connection start
+            // rewriting it underneath a rollback that has not finished. In a finally so that a
+            // close which fails cannot strand the claim: the handle is already cleared, so
+            // nothing later would give it back, and every delete and key change of this database
+            // would be refused for the life of the process.
+            releaseOpenDatabase(openKey);
+        }
     }
 
     @Override

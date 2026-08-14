@@ -293,8 +293,16 @@ public class AndroidDB extends Database {
         for (int iter = 0; iter < cursors.length; iter++) {
             cursors[iter].invalidate();
         }
-        closing.close();
-        AndroidImplementation.databaseConnectionClosed(openPath);
+        try {
+            closing.close();
+        } finally {
+            // In a finally: the handle is already gone from this wrapper, so a close that throws
+            // would otherwise leave the slot taken with nothing left to give it back. A second
+            // close() returns immediately, and the count stays high for the life of the process
+            // -- refusing every delete of this database and telling every conversion that
+            // somebody else still holds it.
+            AndroidImplementation.databaseConnectionClosed(openPath);
+        }
     }
 
     @Override

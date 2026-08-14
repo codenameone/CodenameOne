@@ -205,9 +205,15 @@ class WindowsDatabase extends Database {
         }
         long closing = peer;
         peer = 0;
-        WindowsNative.sqlDbClose(closing);
-        // Last, not first: see the iOS port. The claim covers the handle, not the intent to close.
-        releaseOpenDatabase(openKey);
+        try {
+            WindowsNative.sqlDbClose(closing);
+        } finally {
+            // Last, not first: see the iOS port. The claim covers the handle, not the intent to
+            // close. In a finally because the native close can fail and the handle has already
+            // been cleared here -- a claim left behind would refuse every later delete and key
+            // change of this database for the life of the process.
+            releaseOpenDatabase(openKey);
+        }
     }
 
     @Override

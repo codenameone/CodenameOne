@@ -268,8 +268,14 @@ class AndroidCipherDB extends Database {
         for (int iter = 0; iter < cursors.length; iter++) {
             cursors[iter].invalidate();
         }
-        closing.close();
-        releaseConnectionSlot();
+        try {
+            closing.close();
+        } finally {
+            // In a finally, for the reason given on the plaintext port: the handle has already
+            // been cleared, so a close that throws would strand the slot for the life of the
+            // process.
+            releaseConnectionSlot();
+        }
     }
 
     /** Gives the connection slot back, once. */
