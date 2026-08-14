@@ -840,6 +840,17 @@ class WatchNativeBuilderTest {
         // A developer's own static archive is judged on what is in it, not excluded outright:
         // arm64_32 and armv7k exist on watchOS and nowhere else, so either is unambiguous proof.
         // Skipping every .a left the watch compiling the caller and failing on its symbols.
+        // The declaration, not a probe of the SDK. Every framework watchOS lacks is named in
+        // WATCH_OPTIONAL_FRAMEWORKS -- the same list ParparVM weak-links -- and the port's sources
+        // are #ifdef'd around them, which is how conditional system libraries work on every other
+        // platform here. Probing the SDK directories asked which destination the build targets, a
+        // question a generated project should not depend on.
+        assertTrue(ruby.contains("watch_unavailable = %w["), ruby);
+        assertTrue(ruby.contains("OpenGLES.framework") && ruby.contains("CarPlay.framework"),
+                "the declared list has to reach the script: " + ruby);
+        assertTrue(ruby.contains("present = !watch_unavailable.include?(base)"), ruby);
+        assertFalse(ruby.contains("watch_fw_dirs"),
+                "the SDK directory probe is gone: " + ruby);
         assertTrue(ruby.contains("cn1_watch_archive_has_watch_slice(ref)"), ruby);
         assertTrue(ruby.contains("arm64_32") && ruby.contains("armv7k"), ruby);
         assertTrue(ruby.contains("base.end_with?('.a')"), ruby);

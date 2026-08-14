@@ -2146,9 +2146,13 @@ class WatchNativeBuilder {
                 .append("watch_sdks = ['watchos', 'watchsimulator'].map { |sdk| "
                         + "`xcrun --sdk #{sdk} --show-sdk-path 2>/dev/null`.strip }"
                         + ".reject { |dir| dir.empty? || !File.directory?(dir) }\n")
-                .append("watch_fw_dirs = watch_sdks.map { |dir| "
-                        + "[File.join(dir, 'System/Library/Frameworks'), "
-                        + "File.join(dir, 'System/Library/SubFrameworks')] }\n")
+                // The frameworks watchOS does not have, named rather than discovered. Same list
+                // ParparVM weak-links through -Doptional.frameworks, so the declaration that keeps
+                // the iOS slice linking and the one that keeps the watch target's phase honest
+                // cannot drift apart.
+                .append("watch_unavailable = %w[")
+                .append(WATCH_OPTIONAL_FRAMEWORKS.replace(';', ' '))
+                .append("]\n")
                 .append("already = watch_target.frameworks_build_phase.files_references"
                         + ".map { |r| r.path && File.basename(r.path) }.compact\n")
                 .append("app_target.frameworks_build_phase.files.to_a.each do |bf|\n")
@@ -2172,8 +2176,17 @@ class WatchNativeBuilder {
                         + "|| base.end_with?('.tbd') || base.end_with?('.a')\n")
                 .append("  if base.end_with?('.framework') || base.end_with?('.xcframework')\n")
                 .append("    if ref.source_tree == 'SDKROOT'\n")
-                .append("      present = !watch_fw_dirs.empty? && watch_fw_dirs.all? { |dirs| "
-                        + "dirs.any? { |d| File.directory?(File.join(d, base)) } }\n")
+                // DECLARED, not probed. WATCH_OPTIONAL_FRAMEWORKS already names every framework
+                // the port links that watchOS does not have, and the port's own sources are
+                // #ifdef'd around them -- that is the same conditional-system-library arrangement
+                // every other platform uses here.
+                //
+                // Probing the SDK directories instead asked a question that has no single answer:
+                // a build targets ONE destination, so requiring presence in both watch SDKs
+                // dropped a device-only framework like BackgroundTasks from a device archive, and
+                // requiring it in only the active one makes the project depend on which
+                // destination generated it. The declaration has neither problem and is reviewable.
+                .append("      present = !watch_unavailable.include?(base)\n")
                 .append("    else\n")
                 // Vendored: the bundle's own declaration decides, and a yes means the search paths
                 // and any embed phase have to follow it below.
@@ -2184,10 +2197,8 @@ class WatchNativeBuilder {
                 .append("    present = cn1_watch_archive_has_watch_slice(ref)\n")
                 .append("    vendored_linked ||= present\n")
                 .append("  else\n")
-                .append("    stem = base.sub(/\\.(dylib|tbd)\\z/, '')\n")
-                .append("    present = !watch_sdks.empty? && watch_sdks.all? { |sdk| "
-                        + "[File.join(sdk, 'usr/lib', base), File.join(sdk, 'usr/lib', stem + '.tbd')]"
-                        + ".any? { |c| File.exist?(c) } }\n")
+                // Same rule for a system dylib or text-based stub: declared, not probed.
+                .append("    present = !watch_unavailable.include?(base)\n")
                 .append("  end\n")
                 .append("  unless present\n")
                 .append("    puts \"[watchNative] not linking #{base} into the watch target: "
@@ -2628,6 +2639,13 @@ class WatchNativeBuilder {
                         + "{ |d| found[File.basename(d, '.swiftmodule')] = true }\n")
                 .append("      Dir.glob(File.join(sdk, 'usr/lib/swift/*.swiftinterface')).each "
                         + "{ |d| found[File.basename(d, '.swiftinterface')] = true }\n")
+                // A framework IS a module: `import WatchKit` resolves to one, and the SPM
+                // attribution below needs it named here rather than probed separately.
+                .append("      ['System/Library/Frameworks', 'System/Library/SubFrameworks']"
+                        + ".each do |rel|\n")
+                .append("        Dir.glob(File.join(sdk, rel, '*.framework')).each "
+                        + "{ |d| found[File.basename(d, '.framework')] = true }\n")
+                .append("      end\n")
                 .append("    end\n")
                 // Swift overlays the toolchain ships rather than the SDK, wherever it keeps them.
                 .append("    toolchain = `xcrun --find swift 2>/dev/null`.strip\n")
@@ -2643,8 +2661,6 @@ class WatchNativeBuilder {
                 .append("  cn1_watch_sdk_module_names(sdks).key?(m)\n")
                 .append("end\n")
                 .append("unattributed = watch_modules.reject { |m| product_names.include?(m) || "
-                        + "watch_fw_dirs.any? { |dirs| dirs.any? { |dd| "
-                        + "File.directory?(File.join(dd, m + '.framework')) } } || "
                         + "cn1_watch_sdk_provides_module(watch_sdks, m) }\n")
                 .append("strict_products = watch_import_text && unattributed.empty?\n")
                 .append("if watch_import_text && !unattributed.empty?\n")
