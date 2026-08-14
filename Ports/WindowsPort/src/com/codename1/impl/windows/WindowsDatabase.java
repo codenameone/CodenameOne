@@ -130,6 +130,14 @@ class WindowsDatabase extends Database {
         }
     }
 
+    /// Rejects a script where this method takes one statement.
+    ///
+    /// Honouring the compatibility flag on a port that never shipped looks odd, and is deliberate:
+    /// the flag is a property of the application, not of the platform it happens to be running on.
+    /// An application built in compatibility mode passes the same SQL to every port it runs on,
+    /// and a string this port refused while Android quietly ran its first statement would make
+    /// that application fail here alone. There is no old behaviour of this port to restore, so
+    /// what it restores is the behaviour of the ports the application already runs on.
     private void requireSingleStatement(String sql) throws IOException {
         if (isLegacyBehavior()) {
             return;
@@ -376,6 +384,7 @@ class WindowsDatabase extends Database {
     }
 
     private void checkParameterCount(long stmt, int supplied) throws IOException {
+        // Compatibility mode skips this for the reason given on requireSingleStatement.
         if (isLegacyBehavior()) {
             return;
         }

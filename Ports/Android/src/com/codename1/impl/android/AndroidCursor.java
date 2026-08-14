@@ -366,55 +366,119 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         if (closeListener != null) {
             closeListener.cursorClosed(this);
         }
-        c.close();
+        try {
+            c.close();
+        } catch (RuntimeException failed) {
+            throw new IOException(failed.getMessage(), failed);
+        }
     }
 
     @Override
     public byte[] getBlob(int index) throws IOException {
         beginRead(index);
-        return c.getBlob(index);
+        try {
+            return c.getBlob(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     @Override
     public double getDouble(int index) throws IOException {
         beginRead(index);
-        return c.getDouble(index);
+        try {
+            return c.getDouble(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     @Override
     public float getFloat(int index) throws IOException {
         beginRead(index);
-        return c.getFloat(index);
+        try {
+            return c.getFloat(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     @Override
     public int getInteger(int index) throws IOException {
         beginRead(index);
-        return c.getInt(index);
+        try {
+            return c.getInt(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     @Override
     public long getLong(int index) throws IOException {
         beginRead(index);
-        return c.getLong(index);
+        try {
+            return c.getLong(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     @Override
     public short getShort(int index) throws IOException {
         beginRead(index);
-        return c.getShort(index);
+        try {
+            return c.getShort(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     @Override
     public String getString(int index) throws IOException {
         beginRead(index);
-        return c.getString(index);
+        try {
+            return c.getString(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
     }
 
     public boolean isNull(int index) throws IOException {
         checkOpen();
         checkColumn(index);
-        return c.isNull(index);
+        try {
+            return c.isNull(index);
+        } catch (RuntimeException failed) {
+            throw readFailed(index, failed);
+        }
+    }
+
+    /// Reports a failed value read as this API promises to.
+    ///
+    /// A read is not always only a read. The platform cursor holds a window of rows rather than
+    /// the whole result set, and reading at a row outside that window refills it by running the
+    /// statement again, so an engine failure can surface from a getter and not only from a move. A
+    /// row too wide for the window fails here too, as the SQLiteBlobTooBigException a large blob
+    /// raises. Both arrive unchecked, where this API promises an IOException and every other port
+    /// raises one.
+    ///
+    /// Deliberately not applied to the metadata calls -- getPosition, getColumnCount,
+    /// getColumnIndex and getColumnName. Those are answered from the prepared statement and from
+    /// the cursor's own fields with no engine work behind them, and checkOpen has already rejected
+    /// the one state that makes them throw, so wrapping them would only claim a failure that
+    /// cannot arrive.
+    ///
+    /// #### Params
+    ///
+    /// - `index`: the column being read
+    /// - `failed`: what the platform raised
+    ///
+    /// #### Returns
+    ///
+    /// the exception to throw
+    private static IOException readFailed(int index, RuntimeException failed) {
+        return new IOException("Reading column " + index + " failed: " + failed.getMessage(),
+                failed);
     }
 
     /// Guards a value read and records which column it was, for wasNull().
@@ -462,7 +526,11 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
             // gives and the one the portable contract specifies.
             return Database.isLegacyBehavior();
         }
-        return c.isNull(last_read_column_index);
+        try {
+            return c.isNull(last_read_column_index);
+        } catch (RuntimeException failed) {
+            throw readFailed(last_read_column_index, failed);
+        }
     }
 
     @Override
