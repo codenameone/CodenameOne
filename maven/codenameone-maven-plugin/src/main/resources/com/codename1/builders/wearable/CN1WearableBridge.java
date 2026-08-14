@@ -234,8 +234,10 @@ public class CN1WearableBridge implements WearableBridge {
     /// query that transiently fails -- would make us discard a message the Data Layer already
     /// validated and delivered. So the test is membership of a *recent* snapshot: nodes seen
     /// connected in the last few minutes, plus this device itself (our own published data is echoed
-    /// back to us with the local node as its host). A forged intent from another app on the device
-    /// still carries a node id that was never in that snapshot.
+    /// back to us with the local node as its host). An event naming a node that was never in that
+    /// snapshot is discarded. Note what this is NOT: a local app cannot reach the listener service
+    /// at all, because Play services' own binder rejects any caller that is not Play services --
+    /// see CN1WearableListenerService's class javadoc.
     ///
     /// @param context any context; the Data Layer clients are cheap to obtain
     /// @param sourceNodeId the node the event claims to come from

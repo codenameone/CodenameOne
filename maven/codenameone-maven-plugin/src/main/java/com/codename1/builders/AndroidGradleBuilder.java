@@ -4176,9 +4176,12 @@ public class AndroidGradleBuilder extends Executor {
         if (usesWearable) {
             wearableListenerService =
                     // Exported because Play services binds it -- that is not optional for a
-                    // WearableListenerService. There is no binding permission Play services holds
-                    // that would narrow it, so the service validates the source node of every event
-                    // instead (see CN1WearableListenerService).
+                    // WearableListenerService, and no manifest permission narrows who may bind.
+                    // Binding is not delivery, though: WearableListenerService's binder checks
+                    // Binder.getCallingUid() against UidVerifier.isGooglePlayServicesUid before
+                    // every dispatch, so an app that binds this reaches no callback. The node
+                    // checks in CN1WearableListenerService are about which PEER an authentic
+                    // delivery names; its class javadoc has the whole argument.
                     "        <service android:name=\"com.codename1.impl.android.CN1WearableListenerService\" android:exported=\"true\">\n"
                     // BIND_LISTENER is how Play services binds the service, and its intent carries
                     // no wear: URI -- so it needs a filter of its own. Putting it alongside the

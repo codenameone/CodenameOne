@@ -38,19 +38,44 @@ import com.google.android.gms.wearable.WearableListenerService;
  * exactly the case the Codename One API's cold-start queue exists for: everything here forwards
  * straight to {@code WearableConnection}, which parks the delivery until the app registers a
  * listener and then replays it on the EDT.
+ *
+ * <h2>Why an exported service is not an open door</h2>
+ *
+ * <p>The manifest has to export this -- a {@code WearableListenerService} that Play services
+ * cannot bind is useless -- and there is no manifest permission that narrows who may bind. That
+ * reads like an invitation for any installed app to bind it and hand us a forged message, and it
+ * has been reported as one. It is not, and the reason is in the library rather than in this file,
+ * which is why it is recorded here.</p>
+ *
+ * <p>Every event reaches a subclass through the binder {@code WearableListenerService.onBind}
+ * returns, and that method is {@code final} -- there is no override point, and no need for one.
+ * The binder ({@code com.google.android.gms.wearable.zzag}) begins each dispatch with
+ * {@code Binder.getCallingUid()} and, on any uid it has not already accepted, calls
+ * {@code UidVerifier.isGooglePlayServicesUid}, which requires the calling uid to own the
+ * {@code com.google.android.gms} package AND that package to satisfy
+ * {@code GoogleSignatureVerifier.isGooglePublicSignedPackage}. A uid that fails logs
+ * "Caller is not GooglePlayServices" and the dispatch returns without invoking anything here.</p>
+ *
+ * <p>The started-intent route is closed too: {@code WearableListenerService} declares no
+ * {@code onStartCommand}, so an intent from another app starts the service and delivers nothing.
+ * A local app can therefore bind or start this service and still never reach
+ * {@code onMessageReceived}, {@code onDataChanged} or {@code ensureAppRunning}.</p>
+ *
+ * <p>So the node checks below are NOT the barrier against a local attacker; the uid check already
+ * is. They bound what an authentic Play services delivery may claim about which PEER sent it,
+ * which is a different and weaker question -- see {@code dataItemExists}.</p>
  */
 public class CN1WearableListenerService extends WearableListenerService {
 
     /**
-     * The service has to be exported for Play services to bind it, and there is no binding
-     * permission that would narrow that to Play services alone. So rather than trust the caller,
-     * every event is checked against the nodes the Data Layer has actually reported.
+     * The service has to be exported for Play services to bind it, and there is no manifest
+     * permission that narrows who may bind. The CALLER is nevertheless authenticated, by the
+     * library rather than by us -- see the class javadoc -- so this check is about which NODE an
+     * authentic Play services delivery names, not about who delivered it.
      *
-     * <p>This narrows who can be impersonated; it does not authenticate anyone. A node id is not a
-     * secret -- any app on the device can list the local and connected nodes through its own Data
-     * Layer client and then present one here. What cannot be faked is the item itself, so a data
-     * CHANGE is additionally confirmed to exist in our namespace; see {@code dataItemExists} for
-     * what that covers and what it does not.
+     * <p>A node id is not a secret and does not authenticate the node: a compromised or
+     * misbehaving peer can name another. What cannot be faked is the item itself, so a data CHANGE
+     * is additionally confirmed to exist in our namespace; see {@code dataItemExists}.
      *
      * <p>The check is against a recent snapshot rather than a fresh query, so a peer that drops off
      * between Play services queueing the callback and the check running does not cost us a message
@@ -72,11 +97,9 @@ public class CN1WearableListenerService extends WearableListenerService {
     /**
      * Whether this data item is really in our Data Layer, rather than merely claimed to be.
      *
-     * <p>A node id authenticates nothing. It is not a secret: any app on this device can open its
-     * own Data Layer client, list the local and connected nodes, and then bind this exported
-     * service and hand it a forged event carrying an id {@link #isFromAKnownNode} accepts. The
-     * membership check narrows who can be impersonated; it cannot establish who is calling, and
-     * there is no bind permission Play services holds that would.</p>
+     * <p>A node id does not authenticate the node it names -- it is not a secret, and a peer that
+     * is compromised or simply wrong can present another one. It bounds who can be impersonated,
+     * it does not establish who spoke.</p>
      *
      * <p>The item itself can be checked, though, and that is a real answer. Data Layer items live
      * in the writing package's namespace, so nothing outside this app -- on this device or a paired
@@ -85,10 +108,8 @@ public class CN1WearableListenerService extends WearableListenerService {
      *
      * <p>A deletion has nothing left to read, so it cannot be confirmed this way and falls back to
      * the membership check. So does a message: {@code MessageClient} is transient by design and
-     * leaves no record to verify against. Both remain forgeable by a hostile app already installed
-     * on the device, and the app-facing consequence is a spurious callback -- which is why this
-     * one is worth closing and why the limit of the other two is written down here rather than
-     * left to be rediscovered.</p>
+     * leaves no record to verify against. What that leaves unverified is the NODE, not the caller;
+     * the class javadoc records why a local app cannot reach any of these callbacks at all.</p>
      */
     private boolean dataItemExists(android.net.Uri uri) {
         if (uri == null) {
@@ -264,11 +285,11 @@ public class CN1WearableListenerService extends WearableListenerService {
         // the logical clock has to be restored from it before observations are compared, and
         // persisted through it afterwards.
         CN1WearableBridge.noteServiceContext(this);
-        // NOT before the loop. This service is exported and there is no binding permission that
-        // would narrow it to Play services, so starting the app first let an untrusted caller bring
-        // the UI forward with an empty or forged callback -- the provenance check below stops the
-        // payload but cannot undo a launch that already happened. The app is started on the first
-        // event that proves it came from a known node, which is also the first event that could
+        // NOT before the loop. The caller is authentic Play services (see the class javadoc), but
+        // an event it delivers can still name a node we do not know, and starting the app first
+        // let such an event bring the UI forward on a payload the check below then discards -- a
+        // launch cannot be undone. The app is started on the first event that proves it came from
+        // a known node, which is also the first event that could
         // give the app anything to do.
         boolean started = false;
         for (DataEvent event : events) {
