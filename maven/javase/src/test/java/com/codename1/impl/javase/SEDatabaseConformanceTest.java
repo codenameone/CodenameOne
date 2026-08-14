@@ -351,6 +351,37 @@ public class SEDatabaseConformanceTest {
         }
     }
 
+    @Test
+    public void aFileWhoseNameStartsWithAColonIsStillAFile() throws Exception {
+        // SQLite reserves the leading colon and advises against it, but ":name.db" is a file
+        // called ":name.db" -- only ":memory:" itself is the in-memory database. Reading every
+        // colon-prefixed name as memory left such a file unregistered, so another connection
+        // could re-key or delete it without seeing this one.
+        File odd = new File(":cn1-conformance-colon.db").getAbsoluteFile();
+        Connection relative = java.sql.DriverManager.getConnection(
+                "jdbc:sqlite::cn1-conformance-colon.db");
+        SEDatabase wrapped = new SEDatabase(relative);
+        SEDatabase second = null;
+        try {
+            second = identified(java.sql.DriverManager.getConnection(
+                    "jdbc:sqlite:" + odd.getCanonicalPath()), odd);
+            boolean refused = false;
+            try {
+                second.changeKey(com.codename1.db.DatabaseConfig.passphrase("a secret"));
+            } catch (java.io.IOException expected) {
+                refused = true;
+            }
+            assertTrue(refused, "the connection on the colon-named file has to be visible to a "
+                    + "key change on that same file");
+        } finally {
+            if (second != null) {
+                second.close();
+            }
+            wrapped.close();
+            odd.delete();
+        }
+    }
+
     /// A connection that refuses to say which URL it is open on, which is the case the registry
     /// has to treat as "could be anything".
     private static Connection unreadableConnection() {

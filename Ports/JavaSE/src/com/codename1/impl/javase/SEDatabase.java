@@ -161,8 +161,9 @@ public class SEDatabase extends Database {
         if (query >= 0) {
             path = rest.substring(0, query);
             // The URI form of the same thing: file:name?mode=memory is an in-memory database
-            // whose path looks like a file.
-            if (rest.indexOf("mode=memory") >= 0) {
+            // whose path looks like a file. Read as a parameter rather than as a substring, so a
+            // file genuinely called "mode=memoryish" is not mistaken for one.
+            if (hasMemoryMode(rest.substring(query + 1))) {
                 return true;
             }
         }
@@ -171,7 +172,31 @@ public class SEDatabase extends Database {
             // before the rest is recognisable as one.
             path = path.substring("file:".length());
         }
-        return path.length() == 0 || path.startsWith(":");
+        // The exact names, not every name that starts like one. SQLite reserves the leading colon
+        // and advises against it, but ":customer.db" is still a file called ":customer.db" -- and
+        // treating it as memory would leave that file unregistered, so another connection could
+        // delete or re-key it without seeing this one. An empty name is SQLite's private
+        // temporary database, which no other connection can name and none of those checks can
+        // protect.
+        return path.length() == 0 || ":memory:".equals(path);
+    }
+
+    /// Whether a query string turns this URI into an in-memory database.
+    ///
+    /// #### Parameters
+    ///
+    /// - `query`: everything after the "?" in the URL
+    ///
+    /// #### Returns
+    ///
+    /// true if mode=memory is one of the parameters
+    private static boolean hasMemoryMode(String query) {
+        for (String parameter : com.codename1.util.StringUtil.tokenize(query, '&')) {
+            if ("mode=memory".equals(parameter)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The database file a JDBC connection is open on, canonicalized, or null.
