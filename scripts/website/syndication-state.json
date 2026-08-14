@@ -1658,6 +1658,19 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-08-13T17:01:17+00:00"
+      },
+      "devto": {
+        "id": 4397465,
+        "url": "https://dev.to/codenameone/app-shield-your-server-should-not-trust-the-app-calling-it-4cpa",
+        "syndicated_at": "2026-08-14T14:11:17+00:00"
+      },
+      "foojay": {
+        "id": 125318,
+        "url": "https://foojay.io/wp-admin/post.php?post=125318&action=edit",
+        "preview_url": "https://foojay.io/?p=125318",
+        "featured_media_id": 125317,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-08-14T14:12:17+00:00"
       }
     }
   }
