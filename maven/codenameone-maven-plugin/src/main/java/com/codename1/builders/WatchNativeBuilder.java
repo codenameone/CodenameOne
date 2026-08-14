@@ -96,14 +96,30 @@ class WatchNativeBuilder {
         "CodenameOne_METALViewController.xib", "MainWindowMETAL.xib"
     };
 
-    // Frameworks the iOS port links that are unavailable on watchOS; ParparVM
-    // weak-links these (see -Doptional.frameworks) so the iOS slice is unchanged
-    // while the watch slice tolerates the absent symbols.
+    // Frameworks the watch target must not link; ParparVM weak-links these (see
+    // -Doptional.frameworks) so the iOS slice is unchanged while the watch slice tolerates the
+    // absent symbols.
+    //
+    // Two ways in, and only the first is a build error when missed. A framework watchOS does NOT
+    // HAVE cannot even be weak-linked -- weak linking still resolves against the SDK -- so leaving
+    // one out fails the watch link with "framework 'X' not found". A framework watchOS HAS but the
+    // port never references from watch-compiled sources is here too; dropping it is merely tidy.
+    //
+    // TO ADD AN ENTRY, check the SDK rather than guessing:
+    //   ls "$(xcrun --sdk watchos --show-sdk-path)/System/Library/Frameworks" | grep X
+    // The absences below were all verified that way. The port's own sources are already
+    // #if !TARGET_OS_WATCH guarded around each of them -- this list is the link half of the same
+    // conditional-system-library arrangement, and it is the half that silently lags.
     private static final String WATCH_OPTIONAL_FRAMEWORKS =
             "OpenGLES.framework;GLKit.framework;Metal.framework;"
             + "MapKit.framework;MediaPlayer.framework;MessageUI.framework;"
             + "AddressBookUI.framework;AddressBook.framework;"
             + "WebKit.framework;StoreKit.framework;"
+            // The three the translator puts in EVERY project's link phase
+            // (ByteCodeTranslator.includeFrameworks) that watchOS does not have. Their headers
+            // were already guarded, so the watch target compiled and then failed at the link --
+            // which is why this went unnoticed until an unsigned device archive got that far.
+            + "SystemConfiguration.framework;AudioToolbox.framework;QuickLook.framework;"
             // CarPlay.framework is iOS-only (absent on watchOS); it is linked on the iOS slice when
             // the app references com.codename1.car, so weak-link it for the watch slice.
             + "CarPlay.framework;"

@@ -855,6 +855,16 @@ class WatchNativeBuilderTest {
         assertTrue(ruby.contains("watch_unavailable = %w["), ruby);
         assertTrue(ruby.contains("OpenGLES.framework") && ruby.contains("CarPlay.framework"),
                 "the declared list has to reach the script: " + ruby);
+        // The three ByteCodeTranslator puts in every project's link phase that watchOS does not
+        // have. Their headers are already #if !TARGET_OS_WATCH guarded, so the watch target
+        // compiles and then fails at the link with "framework 'SystemConfiguration' not found" --
+        // an absent framework cannot be weak-linked, only left out.
+        for (String absent : new String[] {"SystemConfiguration.framework",
+                "AudioToolbox.framework", "QuickLook.framework"}) {
+            assertTrue(ruby.contains(absent),
+                    absent + " is absent on watchOS and must not reach the watch link phase: "
+                            + ruby);
+        }
         assertTrue(ruby.contains("present = !watch_unavailable.include?(base)"), ruby);
         assertFalse(ruby.contains("watch_fw_dirs"),
                 "the SDK directory probe is gone: " + ruby);
