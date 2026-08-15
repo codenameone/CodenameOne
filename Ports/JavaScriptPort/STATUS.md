@@ -17,6 +17,74 @@ routing.
 This document is the handoff for whoever picks up the branch next. Read it
 before you re-attempt switching initializr over.
 
+Web-native overlay layer
+------------------------
+
+The port renders to a canvas, but text, semantics and OS state no longer come
+from it. Two DOM layers sit above the canvas, which is itself marked
+`role=presentation` / `aria-hidden`:
+
+- `#cn1-text-layer` (`JavaScriptTextLayer`) carries the **visible text**.
+  `BufferedGraphics.drawString` -- the display graphics -- hands each run to the
+  layer instead of the canvas, so the text on screen is real DOM text that can be
+  selected, found with the browser's find-in-page, and rasterized by the browser
+  rather than by canvas. Codename One remains the sole layout authority: a run
+  arrives already broken and placed, so it is emitted as one `white-space:pre`
+  element at an absolute coordinate and the browser cannot wrap or reflow it.
+  Text measurement is unchanged and stays on the worker's `OffscreenCanvas`.
+- `#cn1-accessibility-tree` (`JavaScriptSemanticOverlay`) carries the ARIA
+  projection of `AccessibilityTreeSnapshot`. It is updated incrementally --
+  elements are keyed by semantic node id and reused -- because the previous
+  rebuild-per-invalidation discarded DOM focus and text selection on every
+  `CHANGE_BOUNDS`, which is raised by every `setX/setY/setWidth/setHeight`.
+
+Text that stays on the canvas, by design:
+
+- offscreen targets (transition buffers, `paintLock`, `ComponentImage`,
+  `Display.screenshot`) -- they use plain `HTML5Graphics`, so the gate is
+  structural rather than a check;
+- cell renderers, which are one component instance stamped at N positions and so
+  cannot key a pooled element per row;
+- anything outside the displayed form, because the layer sits above the canvas as
+  a whole and nothing painted afterwards can occlude it (a modal dialog paints
+  the form beneath it as its own backdrop);
+- shape clips and non-identity transforms.
+
+Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`
+itself and never reaches the implementation.
+
+**Consequence for the screenshot suite:** goldens captured from the canvas via
+`toDataURL` no longer contain text. The suite needs to capture through
+Playwright's `page.screenshot()` and be rebaselined. This has NOT been done yet.
+
+Known gaps in this area:
+
+- Drag-selection is not enabled. The layer takes no pointer events so the canvas
+  keeps hit testing; find-in-page and assistive technology do not need hit
+  testing, but selection does. Enabling it requires the pointer-routing rework.
+- Vertical placement uses `fontHeight()` as the line box, which matches Codename
+  One's own layout metric but is approximate against the browser's font metrics
+  to about a pixel. A text-parity harness comparing `getBoundingClientRect()`
+  against the Codename One width/position is the way to tighten this.
+- Occlusion within a form (a `Sheet` or `InteractionDialog` over text in the same
+  form) is not handled; only cross-form occlusion is.
+
+Main-thread browser state
+-------------------------
+
+Several features were written when the port ran on the main thread and silently
+did nothing once it moved into a worker, because the objects they reach for do
+not exist there. `history.pushState` was a `@JSBody` and threw on every form
+change (the port logged that the back command would not work), and every
+`matchMedia` query -- dark mode, reduced motion, forced colors, contrast,
+reduced transparency -- answered `false` unconditionally. Both now go through
+the host bindings so they run on the main thread; media query results are cached
+and refreshed from a `change` listener.
+
+The rule this illustrates is worth keeping in mind for any future port work:
+**a `@JSBody` runs in the worker.** Anything touching `window`, `document`,
+`history`, `matchMedia` or `navigator` has to go through a host binding instead.
+
 Build
 -----
 
