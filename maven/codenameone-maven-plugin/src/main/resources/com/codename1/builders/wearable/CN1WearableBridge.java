@@ -921,9 +921,16 @@ public class CN1WearableBridge implements WearableBridge {
         // "Reachable" promises the peer app can receive a message, so a connected watch that does
         // not run this app must not qualify: getConnectedNodes() lists physical devices, and only
         // the capability set says which of them installed the counterpart.
+        //
+        // NEARBY is not part of that promise. isNearby() distinguishes a direct transport from a
+        // cloud-routed one; the Data Layer delivers messages over both, and getConnectedNodes()
+        // already means "the Data Layer can route to this node". Requiring nearby made an LTE
+        // watch away from its phone report unreachable while isCompanionAppInstalled() still said
+        // yes -- and fanOut refused to send on the same test -- so the pair silently stopped
+        // talking whenever they were apart, which is the case the cloud route exists for.
         List<String> withApp = bondedNodeIds();
         for (Node n : connectedNodes()) {
-            if (n.isNearby() && withApp.contains(n.getId())) {
+            if (withApp.contains(n.getId())) {
                 return true;
             }
         }
@@ -1119,9 +1126,11 @@ public class CN1WearableBridge implements WearableBridge {
         // known, so a send goes to a watch without the app).
         BondedSnapshot bonded = bondedSnapshot();
         for (Node n : nodes) {
-            if (!n.isNearby()) {
-                continue;
-            }
+            // Capability, not proximity. isNearby() only says whether the transport is direct or
+            // cloud-routed, and sendMessage works over both -- filtering on it dropped every peer
+            // reachable only through the cloud, which is exactly a watch away from its phone. The
+            // node metadata still reports it (see connectedNodeDescriptors); it just does not
+            // decide delivery. Same test as isReachable(), so the two cannot disagree.
             if (bonded.known && !bonded.ids.contains(n.getId())) {
                 continue;
             }

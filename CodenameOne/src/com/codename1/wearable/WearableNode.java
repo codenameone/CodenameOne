@@ -67,8 +67,13 @@ public class WearableNode {
     }
 
     /// Returns true when the device is directly connected (Bluetooth or the same network) rather
-    /// than merely reachable through the cloud. Only a nearby node can receive a live message;
-    /// replicated data reaches both.
+    /// than merely reachable through the cloud.
+    ///
+    /// Informational, not a delivery rule. A cloud-routed peer still receives messages, requests
+    /// and replicated data -- it appears in the connected set, which is what "connected" means --
+    /// so [WearableConnection#isReachable] and message delivery do not consult this. Expect higher
+    /// latency, and an actual failure is reported through the send's own error path rather than
+    /// predicted from the transport.
     ///
     /// #### Returns
     ///
