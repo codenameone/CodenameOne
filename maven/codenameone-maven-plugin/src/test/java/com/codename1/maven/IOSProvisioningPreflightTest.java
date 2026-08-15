@@ -249,6 +249,63 @@ public class IOSProvisioningPreflightTest {
         assertTrue(parsed.expirationDate.after(new Date()));
     }
 
+    // ---- a profile is untrusted input ----
+
+    /**
+     * Nothing here verifies the profile's CMS signature, and a profile can arrive from
+     * anyone. A crafted one must not be able to read a local file during someone's build --
+     * the DOCTYPE has to stay legal (every real plist declares one), but the entity in its
+     * internal subset must not be resolved. Disabling only {@code load-external-dtd} would
+     * leave this open.
+     */
+    @Test
+    public void doesNotResolveExternalEntitiesFromACraftedProfile() throws Exception {
+        File secret = File.createTempFile("preflight-secret", ".txt");
+        secret.deleteOnExit();
+        OutputStream out = new FileOutputStream(secret);
+        try {
+            out.write("TOP-SECRET-KEYCHAIN-CONTENTS".getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+
+        String attack = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                + "<!DOCTYPE plist [ <!ENTITY xxe SYSTEM \"file://" + secret.getAbsolutePath() + "\"> ]>\n"
+                + "<plist version=\"1.0\"><dict>\n"
+                + "<key>Name</key><string>&xxe;</string>\n"
+                + "<key>ExpirationDate</key><date>" + FUTURE + "</date>\n"
+                + "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>\n"
+                + "</dict></plist>";
+
+        String name;
+        try {
+            IOSProvisioningPreflight.Profile parsed = IOSProvisioningPreflight.parse(attack.getBytes("UTF-8"));
+            name = parsed == null || parsed.name == null ? "" : parsed.name;
+        } catch (Exception refusedOutright) {
+            name = "";
+        }
+        assertFalse("the profile must not be able to read a local file, got: " + name,
+                name.contains("TOP-SECRET-KEYCHAIN-CONTENTS"));
+
+        // and the same profile, run through the full check, must not leak it into the message either
+        Properties p = settings(writeRaw(attack.getBytes("UTF-8")), true, "ad-hoc");
+        for (IOSProvisioningPreflight.Problem problem : check(p, true)) {
+            assertFalse("no message may carry the file's contents: " + problem.message,
+                    problem.message.contains("TOP-SECRET-KEYCHAIN-CONTENTS"));
+        }
+    }
+
+    /** A real profile still parses with the hardened parser -- the DOCTYPE stays legal. */
+    @Test
+    public void hardenedParserStillReadsARealProfile() throws Exception {
+        IOSProvisioningPreflight.Profile parsed =
+                IOSProvisioningPreflight.parse(development("Dev Profile").getBytes("UTF-8"));
+        assertNotNull(parsed);
+        assertEquals("Dev Profile", parsed.name);
+        assertEquals("development", parsed.type);
+        assertNotNull(parsed.expirationDate);
+    }
+
     @Test
     public void reportsNoPlistWhenThereIsNone() throws Exception {
         assertNull(IOSProvisioningPreflight.extractEmbeddedPlist(new byte[0]));

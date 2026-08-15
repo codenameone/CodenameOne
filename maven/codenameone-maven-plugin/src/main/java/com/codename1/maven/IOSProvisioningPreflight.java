@@ -27,8 +27,10 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -244,10 +246,7 @@ final class IOSProvisioningPreflight {
         if (plist == null) {
             return null;
         }
-        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-        dbf.setValidating(false);
-        disableExternalDtdLoading(dbf);
-        DocumentBuilder db = dbf.newDocumentBuilder();
+        DocumentBuilder db = secureDocumentBuilder();
         Document doc = db.parse(new ByteArrayInputStream(plist));
 
         Profile profile = new Profile();
@@ -264,18 +263,36 @@ final class IOSProvisioningPreflight {
     }
 
     /**
-     * The plist DOCTYPE points at apple.com. Resolving it would make a local check depend on
-     * Apple's web server answering, so it is turned off where the parser supports it.
+     * A parser that treats the profile as what it is: untrusted input that nothing has
+     * verified. A {@code .mobileprovision} is signed, but neither this check nor the build
+     * server validates that signature, and a profile can arrive from anyone -- a client
+     * sending one for their app, a repository, a support ticket.
      *
-     * @return whether the parser honoured the request
+     * <p>The DOCTYPE itself has to stay legal, because every real plist declares one. What is
+     * refused is entity resolution: without this, an entity declared in a crafted profile's
+     * internal subset is resolved by the JDK parser, so a profile could read a local file or
+     * make a network request during someone's build -- and, used as the profile {@code Name},
+     * have the result printed back in an error message. Turning off external general and
+     * parameter entities, entity-reference expansion, XInclude and external DTD access closes
+     * that; secure processing additionally caps entity expansion, so a profile cannot hang a
+     * build with nested entities.
+     *
+     * <p>None of these is set "best effort": a parser that cannot be told to stop resolving
+     * entities has no business reading an untrusted profile, so the exception propagates and
+     * the profile is reported as unreadable rather than parsed unsafely.
      */
-    private static boolean disableExternalDtdLoading(DocumentBuilderFactory dbf) {
-        try {
-            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-            return true;
-        } catch (Exception ex) {
-            return false;
-        }
+    private static DocumentBuilder secureDocumentBuilder() throws ParserConfigurationException {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        dbf.setValidating(false);
+        dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        // the plist DOCTYPE also points at apple.com, so this keeps a local check from
+        // depending on Apple's web server answering
+        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        dbf.setXIncludeAware(false);
+        dbf.setExpandEntityReferences(false);
+        return dbf.newDocumentBuilder();
     }
 
     /**
