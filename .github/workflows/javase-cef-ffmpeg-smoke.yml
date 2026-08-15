@@ -88,7 +88,23 @@ jobs:
             if (Get-Command ffmpeg -ErrorAction SilentlyContinue) { $ok = $true; break }
           }
           if (-not $ok) {
-            throw "ffmpeg is not on PATH after installing it. The chocolatey feed is the usual reason -- look for a 504 above."
+            # The feed was down for the whole retry window -- seven minutes of 504 on the run
+            # that prompted this. Retrying harder does not help when the outage outlasts the
+            # budget, so fall back to a build hosted on GitHub: if THAT is unreachable the job
+            # could not have checked out the repository either, which makes it the one download
+            # whose failure is never a mystery.
+            Write-Host "chocolatey did not deliver ffmpeg; falling back to a GitHub-hosted build"
+            $zip = "$env:RUNNER_TEMP\ffmpeg.zip"
+            $dest = "$env:RUNNER_TEMP\ffmpeg"
+            Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile $zip
+            Expand-Archive -LiteralPath $zip -DestinationPath $dest -Force
+            $exe = Get-ChildItem -Path $dest -Filter ffmpeg.exe -Recurse | Select-Object -First 1
+            if (-not $exe) {
+              throw "ffmpeg is not on PATH after installing it, and the fallback archive contained no ffmpeg.exe."
+            }
+            # For this step AND the steps after it: GITHUB_PATH is the only one the smoke test sees.
+            $env:PATH = "$($exe.Directory.FullName);$env:PATH"
+            Add-Content -Path $env:GITHUB_PATH -Value $exe.Directory.FullName
           }
           ffmpeg -version
 
