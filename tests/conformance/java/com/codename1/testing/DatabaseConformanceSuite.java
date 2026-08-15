@@ -31,6 +31,7 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Display;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.InputStream;
 
 /// The portable acceptance test for `com.codename1.db`.
@@ -295,7 +296,41 @@ public final class DatabaseConformanceSuite {
         stillOpen.close();
         r.check(Database.exists(databaseName), "and the refused delete left the database alone");
 
-        Database.delete(databaseName);
+        // ---- delete takes the working files with it
+        // A database is not one file. Rows committed in WAL mode sit in -wal until a checkpoint
+        // moves them, and a crash or a kill leaves that file behind holding them; deleting the
+        // database file alone reports a deletion that did not happen, and reopening the same name
+        // reads them back through the leftover. For an encrypted database they are as readable as
+        // the pages they came from.
+        //
+        // The leftover is written here rather than produced by crashing, which a test cannot do:
+        // a clean close checkpoints and removes the real one, so waiting for SQLite to leave one
+        // would assert nothing. What is under test is that delete() looks for it.
+        String sidecarOwner = Database.getDatabasePath(databaseName);
+        if (sidecarOwner != null && Database.isCustomPathSupported()) {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            String leftover = sidecarOwner + "-wal";
+            OutputStream out = null;
+            try {
+                out = fs.openOutputStream(leftover);
+                out.write(new byte[] {'r', 'o', 'w', 's'});
+            } catch (IOException cannotWriteIt) {
+                r.info("could not stage a leftover working file here: "
+                        + cannotWriteIt.getMessage());
+            } finally {
+                closeQuietly(out);
+            }
+            if (fs.exists(leftover)) {
+                Database.delete(databaseName);
+                r.check(!fs.exists(leftover),
+                        "delete() removes the working files beside the database, not just the "
+                        + "database");
+            }
+        }
+
+        if (Database.exists(databaseName)) {
+            Database.delete(databaseName);
+        }
         r.check(!Database.exists(databaseName), "exists() is false after delete()");
     }
 
@@ -1951,6 +1986,18 @@ public final class DatabaseConformanceSuite {
             return cur.getRow().getInteger(0);
         } finally {
             closeQuietly(cur);
+        }
+    }
+
+    /// Closes a stream, if one was opened, without letting the close hide what came before it.
+    private static void closeQuietly(OutputStream out) {
+        if (out == null) {
+            return;
+        }
+        try {
+            out.close();
+        } catch (IOException alreadyReported) {
+            // The write is what mattered, and it has been reported already.
         }
     }
 

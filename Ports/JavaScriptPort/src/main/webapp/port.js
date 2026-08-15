@@ -6938,6 +6938,19 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
       }
       if (cn1SqlitePool) {
         cn1SqlitePool.unlink(cn1SqliteDbPath(n));
+        // The rollback journal as well. The pool holds it as a separate entry, so unlinking the
+        // database alone left a file holding the pages of an interrupted transaction, under a
+        // name reopening the database reads back. (This VFS has no shared memory and so no WAL,
+        // but the whole set is unlinked anyway: it costs nothing when the entry is absent, and
+        // it does not have to be revisited if that ever changes.)
+        const cn1SqliteSidecars = ["-journal", "-wal", "-shm"];
+        for (let i = 0; i < cn1SqliteSidecars.length; i++) {
+          try {
+            cn1SqlitePool.unlink(cn1SqliteDbPath(n) + cn1SqliteSidecars[i]);
+          } catch (ignored) {
+            // A name the pool never had. Nothing to remove is not a failed removal.
+          }
+        }
       } else {
         const anchor = cn1SqliteMemoryAnchors.get(cn1SqliteDbPath(n));
         if (anchor) {

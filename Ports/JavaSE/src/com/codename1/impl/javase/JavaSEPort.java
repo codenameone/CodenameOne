@@ -16984,6 +16984,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
         }
+        // The companions too, for the reason databaseSidecarPaths gives: a crash leaves rows in
+        // them, and deleting the file alone leaves that data on disk under a name nobody looks
+        // at. One that was never created is nothing to do.
+        String[] sidecars = databaseSidecarPaths(f.getAbsolutePath());
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            File sidecar = new File(sidecars[iter]);
+            if (sidecar.exists() && !sidecar.delete()) {
+                throw new IOException("Failed to delete " + sidecar + ", which holds part of the "
+                        + "database. It may be in use; close the database connection first.");
+            }
+        }
     }
     
     

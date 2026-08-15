@@ -9695,6 +9695,36 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// The files SQLite keeps beside a database, given the database's own name or path.
+    ///
+    /// A database is not one file. Rows committed in WAL mode live in `-wal` until a checkpoint
+    /// moves them, `-shm` indexes that log, and in rollback mode `-journal` holds the pages a
+    /// transaction is undoing. A crash or a kill leaves whichever applies sitting there with data
+    /// in it.
+    ///
+    /// So deleting the database file alone reports a deletion that did not happen: the rows are
+    /// still on disk under a name nobody thinks to look at, and reopening the same name reads
+    /// them back through the leftovers. For an encrypted database they are as readable as the
+    /// pages they came from, which is the whole of what the encryption was for.
+    ///
+    /// Listed here rather than in each port so that every one of them deletes the same set. The
+    /// deletion itself stays with the port, because only it knows how to remove a file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databasePathOrName`: what the port would delete for the database itself
+    ///
+    /// #### Returns
+    ///
+    /// the companion names, in no particular order
+    protected static String[] databaseSidecarPaths(String databasePathOrName) {
+        return new String[] {
+            databasePathOrName + "-wal",
+            databasePathOrName + "-shm",
+            databasePathOrName + "-journal"
+        };
+    }
+
     /// Deletes database
     ///
     /// #### Parameters

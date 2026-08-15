@@ -11231,7 +11231,15 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws IOException{
-        nativeInstance.sqlDbDelete(resolveDatabasePath(databaseName));
+        String path = resolveDatabasePath(databaseName);
+        nativeInstance.sqlDbDelete(path);
+        // The companions too, for the reason databaseSidecarPaths gives. Removing one that is not
+        // there is a no-op in the native binding, so the ones this database never had cost a
+        // stat apiece.
+        String[] sidecars = databaseSidecarPaths(path);
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            nativeInstance.sqlDbDelete(sidecars[iter]);
+        }
     }
 
     @Override

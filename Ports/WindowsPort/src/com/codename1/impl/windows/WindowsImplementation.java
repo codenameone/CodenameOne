@@ -3170,7 +3170,14 @@ public class WindowsImplementation extends CodenameOneImplementation {
 
     @Override
     public void deleteDB(String databaseName) throws java.io.IOException {
-        WindowsNative.sqlDbDelete(resolveDatabasePath(databaseName));
+        String path = resolveDatabasePath(databaseName);
+        WindowsNative.sqlDbDelete(path);
+        // The companions too, for the reason databaseSidecarPaths gives. A name that is not there
+        // is the documented no-op in the native binding.
+        String[] sidecars = databaseSidecarPaths(path);
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            WindowsNative.sqlDbDelete(sidecars[iter]);
+        }
     }
 
     @Override
