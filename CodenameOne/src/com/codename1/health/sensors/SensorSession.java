@@ -405,6 +405,27 @@ public class SensorSession {
     /// in the same breath as the session decides it has stopped.
     private boolean flushingStopped;
 
+    /// How many times in a row a batch may fail to be written before the
+    /// session stops resending it.
+    ///
+    /// A store that is busy or locked is worth retrying; one that keeps
+    /// refusing is not, and the answer does not change with time. Without
+    /// a bound the same batch went out every storeBatchMillis for as long
+    /// as the session streamed -- on a 10ms batch interval that is a
+    /// hundred writes and a hundred error callbacks per second, for ever,
+    /// on a device whose store had a revoked permission or no room left.
+    /// The unwritable-type case above is already dropped rather than
+    /// retried; this is the same failure one step along, where the type
+    /// is writable and the store still says no.
+    ///
+    /// Matched to the reconnect ladder's bound, for the same reason: a
+    /// stumble is transient, a run of them is not.
+    private static final int MAX_WRITE_FAILURES = 3;
+
+    /// Consecutive failed flushes. Guarded by `pendingWrites`, the lock
+    /// the requeue decision is already taken under.
+    private int writeFailures;
+
     /// The timer's flush: claims the buffer only while the session runs.
     ///
     /// Checking the state at the top of the tick was not enough. The
@@ -507,6 +528,12 @@ public class SensorSession {
         @Override
         public void onReady(HealthWriteResult value, Throwable error) {
             if (error == null) {
+                // The run is broken, not merely paused: a store that
+                // accepted this batch has earned the full budget again
+                // for the next one.
+                synchronized (session.pendingWrites) {
+                    session.writeFailures = 0;
+                }
                 return;
             }
             // Samples of a type the store will never accept are dropped
@@ -558,6 +585,7 @@ public class SensorSession {
             // caller, so a failed final write refilled the buffer and the
             // next teardown wrote it again.
             boolean requeued;
+            boolean giveUp;
             synchronized (session.pendingWrites) {
                 // The flag and the buffer under one lock, because
                 // teardown sets that flag and drains the buffer under it
@@ -566,15 +594,41 @@ public class SensorSession {
                 // its samples behind it -- into a buffer nothing will
                 // ever claim again, since the re-arm below correctly
                 // declines to schedule anything for a dead session.
-                requeued = !session.flushingStopped;
+                //
+                // The failure count lives under this lock too: it is read
+                // and written in the same breath as the requeue it
+                // governs, and the timer thread and the caller's thread
+                // both arrive here.
+                session.writeFailures++;
+                giveUp = session.writeFailures >= MAX_WRITE_FAILURES;
+                requeued = !session.flushingStopped && !giveUp;
                 if (requeued) {
                     session.pendingWrites.addAll(0, retryable);
                 }
+                if (giveUp) {
+                    // Counted from zero for whatever comes next. The
+                    // batch is gone, so the buffer is empty again and a
+                    // later sample re-arms the timer through the ordinary
+                    // path -- new readings still get their attempts; it
+                    // is only this batch that stops being resent.
+                    session.writeFailures = 0;
+                }
+            }
+            if (giveUp) {
+                com.codename1.io.Log.p("CN1 Health: the store refused "
+                        + MAX_WRITE_FAILURES + " attempts at the same batch"
+                        + " of sensor samples, so it is dropped rather than"
+                        + " retried for as long as the session runs. Later"
+                        + " readings are still written.");
             }
             if (!requeued) {
-                // Teardown won. The samples are reported rather than left
-                // in a buffer nobody will read: this is the only notice
-                // the app gets that they were not stored.
+                // Either teardown won, or the batch has used up its
+                // attempts. Both end the same way: the samples are
+                // reported rather than left in a buffer nobody will read
+                // -- this is the only notice the app gets that they were
+                // not stored -- and nothing is re-armed below, which is
+                // what stops a refusing store being asked again every
+                // storeBatchMillis for the life of the session.
                 session.fireError(asHealthException(error));
                 return;
             }

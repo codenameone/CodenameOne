@@ -387,6 +387,87 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * A store that keeps refusing must not be asked forever.
+     *
+     * <p>A running session put the failed batch back and re-armed the
+     * timer on every failure, so the same samples went out every
+     * storeBatchMillis for as long as it streamed -- at the 10ms interval
+     * used here, a hundred writes and a hundred error callbacks a second,
+     * on a device whose store had a revoked permission or no room left.
+     * It also kept the EDT permanently non-idle, which is what made this
+     * class take 839s on one CI leg against 9.5s locally, and eventually
+     * blew a 60-minute job.</p>
+     *
+     * <p>The unwritable-type case was already dropped rather than
+     * retried; this is the same failure where the type is writable and
+     * the store still says no.</p>
+     */
+    @Test
+    void aRefusingStoreIsNotRetriedForever() throws Exception {
+        CountingStore store = new CountingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+            assertEquals(SensorSessionState.STREAMING, session.getState());
+
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            // The batch is attempted, and attempted again -- a store that
+            // is merely busy deserves that much.
+            int attempts = pumpFor(200, store);
+            assertTrue(attempts > 1,
+                    "a failed batch should be retried at least once, saw "
+                            + attempts);
+
+            // ...but the retries stop, while the session is still
+            // streaming. Without the bound this count climbs for as long
+            // as the test is willing to wait.
+            assertEquals(SensorSessionState.STREAMING, session.getState(),
+                    "giving up on the batch must not end the session");
+            int settled = pumpFor(300, store);
+            assertEquals(settled, pumpFor(300, store),
+                    "a refusing store must stop being retried; it was"
+                            + " asked again");
+            assertTrue(settled <= 6,
+                    "the ladder should be bounded, saw " + settled
+                            + " attempts");
+
+            // A later reading is still offered to the store: what is
+            // dropped is the batch, not the session.
+            int beforeNewSample = store.writeCount();
+            p.notifyHeartRate(73);
+            flushSerialCalls();
+            assertTrue(pumpFor(200, store) > beforeNewSample,
+                    "a new reading should still be attempted");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
      * A session that has ended must not keep retrying its store writes.
      *
      * <p>The re-arm guard tested only for STOPPED, but the reconnect
