@@ -1793,29 +1793,25 @@ public final class WearableConnection {
         }
     }
 
-    /**
-     * Which load of the app a queued callback belongs to.
-     *
-     * <p>Only the simulator's hot reload ever moves this: on a device it stays 0 and every gate
-     * below is a comparison that always passes.</p>
-     */
+    /// Which load of the app a queued callback belongs to.
+    ///
+    /// Only the simulator's hot reload ever moves this: on a device it stays 0 and every gate
+    /// below is a comparison that always passes.
     private static volatile int loadGeneration;
 
-    /**
-     * Hands work to the EDT for THIS load of the app, and drops it if a reload intervenes.
-     *
-     * <p>{@code resetForReload()} can retire what is still parked, but not what has already been
-     * handed to the EDT: {@code callSerially} has no cancel. A reply that arrived a moment before
-     * a reload was removed from {@code pendingReplies} first, so clearing that map missed it, and
-     * the discarded instance's handler then ran against the replacement app -- mutating UI that
-     * belongs to an object nothing else references, or repeating a side effect.</p>
-     *
-     * <p>The generation is read when the work is QUEUED and compared when it runs, so anything
-     * enqueued before a reload is discarded and anything after it survives.</p>
-     *
-     * <p>{@code notifyStateChanged} deliberately does not use this: it takes its listener snapshot
-     * inside the runnable, so after a reload it finds none and running it is already a no-op.</p>
-     */
+    /// Hands work to the EDT for THIS load of the app, and drops it if a reload intervenes.
+    ///
+    /// `resetForReload()` can retire what is still parked, but not what has already been handed
+    /// to the EDT: `callSerially` has no cancel. A reply that arrived a moment before a reload was
+    /// removed from `pendingReplies` first, so clearing that map missed it, and the discarded
+    /// instance's handler then ran against the replacement app -- mutating UI that belongs to an
+    /// object nothing else references, or repeating a side effect.
+    ///
+    /// The generation is read when the work is QUEUED and compared when it runs, so anything
+    /// enqueued before a reload is discarded and anything after it survives.
+    ///
+    /// `notifyStateChanged` deliberately does not use this: it takes its listener snapshot inside
+    /// the runnable, so after a reload it finds none and running it is already a no-op.
     private static void callSeriallyForThisLoad(final Runnable work) {
         final int queuedIn = loadGeneration;
         Display.getInstance().callSerially(new Runnable() {
