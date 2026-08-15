@@ -7205,14 +7205,37 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnIsNull_lon
       if (index < 0 || index >= stmt.columnCount) {
         throw new Error("Column " + index + " is out of range");
       }
-      return stmt.get(index) === null ? 1 : 0;
+      // The column's type, not its value. Asking for the value materialises it, and for a blob
+      // that means allocating and copying every byte out of the wasm heap into a Uint8Array which
+      // is then thrown away -- on the read path the cursor takes before every getBlob, so a large
+      // value was copied a second time for nothing and could fail on memory that would otherwise
+      // have held it. The type is what the question was about anyway.
+      return cn1Sqlite.capi.sqlite3_column_type(stmt.pointer, index)
+              === cn1Sqlite.capi.SQLITE_NULL ? 1 : 0;
     }, -1);
   });
 
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_columnString_long_int_R_java_lang_String", "cn1_com_codename1_impl_html5_database_SQLiteNative_columnString___long_int_R_java_lang_String"],
   function(stmtId, col) {
     return cn1SqliteGuard(function() {
-      const v = cn1SqliteLookup(Number(stmtId)).get(col | 0);
+      const stmt = cn1SqliteLookup(Number(stmtId));
+      const index = col | 0;
+      if (index < 0 || index >= stmt.columnCount) {
+        throw new Error("Column " + index + " is out of range");
+      }
+      // Asked as text, which is what every other port does: they read through
+      // sqlite3_column_text, and SQLite converts whatever is stored. Left to the stored type this
+      // handed back the value as it sits, so a blob arrived as a Uint8Array and String() rendered
+      // it "65,66" where the native ports return "AB" -- the same row read through the same API
+      // giving different answers on one platform.
+      //
+      // NULL is decided before the conversion rather than after it, so that a column holding SQL
+      // NULL stays null instead of becoming whatever text a forced conversion produces for it.
+      if (cn1Sqlite.capi.sqlite3_column_type(stmt.pointer, index)
+              === cn1Sqlite.capi.SQLITE_NULL) {
+        return null;
+      }
+      const v = stmt.get(index, cn1Sqlite.capi.SQLITE_TEXT);
       return v === null || v === undefined ? null : jvm.createStringLiteral(String(v));
     }, null);
   });
