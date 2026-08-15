@@ -131,7 +131,12 @@ class WatchNativeBuilder {
             // outlived two rounds of this list: a build that never touches Vision never links it,
             // and the watch link only fails for the app that does.
             + "AdSupport.framework;CoreImage.framework;CoreNFC.framework;"
-            + "CoreTelephony.framework;JavaScriptCore.framework;Vision.framework";
+            + "CoreTelephony.framework;JavaScriptCore.framework;Vision.framework;"
+            // Named by PlatformFeatureCatalog rather than written in IPhoneBuilder, so they are
+            // built as `name + ".framework"` and no quoted literal exists to grep for. That blind
+            // spot is why they survived the audit that caught the six above; the partition test
+            // now reads the catalog too.
+            + "VisionKit.framework;Speech.framework";
 
     /**
      * Frameworks the watch target MAY link, so that every framework this builder can emit is

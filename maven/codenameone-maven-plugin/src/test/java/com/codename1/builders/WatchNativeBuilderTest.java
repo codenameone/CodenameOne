@@ -1398,24 +1398,60 @@ class WatchNativeBuilderTest {
      */
     @Test
     public void everyEmittedFrameworkIsClassifiedForTheWatch() throws Exception {
-        File src = new File(System.getProperty("basedir", "."),
-                "src/main/java/com/codename1/builders/IPhoneBuilder.java");
-        assertTrue(src.isFile(), "cannot find IPhoneBuilder to scan: " + src.getAbsolutePath());
-        String source = new String(Files.readAllBytes(src.toPath()), "UTF-8");
+        File base = new File(System.getProperty("basedir", "."));
+        // Three sources, because a framework reaches the link phase three ways and only the first
+        // is a quoted "X.framework" literal. PlatformFeatureCatalog names them BARE and
+        // IPhoneBuilder appends the suffix, so grepping only for literals missed VisionKit and
+        // Speech -- a fourth red CI round after the six this test was written for.
+        File[] sources = {
+            new File(base, "src/main/java/com/codename1/builders/IPhoneBuilder.java"),
+            new File(base, "src/main/java/com/codename1/builders/MapsProviderInjector.java"),
+            new File(base, "../platform-feature-catalog/src/main/java/com/codename1/build/shared/"
+                    + "PlatformFeatureCatalog.java"),
+        };
+        StringBuilder all = new StringBuilder();
+        for (File src : sources) {
+            assertTrue(src.isFile(), "cannot find a source to scan: " + src.getAbsolutePath());
+            all.append(new String(Files.readAllBytes(src.toPath()), "UTF-8")).append('\n');
+        }
+        String source = all.toString();
 
+        // Read REFLECTIVELY, not as WatchNativeBuilder.WATCH_OPTIONAL_FRAMEWORKS. Those are
+        // static final Strings, so javac inlines them into this class at compile time: editing
+        // the list without touching this file leaves a stale copy compiled in, and the test
+        // passes on a list it is no longer reading. CI builds clean and never sees it, which is
+        // exactly what makes it worth ruling out here.
         Set<String> classified = new HashSet<String>();
-        for (String s : (WatchNativeBuilder.WATCH_OPTIONAL_FRAMEWORKS + ";"
-                + WatchNativeBuilder.WATCH_LINKABLE_FRAMEWORKS).split(";")) {
-            classified.add(s.trim().toLowerCase());
+        for (String field : new String[] {"WATCH_OPTIONAL_FRAMEWORKS", "WATCH_LINKABLE_FRAMEWORKS"}) {
+            java.lang.reflect.Field f = WatchNativeBuilder.class.getDeclaredField(field);
+            f.setAccessible(true);
+            for (String s : ((String) f.get(null)).split(";")) {
+                classified.add(s.trim().toLowerCase());
+            }
         }
 
         // Quoted literals only, so "-Doptional.frameworks=" and the like are not mistaken for one.
         // Case-insensitive throughout: IPhoneBuilder writes "JavascriptCore.framework".
-        Matcher m = Pattern.compile("\"([A-Za-z][A-Za-z0-9_]*\\.framework)\"").matcher(source);
         Set<String> unclassified = new TreeSet<String>();
+        Matcher m = Pattern.compile("\"([A-Za-z][A-Za-z0-9_]*\\.framework)\"").matcher(source);
         while (m.find()) {
             if (!classified.contains(m.group(1).toLowerCase())) {
                 unclassified.add(m.group(1));
+            }
+        }
+        // The catalog's bare names: .iosFrameworks("VisionKit", "Vision", "CoreImage").
+        Matcher bare = Pattern.compile("\\.iosFrameworks\\(([^)]*)\\)").matcher(source);
+        Matcher quoted = Pattern.compile("\"([A-Za-z][A-Za-z0-9_]*)\"").matcher("");
+        while (bare.find()) {
+            quoted.reset(bare.group(1));
+            while (quoted.find()) {
+                String name = quoted.group(1);
+                if (name.endsWith(".framework")) {
+                    continue;
+                }
+                if (!classified.contains((name + ".framework").toLowerCase())) {
+                    unclassified.add(name + ".framework");
+                }
             }
         }
         assertTrue(unclassified.isEmpty(),

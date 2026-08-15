@@ -48,14 +48,19 @@ never changes a phone build you already ship.
 
 === Companion or Standalone
 
-By default the watch app is a *companion*: it ships inside the phone app and the
-pair installs together. If the watch app is the product and there is no phone app
-to pair with, declare it standalone:
+By default the watch app is a *companion*: on Apple Watch it ships inside the
+phone app and the pair installs together. If the watch app is the product and
+there is no phone app to pair with, declare it standalone:
 
 [source,properties]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
 ----
+
+Wear OS has no companion form yet. An Android project that sets a watch main
+class without `codename1.watchStandalone` builds the phone APK alone -- the
+build says so -- so a Wear app has to be declared standalone today. Apple Watch
+supports both.
 
 On Android a standalone build turns the single APK into the Wear OS app, and that
 is what ships. On Apple the watch target is built standalone -- detached from the
