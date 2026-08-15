@@ -366,7 +366,41 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void drawString(String str, int x, int y) {
+        if (promoteToTextLayer(str, x, y)) {
+            return;
+        }
         primitiveRenderAdapter.drawString(str, x, y);
+    }
+
+    /**
+     * Offers a text run to the DOM text layer, which renders it as real text above the canvas.
+     *
+     * <p>Only runs this class can reproduce faithfully are offered. A shape clip has no
+     * {@code overflow:hidden} equivalent, and under a non-identity transform the run would have
+     * to be re-projected, so both stay on the canvas. Bitmap fonts never reach here at all --
+     * {@code Graphics.drawString} renders a {@code CustomFont} itself and never calls the
+     * implementation.</p>
+     *
+     * <p>This override lives on the display graphics only. Offscreen surfaces use plain
+     * {@link HTML5Graphics}, so text painted into a transition buffer, a paint lock image, a
+     * {@code ComponentImage} or a screenshot is still rasterized onto its bitmap, which is what
+     * those callers read back.</p>
+     *
+     * @return true when the layer took the run and nothing should be drawn on the canvas
+     */
+    private boolean promoteToTextLayer(String str, int x, int y) {
+        JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
+        if (layer == null || clipEmpty || isClipShape) {
+            return false;
+        }
+        if (transform != null && !transform.isIdentity()) {
+            return false;
+        }
+        return layer.promote(str, x, y,
+                clipBoundsTracker.getX(), clipBoundsTracker.getY(),
+                clipBoundsTracker.getWidth(), clipBoundsTracker.getHeight(),
+                getRenderState().getColor(), getRenderState().getAlpha(),
+                getRenderState().getFont(), HTML5Implementation.getDevicePixelRatio());
     }
 
     @Override

@@ -609,6 +609,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * state the incremental update depends on.
      */
     private JavaScriptSemanticOverlay semanticOverlay;
+
+    /**
+     * Holds the DOM elements carrying the visible text that was promoted off the canvas.
+     */
+    private HTMLElement textLayerContainer;
+
+    /**
+     * Promotes text runs off the canvas into real DOM text. Non-null once {@code __init()} has
+     * built its container.
+     */
+    JavaScriptTextLayer textLayer;
     
     
     /**
@@ -1280,7 +1291,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
             NativeOverlay no = (NativeOverlay)overlay;
             no.updateIfMovedAndFocused();
         }
-        
+        if (textLayer != null) {
+            textLayer.beginComponent(c);
+        }
+    }
+
+    @Override
+    public void afterComponentPaint(Component c, Graphics g) {
+        super.afterComponentPaint(c, g);
+        if (textLayer != null) {
+            textLayer.endComponent(c);
+        }
     }
     
     
@@ -1529,6 +1550,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         accessibilityContainer.setAttribute("role", "application");
         accessibilityContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483646;");
         outputCanvas.getParentNode().insertBefore(accessibilityContainer, outputCanvas);
+        // The text layer sits above the canvas but below the semantic tree. It carries the
+        // visible text, so it is hidden from assistive technology -- the semantic tree is what
+        // announces content, and without aria-hidden every label would be read twice.
+        textLayerContainer = (HTMLElement)document.createElement("div");
+        textLayerContainer.setAttribute("id", "cn1-text-layer");
+        textLayerContainer.setAttribute("aria-hidden", "true");
+        textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
+        outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
+        textLayer = new JavaScriptTextLayer(document, textLayerContainer);
         outputCanvas.setAttribute("role", "presentation");
         outputCanvas.setAttribute("aria-hidden", "true");
         
@@ -3339,6 +3369,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
         if (frame.isEmpty()) {
             return false;
+        }
+        if (textLayer != null) {
+            // A form transition paints two pre-rendered offscreen buffers instead of painting
+            // components, so no run is refreshed while it runs. Those buffers carry their own
+            // rasterized text, so the layer must step aside for the duration or the outgoing
+            // form's text would float above the animation.
+            textLayer.setSuspended(Display.getInstance().isInTransition());
+            // Also releases runs whose component has been removed or whose form is no longer
+            // displayed; neither ever paints again, so nothing else would clean them up.
+            textLayer.syncToForm(Display.getInstance().getCurrent());
         }
         // Record the whole frame into the display surface's command buffer (the
         // display graphics draws onto DISPLAY_SURFACE_ID) and ship it in one
