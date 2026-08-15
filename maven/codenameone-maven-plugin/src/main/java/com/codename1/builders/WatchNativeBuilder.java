@@ -136,7 +136,17 @@ class WatchNativeBuilder {
             // built as `name + ".framework"` and no quoted literal exists to grep for. That blind
             // spot is why they survived the audit that caught the six above; the partition test
             // now reads the catalog too.
-            + "VisionKit.framework;Speech.framework";
+            + "VisionKit.framework;Speech.framework;"
+            // The ONLY framework whose availability differs between the two watch SDKs: present
+            // for the device, absent for the simulator. A single declared list cannot be right
+            // both ways, so the question is which side the watch actually needs -- and it needs
+            // neither. Every BGTaskScheduler use in the port is #if !TARGET_OS_WATCH, with no-op
+            // natives on the watch side, so the framework is dead weight on device and a broken
+            // link on the simulator. Dropping it is correct for both.
+            //
+            // This is the "device-only framework" the SDK probe was once written to protect. It
+            // never needed protecting.
+            + "BackgroundTasks.framework";
 
     /**
      * Frameworks the watch target MAY link, so that every framework this builder can emit is
@@ -150,7 +160,7 @@ class WatchNativeBuilder {
      */
     static final String WATCH_LINKABLE_FRAMEWORKS =
             "Accelerate.framework;AuthenticationServices.framework;AVFoundation.framework;"
-            + "AVKit.framework;BackgroundTasks.framework;CoreBluetooth.framework;"
+            + "AVKit.framework;CoreBluetooth.framework;"
             + "CoreLocation.framework;CoreMedia.framework;CoreML.framework;"
             + "CoreMotion.framework;CoreText.framework;CoreVideo.framework;"
             + "DeviceCheck.framework;EventKit.framework;GameKit.framework;"

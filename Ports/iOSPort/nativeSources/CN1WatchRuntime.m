@@ -376,19 +376,51 @@ void cn1_watch_runtime_willEnterForeground(void) {
     cn1WatchHandlePhase(2);
 }
 
+/// Whether the gesture in progress had its press delivered.
+///
+/// Dropping input before Java exists is not enough on its own: a press at t0 that is dropped,
+/// followed by readiness at t1 and a release at t2, hands Java a release for a press it never
+/// saw and leaves the drag state machine believing a pointer is still down. A gesture is
+/// forwarded whole or not at all.
+///
+/// Written and read only from the SwiftUI gesture callbacks, which run on the main thread.
+static volatile BOOL cn1WatchGestureLive = NO;
+
+/// The three below are the input half of the readiness gate the phase path already has.
+///
+/// cn1_watch_runtime_start() launches the VM on a background pthread and returns, but the
+/// generated SwiftUI gesture is live from onAppear -- so a touch in that window reached
+/// IOSImplementation.pointerPressedCallback() through a still-null static `instance`. On the
+/// watch that window is easy to hit: the face is already under the user's finger.
+///
+/// DROPPED rather than queued. A press recorded before the first form existed would be replayed
+/// onto whatever is under those coordinates once it does, which is a synthetic tap the user never
+/// aimed anywhere; the phases are queued because a lifecycle transition missed is a state the app
+/// never learns about, while an input event missed is one the user simply repeats.
 void cn1_watch_runtime_pointerPressed(int x, int y) {
+    if (!cn1WatchJavaReady()) {
+        return;
+    }
+    cn1WatchGestureLive = YES;
     int xs[1] = { x };
     int ys[1] = { y };
     pointerPressedC(xs, ys, 1);
 }
 
 void cn1_watch_runtime_pointerDragged(int x, int y) {
+    if (!cn1WatchJavaReady() || !cn1WatchGestureLive) {
+        return;
+    }
     int xs[1] = { x };
     int ys[1] = { y };
     pointerDraggedC(xs, ys, 1);
 }
 
 void cn1_watch_runtime_pointerReleased(int x, int y) {
+    if (!cn1WatchJavaReady() || !cn1WatchGestureLive) {
+        return;
+    }
+    cn1WatchGestureLive = NO;
     int xs[1] = { x };
     int ys[1] = { y };
     pointerReleasedC(xs, ys, 1);

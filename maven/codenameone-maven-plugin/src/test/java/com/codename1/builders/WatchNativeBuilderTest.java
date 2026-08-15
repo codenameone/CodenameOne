@@ -30,6 +30,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -1460,5 +1462,68 @@ class WatchNativeBuilderTest {
                 + "`ls \"$(xcrun --sdk watchos --show-sdk-path)/System/Library/Frameworks\"` and "
                 + "add it to WATCH_OPTIONAL_FRAMEWORKS (absent, or present but unused by the "
                 + "watch) or WATCH_LINKABLE_FRAMEWORKS (present and wanted).");
+    }
+
+    /**
+     * Everything declared LINKABLE really is in both watch SDKs.
+     *
+     * <p>The partition test proves every framework is classified; it cannot say the
+     * classification is true. BackgroundTasks was declared linkable on the strength of the device
+     * SDK alone and is absent from the SIMULATOR one -- the only framework where the two disagree
+     * -- so every watch simulator build failed to link. That is the fifth framework-not-found CI
+     * round in this branch and the first that a correct-looking declaration caused.
+     *
+     * <p>Skipped where the SDKs are not installed, which is every Linux leg. It runs on the
+     * machine where the declaration gets edited, which is where the mistake is made.
+     */
+    @Test
+    public void everyLinkableFrameworkExistsInBothWatchSdks() throws Exception {
+        Map<String, File> sdks = new LinkedHashMap<String, File>();
+        for (String sdk : new String[] {"watchos", "watchsimulator"}) {
+            File root = sdkPath(sdk);
+            org.junit.jupiter.api.Assumptions.assumeTrue(root != null,
+                    "no " + sdk + " SDK on this machine");
+            sdks.put(sdk, root);
+        }
+        java.lang.reflect.Field f =
+                WatchNativeBuilder.class.getDeclaredField("WATCH_LINKABLE_FRAMEWORKS");
+        f.setAccessible(true);
+        Set<String> missing = new TreeSet<String>();
+        for (String name : ((String) f.get(null)).split(";")) {
+            String bare = name.trim();
+            if (bare.length() == 0) {
+                continue;
+            }
+            for (Map.Entry<String, File> sdk : sdks.entrySet()) {
+                if (!new File(sdk.getValue(), "System/Library/Frameworks/" + bare).isDirectory()) {
+                    missing.add(bare + " (" + sdk.getKey() + ")");
+                }
+            }
+        }
+        assertTrue(missing.isEmpty(), "declared linkable on the watch but not in the SDK: "
+                + missing + ". A framework the watch does not have must go in "
+                + "WATCH_OPTIONAL_FRAMEWORKS instead -- and one that only some watch SDKs have "
+                + "belongs there too, because the list is applied to both.");
+    }
+
+    /// The SDK root, or null when this machine has no Xcode.
+    private static File sdkPath(String sdk) {
+        try {
+            Process p = new ProcessBuilder("xcrun", "--sdk", sdk, "--show-sdk-path")
+                    .redirectErrorStream(true).start();
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int r;
+            while ((r = p.getInputStream().read(buf)) > 0) {
+                out.write(buf, 0, r);
+            }
+            if (!p.waitFor(60, java.util.concurrent.TimeUnit.SECONDS) || p.exitValue() != 0) {
+                return null;
+            }
+            File root = new File(out.toString("UTF-8").trim());
+            return root.isDirectory() ? root : null;
+        } catch (Exception noXcode) {
+            return null;
+        }
     }
 }
