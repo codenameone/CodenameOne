@@ -2703,8 +2703,47 @@ public class WindowsImplementation extends CodenameOneImplementation {
     ///
     /// Never returns the literal "null": an unset AppName and packageName is
     /// what made the base implementation produce "/null/" in the first place.
+    /// The application's package, as the build stamped it.
+    ///
+    /// Read through Display rather than the implementation's own getProperty: the generated
+    /// stub publishes it with setProperty, and only Display holds what was set that way. The
+    /// implementation's own accessor answers from the value derived during initImpl, which a
+    /// native desktop build never has -- its stub calls Display.init(null), so there is no
+    /// object to take a package from.
+    ///
+    /// #### Returns
+    ///
+    /// the package name, or null when the build did not stamp one
+    private String packageIdentity() {
+        try {
+            return com.codename1.ui.Display.getInstance().getProperty("package_name", null);
+        } catch (RuntimeException tooEarly) {
+            // Asked before Display is ready. The caller falls back, and the next call answers.
+            return null;
+        }
+    }
+
     private String appHomeDirName() {
-        String name = getProperty("AppName", null);
+        // The package first, because on this platform the directory name IS the isolation
+        // boundary. Android and iOS put the app home inside an OS sandbox, so two applications
+        // cannot reach each other whatever the directory is called, and the simulator
+        // deliberately shares one home so several projects can be run from one workspace. A
+        // native desktop build has neither: it is a plain directory under the user account, and
+        // anything that can be named twice is a directory two applications share.
+        //
+        // AppName is a display name -- two vendors can both ship "Notes", and the sanitizer below
+        // maps several reserved characters onto "_", so names that differ can still collide. The
+        // package is what the store, the installer and the build all treat as the application's
+        // identity, so it is what this keys on. AppName remains the fallback for a build that
+        // does not carry one.
+        //
+        // Nothing is migrated out of a directory an earlier build used. Every native desktop
+        // build until now landed on the same name, so what is in there cannot be attributed to
+        // one application, and moving it would hand one application another's files.
+        String name = packageIdentity();
+        if (name == null || name.length() == 0) {
+            name = getProperty("AppName", null);
+        }
         if (name == null || name.length() == 0) {
             name = getPackageName();
         }
@@ -3133,7 +3172,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
         String path = resolveDatabasePath(databaseName);
         int sep = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
         if (sep > 0) {
-            mkdir("file://" + path.substring(0, sep));
+            makeDirectories(path.substring(0, sep));
         }
         String key = null;
         if (config != null && config.isEncrypted()) {
@@ -3144,6 +3183,46 @@ public class WindowsImplementation extends CodenameOneImplementation {
             key = config.resolveKeyMaterial(WindowsDatabase.registryKeyFor(path));
         }
         return new WindowsDatabase(databaseName, path, key);
+    }
+
+    /// Creates a directory and every parent of it that is missing.
+    ///
+    /// mkdir() is one level: the native call behind it is a bare mkdir/CreateDirectoryW, which
+    /// fails when the parent is not there and reports nothing. The database lives two levels
+    /// under the storage directory -- the per-application directory, then "database" -- and on a
+    /// first run neither exists, so a single mkdir silently did nothing and the open that
+    /// followed failed with SQLite unable to create the file.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativePath`: the directory to create, as a native path
+    private void makeDirectories(String nativePath) {
+        int from = 0;
+        // Past the root, so the first component asked for is a real directory name: on Linux
+        // that is the leading slash, on Windows the drive or the leading separators of a UNC
+        // path, and asking to create either is a call that can only fail.
+        while (from < nativePath.length()
+                && (nativePath.charAt(from) == '/' || nativePath.charAt(from) == '\\')) {
+            from++;
+        }
+        int colon = nativePath.indexOf(':');
+        if (colon >= 0 && colon + 1 > from) {
+            from = colon + 1;
+            while (from < nativePath.length()
+                    && (nativePath.charAt(from) == '/' || nativePath.charAt(from) == '\\')) {
+                from++;
+            }
+        }
+        for (int iter = from; iter <= nativePath.length(); iter++) {
+            boolean end = iter == nativePath.length();
+            if (!end && nativePath.charAt(iter) != '/' && nativePath.charAt(iter) != '\\') {
+                continue;
+            }
+            String upTo = nativePath.substring(0, iter);
+            if (upTo.length() > 0 && !exists("file://" + upTo)) {
+                mkdir("file://" + upTo);
+            }
+        }
     }
 
     @Override

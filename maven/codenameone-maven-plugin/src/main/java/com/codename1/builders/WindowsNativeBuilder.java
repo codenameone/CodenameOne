@@ -1225,6 +1225,13 @@ public class WindowsNativeBuilder extends Executor {
         src.append(registerNatives);
         src.append("        final ").append(main).append(" app = new ").append(main).append("();\n");
         src.append("        Display.init(null);\n");
+        // The application's identity, which nothing else gives this platform. The stub passes
+        // null to Display.init, so the implementation never derives a package from an object, and
+        // without this the port has only the display name to key the per-application directory on
+        // -- which is not unique between applications, and was absent in these builds anyway, so
+        // every native desktop application shared one home directory and one set of databases.
+        src.append("        Display.getInstance().setProperty(\"package_name\", \"")
+                .append(request.getPackageName()).append("\");\n");
         // Stamp the hardening metadata so Hardening.isHardened() and crash reports carry the
         // mapping id / level on this port too (parity with iOS and Android).
         src.append(hardeningRuntimeProperties(request));
