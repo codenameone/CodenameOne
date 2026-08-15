@@ -305,6 +305,12 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
     @Override
     public boolean prev() throws IOException {
         checkOpen();
+        if (beforeTheFirstRow()) {
+            // There is no row behind the first one, and the platform reaches that answer by
+            // counting the rows, which runs the statement.
+            last_read_column_index = -1;
+            return false;
+        }
         requireInWindow(c.getPosition() - 1);
         last_read_column_index = -1;
         onRow = moved(PREVIOUS, 0);
@@ -316,7 +322,11 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         last_read_column_index = -1;
         onRow = false;
-        c.moveToPosition(-1);
+        if (beforeTheFirstRow()) {
+            // Already there, and asking the platform to go there anyway would run the statement.
+            return;
+        }
+        moved(ABSOLUTE, -1);
     }
 
     @Override
@@ -374,8 +384,9 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         checkOpen();
         last_read_column_index = -1;
         if (row < 0) {
-            onRow = false;
-            moved(ABSOLUTE, -1);
+            // A rewind, and the same one beforeFirst() performs, including its reason for
+            // sometimes performing nothing at all.
+            beforeFirst();
             return false;
         }
         requireInWindow(row);
@@ -477,6 +488,24 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         } catch (RuntimeException failed) {
             throw readFailed(index, failed);
         }
+    }
+
+    /// Whether this cursor still sits where it was created, before the first row.
+    ///
+    /// Worth asking before every backward move, because moving there is not free. The platform
+    /// answers a move by position and gets the row count first -- before it looks at whether the
+    /// target is negative -- and getting the count is what runs the statement. So rewinding a
+    /// cursor that has never been touched runs it, and for a statement that writes, that is the
+    /// insert or the update happening because somebody rewound.
+    ///
+    /// Read from the platform's own position rather than a flag of our own: it is a field there,
+    /// answered without touching the statement, and it is the same number the moves act on.
+    ///
+    /// #### Returns
+    ///
+    /// true if the cursor is before the first row and has read nothing
+    private boolean beforeTheFirstRow() {
+        return !onRow && c.getPosition() < 0;
     }
 
     /// Reports a failed value read as this API promises to.

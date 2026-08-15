@@ -11557,19 +11557,61 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     ///
     /// @return a sentence to append to a failure message, empty when nothing survived
     public static String discardDatabaseMigrationExport(File target) {
-        if (target == null || !target.exists() || target.delete()) {
+        if (target == null) {
             return "";
+        }
+        // The sidecars before anything else, and through the platform's own deletion, which knows
+        // the whole set: -wal, -shm, -journal and the master journals. A database written here
+        // leaves rows in those, so removing the file alone left the data behind under a name
+        // nobody was looking at -- which is the one thing this method exists to prevent. It is
+        // also the case that matters most, since the export is a complete copy of the database,
+        // in plaintext whenever the conversion was a decrypt.
+        android.database.sqlite.SQLiteDatabase.deleteDatabase(target);
+        String survivingSidecars = discardDatabaseSidecars(target);
+        if (!target.exists() || target.delete()) {
+            return survivingSidecars;
         }
         try {
             new FileOutputStream(target).close();
         } catch (IOException cannotEmptyIt) {
             return " A complete copy of the data was left at " + target.getPath()
-                    + " and could not be removed; delete it.";
+                    + " and could not be removed; delete it." + survivingSidecars;
         }
         if (!target.exists() || target.delete()) {
-            return "";
+            return survivingSidecars;
         }
-        return " An emptied file was left at " + target.getPath() + ".";
+        return " An emptied file was left at " + target.getPath() + "." + survivingSidecars;
+    }
+
+    /// Disposes of the files SQLite keeps beside a database, and reports anything that survived.
+    ///
+    /// Called after the platform's own deletion rather than instead of it: that removes them in
+    /// the ordinary case, and this is what happens when one could not be unlinked. Emptying is
+    /// the fallback for the same reason it is for the database itself -- a file that cannot be
+    /// removed can still be stripped of what it holds.
+    ///
+    /// @param target the database file whose companions these are
+    /// @return a sentence to append to a failure message, empty when nothing survived
+    private static String discardDatabaseSidecars(File target) {
+        String[] suffixes = {"-wal", "-shm", "-journal"};
+        StringBuilder left = new StringBuilder();
+        for (int iter = 0; iter < suffixes.length; iter++) {
+            File sidecar = new File(target.getPath() + suffixes[iter]);
+            if (!sidecar.exists() || sidecar.delete()) {
+                continue;
+            }
+            try {
+                new FileOutputStream(sidecar).close();
+            } catch (IOException cannotEmptyIt) {
+                left.append(" Part of the data was left at ").append(sidecar.getPath())
+                        .append(" and could not be removed; delete it.");
+                continue;
+            }
+            if (sidecar.exists() && !sidecar.delete()) {
+                left.append(" An emptied file was left at ").append(sidecar.getPath()).append(".");
+            }
+        }
+        return left.toString();
     }
 
     /// Records that a conversion is under way and which file holds the original.
@@ -11964,7 +12006,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         // reappears, and after an interrupted encryption what reappears is the plaintext copy.
         discardDatabaseMigrationArtifacts(deletePath);
         if (databaseName.startsWith("file://")) {
-            deleteFile(databaseName);
+            // Through the platform's own deletion rather than by removing the file, which is what
+            // this used to do. A SQLite database is more than its file: a crash or a kill leaves
+            // -wal, -shm and -journal beside it, holding rows that were written, and for an
+            // encrypted database those rows are as readable as the pages they came from. Removing
+            // the file alone reported a successful delete and left them there, and the next open
+            // on the same name would read them back. deleteDatabase takes the sidecars and the
+            // master journals with it, which is exactly what the non-custom branch below has been
+            // getting from Context.deleteDatabase all along.
+            android.database.sqlite.SQLiteDatabase.deleteDatabase(new File(deletePath));
             return;
         }
         getContext().deleteDatabase(databaseName);
