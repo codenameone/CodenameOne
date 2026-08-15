@@ -604,6 +604,69 @@ class PortStatusTest(unittest.TestCase):
             self.manifest, "linux-x64", report
         ))
 
+    def test_a_declared_skip_survives_a_missing_screenshot(self):
+        # A test that skips produces no screenshot, so the comparison reports the actual as
+        # missing. Counting that as a failure made "we could not test this here" and "this is
+        # broken" the same red, which is the distinction the gate exists to draw -- and it is why
+        # the map test stayed red after it started reporting the skip properly.
+        log_text = "\n".join(
+            [
+                "CN1SS:INFO:suite starting test=GoogleWebMapScreenshotTest",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=map-tiles-never-loaded",
+                "CN1SS:INFO:suite finished test=GoogleWebMapScreenshotTest",
+                "CN1SS:SUITE:FINISHED",
+            ]
+        )
+        comparison = {"results": [{"test": "GoogleWebMap", "status": "missing_actual"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            comparison_path = root / "comparison.json"
+            comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
+            report = port_status.normalize(
+                manifest=self.manifest,
+                port_id="ios-gl",
+                logs=[log_path],
+                comparisons=[comparison_path],
+                output=root / "report.json",
+                run_url="https://example.invalid/run/9",
+                commit="abc123",
+                generated_at="2026-07-15T00:00:00Z",
+            )
+        self.assertEqual("skip", report["tests"]["GoogleWebMapScreenshotTest"]["status"])
+
+    def test_a_screenshot_that_differs_still_fails_a_skipped_test(self):
+        # The other half, which is what keeps the forgiveness narrow: only a missing actual is
+        # excused. Anything that was captured and compared is a real result, and a difference in
+        # it fails whatever the log said.
+        log_text = "\n".join(
+            [
+                "CN1SS:INFO:suite starting test=GoogleWebMapScreenshotTest",
+                "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=map-tiles-never-loaded",
+                "CN1SS:INFO:suite finished test=GoogleWebMapScreenshotTest",
+                "CN1SS:SUITE:FINISHED",
+            ]
+        )
+        comparison = {"results": [{"test": "GoogleWebMap", "status": "different"}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            log_path = root / "suite.log"
+            log_path.write_text(log_text, encoding="utf-8")
+            comparison_path = root / "comparison.json"
+            comparison_path.write_text(json.dumps(comparison), encoding="utf-8")
+            report = port_status.normalize(
+                manifest=self.manifest,
+                port_id="ios-gl",
+                logs=[log_path],
+                comparisons=[comparison_path],
+                output=root / "report.json",
+                run_url="https://example.invalid/run/10",
+                commit="abc123",
+                generated_at="2026-07-15T00:00:00Z",
+            )
+        self.assertEqual("fail", report["tests"]["GoogleWebMapScreenshotTest"]["status"])
+
     def test_publishable_requires_a_boolean_suite_completion_marker(self):
         # bool() accepted "false" and 1 as a finished suite, and Hugo reads the
         # same value as truthy -- so a report with no failures and a pile of

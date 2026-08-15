@@ -12015,9 +12015,63 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // master journals with it, which is exactly what the non-custom branch below has been
             // getting from Context.deleteDatabase all along.
             android.database.sqlite.SQLiteDatabase.deleteDatabase(new File(deletePath));
-            return;
+        } else {
+            getContext().deleteDatabase(databaseName);
         }
-        getContext().deleteDatabase(databaseName);
+        requireDatabaseGone(deletePath);
+    }
+
+    /// Reports anything the platform left behind, rather than trusting that it deleted it.
+    ///
+    /// Both calls above answer with a boolean and neither says what it could not remove --
+    /// deleteDatabase ORs the results of deleting the file, the journal, the shared-memory index,
+    /// the write-ahead log and any master journals, so it answers true when the database file went
+    /// and a read-only or busy -wal stayed. Reading that boolean would therefore report success
+    /// over surviving pages just as ignoring it did, so this looks at the files instead.
+    ///
+    /// It matters most for the case this was added for: those files hold rows that were written,
+    /// and for an encrypted database they are as readable as the pages they came from. A caller
+    /// told the database was deleted has no reason to look, so the only chance to say so is here.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the database file, whose companions share its name
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: naming whatever is still on disk
+    private void requireDatabaseGone(String path) throws IOException {
+        File database = new File(path);
+        StringBuilder left = new StringBuilder();
+        if (database.exists()) {
+            left.append(' ').append(database.getPath());
+        }
+        String[] sidecars = databaseSidecarPaths(path);
+        for (int iter = 0; iter < sidecars.length; iter++) {
+            File sidecar = new File(sidecars[iter]);
+            if (sidecar.exists()) {
+                left.append(' ').append(sidecar.getPath());
+            }
+        }
+        // The master journals as well, which is why this lists the directory rather than checking
+        // three fixed names: SQLite names them <database>-mj<hex> and there can be more than one.
+        File directory = database.getParentFile();
+        if (directory != null) {
+            final String prefix = database.getName() + "-mj";
+            File[] journals = directory.listFiles();
+            if (journals != null) {
+                for (int iter = 0; iter < journals.length; iter++) {
+                    if (journals[iter].getName().startsWith(prefix)) {
+                        left.append(' ').append(journals[iter].getPath());
+                    }
+                }
+            }
+        }
+        if (left.length() > 0) {
+            throw new IOException("The database was not fully deleted. These files are still on "
+                    + "disk and hold its data:" + left + ". Close every connection to it and try "
+                    + "again, or remove them.");
+        }
     }
 
     @Override

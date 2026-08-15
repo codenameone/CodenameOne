@@ -521,6 +521,15 @@ def parse_comparisons(paths: list[Path], manifest: dict, states: dict[str, dict]
             status = result.get("status", "unknown")
             if status == "equal":
                 entry["comparison_passed"] = True
+            elif status == "missing_actual" and entry["skipped"]:
+                # The test said, in the log, that it could not run here, and the reason it gave is
+                # registered in the supplement -- the contract check refuses a skip without one.
+                # A test that skips produces no screenshot by definition, so counting the absence
+                # as a failure made "we could not test this" and "this is broken" the same red,
+                # which is the one distinction the gate exists to draw. Only this status is
+                # forgiven, and only for a test that skipped: a screenshot that was produced and
+                # differs still fails, skip or no skip.
+                add_reason(entry, f"screenshot-absent-because-skipped:{output_name}")
             else:
                 entry["failed"] = True
                 add_reason(entry, f"screenshot-{status}:{output_name}")
