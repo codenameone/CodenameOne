@@ -422,9 +422,39 @@ public class SensorSession {
     /// stumble is transient, a run of them is not.
     private static final int MAX_WRITE_FAILURES = 3;
 
-    /// Consecutive failed flushes. Guarded by `pendingWrites`, the lock
-    /// the requeue decision is already taken under.
-    private int writeFailures;
+    /// How many times each still-pending sample has been in a failed
+    /// write. Guarded by `pendingWrites`, the lock the requeue decision
+    /// is already taken under.
+    ///
+    /// Per sample, not per session, because batches merge: a failed batch
+    /// goes back at the head of the buffer and the next flush claims it
+    /// together with whatever arrived meanwhile. A session-wide count
+    /// reached its limit on the old samples and discarded the new ones
+    /// along with them -- readings thrown away after a single attempt --
+    /// and two writes in flight at once did the same to each other.
+    ///
+    /// Identity, not equality: two readings of the same value at the same
+    /// millisecond are still two samples, each entitled to its own
+    /// attempts.
+    private final Map<HealthSample, Integer> writeAttempts =
+            new java.util.IdentityHashMap<HealthSample, Integer>();
+
+    /// Counts one failed attempt against `sample` and reports its total.
+    /// Call holding `pendingWrites`.
+    private int recordWriteFailure(HealthSample sample) {
+        Integer previous = writeAttempts.get(sample);
+        int attempts = (previous == null ? 0 : previous.intValue()) + 1;
+        writeAttempts.put(sample, Integer.valueOf(attempts));
+        return attempts;
+    }
+
+    /// Forgets samples that are no longer pending -- written, dropped, or
+    /// discarded by teardown. Call holding `pendingWrites`.
+    private void forgetWriteAttempts(List<HealthSample> samples) {
+        for (HealthSample sample : samples) {
+            writeAttempts.remove(sample);
+        }
+    }
 
     /// The timer's flush: claims the buffer only while the session runs.
     ///
@@ -528,11 +558,10 @@ public class SensorSession {
         @Override
         public void onReady(HealthWriteResult value, Throwable error) {
             if (error == null) {
-                // The run is broken, not merely paused: a store that
-                // accepted this batch has earned the full budget again
-                // for the next one.
+                // These are in the store and will never be sent again, so
+                // their tally goes with them.
                 synchronized (session.pendingWrites) {
-                    session.writeFailures = 0;
+                    session.forgetWriteAttempts(batch);
                 }
                 return;
             }
@@ -584,8 +613,13 @@ public class SensorSession {
             // endSession() flushes unconditionally and has more than one
             // caller, so a failed final write refilled the buffer and the
             // next teardown wrote it again.
+            // Split by what each sample has already been through, not by
+            // what the session has: the batch in hand can hold readings on
+            // their third attempt next to ones on their first.
+            List<HealthSample> keep =
+                    new ArrayList<HealthSample>(retryable.size());
+            List<HealthSample> exhausted = new ArrayList<HealthSample>();
             boolean requeued;
-            boolean giveUp;
             synchronized (session.pendingWrites) {
                 // The flag and the buffer under one lock, because
                 // teardown sets that flag and drains the buffer under it
@@ -595,35 +629,38 @@ public class SensorSession {
                 // ever claim again, since the re-arm below correctly
                 // declines to schedule anything for a dead session.
                 //
-                // The failure count lives under this lock too: it is read
-                // and written in the same breath as the requeue it
-                // governs, and the timer thread and the caller's thread
-                // both arrive here.
-                session.writeFailures++;
-                giveUp = session.writeFailures >= MAX_WRITE_FAILURES;
-                requeued = !session.flushingStopped && !giveUp;
-                if (requeued) {
-                    session.pendingWrites.addAll(0, retryable);
+                // The tally lives under this lock too: it is read and
+                // written in the same breath as the requeue it governs,
+                // and the timer thread and the caller's thread both
+                // arrive here.
+                for (HealthSample sample : retryable) {
+                    if (session.recordWriteFailure(sample)
+                            >= MAX_WRITE_FAILURES) {
+                        exhausted.add(sample);
+                    } else {
+                        keep.add(sample);
+                    }
                 }
-                if (giveUp) {
-                    // Counted from zero for whatever comes next. The
-                    // batch is gone, so the buffer is empty again and a
-                    // later sample re-arms the timer through the ordinary
-                    // path -- new readings still get their attempts; it
-                    // is only this batch that stops being resent.
-                    session.writeFailures = 0;
+                session.forgetWriteAttempts(exhausted);
+                requeued = !session.flushingStopped && !keep.isEmpty();
+                if (requeued) {
+                    session.pendingWrites.addAll(0, keep);
+                } else {
+                    // Nothing goes back, so nothing here is pending any
+                    // more and the tally must not go on holding it.
+                    session.forgetWriteAttempts(keep);
                 }
             }
-            if (giveUp) {
+            if (!exhausted.isEmpty()) {
                 com.codename1.io.Log.p("CN1 Health: the store refused "
-                        + MAX_WRITE_FAILURES + " attempts at the same batch"
-                        + " of sensor samples, so it is dropped rather than"
-                        + " retried for as long as the session runs. Later"
-                        + " readings are still written.");
+                        + exhausted.size() + " sensor sample(s) "
+                        + MAX_WRITE_FAILURES + " times, so they are dropped"
+                        + " rather than retried for as long as the session"
+                        + " runs. Later readings are still written.");
             }
             if (!requeued) {
-                // Either teardown won, or the batch has used up its
-                // attempts. Both end the same way: the samples are
+                // Either teardown won, or every sample in hand has used up
+                // its attempts. Both end the same way: the samples are
                 // reported rather than left in a buffer nobody will read
                 // -- this is the only notice the app gets that they were
                 // not stored -- and nothing is re-armed below, which is
@@ -927,6 +964,8 @@ public class SensorSession {
             // flag, so a short ride still keeps its final partial batch.
             synchronized (pendingWrites) {
                 flushingStopped = true;
+                // Nothing will be flushed again, so nothing needs a tally.
+                writeAttempts.clear();
             }
             cancelFlush();
         }

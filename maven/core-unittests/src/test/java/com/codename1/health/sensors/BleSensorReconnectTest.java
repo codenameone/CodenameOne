@@ -468,6 +468,182 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * A reading that arrives while the store is down keeps its own
+     * attempts.
+     *
+     * <p>A failed batch goes back at the head of the buffer, so the next
+     * flush claims it together with whatever arrived meanwhile. Counting
+     * failures per session rather than per sample meant the tally hit its
+     * limit on the oldest samples and threw the newest away with them --
+     * health data discarded after a single attempt, which is worse than
+     * the retry storm the bound was added to stop.</p>
+     *
+     * <p>Driven a write at a time rather than on a timer: the point is
+     * what happens to a reading that joins a batch already two attempts
+     * in, and only holding each write open makes that arrangement
+     * certain rather than lucky.</p>
+     */
+    @Test
+    void aNewReadingIsNotDiscardedWithAnOlderBatch() throws Exception {
+        DeferredRefusingStore store = new DeferredRefusingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // The first reading spends two of its three attempts.
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+            assertTrue(awaitWrite(store).contains(72),
+                    "the first reading should have been offered");
+            store.failPending();
+            assertTrue(awaitWrite(store).contains(72),
+                    "a failed batch should be retried");
+            store.failPending();
+
+            // The second reading joins the batch the first is most of the
+            // way through.
+            p.notifyHeartRate(73);
+            flushSerialCalls();
+            java.util.List<Integer> merged = awaitWrite(store);
+            assertTrue(merged.contains(72) && merged.contains(73),
+                    "the new reading should be batched with the old one,"
+                            + " saw " + merged);
+            store.failPending();
+
+            // That failure was the first reading's third: it is dropped.
+            // The second has had one attempt and must still be offered.
+            java.util.List<Integer> afterDrop = awaitWrite(store);
+            assertTrue(afterDrop.contains(73),
+                    "the newer reading must keep its own attempts rather"
+                            + " than be discarded with the older one, saw "
+                            + afterDrop);
+            assertFalse(afterDrop.contains(72),
+                    "the older reading has used its attempts and should be"
+                            + " gone, saw " + afterDrop);
+        } finally {
+            store.failPending();
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * Pumps until the store is handed a batch, and reports what was in
+     * it. Bounded, so a batch that never arrives fails the test rather
+     * than hanging it.
+     */
+    private java.util.List<Integer> awaitWrite(DeferredRefusingStore store)
+            throws Exception {
+        for (int i = 0; i < 40; i++) {
+            java.util.List<Integer> batch = store.pendingBatch();
+            if (batch != null) {
+                return batch;
+            }
+            pump(50);
+        }
+        fail("the store was never handed a batch");
+        return null;
+    }
+
+    /**
+     * A store that refuses everything, one write at a time: it holds each
+     * write open until the test fails it, so the test decides exactly
+     * which samples are in flight together.
+     */
+    private static final class DeferredRefusingStore
+            extends com.codename1.health.HealthStore {
+
+        /// Both fields are written on whichever thread the flush runs on
+        /// and read by the test thread.
+        private final Object lock = new Object();
+        private AsyncResource<com.codename1.health.HealthWriteResult>
+                pending;
+        private java.util.List<Integer> pendingSamples;
+
+        /// The readings in the write currently open, or null if none is.
+        java.util.List<Integer> pendingBatch() {
+            synchronized (lock) {
+                return pendingSamples == null ? null
+                        : new java.util.ArrayList<Integer>(pendingSamples);
+            }
+        }
+
+        /// Refuses the open write, if there is one.
+        void failPending() {
+            AsyncResource<com.codename1.health.HealthWriteResult> out;
+            synchronized (lock) {
+                out = pending;
+                pending = null;
+                pendingSamples = null;
+            }
+            if (out != null) {
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError.UNKNOWN,
+                        "this store refuses everything"));
+            }
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            java.util.List<Integer> bpms =
+                    new java.util.ArrayList<Integer>();
+            for (com.codename1.health.HealthSample sample : samples) {
+                if (sample instanceof com.codename1.health.QuantitySample) {
+                    double bpm = ((com.codename1.health.QuantitySample)
+                            sample).getQuantity().getValue(
+                            com.codename1.health.HealthUnit
+                                    .COUNT_PER_MINUTE);
+                    bpms.add(Integer.valueOf((int) Math.round(bpm)));
+                }
+            }
+            synchronized (lock) {
+                pending = out;
+                pendingSamples = bpms;
+            }
+        }
+    }
+
+    /**
      * A session that has ended must not keep retrying its store writes.
      *
      * <p>The re-arm guard tested only for STOPPED, but the reconnect
