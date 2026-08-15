@@ -118,6 +118,34 @@ final class IOSProvisioningPreflight {
         return value.trim();
     }
 
+    /**
+     * The build target {@code cn1:buildIosOnDeviceDebug} selects. Its buildxml target submits
+     * {@code codename1.ios.debug.provision} and is signed on the build server like any other
+     * debug device build, so a bad profile costs a cloud build slot there too.
+     */
+    static final String IOS_ON_DEVICE_DEBUG = "ios-on-device-debug";
+
+    /**
+     * Whether this build is one the pre-flight has any business judging: a cloud iOS build
+     * that the build server signs.
+     *
+     * <p>Excluded: {@code ios-source} (a local Xcode project, signed later or not at all), the
+     * simulator, and the native-Mac targets -- those ride {@code platform=ios} with a different
+     * signing identity, so the app's iOS profile settings do not describe them.
+     */
+    static boolean appliesTo(String platform, String buildTarget) {
+        return platform != null && platform.contains("ios") && buildTarget != null
+                && (buildTarget.startsWith("ios-device") || IOS_ON_DEVICE_DEBUG.equals(buildTarget));
+    }
+
+    /**
+     * Whether this target signs with the release (distribution) profile. Everything else --
+     * {@code ios-device} and {@code ios-on-device-debug} alike -- signs with the debug one.
+     */
+    static boolean isReleaseTarget(String buildTarget) {
+        return buildTarget != null && buildTarget.contains("release");
+    }
+
     /** The profile setting that applies to this build type. */
     static String provisioningProfileSettingKey(boolean release) {
         return release ? "codename1.ios.release.provision" : "codename1.ios.debug.provision";

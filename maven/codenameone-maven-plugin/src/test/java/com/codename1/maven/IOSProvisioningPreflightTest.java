@@ -249,6 +249,47 @@ public class IOSProvisioningPreflightTest {
         assertTrue(parsed.expirationDate.after(new Date()));
     }
 
+    // ---- which builds this applies to ----
+
+    /**
+     * {@code cn1:buildIosOnDeviceDebug} selects {@code ios-on-device-debug}, whose buildxml
+     * target submits {@code codename1.ios.debug.provision} to the build server exactly like
+     * {@code ios-device}. Missing it meant a bad profile still burned a cloud build slot on
+     * that flow.
+     */
+    @Test
+    public void appliesToEveryCloudIOSDeviceBuild() {
+        assertTrue(IOSProvisioningPreflight.appliesTo("ios", "ios-device"));
+        assertTrue(IOSProvisioningPreflight.appliesTo("ios", "ios-device-release"));
+        assertTrue(IOSProvisioningPreflight.appliesTo("ios", "ios-on-device-debug"));
+    }
+
+    /** ...and to nothing the build server does not sign with the app's iOS profile. */
+    @Test
+    public void doesNotApplyToLocalOrNonIOSBuilds() {
+        assertFalse("a local Xcode project is signed later, or not at all",
+                IOSProvisioningPreflight.appliesTo("ios", "ios-source"));
+        assertFalse("native Mac rides platform=ios with a different identity",
+                IOSProvisioningPreflight.appliesTo("ios", "mac-os-x-native"));
+        assertFalse(IOSProvisioningPreflight.appliesTo("javascript", "javascript"));
+        assertFalse(IOSProvisioningPreflight.appliesTo("android", "android-device"));
+        assertFalse(IOSProvisioningPreflight.appliesTo(null, "ios-device"));
+        assertFalse(IOSProvisioningPreflight.appliesTo("ios", null));
+    }
+
+    /** On-device debug signs with the DEBUG profile, like every non-release target. */
+    @Test
+    public void onlyTheReleaseTargetUsesTheReleaseProfile() {
+        assertTrue(IOSProvisioningPreflight.isReleaseTarget("ios-device-release"));
+        assertFalse(IOSProvisioningPreflight.isReleaseTarget("ios-device"));
+        assertFalse(IOSProvisioningPreflight.isReleaseTarget("ios-on-device-debug"));
+        assertFalse(IOSProvisioningPreflight.isReleaseTarget(null));
+
+        assertEquals("codename1.ios.debug.provision",
+                IOSProvisioningPreflight.provisioningProfileSettingKey(
+                        IOSProvisioningPreflight.isReleaseTarget("ios-on-device-debug")));
+    }
+
     // ---- the mismatch decision waits for the merged settings ----
 
     /**

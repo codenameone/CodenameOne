@@ -365,12 +365,12 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // method cannot be judged yet: a CN1Lib can supply ios.*.distributionMethod through
         // its appended/required properties, which createAntProject merges further down, so
         // that comparison waits for applyIOSProvisioningPreflight(Properties) below.
-        report(IOSProvisioningPreflight.checkProfileFile(settings, buildTarget.contains("release"), new Date()));
+        report(IOSProvisioningPreflight.checkProfileFile(settings,
+                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
     }
 
     private boolean isIOSDeviceBuild() {
-        return platform != null && platform.contains("ios")
-                && buildTarget != null && buildTarget.startsWith("ios-device");
+        return IOSProvisioningPreflight.appliesTo(platform, buildTarget);
     }
 
     /**
@@ -383,7 +383,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         if (!isIOSDeviceBuild()) {
             return;
         }
-        report(IOSProvisioningPreflight.check(mergedSettings, buildTarget.contains("release"), new Date()));
+        report(IOSProvisioningPreflight.check(mergedSettings,
+                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
     }
 
     private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {
