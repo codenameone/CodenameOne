@@ -73,6 +73,7 @@ import com.codename1.teavm.geom.JSMatrix4;
 import com.codename1.teavm.io.BlobUtil;
 import com.codename1.teavm.jso.io.Blob;
 import com.codename1.teavm.jso.io.FileList;
+import com.codename1.html5.js.browser.MediaQueryList;
 import com.codename1.teavm.jso.util.EventUtil;
 import com.codename1.teavm.jso.util.JSDateFormat;
 import com.codename1.teavm.jso.util.JSNumberFormat;
@@ -103,6 +104,7 @@ import com.codename1.ui.TextInputConfig;
 import com.codename1.ui.TextInputState;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
+import com.codename1.ui.Command;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
@@ -1332,8 +1334,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
     
+    /**
+     * The port maps every Codename One cursor onto its CSS equivalent, so applications that ask
+     * before setting one -- the documented way, via {@code Component.isSetCursorSupported()} --
+     * get the right answer. The hover path itself remains gated on
+     * {@code Form.isEnableCursors()}.
+     */
+    @Override
+    public boolean isSetCursorSupported() {
+        return true;
+    }
+
     private int currCursorType;
-    
+
     private void setCursor(int cursorType) {
         if (currCursorType != cursorType) {
             currCursorType = cursorType;
@@ -1559,6 +1572,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
         outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
         textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+        installHistoryListener();
         outputCanvas.setAttribute("role", "presentation");
         outputCanvas.setAttribute("aria-hidden", "true");
         
@@ -10338,14 +10352,86 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return buildVersion;
     }
 
-    @JSBody(script="try {history.pushState(\"jibberish\", null, null)} catch (e){console.log('history.pushState not supported. Back command will not work.')}")
-    private native static void pushHistoryState();
-    
+    /**
+     * True once a history entry has been pushed, so the first form does not consume a back step
+     * that would otherwise navigate away from the app.
+     */
+    private boolean historyStatePushed;
+
+    /**
+     * True while a back command is being dispatched in response to popstate, so the form change
+     * it causes does not push a new entry and trap the user in the app.
+     */
+    private boolean handlingPopState;
+
+    /**
+     * Pushes a history entry so the browser's Back button has something to pop.
+     *
+     * <p>This used to be a {@code @JSBody}, which is compiled into the worker -- where there is
+     * no {@code history} object, so it threw on every form change and the port logged that the
+     * back command would not work. Going through the window binding puts the call on the main
+     * thread, where the History API actually exists.</p>
+     */
+    private void pushHistoryState() {
+        if (handlingPopState) {
+            return;
+        }
+        try {
+            window.getHistory().pushState(null, "");
+            historyStatePushed = true;
+        } catch (Throwable ignored) {
+            // A sandboxed or file:// document can refuse pushState. Back simply stays inert.
+        }
+    }
+
+    /**
+     * Routes a browser Back gesture to the current form's back command, so the browser control
+     * and the in-app control agree.
+     */
+    private void installHistoryListener() {
+        try {
+            EventUtil.addEventListener(window, "popstate", new EventListener() {
+                @Override
+                public void handleEvent(Event evt) {
+                    callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            dispatchBrowserBack();
+                        }
+                    });
+                }
+            });
+        } catch (Throwable ignored) {
+            // Without popstate the Back button leaves the app, which is the old behaviour.
+        }
+    }
+
+    private void dispatchBrowserBack() {
+        Form current = Display.getInstance().getCurrent();
+        if (current == null) {
+            return;
+        }
+        Command back = current.getBackCommand();
+        if (back == null) {
+            return;
+        }
+        handlingPopState = true;
+        try {
+            current.dispatchCommand(back, new ActionEvent(back));
+        } finally {
+            handlingPopState = false;
+        }
+        // The entry the user just popped has to be replaced, or a second Back would leave the
+        // app even though there is still somewhere to go within it.
+        if (historyStatePushed) {
+            pushHistoryState();
+        }
+    }
+
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
         pushHistoryState();
-        
     }
     
     
@@ -12526,16 +12612,74 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
-    @JSBody(params={}, script="return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)")
-    private static native boolean isDarkMode_();
-    
     @Override
     public Boolean isDarkMode() {
-        return isDarkMode_();
+        return Boolean.valueOf(matchesMediaQuery("(prefers-color-scheme: dark)"));
     }
 
-    @JSBody(params={"query"}, script="return !!(window.matchMedia && window.matchMedia(query).matches);")
-    private static native boolean matchesMediaQuery(String query);
+    /**
+     * Last known value of each media query, keyed by query text.
+     */
+    private final Map<String, Boolean> mediaQueryCache = new HashMap<String, Boolean>();
+
+    /**
+     * Evaluates an OS-level preference media query.
+     *
+     * <p>These used to be {@code @JSBody} scripts calling {@code window.matchMedia}. That script
+     * is compiled into the worker, which has no {@code matchMedia}, so every query silently
+     * answered false: dark mode was never detected, and neither was reduced motion or forced
+     * colors. The query is now evaluated on the main thread through the window binding.</p>
+     *
+     * <p>The result is cached and refreshed by a change listener rather than re-read per call,
+     * because reading it crosses the worker boundary and callers such as the theme layer ask
+     * repeatedly.</p>
+     *
+     * @param query the media query text
+     * @return true when the query currently matches
+     */
+    private boolean matchesMediaQuery(final String query) {
+        Boolean cached = mediaQueryCache.get(query);
+        if (cached != null) {
+            return cached.booleanValue();
+        }
+        boolean matches = false;
+        try {
+            MediaQueryList list = window.matchMedia(query);
+            if (list != null) {
+                matches = list.getMatches();
+                list.addEventListener("change", new EventListener() {
+                    @Override
+                    public void handleEvent(Event evt) {
+                        onMediaQueryChanged(query);
+                    }
+                });
+            }
+        } catch (Throwable ignored) {
+            // An old browser without matchMedia keeps the platform default of "not matching".
+        }
+        mediaQueryCache.put(query, Boolean.valueOf(matches));
+        return matches;
+    }
+
+    private void onMediaQueryChanged(final String query) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    MediaQueryList list = window.matchMedia(query);
+                    if (list != null) {
+                        mediaQueryCache.put(query, Boolean.valueOf(list.getMatches()));
+                    }
+                } catch (Throwable ignored) {
+                    return;
+                }
+                Form current = Display.getInstance().getCurrent();
+                if (current != null) {
+                    current.repaint();
+                }
+            }
+        });
+    }
 
     @Override
     public boolean isHighContrastEnabled() {

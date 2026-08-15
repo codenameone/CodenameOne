@@ -33,6 +33,16 @@ import com.codename1.html5.js.dom.EventListener;
  * https://developer.mozilla.org/en-US/docs/Web/API/Window
  */
 public interface Window extends JSObject {
+    /**
+     * Evaluates a CSS media query on the main thread. The worker has no matchMedia, so every
+     * OS-level preference -- dark mode, reduced motion, forced colors -- has to be read through
+     * this binding rather than from worker script.
+     *
+     * @param query the media query text
+     * @return the live query list, or null where the browser does not support matchMedia
+     */
+    MediaQueryList matchMedia(String query);
+
     static Window current() {
         return null; // Native implementation
     }
