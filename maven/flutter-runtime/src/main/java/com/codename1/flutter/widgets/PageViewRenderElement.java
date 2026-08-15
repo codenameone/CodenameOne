@@ -12,6 +12,11 @@ import com.codename1.flutter.rendering.Size;
 
 import dart.core.DartList;
 
+/*
+ * NOTE on the gallery: its home carousel passes pageSnapping: false, so it scrolls freely
+ * and NONE of the settle code below runs for it. Worth knowing before reaching for this
+ * class to explain something the carousel does - the answer is in the scroll physics.
+ */
 /**
  * Scroll boundary for {@link PageView}: pages sit side by side along the scroll
  * axis inside a real CN1 scroll pane, each sized to the controller's
@@ -195,6 +200,41 @@ public class PageViewRenderElement extends ScrollRenderElement {
     /** How long the settle animation runs, matching Flutter's page settle feel. */
     private static final int SNAP_MS = 240;
 
+    /**
+     * The scroll offset a release settles to — Flutter's
+     * {@code PageScrollPhysics._getTargetPixels}.
+     *
+     * <p>Package-private and static so the rule can be asserted directly: it is the whole
+     * difference between a carousel that pages the way Flutter's does and one that drifts
+     * to the nearest card.</p>
+     *
+     * @param from     the offset at the moment the finger lifted
+     * @param extent   one page's worth of scroll
+     * @param velocity the release velocity, device pixels per millisecond, positive
+     *                 towards later pages
+     * @param max      the last page's resting offset
+     */
+    static int settleTarget(int from, double extent, float velocity, int max) {
+        double page = from / extent;
+        if (velocity < -VELOCITY_TOLERANCE_PX_PER_MS) {
+            page -= 0.5;
+        } else if (velocity > VELOCITY_TOLERANCE_PX_PER_MS) {
+            page += 0.5;
+        }
+        int target = (int) Math.round(Math.round(page) * extent);
+        return Math.max(0, Math.min(target, max));
+    }
+
+    /// Below this a release counts as a stop rather than a flick, and the carousel falls
+    /// back to the nearest page instead of advancing.
+    ///
+    /// Flutter's `Tolerance.defaultTolerance.velocity` is 1/(0.05*3) logical pixels per
+    /// SECOND; this is the same figure in the device pixels per MILLISECOND that Codename
+    /// One's drag speed is measured in. It is deliberately tiny - in Flutter any purposeful
+    /// flick clears it, and only a release that is really a stop does not.
+    private static final float VELOCITY_TOLERANCE_PX_PER_MS =
+            (float) (com.codename1.flutter.rendering.Dp.px(1.0 / (0.05 * 3.0)) / 1000.0);
+
     @Override
     protected com.codename1.ui.Container createPane(com.codename1.ui.layouts.Layout layout) {
         return new SnappingPane(layout);
@@ -213,6 +253,15 @@ public class PageViewRenderElement extends ScrollRenderElement {
 
         private boolean settling;
 
+        /// The settle currently running, so it can be called off.
+        ///
+        /// Without this a settle is unstoppable once started: a finger landing mid-settle,
+        /// or a second flick arriving before the first finished, leaves the old animation
+        /// running alongside the new one. Both write the scroll offset every frame, the
+        /// loser gets overwritten, and whichever finishes last drags the carousel to ITS
+        /// target - which is how it ends up resting between two cards.
+        private com.codename1.ui.animations.Animation settleAnim;
+
         SnappingPane(com.codename1.ui.layouts.Layout layout) {
             super(layout);
             // CN1 writes the scroll offset directly while a finger drags it, so the
@@ -229,18 +278,72 @@ public class PageViewRenderElement extends ScrollRenderElement {
 
         @Override
         public void pointerPressed(int x, int y) {
-            // A new touch owns the pane; the previous flick's watcher must not fire a
-            // snap under the finger.
-            stopWatching();
+            // The finger owns the carousel now; a settle still running would fight it.
+            cancelSettle();
             super.pointerPressed(x, y);
+        }
+
+        /** Stops any settle in flight, leaving the scroll exactly where it got to. */
+        private void cancelSettle() {
+            settling = false;
+            if (settleAnim == null) {
+                return;
+            }
+            com.codename1.ui.Form f = getComponentForm();
+            if (f != null) {
+                f.deregisterAnimated(settleAnim);
+            }
+            settleAnim = null;
         }
 
         @Override
         public void pointerReleased(int x, int y) {
-            super.pointerReleased(x, y);
-            if (pageView().isPageSnapping()) {
-                awaitMomentum();
+            if (!pageView().isPageSnapping()) {
+                super.pointerReleased(x, y);
+                return;
             }
+            // Read the fling BEFORE super consumes the drag state.
+            float velocity = getDragSpeed(!horizontal());
+            super.pointerReleased(x, y);
+            // Codename One has just started its own decay. Flutter runs exactly ONE
+            // simulation from the moment of release, aimed at a page; letting the decay
+            // play out first and settling afterwards is two motions, and it looks like it -
+            // the carousel coasts to a stop and then visibly shifts again.
+            stopScrollMomentum();
+            settle(velocity);
+        }
+
+        /**
+         * Settles onto a page the way Flutter's {@code PageScrollPhysics} does: the target
+         * is chosen from the position AND the release velocity, then a single spring runs
+         * to it.
+         *
+         * <p>The half-page bias is what makes a flick feel like a flick. Past the velocity
+         * tolerance you go to the NEXT page even from a barely-moved carousel; below it you
+         * fall back to whichever page you are nearest.</p>
+         */
+        private void settle(float velocityPxPerMs) {
+            double extent = pageExtent();
+            int from = horizontal() ? getScrollX() : getScrollY();
+            int max = Math.max(0, (horizontal()
+                    ? getScrollDimension().getWidth() - getWidth()
+                    : getScrollDimension().getHeight() - getHeight()));
+            int target = extent > 0 ? settleTarget(from, extent, velocityPxPerMs, max) : from;
+            if ("true".equals(com.codename1.ui.Display.getInstance()
+                    .getProperty("cn1.flutter.debugSettle", "false"))) {
+                com.codename1.flutter.FlutterErrorReport.unimplemented("PageSettle",
+                        "from=" + from + " extent=" + (int) extent + " v=" + velocityPxPerMs
+                        + " tol=" + VELOCITY_TOLERANCE_PX_PER_MS + " max=" + max
+                        + " target=" + target);
+            }
+            if (extent <= 0) {
+                return;
+            }
+            if (target == from) {
+                settling = false;
+                return;
+            }
+            animateScroll(from, target);
         }
 
         /** Programmatic paging from the controller. */
@@ -253,103 +356,38 @@ public class PageViewRenderElement extends ScrollRenderElement {
                 setScroll(target);
                 return;
             }
-            settling = true;
-            animateScroll(from, target);
-        }
-
-        /// Registered while the release's momentum is still carrying the pane.
-        /// Held so a second release cannot stack a second watcher on the form.
-        private com.codename1.ui.animations.Animation momentumWatch;
-
-        /// Watches the pane once per frame until CN1's momentum stops moving it, then
-        /// settles onto the nearest page.
-        ///
-        /// This used to poll with {@code CN.setTimeout(50)}, which is wrong on both
-        /// counts: {@code Display.setTimeout} allocates a whole {@code java.util.Timer}
-        /// thread per call, so a single flick spun up and abandoned one thread per poll;
-        /// and a 50ms poll cannot see the moment momentum stops, so the snap started up
-        /// to a frame-and-a-half late. Riding the form's animation loop costs nothing
-        /// extra - the pane is already keeping the EDT awake while it glides - and
-        /// notices the stop on the very frame it happens.
-        private void awaitMomentum() {
-            final com.codename1.ui.Form form = getComponentForm();
-            if (form == null) {
-                snap();
-                return;
-            }
-            if (momentumWatch != null) {
-                return;
-            }
-            momentumWatch = new com.codename1.ui.animations.Animation() {
-                private int previous = Integer.MIN_VALUE;
-
-                @Override
-                public boolean animate() {
-                    int current = horizontal() ? getScrollX() : getScrollY();
-                    if (current != previous) {
-                        previous = current;
-                        // False: the pane repaints itself as it scrolls; asking for a
-                        // repaint here would add a full one per frame on top.
-                        return false;
-                    }
-                    stopWatching();
-                    snap();
-                    return false;
-                }
-
-                @Override
-                public void paint(com.codename1.ui.Graphics g) {
-                }
-            };
-            form.registerAnimated(momentumWatch);
-        }
-
-        private void stopWatching() {
-            if (momentumWatch == null) {
-                return;
-            }
-            com.codename1.ui.Form f = getComponentForm();
-            if (f != null) {
-                f.deregisterAnimated(momentumWatch);
-            }
-            momentumWatch = null;
-        }
-
-        private void snap() {
-            double extent = pageExtent();
-            if (settling || extent <= 0) {
-                return;
-            }
-            int from = horizontal() ? getScrollX() : getScrollY();
-            int target = (int) Math.round(Math.round(from / extent) * extent);
-            if (target == from) {
-                return;
-            }
-            settling = true;
             animateScroll(from, target);
         }
 
         private void animateScroll(int from, final int target) {
+            // Exactly one settle may be in flight; starting a second without stopping the
+            // first leaves two animations writing the scroll offset every frame.
+            cancelSettle();
             final com.codename1.ui.Form form = getComponentForm();
             if (form == null) {
                 setScroll(target);
                 settling = false;
                 return;
             }
+            settling = true;
             final com.codename1.ui.animations.Motion motion =
-                    com.codename1.ui.animations.Motion.createEaseInOutMotion(from, target, SNAP_MS);
+                    // Critically damped, like Flutter's page spring - it eases out of the
+                    // release without the symmetric slow start of an ease-in-out, which on
+                    // a carousel that is ALREADY moving reads as a hitch before it goes.
+                    com.codename1.ui.animations.Motion.createCriticalDampedSpringMotion(
+                            from, target, SNAP_MS);
             motion.start();
-            form.registerAnimated(new com.codename1.ui.animations.Animation() {
+            settleAnim = new com.codename1.ui.animations.Animation() {
                 @Override
                 public boolean animate() {
+                    if (settleAnim != this) {
+                        // Superseded by a newer settle, or called off by a finger landing.
+                        return false;
+                    }
                     setScroll(motion.getValue());
                     if (motion.isFinished()) {
                         setScroll(target);
-                        settling = false;
-                        com.codename1.ui.Form f = getComponentForm();
-                        if (f != null) {
-                            f.deregisterAnimated(this);
-                        }
+                        cancelSettle();
                     }
                     // False, even though this animation changes the screen every frame:
                     // setScroll already repaints the pane, and returning true from a
@@ -363,7 +401,8 @@ public class PageViewRenderElement extends ScrollRenderElement {
                 @Override
                 public void paint(com.codename1.ui.Graphics g) {
                 }
-            });
+            };
+            form.registerAnimated(settleAnim);
         }
 
         private void setScroll(int v) {
