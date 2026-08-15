@@ -6834,8 +6834,26 @@ function cn1SqliteOpen(name, key) {
     // Created after the real connection so the store already exists. The anchor takes the same
     // key, but only so that opening it succeeds; it never reads or writes a page afterwards, so
     // a later rekey through another connection leaves it holding a key it no longer needs.
-    const anchor = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
-    cn1SqliteApplyKey(anchor, key);
+    let anchor = null;
+    try {
+      anchor = new cn1Sqlite.oo1.DB({ filename: uri, flags: "c" });
+      cn1SqliteApplyKey(anchor, key);
+    } catch (err) {
+      // The primary too, not just the anchor. It is open, prepared and keyed by this point, and
+      // nothing has recorded it yet -- the handle map and the open count are both written after
+      // this block -- so letting the throw past here left a live connection that nothing could
+      // close and that would keep the store alive against a later delete. Each failed open
+      // leaked another.
+      if (anchor !== null) {
+        try {
+          anchor.close();
+        } catch (alsoFailed) {
+          // The original failure is the one worth reporting.
+        }
+      }
+      db.close();
+      throw err;
+    }
     cn1SqliteMemoryAnchors.set(memoryName, anchor);
   }
   // Tagged so closing this connection can decrement the count without another lookup, and so the
@@ -6943,13 +6961,15 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_delete_java_lang
         // name reopening the database reads back. (This VFS has no shared memory and so no WAL,
         // but the whole set is unlinked anyway: it costs nothing when the entry is absent, and
         // it does not have to be revisited if that ever changes.)
+        // Unwrapped, like the unlink above it. The pool answers a name it never had by returning
+        // false, so the entries this database never created cost nothing and raise nothing; it
+        // throws only when it held the entry and could not release it, and that has to reach the
+        // guard. Swallowing it would report a deletion that did not happen while a file holding
+        // database pages stayed in the pool, which is the whole of what deleting the working
+        // files is for.
         const cn1SqliteSidecars = ["-journal", "-wal", "-shm"];
         for (let i = 0; i < cn1SqliteSidecars.length; i++) {
-          try {
-            cn1SqlitePool.unlink(cn1SqliteDbPath(n) + cn1SqliteSidecars[i]);
-          } catch (ignored) {
-            // A name the pool never had. Nothing to remove is not a failed removal.
-          }
+          cn1SqlitePool.unlink(cn1SqliteDbPath(n) + cn1SqliteSidecars[i]);
         }
       } else {
         const anchor = cn1SqliteMemoryAnchors.get(cn1SqliteDbPath(n));
