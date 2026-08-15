@@ -507,7 +507,34 @@ class AndroidCipherDB extends Database {
         for (int iter = 0; iter < migrating.length; iter++) {
             migrating[iter].invalidate();
         }
-        closing.close();
+        try {
+            closing.close();
+        } catch (RuntimeException cannotClose) {
+            // The one step between writing the export and installing it that was left unguarded,
+            // and the most expensive one to leave: at this point the export is a complete copy of
+            // the database -- in plaintext whenever this conversion is a decrypt -- and the marker
+            // names it. Failing out of here left both in the migration directory with db already
+            // null, so the caller's close() released the connection slot and nothing else, and
+            // that copy stayed on disk until something happened to open this database again and
+            // run recovery. It could be never.
+            //
+            // Discarded here instead, through the same path a failed export uses, which unlinks
+            // the export and its working files or empties them when it cannot.
+            String surviving = discardExport(target);
+            File unusedMarker = AndroidImplementation.databaseMigrationMarker(path);
+            if (unusedMarker != null) {
+                unusedMarker.delete();
+            }
+            // Deliberately not reopened, unlike the failures below it. Those leave a database that
+            // was never touched, so handing the caller a working connection again is right. Here
+            // the close itself failed: what became of the connection is exactly what is not known,
+            // and opening a second one on the same file would leave the first alive and the
+            // registry counting one where there are two. The object reports itself closed, which
+            // is the honest answer, and the database on disk is unchanged.
+            throw new IOException("The database could not be closed, so the converted copy was not "
+                    + "installed and the database was left as it was: " + cannotClose.getMessage()
+                    + surviving, cannotClose);
+        }
         File original = new File(path);
         // Same reasoning as the target: created, not named, so nothing pre-existing is disturbed.
         File backup;
