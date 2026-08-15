@@ -142,6 +142,7 @@ public class ImageRenderElement extends RenderElement {
     private int fittedW = -1;
     private int fittedH = -1;
     private BoxFit fittedFit;
+    private int fittedRadius;
 
     private void applyFit() {
         Label l = (Label) component();
@@ -156,13 +157,16 @@ public class ImageRenderElement extends RenderElement {
             return;
         }
         BoxFit fit = image().getFit() == null ? BoxFit.contain : image().getFit();
-        if (img == fittedFrom && bw == fittedW && bh == fittedH && fit == fittedFit) {
+        int radius = enclosingCornerRadius(bw, bh);
+        if (img == fittedFrom && bw == fittedW && bh == fittedH && fit == fittedFit
+                && radius == fittedRadius) {
             return;
         }
         fittedFrom = img;
         fittedW = bw;
         fittedH = bh;
         fittedFit = fit;
+        fittedRadius = radius;
         com.codename1.ui.Image scaled;
         switch (fit) {
             case fill:
@@ -187,6 +191,78 @@ public class ImageRenderElement extends RenderElement {
                         Math.max(1, (int) Math.round(ih * r)));
                 break;
         }
-        l.setIcon(scaled);
+        l.setIcon(roundCorners(scaled, radius));
+    }
+
+    /**
+     * The corner radius this image has to round into its own bitmap, or 0.
+     *
+     * <p>Non-zero only when the image exactly fills a clipping {@link
+     * com.codename1.flutter.material.Material} with rounded corners — i.e. when the image
+     * IS the card's surface and its own square corners are what you would see.</p>
+     *
+     * <p>Flutter expresses this as a clip and so does this runtime, but a clip is only as
+     * good as the port underneath: on Codename One's iOS Metal backend a polygon clip masks
+     * geometry (a {@code fillRect} through it comes out round) and does NOT mask a textured
+     * quad, so the card's artwork paints straight over the rounded corners. Rounding the
+     * bitmap once, when it is scaled, does not depend on the clip at all — and costs
+     * nothing per frame, which a clip does.</p>
+     */
+    private int enclosingCornerRadius(int bw, int bh) {
+        for (com.codename1.flutter.Element e = parent(); e != null; e = e.parent()) {
+            if (!(e instanceof com.codename1.flutter.material.MaterialRenderElement)) {
+                continue;
+            }
+            com.codename1.flutter.material.MaterialRenderElement m =
+                    (com.codename1.flutter.material.MaterialRenderElement) e;
+            int r = m.clipRadiusPx();
+            if (r <= 0) {
+                return 0;
+            }
+            // Only when this image really is the surface. An image inset inside a card has
+            // square corners in Flutter too, and rounding it would be wrong.
+            com.codename1.flutter.rendering.Size ms = m.size();
+            if (ms == null || Math.abs(ms.width() - bw) > 1 || Math.abs(ms.height() - bh) > 1) {
+                return 0;
+            }
+            return Math.min(r, Math.min(bw, bh) / 2);
+        }
+        return 0;
+    }
+
+    /**
+     * Returns {@code src} with its corners cut to {@code radius}, transparent outside the
+     * curve. Touches only the four corner squares, so the cost is the pixel copy rather
+     * than the rounding.
+     */
+    private static com.codename1.ui.Image roundCorners(com.codename1.ui.Image src, int radius) {
+        if (radius <= 0) {
+            return src;
+        }
+        int w = src.getWidth();
+        int h = src.getHeight();
+        int[] argb = src.getRGB();
+        roundCornersInPlace(argb, w, h, radius);
+        return com.codename1.ui.Image.createImage(argb, w, h);
+    }
+
+    /// Clears the alpha of every pixel lying outside the four corner arcs. Package-private
+    /// and free of any Image so the geometry can be asserted headlessly.
+    static void roundCornersInPlace(int[] argb, int w, int h, int radius) {
+        int r = Math.min(radius, Math.min(w, h) / 2);
+        for (int cy = 0; cy < r; cy++) {
+            for (int cx = 0; cx < r; cx++) {
+                // Distance from the centre of THIS corner's arc; outside it, clear alpha.
+                double dx = r - 0.5 - cx;
+                double dy = r - 0.5 - cy;
+                if (dx * dx + dy * dy <= (double) r * r) {
+                    continue;
+                }
+                argb[cy * w + cx] = 0;                              // top left
+                argb[cy * w + (w - 1 - cx)] = 0;                    // top right
+                argb[(h - 1 - cy) * w + cx] = 0;                    // bottom left
+                argb[(h - 1 - cy) * w + (w - 1 - cx)] = 0;          // bottom right
+            }
+        }
     }
 }

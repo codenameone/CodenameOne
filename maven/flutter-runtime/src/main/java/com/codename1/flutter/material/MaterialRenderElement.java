@@ -32,53 +32,112 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
 
 
 
+    /**
+     * A rounded Material paints its own surface (see {@link #paintSurface}), so all this
+     * has to do is stop Codename One painting a second, square one underneath.
+     *
+     * <p>It used to hand the job to a {@code RoundRectBorder}. That draws the fill as the
+     * component BACKGROUND, and a background is painted before {@code paint()} runs - so it
+     * landed outside the rounded clip this element installs and squared the corners off
+     * again from behind. Rounding is not a style the surface happens to have; it is the
+     * same shape the subtree is clipped to, and both come from one path here.</p>
+     */
     private void applyStyle(Component face) {
         try {
-            double radiusLp = cornerRadiusLp();
-            double elevation = material().getElevation();
-            if (radiusLp > 0 || elevation > 0) {
-                // Rounded corners and a shadow are what make a Material surface read as
-                // Material; a bare bgColor gives a flat rectangle.
-                com.codename1.ui.plaf.RoundRectBorder border =
-                        com.codename1.ui.plaf.RoundRectBorder.create()
-                                .useCache(false)
-                                .cornerRadius(com.codename1.flutter.rendering.Dp.mm(radiusLp));
-                if (elevation > 0) {
-                    // Flutter draws an elevation shadow OUTSIDE the box, leaving the surface
-                    // where layout put it. RoundRectBorder instead reserves the spread INSIDE
-                    // the component and draws the surface smaller by that much, displaced
-                    // towards whichever edge shadowY favours (0.5 is centred, 1 is hard
-                    // against the bottom).
-                    //
-                    // So the spread is not a free parameter here: it comes straight off the
-                    // card's geometry. The previous values - a spread in MILLIMETRES that
-                    // worked out to ~23px at this density, with shadowY hard over at 1 -
-                    // pushed the study card 23px clear of its own box, which read as a grey
-                    // band along its top edge and content spilling past its bottom.
-                    //
-                    // Keep it in pixels off the elevation, and near-centred so the surface
-                    // stays put; Material's shadow is a soft halo cast slightly downwards,
-                    // not an offset frame.
-                    border = border
-                            .shadowOpacity(Math.min(255, (int) Math.round(20 + elevation * 15)))
-                            .shadowSpread((int) Math.round(
-                                    com.codename1.flutter.rendering.Dp.px(elevation)))
-                            .shadowY(0.6f);
-                }
-                face.getAllStyles().setBorder(border);
-            }
+            boolean rounded = cornerRadiusLp() > 0;
             if (material().getColor() != null) {
                 com.codename1.flutter.material.ThemeDataAdapter.paintColor(
                         face.getAllStyles(), material().getColor());
-                if (radiusLp > 0 || elevation > 0) {
-                    // the border paints the fill; keep the flat bg from squaring it off
-                    face.getAllStyles().setBgTransparency(
-                            material().getColor().alpha() == 0 ? 0 : 255);
-                }
+            }
+            if (rounded) {
+                face.getAllStyles().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+                face.getAllStyles().setBgTransparency(0);
             }
         } catch (Exception err) {
             // best-effort
         }
+    }
+
+    /**
+     * Fills the surface, and casts its elevation shadow, in the shape the subtree is about
+     * to be clipped to — Flutter's {@code Material(color:, shape:, elevation:)}.
+     *
+     * <p>The shadow is drawn OUTSIDE the surface, as Flutter's is: a few progressively
+     * wider, fainter rings under the card. Codename One's own shadow reserves its spread
+     * INSIDE the component box and shifts the surface to make room, which is a different
+     * thing altogether and moved the card clear of its own bounds.</p>
+     */
+    private void paintSurface(com.codename1.ui.Graphics g, int[] q, double elevation) {
+        com.codename1.flutter.Color c = material().getColor();
+        if (c == null || c.alpha() == 0) {
+            return;
+        }
+        int rgb = (int) (c.value() & 0xFFFFFF);
+        boolean oldAA = g.isAntiAliased();
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        g.setAntiAliased(true);
+        try {
+            // Material's elevation shadow: roughly a blur of twice the elevation, dropped by
+            // half of it. fillShapeShadow does the fill and the blur in one accelerated draw
+            // with no retained bitmap, which is what makes it affordable on a card that
+            // repaints every frame of a scroll.
+            if (elevation > 0 && g.isShapeShadowSupported()) {
+                g.fillShapeShadow(clipShape(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]),
+                        rgb, c.alpha(), 0x000000, 0.28f,
+                        (int) Math.round(com.codename1.flutter.rendering.Dp.px(elevation * 2)),
+                        0, (int) Math.round(
+                                com.codename1.flutter.rendering.Dp.px(elevation / 2.0)));
+                return;
+            }
+            if (elevation > 0) {
+                paintShadowRings(g, q, elevation);
+            }
+            g.setColor(rgb);
+            g.setAlpha(c.alpha());
+            // AFTER the rings: they are built through the same reused path, so taking this
+            // shape earlier would hand the fill whatever the last ring left behind.
+            g.fillShape(clipShape(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]));
+        } finally {
+            g.setAntiAliased(oldAA);
+            g.setAlpha(oldAlpha);
+            g.setColor(oldColor);
+        }
+    }
+
+    /// How many rounded rects approximate the blur where the port has no real one.
+    /// Each is a full fill, per card per frame, so this is deliberately small: four reads
+    /// as a soft edge, and more is not visible at these opacities.
+    private static final int SHADOW_RINGS = 4;
+
+    /**
+     * The elevation shadow where {@code fillShapeShadow} is unavailable (the iOS port among
+     * them): a few progressively larger, fainter rounded rects under the card, drawn
+     * outside-in so their alpha accumulates towards the surface.
+     *
+     * <p>Deliberately NOT cached to a bitmap. Caching a per-card shadow image is what made
+     * these same cards a RAM and jank problem on Android, and the surface has to be redrawn
+     * every frame of a scroll anyway.</p>
+     */
+    private void paintShadowRings(com.codename1.ui.Graphics g, int[] q, double elevation) {
+        int spread = Math.max(1, (int) Math.round(
+                com.codename1.flutter.rendering.Dp.px(elevation)));
+        int drop = Math.max(1, (int) Math.round(
+                com.codename1.flutter.rendering.Dp.px(elevation / 2.0)));
+        g.setColor(0x000000);
+        for (int i = SHADOW_RINGS; i >= 1; i--) {
+            int e = Math.max(1, spread * i / SHADOW_RINGS);
+            g.setAlpha(10);
+            g.fillShape(clipShape(q[0] - e, q[1] - e + drop, q[2] + e * 2, q[3] + e * 2,
+                    grown(q[4], e), grown(q[5], e), grown(q[6], e), grown(q[7], e)));
+        }
+    }
+
+    /// The matching corner on a shadow ring {@code by} pixels outside a corner of radius
+    /// {@code r}. A squared corner stays squared - rounding it would put a curve back on a
+    /// corner the clip deliberately cut off at the edge of a viewport.
+    private static int grown(int r, int by) {
+        return r <= 0 ? 0 : r + by;
     }
 
     @Override
@@ -86,16 +145,17 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
             com.codename1.ui.Container pane, Runnable paintChildren) {
         styleOnce(pane);
         int radius = (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
-        if (radius <= 0 || material().getClipBehavior() == com.codename1.flutter.Clip.none
-                || noShapeClip()) {
+        if (radius <= 0) {
+            // Square surface: nothing to paint here that the component's own background
+            // does not already do (applyStyle leaves it in place in this case).
             paintChildren.run();
             return;
         }
-        if (!g.isShapeClipSupported()) {
+        boolean clips = !noShapeClip() && g.isShapeClipSupported()
+                && material().getClipBehavior() != com.codename1.flutter.Clip.none;
+        if (!noShapeClip() && !g.isShapeClipSupported()) {
             com.codename1.flutter.FlutterErrorReport.unimplemented("Material",
-                    "this port cannot clip to a shape, so the corners paint square");
-            paintChildren.run();
-            return;
+                    "this port cannot clip to a shape, so the subtree paints square-cornered");
         }
         int x = pane.getX();
         int y = pane.getY();
@@ -133,6 +193,28 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
             return;
         }
         int[] q = clipGeom;
+        if ("true".equals(com.codename1.ui.Display.getInstance()
+                .getProperty("cn1.flutter.debugClip", "false"))) {
+            // Reported through the error channel so it comes back over bench_errors, which
+            // dedupes: a device needs no new tooling to answer "what geometry did this card
+            // actually compute", and guessing at that has been expensive.
+            com.codename1.flutter.FlutterErrorReport.unimplemented("MaterialClip",
+                    "box=" + x + "," + y + "," + w + "," + h
+                    + " clip=" + cx + "," + cy + "," + cw + "," + ch
+                    + " r=" + radius + " out=" + q[0] + "," + q[1] + "," + q[2] + "," + q[3]
+                    + " corners=" + q[4] + "," + q[5] + "," + q[6] + "," + q[7]
+                    + " shapeClip=" + g.isShapeClipSupported()
+                    + " shadow=" + g.isShapeShadowSupported());
+        }
+        // Surface first, then the subtree on top of it, both in the same shape. The surface
+        // is painted here rather than as the component's background because a background is
+        // painted before paint() runs, i.e. outside the clip below - which is exactly how
+        // the corners used to end up square from behind.
+        paintSurface(g, q, material().getElevation());
+        if (!clips) {
+            paintChildren.run();
+            return;
+        }
         try {
             g.setClip(clipShape(q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[7]));
             paintChildren.run();
@@ -213,7 +295,7 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
     /// A rectangle with an independent radius per corner, in the coordinate space a
     /// component paints in - parent-relative, because the Graphics has already accumulated
     /// its ancestors' translation. Radii run clockwise from the top left.
-    private com.codename1.ui.geom.Shape clipShape(int x, int y, int w, int h,
+    com.codename1.ui.geom.Shape clipShape(int x, int y, int w, int h,
             int tl, int tr, int br, int bl) {
         // Cheap identity for "same shape as last time": the carousel settles between drags
         // and every static card then re-installs a clip the port can recognise as unchanged.
@@ -232,23 +314,38 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
         com.codename1.ui.geom.GeneralPath p = clipPath;
         p.moveTo(x + tl, y);
         p.lineTo(x + w - tr, y);
-        if (tr > 0) {
-            p.quadTo(x + w, y, x + w, y + tr);
-        }
+        arc(p, x + w - tr, y + tr, tr, -90);
         p.lineTo(x + w, y + h - br);
-        if (br > 0) {
-            p.quadTo(x + w, y + h, x + w - br, y + h);
-        }
+        arc(p, x + w - br, y + h - br, br, 0);
         p.lineTo(x + bl, y + h);
-        if (bl > 0) {
-            p.quadTo(x, y + h, x, y + h - bl);
-        }
+        arc(p, x + bl, y + h - bl, bl, 90);
         p.lineTo(x, y + tl);
-        if (tl > 0) {
-            p.quadTo(x, y, x + tl, y);
-        }
+        arc(p, x + tl, y + tl, tl, 180);
         p.closePath();
         return p;
+    }
+
+    /**
+     * Appends one 90° corner as short line segments, sweeping clockwise from
+     * {@code startDeg} about ({@code cx},{@code cy}).
+     *
+     * <p>Line segments rather than a {@code quadTo} because a clip has to survive being
+     * handed to a GPU, and the ports test for a POLYGON to decide how: Codename One's iOS
+     * backend renders a polygon clip through a stencil, and anything it cannot reduce to
+     * one falls back to the shape's BOUNDING BOX - which is a square-cornered card. The
+     * curve buys nothing here anyway: at a 10dp radius these segments are under two pixels
+     * each, and the same path also fills the surface, so shape and fill cannot disagree.</p>
+     */
+    private static void arc(com.codename1.ui.geom.GeneralPath p, int cx, int cy, int r,
+            int startDeg) {
+        if (r <= 0) {
+            return;
+        }
+        int segs = Math.max(3, Math.min(10, r / 3));
+        for (int i = 1; i <= segs; i++) {
+            double a = Math.toRadians(startDeg + 90.0 * i / segs);
+            p.lineTo((float) (cx + r * Math.cos(a)), (float) (cy + r * Math.sin(a)));
+        }
     }
 
     /// Applies the surface style when it first paints or after its configuration
@@ -267,6 +364,20 @@ public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectR
 
 
     /// The corner radius in logical pixels from the shape or an explicit borderRadius.
+    /**
+     * The radius this surface clips its subtree to, in pixels; 0 when it does not clip.
+     *
+     * <p>Descendants need this because a clip is not reliable on every port — see
+     * {@code ImageRenderElement.enclosingCornerRadius}, where an image that fills the
+     * surface rounds its own bitmap instead of trusting one.</p>
+     */
+    public int clipRadiusPx() {
+        if (material().getClipBehavior() == com.codename1.flutter.Clip.none) {
+            return 0;
+        }
+        return (int) Math.round(com.codename1.flutter.rendering.Dp.px(cornerRadiusLp()));
+    }
+
     private double cornerRadiusLp() {
         Object r = material().getShape() instanceof com.codename1.flutter.RoundedRectangleBorder
                 ? ((com.codename1.flutter.RoundedRectangleBorder) material().getShape()).getBorderRadius()

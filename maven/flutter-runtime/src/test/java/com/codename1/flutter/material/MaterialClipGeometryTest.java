@@ -1,6 +1,7 @@
 package com.codename1.flutter.material;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -73,6 +74,37 @@ class MaterialClipGeometryTest {
         // Touching edges only - an empty intersection, not a one-pixel sliver.
         assertFalse(MaterialRenderElement.clipGeometry(new int[8],
                 100, 100, 200, 150, 20, 300, 0, 300, 1000));
+    }
+
+    @Test
+    @DisplayName("the clip path is a POLYGON, which is what keeps corners round on a GPU")
+    void clipPathReducesToAPolygon() {
+        // Not a stylistic preference. The ports ask isPolygon() to decide how to hand a clip
+        // to the GPU: Codename One's iOS backend renders a polygon through a stencil, and a
+        // shape it cannot reduce to one falls back to the BOUNDING BOX - a square-cornered
+        // card. Built with quadTo this returned false, and the study card's corners were
+        // square on iOS while correct on the desktop simulator for exactly that reason.
+        com.codename1.ui.geom.GeneralPath p = (com.codename1.ui.geom.GeneralPath)
+                new MaterialRenderElement(new Material())
+                        .clipShape(100, 100, 300, 200, 30, 30, 30, 30);
+        assertTrue(p.isPolygon(), "clip must reduce to a polygon");
+        assertFalse(p.isRectangle(), "a rounded clip is not a rectangle");
+        assertEquals(new com.codename1.ui.geom.Rectangle(100, 100, 300, 200).toString(),
+                p.getBounds().toString(), "rounding must not move the bounds");
+
+        // And it must still be a polygon after a child clips to its own rect, which is what
+        // every component in the subtree does on its way down.
+        p.intersect(new com.codename1.ui.geom.Rectangle(100, 100, 300, 200));
+        assertTrue(p.isPolygon(), "clip must survive a child's clipRect as a polygon");
+    }
+
+    @Test
+    @DisplayName("a fully squared clip really is a plain rectangle")
+    void squaredClipIsARectangle() {
+        com.codename1.ui.geom.GeneralPath p = (com.codename1.ui.geom.GeneralPath)
+                new MaterialRenderElement(new Material())
+                        .clipShape(100, 100, 300, 200, 0, 0, 0, 0);
+        assertTrue(p.isRectangle(), "no corners rounded means a rectangle, and the cheap path");
     }
 
     @Test
