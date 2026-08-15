@@ -1693,6 +1693,14 @@ public class CN1WearableBridge implements WearableBridge {
             return null;
         }
         synchronized (SPOOL_LOCK) {
+            // Held outside the try so the handler can release a claim taken inside it. commit()
+            // can THROW as well as answer false -- a storage failure does not politely return --
+            // and the handler below used to return without undoing the claim, so the key stayed
+            // in SPOOL_IN_FLIGHT for the life of the process. spoolBusy() then answers yes for
+            // ever and every later reply-bearing request is downgraded to a one-way message: a
+            // transient disk error permanently disables requests. claimSpooled already gets this
+            // right, which is the shape copied here.
+            String claimed = null;
             try {
                 android.content.SharedPreferences prefs =
                         c.getSharedPreferences(SPOOL_PREFS, Context.MODE_PRIVATE);
@@ -1708,12 +1716,16 @@ public class CN1WearableBridge implements WearableBridge {
                 // Claimed on the spot: this record is being delivered live, so the drain must not
                 // pick it up as well and hand the app the same payload twice.
                 SPOOL_IN_FLIGHT.add(key);
+                claimed = key;
                 if (!edit.commit()) {
                     SPOOL_IN_FLIGHT.remove(key);
                     return null;
                 }
                 return key;
             } catch (Throwable unavailable) {
+                if (claimed != null) {
+                    SPOOL_IN_FLIGHT.remove(claimed);
+                }
                 return null;
             }
         }

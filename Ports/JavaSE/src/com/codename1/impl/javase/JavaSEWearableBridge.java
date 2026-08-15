@@ -966,7 +966,22 @@ class JavaSEWearableBridge implements WearableBridge {
         Thread t = new Thread(new Runnable() {
             public void run() {
                 while (!closed) {
-                    scanData();
+                    try {
+                        scanData();
+                    } catch (Throwable oneBadPass) {
+                        // This thread is the ONLY thing that notices peer writes, and it had no
+                        // guard: anything thrown out of a scan ended replication for the rest of
+                        // the session, silently. The cause found was a filename with a malformed
+                        // percent escape -- fixed at source in decodePath -- but the shape of the
+                        // failure is what matters here. A scan reads whatever is in a directory on
+                        // a developer's machine; it is not a place to assume well-formed input.
+                        //
+                        // Logged once per pass rather than swallowed, and the next pass retries in
+                        // 500ms: a persistently bad entry keeps complaining instead of quietly
+                        // stopping the port.
+                        System.err.println("[wearable] the simulator data scan failed; retrying: "
+                                + oneBadPass);
+                    }
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException ignored) {
@@ -1655,18 +1670,47 @@ class JavaSEWearableBridge implements WearableBridge {
         return sb.toString();
     }
 
+    /**
+     * The reverse of {@link #encodePath}, tolerant of text that it never produced.
+     *
+     * <p>A '%' NOT followed by four hex digits is literal text. Integer.parseInt threw
+     * NumberFormatException on it instead, and this runs on filenames the simulator's data
+     * directory happens to contain -- one file a person dropped in by hand, or left by an older
+     * build, killed the watcher thread and stayed there across restarts, so replication was dead
+     * on every subsequent launch too.</p>
+     *
+     * <p>The same leniency the Android bridge's decode() has. Two ports reading one wire format
+     * should not disagree about what a malformed name means.</p>
+     */
     private static String decodePath(String name) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
-            if (c == '%' && i + 4 < name.length()) {
-                sb.append((char) Integer.parseInt(name.substring(i + 1, i + 5), 16));
+            int value = c == '%' ? hexQuadAt(name, i + 1) : -1;
+            if (value >= 0) {
+                sb.append((char) value);
                 i += 4;
             } else {
                 sb.append(c);
             }
         }
         return sb.toString();
+    }
+
+    /// The value of the four hex digits at {@code from}, or -1 if there are not four there.
+    private static int hexQuadAt(String s, int from) {
+        if (from + 4 > s.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            int digit = Character.digit(s.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = (value << 4) | digit;
+        }
+        return value;
     }
 
     private static byte[] readFully(File f) throws IOException {
