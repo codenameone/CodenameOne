@@ -249,6 +249,59 @@ public class IOSProvisioningPreflightTest {
         assertTrue(parsed.expirationDate.after(new Date()));
     }
 
+    // ---- Ant placeholders in the path ----
+
+    /**
+     * A profile path is routinely written as {@code ${user.home}/certs/dev.mobileprovision},
+     * and Ant expands it before the build task sees it. Handing the literal string to
+     * {@code new File} would report a perfectly good profile as missing and refuse a build
+     * that works today.
+     */
+    @Test
+    public void expandsAPlaceholderInTheProfilePath() throws Exception {
+        File profile = write(appStore("Store"));
+        Properties p = new Properties();
+        p.setProperty("certs.dir", profile.getParent());
+        p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true),
+                "${certs.dir}/" + profile.getName());
+        p.setProperty("codename1.arg.ios.release.distributionMethod", "app-store");
+        assertTrue("an expandable path must be read, not reported missing",
+                check(p, true).isEmpty());
+    }
+
+    /** System properties are part of that context -- {@code user.home} lives there. */
+    @Test
+    public void expandsSystemPropertiesToo() {
+        assertEquals(System.getProperty("user.home") + "/certs/dev.mobileprovision",
+                IOSProvisioningPreflight.resolvePlaceholders(
+                        "${user.home}/certs/dev.mobileprovision", new Properties()));
+    }
+
+    /** A path this code cannot expand is a path it may not judge. */
+    @Test
+    public void aPathItCannotResolveIsNotRefused() {
+        Properties p = new Properties();
+        p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true),
+                "${some.ant.property.only.ant.knows}/dev.mobileprovision");
+        assertTrue("an unresolvable placeholder must not fail the build",
+                check(p, true).isEmpty());
+        assertTrue(IOSProvisioningPreflight.checkProfileFile(p, true, new Date()).isEmpty());
+    }
+
+    /** A self-referential property must not spin. */
+    @Test
+    public void resolutionTerminates() {
+        Properties p = new Properties();
+        p.setProperty("a", "${a}");
+        assertEquals("${a}", IOSProvisioningPreflight.resolvePlaceholders("${a}", p));
+    }
+
+    @Test
+    public void leavesAnOrdinaryPathAlone() {
+        assertEquals("/certs/dev.mobileprovision",
+                IOSProvisioningPreflight.resolvePlaceholders("/certs/dev.mobileprovision", new Properties()));
+    }
+
     // ---- which builds this applies to ----
 
     /**

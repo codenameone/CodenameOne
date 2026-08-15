@@ -199,13 +199,78 @@ final class IOSProvisioningPreflight {
     }
 
     /**
+     * Expands {@code ${name}} references the way the generated build file's
+     * {@code <property file="codenameone_settings.properties">} does: a profile path is
+     * routinely written as {@code ${user.home}/certs/dev.mobileprovision}, and Ant resolves
+     * that before handing the value to the build task. A name is looked up in the settings
+     * themselves first, then in the JVM's system properties, which is where {@code user.home}
+     * and friends live.
+     *
+     * <p>What cannot be resolved is left standing rather than guessed at, and the caller
+     * treats a value that still carries a placeholder as one it may not judge. Refusing a
+     * build over a path this code merely failed to expand would break configurations that
+     * work today -- the opposite of the point.
+     *
+     * @return the value with every resolvable reference expanded
+     */
+    static String resolvePlaceholders(String value, Properties settings) {
+        if (value == null) {
+            return null;
+        }
+        String current = value;
+        // Bounded: a self-referential property would otherwise spin here.
+        for (int pass = 0; pass < 10 && current.indexOf("${") >= 0; pass++) {
+            StringBuilder out = new StringBuilder();
+            boolean expandedAny = false;
+            int i = 0;
+            while (i < current.length()) {
+                int start = current.indexOf("${", i);
+                if (start < 0) {
+                    out.append(current.substring(i));
+                    break;
+                }
+                int end = current.indexOf('}', start);
+                if (end < 0) {
+                    out.append(current.substring(i));
+                    break;
+                }
+                out.append(current, i, start);
+                String name = current.substring(start + 2, end);
+                String replacement = settings == null ? null : settings.getProperty(name);
+                if (replacement == null) {
+                    replacement = System.getProperty(name);
+                }
+                if (replacement == null) {
+                    out.append(current, start, end + 1);
+                } else {
+                    out.append(replacement);
+                    expandedAny = true;
+                }
+                i = end + 1;
+            }
+            current = out.toString();
+            if (!expandedAny) {
+                break;
+            }
+        }
+        return current;
+    }
+
+    /**
      * @param checkMethodMismatch whether to also compare the profile's kind against the
      * distribution method these settings resolve to. Only true once the settings are the ones
      * the build will be submitted with, since a CN1Lib can still change the method.
      */
     private static void collectFileProblems(List<Problem> problems, Properties settings, boolean release,
             Date now, String path, String settingKey, boolean checkMethodMismatch) {
-        File file = new File(path.trim());
+        String resolved = resolvePlaceholders(path.trim(), settings);
+        if (resolved.indexOf("${") >= 0) {
+            // Ant resolves this when it binds the value to the build task; this check cannot,
+            // because it does not have that property context. A path it cannot resolve is a
+            // path it cannot judge -- and calling it missing would refuse a build that works.
+            return;
+        }
+        File file = new File(resolved);
         if (!file.exists() || !file.isFile()) {
             problems.add(new Problem("The provisioning profile for this build was not found at "
                     + file.getAbsolutePath() + " (" + settingKey + "). Point that setting at the "
