@@ -344,8 +344,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
      * signing identity, so neither is this check's business.
      */
     private void applyIOSProvisioningPreflight() throws MojoFailureException {
-        if (platform == null || !platform.contains("ios") || buildTarget == null
-                || !buildTarget.startsWith("ios-device")) {
+        if (!isIOSDeviceBuild()) {
             return;
         }
         Properties settings = new Properties();
@@ -362,9 +361,32 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
         overlayCommandLineBuildHints(settings);
 
-        boolean release = buildTarget.contains("release");
-        List<IOSProvisioningPreflight.Problem> problems =
-                IOSProvisioningPreflight.check(settings, release, new Date());
+        // Only what the file itself decides. Whether the profile's KIND matches the export
+        // method cannot be judged yet: a CN1Lib can supply ios.*.distributionMethod through
+        // its appended/required properties, which createAntProject merges further down, so
+        // that comparison waits for applyIOSProvisioningPreflight(Properties) below.
+        report(IOSProvisioningPreflight.checkProfileFile(settings, buildTarget.contains("release"), new Date()));
+    }
+
+    private boolean isIOSDeviceBuild() {
+        return platform != null && platform.contains("ios")
+                && buildTarget != null && buildTarget.startsWith("ios-device");
+    }
+
+    /**
+     * The full pre-flight, run against the settings the build is actually submitted with --
+     * the project's own, plus the command-line overlay, plus every CN1Lib-contributed
+     * property. This is where a profile-kind/distribution-method mismatch is decided, since
+     * a library can still change the method after the early pass has run.
+     */
+    private void applyIOSProvisioningPreflight(Properties mergedSettings) throws MojoFailureException {
+        if (!isIOSDeviceBuild()) {
+            return;
+        }
+        report(IOSProvisioningPreflight.check(mergedSettings, buildTarget.contains("release"), new Date()));
+    }
+
+    private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {
         String fatal = null;
         for (IOSProvisioningPreflight.Problem problem : problems) {
             if (problem.fatal) {
@@ -1424,6 +1446,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // local-build refusal / force-off and produce a locally hardened artifact whose mapping is never
         // uploaded (so its crashes could never be retraced).
         applyHardeningPreflight(cn1SettingsProps);
+
+        // Same reason, for the same reason: a CN1Lib can supply ios.*.distributionMethod, so the
+        // profile's kind is compared against the export method only now that those properties
+        // have been merged -- an early refusal would reject a build the merge was about to fix.
+        applyIOSProvisioningPreflight(cn1SettingsProps);
 
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);

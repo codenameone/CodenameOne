@@ -124,9 +124,35 @@ final class IOSProvisioningPreflight {
     }
 
     /**
+     * The checks that depend only on the profile file itself, safe to run before a CN1Lib's
+     * properties have been merged in.
+     *
+     * <p>A library can supply {@code codename1.arg.ios.*.distributionMethod} through its
+     * appended/required properties, which the mojo merges later -- so deciding a type mismatch
+     * this early would refuse a build whose method the merge was about to make correct. That
+     * decision belongs to {@link #check}, run against the merged settings. What a file is,
+     * whether it exists, and whether it has expired cannot change in the merge, so those fail
+     * here, before the app is packaged.
+     *
+     * @return the problems with the file; empty when there is nothing to say, including when
+     * no profile is configured yet (the merge may still supply one).
+     */
+    static List<Problem> checkProfileFile(Properties settings, boolean release, Date now) {
+        List<Problem> problems = new ArrayList<Problem>();
+        String settingKey = provisioningProfileSettingKey(release);
+        String path = settings.getProperty(settingKey);
+        if (path == null || path.trim().isEmpty()) {
+            return problems;
+        }
+        collectFileProblems(problems, settings, release, now, path, settingKey, false);
+        return problems;
+    }
+
+    /**
      * @return the problems with the configured profile, in the order they should be
      * reported; empty when there is nothing to say. A fatal problem means the build
-     * cannot succeed as configured.
+     * cannot succeed as configured. Run this against the settings the build will actually
+     * be submitted with -- see {@link #checkProfileFile} for why.
      */
     static List<Problem> check(Properties settings, boolean release, Date now) {
         List<Problem> problems = new ArrayList<Problem>();
@@ -140,13 +166,23 @@ final class IOSProvisioningPreflight {
                     + "build server will reject it unless the profile is supplied another way.", false));
             return problems;
         }
+        collectFileProblems(problems, settings, release, now, path, settingKey, true);
+        return problems;
+    }
 
+    /**
+     * @param checkMethodMismatch whether to also compare the profile's kind against the
+     * distribution method these settings resolve to. Only true once the settings are the ones
+     * the build will be submitted with, since a CN1Lib can still change the method.
+     */
+    private static void collectFileProblems(List<Problem> problems, Properties settings, boolean release,
+            Date now, String path, String settingKey, boolean checkMethodMismatch) {
         File file = new File(path.trim());
         if (!file.exists() || !file.isFile()) {
             problems.add(new Problem("The provisioning profile for this build was not found at "
                     + file.getAbsolutePath() + " (" + settingKey + "). Point that setting at the "
                     + ".mobileprovision file, or re-generate it with the certificate wizard.", true));
-            return problems;
+            return;
         }
 
         byte[] raw;
@@ -155,14 +191,14 @@ final class IOSProvisioningPreflight {
         } catch (IOException ex) {
             problems.add(new Problem("The provisioning profile at " + file.getAbsolutePath()
                     + " could not be read: " + ex.getMessage(), true));
-            return problems;
+            return;
         }
 
         if (raw.length == 0) {
             problems.add(new Problem("The provisioning profile at " + file.getAbsolutePath()
                     + " is empty (0 bytes). Re-download it from the Apple Developer portal, or "
                     + "re-generate it with the certificate wizard.", true));
-            return problems;
+            return;
         }
 
         Profile profile;
@@ -176,7 +212,7 @@ final class IOSProvisioningPreflight {
                     + " bytes) is not a valid .mobileprovision file -- it carries no readable "
                     + "provisioning plist. Re-download it from the Apple Developer portal, or "
                     + "re-generate it with the certificate wizard.", true));
-            return problems;
+            return;
         }
 
         String describe = profile.name == null ? file.getName() : "\"" + profile.name + "\"";
@@ -184,15 +220,17 @@ final class IOSProvisioningPreflight {
             problems.add(new Problem("The provisioning profile " + describe + " expired on "
                     + profile.expirationDate + ". Generate a new one in the Apple Developer portal "
                     + "and update " + settingKey + ".", true));
-            return problems;
+            return;
         }
 
+        if (!checkMethodMismatch) {
+            return;
+        }
         String method = effectiveDistributionMethod(settings, release);
         Problem mismatch = checkMethod(profile, method, describe, release);
         if (mismatch != null) {
             problems.add(mismatch);
         }
-        return problems;
     }
 
     /**

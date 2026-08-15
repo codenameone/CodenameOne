@@ -249,6 +249,57 @@ public class IOSProvisioningPreflightTest {
         assertTrue(parsed.expirationDate.after(new Date()));
     }
 
+    // ---- the mismatch decision waits for the merged settings ----
+
+    /**
+     * A CN1Lib can supply {@code codename1.arg.ios.release.distributionMethod} through its
+     * appended/required properties, and the mojo merges those only later. Judging the profile
+     * kind before that merge would refuse an Ad Hoc profile against the release default of
+     * app-store -- a build the merge was about to make correct. So the early pass reads the
+     * file and stops short of the comparison.
+     */
+    @Test
+    public void earlyPassDoesNotJudgeTheMethodALibraryCouldStillSupply() throws Exception {
+        Properties beforeMerge = settings(write(adHoc("AdHoc")), true, null);
+        assertTrue("the early pass must not refuse on a method the merge can still change",
+                IOSProvisioningPreflight.checkProfileFile(beforeMerge, true, new Date()).isEmpty());
+
+        // the same settings, once the library's property has been merged in: still fine
+        Properties afterMerge = new Properties();
+        afterMerge.putAll(beforeMerge);
+        afterMerge.setProperty("codename1.arg.ios.release.distributionMethod", "ad-hoc");
+        assertTrue("a library-supplied method that matches must not be refused",
+                check(afterMerge, true).isEmpty());
+    }
+
+    /** The early pass still fails what the merge cannot fix. */
+    @Test
+    public void earlyPassStillCatchesAnUnusableFile() throws Exception {
+        File garbage = writeRaw("not a profile".getBytes("UTF-8"));
+        List<IOSProvisioningPreflight.Problem> problems =
+                IOSProvisioningPreflight.checkProfileFile(settings(garbage, true, null), true, new Date());
+        assertFalse(problems.isEmpty());
+        assertTrue(problems.get(0).fatal);
+
+        File missing = new File(System.getProperty("java.io.tmpdir"), "absent.mobileprovision");
+        Properties p = new Properties();
+        p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true), missing.getAbsolutePath());
+        assertTrue(IOSProvisioningPreflight.checkProfileFile(p, true, new Date()).get(0).fatal);
+    }
+
+    /** No profile configured yet is not the early pass's business -- the merge may supply one. */
+    @Test
+    public void earlyPassIsSilentWhenNoProfileIsConfiguredYet() {
+        assertTrue(IOSProvisioningPreflight.checkProfileFile(new Properties(), true, new Date()).isEmpty());
+    }
+
+    /** The merged pass is the one that catches the real mismatch. */
+    @Test
+    public void mergedPassCatchesTheMismatch() throws Exception {
+        Properties merged = settings(write(appStore("HBZ_PROD_DISTRIBUTION")), true, "ad-hoc");
+        assertFatal(check(merged, true), "HBZ_PROD_DISTRIBUTION", "App Store distribution");
+    }
+
     // ---- a profile is untrusted input ----
 
     /**
