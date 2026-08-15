@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /// The link between a phone app and its watch app. The same API on both ends, and the same API on
 /// Apple Watch and Wear OS.
@@ -1321,7 +1322,7 @@ public final class WearableConnection {
     public static void resetForReload() {
         // FIRST, before anything is cleared: everything already handed to the EDT belongs to the
         // instance being discarded, and this is what stops it running against the new one.
-        loadGeneration++;
+        loadGeneration.incrementAndGet();
         List<Runnable> release = new ArrayList<Runnable>();
         synchronized (pendingData) {
             // A reload discards every PARKED delivery, and a parked delivery is by definition one
@@ -1797,7 +1798,13 @@ public final class WearableConnection {
     ///
     /// Only the simulator's hot reload ever moves this: on a device it stays 0 and every gate
     /// below is a comparison that always passes.
-    private static volatile int loadGeneration;
+    ///
+    /// An AtomicInteger rather than the monitor-guarded field [#droppedDeliveries] uses, because
+    /// the reasoning there does not transfer: every read of that one already happens under the
+    /// pendingData lock, while these reads are a port thread queueing work and the EDT running it,
+    /// neither holding anything. Taking a lock purely for this would put the data queue's monitor
+    /// on the EDT's path to answer a question about an int.
+    private static final AtomicInteger loadGeneration = new AtomicInteger();
 
     /// Hands work to the EDT for THIS load of the app, and drops it if a reload intervenes.
     ///
@@ -1813,11 +1820,11 @@ public final class WearableConnection {
     /// `notifyStateChanged` deliberately does not use this: it takes its listener snapshot inside
     /// the runnable, so after a reload it finds none and running it is already a no-op.
     private static void callSeriallyForThisLoad(final Runnable work) {
-        final int queuedIn = loadGeneration;
+        final int queuedIn = loadGeneration.get();
         Display.getInstance().callSerially(new Runnable() {
             @Override
             public void run() {
-                if (queuedIn != loadGeneration) {
+                if (queuedIn != loadGeneration.get()) {
                     return;
                 }
                 work.run();
