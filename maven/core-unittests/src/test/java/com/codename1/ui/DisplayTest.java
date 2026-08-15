@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,6 +23,26 @@ public class DisplayTest extends UITestBase {
         CN.getCurrentForm().getAnimationManager().flush();
     }
 
+    /**
+     * How long a queued runnable may take to reach the EDT before the suite calls it wedged.
+     * Generous next to any real flush (they finish in milliseconds) and short next to a CI job
+     * timeout, which is the point: a wedge should cost seconds, not the whole job.
+     */
+    private static final int EDT_FLUSH_TIMEOUT_MS = 30000;
+
+    /**
+     * Runs a flush on the EDT and waits for it -- with a deadline.
+     *
+     * <p>This used to call {@code callSeriallyAndWait}, which waits forever. Anything that
+     * wedges the EDT therefore wedged the whole suite: {@code BleSensorReconnectTest} printed
+     * its "Running" line, went silent, and the JDK 8 CI leg was cancelled 55 minutes later at
+     * the job timeout, with no test named as the culprit and no evidence of what it was
+     * waiting on. Every test in this suite reaches the EDT through here, so one deadlocked
+     * session anywhere costs an hour of CI and reports nothing.
+     *
+     * <p>A wedge is now a fast, named failure carrying the stack of every live thread --
+     * which is exactly the evidence needed to find the lock cycle behind it.
+     */
     public static void flushEdt() {
         final Display display = Display.getInstance();
         if (display.isEdt()) {
@@ -28,11 +50,45 @@ public class DisplayTest extends UITestBase {
             return;
         }
 
+        // Still callSeriallyAndWait, deliberately: its RunnableWrapper is what carries the
+        // invokeAndBlock nesting, and a plain callSerially plus a latch drops that -- which
+        // showed up at once as StorageImageAsyncTest timing out against a display it could no
+        // longer see. Only the deadline is new. The latch is what makes the EDT's write to it
+        // visible here, and reports whether the runnable ever ran.
+        final CountDownLatch done = new CountDownLatch(1);
         display.callSeriallyAndWait(new Runnable() {
             public void run() {
-                display.flushEdt();
+                try {
+                    display.flushEdt();
+                } finally {
+                    done.countDown();
+                }
             }
-        });
+        }, EDT_FLUSH_TIMEOUT_MS);
+        if (done.getCount() != 0) {
+            throw new IllegalStateException("The EDT did not run a queued runnable within "
+                    + EDT_FLUSH_TIMEOUT_MS + "ms -- it is wedged, most likely on a lock held by"
+                    + " a thread that is itself waiting for the EDT.\n" + dumpAllThreads());
+        }
+    }
+
+    /** Every live thread and where it is, for a wedge that has to be diagnosed from a CI log. */
+    private static String dumpAllThreads() {
+        StringBuilder sb = new StringBuilder("--- thread dump ---\n");
+        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
+        for (Map.Entry<Thread, StackTraceElement[]> e : traces.entrySet()) {
+            Thread t = e.getKey();
+            sb.append('"').append(t.getName()).append("\" ").append(t.getState());
+            if (t.isDaemon()) {
+                sb.append(" daemon");
+            }
+            sb.append('\n');
+            for (StackTraceElement frame : e.getValue()) {
+                sb.append("\tat ").append(frame).append('\n');
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
     }
 
     @AfterEach

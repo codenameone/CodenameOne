@@ -467,13 +467,18 @@ class BleSensorReconnectTest extends UITestBase {
         }
     }
 
-    /** Pumps the EDT for a while and reports the store's write count. */
+    /**
+     * Pumps the EDT for a while and reports the store's write count.
+     *
+     * <p>The slice is 100ms rather than 10ms because every flush is a blocking round trip to
+     * the EDT, and on the JDK 8 CI leg one costs on the order of a second where it costs
+     * milliseconds locally and on JDK 17/21. At 10ms slices this class issued ~500 of them and
+     * took 839s there against 9.5s locally -- which is what pushed the job past its 60-minute
+     * timeout. What the test needs is wall-clock time for the timers to fire and a drain
+     * afterwards, not a drain every 10ms.
+     */
     private int pumpFor(long millis, WriteCounter store) throws Exception {
-        long until = System.currentTimeMillis() + millis;
-        while (System.currentTimeMillis() < until) {
-            flushSerialCalls();
-            Thread.sleep(10);
-        }
+        pump(millis);
         return store.writeCount();
     }
 
@@ -728,12 +733,15 @@ class BleSensorReconnectTest extends UITestBase {
         flushSerialCalls();
     }
 
-    /** Pumps the EDT for a while so timers can fire. */
+    /**
+     * Pumps the EDT for a while so timers can fire -- see {@link #pumpFor} for why the slice
+     * is 100ms and not 10ms.
+     */
     private void pump(long millis) throws Exception {
         long until = System.currentTimeMillis() + millis;
         while (System.currentTimeMillis() < until) {
+            Thread.sleep(Math.min(100, Math.max(1, until - System.currentTimeMillis())));
             flushSerialCalls();
-            Thread.sleep(10);
         }
     }
 
