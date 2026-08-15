@@ -2068,6 +2068,58 @@ public class CN1WearableBridge implements WearableBridge {
                 SPOOL_IN_FLIGHT.remove(key);
             }
         }
+        // spoolDirty alone is not enough. It is read by a RUNNING drain loop, and this runs from
+        // the pending-delivery cap's dropped callback on the EDT -- typically long after the drain
+        // that queued the delivery has finished. With no owner to notice the flag, the record sat
+        // on disk until unrelated Data Layer traffic happened to start another drain; an app that
+        // stays open and receives nothing further never saw it at all.
+        scheduleSpoolDrain(context);
+    }
+
+    /// Whether a drain is already booked, so a queue that stays full does not spin.
+    private static boolean spoolDrainScheduled;
+
+    /// How long to wait before looking again after the cap turned a delivery away.
+    ///
+    /// Not zero. The cap evicted this because the app's queue was full, and retrying immediately
+    /// would evict it again and reschedule from the same callback -- a busy loop for as long as
+    /// the app stays behind. A second is long enough for a listener to drain and short enough that
+    /// nobody notices the delay.
+    private static final long SPOOL_RETRY_MILLIS = 1000L;
+
+    /// Books one drain, off this thread and outside the spool lock.
+    private static void scheduleSpoolDrain(Context context) {
+        final Context c = spoolContext(context);
+        if (c == null) {
+            return;
+        }
+        synchronized (SPOOL_LOCK) {
+            if (spoolDrainScheduled) {
+                return;
+            }
+            spoolDrainScheduled = true;
+        }
+        try {
+            transferTimer.schedule(new Runnable() {
+                public void run() {
+                    synchronized (SPOOL_LOCK) {
+                        spoolDrainScheduled = false;
+                    }
+                    try {
+                        drainSpool(c);
+                    } catch (Throwable notNow) {
+                        // A drain that fails has its own recovery -- the records are still on disk
+                        // and the next inbound event tries again. Letting this escape would kill
+                        // the shared timer thread that also runs the transfer sweeps.
+                        android.util.Log.w("CN1Wearable", "a scheduled spool drain failed");
+                    }
+                }
+            }, SPOOL_RETRY_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (Throwable rejected) {
+            synchronized (SPOOL_LOCK) {
+                spoolDrainScheduled = false;
+            }
+        }
     }
 
     /// Whether a listener of the kind this record needs is registered right now.
