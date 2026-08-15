@@ -644,6 +644,163 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * A partly successful write must not leave its committed samples
+     * behind in the attempt tally.
+     *
+     * <p>{@code uncommitted()} drops the committed prefix before the
+     * retry bookkeeping runs, and the tally was only cleared for samples
+     * this class explicitly dropped. So every partial failure left the
+     * records that DID reach the store sitting in the identity map,
+     * strongly referenced, for as long as the session streamed -- a map
+     * that only ever grew on a long ride with a flaky store.</p>
+     */
+    @Test
+    void aPartlyCommittedWriteDoesNotAccumulateAttempts() throws Exception {
+        FlakyPrefixStore store = new FlakyPrefixStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // The low reading fails once and is committed on its next
+            // attempt, in the same write whose later chunk fails -- so it
+            // is a committed prefix of a failed write, and it already had
+            // a tally entry from the attempt before.
+            for (int round = 0; round < 4; round++) {
+                p.notifyHeartRate(70 + round * 10);
+                p.notifyHeartRate(72 + round * 10);
+                flushSerialCalls();
+                pump(200);
+            }
+
+            // The tally may hold what is still waiting to be written; it
+            // may not hold what already reached the store.
+            assertTrue(writeAttemptCount(session) <= pendingWriteCount(session),
+                    "the attempt tally kept "
+                            + writeAttemptCount(session) + " samples with only "
+                            + pendingWriteCount(session)
+                            + " still pending -- the committed ones leaked");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    private static int writeAttemptCount(SensorSession session)
+            throws Exception {
+        return sizeOfField(session, "writeAttempts");
+    }
+
+    private static int pendingWriteCount(SensorSession session)
+            throws Exception {
+        return sizeOfField(session, "pendingWrites");
+    }
+
+    /** Reads a private collection's size -- the tally has no getter. */
+    private static int sizeOfField(SensorSession session, String name)
+            throws Exception {
+        java.lang.reflect.Field f =
+                SensorSession.class.getDeclaredField(name);
+        f.setAccessible(true);
+        Object value = f.get(session);
+        if (value instanceof java.util.Map) {
+            java.util.Map<?, ?> m = (java.util.Map<?, ?>) value;
+            synchronized (value) {
+                return m.size();
+            }
+        }
+        java.util.Collection<?> c = (java.util.Collection<?>) value;
+        synchronized (value) {
+            return c.size();
+        }
+    }
+
+    /**
+     * Writes one record at a time. The even readings fail their first
+     * attempt and are committed on the next; the odd ones never succeed.
+     * So a retried batch commits a sample that already carries a failed
+     * attempt, and then fails -- which is the partial-commit case.
+     */
+    private static final class FlakyPrefixStore
+            extends com.codename1.health.HealthStore {
+
+        /// Offered counts per reading, touched from the flush thread.
+        private final java.util.Map<Integer, Integer> offers =
+                new java.util.HashMap<Integer, Integer>();
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        /** One record per chunk, so the batch splits sample by sample. */
+        @Override
+        public int getMaxWriteBatchSize() {
+            return 1;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            com.codename1.health.QuantitySample q =
+                    (com.codename1.health.QuantitySample) samples.get(0);
+            int bpm = (int) Math.round(q.getQuantity().getValue(
+                    com.codename1.health.HealthUnit.COUNT_PER_MINUTE));
+            int times;
+            synchronized (offers) {
+                Integer prev = offers.get(Integer.valueOf(bpm));
+                times = (prev == null ? 0 : prev.intValue()) + 1;
+                offers.put(Integer.valueOf(bpm), Integer.valueOf(times));
+            }
+            if (bpm % 2 != 0 || times < 2) {
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError
+                                .DATABASE_INACCESSIBLE,
+                        "scripted failure for " + bpm + " on attempt "
+                                + times));
+                return;
+            }
+            com.codename1.health.HealthWriteResult r =
+                    new com.codename1.health.HealthWriteResult();
+            r.addSampleId("committed-" + bpm);
+            out.complete(r);
+        }
+    }
+
+    /**
      * A session that has ended must not keep retrying its store writes.
      *
      * <p>The re-arm guard tested only for STOPPED, but the reconnect

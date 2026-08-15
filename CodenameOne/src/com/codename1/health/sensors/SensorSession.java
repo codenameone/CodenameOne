@@ -456,6 +456,35 @@ public class SensorSession {
         }
     }
 
+    /// Forgets everything in `all` that is not in `keep`, by identity.
+    ///
+    /// A failed write leaves the buffer holding only what is going back;
+    /// everything else it carried is gone for good, whether it was
+    /// committed by a partial success, refused for its type, or out of
+    /// attempts. Removing only the ones this class explicitly dropped
+    /// left the committed prefix of every partial failure in the map for
+    /// the life of the session -- samples in the store, still strongly
+    /// referenced here, accumulating for as long as a sensor streamed.
+    ///
+    /// Linear against `keep` rather than a set: a batch is small, this
+    /// runs only on the failure path, and the identity comparison is the
+    /// point.
+    private void forgetWriteAttemptsExcept(List<HealthSample> all,
+            List<HealthSample> keep) {
+        for (HealthSample sample : all) {
+            boolean kept = false;
+            for (int i = 0; i < keep.size(); i++) {
+                if (keep.get(i) == sample) {
+                    kept = true;
+                    break;
+                }
+            }
+            if (!kept) {
+                writeAttempts.remove(sample);
+            }
+        }
+    }
+
     /// The timer's flush: claims the buffer only while the session runs.
     ///
     /// Checking the state at the top of the tick was not enough. The
@@ -641,14 +670,17 @@ public class SensorSession {
                         keep.add(sample);
                     }
                 }
-                session.forgetWriteAttempts(exhausted);
                 requeued = !session.flushingStopped && !keep.isEmpty();
                 if (requeued) {
                     session.pendingWrites.addAll(0, keep);
+                    // Everything else this write carried is gone for
+                    // good: committed by a partial success, refused for
+                    // its type, or out of attempts.
+                    session.forgetWriteAttemptsExcept(batch, keep);
                 } else {
-                    // Nothing goes back, so nothing here is pending any
-                    // more and the tally must not go on holding it.
-                    session.forgetWriteAttempts(keep);
+                    // Nothing goes back, so nothing this write carried is
+                    // pending any more and the tally must not hold it.
+                    session.forgetWriteAttempts(batch);
                 }
             }
             if (!exhausted.isEmpty()) {
