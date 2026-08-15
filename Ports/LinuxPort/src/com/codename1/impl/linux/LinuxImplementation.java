@@ -3279,20 +3279,17 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// - `nativePath`: the directory to create, as a native path
     private void makeDirectories(String nativePath) {
         int from = 0;
-        // Past the root, so the first component asked for is a real directory name: on Linux
-        // that is the leading slash, on Windows the drive or the leading separators of a UNC
-        // path, and asking to create either is a call that can only fail.
-        while (from < nativePath.length()
-                && (nativePath.charAt(from) == '/' || nativePath.charAt(from) == '\\')) {
+        // Past the root, so the first component asked for is a real directory name rather than
+        // "/", which is a call that can only fail.
+        //
+        // No drive-letter handling here, deliberately. This started as one helper written for
+        // both native desktop ports, and skipping everything before a colon is right on Windows
+        // and wrong here: a colon is an ordinary character in a Linux directory name, so
+        // /tmp/missing/tag:one/app.db had every component before "tag:one" skipped and its parent
+        // was never created. The two ports have their own copies; each keeps the rule its
+        // filesystem actually has.
+        while (from < nativePath.length() && nativePath.charAt(from) == '/') {
             from++;
-        }
-        int colon = nativePath.indexOf(':');
-        if (colon >= 0 && colon + 1 > from) {
-            from = colon + 1;
-            while (from < nativePath.length()
-                    && (nativePath.charAt(from) == '/' || nativePath.charAt(from) == '\\')) {
-                from++;
-            }
         }
         for (int iter = from; iter <= nativePath.length(); iter++) {
             boolean end = iter == nativePath.length();

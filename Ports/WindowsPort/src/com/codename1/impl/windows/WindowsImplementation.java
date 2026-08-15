@@ -3205,8 +3205,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 && (nativePath.charAt(from) == '/' || nativePath.charAt(from) == '\\')) {
             from++;
         }
+        // Only a colon that comes before the first separator is a drive: "C:\\dir" has one,
+        // "\\\\server\\share" has none because its first separator is at the start, and a colon
+        // further in belongs to a directory name. Skipping every component before any colon was
+        // wrong even here, and on a filesystem where a colon is an ordinary character it left the
+        // parents of "tag:one" uncreated.
         int colon = nativePath.indexOf(':');
-        if (colon >= 0 && colon + 1 > from) {
+        int separator = nativePath.length();
+        for (int iter = 0; iter < nativePath.length(); iter++) {
+            if (nativePath.charAt(iter) == '/' || nativePath.charAt(iter) == '\\') {
+                separator = iter;
+                break;
+            }
+        }
+        if (colon >= 0 && colon < separator) {
             from = colon + 1;
             while (from < nativePath.length()
                     && (nativePath.charAt(from) == '/' || nativePath.charAt(from) == '\\')) {
