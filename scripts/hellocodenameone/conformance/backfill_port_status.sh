@@ -172,14 +172,25 @@ while IFS= read -r workflow; do
   # and a five-run cap then hides a perfectly good report just behind them. The
   # loop below stops as soon as every port the workflow owns is covered, so the
   # wider net costs nothing when the newest run is complete.
+  #
+  # A run that is still going is not a candidate at all. This sweep is scheduled
+  # while the long producers are mid-flight -- the Windows suite takes half an
+  # hour, the iOS one two -- and a running job has uploaded no artifact yet, so
+  # treating it as the newest candidate reported it as a producer that "uploaded
+  # no port-status artifact" and failed the nightly every single night. The
+  # conclusion test alone does not exclude it: `gh run list` types conclusion as
+  # a string, so an in-flight run comes back as "" rather than null and sails
+  # through `.conclusion != null`. Gate on status instead, which is what
+  # actually distinguishes finished from running.
   horizon="$(date -u -d "${sweep_stale_days} days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
     || date -u -v-"${sweep_stale_days}"d +%Y-%m-%dT%H:%M:%SZ)"
   # gh's --jq takes one expression and forwards no jq CLI options, so --arg has
   # to go to a separate jq invocation rather than being smuggled in after --jq.
   candidates="$(gh run list --workflow "${workflow}" --branch master --limit 100 \
-    --json databaseId,event,conclusion,updatedAt \
+    --json databaseId,event,status,conclusion,updatedAt \
     | jq -r --arg horizon "${horizon}" '[.[] | select((.event == "push" or .event == "schedule" or .event == "workflow_dispatch") and
-          (.conclusion != null and .conclusion != "cancelled" and .conclusion != "skipped") and
+          (.status == "completed") and
+          (.conclusion != null and .conclusion != "" and .conclusion != "cancelled" and .conclusion != "skipped") and
           (.updatedAt >= $horizon))]
           | sort_by(.updatedAt) | reverse | .[] | "\(.databaseId):\(.event)"')"
   if [ -z "${candidates}" ]; then
