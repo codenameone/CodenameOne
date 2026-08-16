@@ -309,6 +309,57 @@ public class IOSProvisioningPreflightTest {
                 IOSProvisioningPreflight.resolvePlaceholders("/certs/dev.mobileprovision", new Properties()));
     }
 
+    /**
+     * The distribution hint can be a placeholder too: {@code -Drelease.method=ad-hoc} against
+     * {@code ...distributionMethod=${release.method}}. Comparing the literal placeholder to a
+     * profile's kind refused a build whose method Ant was about to resolve to the matching one.
+     */
+    @Test
+    public void expandsAPlaceholderInTheDistributionMethod() throws Exception {
+        System.setProperty("preflight.test.method", "ad-hoc");
+        try {
+            Properties p = settings(write(adHoc("AdHoc")), true, "${preflight.test.method}");
+            assertEquals("ad-hoc",
+                    IOSProvisioningPreflight.effectiveDistributionMethod(p, true));
+            assertTrue("a resolvable method that matches must not be refused",
+                    check(p, true).isEmpty());
+        } finally {
+            System.clearProperty("preflight.test.method");
+        }
+    }
+
+    /** A method it cannot resolve is a method it may not judge. */
+    @Test
+    public void anUnresolvableMethodIsNotJudged() throws Exception {
+        Properties p = settings(write(adHoc("AdHoc")), true, "${nobody.sets.this}");
+        assertTrue("an unresolvable method must not fail the build",
+                check(p, true).isEmpty());
+    }
+
+    /**
+     * Ant seeds its project from the JVM properties before the generated build file reads
+     * codenameone_settings.properties, and an Ant property cannot be set twice -- so
+     * {@code -Dprofile.dir=/new} beats a {@code profile.dir=/old} in the file. Reading the
+     * file first refused /old as missing while the build was using /new.
+     */
+    @Test
+    public void aCommandLinePropertyBeatsTheSettingsFile() throws Exception {
+        File profile = write(appStore("Store"));
+        System.setProperty("preflight.test.dir", profile.getParent());
+        try {
+            Properties p = new Properties();
+            // the stale value the settings file still carries
+            p.setProperty("preflight.test.dir", "/no/such/directory");
+            p.setProperty(IOSProvisioningPreflight.provisioningProfileSettingKey(true),
+                    "${preflight.test.dir}/" + profile.getName());
+            p.setProperty("codename1.arg.ios.release.distributionMethod", "app-store");
+            assertTrue("the -D value should win, as it does in Ant",
+                    check(p, true).isEmpty());
+        } finally {
+            System.clearProperty("preflight.test.dir");
+        }
+    }
+
     // ---- which builds this applies to ----
 
     /**

@@ -108,7 +108,10 @@ final class IOSProvisioningPreflight {
         String method = release ? APP_STORE : DEVELOPMENT;
         method = arg(settings, "ios.distributionMethod", method);
         method = arg(settings, release ? "ios.release.distributionMethod" : "ios.debug.distributionMethod", method);
-        return method;
+        // The hint can be written as ${release.method} and passed with -D, exactly like the
+        // profile path. Comparing the literal placeholder against a profile's kind refused
+        // builds whose method Ant was about to resolve to the matching one.
+        return resolvePlaceholders(method, settings);
     }
 
     private static String arg(Properties settings, String hint, String defaultValue) {
@@ -237,9 +240,15 @@ final class IOSProvisioningPreflight {
                 }
                 out.append(current, i, start);
                 String name = current.substring(start + 2, end);
-                String replacement = settings == null ? null : settings.getProperty(name);
-                if (replacement == null) {
-                    replacement = System.getProperty(name);
+                // JVM properties first, which is Ant's own order. Ant seeds its project
+                // from the system properties before the generated build file's
+                // <property file="codenameone_settings.properties"> runs, and an Ant
+                // property cannot be set twice -- so -Dprofile.dir=/new beats a
+                // profile.dir=/old in the file. Reading the file first meant refusing
+                // /old/profile.mobileprovision as missing while the build used /new.
+                String replacement = System.getProperty(name);
+                if (replacement == null && settings != null) {
+                    replacement = settings.getProperty(name);
                 }
                 if (replacement == null) {
                     out.append(current, start, end + 1);
@@ -332,6 +341,10 @@ final class IOSProvisioningPreflight {
             return;
         }
         String method = effectiveDistributionMethod(settings, release);
+        if (method.indexOf("${") >= 0) {
+            // Same rule as the path: what this cannot resolve, it may not judge.
+            return;
+        }
         Problem mismatch = checkMethod(profile, method, describe, release);
         if (mismatch != null) {
             problems.add(mismatch);
