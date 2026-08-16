@@ -26,6 +26,8 @@
 #if TARGET_OS_MACCATALYST
 
 #import <CoreGraphics/CoreGraphics.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * Delivery into the framework. Defined in IOSNative.m alongside the existing
@@ -146,16 +148,47 @@ static int slotForScene(UIWindowScene* scene) {
     return -1;
 }
 
-/* A slot that has been requested but has no scene yet; the system hands scenes
- * back asynchronously, so the first unattached slot claims the next arrival. */
-static int slotAwaitingScene(void) {
+/*
+ * Slots that have asked for a scene and are still waiting for one, oldest first.
+ *
+ * The system hands scenes back asynchronously, so a slot cannot simply take "the
+ * next arrival": open two windows in quick succession and picking the first
+ * unattached slot each time would swap their identities. Scenes are delivered in
+ * the order they were requested, so a FIFO matches them correctly. Only touched
+ * on the main thread, where both the request and the delivery happen.
+ */
+static int g_pendingSlots[CN1_MAC_MAX_WINDOWS];
+static int g_pendingCount;
+
+static void pushPendingSlot(int slot) {
+    if (g_pendingCount < CN1_MAC_MAX_WINDOWS) {
+        g_pendingSlots[g_pendingCount++] = slot;
+    }
+}
+
+static int popPendingSlot(void) {
+    int slot;
     int iter;
-    for (iter = 0; iter < CN1_MAC_MAX_WINDOWS; iter++) {
-        if (g_macWindows[iter].inUse && g_macWindows[iter].scene == nil) {
-            return iter;
+    if (g_pendingCount <= 0) {
+        return -1;
+    }
+    slot = g_pendingSlots[0];
+    for (iter = 1; iter < g_pendingCount; iter++) {
+        g_pendingSlots[iter - 1] = g_pendingSlots[iter];
+    }
+    g_pendingCount--;
+    return slot;
+}
+
+static void dropPendingSlot(int slot) {
+    int read;
+    int write = 0;
+    for (read = 0; read < g_pendingCount; read++) {
+        if (g_pendingSlots[read] != slot) {
+            g_pendingSlots[write++] = g_pendingSlots[read];
         }
     }
-    return -1;
+    g_pendingCount = write;
 }
 
 int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, int height,
@@ -179,6 +212,9 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].pendingTitle = [title retain];
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        // Enqueue and request on the same main-thread turn, so the queue order is
+        // exactly the request order the system will deliver scenes in.
+        pushPendingSlot(slot);
         if (@available(macCatalyst 13.0, *)) {
             UISceneActivationRequestOptions* options =
                     [[UISceneActivationRequestOptions alloc] init];
@@ -200,7 +236,9 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
  * scene delegate, which is the only place a scene object becomes available.
  */
 BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
-    if (slotAwaitingScene() < 0) {
+    if (g_pendingCount <= 0 || slotForScene(scene) >= 0) {
+        // Nothing is waiting, or this scene was already adopted: it belongs to the
+        // application's main form.
         return NO;
     }
     CN1MacWindowSceneConnected(scene);
@@ -208,9 +246,9 @@ BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
 }
 
 void CN1MacWindowSceneConnected(UIWindowScene* scene) {
-    int slot = slotAwaitingScene();
+    int slot = popPendingSlot();
     CN1MacWindow* w;
-    if (slot < 0) {
+    if (slot < 0 || !g_macWindows[slot].inUse) {
         return;
     }
     w = &g_macWindows[slot];
@@ -243,6 +281,7 @@ void CN1MacWindowDestroy(int slot) {
     if (w == NULL) {
         return;
     }
+    dropPendingSlot(slot);
     UIWindowScene* scene = w->scene;
     UIWindow* window = w->window;
     CN1MacWindowController* controller = w->controller;
@@ -397,6 +436,13 @@ UIView* CN1MacWindowContentView(int slot) {
     return w == NULL ? nil : w->content;
 }
 
+/* Frees a frame's pixels once Core Graphics has finished with the image. */
+static void cn1MacReleasePixels(void* info, const void* data, size_t size) {
+    (void) info;
+    (void) size;
+    free((void*) data);
+}
+
 void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
     CN1MacWindow* w = slotAt(slot);
     if (w == NULL || argb == NULL || width <= 0 || height <= 0) {
@@ -407,19 +453,46 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
         return;
     }
     {
-        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-        CGContextRef ctx = CGBitmapContextCreate(argb, width, height, 8, width * 4, cs,
-                kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
-        CGImageRef image = ctx != NULL ? CGBitmapContextCreateImage(ctx) : NULL;
-        CGColorSpaceRelease(cs);
-        if (ctx != NULL) {
-            CGContextRelease(ctx);
+        size_t bytes = (size_t) width * (size_t) height * 4;
+        /* Copy before wrapping. The caller hands us a Java int[]'s data pointer, and
+         * that array is garbage the moment this returns -- the collector is free to
+         * reclaim or move it while the image below is still referencing the memory on
+         * a later main-queue turn. */
+        void* pixels = malloc(bytes);
+        if (pixels == NULL) {
+            return;
         }
-        if (image != NULL) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [view presentImage:image];
-                CGImageRelease(image);
-            });
+        memcpy(pixels, argb, bytes);
+        {
+            CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+            /* A data provider with a release callback, rather than a bitmap context:
+             * CGBitmapContextCreateImage is copy-on-write, so it is not defined when
+             * the backing buffer becomes free to release. Here the buffer's lifetime is
+             * explicit -- Core Graphics calls cn1MacReleasePixels once the image is
+             * finished with it. */
+            CGDataProviderRef provider =
+                    CGDataProviderCreateWithData(NULL, pixels, bytes, cn1MacReleasePixels);
+            CGImageRef image = NULL;
+            if (provider != NULL) {
+                /* Codename One hands back straight (non-premultiplied) ARGB and a
+                 * window's content is opaque, so skip the alpha channel rather than
+                 * declaring it premultiplied -- claiming premultiplied would darken
+                 * every pixel that is not fully opaque. ByteOrder32Little pairs with
+                 * ARGB ints on a little-endian host. */
+                image = CGImageCreate(width, height, 8, 32, (size_t) width * 4, cs,
+                        kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little,
+                        provider, NULL, false, kCGRenderingIntentDefault);
+                CGDataProviderRelease(provider);
+            } else {
+                free(pixels);
+            }
+            CGColorSpaceRelease(cs);
+            if (image != NULL) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [view presentImage:image];
+                    CGImageRelease(image);
+                });
+            }
         }
     }
 }
