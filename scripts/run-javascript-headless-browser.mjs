@@ -42,7 +42,7 @@ let suiteFinished = false;
 // blocked on that call, so the suite cannot advance while the screenshot is being taken.
 // Driving it from a console marker would race the next test's form onto the screen.
 let capturedCount = 0;
-const CAPTURE_TIMEOUT_MS = Number(process.env.CN1_JS_CAPTURE_TIMEOUT_MS || '5000');
+const CAPTURE_TIMEOUT_MS = Number(process.env.CN1_JS_CAPTURE_TIMEOUT_MS || '4000');
 
 async function installCompositeCapture(page) {
   if (process.env.CN1_JS_DISABLE_COMPOSITE_CAPTURE === '1') {
@@ -50,16 +50,16 @@ async function installCompositeCapture(page) {
   }
   await page.exposeFunction('__cn1CompositeCapture', async () => {
     try {
-      // No `animations: 'disabled'`: that makes Playwright wait for animations to settle, and
-      // a screen with a running animation (a toast, say) never settles -- the capture then
-      // outlives the suite's own timeout, which is waiting on this very call, and the test is
-      // recorded as never delivering.
+      // `animations: 'disabled'` is what makes the capture reproducible: it settles animations
+      // and waits for fonts, and without it the screenshot races the canvas presentation --
+      // dropping it turned 59 of 181 goldens into mismatches, the static graphics and chart
+      // tests among them.
       //
-      // The explicit timeout plus the race is the backstop for the same failure mode from any
-      // other cause: the suite is blocked on this promise, so it must always resolve promptly.
-      // Falling back to the canvas readback costs the DOM text in one golden; hanging costs
-      // the whole test.
-      const shot = page.screenshot({ timeout: CAPTURE_TIMEOUT_MS });
+      // It can also wait too long on a screen that never settles, and the suite is blocked on
+      // this very promise, so the timeout and the race are the backstop: always resolve
+      // promptly. Falling back to the canvas readback costs the promoted text in one golden;
+      // hanging costs the whole test.
+      const shot = page.screenshot({ animations: 'disabled', timeout: CAPTURE_TIMEOUT_MS });
       const buffer = await Promise.race([
         shot,
         new Promise(resolve => setTimeout(() => resolve(null), CAPTURE_TIMEOUT_MS))

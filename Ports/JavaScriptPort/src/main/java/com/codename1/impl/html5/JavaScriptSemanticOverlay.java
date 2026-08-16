@@ -97,6 +97,7 @@ public final class JavaScriptSemanticOverlay {
         private final Map<String, String> attributes = new HashMap<String, String>();
         private final List<Long> childOrder = new ArrayList<Long>();
         private Map<String, HTMLElement> customActions;
+        private Map<String, String> customActionLabels;
         private HTMLElement textNode;
         private String geometry;
         private String text;
@@ -382,10 +383,24 @@ public final class JavaScriptSemanticOverlay {
             if (entry.customActions == null) {
                 entry.customActions = new HashMap<String, HTMLElement>();
             }
-            if (entry.customActions.containsKey(action.getId())) {
+            String label = action.getLabel() == null ? action.getId() : action.getLabel();
+            HTMLElement existing = entry.customActions.get(action.getId());
+            if (existing != null) {
+                // An application can replace an action with the same id and a new label -- an
+                // Expand that becomes a Collapse. Without this the retained button keeps
+                // announcing the old wording until the action is removed entirely.
+                if (!label.equals(entry.customActionLabels.get(action.getId()))) {
+                    existing.setAttribute("aria-label", label);
+                    existing.setTextContent(label);
+                    entry.customActionLabels.put(action.getId(), label);
+                }
                 continue;
             }
-            entry.customActions.put(action.getId(), createCustomAction(entry, action));
+            if (entry.customActionLabels == null) {
+                entry.customActionLabels = new HashMap<String, String>();
+            }
+            entry.customActions.put(action.getId(), createCustomAction(entry, action, label));
+            entry.customActionLabels.put(action.getId(), label);
         }
         if (entry.customActions == null) {
             return;
@@ -395,14 +410,17 @@ public final class JavaScriptSemanticOverlay {
             Map.Entry<String, HTMLElement> existing = it.next();
             if (desired == null || !desired.contains(existing.getKey())) {
                 entry.element.removeChild(existing.getValue());
+                if (entry.customActionLabels != null) {
+                    entry.customActionLabels.remove(existing.getKey());
+                }
                 it.remove();
             }
         }
     }
 
-    private HTMLElement createCustomAction(Entry entry, final AccessibilityAction action) {
+    private HTMLElement createCustomAction(Entry entry, final AccessibilityAction action,
+            String label) {
         final long nodeId = entry.id;
-        String label = action.getLabel() == null ? action.getId() : action.getLabel();
         HTMLElement button = document.createElement("button");
         button.setAttribute("type", "button");
         button.setAttribute("aria-label", label);

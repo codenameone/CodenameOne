@@ -3415,10 +3415,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // components, so no run is refreshed while it runs. Those buffers carry their own
             // rasterized text, so the layer must step aside for the duration or the outgoing
             // form's text would float above the animation.
+            // A buffered transition -- a fade, where areMutableImagesFast() is true -- paints
+            // only its prebuilt images and never puts a component through the display graphics,
+            // so the frame-start hook never runs and would leave the outgoing form's DOM text
+            // fixed above the animation for its whole duration. Catch it here, which does run
+            // every display frame.
+            //
+            // Suspending only, never resuming: the components of this frame have already
+            // painted, so lifting the suspension now would show runs that this frame's canvas
+            // also rasterized. Resuming is left to the frame-start hook, which runs before any
+            // component paints.
+            if (!textLayer.isSuspended() && Display.getInstance().isInTransition()) {
+                textLayer.setSuspended(true);
+            }
             // Releases runs whose component has been removed, hidden, or whose form is no
             // longer displayed; none of those ever paints again, so nothing else would clean
-            // them up. Suspension is decided before painting instead (see
-            // updateTextLayerSuspension), not here.
+            // them up.
             textLayer.syncToForm(Display.getInstance().getCurrent());
         }
         // Record the whole frame into the display surface's command buffer (the
@@ -5687,10 +5699,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         String autocomplete;
         if (override != null) {
             autocomplete = override.toString();
+        } else if (sensitive) {
+            // Checked ahead of the password case on purpose: SENSITIVE asks that the value is
+            // never retained for predictive or completing schemes, and "current-password" is an
+            // explicit invitation to offer a stored one.
+            autocomplete = "off";
         } else if (password) {
             autocomplete = "current-password";
-        } else if (sensitive) {
-            autocomplete = "off";
         } else if (base == TextArea.EMAILADDR) {
             autocomplete = "email";
         } else if (base == TextArea.PHONENUMBER) {
@@ -10501,12 +10516,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     private void dispatchBrowserBack() {
-        Form current = Display.getInstance().getCurrent();
+        final Form current = Display.getInstance().getCurrent();
         if (current == null) {
             return;
         }
         Command back = current.getBackCommand();
         if (back == null) {
+            // Nothing to go back to inside the app, so keep unwinding. Entries can outlive the
+            // navigation that created them -- an in-app Back consumes a form without consuming
+            // an entry -- and swallowing the press here would make those leftovers visible as
+            // Back presses that appear to do nothing.
+            try {
+                window.getHistory().back();
+            } catch (Throwable ignored) {
+                // Nothing left to pop; the browser leaves the document on its own.
+            }
             return;
         }
         handlingPopState = true;
@@ -10515,6 +10539,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         } finally {
             handlingPopState = false;
         }
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (Display.getInstance().getCurrent() == current) {
+                    // A pop guard refused the navigation and the same form is still showing,
+                    // but the entry has already been spent. Put it back, or the next Back would
+                    // leave the app instead of asking the guard again.
+                    pushHistoryState();
+                }
+            }
+        });
         // Nothing is pushed to replace the entry that was just popped. Every form show pushes
         // one, so the history depth already tracks the navigation depth: popping one entry and
         // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
@@ -10526,6 +10561,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private boolean historyRootShown;
 
+    /**
+     * The form displayed before the current one, used to recognise a backward navigation.
+     * Only one step is remembered; deeper unwinds are handled when Back is pressed.
+     */
+    private Form historyPreviousForm;
+
+    /**
+     * The form currently displayed, as far as history tracking is concerned.
+     */
+    private Form historyCurrentForm;
+
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
@@ -10534,8 +10580,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // first Back popped without navigating anywhere, so leaving the app from the root
             // form took two presses.
             historyRootShown = true;
+            historyCurrentForm = f;
             return;
         }
+        if (f != null && f == historyPreviousForm) {
+            // Backward navigation, from a toolbar back command or showBack(). The impl is not
+            // told the direction, so it is inferred: going back to the form we came from spends
+            // a step rather than adding one, and pushing here would leave an entry behind that
+            // a later Back has to walk past.
+            historyPreviousForm = null;
+            historyCurrentForm = f;
+            return;
+        }
+        historyPreviousForm = historyCurrentForm;
+        historyCurrentForm = f;
         pushHistoryState();
     }
     
