@@ -4965,20 +4965,13 @@
     var baseline = pickBestCanvasSnapshot(false, previousSignature) || null;
     var baselinePaintSeq = baseline ? (baseline.canvasLastPaintSeq | 0) : 0;
     var baselinePaintCount = baseline ? (baseline.canvasPaintCount | 0) : 0;
-    // With a composited capture hook installed the canvas is no longer the whole frame -- text
-    // lives in a DOM layer above it -- so canvas quiet/change detection is the wrong instrument
-    // to decide when the screen is ready. It also cannot terminate on a screen that animates
-    // indefinitely: the render queue keeps advancing, the loop never sees its quiet frames, and
-    // the caller's own timeout expires first with nothing delivered. Settle briefly and let the
-    // host screenshot, which waits for animations and fonts itself, decide the rest.
-    var compositeHook = typeof global.__cn1CompositeCapture === 'function';
-    var attempts = compositeHook ? 6 : 24;
+    var attempts = 24;
     var best = null;
     var startRenderSeq = global.__cn1RenderQueueSeq | 0;
     var seenRenderSeq = startRenderSeq;
     var renderAdvanced = false;
     var quietFrames = 0;
-    var quietFramesRequired = compositeHook ? 1 : 3;
+    var quietFramesRequired = 3;
     function chooseBetter(a, b) {
       if (!a) {
         return b;

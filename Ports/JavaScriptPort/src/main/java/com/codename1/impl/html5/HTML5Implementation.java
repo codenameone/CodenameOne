@@ -6588,16 +6588,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // is telling us which representation it needs, so promotion stops for good at the first
         // such call and the text returns to the canvas, where the reads can see it.
         //
-        // The frame already in the buffer was composed with the text promoted, so this first
-        // screenshot is still text-less; everything painted afterwards carries its text again.
-        // Callers that poll -- waiting for something to appear before capturing -- therefore
-        // settle on the second read.
+        // The repaint has to be carried out here, not merely requested: repaint() only enqueues
+        // the form, and draining the command buffer does not run the paint queue. Without
+        // paintDirty() the read would return the frame that was composed while the text was
+        // still promoted, so a one-shot capture would come back without it.
         if (textLayer != null && !textLayer.isSuspended()) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
             Form current = getCurrentForm();
             if (current != null) {
                 current.repaint();
+                paintDirty();
+                flushGraphics();
             }
         }
         drainPendingDisplayFrame();
@@ -10648,15 +10650,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean historyRootShown;
 
     /**
-     * The form displayed before the current one, used to recognise a backward navigation.
-     * Only one step is remembered; deeper unwinds are handled when Back is pressed.
+     * The forms shown so far, newest last, used to recognise a backward navigation. The
+     * implementation is not told the direction of a form change, so it is inferred from whether
+     * the incoming form is the one behind the current entry.
+     *
+     * <p>Bounded: an app that never navigates back would otherwise accumulate an entry per
+     * screen for the life of the session. Losing the oldest entries only means a very deep
+     * unwind stops being recognised, which degrades to the old behaviour of pushing.</p>
      */
-    private Form historyPreviousForm;
+    private final java.util.List<Form> historyStack = new java.util.ArrayList<Form>();
 
-    /**
-     * The form currently displayed, as far as history tracking is concerned.
-     */
-    private Form historyCurrentForm;
+    private static final int HISTORY_STACK_LIMIT = 32;
 
     @Override
     public void setCurrentForm(Form f) {
@@ -10666,20 +10670,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // first Back popped without navigating anywhere, so leaving the app from the root
             // form took two presses.
             historyRootShown = true;
-            historyCurrentForm = f;
+            historyStack.add(f);
             return;
         }
-        if (f != null && f == historyPreviousForm) {
-            // Backward navigation, from a toolbar back command or showBack(). The impl is not
-            // told the direction, so it is inferred: going back to the form we came from spends
-            // a step rather than adding one, and pushing here would leave an entry behind that
-            // a later Back has to walk past.
-            historyPreviousForm = null;
-            historyCurrentForm = f;
+        int depth = historyStack.size();
+        if (f != null && depth >= 2 && f == historyStack.get(depth - 2)) {
+            // Backward navigation, from a toolbar back command or showBack(). Going back to the
+            // form behind the current one spends a step rather than adding one; pushing here
+            // would leave an entry behind for a later Back to walk past. Keeping the whole
+            // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
+            // to A -- each be recognised.
+            historyStack.remove(depth - 1);
             return;
         }
-        historyPreviousForm = historyCurrentForm;
-        historyCurrentForm = f;
+        historyStack.add(f);
+        if (historyStack.size() > HISTORY_STACK_LIMIT) {
+            historyStack.remove(0);
+        }
         pushHistoryState();
     }
     
