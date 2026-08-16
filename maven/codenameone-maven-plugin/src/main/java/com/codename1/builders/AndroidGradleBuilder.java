@@ -6835,6 +6835,16 @@ public class AndroidGradleBuilder extends Executor {
         // documentation promises launch-time protection -- worse than not offering it, because
         // the app ships believing it is guarded. The mirror is BuildDaemon#181 and the two are
         // meant to land together; keep them in step when either side changes.
+        //
+        // On ordering, since this looks late and is not: createOnCreateCode's output is the
+        // tail of the generated onCreate. The application's start() is emitted separately, by
+        // createStartInvocation, into the generated run() method that onResume reaches -- so
+        // Android has already returned from onCreate before any of it runs. Display is usually
+        // not initialized this early, which is fine and deliberate: Display.setProperty parks
+        // both values and Display.init() applies them, and that init happens in onResume ahead
+        // of the start call. The policy and the overlay request are therefore both in force
+        // before application code can show its first form. Moving these emissions later, into
+        // the start path, would be the change that actually opened a window.
         if (tapjackingGuard) {
             // Locale.ENGLISH, not the default locale: in a Turkish locale "STRICT".toLowerCase()
             // yields "strıct" (dotless i), which would silently miss the match below.
