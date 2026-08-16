@@ -2705,18 +2705,9 @@ public final class Display extends CN1Constants {
     /// - `windowId`: the id the port was given when the window was created
     ///
     /// - `gained`: true when the window gained focus
-    public void windowFocusChanged(final int windowId, final boolean gained) {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Window w = Desktop.getInstance().windowById(windowId);
-                if (gained) {
-                    Desktop.getInstance().setFocusedWindow(w);
-                } else if (Desktop.getInstance().getFocusedWindow() == w) { //NOPMD CompareObjectsWithEquals
-                    Desktop.getInstance().setFocusedWindow(null);
-                }
-            }
-        });
+    public void windowFocusChanged(int windowId, boolean gained) {
+        callSerially(new WindowCallback(windowId,
+                gained ? WindowCallback.FOCUS_GAINED : WindowCallback.FOCUS_LOST));
     }
 
     /// Notifies Codename One that the user activated a native window's close control.
@@ -2726,16 +2717,8 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `windowId`: the id the port was given when the window was created
-    public void windowCloseRequested(final int windowId) {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Window w = Desktop.getInstance().windowById(windowId);
-                if (w != null) {
-                    w.closeRequested();
-                }
-            }
-        });
+    public void windowCloseRequested(int windowId) {
+        callSerially(new WindowCallback(windowId, WindowCallback.CLOSE_REQUESTED));
     }
 
     /// Notifies Codename One that a native window moved to a monitor with different
@@ -2744,30 +2727,67 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `windowId`: the id the port was given when the window was created
-    public void windowMonitorChanged(final int windowId) {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                Window w = Desktop.getInstance().windowById(windowId);
-                if (w != null) {
-                    w.monitorChanged();
-                }
-                Desktop.getInstance().fireMonitorChanged();
-            }
-        });
+    public void windowMonitorChanged(int windowId) {
+        callSerially(new WindowCallback(windowId, WindowCallback.MONITOR_CHANGED));
     }
 
     /// Notifies Codename One that the set of attached monitors changed.
     public void monitorsChanged() {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                for (Window w : Desktop.getInstance().getWindows()) {
-                    w.monitorChanged();
-                }
-                Desktop.getInstance().fireMonitorChanged();
+        callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
+    }
+
+    /// Marshals a window notification that arrived on the platform's own thread onto
+    /// the event dispatch thread. A named static class rather than an anonymous one so
+    /// it does not retain the `Display` it was created from.
+    private static final class WindowCallback implements Runnable {
+        private static final int FOCUS_GAINED = 0;
+        private static final int FOCUS_LOST = 1;
+        private static final int CLOSE_REQUESTED = 2;
+        private static final int MONITOR_CHANGED = 3;
+        private static final int MONITORS_CHANGED = 4;
+
+        private final int windowId;
+        private final int kind;
+
+        WindowCallback(int windowId, int kind) {
+            this.windowId = windowId;
+            this.kind = kind;
+        }
+
+        @Override
+        public void run() {
+            Desktop desktop = Desktop.getInstance();
+            Window w = desktop.windowById(windowId);
+            switch (kind) {
+                case FOCUS_GAINED:
+                    desktop.setFocusedWindow(w);
+                    break;
+                case FOCUS_LOST:
+                    if (desktop.getFocusedWindow() == w) { //NOPMD CompareObjectsWithEquals
+                        desktop.setFocusedWindow(null);
+                    }
+                    break;
+                case CLOSE_REQUESTED:
+                    if (w != null) {
+                        w.closeRequested();
+                    }
+                    break;
+                case MONITOR_CHANGED:
+                    if (w != null) {
+                        w.monitorChanged();
+                    }
+                    desktop.fireMonitorChanged();
+                    break;
+                case MONITORS_CHANGED:
+                    for (Window each : desktop.getWindows()) {
+                        each.monitorChanged();
+                    }
+                    desktop.fireMonitorChanged();
+                    break;
+                default:
+                    break;
             }
-        });
+        }
     }
 
     private void addNotifyEvent(int type) {

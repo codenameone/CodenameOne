@@ -93,7 +93,10 @@ public class Window extends Container implements TopLevelContainer {
     private Object nativePeer;
     private Object paintSurface;
     private Graphics windowGraphics;
-    private boolean disposed;
+    /// Set as soon as dispose() begins, so re-entering it is a no-op.
+    private boolean disposing;
+    /// Published under Display.lock once teardown is complete; showModal waits on it.
+    private volatile boolean disposed;
     private boolean nativeVisible;
 
     private final Container contentPane;
@@ -106,10 +109,10 @@ public class Window extends Container implements TopLevelContainer {
 
     private Component focused;
     private Component dragged;
+    private Component pressedCmp;
     private Object currentPointerPress;
     private int initialPressX;
     private int initialPressY;
-    private ArrayList<Component> componentsAwaitingRelease;
     private boolean cyclicFocus = true;
 
     private final AnimationManager animMananger = new AnimationManager(this);
@@ -221,7 +224,7 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     private void requireLive() {
-        if (disposed) {
+        if (disposing) {
             throw new IllegalStateException("This Window has been disposed");
         }
     }
@@ -1192,16 +1195,16 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// true if the window is showing
     public boolean isWindowShowing() {
-        return nativeVisible && !disposed;
+        return nativeVisible && !disposing;
     }
 
     /// Destroys this window and releases the native window behind it. Calling this
     /// more than once is harmless.
     public void dispose() {
-        if (disposed) {
+        if (disposing) {
             return;
         }
-        disposed = true;
+        disposing = true;
         nativeVisible = false;
         Desktop.getInstance().deregisterWindow(this);
         Display.getInstance().windowDisposed(this);
@@ -1225,11 +1228,14 @@ public class Window extends Container implements TopLevelContainer {
         paintSurface = null;
         nativePeer = null;
         windowGraphics = null;
-        closeListeners.fireActionEvent(new ActionEvent(this));
-        fireWindowEvent(WindowEvent.Type.Hidden);
+        // showModal parks on Display.lock and wakes on this flag, so publish it under
+        // the very monitor the waiter is blocked on
         synchronized (Display.lock) {
+            disposed = true;
             Display.lock.notifyAll();
         }
+        closeListeners.fireActionEvent(new ActionEvent(this));
+        fireWindowEvent(WindowEvent.Type.Hidden);
     }
 
     /// Indicates whether this window has been disposed.
@@ -1445,6 +1451,92 @@ public class Window extends Container implements TopLevelContainer {
             return windowLayeredPane;
         }
         return contentPane;
+    }
+
+    // ---- pointer dispatch ---------------------------------------------------------
+
+    /// {@inheritDoc}
+    ///
+    /// A `Container` has no hit testing of its own -- `Form` does that work itself --
+    /// so a `Window` has to as well, or a press would never reach the component under
+    /// it. This is the same walk `Form` performs, without the title area and menu bar
+    /// special cases a window has no equivalent of.
+    @Override
+    public void pointerPressed(int x, int y) {
+        initialPressX = x;
+        initialPressY = y;
+        currentPointerPress = new Object();
+        dragged = null;
+        Component cmp = resolveComponentAt(x, y);
+        pressedCmp = cmp;
+        if (cmp != null) {
+            LeadUtil.pointerPressed(cmp, x, y);
+            if (cmp.isFocusable()) {
+                setFocused(cmp);
+            }
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int x, int y) {
+        Component target = dragged != null ? dragged : pressedCmp;
+        if (target != null) {
+            LeadUtil.pointerDragged(target, x, y);
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+        Component target = dragged != null ? dragged : pressedCmp;
+        if (target != null) {
+            LeadUtil.pointerReleased(target, x, y);
+        }
+        pressedCmp = null;
+        dragged = null;
+        currentPointerPress = null;
+    }
+
+    private Component resolveComponentAt(int x, int y) {
+        Component cmp = getActualPane().getComponentAt(x, y);
+        while (cmp != null && cmp.isIgnorePointerEvents()) {
+            cmp = cmp.getParent();
+        }
+        if (cmp == null) {
+            return null;
+        }
+        return LeadUtil.leadParentImpl(cmp);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    Object getCurrentPointerPress() {
+        return currentPointerPress;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    int getInitialPressX() {
+        return initialPressX;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    int getInitialPressY() {
+        return initialPressY;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    Component getDraggedComponent() {
+        return dragged;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    void setDraggedComponent(Component dragged) {
+        this.dragged = LeadUtil.leadParentImpl(dragged);
     }
 
     private void initFocused() {
