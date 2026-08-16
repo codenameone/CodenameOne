@@ -3828,6 +3828,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
     
     private void updateCanvasSize() {
+        refreshDevicePixelRatio();
         JavaScriptCanvasLayout.Dimensions dimensions = JavaScriptCanvasLayout.compute(
                 doc().getBody().getClientWidth(),
                 window.getInnerHeight(),
@@ -4425,6 +4426,26 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @JSBody(params={"name"}, script="return getParameterByName(name);")
     static native String getParameterByName(String name);
     
+    /**
+     * Re-reads the display's scale factor from the main thread.
+     *
+     * <p>The cached value is taken once at start-up, but the ratio changes when the page is
+     * zoomed or the window moves between displays. Left stale, the canvas backing store no
+     * longer matches the display and the browser rescales it -- the same softening this port
+     * used to have by rendering at 1x. Read on resize only, which is when it can change and is
+     * rare enough for a round trip.</p>
+     */
+    private void refreshDevicePixelRatio() {
+        try {
+            double ratio = window.getDevicePixelRatio();
+            if (ratio > 0) {
+                devicePixelRatio = ratio;
+            }
+        } catch (Throwable ignored) {
+            // Keep whatever was resolved at start-up.
+        }
+    }
+
     static double getDevicePixelRatio() {
         if (devicePixelRatio < 0) {
             devicePixelRatio = getDevicePixelRatio_();
@@ -10728,7 +10749,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         int depth = historyStack.size();
-        if (f != null && depth >= 2 && f == historyStack.get(depth - 2)) {
+        int previousIndex = f == null ? -1 : historyStack.lastIndexOf(f);
+        if (previousIndex >= 0 && previousIndex < depth - 1) {
             // Backward navigation, from a toolbar back command or showBack(). Keeping the whole
             // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
             // to A -- each be recognised.
@@ -10737,16 +10759,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // place means the next browser Back pops an entry that no longer corresponds to a
             // form, finds no back command, and appears to do nothing. Going back fires popstate,
             // which is why the next one is marked as already accounted for.
-            historyStack.remove(depth - 1);
+            // A back command can skip forms -- A, B, C then showBack() to A -- so every form
+            // above the one being shown is being left, and one entry per form has to go with
+            // them. Recognising only a single step left the extra entries behind for later
+            // Back presses to pop without any form change.
+            int steps = depth - 1 - previousIndex;
+            for (int i = 0; i < steps; i++) {
+                historyStack.remove(historyStack.size() - 1);
+            }
             if (handlingPopState) {
-                // The user's own Back already spent the entry, and this form change is the
-                // result of servicing it. Going back again here would traverse twice for one
-                // press and walk straight out of the document.
+                // The user's own Back already spent an entry, and this form change is the result
+                // of servicing it. Traversing again would move twice for one press.
                 return;
             }
             historySuppressPop = true;
             try {
-                window.getHistory().back();
+                // One traversal for the whole jump, so it raises a single popstate.
+                window.getHistory().go(-steps);
             } catch (Throwable ignored) {
                 historySuppressPop = false;
             }

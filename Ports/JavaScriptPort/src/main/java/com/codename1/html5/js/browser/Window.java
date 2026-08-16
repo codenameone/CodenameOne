@@ -43,6 +43,14 @@ public interface Window extends JSObject {
      */
     MediaQueryList matchMedia(String query);
 
+    /**
+     * The display's scale factor, read from the main thread. The worker's copy is forwarded
+     * once at start-up and does not follow zoom or a move between displays.
+     *
+     * @return devicePixelRatio
+     */
+    double getDevicePixelRatio();
+
     static Window current() {
         return null; // Native implementation
     }
