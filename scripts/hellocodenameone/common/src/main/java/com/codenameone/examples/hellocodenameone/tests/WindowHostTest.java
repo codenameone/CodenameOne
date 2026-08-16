@@ -148,8 +148,10 @@ public abstract class WindowHostTest extends BaseTest {
         // A window reports the size it was asked for before the platform has
         // actually produced it -- on Mac Catalyst the scene arrives asynchronously --
         // so size and visibility are both true well before anything is renderable.
-        Image probe = window == null ? null : window.capture();
-        boolean ready = probe != null;
+        // Both conditions matter: the raster exists from the moment the window is
+        // shown, so capture() alone succeeds against a blank frame of the right size.
+        boolean ready = window != null && window.hasPaintedOnce()
+                && window.capture() != null;
         if (ready || System.currentTimeMillis() >= deadline) {
             captureAndAdvance(index, width, height, ready);
             return;

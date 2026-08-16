@@ -99,7 +99,8 @@ public class WindowModalTest extends BaseTest {
     private void awaitRenderable(final long deadline) {
         // Readiness is "a capture succeeds": a window reports the size it was asked
         // for before the platform has actually produced it.
-        boolean ready = background.capture() != null && modal.isWindowShowing();
+        boolean ready = background.hasPaintedOnce() && background.capture() != null
+                && modal.isWindowShowing();
         if (ready) {
             capture();
             return;

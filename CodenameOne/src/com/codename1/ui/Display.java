@@ -3421,6 +3421,10 @@ public final class Display extends CN1Constants {
             w.flushRevalidateQueue();
             impl.paintDirtyWindow(w.getPaintSurface());
             w.repaintAnimations();
+            // The window's raster exists from the moment it is shown, so a capture
+            // before this point returns a blank frame of the right size. Recording
+            // that a cycle completed is what lets a caller wait for real content.
+            w.markPainted();
         }
     }
 

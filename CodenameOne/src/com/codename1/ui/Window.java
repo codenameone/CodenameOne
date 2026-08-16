@@ -1256,6 +1256,28 @@ public class Window extends Container implements TopLevelContainer {
         return disposed;
     }
 
+    /// Indicates whether this window has completed at least one paint cycle, and so
+    /// whether its content -- rather than an empty surface -- is what a capture would
+    /// return.
+    ///
+    /// A window's raster exists from the moment it is shown, so capturing before the
+    /// first paint yields a blank frame of the right size rather than a failure. Test
+    /// and tooling code that wants the content should wait on this.
+    ///
+    /// #### Returns
+    ///
+    /// true once the window has painted
+    public boolean hasPaintedOnce() {
+        return paintedOnce;
+    }
+
+    /// Invoked by the framework once a paint cycle for this window has completed.
+    void markPainted() {
+        paintedOnce = true;
+    }
+
+    private volatile boolean paintedOnce;
+
     /// Captures this window's current contents.
     ///
     /// The ordinary `Display#screenshot(com.codename1.util.SuccessCallback)` can only
