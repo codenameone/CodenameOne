@@ -4331,6 +4331,30 @@ public class Component implements Animation, StyleListener, Editable {
         return retVal;
     }
 
+    /// Returns the top level container this component currently belongs to, which is
+    /// either the `Form` filling the main surface or the `Window` of a native desktop
+    /// window, or null when this component is not attached to one.
+    ///
+    /// Prefer this over `#getComponentForm()` in code that must keep working inside a
+    /// desktop `Window`. `getComponentForm()` keeps its original meaning and returns
+    /// null for a component hosted in a `Window`, because a `Window` is not a `Form`.
+    ///
+    /// #### Returns
+    ///
+    /// the enclosing top level container, or null when detached
+    ///
+    /// #### See also
+    ///
+    /// - #getComponentForm()
+    public TopLevelContainer getTopLevelContainer() {
+        TopLevelContainer retVal = null;
+        Component parent = getParent();
+        if (parent != null) {
+            retVal = parent.getTopLevelContainer();
+        }
+        return retVal;
+    }
+
     /// Repaint the given component to the screen
     ///
     /// #### Parameters

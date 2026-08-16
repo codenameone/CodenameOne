@@ -331,6 +331,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cnt`: The container to schedule for revalidation
+    @Override
     void revalidateLater(Container cnt) {
         if (!pendingRevalidateQueue.contains(cnt)) {
             // It doesn't need to be in queue more than once.
@@ -361,10 +362,12 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cnt`: The container to remove from the queue.
+    @Override
     void removeFromRevalidateQueue(Container cnt) {
         pendingRevalidateQueue.remove(cnt);
     }
 
+    @Override
     void flushRevalidateQueue() {
 
         if (!pendingRevalidateQueue.isEmpty()) {
@@ -1429,14 +1432,29 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     /// Gets the current dragged Component
+    @Override
     Component getDraggedComponent() {
         return dragged;
     }
 
     /// Sets the current dragged Component
+    @Override
     void setDraggedComponent(Component dragged) {
         this.dragged = LeadUtil.leadParentImpl(dragged);
     }
+
+    /// {@inheritDoc}
+    @Override
+    int getInitialPressX() {
+        return initialPressX;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    int getInitialPressY() {
+        return initialPressY;
+    }
+
 
     /// Returns true if the given dest component is in the column of the source component
     private boolean isInSameColumn(Component source, Component dest) {
@@ -1869,6 +1887,7 @@ public class Form extends Container implements TopLevelContainer {
         return layeredPane;
     }
 
+    @Override
     Container getActualPane() {
         if (layeredPane != null) {
             return layeredPane.getParent();
@@ -2201,6 +2220,7 @@ public class Form extends Container implements TopLevelContainer {
     /// Identical to the none-internal version, the difference between the internal/none-internal
     /// is that it references a different vector that is unaffected by the user actions.
     /// That is why we can dynamically register/deregister without interfering with user interaction.
+    @Override
     void registerAnimatedInternal(Animation cmp) {
         if (cmp instanceof Component) {
             Component c = (Component) cmp;
@@ -2221,6 +2241,7 @@ public class Form extends Container implements TopLevelContainer {
     /// Identical to the none-internal version, the difference between the internal/none-internal
     /// is that it references a different vector that is unaffected by the user actions.
     /// That is why we can dynamically register/deregister without interfering with user interaction.
+    @Override
     void deregisterAnimatedInternal(Animation cmp) {
         if (internalAnimatableComponents != null) {
             if (cmp instanceof Component) {
@@ -2927,6 +2948,18 @@ public class Form extends Container implements TopLevelContainer {
         return this;
     }
 
+    /// {@inheritDoc}
+    ///
+    /// A `Form` terminates the walk unless it is itself embedded in another
+    /// hierarchy, exactly as `#getComponentForm()` does.
+    @Override
+    public TopLevelContainer getTopLevelContainer() {
+        if (getParent() != null) {
+            return super.getTopLevelContainer();
+        }
+        return this;
+    }
+
     /// Invoked by display to hide the menu during transition
     ///
     /// #### See also
@@ -2945,6 +2978,7 @@ public class Form extends Container implements TopLevelContainer {
         menuBar.installMenuBar();
     }
 
+    @Override
     void setFocusedInternal(Component focused) {
         this.focused = focused;
     }
@@ -3408,6 +3442,7 @@ public class Form extends Container implements TopLevelContainer {
     /// Gets the handle for the current pointer press event.  A new object
     /// is generated for each pointer press.
     ///
+    @Override
     Object getCurrentPointerPress() {
         return currentPointerPress;
     }
@@ -4619,6 +4654,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cmp`: the form child component
+    @Override
     void requestFocus(Component cmp) {
         if (cmp.isFocusable() && contains(cmp)) {
             scrollComponentToVisible(cmp);

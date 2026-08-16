@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.AnimationTime;
 import com.codename1.ui.animations.ComponentAnimation;
 import com.codename1.ui.animations.Motion;
@@ -1614,11 +1615,138 @@ public class Container extends Component implements Iterable<Component> {
     /// of containers that require revalidation, so that the system doesn't end up
     /// revalidating the same container multiple times between paints.
     public void revalidateLater() {
-        Form root = getComponentForm();
+        Container root = TopLevelSupport.rootOf(this);
         if (root != null) {
             root.revalidateLater(this);
         }
 
+    }
+
+    // ---------------------------------------------------------------------------
+    // Top level hooks.
+    //
+    // These are the internals that Component, Container and Toolbar need to drive
+    // whichever top level they sit in -- a Form on the main surface, or a Window on
+    // the desktop. They live here rather than on an interface because they must stay
+    // package private: every method of a Java interface is implicitly public, so
+    // putting them on one would silently widen Form's public API.
+    //
+    // Container is the nearest common supertype of Form and Window, so declaring
+    // them here dispatches virtually with no instanceof. The defaults are inert;
+    // Form and Window override the ones that mean something to them.
+    // ---------------------------------------------------------------------------
+
+    /// Registers an animation not exposed through the public animation registry.
+    /// Inert unless this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the animation to register
+    void registerAnimatedInternal(Animation cmp) {
+    }
+
+    /// Removes an internally registered animation. Inert unless this container is a
+    /// top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the animation to remove
+    void deregisterAnimatedInternal(Animation cmp) {
+    }
+
+    /// Moves focus without the side effects of the public setter. Inert unless this
+    /// container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `focused`: the new focus owner
+    void setFocusedInternal(Component focused) {
+    }
+
+    /// Requests focus for a component. Inert unless this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component requesting focus
+    void requestFocus(Component cmp) {
+    }
+
+    /// Returns the container that hit testing and focus traversal treat as the root.
+    ///
+    /// #### Returns
+    ///
+    /// this container, unless a top level overrides it
+    Container getActualPane() {
+        return this;
+    }
+
+    /// Schedules a container to be revalidated before the next paint. Inert unless
+    /// this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container to revalidate later
+    void revalidateLater(Container cnt) {
+    }
+
+    /// Drops a container from the pending revalidate queue. Inert unless this
+    /// container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cnt`: the container to drop
+    void removeFromRevalidateQueue(Container cnt) {
+    }
+
+    /// Revalidates everything queued by `#revalidateLater(Container)`. Inert unless
+    /// this container is a top level.
+    void flushRevalidateQueue() {
+    }
+
+    /// Returns the token identifying the current pointer press, used to stop a drag
+    /// from outliving the press that started it.
+    ///
+    /// #### Returns
+    ///
+    /// the press token, or null unless this container is a top level
+    Object getCurrentPointerPress() {
+        return null;
+    }
+
+    /// Returns the x coordinate at which the current press began.
+    ///
+    /// #### Returns
+    ///
+    /// the initial press x, or zero unless this container is a top level
+    int getInitialPressX() {
+        return 0;
+    }
+
+    /// Returns the y coordinate at which the current press began.
+    ///
+    /// #### Returns
+    ///
+    /// the initial press y, or zero unless this container is a top level
+    int getInitialPressY() {
+        return 0;
+    }
+
+    /// Returns the component currently being dragged.
+    ///
+    /// #### Returns
+    ///
+    /// the dragged component, or null unless this container is a top level
+    Component getDraggedComponent() {
+        return null;
+    }
+
+    /// Sets the component currently being dragged. Inert unless this container is a
+    /// top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dragged`: the dragged component, or null to clear it
+    void setDraggedComponent(Component dragged) {
     }
 
     /// A more powerful form of revalidate that recursively lays out the full hierarchy

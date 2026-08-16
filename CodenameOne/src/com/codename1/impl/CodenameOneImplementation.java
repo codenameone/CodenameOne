@@ -7420,6 +7420,21 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific window manager, which carries the whole native
+    /// windowing contract. Default implementation returns {@code null}; the desktop
+    /// ports override it to return a cached instance.
+    ///
+    /// A {@code null} return **is** the capability query --- there is deliberately no
+    /// separate supported flag that could drift out of step with it. Application code
+    /// should use {@link com.codename1.ui.Desktop} rather than calling this directly.
+    ///
+    /// #### Returns
+    ///
+    /// the window manager, or {@code null} when this platform has no windowing system
+    public WindowManager getWindowManager() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters
