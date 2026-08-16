@@ -390,6 +390,35 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
+    void aListenerRegisteredAfterATransitionDoesNotHearIt() {
+        // The listener set is captured when the transition is queued, not read when the EDT
+        // finally delivers it, so a listener that registers during an EDT backlog is not told
+        // about a change that predates it. Holding the dispatcher instead made that depend on
+        // whether an unrelated listener happened to exist at queue time, since an empty set
+        // queues nothing at all.
+        final List<Object> late = new ArrayList<Object>();
+        ActionListener lateListener = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                late.add(evt.getSource());
+            }
+        };
+
+        implementation.notifyScreenObscured(true, "obscured");
+        DeviceIntegrity.addTapjackingListener(lateListener);
+        flushSerialCalls();
+
+        try {
+            assertEquals(0, late.size(),
+                    "a listener must not receive a transition from before it registered");
+            // The listener that was registered when it happened still gets it.
+            assertTrue(observed.contains(Boolean.TRUE));
+        } finally {
+            DeviceIntegrity.removeTapjackingListener(lateListener);
+        }
+    }
+
+    @Test
     void aRemovedListenerStopsReceiving() {
         DeviceIntegrity.removeTapjackingListener(listener);
         implementation.notifyScreenObscured(true, "obscured");

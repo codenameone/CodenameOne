@@ -11405,30 +11405,54 @@ public abstract class CodenameOneImplementation {
         // application code while this lock is held, the deadlock ShieldSignals documents. It is
         // not a real gap either way: a listener can only be registered through Display, so
         // before init there is nobody to tell.
-        if (target == null || !target.hasListeners() || !Display.isInitialized()) {
+        if (target == null || !Display.isInitialized()) {
             return;
+        }
+        // The listeners are captured now rather than resolved when the runnable finally runs.
+        // Holding the dispatcher instead would mean the set is read at delivery, so a listener
+        // registered after this transition -- while an EDT backlog held the runnable -- would be
+        // told about a change that predates it, and whether it heard that would depend on
+        // whether some unrelated listener happened to exist at queue time, since an empty set
+        // queues nothing at all. A listener removed in the same window still receives this one
+        // event, which is the same trade ShieldSignals makes by snapshotting its own array here.
+        //
+        // Copied under the dispatcher's own monitor: getListenerCollection hands back the live
+        // list, and addListener/removeListener synchronize on the dispatcher.
+        ActionListener[] snapshot;
+        synchronized (target) {
+            java.util.Collection current = target.getListenerCollection();
+            if (current == null || current.isEmpty()) {
+                return;
+            }
+            Object[] raw = current.toArray();
+            snapshot = new ActionListener[raw.length];
+            for (int i = 0; i < raw.length; i++) {
+                snapshot[i] = (ActionListener) raw[i];
+            }
         }
         // Boolean source so a listener can read the state straight off the event without a
         // second call back into the API, which is what makes an ordered replay meaningful.
         Display.getInstance().callSerially(
-                new TapjackingDispatch(target, new ActionEvent(Boolean.valueOf(obscured))));
+                new TapjackingDispatch(snapshot, new ActionEvent(Boolean.valueOf(obscured))));
     }
 
     /// One queued tapjacking announcement. A named static class rather than an anonymous one
     /// because it captures nothing from the implementation instance -- the same shape, and for
     /// the same reason, as ShieldSignals' own dispatch.
     private static final class TapjackingDispatch implements Runnable {
-        private final com.codename1.ui.util.EventDispatcher target;
+        private final ActionListener[] targets;
         private final ActionEvent event;
 
-        TapjackingDispatch(com.codename1.ui.util.EventDispatcher target, ActionEvent event) {
-            this.target = target;
+        TapjackingDispatch(ActionListener[] targets, ActionEvent event) {
+            this.targets = targets;
             this.event = event;
         }
 
         @Override
         public void run() {
-            target.fireActionEvent(event);
+            for (ActionListener l : targets) {
+                l.actionPerformed(event);
+            }
         }
     }
 
