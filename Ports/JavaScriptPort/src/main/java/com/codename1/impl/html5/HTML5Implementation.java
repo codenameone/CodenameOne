@@ -4316,23 +4316,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private static native boolean isIPad();
     
     
-    // Codename One has always preferred to work in CSS pixels (logical
-    // "real" pixels) end-to-end on the JS port -- we don't auto-scale to
-    // device pixels. Defaulting ``overridePixelRatio`` to 1 keeps:
-    //   * the canvas backing dimensions equal to CSS dimensions (no
-    //     HiDPI 2x backing surface),
-    //   * pointer-event coordinates flowing through unmultiplied (so a
-    //     click at CSS (574, 455) is delivered to Form.pointerPressed
-    //     as (574, 455), not (1148, 910) on a retina display),
-    //   * scaleCoord / unscaleCoord becoming no-ops.
-    // Anyone who specifically wants HiDPI rendering can opt in via the
-    // ``?pixelRatio=2`` URL parameter.
+    // Codename One addresses DEVICE pixels. The iOS port detects the retina factor and
+    // multiplies/divides the values it hands the native primitives, so the framework
+    // draws at the display's real resolution; this port works the same way, with
+    // scaleCoord/unscaleCoord converting at the DOM boundary (peers, overlays, pointer
+    // coordinates) and nowhere else.
+    //
+    // This used to default to 1, which made the canvas backing store equal to the CSS
+    // size -- so on any HiDPI display the browser upscaled a 1x bitmap, softening
+    // everything and text most visibly. ``?pixelRatio=N`` still pins a specific factor
+    // for the screenshot harness and the skin designer.
     @JSBody(params={}, script="if (window.overridePixelRatio === undefined) {"
             + "    var ratioStr = getParameterByName('pixelRatio');"
             + "    if (ratioStr != '') {"
             + "        window.overridePixelRatio = parseFloat(ratioStr);"
-            + "    } else {"
-            + "        window.overridePixelRatio = 1;"
             + "    }"
             + "    if (window.cn1ScaleCoord === undefined){ window.cn1ScaleCoord = function(x) { return x===-1?-1:x/(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"
             + "    if (window.cn1UnscaleCoord === undefined){ window.cn1UnscaleCoord = function(x) { return x===-1?-1:x*(window.overridePixelRatio || window.devicePixelRatio || 1.0);};}"

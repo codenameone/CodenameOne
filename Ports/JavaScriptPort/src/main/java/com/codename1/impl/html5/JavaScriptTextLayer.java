@@ -265,10 +265,12 @@ public final class JavaScriptTextLayer {
         StringBuilder textCss = new StringBuilder("position:absolute;white-space:pre;");
         textCss.append("left:").append((x - clipX) / scale).append("px;");
         textCss.append("top:").append((y - clipY) / scale).append("px;");
+        // The font shorthand carries its own line-height ("18.9px/1.0"), so it has to be
+        // written before the explicit line-height or it would reset it.
+        textCss.append("font:").append(font.getScaledCSS()).append(";");
         // Codename One lays text out against fontHeight(), so using it as the line box keeps
         // the DOM run on the same vertical rhythm as the canvas text it replaces.
         textCss.append("line-height:").append(font.fontHeight() / scale).append("px;");
-        textCss.append("font:").append(font.getScaledCSS()).append(";");
         textCss.append("color:").append(HTML5Graphics.color(color)).append(";");
         if (alpha < 255) {
             textCss.append("opacity:").append(alpha / 255.0).append(";");

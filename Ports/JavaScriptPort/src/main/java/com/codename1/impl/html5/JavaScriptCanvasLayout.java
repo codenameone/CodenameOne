@@ -75,8 +75,11 @@ public final class JavaScriptCanvasLayout {
         int backingHeight = cssHeight;
         String styleWidth = null;
         String styleHeight = null;
-        int hidpiWidth = (int) (cssWidth * devicePixelRatio);
-        int hidpiHeight = (int) (cssHeight * devicePixelRatio);
+        // Rounded, not truncated: at a fractional ratio such as 1.5 or 2.5 a truncated
+        // backing store no longer matches cssSize * ratio, so the browser rescales the
+        // canvas by a hair and every glyph edge softens.
+        int hidpiWidth = (int) Math.round(cssWidth * devicePixelRatio);
+        int hidpiHeight = (int) Math.round(cssHeight * devicePixelRatio);
         if (cssWidth != hidpiWidth) {
             backingWidth = hidpiWidth;
             backingHeight = hidpiHeight;
