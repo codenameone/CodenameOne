@@ -15973,6 +15973,43 @@ static NSMutableDictionary *cn1_secureStoragePlainQuery(NSString *account, NSStr
 // LocalAuthentication or block on a prompt, so they use a plain generic-password
 // keychain item while the async biometric methods below continue to use their
 // existing SecAccessControl path.
+// Whether a keychain item exists, which is not the same question as whether it can be read.
+// SecItemCopyMatching separates them: errSecItemNotFound means there is nothing under that
+// account, while any other failure means the keychain could not answer -- locked, an entitlement
+// problem, a daemon that is not talking. Reading alone cannot tell those apart, and a caller that
+// treats "could not read" as "not there" overwrites a key that exists, after which the database it
+// encrypted is unreadable for good.
+//
+// Asks for no data, only for the item's presence, so a locked item still answers.
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    if (account == JAVA_NULL) {
+        return -1;
+    }
+    JAVA_INT result;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    [q setObject:@NO forKey:(__bridge id)kSecReturnData];
+    [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, NULL);
+    if (status == errSecSuccess || status == errSecInteractionNotAllowed) {
+        // The second one is an item that is there but locked, which is presence, not absence.
+        result = 1;
+    } else if (status == errSecItemNotFound) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    return com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_lang_String_R_int(CN1_THREAD_STATE_PASS_ARG me, account);
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
     if (account == JAVA_NULL) {
         return JAVA_NULL;

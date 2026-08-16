@@ -67,6 +67,21 @@ public class LinuxSecureStorage extends SecureStorage {
     }
 
     @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        try {
+            // Whether the token is stored, not whether the secret behind it can be fetched. A
+            // keyring that is briefly unavailable leaves the token exactly where it was, and
+            // reporting the entry absent then is what would let a caller overwrite the key.
+            return Storage.getInstance().exists(key(account)) ? ENTRY_PRESENT : ENTRY_ABSENT;
+        } catch (Throwable cannotAsk) {
+            return ENTRY_UNKNOWN;
+        }
+    }
+
+    @Override
     public String get(String account) {
         if (account == null) {
             return null;

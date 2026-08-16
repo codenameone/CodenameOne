@@ -73,6 +73,22 @@ public final class IOSSecureStorage extends SecureStorage {
     }
 
     @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        try {
+            int state = nativeInstance.secureStorageEntryStatePlain(account);
+            if (state == 1) {
+                return ENTRY_PRESENT;
+            }
+            return state == 0 ? ENTRY_ABSENT : ENTRY_UNKNOWN;
+        } catch (Throwable cannotAsk) {
+            return ENTRY_UNKNOWN;
+        }
+    }
+
+    @Override
     public String get(String account) {
         if (account == null) {
             return null;

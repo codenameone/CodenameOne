@@ -708,8 +708,17 @@ public abstract class Database {
         // survived. One application's explicit alias can also be another database's name --
         // managed("shared") over here, a database called "shared" over there -- and deleting both
         // would take out a key its owner never named.
-        if (ManagedKeys.has(keyAlias)) {
+        int stored = ManagedKeys.state(keyAlias);
+        if (stored == com.codename1.security.SecureStorage.ENTRY_PRESENT) {
             return ManagedKeys.forget(keyAlias);
+        }
+        if (stored != com.codename1.security.SecureStorage.ENTRY_ABSENT) {
+            // The store could not be asked, so nothing here is known -- and the fallback below
+            // deletes a key filed under a different name. Where an explicit alias happens to be
+            // another database's name, which is the collision this method is careful about, a
+            // guess taken here removes that database's key and its data can never be read again.
+            // Reporting failure costs a retry; guessing costs somebody else's database.
+            return false;
         }
         String identity = Display.getInstance().databaseManagedKeyIdentity(keyAlias);
         if (identity != null && !identity.equals(keyAlias)) {

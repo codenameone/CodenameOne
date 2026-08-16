@@ -79,6 +79,21 @@ final class ManagedKeys {
                     + "any existing database unreadable.");
         }
 
+        // Nothing came back, which is not the same as nothing being there. Every platform's
+        // get() answers null for an entry it could not read as well as for one that does not
+        // exist, and generating on the strength of that overwrites a key that was there all
+        // along -- after which the database encrypted under the old one cannot be opened by
+        // anyone, ever. So the store is asked the question it can actually answer, and a key is
+        // generated only when it says the entry is absent.
+        if (storage.entryState(account) != SecureStorage.ENTRY_ABSENT) {
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,
+                    "The managed database key for '" + alias + "' could not be read, and this "
+                    + "platform cannot say whether one is stored. Refusing to generate a "
+                    + "replacement, because doing so would overwrite an existing key and leave "
+                    + "the database it encrypted unreadable. Try again when the key store is "
+                    + "available, or supply a passphrase with DatabaseConfig.passphrase().");
+        }
+
         byte[] generated = SecureRandom.bytes(KEY_LENGTH);
         if (!storage.set(account, toHex(generated))) {
             // Deliberately fatal. Carrying on with a key we cannot persist would
@@ -112,7 +127,30 @@ final class ManagedKeys {
     /// errSecItemNotFound as success -- so a caller choosing between two aliases has to look
     /// before it deletes rather than infer from what the delete returned.
     static boolean has(String alias) {
-        return SecureStorage.getInstance().get(accountName(alias)) != null;
+        return state(alias) == SecureStorage.ENTRY_PRESENT;
+    }
+
+    /// What the key store says about an alias: present, absent, or unknown.
+    ///
+    /// Separate from `#has(String)` because a caller that acts on absence has to tell absence from
+    /// a store that could not be asked. Deleting on the strength of a failed lookup is how an
+    /// unrelated database loses its key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `alias`: the logical key name
+    ///
+    /// #### Returns
+    ///
+    /// one of the `SecureStorage` entry states
+    static int state(String alias) {
+        SecureStorage storage = SecureStorage.getInstance();
+        String account = accountName(alias);
+        if (storage.get(account) != null) {
+            // Readable, so it is certainly there, whatever the store would say about it.
+            return SecureStorage.ENTRY_PRESENT;
+        }
+        return storage.entryState(account);
     }
 
     /// Maps an alias to the `SecureStorage` account name.

@@ -1270,6 +1270,17 @@ public final class IOSNative {
     /** Synchronous keychain read without biometric prompting. */
     native String secureStorageGetPlain(String account);
 
+    /**
+     * Whether a keychain item exists: 1 present, 0 absent, -1 the keychain could not say.
+     *
+     * <p>Separate from {@link #secureStorageGetPlain(String)}, which answers null for an item that
+     * is not there and for one it could not read.
+     *
+     * @param account the item to ask about
+     * @return the state
+     */
+    native int secureStorageEntryStatePlain(String account);
+
     /** Synchronous keychain write without biometric prompting. */
     native boolean secureStorageSetPlain(String account, String value);
 

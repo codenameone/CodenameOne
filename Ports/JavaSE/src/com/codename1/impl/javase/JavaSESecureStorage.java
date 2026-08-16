@@ -154,6 +154,16 @@ public final class JavaSESecureStorage extends SecureStorage {
     }
 
     @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        // The stored string, not the decrypted value: an entry whose ciphertext will not decrypt
+        // still exists, and reporting it absent is what would let a caller overwrite it.
+        return plainPrefs.get(VALUE_PREFIX + account, null) != null ? ENTRY_PRESENT : ENTRY_ABSENT;
+    }
+
+    @Override
     public String get(String account) {
         if (account == null) {
             return null;

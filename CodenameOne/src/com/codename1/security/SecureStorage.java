@@ -176,4 +176,37 @@ public class SecureStorage {
     public boolean remove(String account) {
         return false;
     }
+
+    /// The entry is there.
+    public static final int ENTRY_PRESENT = 1;
+
+    /// The store answered, and there is nothing under that account.
+    public static final int ENTRY_ABSENT = 0;
+
+    /// The store could not be asked, so nothing is known about the entry.
+    public static final int ENTRY_UNKNOWN = -1;
+
+    /// Whether an entry exists, as distinct from whether it can be read.
+    ///
+    /// `#get(String)` cannot answer this: it returns null for an entry that is not there and for
+    /// one it could not read, and a caller that treats those alike will eventually treat a store
+    /// that is briefly unavailable as a store that is empty. Where that caller then writes -- a
+    /// managed database key is the case this was added for -- it overwrites a key that was there
+    /// all along, and the database encrypted under the old one can never be opened again.
+    ///
+    /// A port answers `#ENTRY_PRESENT` for an entry it can see even if it cannot decrypt it: the
+    /// question is existence, not readability. The default is `#ENTRY_UNKNOWN`, which is the
+    /// honest answer for a platform with no non-prompting store, and callers must treat it as
+    /// "do not write".
+    ///
+    /// #### Parameters
+    ///
+    /// - `account`: the entry to ask about
+    ///
+    /// #### Returns
+    ///
+    /// one of `#ENTRY_PRESENT`, `#ENTRY_ABSENT` or `#ENTRY_UNKNOWN`
+    public int entryState(String account) {
+        return ENTRY_UNKNOWN;
+    }
 }

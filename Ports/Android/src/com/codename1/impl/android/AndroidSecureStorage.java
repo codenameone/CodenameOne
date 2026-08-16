@@ -279,6 +279,25 @@ public final class AndroidSecureStorage extends SecureStorage {
     }
 
     @Override
+    public int entryState(String account) {
+        if (account == null) {
+            return ENTRY_UNKNOWN;
+        }
+        if (Build.VERSION.SDK_INT < 23) {
+            return legacyPlainGet(account) != null ? ENTRY_PRESENT : ENTRY_ABSENT;
+        }
+        SharedPreferences prefs = plainPrefs();
+        if (prefs == null) {
+            // The store itself could not be opened, so nothing can be said about what is in it.
+            return ENTRY_UNKNOWN;
+        }
+        // contains(), not get(): the question is whether an entry exists, and an entry that is
+        // there but cannot be decrypted still exists. Answering absent for it is what would let a
+        // caller overwrite a key it could not read.
+        return prefs.contains(account) ? ENTRY_PRESENT : ENTRY_ABSENT;
+    }
+
+    @Override
     public String get(String account) {
         if (account == null) {
             return null;
