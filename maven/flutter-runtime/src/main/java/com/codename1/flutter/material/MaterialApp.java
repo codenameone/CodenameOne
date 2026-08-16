@@ -394,9 +394,25 @@ public class MaterialApp extends StatelessWidget {
         }
     }
 
+    /**
+     * The locale the app runs in — Flutter's resolution order: an explicit {@code locale}
+     * wins, otherwise the app's {@code localeListResolutionCallback} is asked to choose
+     * from the device's locales, otherwise the first supported locale.
+     *
+     * <p>Asking the callback is not optional politeness. It is where an app learns what the
+     * device asked for: the gallery's records the device locale in a global that its own
+     * {@code GalleryOptions.locale} falls back to, and everything derived from that — the
+     * text direction, most obviously — is null until the callback has run. Skipping it left
+     * {@code resolvedTextDirection()} returning null, and the settings icon's tap handler
+     * asserts that value is non-null, so opening settings threw.</p>
+     */
     private Locale effectiveLocale() {
         if (locale != null) {
             return locale;
+        }
+        Locale chosen = askResolutionCallback();
+        if (chosen != null) {
+            return chosen;
         }
         if (supportedLocales instanceof Iterable) {
             for (Object l : (Iterable<?>) supportedLocales) {
@@ -406,6 +422,54 @@ public class MaterialApp extends StatelessWidget {
             }
         }
         return new Locale("en", null);
+    }
+
+    /// Runs the app's locale-resolution callback once, over the device's locales.
+    private Locale askResolutionCallback() {
+        if (localeListResolutionCallback == null || resolutionAsked) {
+            return resolvedByCallback;
+        }
+        resolutionAsked = true;
+        try {
+            DartList<Locale> device = deviceLocales();
+            DartIterable<Locale> supported = supportedLocaleList();
+            resolvedByCallback = localeListResolutionCallback.call(device, supported);
+        } catch (Throwable t) {
+            com.codename1.flutter.FlutterErrorReport.record(t);
+        }
+        return resolvedByCallback;
+    }
+
+    private boolean resolutionAsked;
+    private Locale resolvedByCallback;
+
+    /// What the platform reports, as Flutter's ordered preference list.
+    private DartList<Locale> deviceLocales() {
+        DartList<Locale> out = new DartList<Locale>();
+        try {
+            String lang = com.codename1.l10n.L10NManager.getInstance().getLanguage();
+            if (lang != null && lang.length() > 0) {
+                out.add(new Locale(lang, null));
+            }
+        } catch (Throwable ignore) {
+            // headless
+        }
+        if (out.isEmpty()) {
+            out.add(new Locale("en", null));
+        }
+        return out;
+    }
+
+    private DartIterable<Locale> supportedLocaleList() {
+        DartList<Locale> out = new DartList<Locale>();
+        if (supportedLocales instanceof Iterable) {
+            for (Object l : (Iterable<?>) supportedLocales) {
+                if (l instanceof Locale) {
+                    out.add((Locale) l);
+                }
+            }
+        }
+        return DartIterable.wrap(out);
     }
 
     @Override
