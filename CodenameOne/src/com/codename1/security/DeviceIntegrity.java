@@ -23,9 +23,10 @@
 package com.codename1.security;
 
 import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.util.AsyncResource;
 
-/// Device-integrity and runtime self-protection (RASP) entry point. Groups three families of
+/// Device-integrity and runtime self-protection (RASP) entry point. Groups four families of
 /// security primitives that an app -- a banking app in particular -- can use to react to a hostile
 /// runtime environment:
 ///
@@ -41,6 +42,11 @@ import com.codename1.util.AsyncResource;
 ///    [#hasUntrustedAccessibilityService(String...)] detect malware that abuses Android accessibility
 ///    services for overlays, remote control and on-screen text extraction, and [#setSecureScreen(boolean)]
 ///    blocks screenshots, screen recording and accessibility screen scraping on sensitive screens.
+/// 4. **Tapjacking / overlay defense** -- [#setTapjackingProtection(TapjackingPolicy)] detects, and
+///    optionally drops, touches that arrive while another app's window is drawn over yours, and
+///    [#setHideOverlayWindows(boolean)] asks Android 12+ to remove such windows outright. Where
+///    family 3 asks "is a hostile accessibility service installed", this one answers "is something
+///    covering the screen right now".
 ///
 /// #### Zero-code build hints
 ///
@@ -57,18 +63,26 @@ import com.codename1.util.AsyncResource;
 /// - `android.accessibilityGuard=true` (optionally `android.accessibilityGuard.allow=<csv packages>`
 ///   and `android.accessibilityGuard.mode=exit|warn`) -- checks the enabled accessibility services at
 ///   launch and exits (or logs) when an untrusted one is active.
+/// - `android.tapjackingGuard=true` (optionally `android.tapjackingGuard.mode=block|strict|report`
+///   and `android.tapjackingGuard.hideOverlays=true|false`) -- applies a tapjacking policy at
+///   startup and, by default, also asks Android 12+ to hide overlay windows, with no app code.
 ///
 /// #### Platform support
 ///
 /// - **Android** -- full support. Attestation via Play Integrity (requires the `android.playIntegrity`
 ///   build hint to bundle the SDK), RASP via the root/Frida/emulator checks, accessibility enumeration
-///   via the system settings, and secure screens via `FLAG_SECURE`.
+///   via the system settings, and secure screens via `FLAG_SECURE`. Tapjacking detection reads the
+///   obscured flags carried on each touch; [#setHideOverlayWindows(boolean)] needs Android 12+.
 /// - **iOS** -- attestation via App Attest (requires the `ios.appAttest` build hint), RASP via the
 ///   jailbreak detector. Accessibility-service enumeration and [#setSecureScreen(boolean)] are
-///   Android-only concepts and are no-ops on iOS.
+///   Android-only concepts and are no-ops on iOS. So is the tapjacking family: iOS gives no
+///   application a way to draw over another app, so there is nothing to detect and
+///   [#isScreenObscured()] is always false. (Screen recording and mirroring are a different threat,
+///   covered by the `ios.disableScreenshots` build hint.)
 /// - **JavaSE simulator / other ports** -- behave as a clean, unsupported device: attestation
 ///   completes with an error, [#isDeviceCompromised()] returns false and the accessibility list is
-///   empty. Application code never needs platform `if` statements.
+///   empty. Application code never needs platform `if` statements. The simulator can fake an
+///   overlay from `Simulate > App Shield > Screen Overlay (Tapjacking)`.
 public final class DeviceIntegrity {
 
     private DeviceIntegrity() {
@@ -232,5 +246,99 @@ public final class DeviceIntegrity {
     /// - `secure`: true to protect the screen, false to clear the protection
     public static void setSecureScreen(boolean secure) {
         Display.getInstance().setSecureScreen(secure);
+    }
+
+    /// Sets what the framework does about touches that arrive while another application's window is
+    /// drawn over this app -- a tapjacking attack.
+    ///
+    /// The default is [TapjackingPolicy#OFF]. [TapjackingPolicy#BLOCK] is the recommended setting
+    /// for a sensitive app: it drops any gesture that starts on a fully obscured window, and
+    /// reports it. Set this once during startup.
+    ///
+    /// ```java
+    /// DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+    /// DeviceIntegrity.addTapjackingListener(e -> {
+    ///     if (DeviceIntegrity.isScreenObscured()) {
+    ///         Dialog.show("Security warning",
+    ///             "Another app is drawing over this screen. Close it before continuing.",
+    ///             "OK", null);
+    ///     }
+    /// });
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `policy`: the policy to apply; null is treated as [TapjackingPolicy#OFF]
+    public static void setTapjackingProtection(TapjackingPolicy policy) {
+        Display.getInstance().setTapjackingProtection(policy);
+    }
+
+    /// The tapjacking policy currently in force. Never null; [TapjackingPolicy#OFF] until set.
+    public static TapjackingPolicy getTapjackingPolicy() {
+        return Display.getInstance().getTapjackingPolicy();
+    }
+
+    /// True when the **most recently observed touch** arrived while another application's window was
+    /// drawn over this app.
+    ///
+    /// Read that literally. Android reports obscuring as a flag on a delivered touch event, so this
+    /// is not a live query of the window stack: if an overlay appears and the user never touches
+    /// the screen, nothing is observed and this stays false. It also only becomes live once a
+    /// policy other than [TapjackingPolicy#OFF] is set.
+    ///
+    /// That reactive limitation is the reason [#setHideOverlayWindows(boolean)] exists -- it
+    /// prevents the overlay instead of noticing it after the fact.
+    ///
+    /// #### Returns
+    ///
+    /// true if the last observed touch was obscured
+    public static boolean isScreenObscured() {
+        return Display.getInstance().isScreenObscured();
+    }
+
+    /// Registers a listener notified when the obscured state **changes** -- once when an overlay is
+    /// first observed, and again when a later touch arrives clean, so an app can raise and then
+    /// dismiss a warning. It does not fire per touch.
+    ///
+    /// This matters when the policy blocks: a blocked gesture is never delivered to your components,
+    /// so this listener is the only way the app learns the tap happened at all. Callbacks arrive on
+    /// the EDT, and the [com.codename1.ui.events.ActionEvent] source is a `Boolean` carrying the new
+    /// state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addTapjackingListener(ActionListener l) {
+        Display.getInstance().addTapjackingListener(l);
+    }
+
+    /// Removes a listener added by [#addTapjackingListener(ActionListener)].
+    public static void removeTapjackingListener(ActionListener l) {
+        Display.getInstance().removeTapjackingListener(l);
+    }
+
+    /// Asks the OS to hide non-system windows drawn over this app while it is in the foreground
+    /// (Android 12 / API 31 `Window.setHideOverlayWindows`).
+    ///
+    /// This is the strongest of the tapjacking defenses and the only one that also covers native
+    /// peer components such as `BrowserComponent` and native text fields, because it removes the
+    /// overlay rather than filtering the touches it enables. Pair it with [#setSecureScreen(boolean)]
+    /// when entering a sensitive screen and clear both on the way out.
+    ///
+    /// Requires Android 12 or newer -- check [#isHideOverlayWindowsSupported()]. On older Android
+    /// releases, and on every other platform, this is a no-op and the touch level policy set by
+    /// [#setTapjackingProtection(TapjackingPolicy)] is what protects the app.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hide`: true to hide overlay windows, false to allow them again
+    public static void setHideOverlayWindows(boolean hide) {
+        Display.getInstance().setHideOverlayWindows(hide);
+    }
+
+    /// True when [#setHideOverlayWindows(boolean)] is actually enforced by this platform, i.e. on
+    /// Android 12 and newer. False elsewhere, where the call is silently ignored.
+    public static boolean isHideOverlayWindowsSupported() {
+        return Display.getInstance().isHideOverlayWindowsSupported();
     }
 }

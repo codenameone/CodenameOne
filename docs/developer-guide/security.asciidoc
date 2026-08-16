@@ -230,6 +230,35 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 NOTE: Accessibility-service enumeration and `setSecureScreen()` are Android concepts; on iOS they're no-ops (iOS has no equivalent third-party accessibility-service threat model). Use `ios.disableScreenshots=true` to block screen capture on iOS as described in <<Disabling screenshots>>.
 
+==== Defending against tapjacking and screen overlays (Android)
+
+Tapjacking is the other half of the same attack. Instead of driving your app through an accessibility service, a malicious app draws its own window on top of yours -- a fake PIN pad, a fake confirmation button, or an invisible layer -- so the user believes they're tapping your UI while the tap is being framed, or harvested, by someone else. It's the classic way a banking transfer gets confirmed by a user who thought they were dismissing a notice.
+
+Android exposes this as flags on each touch event, and Codename One turns that into a policy you set once:
+
+* `android.tapjackingGuard=true` -- switches on protection at launch with no code. By default it blocks obscured touches and asks Android 12+ to hide overlay windows.
+* `android.tapjackingGuard.mode=block|strict|report` -- `block` (default) drops any gesture that starts while another window covers the touched point. `report` observes without changing behavior, which is the safe way to measure how often this happens in your user base first. `strict` also drops *partially* obscured touches; read the warning below before choosing it.
+* `android.tapjackingGuard.hideOverlays=true|false` -- whether to also call `setHideOverlayWindows()`. Defaults to `true`.
+
+The runtime API gives you the same control plus a notification:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava017Snippet.java[tag=security-java-017,indent=0]
+----
+
+Two properties of this API are worth being precise about, because getting them wrong leads to a false sense of coverage.
+
+*Detection is touch-driven, not a live window query.* Android reports obscuring as a flag on a delivered `MotionEvent`, so `isScreenObscured()` means "the most recently observed touch arrived obscured". If an overlay appears and the user never touches the screen, nothing is observed. That's a platform limitation, not an implementation gap.
+
+*A blocked gesture is dropped in full.* Swallowing only the press and delivering the release would leave the framework holding half a gesture, so once a gesture starts obscured, everything through to the matching release is discarded. Your components see nothing at all -- which is exactly why the listener exists, and why an app that blocks should register one rather than rely on polling.
+
+`setHideOverlayWindows(true)` is the strongest of the three defenses and the only one that also covers native peer components such as `BrowserComponent` and native text fields, because it removes the offending window instead of filtering the touches it enables. It needs Android 12 (API 31); check `isHideOverlayWindowsSupported()`. Pair it with `setSecureScreen(true)` when you enter a sensitive screen and clear both on the way out.
+
+WARNING: `strict` mode blocks partially obscured touches, and ordinary system UI sets that flag routinely. On some devices this will discard taps the user intended and the app will simply feel broken, with nothing in the logs to explain it. Use it only where a missed tap is clearly preferable to a hijacked one, and test it on real hardware.
+
+NOTE: This family is Android-only. iOS gives no application a way to draw over another app, so there is nothing to detect: `isScreenObscured()` is always false and the policy has no effect. Screen recording and mirroring are a different threat, covered by `ios.disableScreenshots=true`. In the simulator, *Simulate > App Shield > Screen Overlay (Tapjacking)* fakes an overlay so you can exercise your listener on the desktop.
+
 === Strong Android certificates
 
 When Android launched RSA1024 with SHA1 was considered strong enough for the foreseeable future, this hasn't changed completely but the recommendation today is to use stronger ciphers for signing & encrypting as those can be compromised.

@@ -221,6 +221,15 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 |android.rootCheck
 |Boolean true/false defaults to false. Indicates whether the app should check for root access on the device. If root access is detected, the app will exit.
 
+|android.tapjackingGuard
+|Boolean true/false defaults to false. Switches on tapjacking / screen-overlay protection at launch, so touches that arrive while another app's window covers this one are detected and dropped. See the security chapter.
+
+|android.tapjackingGuard.mode
+|`block` (default), `strict`, `report` or `off`. `block` drops gestures that start on a fully obscured window, `report` only observes, `strict` also drops partially obscured touches (which benign system UI can trigger). Only relevant if `android.tapjackingGuard=true`.
+
+|android.tapjackingGuard.hideOverlays
+|Boolean true/false defaults to true. Also asks Android 12+ to hide overlay windows drawn over the app, which is the only mitigation that covers native peer components. Only relevant if `android.tapjackingGuard=true`.
+
 |android.fridaDetection
 |Boolean true/false defaults to false. Indicates whether the app should check for the presence of the https://www.frida.re/[Frida] dynamic instrumentation toolkit on the device. If Frida is detected, the app will exit. This uses the [frida-blocker](https://github.com/shannah/frida-blocker) library to perform the frida detection.
 

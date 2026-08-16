@@ -31,6 +31,7 @@ import android.util.Log;
 import android.view.*;
 import android.view.inputmethod.EditorInfo;
 import android.os.Build;
+import com.codename1.security.TapjackingPolicy;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -630,7 +631,58 @@ public class CodenameOneView {
 
     private boolean cn1GrabbedPointer = false;
     //private boolean nativePeerGrabbedPointer = false;
-    
+
+    /**
+     * Android's own obscured-touch filtering, which
+     * {@code View.setFilterTouchesWhenObscured(true)} enables, runs inside
+     * {@code View.dispatchTouchEvent} via {@code onFilterTouchEventForSecurity}.
+     * {@link AndroidAsyncView#dispatchTouchEvent} -- the primary surface on every
+     * modern device -- calls straight into {@link #onTouchEvent} and only falls
+     * back to {@code super} when we decline the event, so that filtering never
+     * runs on the path CN1 components are actually reached through. The check has
+     * to be made explicitly here, or the flag would look enabled and do nothing.
+     *
+     * <p>Latched for the duration of a gesture rather than evaluated per event:
+     * dropping only the ACTION_DOWN would deliver a pointerReleased with no
+     * matching pointerPressed and leave the framework holding half a gesture.</p>
+     */
+    private boolean tapjackBlockedGesture = false;
+
+    /**
+     * MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED. Added in API 21 but absent
+     * from the android.jar this port compiles against, so the value is inlined --
+     * the same approach the port already takes for FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
+     * in AndroidImplementation.
+     */
+    private static final int FLAG_WINDOW_IS_PARTIALLY_OBSCURED = 0x2;
+
+    /**
+     * Reports the obscured flags on an event and answers whether the touch it
+     * belongs to must be withheld from the application.
+     *
+     * @param event the event being handled
+     * @return true when the caller must not dispatch this event
+     */
+    private boolean tapjacked(MotionEvent event) {
+        TapjackingPolicy policy = this.implementation.getTapjackingPolicy();
+        if (policy == null || !policy.isDetecting()) {
+            return false;
+        }
+        boolean obscured;
+        boolean partial;
+        try {
+            int flags = event.getFlags();
+            obscured = (flags & MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0;
+            partial = (flags & FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0;
+        } catch (Throwable t) {
+            // Detection must never break input handling.
+            return false;
+        }
+        this.implementation.notifyScreenObscured(obscured || partial,
+                obscured ? "obscured" : (partial ? "partiallyObscured" : null));
+        return policy.blocks(obscured, partial);
+    }
+
     public boolean onTouchEvent(MotionEvent event) {
 
         if (this.implementation.getCurrentForm() == null) {
@@ -712,6 +764,27 @@ public class CodenameOneView {
         }
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
 
+        // Tapjacking: a gesture that starts obscured is dropped in full.
+        //
+        // Returns true unconditionally rather than the consumeEvent computed above. That value
+        // is false when the touch landed on a native peer, and returning it would send the event
+        // back to AndroidAsyncView.dispatchTouchEvent, which then hands it to
+        // super.dispatchTouchEvent and straight on to the peer -- delivering to a
+        // BrowserComponent or a native text field precisely the touch we are withholding from
+        // everything else. Claiming the event is what actually drops it.
+        boolean blocked = tapjacked(event);
+        int tapjackAction = event.getAction();
+        if (tapjackAction == MotionEvent.ACTION_DOWN) {
+            tapjackBlockedGesture = blocked;
+        }
+        if (tapjackBlockedGesture) {
+            if (tapjackAction == MotionEvent.ACTION_UP || tapjackAction == MotionEvent.ACTION_CANCEL) {
+                tapjackBlockedGesture = false;
+                cn1GrabbedPointer = false;
+            }
+            return true;
+        }
+
         updatePointerMetadata(event, false);
 
         switch (event.getAction()) {
@@ -756,6 +829,9 @@ public class CodenameOneView {
         if (this.implementation.getCurrentForm() == null) {
             return false;
         }
+        if (tapjacked(event)) {
+            return true;
+        }
         final int x = (int) event.getX();
         final int y = (int) event.getY();
         updatePointerMetadata(event, true);
@@ -783,6 +859,9 @@ public class CodenameOneView {
     public boolean onGenericMotionEvent(MotionEvent event) {
         if (this.implementation.getCurrentForm() == null) {
             return false;
+        }
+        if (tapjacked(event)) {
+            return true;
         }
         if (event.getActionMasked() == MotionEvent.ACTION_SCROLL) {
             int x = (int) event.getX();

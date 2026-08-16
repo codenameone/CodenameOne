@@ -45,6 +45,11 @@ public final class ShieldSignal {
     public static final String REPACKAGED = "repackaged";
     /// An accessibility service that is not on the allow list is enabled.
     public static final String ACCESSIBILITY = "accessibility";
+    /// Another application's window was drawn over this app while it was being touched, which is
+    /// how a tapjacking attack presents itself. Unlike the signals above this describes a moment
+    /// rather than a property of the device: see
+    /// [com.codename1.security.DeviceIntegrity#isScreenObscured()].
+    public static final String TAPJACK = "tapjack";
 
     private final String id;
     private final int severity;

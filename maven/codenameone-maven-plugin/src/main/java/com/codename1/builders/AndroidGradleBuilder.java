@@ -108,6 +108,8 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean accessibilityGuard = false;
 
+    private boolean tapjackingGuard = false;
+
     private boolean useGradle8 = true;
 
     // Flag to indicate whether we should strip kotlin from user classes
@@ -917,6 +919,7 @@ public class AndroidGradleBuilder extends Executor {
         fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
         playIntegrity = request.getArg("android.playIntegrity", "false").equals("true");
         accessibilityGuard = request.getArg("android.accessibilityGuard", "false").equals("true");
+        tapjackingGuard = request.getArg("android.tapjackingGuard", "false").equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
@@ -6803,6 +6806,29 @@ public class AndroidGradleBuilder extends Executor {
 
         if (request.getArg("android.disableScreenshots", "false").equalsIgnoreCase("true")) {
             retVal += "Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
+        }
+
+        // android.tapjackingGuard turns on overlay/tapjacking protection with no app code.
+        // Unlike rootCheck/accessibilityGuard this is not a launch-time exit gate, it is a
+        // standing runtime policy, so it is delivered as a Display property that
+        // AndroidImplementation applies rather than as generated code in onCreate.
+        if (tapjackingGuard) {
+            // Locale.ENGLISH, not the default locale: in a Turkish locale "STRICT".toLowerCase()
+            // yields "strıct" (dotless i), which would silently miss the match below.
+            String mode = request.getArg("android.tapjackingGuard.mode", "block")
+                    .trim().toLowerCase(java.util.Locale.ENGLISH);
+            if (!"block".equals(mode) && !"strict".equals(mode) && !"report".equals(mode)
+                    && !"off".equals(mode)) {
+                // A typo here would silently ship an unprotected app, so say so and use the
+                // documented default rather than passing the bad value through.
+                log("WARNING: unrecognized android.tapjackingGuard.mode '" + mode
+                        + "', using 'block'. Valid values are block, strict, report, off.");
+                mode = "block";
+            }
+            retVal += "Display.getInstance().setProperty(\"TapjackingProtection\", \"" + mode + "\");\n";
+            if (request.getArg("android.tapjackingGuard.hideOverlays", "true").equalsIgnoreCase("true")) {
+                retVal += "Display.getInstance().setProperty(\"HideOverlayWindows\", \"true\");\n";
+            }
         }
 
 

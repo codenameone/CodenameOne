@@ -8734,6 +8734,19 @@ public class JavaSEPort extends CodenameOneImplementation {
                         JavaSEShield.simUntrustedAccessibility = v;
                     }
                 }));
+        shieldMenu.add(shieldToggle(pref, "Screen Overlay (Tapjacking)",
+                "ShieldSim.tapjack", new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simScreenObscured = v;
+                        // Drive the real state machine rather than overriding
+                        // isScreenObscured(). Setting a flag the getter reads would leave
+                        // the tapjacking listeners and the ShieldSignal silent, so the
+                        // switch would report a state it did not actually cause -- which
+                        // is the failure this menu exists to avoid.
+                        notifyScreenObscured(v, v ? "simulated" : null);
+                    }
+                }));
 
         shieldMenu.addSeparator();
 
@@ -19514,6 +19527,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         // No OS-level equivalent on the desktop. Recorded so the menu can show
         // whether the app asked for it, which is what a developer is checking.
         JavaSEShield.secureScreen = secure;
+    }
+
+    @Override
+    public void setHideOverlayWindows(boolean hide) {
+        // As above: the desktop has no overlay windows to hide, so this is
+        // recorded rather than acted on.
+        JavaSEShield.hideOverlayWindows = hide;
     }
 
     @Override

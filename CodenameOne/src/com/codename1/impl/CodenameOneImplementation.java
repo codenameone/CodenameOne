@@ -70,6 +70,7 @@ import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
+import com.codename1.security.TapjackingPolicy;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
@@ -11333,6 +11334,99 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `secure`: true to mark the window secure, false to clear the flag
     public void setSecureScreen(boolean secure) {
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Tapjacking / screen-overlay defense. The state lives here rather than in a port so every
+    // platform inherits the same reporting and dispatch semantics, and a port only has to supply
+    // the one thing it alone can know: whether a given touch arrived obscured.
+    // -----------------------------------------------------------------------------------------
+
+    private TapjackingPolicy tapjackingPolicy = TapjackingPolicy.OFF;
+    private boolean screenObscured;
+    private com.codename1.ui.util.EventDispatcher tapjackingListeners;
+
+    /// Sets the tapjacking policy. See
+    /// [com.codename1.security.DeviceIntegrity#setTapjackingProtection(TapjackingPolicy)]. Ports
+    /// that can also apply a platform level filter override this, call `super`, and apply it.
+    public void setTapjackingProtection(TapjackingPolicy policy) {
+        tapjackingPolicy = policy == null ? TapjackingPolicy.OFF : policy;
+    }
+
+    /// The tapjacking policy currently in force. Never null.
+    public TapjackingPolicy getTapjackingPolicy() {
+        return tapjackingPolicy;
+    }
+
+    /// True when the most recently observed touch arrived while another application's window was
+    /// drawn over this app. Always false where the platform cannot report it.
+    public boolean isScreenObscured() {
+        return screenObscured;
+    }
+
+    /// Registers a listener notified when the obscured state changes. See
+    /// [com.codename1.security.DeviceIntegrity#addTapjackingListener(ActionListener)].
+    public void addTapjackingListener(ActionListener l) {
+        if (l == null) {
+            return;
+        }
+        if (tapjackingListeners == null) {
+            tapjackingListeners = new com.codename1.ui.util.EventDispatcher();
+        }
+        tapjackingListeners.addListener(l);
+    }
+
+    /// Removes a listener added by [#addTapjackingListener(ActionListener)].
+    public void removeTapjackingListener(ActionListener l) {
+        if (l == null || tapjackingListeners == null) {
+            return;
+        }
+        tapjackingListeners.removeListener(l);
+    }
+
+    /// Called by a port when it observes a touch, to report whether that touch was obscured.
+    ///
+    /// Only a *change* is acted on. A port calls this for every touch it handles, so notifying
+    /// unconditionally would put a runnable on the EDT per touch and re-raise the same signal
+    /// forever; the interesting events are "an overlay appeared" and "it went away". The signal is
+    /// raised on the [com.codename1.security.shield.ShieldSignals] bus at severity 80, above
+    /// `ROOT` because an overlay over a live screen is an attack in progress rather than a standing
+    /// property of the device, and below `HOOK` because it has benign causes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obscured`: true when the observed touch was obscured
+    /// - `detail`: a short machine readable description of which flag fired, or null
+    public void notifyScreenObscured(boolean obscured, String detail) {
+        if (obscured == screenObscured) {
+            return;
+        }
+        screenObscured = obscured;
+        if (obscured) {
+            try {
+                com.codename1.security.shield.ShieldSignals.add(
+                        com.codename1.security.shield.ShieldSignal.TAPJACK, 80, detail);
+            } catch (Throwable t) {
+                // Reporting must never break input handling: this runs on the touch path.
+                Log.e(t);
+            }
+        }
+        if (tapjackingListeners != null && tapjackingListeners.hasListeners()) {
+            // Boolean source so a listener can read the new state straight off the event without
+            // a second call back into the API.
+            tapjackingListeners.fireActionEvent(new ActionEvent(Boolean.valueOf(obscured)));
+        }
+    }
+
+    /// Asks the OS to hide non-system windows drawn over this app while it is in the foreground.
+    /// See [com.codename1.security.DeviceIntegrity#setHideOverlayWindows(boolean)]. No-op where
+    /// unsupported.
+    public void setHideOverlayWindows(boolean hide) {
+    }
+
+    /// True where [#setHideOverlayWindows(boolean)] actually does something.
+    public boolean isHideOverlayWindowsSupported() {
+        return false;
     }
 
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's

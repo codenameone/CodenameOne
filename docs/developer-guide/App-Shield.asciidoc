@@ -354,6 +354,9 @@ None of this is testable against a real service on a developer's desktop, so the
 |Device signal toggles
 |Rooted / jailbroken, hooking framework, emulator, debugger, repackaged, untrusted accessibility service -- each raising the signal your code reacts to.
 
+|*Screen Overlay (Tapjacking)*
+|Fakes another app drawing over yours. It drives the real reporting path rather than setting a flag, so your tapjacking listener fires and the `tapjack` signal is raised exactly as it would be on a device. The desktop has no overlay windows, so this is the only way to reach that branch outside Android.
+
 |*Serve Expired Token*
 |The refresh path, without waiting out a real token's lifetime.
 
