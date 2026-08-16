@@ -455,6 +455,19 @@ public final class WindowsNative {
      */
     public static native String fileIdentity(String path);
 
+    /**
+     * The operating system's own upper-casing of a string, which is the rule the filesystem
+     * compares names by.
+     *
+     * <p>Unlike {@link #fileIdentity(String)} this needs no file: it is a property of the text, so
+     * it is stable before the file exists and after it has been deleted and made again. That is
+     * what a managed key alias needs.
+     *
+     * @param text the string to fold
+     * @return the folded string, or null if the platform would not fold it
+     */
+    public static native String caseFold(String text);
+
     public static native boolean fileIsDirectory(String path);
 
     public static native long fileLength(String path);

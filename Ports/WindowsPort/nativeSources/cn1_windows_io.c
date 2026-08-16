@@ -234,6 +234,49 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileExists___java_lang_Str
  * FILE_FLAG_BACKUP_SEMANTICS so a directory can be identified too, and every share mode so
  * identifying a file never blocks the connection already using it.
  */
+/*
+ * Upper-case a string the way the filesystem does.
+ *
+ * NTFS decides that two names are one file with an upcase table, and CharUpperW is that table --
+ * not the process locale. String.toLowerCase on this target folds through towlower, which reads
+ * the C locale and commonly maps ASCII alone, so two spellings of a non-ASCII name folded apart
+ * and derived two different managed keys: the second open of an intact database then reported a
+ * wrong key.
+ *
+ * Deliberately text and not a file handle. A managed key has to be found again after its database
+ * has been deleted and recreated, so its alias cannot depend on the file existing.
+ */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_caseFold___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* text = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    int bytes;
+    char* utf8;
+    JAVA_OBJECT out;
+    if (text == NULL) {
+        return JAVA_NULL;
+    }
+    CharUpperW(text);
+    bytes = WideCharToMultiByte(CP_UTF8, 0, text, -1, NULL, 0, NULL, NULL);
+    if (bytes <= 0) {
+        free(text);
+        return JAVA_NULL;
+    }
+    utf8 = (char*) malloc((size_t) bytes);
+    if (utf8 == NULL) {
+        free(text);
+        return JAVA_NULL;
+    }
+    if (WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, bytes, NULL, NULL) <= 0) {
+        free(utf8);
+        free(text);
+        return JAVA_NULL;
+    }
+    free(text);
+    out = newStringFromCString(threadStateData, utf8);
+    free(utf8);
+    return out;
+}
+
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileIdentity___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
     UINT32 len = 0;
     WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);

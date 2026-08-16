@@ -113,6 +113,16 @@ class WindowsDatabase extends Database {
             opened = true;
         } finally {
             if (!opened) {
+                // The handle first, and only then the registration. Anything that fails after the
+                // open leaves a live SQLite handle that no caller can reach -- construction did
+                // not complete, so nobody has this object to close it -- and adopting the file
+                // identity is a step that can fail, because the identity it moves to may already
+                // be claimed by a delete or a conversion. Closing before releasing also means the
+                // file is never unregistered while this connection still holds it open.
+                if (peer != 0) {
+                    WindowsNative.sqlDbClose(peer);
+                    peer = 0;
+                }
                 releaseOpenDatabase(openKey);
             }
         }
@@ -213,7 +223,24 @@ class WindowsDatabase extends Database {
         if (path == null) {
             return null;
         }
-        return normalizeDatabasePathKey(path.replace('\\', '/')).toLowerCase();
+        String normalized = normalizeDatabasePathKey(path.replace('\\', '/'));
+        // Folded by the platform, because the platform is what decides two names are one file.
+        // NTFS compares through an upcase table; String.toLowerCase on this target goes through
+        // towlower, which reads the C locale and commonly maps ASCII alone -- so two spellings of
+        // a non-ASCII name folded apart, and an implicit managed key derived under one of them was
+        // not found under the other. The second open of an intact database then reported a wrong
+        // key, which is the failure this alias exists to prevent.
+        //
+        // Text rather than the file identity used by the registry, deliberately: a managed key has
+        // to be found again after its database has been deleted and made afresh, and a file's
+        // identity does not survive that. This does, because it depends on nothing but the name.
+        String folded = WindowsNative.caseFold(normalized);
+        if (folded != null && folded.length() > 0) {
+            return folded;
+        }
+        // A platform that would not fold it. The old rule is still better than none: it agrees
+        // with itself, so two identical spellings still meet.
+        return normalized.toLowerCase();
     }
 
     private void checkOpen() throws IOException {
