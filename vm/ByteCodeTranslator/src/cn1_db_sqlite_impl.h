@@ -80,6 +80,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
 
@@ -266,14 +268,22 @@ static const char* cn1DbErrorText(int code, char* buffer, size_t length) {
     return strerror(code);
 }
 
-/** Whether a file exists. Everywhere but Windows the narrow path is already the right bytes. */
+/*
+ * Whether a file exists. Everywhere but Windows the narrow path is already the right bytes.
+ *
+ * Asked of the directory entry rather than by opening the file. Opening answers "no" for a
+ * database that is there but cannot be read right now -- mode 000, an ACL that denies this
+ * process, no descriptors left -- and every caller reads that as "no database": exists() says it
+ * is gone, isEncrypted() says it is not encrypted, and encrypt() fails with a message about a
+ * database that does not exist while the database is sitting there.
+ */
 static int cn1DbFileExists(const char* utf8) {
-    FILE* f = fopen(utf8, "rb");
-    if (f == NULL) {
+    struct stat info;
+    if (stat(utf8, &info) != 0) {
         return 0;
     }
-    fclose(f);
-    return 1;
+    /* A directory is not a database, and the Windows branch above answers the same way. */
+    return S_ISDIR(info.st_mode) ? 0 : 1;
 }
 
 /** Removes a file, returning 0 on success and setting errno. */

@@ -282,6 +282,9 @@ class AndroidCipherDB extends Database {
     private void releaseConnectionSlot() {
         if (slotHeld) {
             slotHeld = false;
+            // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
             AndroidImplementation.databaseConnectionClosed(openPath);
         }
     }

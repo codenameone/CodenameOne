@@ -83,7 +83,10 @@ class DatabaseImpl extends Database {
             opened = true;
         } finally {
             if (!opened) {
-                releaseOpenDatabase(openKey);
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
             }
         }
     }
@@ -127,7 +130,10 @@ class DatabaseImpl extends Database {
             opened = true;
         } finally {
             if (!opened) {
-                releaseOpenDatabase(openKey);
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
             }
         }
     }
@@ -231,6 +237,9 @@ class DatabaseImpl extends Database {
             // close which fails cannot strand the claim: the handle is already cleared, so
             // nothing later would give it back, and every delete and key change of this database
             // would be refused for the life of the process.
+            // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
             releaseOpenDatabase(openKey);
         }
     }

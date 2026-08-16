@@ -722,6 +722,14 @@ public abstract class Database {
         }
         String identity = Display.getInstance().databaseManagedKeyIdentity(keyAlias);
         if (identity != null && !identity.equals(keyAlias)) {
+            // Asked before removing, because every platform's remove reports success for an entry
+            // that was not there -- which is documented on has() a few lines up and is exactly why
+            // this method looks before it deletes. Removing blind here made forgetManagedKey
+            // answer true for a database that never had a key, and this method's true is supposed
+            // to mean a key was removed.
+            if (ManagedKeys.state(identity) != com.codename1.security.SecureStorage.ENTRY_PRESENT) {
+                return false;
+            }
             return ManagedKeys.forget(identity);
         }
         return false;
@@ -968,7 +976,187 @@ public abstract class Database {
                 continue;
             }
             noteSavepointControl(statement);
+            noteAttachment(statement);
         }
+    }
+
+    /// The databases this connection has attached, by the schema name they were attached as.
+    ///
+    /// Held per connection because that is what owns them: SQLite drops every attachment when the
+    /// connection closes, so this has to as well.
+    private java.util.Hashtable attachments;
+
+    /// Records an ATTACH so that deleting the attached file is refused, and a DETACH so it is not.
+    ///
+    /// An attached database is open, and nothing said so. Only the connection's own file was
+    /// registered, so `#delete(String)` counted no connections on the attached one and unlinked it
+    /// while SQLite still held it -- after which writes through that schema go to a file with no
+    /// name and are lost when the connection closes, and reopening the name makes a fresh empty
+    /// database.
+    ///
+    /// Registered under the key the port resolves the name to, which is the same key a delete of
+    /// that database computes. A name this cannot resolve registers nothing: that leaves the hole
+    /// exactly as it was for that one shape rather than refusing deletes of a file nobody named.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: one statement, already split out of any script
+    private void noteAttachment(String statement) {
+        String trimmed = statement == null ? "" : statement.trim();
+        if (trimmed.length() == 0) {
+            return;
+        }
+        String upper = trimmed.toUpperCase();
+        if (upper.startsWith("DETACH")) {
+            String schema = attachmentSchemaOf(trimmed, true);
+            if (schema != null && attachments != null) {
+                String key = (String) attachments.remove(schema);
+                if (key != null) {
+                    releaseOpenDatabase(key);
+                }
+            }
+            return;
+        }
+        if (!upper.startsWith("ATTACH")) {
+            return;
+        }
+        String schema = attachmentSchemaOf(trimmed, false);
+        String file = attachmentFileOf(trimmed);
+        if (schema == null || file == null || file.length() == 0 || ":memory:".equals(file)) {
+            return;
+        }
+        String key;
+        try {
+            key = Display.getInstance().databaseManagedKeyIdentity(file);
+        } catch (RuntimeException cannotResolve) {
+            return;
+        }
+        if (key == null) {
+            return;
+        }
+        try {
+            registerOpenDatabase(key);
+        } catch (IOException beingDeleted) {
+            // The attach has already happened, so there is nothing to undo and nothing useful to
+            // report from here. Not registering leaves this attachment invisible to a delete,
+            // which is the state everything was in before this method existed.
+            return;
+        }
+        if (attachments == null) {
+            attachments = new java.util.Hashtable();
+        }
+        attachments.put(schema, key);
+    }
+
+    /// The schema name an ATTACH or DETACH statement names, or null if it cannot be read.
+    private static String attachmentSchemaOf(String statement, boolean detach) {
+        String[] words = splitWords(statement);
+        if (detach) {
+            // DETACH [DATABASE] schema
+            for (int iter = 1; iter < words.length; iter++) {
+                if (!"DATABASE".equals(words[iter].toUpperCase())) {
+                    return unquote(words[iter]);
+                }
+            }
+            return null;
+        }
+        // ATTACH [DATABASE] file AS schema
+        for (int iter = 0; iter < words.length - 1; iter++) {
+            if ("AS".equals(words[iter].toUpperCase())) {
+                return unquote(words[iter + 1]);
+            }
+        }
+        return null;
+    }
+
+    /// The file an ATTACH statement names, or null when it is not a plain literal.
+    private static String attachmentFileOf(String statement) {
+        String[] words = splitWords(statement);
+        for (int iter = 1; iter < words.length; iter++) {
+            String word = words[iter];
+            if ("DATABASE".equals(word.toUpperCase())) {
+                continue;
+            }
+            if ("AS".equals(word.toUpperCase())) {
+                return null;
+            }
+            String file = unquote(word);
+            if (file.length() == 0) {
+                return null;
+            }
+            // An absolute path is a custom database to every port, and they resolve one only when
+            // it arrives as a file URL. A bare name is left as it is, which is what a port expects
+            // for a database in its own directory.
+            if (file.charAt(0) == '/' || file.charAt(0) == '\\'
+                    || (file.length() > 1 && file.charAt(1) == ':')) {
+                return "file://" + file;
+            }
+            return file;
+        }
+        return null;
+    }
+
+    /// Splits a statement into words, keeping quoted runs together.
+    private static String[] splitWords(String statement) {
+        java.util.Vector words = new java.util.Vector();
+        int at = 0;
+        int length = statement.length();
+        while (at < length) {
+            char c = statement.charAt(at);
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ';') {
+                at++;
+                continue;
+            }
+            if (c == '\'' || c == '"' || c == '`') {
+                int end = statement.indexOf(c, at + 1);
+                if (end < 0) {
+                    break;
+                }
+                words.addElement(statement.substring(at, end + 1));
+                at = end + 1;
+                continue;
+            }
+            int end = at;
+            while (end < length) {
+                char e = statement.charAt(end);
+                if (e == ' ' || e == '\t' || e == '\n' || e == '\r' || e == ';') {
+                    break;
+                }
+                end++;
+            }
+            words.addElement(statement.substring(at, end));
+            at = end;
+        }
+        String[] out = new String[words.size()];
+        words.copyInto(out);
+        return out;
+    }
+
+    /// Strips one layer of SQL quoting.
+    private static String unquote(String word) {
+        if (word.length() > 1) {
+            char first = word.charAt(0);
+            if ((first == '\'' || first == '"' || first == '`') && word.charAt(word.length() - 1) == first) {
+                return word.substring(1, word.length() - 1);
+            }
+        }
+        return word;
+    }
+
+    /// Releases what this connection held besides its own file.
+    ///
+    /// Every port calls this as it closes. SQLite drops a connection's attachments when it closes,
+    /// so the registrations taken for them have to go at the same moment -- otherwise a database
+    /// that was attached once could never be deleted again for the life of the process.
+    protected void noteConnectionClosed() {
+        if (attachments == null) {
+            return;
+        }
+        java.util.Enumeration keys = attachments.elements();
+        while (keys.hasMoreElements()) {
+            releaseOpenDatabase((String) keys.nextElement());
+        }
+        attachments.clear();
     }
 
     /// Records the transaction control in the first statement of a script, and only that one.

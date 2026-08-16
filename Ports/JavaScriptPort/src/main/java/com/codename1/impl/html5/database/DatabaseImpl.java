@@ -80,7 +80,10 @@ public class DatabaseImpl extends Database {
             opened = openOrFail(name);
         } finally {
             if (!opened) {
-                releaseOpenDatabase(openKey);
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
             }
         }
     }
@@ -210,6 +213,9 @@ public class DatabaseImpl extends Database {
             // Last, not first: until the engine has let the database go this connection still
             // holds it, and giving the claim back sooner lets another connection start rewriting
             // it underneath a rollback that has not finished.
+            // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
             releaseOpenDatabase(openKey);
         }
     }

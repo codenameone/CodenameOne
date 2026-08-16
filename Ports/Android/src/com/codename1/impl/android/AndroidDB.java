@@ -301,6 +301,9 @@ public class AndroidDB extends Database {
             // close() returns immediately, and the count stays high for the life of the process
             // -- refusing every delete of this database and telling every conversion that
             // somebody else still holds it.
+            // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
             AndroidImplementation.databaseConnectionClosed(openPath);
         }
     }

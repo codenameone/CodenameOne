@@ -328,6 +328,56 @@ public final class DatabaseConformanceSuite {
             }
         }
 
+        // ---- an attached database counts as open
+        // ATTACH makes a second database part of this connection, and SQLite holds it until the
+        // connection closes or it is detached. Only the connection's own file was registered, so
+        // a delete of the attached one saw nothing holding it and unlinked it underneath SQLite:
+        // writes through that schema then go to a file with no name and are lost at close, while
+        // reopening the name makes a fresh empty database.
+        if (Database.isCustomPathSupported()) {
+            Database db2 = Database.openOrCreate(databaseName);
+            String attachedName = null;
+            try {
+                String base = Database.getDatabasePath(databaseName);
+                if (base != null) {
+                    attachedName = "file://" + base + ".attached";
+                    Database attached = Database.openOrCreate(attachedName);
+                    attached.close();
+                    db2.execute("ATTACH DATABASE '" + base + ".attached' AS cn1attached");
+                    boolean refused = false;
+                    try {
+                        Database.delete(attachedName);
+                    } catch (IOException expected) {
+                        refused = true;
+                    }
+                    r.check(refused, "deleting a database another connection has attached is "
+                            + "refused");
+                    db2.execute("DETACH DATABASE cn1attached");
+                    // And given back on detach, rather than held for the life of the process.
+                    boolean deleted = true;
+                    try {
+                        Database.delete(attachedName);
+                    } catch (IOException stillRefused) {
+                        deleted = false;
+                    }
+                    r.check(deleted, "and deletable again once it has been detached");
+                }
+            } catch (IOException attachUnsupported) {
+                r.info("this engine would not attach a second database: "
+                        + attachUnsupported.getMessage());
+            } finally {
+                closeQuietly(db2);
+                if (attachedName != null && Database.exists(attachedName)) {
+                    try {
+                        Database.delete(attachedName);
+                    } catch (IOException leftBehind) {
+                        r.info("the attached database could not be cleaned up: "
+                                + leftBehind.getMessage());
+                    }
+                }
+            }
+        }
+
         if (Database.exists(databaseName)) {
             Database.delete(databaseName);
         }

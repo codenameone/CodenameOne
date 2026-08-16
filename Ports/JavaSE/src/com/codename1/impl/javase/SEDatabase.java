@@ -306,6 +306,8 @@ public class SEDatabase extends Database {
 
     /// Gives back a claim `#reserveConnection(String)` took, for an open that did not happen.
     static void releaseConnection(String openKey) {
+        // No attachments to give back here: this is the reservation for an open that never
+        // happened, so no connection exists to have attached anything.
         releaseOpenDatabase(openKey);
     }
 
@@ -651,7 +653,10 @@ public class SEDatabase extends Database {
             // and locks it, and giving the claim back sooner lets another connection start
             // rewriting it underneath a rollback that has not finished.
             if (registered) {
-                releaseOpenDatabase(openKey);
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
             }
         }
     }

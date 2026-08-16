@@ -92,7 +92,10 @@ class LinuxDatabase extends Database {
             opened = true;
         } finally {
             if (!opened) {
-                releaseOpenDatabase(openKey);
+                // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
+            releaseOpenDatabase(openKey);
             }
         }
     }
@@ -193,6 +196,9 @@ class LinuxDatabase extends Database {
             // close. In a finally because the native close can fail and the handle has already
             // been cleared here -- a claim left behind would refuse every later delete and key
             // change of this database for the life of the process.
+            // Anything this connection attached goes with it: SQLite drops attachments when the
+            // connection closes, so the registrations taken for them have to go at the same moment.
+            noteConnectionClosed();
             releaseOpenDatabase(openKey);
         }
     }
