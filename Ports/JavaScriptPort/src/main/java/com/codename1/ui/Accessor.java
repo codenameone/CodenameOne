@@ -47,6 +47,22 @@ public class Accessor {
     }
 
     /**
+     * Returns true when the form paints something over its children that the DOM text layer
+     * would end up on top of.
+     *
+     * <p>The text layer sits above the output canvas as a whole, so anything the canvas draws
+     * after a component -- the glass pane, the image of a dragged component -- cannot cover
+     * promoted text. While either is present the layer stands down and text goes back to the
+     * canvas, where paint order still decides what is on top.</p>
+     *
+     * @param f the form to test, may be null
+     * @return true when text promotion must be suspended for this form
+     */
+    public static boolean paintsOverChildren(Form f) {
+        return f != null && (f.getGlassPane() != null || f.getDraggedComponent() != null);
+    }
+
+    /**
      * Returns true when a component and its whole ancestor chain are visible.
      *
      * <p>A hidden component stops painting without being detached, so this is what tells the

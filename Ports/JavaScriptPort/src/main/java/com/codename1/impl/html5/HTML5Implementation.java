@@ -3380,10 +3380,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // components, so no run is refreshed while it runs. Those buffers carry their own
             // rasterized text, so the layer must step aside for the duration or the outgoing
             // form's text would float above the animation.
-            textLayer.setSuspended(Display.getInstance().isInTransition());
+            Form currentForm = Display.getInstance().getCurrent();
+            textLayer.setSuspended(Display.getInstance().isInTransition()
+                    || com.codename1.ui.Accessor.paintsOverChildren(currentForm));
             // Also releases runs whose component has been removed or whose form is no longer
             // displayed; neither ever paints again, so nothing else would clean them up.
-            textLayer.syncToForm(Display.getInstance().getCurrent());
+            textLayer.syncToForm(currentForm);
         }
         // Record the whole frame into the display surface's command buffer (the
         // display graphics draws onto DISPLAY_SURFACE_ID) and ship it in one
@@ -10418,12 +10420,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * True once a history entry has been pushed, so the first form does not consume a back step
-     * that would otherwise navigate away from the app.
-     */
-    private boolean historyStatePushed;
-
-    /**
      * True while a back command is being dispatched in response to popstate, so the form change
      * it causes does not push a new entry and trap the user in the app.
      */
@@ -10443,7 +10439,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         try {
             window.getHistory().pushState(null, "");
-            historyStatePushed = true;
         } catch (Throwable ignored) {
             // A sandboxed or file:// document can refuse pushState. Back simply stays inert.
         }
@@ -10486,11 +10481,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         } finally {
             handlingPopState = false;
         }
-        // The entry the user just popped has to be replaced, or a second Back would leave the
-        // app even though there is still somewhere to go within it.
-        if (historyStatePushed) {
-            pushHistoryState();
-        }
+        // Nothing is pushed to replace the entry that was just popped. Every form show pushes
+        // one, so the history depth already tracks the navigation depth: popping one entry and
+        // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
+        // from the root form the first Back did nothing and only the second left the app.
     }
 
     @Override

@@ -5028,30 +5028,41 @@
       });
     }
     // The port promotes text into a DOM layer above the canvas, so a canvas readback is no
-    // longer the whole frame. When a test harness has installed a composited capture hook,
-    // give it the frame BEFORE this promise settles: the worker is blocked on this host call,
-    // so the suite cannot advance to the next test while the screenshot is being taken. Doing
-    // it off a console marker instead would race the next test's form onto the screen.
-    function withCompositedCapture(value) {
+    // longer the whole frame. When a test harness installs a composited capture hook, let it
+    // supply the image instead and return THAT as the screenshot: the bytes then travel the
+    // normal path to the cn1ss server, so there is exactly one writer of the PNG and no
+    // ordering to get wrong. Writing the composite to disk from the harness instead would be
+    // overwritten moments later by the canvas-only bytes this call is about to return.
+    //
+    // The hook is awaited inside this host call, and the worker is blocked on the call, so the
+    // suite cannot advance to the next test while the screenshot is being taken. Driving it
+    // from a console marker instead would race the next test's form onto the screen.
+    function withCompositedCapture(makeResult) {
       var hook = global.__cn1CompositeCapture;
       if (typeof hook !== 'function') {
-        return value;
+        return makeResult(null);
       }
-      return Promise.resolve(hook()).then(function() {
-        return value;
+      return Promise.resolve(hook()).then(function(dataUrl) {
+        var composited = (typeof dataUrl === 'string'
+            && dataUrl.indexOf('data:image/') === 0) ? dataUrl : null;
+        return makeResult(composited);
       }, function() {
-        return value;
+        return makeResult(null);
       });
     }
     return runAttempt(0).then(function(result) {
       if (!result || !result.dataUrl) {
         global.__cn1LastCaptureMeta = null;
-        return withCompositedCapture(includeMeta ? {
-          dataUrl: '',
-          canvasScore: -1,
-          canvasLastPaintSeq: baselinePaintSeq | 0,
-          canvasPaintedSinceStart: 0
-        } : '');
+        return withCompositedCapture(function(composited) {
+          // A composited capture stands on its own: the canvas readback found nothing usable,
+          // but the page still has a frame worth recording.
+          return includeMeta ? {
+            dataUrl: composited || '',
+            canvasScore: composited ? 0 : -1,
+            canvasLastPaintSeq: baselinePaintSeq | 0,
+            canvasPaintedSinceStart: 0
+          } : (composited || '');
+        });
       }
       global.__cn1LastScreenshotSignature = result.canvasSignature || '';
       diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
@@ -5087,10 +5098,16 @@
         canvasPaintedSinceStart: result.paintedSinceStart ? 1 : 0,
         canvasSignature: result.canvasSignature || 'none'
       };
-      if (includeMeta) {
-        return withCompositedCapture(global.__cn1LastCaptureMeta);
-      }
-      return withCompositedCapture(String(result.dataUrl || ''));
+      return withCompositedCapture(function(composited) {
+        if (composited) {
+          global.__cn1LastCaptureMeta.dataUrl = composited;
+          diag('SCREENSHOT_START', 'compositedLen', composited.length);
+        }
+        if (includeMeta) {
+          return global.__cn1LastCaptureMeta;
+        }
+        return String(global.__cn1LastCaptureMeta.dataUrl || '');
+      });
     });
   });
 

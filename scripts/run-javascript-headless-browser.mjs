@@ -32,47 +32,30 @@ let suiteFinished = false;
 // longer the whole picture: the port promotes text into a DOM layer above the canvas, so a
 // canvas-only capture is missing every label on screen.
 //
-// Rather than fork the transport that iOS, Android, watch and TV also use, take the
-// authoritative capture here -- Playwright screenshots the composited page, canvas and
-// overlays together -- and write it over the app's file in the same directory. Everything
-// downstream (the delivered artifacts, the golden comparison) is unchanged.
+// Rather than fork the transport that iOS, Android, watch and TV also use, supply the image
+// to the port and let it travel that transport: browser_bridge.js awaits this hook inside the
+// screenshot host call and returns what it produces as the screenshot, so the cn1ss server
+// remains the only writer of the PNG. Writing the file here instead would be overwritten
+// moments later by the canvas-only bytes the same call goes on to send.
 //
-// The capture is driven by a hook the page calls, NOT by a console marker. browser_bridge.js
-// awaits __cn1CompositeCapture inside the screenshot host call, and the worker is blocked on
-// that call, so the suite cannot advance while the screenshot is being taken. Watching for a
-// log line instead would race the next test's form onto the screen and write it under the
-// previous test's name.
-const screenshotDir = process.env.CN1SS_WS_DIR;
-const TEST_START_MARKER = /CN1SS:INFO:suite starting test=([A-Za-z0-9_.$-]+)/;
-let currentTest = null;
+// Being awaited inside the host call is also what makes the capture safe: the worker is
+// blocked on that call, so the suite cannot advance while the screenshot is being taken.
+// Driving it from a console marker would race the next test's form onto the screen.
 let capturedCount = 0;
 
-function trackCurrentTest(text) {
-  const match = TEST_START_MARKER.exec(text);
-  if (match) {
-    currentTest = match[1];
-  }
-}
-
 async function installCompositeCapture(page) {
-  if (!screenshotDir) {
+  if (process.env.CN1_JS_DISABLE_COMPOSITE_CAPTURE === '1') {
     return;
   }
   await page.exposeFunction('__cn1CompositeCapture', async () => {
-    if (!currentTest) {
-      return false;
-    }
-    const testName = currentTest;
     try {
       const buffer = await page.screenshot({ animations: 'disabled' });
-      fs.writeFileSync(`${screenshotDir}/${testName}.png`, buffer);
       capturedCount++;
-      append(`screenshot:composited:${testName}:${buffer.length}`);
-      return true;
+      return `data:image/png;base64,${buffer.toString('base64')}`;
     } catch (err) {
-      // Leave the app's canvas-only PNG in place rather than losing the test entirely.
-      append(`screenshot:failed:${testName}:${String(err)}`);
-      return false;
+      // Fall back to the canvas readback rather than losing the test entirely.
+      append(`screenshot:failed:${String(err)}`);
+      return null;
     }
   });
   append('screenshot:composited:hook-installed');
@@ -213,7 +196,6 @@ try {
     if (text.indexOf(SUITE_FINISHED_MARKER) >= 0) {
       suiteFinished = true;
     }
-    trackCurrentTest(text);
   });
   page.on('pageerror', err => append(`pageerror:${String(err)}`));
   page.on('requestfailed', req => append(`requestfailed:${req.url()} ${req.failure()?.errorText || ''}`));
@@ -315,8 +297,6 @@ try {
   }
   await finalizeProfile();
 } finally {
-  if (screenshotDir) {
-    append(`screenshot:composited:total=${capturedCount}`);
-  }
+  append(`screenshot:composited:total=${capturedCount}`);
   await browser.close();
 }
