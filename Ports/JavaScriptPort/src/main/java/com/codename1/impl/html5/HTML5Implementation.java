@@ -10670,7 +10670,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private void handlePopStateEvent(Event evt) {
         final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
-        final boolean backward = restored < historyIndex;
+        final int previous = historyIndex;
+        final boolean backward = restored < previous;
         historyIndex = restored;
         if (historySuppressPop) {
             // The port asked for this one, to spend an entry belonging to a form an in-app back
@@ -10692,11 +10693,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             return;
         }
-        historyEntriesPushed = Math.max(0, historyEntriesPushed - 1);
+        // A traversal can cross more than one entry at once -- the Back button's history menu,
+        // or history.go(-N) -- so the distance decides how many forms to leave, not one.
+        final int distance = Math.max(1, previous - restored);
+        historyEntriesPushed = Math.max(0, historyEntriesPushed - distance);
         callSerially(new Runnable() {
             @Override
             public void run() {
-                dispatchBrowserBack();
+                for (int i = 0; i < distance; i++) {
+                    dispatchBrowserBack();
+                }
             }
         });
     }

@@ -83,6 +83,7 @@ public final class JavaScriptTextLayer {
         private String content;
         private boolean attached;
         private boolean everAttached;
+        private int lastY = Integer.MIN_VALUE;
 
         Run(HTMLElement clip, HTMLElement text) {
             this.clip = clip;
@@ -311,7 +312,7 @@ public final class JavaScriptTextLayer {
         // updated so a component scrolling across the viewport edge keeps up rather than
         // freezing at its last fully visible position.
         Run run = frame.covering ? obtain(frame.runs, frame.sequence)
-                : obtainByContent(frame.runs, str);
+                : obtainClipped(frame.runs, str, y);
         frame.sequence++;
 
         double scale = ratio <= 0 ? 1 : ratio;
@@ -374,6 +375,7 @@ public final class JavaScriptTextLayer {
             run.text.setTextContent(str);
             run.content = str;
         }
+        run.lastY = y;
         if (!run.attached) {
             container.appendChild(run.clip);
             run.attached = true;
@@ -433,7 +435,16 @@ public final class JavaScriptTextLayer {
      *
      * <p>Used when the paint is clipped and ordering cannot be trusted.</p>
      */
-    private Run obtainByContent(ComponentRuns runs, String content) {
+    private Run obtainClipped(ComponentRuns runs, String content, int y) {
+        // Position first: a line keeps its baseline when its text changes, so this is what
+        // matches a clipped repaint of new content to the run showing the old.
+        for (int i = 0; i < runs.runs.size(); i++) {
+            Run candidate = runs.runs.get(i);
+            if (candidate.lastY == y) {
+                return candidate;
+            }
+        }
+        // Then content: a line keeps its text when it scrolls, which is what moves the baseline.
         for (int i = 0; i < runs.runs.size(); i++) {
             Run candidate = runs.runs.get(i);
             if (content.equals(candidate.content)) {
