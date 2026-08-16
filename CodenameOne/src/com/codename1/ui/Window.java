@@ -203,7 +203,16 @@ public class Window extends Container implements TopLevelContainer {
 
     // ---- identity -------------------------------------------------------------
 
-    int getWindowId() {
+    /// Returns the framework assigned id of this window.
+    ///
+    /// This is the id a port stores at creation and echoes back on every event, so it
+    /// is also how a window is looked up from
+    /// `Desktop#windowById(int)`.
+    ///
+    /// #### Returns
+    ///
+    /// the window id
+    public int getWindowId() {
         return windowId;
     }
 
@@ -1245,6 +1254,26 @@ public class Window extends Container implements TopLevelContainer {
     /// true once `#dispose()` has run
     public boolean isWindowDisposed() {
         return disposed;
+    }
+
+    /// Captures this window's current contents.
+    ///
+    /// The ordinary `Display#screenshot(com.codename1.util.SuccessCallback)` can only
+    /// see the application's main surface, so a window has to be captured through the
+    /// window manager instead. This is what the windowed screenshot tests use.
+    ///
+    /// #### Returns
+    ///
+    /// an image of the window, or null when the port cannot capture one
+    public Image capture() {
+        if (disposing || nativePeer == null) {
+            return null;
+        }
+        Object nativeImage = manager().capture(nativePeer);
+        if (nativeImage == null) {
+            return null;
+        }
+        return Image.createImage(nativeImage);
     }
 
     /// Sets what happens when the user closes this window through the platform's own

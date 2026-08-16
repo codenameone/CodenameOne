@@ -309,7 +309,15 @@ public final class Desktop {
 
     /// Returns the window carrying the given framework assigned id, which is how an
     /// event that arrived off the event dispatch thread is routed back to its tree.
-    Window windowById(int windowId) {
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id from `Window#getWindowId()`
+    ///
+    /// #### Returns
+    ///
+    /// the matching window, or null when none is open with that id
+    public Window windowById(int windowId) {
         synchronized (windows) {
             int len = windows.size();
             for (int iter = 0; iter < len; iter++) {
