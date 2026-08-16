@@ -78,10 +78,17 @@ public class DisplayTest extends UITestBase {
         // longer see. Only the deadline is new. The latch is what makes the EDT's write to it
         // visible here, and reports whether the runnable ever ran.
         final CountDownLatch done = new CountDownLatch(1);
+        final Throwable[] failure = new Throwable[1];
         display.callSeriallyAndWait(new Runnable() {
             public void run() {
                 try {
                     display.flushEdt();
+                } catch (Throwable t) {
+                    // Caught rather than allowed to escape. An exception leaving here never
+                    // reaches the test thread -- RunnableWrapper would not mark itself done,
+                    // so the wait below would burn its full timeout and then find a counted-down
+                    // latch and report success, losing the failure and charging 30s for it.
+                    failure[0] = t;
                 } finally {
                     done.countDown();
                 }
@@ -92,6 +99,22 @@ public class DisplayTest extends UITestBase {
                     + EDT_FLUSH_TIMEOUT_MS + "ms -- it is wedged, most likely on a lock held by"
                     + " a thread that is itself waiting for the EDT.\n" + dumpAllThreads());
         }
+        if (failure[0] != null) {
+            // Rethrown on the calling thread, so it fails the test that caused it rather than
+            // being logged on the EDT and surfacing as something confusing later in the suite.
+            rethrow(failure[0]);
+        }
+    }
+
+    /** Rethrows what the EDT threw, keeping its own stack as the cause. */
+    private static void rethrow(Throwable t) {
+        if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+        }
+        if (t instanceof Error) {
+            throw (Error) t;
+        }
+        throw new IllegalStateException("The EDT flush failed: " + t, t);
     }
 
     /** Every live thread and where it is, for a wedge that has to be diagnosed from a CI log. */
@@ -111,6 +134,46 @@ public class DisplayTest extends UITestBase {
             sb.append('\n');
         }
         return sb.toString();
+    }
+
+    /**
+     * What the EDT throws must fail the test that caused it.
+     *
+     * <p>An {@code Error} -- which is what a JUnit assertion inside a
+     * queued runnable produces -- passes straight through
+     * {@code edtLoopImpl}, whose catch covers only
+     * {@code RuntimeException}. Letting it escape the runnable meant
+     * {@code RunnableWrapper} never marked itself done: the wait burned
+     * its full 30 seconds, then found the latch counted down and reported
+     * success. So an assertion that failed on the EDT cost half a minute
+     * and was recorded as a pass.</p>
+     */
+    @Test
+    void aFailureOnTheEdtReachesTheCallingThread() {
+        final AssertionError boom = new AssertionError("asserted on the EDT");
+        // Queued from inside another serial call, so it is still pending when the
+        // flush below starts and is processed by that flush rather than by the
+        // outer EDT loop -- which catches Throwable and only logs it.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        throw boom;
+                    }
+                });
+            }
+        });
+
+        long started = System.currentTimeMillis();
+        try {
+            flushEdt();
+            fail("the error the EDT threw should have reached this thread");
+        } catch (AssertionError actual) {
+            assertSame(boom, actual,
+                    "the original error should arrive, not a substitute");
+        }
+        assertTrue(System.currentTimeMillis() - started < 5000,
+                "a failure should arrive at once, not after the wedge timeout");
     }
 
     @AfterEach

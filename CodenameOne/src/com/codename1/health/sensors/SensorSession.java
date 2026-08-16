@@ -466,20 +466,18 @@ public class SensorSession {
     /// the life of the session -- samples in the store, still strongly
     /// referenced here, accumulating for as long as a sensor streamed.
     ///
-    /// Linear against `keep` rather than a set: a batch is small, this
-    /// runs only on the failure path, and the identity comparison is the
-    /// point.
+    /// The kept set is an identity map for the same reason the tally is:
+    /// two readings of the same value at the same millisecond are
+    /// distinct samples, and equality would treat one as the other.
     private void forgetWriteAttemptsExcept(List<HealthSample> all,
             List<HealthSample> keep) {
+        Map<HealthSample, Boolean> kept =
+                new java.util.IdentityHashMap<HealthSample, Boolean>();
+        for (HealthSample sample : keep) {
+            kept.put(sample, Boolean.TRUE);
+        }
         for (HealthSample sample : all) {
-            boolean kept = false;
-            for (int i = 0; i < keep.size(); i++) {
-                if (keep.get(i) == sample) {
-                    kept = true;
-                    break;
-                }
-            }
-            if (!kept) {
+            if (!kept.containsKey(sample)) {
                 writeAttempts.remove(sample);
             }
         }
