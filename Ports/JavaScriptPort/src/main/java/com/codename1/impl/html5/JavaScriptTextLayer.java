@@ -159,17 +159,6 @@ public final class JavaScriptTextLayer {
     }
 
     /**
-     * Marks the start of a frame, before any component has painted.
-     *
-     * <p>Resets the draw counter that orders overlapping runs. DOM insertion order alone would
-     * reflect the order runs were first attached, not the order the frame paints them, so a run
-     * that is detached and later re-attached would jump to the top of the stack.</p>
-     */
-    public void beginFrame() {
-        drawSequence = 0;
-    }
-
-    /**
      * Reports, and clears, whether a run was attached after having been detached.
      *
      * <p>Only repainted runs get a fresh stacking index, so after a re-attach the frame holds a
@@ -304,9 +293,21 @@ public final class JavaScriptTextLayer {
         clipCss.append("top:").append(clipY / scale).append("px;");
         clipCss.append("width:").append(clipW / scale).append("px;");
         clipCss.append("height:").append(clipH / scale).append("px;");
-        // Stacking follows the frame's draw order rather than DOM insertion order, so a run
-        // that is hidden and shown again lands back underneath whatever paints after it.
+        // Stacking follows draw order rather than DOM insertion order, so a run that is hidden
+        // and shown again does not jump to the top of the stack.
+        //
+        // The counter is monotonic and is NOT reset per frame. Resetting cannot order a partial
+        // repaint correctly: only the components that repainted would be renumbered, so a dirty
+        // component starting again from 1 could fall beneath untouched runs still carrying
+        // higher numbers from an earlier full frame. Left monotonic, every index remains
+        // comparable with every other, and the most recently painted run is on top -- which is
+        // what the canvas would have done.
         drawSequence++;
+        if (drawSequence == Integer.MAX_VALUE) {
+            // Unreachable in practice; renumber from a clean slate rather than wrap.
+            drawSequence = 1;
+            reattachedThisFrame = true;
+        }
         clipCss.append("z-index:").append(drawSequence).append(";");
         String clipDeclaration = clipCss.toString();
         if (!clipDeclaration.equals(run.clipCss)) {

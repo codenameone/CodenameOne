@@ -3465,12 +3465,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // them up.
             Form displayed = Display.getInstance().getCurrent();
             textLayer.syncToForm(displayed);
-            // The stacking counter resets here, at the frame boundary, and not when a component
-            // paint opens: paintDirty() paints individual dirty components, so resetting there
-            // would restart at 1 for a partial repaint while the rest of the form still carried
-            // higher indices from the last full frame -- and an upper component's text could
-            // then fall beneath a lower one's.
-            textLayer.beginFrame();
             if (textLayer.consumeReattachFlag() && displayed != null) {
                 // A run came back after being detached, so it holds a fresh stacking index
                 // while everything that did not repaint still holds an older one. One full
@@ -6576,7 +6570,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
-    public void screenshot(SuccessCallback<Image> callback) {
+    public void screenshot(final SuccessCallback<Image> callback) {
         if (callback == null) {
             return;
         }
@@ -6584,40 +6578,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
             super.screenshot(callback);
             return;
         }
-        flushGraphics();
-        final int width = getDisplayWidth();
-        final int height = getDisplayHeight();
-        if (width <= 0 || height <= 0) {
-            super.screenshot(callback);
-            return;
-        }
-        // A screenshot has to be what the user sees, and promoted text lives in a DOM layer
-        // that a surface read cannot reach. Put the text back on the canvas for the duration:
-        // suspend promotion, repaint the form through the display graphics so the strings
-        // rasterize, read, then restore. Without this every screenshot -- including the ones
-        // applications take themselves -- comes back with its labels missing.
         // Reading the screen back as pixels and promoting text into the DOM cannot both be
-        // authoritative: a surface read cannot see a DOM layer, so a screenshot taken while
-        // text is promoted comes back with its labels missing. An application that reads pixels
-        // is telling us which representation it needs, so promotion stops for good at the first
+        // authoritative: a surface read cannot see a DOM layer, so a capture taken while text is
+        // promoted comes back with its labels missing. An application that reads pixels is
+        // telling us which representation it needs, so promotion stops for good at the first
         // such call and the text returns to the canvas, where the reads can see it.
         //
-        // The repaint is requested, not carried out here. Review asked for the rasterizing
-        // paint to complete before the surface is read, so that a ONE-SHOT capture already
-        // contains the text rather than only the second of a polling pair. That is the right
-        // instinct, but driving paintDirty() from inside the capture measurably breaks
-        // rendering: it makes graphics-draw-gradient-stops come back with its gradients
-        // unpainted, reproducibly and across a re-run, while every other golden is unchanged.
-        // Forcing a paint from within a read re-enters the render queue at a point it is not
-        // built for, and trading a whole screen of gradients for one frame of text is the wrong
-        // way round.
-        //
-        // So the first capture taken while text is promoted is still text-less, and everything
-        // painted afterwards carries its text again. Callers that poll -- the usual shape, since
-        // a capture normally waits for something to appear -- settle on the next read. Making
-        // the single-shot case correct needs the read to be deferred to the next frame, which
-        // means an async capture path, and that is worth doing separately rather than smuggling
-        // it in here.
+        // The first capture then has to wait for a frame that was actually painted with
+        // promotion off. That paint is NOT driven from inside this call: calling paintDirty()
+        // here re-enters the render queue at a point it is not built for, and it measurably
+        // breaks rendering -- graphics-draw-gradient-stops came back with its gradients
+        // unpainted, reproducibly and across a re-run, while every other golden was unchanged.
+        // The repaint is requested and the read deferred instead, which this API can do because
+        // it answers through a callback. Two hops: the event thread runs queued work before it
+        // paints, so the first lands before the repaint and the second after it.
         if (textLayer != null && !textLayer.isSuspended()) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
@@ -6625,6 +6599,34 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (current != null) {
                 current.repaint();
             }
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    Display.getInstance().callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            readDisplaySurface(callback);
+                        }
+                    });
+                }
+            });
+            return;
+        }
+        readDisplaySurface(callback);
+    }
+
+    /**
+     * Reads the display surface back and hands the pixels to the caller.
+     *
+     * @param callback receives the captured image
+     */
+    private void readDisplaySurface(SuccessCallback<Image> callback) {
+        flushGraphics();
+        final int width = getDisplayWidth();
+        final int height = getDisplayHeight();
+        if (width <= 0 || height <= 0) {
+            super.screenshot(callback);
+            return;
         }
         drainPendingDisplayFrame();
         // Read the display SURFACE pixels by id (the one legitimate pixel
@@ -6632,7 +6634,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // host-ref. nativeSurfaceReadRGB returns ARGB straight into ``rgb``.
         final int[] rgb = new int[width * height];
         nativeSurfaceReadRGB(DISPLAY_SURFACE_ID, 0, 0, width, height, rgb);
-
         callback.onSucess(Image.createImage(rgb, width, height));
     }
 
@@ -10575,6 +10576,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private int historyIndex;
 
+    /**
+     * True while a popstate is expected because the port itself asked the browser to go back,
+     * having consumed a form through an in-app back command.
+     */
+    private boolean historySuppressPop;
+
     private void pushHistoryState() {
         if (handlingPopState) {
             return;
@@ -10602,6 +10609,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
                     final boolean backward = restored < historyIndex;
                     historyIndex = restored;
+                    if (historySuppressPop) {
+                        // The port asked for this one, to spend the entry belonging to a form an
+                        // in-app back command had already left.
+                        historySuppressPop = false;
+                        return;
+                    }
                     if (!backward) {
                         return;
                     }
@@ -10699,12 +10712,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         int depth = historyStack.size();
         if (f != null && depth >= 2 && f == historyStack.get(depth - 2)) {
-            // Backward navigation, from a toolbar back command or showBack(). Going back to the
-            // form behind the current one spends a step rather than adding one; pushing here
-            // would leave an entry behind for a later Back to walk past. Keeping the whole
+            // Backward navigation, from a toolbar back command or showBack(). Keeping the whole
             // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
             // to A -- each be recognised.
+            //
+            // The browser entry has to be spent as well, not just the Java one: leaving it in
+            // place means the next browser Back pops an entry that no longer corresponds to a
+            // form, finds no back command, and appears to do nothing. Going back fires popstate,
+            // which is why the next one is marked as already accounted for.
             historyStack.remove(depth - 1);
+            historySuppressPop = true;
+            try {
+                window.getHistory().back();
+            } catch (Throwable ignored) {
+                historySuppressPop = false;
+            }
             return;
         }
         historyStack.add(f);
