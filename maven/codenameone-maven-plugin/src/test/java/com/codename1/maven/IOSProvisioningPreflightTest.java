@@ -467,6 +467,41 @@ public class IOSProvisioningPreflightTest {
                 "no readable expiry date");
     }
 
+    /**
+     * A date that is only nearly a date is not one.
+     *
+     * <p>{@code SimpleDateFormat} is lenient by default, so {@code 2099-02-30} rolls over to
+     * 2 March and looks like a valid future expiry; and {@code parse(String)} stops at the
+     * first character it cannot use, so trailing garbage is ignored. Both let a corrupted
+     * profile through the unreadable-expiry check.
+     */
+    @Test
+    public void aDateThatIsOnlyNearlyADateIsRefused() throws Exception {
+        String impossible = profile("Impossible Day", "2099-02-30T00:00:00Z",
+                "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>\n");
+        assertFatal(check(settings(write(impossible), true, "app-store"), true),
+                "no readable expiry date");
+
+        String trailing = profile("Trailing Garbage", "2099-01-01T00:00:00Z and then some",
+                "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>\n");
+        assertFatal(check(settings(write(trailing), true, "app-store"), true),
+                "no readable expiry date");
+    }
+
+    /** The timestamp Apple actually writes still reads, to the second. */
+    @Test
+    public void theRealTimestampFormatStillParses() throws Exception {
+        IOSProvisioningPreflight.Profile parsed = IOSProvisioningPreflight.parse(
+                profile("Real", "2027-05-24T01:19:39Z",
+                        "<key>Entitlements</key><dict><key>get-task-allow</key><true/></dict>\n")
+                        .getBytes("UTF-8"));
+        assertNotNull(parsed);
+        Calendar expected = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        expected.clear();
+        expected.set(2027, Calendar.MAY, 24, 1, 19, 39);
+        assertEquals(expected.getTime(), parsed.expirationDate);
+    }
+
     // ---- a profile is untrusted input ----
 
     /**

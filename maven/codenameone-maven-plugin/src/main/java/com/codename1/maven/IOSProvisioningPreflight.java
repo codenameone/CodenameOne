@@ -38,7 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -505,14 +505,25 @@ final class IOSProvisioningPreflight {
         return null;
     }
 
+    /**
+     * The profile's expiry, or null when the value is not exactly the timestamp Apple writes.
+     *
+     * <p>Strict on both counts, because the default is not. Lenient parsing rolls an
+     * impossible date over -- {@code 2099-02-30} becomes 2 March -- and
+     * {@code parse(String)} stops at the first character it cannot use, so a value with
+     * trailing garbage came back as a perfectly good date. Either way a corrupted profile
+     * looked valid and went on to spend a cloud build slot.
+     */
     private static Date parseDate(String value) {
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
         format.setTimeZone(TimeZone.getTimeZone("UTC"));
-        try {
-            return format.parse(value);
-        } catch (ParseException ex) {
+        format.setLenient(false);
+        ParsePosition at = new ParsePosition(0);
+        Date parsed = format.parse(value, at);
+        if (parsed == null || at.getIndex() != value.length()) {
             return null;
         }
+        return parsed;
     }
 
     /**
