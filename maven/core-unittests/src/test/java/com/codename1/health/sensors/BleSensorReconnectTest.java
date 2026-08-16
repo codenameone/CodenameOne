@@ -571,8 +571,16 @@ class BleSensorReconnectTest extends UITestBase {
      * write open until the test fails it, so the test decides exactly
      * which samples are in flight together.
      */
-    private static final class DeferredRefusingStore
+    private static class DeferredRefusingStore
             extends com.codename1.health.HealthStore {
+
+        private int offers;
+
+        int offerCount() {
+            synchronized (lock) {
+                return offers;
+            }
+        }
 
         /// Both fields are written on whichever thread the flush runs on
         /// and read by the test thread.
@@ -639,6 +647,7 @@ class BleSensorReconnectTest extends UITestBase {
             synchronized (lock) {
                 pending = out;
                 pendingSamples = bpms;
+                offers++;
             }
         }
     }
@@ -830,6 +839,103 @@ class BleSensorReconnectTest extends UITestBase {
                     new com.codename1.health.HealthWriteResult();
             r.addSampleId("committed-" + bpm);
             out.complete(r);
+        }
+    }
+
+    /**
+     * A store that stops accepting the type must not leave the samples it
+     * already failed in the attempt tally.
+     *
+     * <p>When nothing in a batch is retryable any more the callback
+     * reports the error and returns early, and that return skipped the
+     * bookkeeping. A sample that had failed once already carried a tally
+     * entry, so it stayed referenced for the life of the session -- and a
+     * provider that comes and goes, which is exactly what Health Connect
+     * does when its SDK status changes or a permission is revoked
+     * mid-ride, accumulated one per round.</p>
+     */
+    @Test
+    void aStoreThatStopsAcceptingTheTypeDropsItsTally() throws Exception {
+        WithdrawingStore store = new WithdrawingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // One failure while the type is still writable, so the sample
+            // earns a tally entry. Driven a write at a time: on the timer
+            // the sample can burn all three attempts and be dropped before
+            // the type is withdrawn, and then there is nothing left to
+            // leak and the test passes whatever the code does.
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+            assertTrue(awaitWrite(store).contains(72),
+                    "the sample should have been offered");
+            store.failPending();
+
+            // The retry claims it again. This write has to be in flight
+            // BEFORE the type is withdrawn: once it is not writable, the
+            // flush is refused before it ever reaches the store, and the
+            // callback that clears the tally never runs.
+            assertTrue(awaitWrite(store).contains(72),
+                    "the requeued sample should have been offered again");
+
+            // The store stops accepting the type while that write is out.
+            // Failing it now is what leaves the callback with nothing
+            // retryable -- the path that used to return without clearing
+            // anything.
+            store.withdrawType();
+            store.failPending();
+            pump(300);
+
+            int[] books = attemptsAndPending(session);
+            assertEquals(0, books[0],
+                    "the tally kept " + books[0] + " samples after the store"
+                            + " stopped accepting the type");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * A {@link DeferredRefusingStore} that can also stop accepting the
+     * type, so a test can put the session in the state where a failure
+     * leaves nothing retryable.
+     */
+    private static final class WithdrawingStore
+            extends DeferredRefusingStore {
+
+        private volatile boolean writable = true;
+
+        void withdrawType() {
+            writable = false;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return writable;
         }
     }
 

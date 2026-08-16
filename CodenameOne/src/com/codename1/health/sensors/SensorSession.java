@@ -628,6 +628,18 @@ public class SensorSession {
                         + " the readings to a workout instead.");
             }
             if (retryable.isEmpty()) {
+                // Nothing here is going back, so nothing here is pending
+                // any more. A sample that had already failed once carries
+                // a tally entry, and a store whose type support has just
+                // gone away -- Health Connect reporting a provider it
+                // reported a moment ago, a permission revoked mid-ride --
+                // sends every sample down this path. Returning without
+                // clearing left those entries for the life of the
+                // session, so a provider that came and went repeatedly
+                // accumulated them.
+                synchronized (session.pendingWrites) {
+                    session.forgetWriteAttempts(batch);
+                }
                 session.fireError(asHealthException(error));
                 return;
             }
