@@ -65,8 +65,14 @@ class DatabaseImpl extends Database {
     public DatabaseImpl(String databaseName, String path) throws IOException {
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.openKey = normalizeDatabasePathKey(path);
         this.aliasKey = IOSImplementation.managedKeyAliasForPath(path);
+        // The same string, and it has to be. Database.delete and the conversion claim ask the
+        // implementation for the identity and count registrations under what comes back, so a
+        // connection filed under the absolute path was invisible to a delete asking about the
+        // container-relative one -- the open-database guard stopped firing and a database was
+        // unlinked underneath a live connection. Two spellings of one database still meet here,
+        // because the path is resolved before the container is taken off it.
+        this.openKey = aliasKey;
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
@@ -91,8 +97,14 @@ class DatabaseImpl extends Database {
     public DatabaseImpl(String databaseName, String path, String key) throws IOException {
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.openKey = normalizeDatabasePathKey(path);
         this.aliasKey = IOSImplementation.managedKeyAliasForPath(path);
+        // The same string, and it has to be. Database.delete and the conversion claim ask the
+        // implementation for the identity and count registrations under what comes back, so a
+        // connection filed under the absolute path was invisible to a delete asking about the
+        // container-relative one -- the open-database guard stopped firing and a database was
+        // unlinked underneath a live connection. Two spellings of one database still meet here,
+        // because the path is resolved before the container is taken off it.
+        this.openKey = aliasKey;
         // See the other constructor: the registration is what refuses an open during a key change,
         // so it has to happen before the file is touched.
         registerOpenDatabase(openKey);
