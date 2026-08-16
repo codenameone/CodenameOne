@@ -234,11 +234,17 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         if (inWindow(row)) {
             return;
         }
-        throw new IOException("This cursor is over a statement that changes the database, and the "
-                + "row asked for is outside the rows already read. Reaching it would run the "
-                + "statement again and repeat those changes, so it is refused: read the rows this "
-                + "cursor returns as it returns them, or run the statement with execute() and "
-                + "query for what you need afterwards.");
+        // Says that the changes are done, which is the part a caller has to know. Everything
+        // else here is recoverable by reading differently; a retry is not, because the insert or
+        // the update has already been applied and doing it again applies it twice. The platform
+        // cannot offer anything better: the rows past this point exist only in a window that has
+        // to be refilled, and refilling is re-running.
+        throw new IOException("This cursor is over a statement that changes the database. Those "
+                + "changes have already been applied and must not be repeated -- do not retry "
+                + "this statement. The rows past the first window cannot be reached, because "
+                + "reaching them would run it again. Read the rows this cursor returns as it "
+                + "returns them, or run the statement with execute() and query for what you need "
+                + "afterwards.");
     }
 
     public void setCloseListener(CloseListener listener) {

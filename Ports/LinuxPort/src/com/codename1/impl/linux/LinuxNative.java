@@ -561,6 +561,17 @@ public final class LinuxNative {
     /** Inverse of {@link #dpapiProtect}: decrypts a DPAPI blob, or {@code null}. */
     public static native byte[] dpapiUnprotect(byte[] data);
 
+    /**
+     * Removes the keyring entry the given token names.
+     *
+     * <p>The blob {@link #dpapiProtect(byte[])} returns is a token, not the secret: the secret
+     * lives in the Secret Service. Dropping the blob alone leaves it there.
+     *
+     * @param data the token blob
+     * @return true if an entry was removed, false if there was none or the keyring refused
+     */
+    public static native boolean dpapiForget(byte[] data);
+
     /* --------------------------------------------------- local notifications */
 
     /**

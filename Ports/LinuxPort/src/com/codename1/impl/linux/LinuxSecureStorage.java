@@ -91,6 +91,23 @@ public class LinuxSecureStorage extends SecureStorage {
         if (account == null) {
             return false;
         }
+        // The keyring entry first, then the token that names it. What is stored here is a token;
+        // the secret itself is in the Secret Service, so deleting the token alone made the value
+        // unreachable through this class while leaving it in the user's keyring -- recoverable,
+        // and an orphan for every key ever forgotten. For a forgotten database key that is the
+        // difference between erased and merely hidden.
+        //
+        // In this order because the token is the only way to find the entry: dropping it first
+        // would leave nothing to clear the keyring with.
+        try {
+            Object stored = Storage.getInstance().readObject(key(account));
+            if (stored instanceof byte[]) {
+                LinuxNative.dpapiForget((byte[]) stored);
+            }
+        } catch (Throwable cannotRead) {
+            // A token that cannot be read cannot be cleared either. The stored object still goes,
+            // which is what this method promises; the keyring entry is reported below.
+        }
         Storage.getInstance().deleteStorageFile(key(account));
         return true;
     }

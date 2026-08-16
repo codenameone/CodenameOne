@@ -364,6 +364,15 @@ and stepping again. Prefer `next()` for large result sets.
 One consequence is worth knowing: because a backward seek re-runs the statement, a cursor is a
 repeatable read only inside a transaction. Outside one, another thread can write between the two passes, changing what the second pass sees.
 
+There's a limit on Android that follows from the same mechanism. A statement that changes the
+database and returns rows -- `INSERT ... RETURNING` and its relatives -- runs once, and Android
+reads its rows through a window it can only refill by running the statement again. The rows that
+fit in the first window are therefore readable and the rest aren't: reaching them would apply the
+insert a second time. Codename One refuses that rather than doing it, and says so in the error,
+including that the changes are already applied and the statement must not be retried. If the
+result set may be large, run the statement with `execute()` and query for what you need
+afterwards. Every other port steps through such a statement once and has no such limit.
+
 [[sql-legacy]]
 ==== Compatibility with the previous behaviour
 

@@ -73,6 +73,7 @@ extern struct clazz class_array1__java_lang_String;
 static __typeof__(secret_password_store_sync)*  p_secret_password_store_sync;
 static __typeof__(secret_password_lookup_sync)* p_secret_password_lookup_sync;
 static __typeof__(secret_password_free)*        p_secret_password_free;
+static __typeof__(secret_password_clear_sync)*  p_secret_password_clear_sync;
 static int cn1_secret_state = 0; /* 0 = untried, 1 = available, -1 = unavailable */
 
 static int cn1LoadSecret(void) {
@@ -90,6 +91,7 @@ static int cn1LoadSecret(void) {
     CN1_SECRET_SYM(p_secret_password_store_sync, "secret_password_store_sync");
     CN1_SECRET_SYM(p_secret_password_lookup_sync, "secret_password_lookup_sync");
     CN1_SECRET_SYM(p_secret_password_free, "secret_password_free");
+    CN1_SECRET_SYM(p_secret_password_clear_sync, "secret_password_clear_sync");
 #undef CN1_SECRET_SYM
     cn1_secret_state = ok ? 1 : -1;
     if (!ok) { cn1LinuxStubOnce("libsecret present but an expected symbol was missing; secure storage unsupported"); }
@@ -550,6 +552,41 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiUnprotect___byte_1ARRAY_R_
     result = cn1LinuxNewByteArray(threadStateData, decoded, (int) decodedLen);
     g_free(decoded);
     return result;
+}
+
+/*
+ * Removes the keyring entry a token names.
+ *
+ * The blob this port hands back from dpapiProtect is not the secret: the secret is in the Secret
+ * Service and the blob is the token it is filed under. So deleting the stored blob makes the
+ * secret unreachable through this API while leaving it in the user's keyring -- which for
+ * forgetting a database key is the difference between erased and merely hidden, and leaves an
+ * orphan behind for every key ever forgotten.
+ */
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_dpapiForget___byte_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data) {
+    unsigned char* tokenBytes;
+    int len;
+    char token[128];
+    GError* err = 0;
+    gboolean cleared;
+    if (data == JAVA_NULL || !cn1LoadSecret()) {
+        return JAVA_FALSE;
+    }
+    tokenBytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
+    len = (int) (*(JAVA_ARRAY) data).length;
+    if (len <= 0 || len >= (int) sizeof(token)) {
+        return JAVA_FALSE;
+    }
+    memcpy(token, tokenBytes, len);
+    token[len] = 0;
+    cleared = p_secret_password_clear_sync(&cn1SecretSchema, 0, &err, "token", token, NULL);
+    if (err) {
+        g_error_free(err);
+        return JAVA_FALSE;
+    }
+    /* False means the keyring had no entry under this token, which is what a second forget sees.
+     * The caller treats that as nothing left to remove rather than as a failure. */
+    return cleared ? JAVA_TRUE : JAVA_FALSE;
 }
 
 /* ----------------------------------------------------------- file dialog */

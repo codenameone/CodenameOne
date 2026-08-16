@@ -11579,6 +11579,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         if (!target.exists() || target.delete()) {
             return survivingSidecars;
         }
+        if (isSymbolicLink(target)) {
+            // Emptying follows the link, and what it would empty is whatever the link points at.
+            // The name was checked before any of this began, but a directory another actor can
+            // write to can have that name replaced afterwards, and unlinking a link that cannot
+            // be unlinked leaves this holding a name that now means somebody else's file.
+            // Reported instead: the export could not be removed, and nothing else is touched.
+            return " A complete copy of the data was left at " + target.getPath()
+                    + ", which is now a link and was left alone; delete it." + survivingSidecars;
+        }
         try {
             new FileOutputStream(target).close();
         } catch (IOException cannotEmptyIt) {
@@ -11589,6 +11598,39 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return survivingSidecars;
         }
         return " An emptied file was left at " + target.getPath() + "." + survivingSidecars;
+    }
+
+    /// Whether a name now resolves to something other than itself.
+    ///
+    /// Everything under the migration directory was checked to be a plain name inside it before
+    /// any of it was acted on. That check happens once, and a directory another actor can write to
+    /// can have an entry replaced between then and the cleanup -- so anything that opens a file
+    /// rather than unlinking it asks again, immediately before it opens it.
+    ///
+    /// Unlinking needs no such question: removing a link removes the link. Emptying does, because
+    /// a stream follows it and empties whatever it points at.
+    ///
+    /// Compares the canonical path with the absolute one rather than using a no-follow open, which
+    /// this port cannot reach at the API levels it supports. It does not close the window between
+    /// the question and the open, and cannot from Java; it does stop the case that makes the
+    /// window worth anything, which is a link that has been left in place because it could not be
+    /// unlinked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `f`: the entry about to be opened
+    ///
+    /// #### Returns
+    ///
+    /// true if it is a link, or if that could not be determined
+    private static boolean isSymbolicLink(File f) {
+        try {
+            return !f.getCanonicalFile().equals(f.getAbsoluteFile());
+        } catch (IOException cannotResolve) {
+            // Unresolvable is treated as a link: this only decides whether to open something, and
+            // not opening it costs a message where opening it could truncate another file.
+            return true;
+        }
     }
 
     /// Disposes of the files SQLite keeps beside a database, and reports anything that survived.
@@ -11606,6 +11648,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         for (int iter = 0; iter < suffixes.length; iter++) {
             File sidecar = new File(target.getPath() + suffixes[iter]);
             if (!sidecar.exists() || sidecar.delete()) {
+                continue;
+            }
+            if (isSymbolicLink(sidecar)) {
+                // As above: emptying a link empties its target, and the target is not ours.
+                left.append(" A working file was left at ").append(sidecar.getPath())
+                        .append(", which is now a link and was left alone.");
                 continue;
             }
             try {
