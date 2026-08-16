@@ -59,10 +59,16 @@ class TapjackingTest extends UITestBase {
     @BeforeEach
     void armListener() {
         ShieldSignals.clear();
-        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
         // The implementation is shared across test classes, so the obscured state has to be
-        // wound back explicitly; nothing else resets it.
+        // wound back explicitly; nothing else resets it. Switching to OFF is what retracts it.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
         implementation.notifyScreenObscured(false, null);
+        flushSerialCalls();
+        // Then arm a detecting policy as the baseline. A port only ever reports while it is
+        // detecting -- Android returns from tapjacked() before reporting under OFF -- and the
+        // core now refuses obscured reports arriving under OFF, so a test that reported from
+        // the default policy would be exercising a state no port can produce.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
         flushSerialCalls();
         observed.clear();
         listener = new ActionListener() {
@@ -85,9 +91,22 @@ class TapjackingTest extends UITestBase {
     // --- policy plumbing --------------------------------------------------
 
     @Test
-    void defaultsToOffAndAClearScreen() {
+    void offReportsNothingAndKeepsTheScreenClear() {
+        // Deliberately NOT asserted against a fresh TestCodenameOneImplementation: its
+        // constructor assigns the static singleton, so building one here would repoint
+        // UITestBase's `implementation` away from the instance Display holds and quietly
+        // desynchronize every later test in the class. That the untouched default is OFF is
+        // covered by aNullPolicyIsTreatedAsOffRatherThanStored.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
+        flushSerialCalls();
+        observed.clear();
+
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+
         assertSame(TapjackingPolicy.OFF, DeviceIntegrity.getTapjackingPolicy());
         assertFalse(DeviceIntegrity.isScreenObscured());
+        assertEquals(0, observed.size());
     }
 
     @Test
@@ -264,6 +283,42 @@ class TapjackingTest extends UITestBase {
         assertFalse(DeviceIntegrity.isScreenObscured());
         assertEquals(2, observed.size(), "the listener is owed its closing transition");
         assertEquals(Boolean.FALSE, observed.get(1));
+    }
+
+    @Test
+    void aSightingThatRacedTheSwitchOffIsDropped() {
+        // The interleaving the ports can actually produce: Android's input thread reads the
+        // old BLOCK policy inside tapjacked() and decides to report, the EDT stores OFF and
+        // clears the state, and only then does the report land. Accepting it would set a
+        // state nothing clears afterwards -- reporting has stopped under OFF -- and hand a
+        // listener an obscured callback for protection the app had already switched off.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
+        flushSerialCalls();
+        observed.clear();
+
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+
+        assertFalse(DeviceIntegrity.isScreenObscured(),
+                "a report that lost the race must not resurrect the state");
+        assertEquals(0, observed.size());
+        assertNull(findTapjackSignal());
+    }
+
+    @Test
+    void aRetractionIsNeverDroppedEvenWhileOff() {
+        // Only assertions are refused while OFF. If the order had been the other way round --
+        // the sighting landing before the switch-off -- the clearing call is what rescues the
+        // state, so it must still be honoured under a non-detecting policy.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+        assertTrue(DeviceIntegrity.isScreenObscured());
+
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
+        flushSerialCalls();
+        assertFalse(DeviceIntegrity.isScreenObscured());
     }
 
     @Test

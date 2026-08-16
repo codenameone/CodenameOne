@@ -11342,6 +11342,16 @@ public abstract class CodenameOneImplementation {
     // the one thing it alone can know: whether a given touch arrived obscured.
     // -----------------------------------------------------------------------------------------
 
+    /// Guards the three fields below. They are written from the platform's input thread and read
+    /// and written from the EDT, and the pair (policy, state) has to move together: a report that
+    /// raced a switch-off would otherwise land after the state was cleared and leave
+    /// [#isScreenObscured()] stuck true, because nothing reports again once the policy is OFF.
+    ///
+    /// A lock rather than volatile fields, because the invariant spans two fields rather than
+    /// being about the visibility of either one. Dispatch never happens while it is held: see
+    /// [#notifyScreenObscured(boolean, String)].
+    private final Object tapjackingLock = new Object();
+
     private TapjackingPolicy tapjackingPolicy = TapjackingPolicy.OFF;
     private boolean screenObscured;
     private com.codename1.ui.util.EventDispatcher tapjackingListeners;
@@ -11350,26 +11360,37 @@ public abstract class CodenameOneImplementation {
     /// [com.codename1.security.DeviceIntegrity#setTapjackingProtection(TapjackingPolicy)]. Ports
     /// that can also apply a platform level filter override this, call `super`, and apply it.
     public void setTapjackingProtection(TapjackingPolicy policy) {
-        tapjackingPolicy = policy == null ? TapjackingPolicy.OFF : policy;
-        if (!tapjackingPolicy.isDetecting()) {
+        boolean retract;
+        synchronized (tapjackingLock) {
+            tapjackingPolicy = policy == null ? TapjackingPolicy.OFF : policy;
+            retract = !tapjackingPolicy.isDetecting();
+        }
+        if (retract) {
             // Switching off has to retract the state, because switching off is also what stops
             // anything from retracting it later: a port stops reporting under OFF -- the Android
             // one returns from tapjacked() before it reports -- so a screenObscured left true
             // here would have isScreenObscured() answering true for the rest of the process and
             // the listener would never receive its closing transition.
+            //
+            // Outside the lock: this dispatches to listeners, and holding a lock across
+            // application code invites the deadlock ShieldSignals documents at length.
             notifyScreenObscured(false, null);
         }
     }
 
     /// The tapjacking policy currently in force. Never null.
     public TapjackingPolicy getTapjackingPolicy() {
-        return tapjackingPolicy;
+        synchronized (tapjackingLock) {
+            return tapjackingPolicy;
+        }
     }
 
     /// True when the most recently observed touch arrived while another application's window was
     /// drawn over this app. Always false where the platform cannot report it.
     public boolean isScreenObscured() {
-        return screenObscured;
+        synchronized (tapjackingLock) {
+            return screenObscured;
+        }
     }
 
     /// Registers a listener notified when the obscured state changes. See
@@ -11378,18 +11399,29 @@ public abstract class CodenameOneImplementation {
         if (l == null) {
             return;
         }
-        if (tapjackingListeners == null) {
-            tapjackingListeners = new com.codename1.ui.util.EventDispatcher();
+        com.codename1.ui.util.EventDispatcher target;
+        synchronized (tapjackingLock) {
+            if (tapjackingListeners == null) {
+                tapjackingListeners = new com.codename1.ui.util.EventDispatcher();
+            }
+            target = tapjackingListeners;
         }
-        tapjackingListeners.addListener(l);
+        // EventDispatcher does its own locking; the lock above is only for the lazy creation,
+        // so that two threads registering at once cannot end up with two dispatchers and one
+        // of them holding a listener nothing ever fires.
+        target.addListener(l);
     }
 
     /// Removes a listener added by [#addTapjackingListener(ActionListener)].
     public void removeTapjackingListener(ActionListener l) {
-        if (l == null || tapjackingListeners == null) {
+        com.codename1.ui.util.EventDispatcher target;
+        synchronized (tapjackingLock) {
+            target = tapjackingListeners;
+        }
+        if (l == null || target == null) {
             return;
         }
-        tapjackingListeners.removeListener(l);
+        target.removeListener(l);
     }
 
     /// Called by a port when it observes a touch, to report whether that touch was obscured.
@@ -11406,8 +11438,22 @@ public abstract class CodenameOneImplementation {
     /// - `obscured`: true when the observed touch was obscured
     /// - `detail`: a short machine readable description of which flag fired, or null
     public void notifyScreenObscured(boolean obscured, String detail) {
-        boolean changed = obscured != screenObscured;
-        screenObscured = obscured;
+        boolean changed;
+        com.codename1.ui.util.EventDispatcher listeners;
+        synchronized (tapjackingLock) {
+            if (obscured && !tapjackingPolicy.isDetecting()) {
+                // A sighting that raced a switch-off. The port read the old policy, decided to
+                // report, and only got here after the EDT had already stored OFF and cleared the
+                // state. Letting it through would resurrect a state nothing clears afterwards --
+                // reporting has stopped -- and hand a listener an obscured callback for a
+                // protection the app had already turned off. Retractions are never dropped, only
+                // assertions, so the clearing path below still works.
+                return;
+            }
+            changed = obscured != screenObscured;
+            screenObscured = obscured;
+            listeners = tapjackingListeners;
+        }
         if (obscured) {
             // Submitted on every obscured touch rather than only on the transition, because
             // the bus and the listener want different things. ShieldSignals.add already
@@ -11430,10 +11476,11 @@ public abstract class CodenameOneImplementation {
             // touch would queue a runnable onto the EDT for every event of every gesture.
             return;
         }
-        if (tapjackingListeners != null && tapjackingListeners.hasListeners()) {
+        if (listeners != null && listeners.hasListeners()) {
             // Boolean source so a listener can read the new state straight off the event without
-            // a second call back into the API.
-            tapjackingListeners.fireActionEvent(new ActionEvent(Boolean.valueOf(obscured)));
+            // a second call back into the API -- which is also what makes dispatching outside the
+            // lock safe, since the event does not depend on the state still being current.
+            listeners.fireActionEvent(new ActionEvent(Boolean.valueOf(obscured)));
         }
     }
 
