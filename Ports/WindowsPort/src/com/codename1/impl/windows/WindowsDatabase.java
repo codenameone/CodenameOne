@@ -310,6 +310,9 @@ class WindowsDatabase extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
+        // Before the engine runs it: an ATTACH of a database that is being deleted has to be
+        // refused rather than undone, because undoing it can fail while the delete proceeds.
+        reserveAttachments(sql);
         // The engine runs the whole script, so a failure partway leaves everything before the
         // failing statement done and nothing here able to see how far it got.
         try {

@@ -720,6 +720,9 @@ class AndroidCipherDB extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
+        // Before the engine runs it: an ATTACH of a database that is being deleted has to be
+        // refused rather than undone, because undoing it can fail while the delete proceeds.
+        reserveAttachments(sql);
         try {
             if (isLegacyBehavior()) {
                 db.execSQL(sql);

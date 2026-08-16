@@ -948,7 +948,11 @@ public abstract class Database {
         if (sql == null) {
             return;
         }
-        for (String statement : SQLStatementSplitter.split(sql)) {
+        String[] statements = SQLStatementSplitter.split(sql);
+        // One statement means the caller ran exactly this and it is known to have been reached.
+        // Several mean a script reported after the fact, which may have stopped anywhere in it.
+        boolean certainItRan = statements.length == 1;
+        for (String statement : statements) {
             String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
                 if (inTransaction && isLegacyBehavior() && supportsNestedTransactions()) {
@@ -976,7 +980,7 @@ public abstract class Database {
                 continue;
             }
             noteSavepointControl(statement);
-            noteAttachment(statement);
+            noteAttachment(statement, certainItRan);
         }
     }
 
@@ -986,81 +990,93 @@ public abstract class Database {
     /// connection closes, so this has to as well.
     private java.util.Hashtable attachments;
 
-    /// Records an ATTACH so that deleting the attached file is refused, and a DETACH so it is not.
+    /// Reserves the databases a script is about to attach, before the engine attaches them.
     ///
-    /// An attached database is open, and nothing said so. Only the connection's own file was
-    /// registered, so `#delete(String)` counted no connections on the attached one and unlinked it
-    /// while SQLite still held it -- after which writes through that schema go to a file with no
-    /// name and are lost when the connection closes, and reopening the name makes a fresh empty
-    /// database.
+    /// Called by every port at the top of `#execute(String)`. Reserving first is what makes this
+    /// safe rather than merely watchful: if the file is being deleted the reservation is refused
+    /// and this throws, so the ATTACH never runs and there is nothing to undo. Compensating
+    /// afterwards -- attaching, then detaching again when the reservation lost -- could itself
+    /// fail, on a locked database or inside a transaction, and left the attachment live with the
+    /// delete already under way.
     ///
-    /// Registered under the key the port resolves the name to, which is the same key a delete of
-    /// that database computes. A name this cannot resolve registers nothing: that leaves the hole
-    /// exactly as it was for that one shape rather than refusing deletes of a file nobody named.
+    /// Over-reserving is the deliberate direction. A statement that is reserved and then fails to
+    /// execute leaves a reservation that is given back when the connection closes; the cost is a
+    /// delete refused until then. The other direction loses data.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the script about to run
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a database it attaches is being deleted or converted
+    protected void reserveAttachments(String sql) throws IOException {
+        if (sql == null) {
+            return;
+        }
+        for (String statement : SQLStatementSplitter.split(sql)) {
+            String trimmed = statement.trim();
+            if (!trimmed.toUpperCase().startsWith("ATTACH")) {
+                continue;
+            }
+            String schema = attachmentSchemaOf(trimmed, false);
+            String file = attachmentFileOf(trimmed);
+            if (schema == null || file == null || file.length() == 0 || ":memory:".equals(file)) {
+                continue;
+            }
+            String key;
+            try {
+                key = Display.getInstance().databaseManagedKeyIdentity(file);
+            } catch (RuntimeException cannotResolve) {
+                continue;
+            }
+            if (key == null) {
+                continue;
+            }
+            if (attachments != null && attachments.containsKey(schema.toUpperCase())) {
+                // Already held under this schema; re-attaching the same name would otherwise
+                // reserve twice and give back once.
+                continue;
+            }
+            registerOpenDatabase(key);
+            if (attachments == null) {
+                attachments = new java.util.Hashtable();
+            }
+            attachments.put(schema.toUpperCase(), key);
+        }
+    }
+
+    /// Gives back the reservation a DETACH releases.
+    ///
+    /// Release only, and only for a statement this knows ran. Taking the reservation is
+    /// `#reserveAttachments(String)`'s job, before the engine runs anything, because a reservation
+    /// taken afterwards cannot stop an attach that already happened.
     ///
     /// #### Parameters
     ///
     /// - `statement`: one statement, already split out of any script
-    private void noteAttachment(String statement) {
+    /// - `certainItRan`: whether the engine is known to have reached this statement
+    private void noteAttachment(String statement, boolean certainItRan) {
         String trimmed = statement == null ? "" : statement.trim();
-        if (trimmed.length() == 0) {
+        if (!certainItRan || !trimmed.toUpperCase().startsWith("DETACH") || attachments == null) {
+            // A script is reported here as a whole, after the fact, whether or not the engine
+            // reached the end of it -- so a DETACH sitting after a statement that failed never
+            // ran, and giving its reservation back would free a file that is still attached.
+            // Holding a reservation too long refuses a delete; letting one go too early loses
+            // data, so only a statement reported on its own is acted on.
             return;
         }
-        String upper = trimmed.toUpperCase();
-        if (upper.startsWith("DETACH")) {
-            String schema = attachmentSchemaOf(trimmed, true);
-            if (schema != null && attachments != null) {
-                // Upper-cased on both sides: a schema name is case insensitive to the engine, so
-                // ATTACH ... AS Aux followed by DETACH aux detaches it -- and a case-sensitive
-                // lookup here missed that, leaving the attached file registered until the
-                // connection closed and every delete of it refused in the meantime.
-                String key = (String) attachments.remove(schema.toUpperCase());
-                if (key != null) {
-                    releaseOpenDatabase(key);
-                }
-            }
+        String schema = attachmentSchemaOf(trimmed, true);
+        if (schema == null) {
             return;
         }
-        if (!upper.startsWith("ATTACH")) {
-            return;
+        // Upper-cased on both sides: a schema name is case insensitive to the engine, so
+        // ATTACH ... AS Aux followed by DETACH aux detaches it, and a case-sensitive lookup kept
+        // the reservation until the connection closed.
+        String key = (String) attachments.remove(schema.toUpperCase());
+        if (key != null) {
+            releaseOpenDatabase(key);
         }
-        String schema = attachmentSchemaOf(trimmed, false);
-        String file = attachmentFileOf(trimmed);
-        if (schema == null || file == null || file.length() == 0 || ":memory:".equals(file)) {
-            return;
-        }
-        String key;
-        try {
-            key = Display.getInstance().databaseManagedKeyIdentity(file);
-        } catch (RuntimeException cannotResolve) {
-            return;
-        }
-        if (key == null) {
-            return;
-        }
-        try {
-            registerOpenDatabase(key);
-        } catch (IOException beingDeleted) {
-            // A delete of that file claimed it first. The attach has already happened, so leaving
-            // it would hand the deleting thread a file SQLite still holds -- it counts no
-            // connection, unlinks it, and everything written through this schema afterwards is
-            // lost. Undone here instead: the attachment is dropped, which is the state the
-            // deleting thread already believes in.
-            try {
-                execute("DETACH DATABASE \"" + schema.replace("\"", "\"\"") + "\"");
-            } catch (IOException cannotDetach) {
-                // Nothing further is possible from here: the delete holds the claim and will
-                // proceed, and this connection keeps an attachment to a file that is about to
-                // lose its name. Writes through it are already lost at that point; saying so is
-                // the caller's next failure rather than something this hook can prevent.
-                return;
-            }
-            return;
-        }
-        if (attachments == null) {
-            attachments = new java.util.Hashtable();
-        }
-        attachments.put(schema.toUpperCase(), key);
     }
 
     /// The schema name an ATTACH or DETACH statement names, or null if it cannot be read.
@@ -1120,7 +1136,8 @@ public abstract class Database {
                 || found.charAt(found.length() - 1) != '\'') {
             return null;
         }
-        String file = found.substring(1, found.length() - 1);
+        // Unescaped, so the name this resolves is the name the engine opened.
+        String file = replaceAll(found.substring(1, found.length() - 1), "''", "'");
         if (file.length() == 0) {
             return null;
         }
@@ -1146,8 +1163,22 @@ public abstract class Database {
                 continue;
             }
             if (c == '\'' || c == '"' || c == '`') {
-                int end = statement.indexOf(c, at + 1);
-                if (end < 0) {
+                // Doubled delimiters are an escaped one, not the end: 'quoted''name.db' is a
+                // single literal for a file whose name has an apostrophe in it. Stopping at the
+                // first half of the pair read that as a database called "quoted" and registered
+                // it, while the file SQLite really attached went untracked.
+                int end = at + 1;
+                while (end < length) {
+                    if (statement.charAt(end) == c) {
+                        if (end + 1 < length && statement.charAt(end + 1) == c) {
+                            end += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    end++;
+                }
+                if (end >= length) {
                     break;
                 }
                 words.addElement(statement.substring(at, end + 1));
@@ -1168,6 +1199,22 @@ public abstract class Database {
         String[] out = new String[words.size()];
         words.copyInto(out);
         return out;
+    }
+
+    /// Replaces every occurrence of one string with another.
+    private static String replaceAll(String text, String find, String with) {
+        StringBuilder out = new StringBuilder(text.length());
+        int at = 0;
+        while (at < text.length()) {
+            int next = text.indexOf(find, at);
+            if (next < 0) {
+                out.append(text.substring(at));
+                break;
+            }
+            out.append(text.substring(at, next)).append(with);
+            at = next + find.length();
+        }
+        return out.toString();
     }
 
     /// Strips one layer of SQL quoting.

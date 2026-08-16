@@ -272,6 +272,9 @@ class DatabaseImpl extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
+        // Before the engine runs it: an ATTACH of a database that is being deleted has to be
+        // refused rather than undone, because undoing it can fail while the delete proceeds.
+        reserveAttachments(sql);
         // sqlite3_exec runs a whole script, which is the portable contract -- and which means a
         // failure partway leaves everything before the failing statement done.
         try {

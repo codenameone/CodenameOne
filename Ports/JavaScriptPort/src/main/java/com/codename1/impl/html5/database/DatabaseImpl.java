@@ -244,6 +244,9 @@ public class DatabaseImpl extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
+        // Before the engine runs it: an ATTACH of a database that is being deleted has to be
+        // refused rather than undone, because undoing it can fail while the delete proceeds.
+        reserveAttachments(sql);
         // The engine runs the whole script; see the iOS port for why the failure path matters.
         try {
             checkNative(SQLiteNative.execScript(peer, sql));

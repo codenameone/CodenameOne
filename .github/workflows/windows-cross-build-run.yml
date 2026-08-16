@@ -184,7 +184,11 @@ jobs:
           CN1_CROSS_EXE_OUT: ${{ github.workspace }}/artifacts/WinHelloMain.exe
         run: |
           cd vm
-          JAVA_HOME="$JDK_8_HOME" mvn -B -pl tests -am test \
+          # Through the retry wrapper: this resolves plugins from Maven Central and the runner
+          # edge intermittently resets the connection mid-download, which Maven treats as a
+          # permanent resolution failure -- this run died on a truncated plexus-utils with nothing
+          # compiled yet. A real failure fails the same way on every attempt.
+          JAVA_HOME="$JDK_8_HOME" bash ../scripts/ci/retry.sh mvn -B -pl tests -am test \
             '-Dtest=CleanTargetIntegrationTest#crossBuildsHelloSuiteExe' \
             '-Dsurefire.failIfNoSpecifiedTests=false'
           test -f "$CN1_CROSS_EXE_OUT"

@@ -689,6 +689,9 @@ public class SEDatabase extends Database {
     @Override
     public void execute(String sql) throws IOException {
         checkOpen();
+        // Before the engine runs it: an ATTACH of a database that is being deleted has to be
+        // refused rather than undone, because undoing it can fail while the delete proceeds.
+        reserveAttachments(sql);
         if (isLegacyBehavior()) {
             // A PreparedStatement prepares only the first statement of a script and silently
             // discards the rest, which is exactly what this port used to do.
