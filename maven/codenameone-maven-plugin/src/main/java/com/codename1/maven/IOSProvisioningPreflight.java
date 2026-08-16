@@ -43,6 +43,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
 
@@ -515,7 +516,12 @@ final class IOSProvisioningPreflight {
      * looked valid and went on to spend a cloud build slot.
      */
     private static Date parseDate(String value) {
-        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+        // Locale.US, not the machine's: the no-argument constructor takes the default
+        // locale's calendar, so under th_TH that is a BuddhistCalendar and Apple's 2099
+        // reads as Gregorian 1556 -- a perfectly good profile refused as expired on one
+        // developer's laptop and accepted on the next.
+        SimpleDateFormat format =
+                new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
         format.setTimeZone(TimeZone.getTimeZone("UTC"));
         format.setLenient(false);
         ParsePosition at = new ParsePosition(0);

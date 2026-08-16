@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.TimeZone;
 
@@ -500,6 +501,28 @@ public class IOSProvisioningPreflightTest {
         expected.clear();
         expected.set(2027, Calendar.MAY, 24, 1, 19, 39);
         assertEquals(expected.getTime(), parsed.expirationDate);
+    }
+
+    /**
+     * The verdict must not depend on the developer's locale.
+     *
+     * <p>{@code new SimpleDateFormat(pattern)} takes the default locale's calendar. Under
+     * {@code th_TH} that is a {@code BuddhistCalendar}, so Apple's {@code 2099} is read as
+     * Gregorian 1556 and a perfectly good profile is refused as expired -- on one laptop and
+     * not the next.
+     */
+    @Test
+    public void theVerdictDoesNotDependOnTheMachinesLocale() throws Exception {
+        Locale original = Locale.getDefault();
+        try {
+            Locale.setDefault(new Locale("th", "TH", "TH"));
+            Properties p = settings(write(appStore("Store")), true, "app-store");
+            assertTrue("a profile expiring in 2099 must not read as expired under a"
+                            + " non-Gregorian default calendar",
+                    check(p, true).isEmpty());
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     // ---- a profile is untrusted input ----
