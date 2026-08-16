@@ -949,9 +949,6 @@ public abstract class Database {
             return;
         }
         String[] statements = SQLStatementSplitter.split(sql);
-        // One statement means the caller ran exactly this and it is known to have been reached.
-        // Several mean a script reported after the fact, which may have stopped anywhere in it.
-        boolean certainItRan = statements.length == 1;
         for (String statement : statements) {
             String keyword = transactionControlKeyword(statement);
             if ("BEGIN".equals(keyword)) {
@@ -980,8 +977,18 @@ public abstract class Database {
                 continue;
             }
             noteSavepointControl(statement);
-            noteAttachment(statement, certainItRan);
         }
+        if (mentionsAttachment(sql)) {
+            // Only when the script could have changed what is attached: this asks the engine, and
+            // asking it after every statement would cost a query per execute.
+            reconcileAttachments();
+        }
+    }
+
+    /// Whether a script could have changed what is attached, cheaply enough to ask every time.
+    private static boolean mentionsAttachment(String sql) {
+        String upper = sql.toUpperCase();
+        return upper.indexOf("ATTACH") >= 0;
     }
 
     /// The databases this connection has attached, by the schema name they were attached as.
@@ -1033,49 +1040,115 @@ public abstract class Database {
             if (key == null) {
                 continue;
             }
-            if (attachments != null && attachments.containsKey(schema.toUpperCase())) {
-                // Already held under this schema; re-attaching the same name would otherwise
-                // reserve twice and give back once.
+            String held = attachments == null ? null : (String) attachments.get(schema.toUpperCase());
+            if (key.equals(held)) {
+                // Already reserved under this schema for this same file.
                 continue;
             }
             registerOpenDatabase(key);
             if (attachments == null) {
                 attachments = new java.util.Hashtable();
             }
+            // A script can reuse a schema -- attach a, detach it, attach b under the same name --
+            // and skipping the second one left b unprotected. The new file is reserved and the
+            // one it replaces given back, and the reconciliation after the script settles whatever
+            // the engine really ended up with.
             attachments.put(schema.toUpperCase(), key);
+            if (held != null) {
+                releaseOpenDatabase(held);
+            }
         }
     }
 
-    /// Gives back the reservation a DETACH releases.
+    /// Brings the reservations into line with what the engine actually has attached.
     ///
-    /// Release only, and only for a statement this knows ran. Taking the reservation is
-    /// `#reserveAttachments(String)`'s job, before the engine runs anything, because a reservation
-    /// taken afterwards cannot stop an attach that already happened.
+    /// Asked of the engine rather than worked out from the SQL, because the SQL cannot answer it.
+    /// Three separate ways of being wrong came from trying: a DETACH the engine rejected because
+    /// the database was locked still read as detached; a script that reused a schema name --
+    /// attach a, detach, attach b -- left b unprotected and a released; and a relative filename
+    /// resolves against the process directory for SQLite and against the Codename One database
+    /// directory for a port, so the name reserved was not the file opened. `PRAGMA database_list`
+    /// has none of those problems: it reports the schemas that are attached right now and the
+    /// absolute file behind each one.
     ///
-    /// #### Parameters
+    /// Reservations are added for anything newly attached and given back for anything no longer
+    /// attached, so a failed DETACH keeps its reservation and a reused schema follows the file it
+    /// now names.
     ///
-    /// - `statement`: one statement, already split out of any script
-    /// - `certainItRan`: whether the engine is known to have reached this statement
-    private void noteAttachment(String statement, boolean certainItRan) {
-        String trimmed = statement == null ? "" : statement.trim();
-        if (!certainItRan || !trimmed.toUpperCase().startsWith("DETACH") || attachments == null) {
-            // A script is reported here as a whole, after the fact, whether or not the engine
-            // reached the end of it -- so a DETACH sitting after a statement that failed never
-            // ran, and giving its reservation back would free a file that is still attached.
-            // Holding a reservation too long refuses a delete; letting one go too early loses
-            // data, so only a statement reported on its own is acted on.
+    /// Failure here leaves every reservation as it is. That holds a delete off a file that may no
+    /// longer be attached, which is the recoverable direction; the other one unlinks a database
+    /// somebody is writing through.
+    private void reconcileAttachments() {
+        java.util.Hashtable live = new java.util.Hashtable();
+        Cursor cursor = null;
+        try {
+            cursor = executeQuery("PRAGMA database_list");
+            while (cursor.next()) {
+                Row row = cursor.getRow();
+                String schema = row.getString(1);
+                String file = row.getString(2);
+                if (schema == null || "main".equalsIgnoreCase(schema)
+                        || "temp".equalsIgnoreCase(schema)) {
+                    continue;
+                }
+                if (file == null || file.length() == 0) {
+                    // An attached in-memory or temporary database, which has no file to protect.
+                    continue;
+                }
+                String key = Display.getInstance().databaseManagedKeyIdentity("file://" + file);
+                if (key != null) {
+                    live.put(schema.toUpperCase(), key);
+                }
+            }
+        } catch (IOException cannotAsk) {
             return;
-        }
-        String schema = attachmentSchemaOf(trimmed, true);
-        if (schema == null) {
+        } catch (RuntimeException cannotAsk) {
             return;
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (IOException ignored) {
+                    // The reconciliation below is what matters.
+                }
+            }
         }
-        // Upper-cased on both sides: a schema name is case insensitive to the engine, so
-        // ATTACH ... AS Aux followed by DETACH aux detaches it, and a case-sensitive lookup kept
-        // the reservation until the connection closed.
-        String key = (String) attachments.remove(schema.toUpperCase());
-        if (key != null) {
-            releaseOpenDatabase(key);
+        if (attachments != null) {
+            java.util.Enumeration held = attachments.keys();
+            java.util.Vector gone = new java.util.Vector();
+            while (held.hasMoreElements()) {
+                String schema = (String) held.nextElement();
+                String key = (String) attachments.get(schema);
+                String stillThere = (String) live.get(schema);
+                if (!key.equals(stillThere)) {
+                    gone.addElement(schema);
+                }
+            }
+            java.util.Enumeration removing = gone.elements();
+            while (removing.hasMoreElements()) {
+                String schema = (String) removing.nextElement();
+                releaseOpenDatabase((String) attachments.remove(schema));
+            }
+        }
+        java.util.Enumeration schemas = live.keys();
+        while (schemas.hasMoreElements()) {
+            String schema = (String) schemas.nextElement();
+            String key = (String) live.get(schema);
+            if (attachments != null && key.equals(attachments.get(schema))) {
+                continue;
+            }
+            try {
+                registerOpenDatabase(key);
+            } catch (IOException beingDeleted) {
+                // Attached already, and something else has claimed the file. Nothing here can
+                // undo the attach -- that is why the reservation is also taken before the
+                // statement runs, which is where a refusal can still stop it.
+                continue;
+            }
+            if (attachments == null) {
+                attachments = new java.util.Hashtable();
+            }
+            attachments.put(schema, key);
         }
     }
 
