@@ -11181,12 +11181,77 @@ public class IOSImplementation extends CodenameOneImplementation {
         // data.
         String path = resolveDatabasePath(databaseName);
         return new DatabaseImpl(databaseName, path,
-                config.resolveKeyMaterial(Database.normalizeDatabaseKey(path)));
+                config.resolveKeyMaterial(databaseManagedKeyIdentity(databaseName)));
     }
 
     @Override
     public String databaseManagedKeyIdentity(String databaseName) {
-        return Database.normalizeDatabaseKey(resolveDatabasePath(databaseName));
+        return Database.normalizeDatabaseKey(containerRelativeDatabaseName(databaseName));
+    }
+
+    /// Where a database sits inside this application, rather than where the device is keeping it
+    /// today.
+    ///
+    /// A managed key with no alias of its own is stored under whatever this returns, so what this
+    /// returns has to survive everything the key survives. The keychain item does survive an
+    /// encrypted backup and a restore onto another device -- that is the promise the security
+    /// notes make -- but the absolute path does not: iOS gives the application a fresh container
+    /// directory, and the same database comes back at
+    /// /var/mobile/Containers/Data/Application/<a different UUID>/Documents/app.db. Keying on that
+    /// meant the restored keychain still held the key under the old container while the open
+    /// derived a new one under the new container, so a database that restored perfectly reported
+    /// a wrong key against intact data.
+    ///
+    /// Taking the path apart rather than using the name it was asked for keeps the property the
+    /// absolute path was chosen for: two spellings of one database still resolve to one file and
+    /// therefore to one key. What changes is that the part which moves is removed.
+    ///
+    /// A path outside the container is left as it is. There is nothing stable to measure it
+    /// against, and an application that puts a database there has told us where it wants it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the name or file URL the application opened
+    ///
+    /// #### Returns
+    ///
+    /// the identity to store a managed key under, never null
+    private String containerRelativeDatabaseName(String databaseName) {
+        String path = resolveDatabasePath(databaseName);
+        String container = applicationContainerPath();
+        if (container != null && path.startsWith(container)) {
+            return path.substring(container.length());
+        }
+        return path;
+    }
+
+    /// The directory iOS hands this application, which is the part of a database path that moves.
+    ///
+    /// Derived from the application home rather than asked for directly: the home is the Documents
+    /// directory inside the container, so its parent is the container itself, and taking the
+    /// parent covers a database the application put somewhere else inside the sandbox as well.
+    ///
+    /// #### Returns
+    ///
+    /// the container path with a trailing separator, or null if it cannot be determined
+    private String applicationContainerPath() {
+        String home = FileSystemStorage.getInstance().getAppHomePath();
+        if (home == null || home.length() == 0) {
+            return null;
+        }
+        String nativeHome = FileSystemStorage.getInstance().toNativePath(home);
+        if (nativeHome == null || nativeHome.length() == 0) {
+            return null;
+        }
+        int end = nativeHome.length();
+        while (end > 0 && nativeHome.charAt(end - 1) == '/') {
+            end--;
+        }
+        int parent = nativeHome.lastIndexOf('/', end - 1);
+        if (parent < 0) {
+            return null;
+        }
+        return nativeHome.substring(0, parent + 1);
     }
 
     @Override
