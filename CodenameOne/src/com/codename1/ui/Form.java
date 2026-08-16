@@ -65,7 +65,7 @@ import java.util.Set;
 /// will work whereas `form.animateLayout(200)` will fail.
 ///
 /// @author Chen Fishbein
-public class Form extends Container {
+public class Form extends Container implements TopLevelContainer {
     private static final String Z_INDEX_PROP = "cn1$_zIndex";
     static int activePeerCount;
     static int rippleX;
@@ -1601,6 +1601,12 @@ public class Form extends Container {
     /// a content pane instance
     public Container getContentPane() {
         return contentPane;
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Container asContainer() {
+        return this;
     }
 
     /// This method returns the layered pane of the Form, the layered pane is laid
