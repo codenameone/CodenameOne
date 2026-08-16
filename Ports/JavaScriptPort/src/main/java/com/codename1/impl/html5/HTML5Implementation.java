@@ -1327,7 +1327,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void afterComponentPaint(Component c, Graphics g) {
         super.afterComponentPaint(c, g);
         if (textLayer != null && isDisplayGraphics(g)) {
-            textLayer.endComponent(c, g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
+            // The display graphics reports its clip in absolute coordinates, which is the space
+            // component bounds are in. Graphics.getClipX() subtracts the current translation, so
+            // it would be component-local and the comparison would almost never hold.
+            textLayer.endComponent(c, graphics.getClipX(), graphics.getClipY(),
+                    graphics.getClipWidth(), graphics.getClipHeight());
         }
     }
 
@@ -10699,9 +10703,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         Command back = current.getBackCommand();
         if (back == null) {
-            // Nothing to go back to inside the app. The press is left alone: the entry has
-            // already been popped, so pressing Back once more leaves the document, which is
-            // what the user asked for on a form with no back action.
+            // The form was shown normally, so it has an entry, but it offers no back action --
+            // popping that entry would otherwise look like a press that did nothing and the user
+            // would have to press again. Carry the traversal outwards instead, which leaves the
+            // document, since that is what Back means on a form with nowhere to go.
+            historySuppressPop = true;
+            try {
+                window.getHistory().back();
+            } catch (Throwable ignored) {
+                historySuppressPop = false;
+            }
             return;
         }
         handlingPopState = true;
