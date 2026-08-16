@@ -10700,9 +10700,42 @@ public class HTML5Implementation extends CodenameOneImplementation {
         callSerially(new Runnable() {
             @Override
             public void run() {
-                for (int i = 0; i < distance; i++) {
-                    dispatchBrowserBack();
+                dispatchBrowserBackTimes(distance);
+            }
+        });
+    }
+
+    /**
+     * Leaves a number of forms, one at a time.
+     *
+     * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
+     * back command issued straight away would read the form the first one was still leaving and
+     * run its command again -- two entries would be spent while the application moved one.
+     * Each step waits for the form to actually change before the next is issued.</p>
+     */
+    private void dispatchBrowserBackTimes(int remaining) {
+        if (remaining <= 0) {
+            return;
+        }
+        Form before = Display.getInstance().getCurrent();
+        dispatchBrowserBack();
+        if (remaining > 1) {
+            awaitFormChangeThenBack(before, remaining - 1, 0);
+        }
+    }
+
+    private void awaitFormChangeThenBack(final Form before, final int remaining, final int attempt) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                // Bounded: a back command that refuses to navigate -- a pop guard, or a form
+                // with nowhere to go -- must not leave this waiting for a change that is never
+                // coming.
+                if (Display.getInstance().getCurrent() == before && attempt < 40) {
+                    awaitFormChangeThenBack(before, remaining, attempt + 1);
+                    return;
                 }
+                dispatchBrowserBackTimes(remaining);
             }
         });
     }
