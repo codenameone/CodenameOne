@@ -33,6 +33,19 @@ public class Accessor {
     }
 
     /**
+     * Returns true when the form change in progress is a backward navigation.
+     *
+     * <p>The direction cannot be inferred from which form is appearing: an application may show
+     * an earlier form again as ordinary forward navigation, and treating that as a back would
+     * spend history entries the user can still reach.</p>
+     *
+     * @return true when the change came from showBack()
+     */
+    public static boolean isNavigatingBack() {
+        return Display.getInstance().isNavigatingBack();
+    }
+
+    /**
      * Returns the implementation-level graphics a {@link Graphics} is drawing through.
      *
      * <p>The port needs this to tell a paint aimed at the display from one aimed at an

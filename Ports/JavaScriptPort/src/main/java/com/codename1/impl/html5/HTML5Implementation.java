@@ -10769,7 +10769,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         int depth = historyStack.size();
         int previousIndex = f == null ? -1 : historyStack.lastIndexOf(f);
-        if (previousIndex >= 0 && previousIndex < depth - 1) {
+        // The direction comes from the framework rather than from which form appeared: an
+        // application can legitimately show an earlier form again as forward navigation --
+        // A, B, then A again -- and treating that as a back would spend entries the user can
+        // still reach.
+        if (previousIndex >= 0 && previousIndex < depth - 1
+                && (handlingPopState || com.codename1.ui.Accessor.isNavigatingBack())) {
             // Backward navigation, from a toolbar back command or showBack(). Keeping the whole
             // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
             // to A -- each be recognised.

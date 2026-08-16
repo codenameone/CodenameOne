@@ -268,6 +268,9 @@ public final class Display extends CN1Constants {
     /// so a high/low FPS will have no effect then.
     private int framerateLock = 15;
     private boolean codenameOneRunning = false;
+
+    /// True while the form change in progress is a backward navigation.
+    private boolean navigatingBack;
     /// This is the instance of the EDT used internally to indicate whether
     /// we are executing on the EDT or some arbitrary thread
     private Thread edt;
@@ -1058,6 +1061,18 @@ public final class Display extends CN1Constants {
         }
     }
 
+    /// Whether the form change being performed is a backward one -- showBack() rather than
+    /// show(). Ports that mirror the navigation stack somewhere else, such as the browser's
+    /// history in the JavaScript port, need the direction: the same form can legitimately be
+    /// shown forwards again, so it cannot be inferred from which form is appearing.
+    ///
+    /// #### Returns
+    ///
+    /// true when the current form change came from showBack()
+    boolean isNavigatingBack() {
+        return navigatingBack;
+    }
+
     /// Returns true if the system is currently in the process of transitioning between
     /// forms
     ///
@@ -1622,6 +1637,7 @@ public final class Display extends CN1Constants {
         if (edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
+        navigatingBack = reverse;
 
         if (!isEdt()) {
             // when not running callSerially executes synchronously and would recurse here forever (#4811)
