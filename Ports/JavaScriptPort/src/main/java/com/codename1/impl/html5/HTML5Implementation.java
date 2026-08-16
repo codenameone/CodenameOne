@@ -10755,14 +10755,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
         callSerially(new Runnable() {
             @Override
             public void run() {
+                if (Display.getInstance().getCurrent() != before) {
+                    dispatchBrowserBackTimes(remaining);
+                    return;
+                }
                 // Bounded: a back command that refuses to navigate -- a pop guard, or a form
                 // with nowhere to go -- must not leave this waiting for a change that is never
                 // coming.
-                if (Display.getInstance().getCurrent() == before && attempt < 40) {
+                if (attempt < 40) {
                     awaitFormChangeThenBack(before, remaining, attempt + 1);
                     return;
                 }
-                dispatchBrowserBackTimes(remaining);
+                // Still on the same form, so that step was refused. The remaining steps are
+                // dropped rather than dispatched: they would ask the same guard again on the
+                // same form, and one of the later answers could navigate even though the jump
+                // this belongs to was already refused.
             }
         });
     }
