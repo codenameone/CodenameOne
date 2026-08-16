@@ -432,7 +432,7 @@ static void cn1WinDesktopDestroyOnPump(CN1DesktopWindowOp* op) {
         /* cn1WinCreateGraphics mallocs the struct and does not own the target;
          * releasing the target below is what frees the Direct2D resources. */
         if (w->graphics->brush != NULL) {
-            ID2D1Brush_Release((ID2D1Brush*) w->graphics->brush);
+            ID2D1SolidColorBrush_Release(w->graphics->brush);
         }
         free(w->graphics);
         w->graphics = NULL;

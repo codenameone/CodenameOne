@@ -108,9 +108,9 @@ void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode);
  * Every entry point here must run on the GTK main thread; callers marshal with
  * cn1LinuxRunOnMainAndWait. */
 #define CN1_MAX_DESKTOP_WINDOWS 32
-struct CN1Graphics* cn1LinuxDesktopGraphics(int slot);
-GtkWidget* cn1LinuxDesktopWidget(int slot);
-GtkWidget* cn1LinuxDesktopFixed(int slot);
+/* The GTK-typed accessors live in cn1_linux_gfx.h, which is the header that
+ * includes gtk. This one is included by units that have no GTK on their include
+ * path, so declaring a GtkWidget* here would break them. */
 
 /*
  * Pops one event into out[0..3] = {type, x, y, keyCode}; returns 1 if one was

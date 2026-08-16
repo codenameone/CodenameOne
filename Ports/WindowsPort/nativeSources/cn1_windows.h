@@ -279,7 +279,7 @@ LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
  * single-window path changes. */
 #define CN1_MAX_DESKTOP_WINDOWS 32
 /* Marshals window creation onto the pump thread, which must own the HWND. */
-#define WM_CN1_DESKTOPWINDOW (WM_APP + 24)
+#define WM_CN1_DESKTOPWINDOW (WM_APP + 25)
 void cn1WinDesktopHandleMessage(WPARAM wParam, LPARAM lParam);
 HWND cn1WinDesktopHwnd(int slot);
 int  cn1WinDesktopSlotForHwnd(HWND hwnd);

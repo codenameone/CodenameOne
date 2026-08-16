@@ -126,6 +126,13 @@ void cn1LinuxOverlayRemove(GtkWidget* w);
 /* The top-level GtkWindow (NULL in headless mode). */
 GtkWidget* cn1LinuxWindowWidget(void);
 
+/* Additional desktop windows (cn1_linux_desktopwindow.c). A secondary window
+ * carries its own GtkWindow, drawing area, peer overlay and cairo back buffer;
+ * the main window's statics are untouched. */
+CN1Graphics* cn1LinuxDesktopGraphics(int slot);
+GtkWidget* cn1LinuxDesktopWidget(int slot);
+GtkWidget* cn1LinuxDesktopFixed(int slot);
+
 /* Runs fn(arg) on the GTK main loop and blocks the caller until done (inline in
  * headless mode). For GTK calls the EDT must not make directly. */
 void cn1LinuxRunOnMainAndWait(void (*fn)(void*), void* arg);
