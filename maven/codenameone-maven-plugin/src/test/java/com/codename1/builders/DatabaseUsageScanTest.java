@@ -169,6 +169,64 @@ class DatabaseUsageScanTest {
     }
 
     @Test
+    void anUnreadableNestedArchiveDoesNotHideTheClassesAfterIt() throws IOException {
+        // A name ending in .jar need not be an archive: a truncated or opaque resource carries that
+        // name perfectly well. Letting the failure out abandoned the rest of a library that was
+        // otherwise fine, and what it dropped is exactly what this scan exists to find -- silently,
+        // because the build then prunes the cipher from an application that needs it and the
+        // failure appears on the device.
+        File lib = new File(root, "libs");
+        assertTrue(lib.mkdirs() || lib.isDirectory(), "the library directory has to exist");
+        File jar = new File(lib, "vendor.jar");
+        java.util.zip.ZipOutputStream zip =
+                new java.util.zip.ZipOutputStream(new FileOutputStream(jar));
+        try {
+            // Ordered deliberately: the unreadable entry comes first, so a scan that stops on it
+            // never reaches the class that matters.
+            zip.putNextEntry(new java.util.zip.ZipEntry("assets/truncated.jar"));
+            zip.write(truncatedArchive());
+            zip.closeEntry();
+            zip.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Storage.class"));
+            zip.write(classCalling("passphrase"));
+            zip.closeEntry();
+        } finally {
+            zip.close();
+        }
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "the class after the unreadable entry still counts");
+        assertTrue(usage.usesDatabaseCipher(), "and its encryption still counts");
+    }
+
+    /**
+     * The bytes of an archive that begins well and stops in the middle of an entry.
+     *
+     * <p>Garbage would not do: a zip reader given bytes that are not an archive at all reports no
+     * entries and raises nothing, so it would exercise none of this. What fails is data that
+     * starts as an archive and runs out -- the reader accepts the header, begins inflating, and
+     * meets the end of the stream.
+     */
+    private byte[] truncatedArchive() throws IOException {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.util.zip.ZipOutputStream inner = new java.util.zip.ZipOutputStream(bytes);
+        try {
+            inner.putNextEntry(new java.util.zip.ZipEntry("com/vendor/Big.class"));
+            byte[] filler = new byte[4096];
+            for (int i = 0; i < filler.length; i++) {
+                filler[i] = (byte) (i % 251);
+            }
+            inner.write(filler);
+            inner.closeEntry();
+        } finally {
+            inner.close();
+        }
+        byte[] whole = bytes.toByteArray();
+        byte[] cut = new byte[whole.length / 2];
+        System.arraycopy(whole, 0, cut, 0, cut.length);
+        return cut;
+    }
+
+    @Test
     void anApplicationClassInsideTheFrameworkPackageIsStillScanned() throws IOException {
         // The package is the framework's by convention, not by ownership. Skipping the whole
         // directory made a helper an application or a library put there invisible, so it could

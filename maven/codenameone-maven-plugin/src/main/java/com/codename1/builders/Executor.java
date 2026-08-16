@@ -890,22 +890,44 @@ public abstract class Executor {
                 if (name.endsWith(".jar")) {
                     // An Android archive keeps its bytecode in a nested classes.jar, so the
                     // entries that matter are one level further in.
-                    java.io.InputStream nested = zip.getInputStream(entry);
+                    //
+                    // Caught per entry, because an entry that cannot be read says nothing about
+                    // the entries after it. A name ending in .jar need not be an archive at all --
+                    // a truncated or opaque resource carries that name perfectly well -- and
+                    // letting it out of here abandoned the rest of a library that was otherwise
+                    // fine. The classes it dropped are the ones this scan exists to find, and the
+                    // consequence is silent: the cipher implementation is pruned from an
+                    // application that turns out to need it, and encryption fails on the device.
                     try {
-                        scanNestedArchiveForDatabaseUsage(nested, found);
-                    } finally {
-                        nested.close();
+                        java.io.InputStream nested = zip.getInputStream(entry);
+                        try {
+                            scanNestedArchiveForDatabaseUsage(nested, found);
+                        } finally {
+                            nested.close();
+                        }
+                    } catch (IOException cannotReadEntry) {
+                        log("WARNING: could not read " + name + " inside " + archive
+                                + " while looking for database use; the rest of the archive was "
+                                + "still read");
                     }
                     continue;
                 }
                 if (!name.endsWith(".class") || isFrameworkDatabaseClass(name)) {
                     continue;
                 }
-                java.io.InputStream in = zip.getInputStream(entry);
+                // Per entry for the same reason: one unreadable class is not a reason to stop
+                // reading the ones after it.
                 try {
-                    inspectClassForDatabaseUsage(readAllBytes(in), found);
-                } finally {
-                    in.close();
+                    java.io.InputStream in = zip.getInputStream(entry);
+                    try {
+                        inspectClassForDatabaseUsage(readAllBytes(in), found);
+                    } finally {
+                        in.close();
+                    }
+                } catch (IOException cannotReadEntry) {
+                    log("WARNING: could not read " + name + " inside " + archive
+                            + " while looking for database use; the rest of the archive was still "
+                            + "read");
                 }
             }
         } catch (IOException cannotRead) {
