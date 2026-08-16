@@ -1270,7 +1270,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
             no.updateIfMovedAndFocused();
         }
         if (textLayer != null && isDisplayGraphics(g)) {
+            if (!textLayer.isPainting()) {
+                updateTextLayerSuspension();
+            }
             textLayer.beginComponent(c);
+        }
+    }
+
+    /**
+     * Decides whether text promotion is suspended, before any component of the frame paints.
+     *
+     * <p>The decision cannot wait until the frame is flushed. By then the components have
+     * already painted under the old setting -- their strings either promoted and left off the
+     * canvas, or rasterized onto it -- so flipping the flag afterwards leaves the frame either
+     * missing its text or showing it twice.</p>
+     */
+    private void updateTextLayerSuspension() {
+        Form currentForm = Display.getInstance().getCurrent();
+        boolean overlayBlocked = com.codename1.ui.Accessor.paintsOverChildren(currentForm);
+        boolean shouldSuspend = Display.getInstance().isInTransition() || overlayBlocked;
+        if (shouldSuspend == textLayer.isSuspended()) {
+            return;
+        }
+        textLayer.setSuspended(shouldSuspend);
+        // Only the dirty region is repainting, so whatever lies outside it still carries the
+        // previous representation. Ask for a full repaint so the whole form agrees. A
+        // transition needs no help: it painted its buffers offscreen, which always rasterizes
+        // text.
+        if (currentForm != null && (overlayBlocked || !shouldSuspend)) {
+            currentForm.repaint();
         }
     }
 
@@ -1563,6 +1591,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
         outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
         textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+        // Paint locking caches a component's pixels in an image and serves that image instead
+        // of painting, returning from Component.paintInternal() before the per-component hooks
+        // run. A locked component therefore stops reporting its text while its DOM runs stay on
+        // screen, so the cached image's rasterized text and the live DOM text are both visible.
+        // The two representations cannot be reconciled, and the lock is only an optimisation,
+        // so it is switched off for this port.
+        Display.getInstance().setProperty("paintLockEnabled", "false");
         installHistoryListener();
         outputCanvas.setAttribute("role", "presentation");
         outputCanvas.setAttribute("aria-hidden", "true");
@@ -3380,12 +3415,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // components, so no run is refreshed while it runs. Those buffers carry their own
             // rasterized text, so the layer must step aside for the duration or the outgoing
             // form's text would float above the animation.
-            Form currentForm = Display.getInstance().getCurrent();
-            textLayer.setSuspended(Display.getInstance().isInTransition()
-                    || com.codename1.ui.Accessor.paintsOverChildren(currentForm));
-            // Also releases runs whose component has been removed or whose form is no longer
-            // displayed; neither ever paints again, so nothing else would clean them up.
-            textLayer.syncToForm(currentForm);
+            // Releases runs whose component has been removed, hidden, or whose form is no
+            // longer displayed; none of those ever paints again, so nothing else would clean
+            // them up. Suspension is decided before painting instead (see
+            // updateTextLayerSuspension), not here.
+            textLayer.syncToForm(Display.getInstance().getCurrent());
         }
         // Record the whole frame into the display surface's command buffer (the
         // display graphics draws onto DISPLAY_SURFACE_ID) and ship it in one
@@ -10487,9 +10521,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // from the root form the first Back did nothing and only the second left the app.
     }
 
+    /**
+     * True once a form has been shown, so the very first one does not push an entry.
+     */
+    private boolean historyRootShown;
+
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
+        if (!historyRootShown) {
+            // The first form has nothing behind it. Pushing for it left a dead entry that the
+            // first Back popped without navigating anywhere, so leaving the app from the root
+            // form took two presses.
+            historyRootShown = true;
+            return;
+        }
         pushHistoryState();
     }
     

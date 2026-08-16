@@ -148,6 +148,19 @@ public final class JavaScriptTextLayer {
     }
 
     /**
+     * Returns true while a component paint is open.
+     *
+     * <p>Callers use this to recognise the start of a frame, which is the only point at which
+     * suspension may change: flipping it once painting has begun would apply to part of a frame
+     * only.</p>
+     *
+     * @return true when at least one component paint is in progress
+     */
+    public boolean isPainting() {
+        return depth > 0;
+    }
+
+    /**
      * Marks the start of a component's paint. Runs are keyed by component and by their order
      * within that component's paint, which is what lets them be reused across repaints instead
      * of being recreated.

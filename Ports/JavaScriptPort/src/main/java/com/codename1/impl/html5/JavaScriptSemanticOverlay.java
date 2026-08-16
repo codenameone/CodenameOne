@@ -97,6 +97,7 @@ public final class JavaScriptSemanticOverlay {
         private final Map<String, String> attributes = new HashMap<String, String>();
         private final List<Long> childOrder = new ArrayList<Long>();
         private Map<String, HTMLElement> customActions;
+        private HTMLElement textNode;
         private String geometry;
         private String text;
         private long parentId = -1;
@@ -282,16 +283,45 @@ public final class JavaScriptSemanticOverlay {
             text = node.getLabel() == null ? "" : node.getLabel();
         }
         if (text == null) {
-            if (entry.text != null) {
-                entry.element.setTextContent("");
+            if (entry.textNode != null) {
+                entry.textNode.setTextContent("");
                 entry.text = null;
             }
             return;
         }
-        if (!text.equals(entry.text)) {
-            entry.element.setTextContent(text);
-            entry.text = text;
+        if (text.equals(entry.text)) {
+            return;
         }
+        // The text goes into a child of its own rather than through setTextContent on the node.
+        // setTextContent replaces every child, which would silently detach this node's semantic
+        // children and its custom-action buttons while the retained ordering still claimed they
+        // were attached -- so the reconcile pass would skip re-adding them and those controls
+        // would vanish until an unrelated structural change rebuilt them.
+        if (entry.textNode == null) {
+            entry.textNode = document.createElement("span");
+            HTMLElement first = firstChildElement(entry);
+            if (first == null) {
+                entry.element.appendChild(entry.textNode);
+            } else {
+                entry.element.insertBefore(entry.textNode, first);
+            }
+        }
+        entry.textNode.setTextContent(text);
+        entry.text = text;
+    }
+
+    /**
+     * Returns the element currently occupying the first child slot, so a newly created text
+     * node can be placed ahead of the node's children and read before them.
+     */
+    private HTMLElement firstChildElement(Entry entry) {
+        if (!entry.childOrder.isEmpty()) {
+            Entry child = entries.get(entry.childOrder.get(0));
+            if (child != null) {
+                return child.element;
+            }
+        }
+        return null;
     }
 
     private void applyListeners(Entry entry, AccessibilityNodeSnapshot node) {

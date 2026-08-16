@@ -42,6 +42,7 @@ let suiteFinished = false;
 // blocked on that call, so the suite cannot advance while the screenshot is being taken.
 // Driving it from a console marker would race the next test's form onto the screen.
 let capturedCount = 0;
+const CAPTURE_TIMEOUT_MS = Number(process.env.CN1_JS_CAPTURE_TIMEOUT_MS || '5000');
 
 async function installCompositeCapture(page) {
   if (process.env.CN1_JS_DISABLE_COMPOSITE_CAPTURE === '1') {
@@ -49,7 +50,25 @@ async function installCompositeCapture(page) {
   }
   await page.exposeFunction('__cn1CompositeCapture', async () => {
     try {
-      const buffer = await page.screenshot({ animations: 'disabled' });
+      // No `animations: 'disabled'`: that makes Playwright wait for animations to settle, and
+      // a screen with a running animation (a toast, say) never settles -- the capture then
+      // outlives the suite's own timeout, which is waiting on this very call, and the test is
+      // recorded as never delivering.
+      //
+      // The explicit timeout plus the race is the backstop for the same failure mode from any
+      // other cause: the suite is blocked on this promise, so it must always resolve promptly.
+      // Falling back to the canvas readback costs the DOM text in one golden; hanging costs
+      // the whole test.
+      const shot = page.screenshot({ timeout: CAPTURE_TIMEOUT_MS });
+      const buffer = await Promise.race([
+        shot,
+        new Promise(resolve => setTimeout(() => resolve(null), CAPTURE_TIMEOUT_MS))
+      ]);
+      if (!buffer) {
+        shot.catch(() => {});
+        append('screenshot:timeout');
+        return null;
+      }
       capturedCount++;
       return `data:image/png;base64,${buffer.toString('base64')}`;
     } catch (err) {
