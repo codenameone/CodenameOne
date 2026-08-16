@@ -1,0 +1,479 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.wearable;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A payload addressed to a path, used both for live messages and for replicated data.
+///
+/// The path is what the receiving side matches on -- `"/steps"`, `"/workout/start"` -- and works
+/// like a URL path, so give related payloads a common prefix. Values are the primitive types every
+/// wearable transport can carry natively on both platforms: string, int, long, double, boolean and
+/// raw bytes.
+///
+/// ```java
+/// WearableMessage m = new WearableMessage("/steps")
+///         .put("count", 8412)
+///         .put("goalReached", true);
+/// WearableConnection.putData(m);
+/// ```
+///
+/// Reads name a default, so a peer running an older version of your app that never sent a key gets
+/// a sane value rather than an exception. That matters more than usual here: the two apps are
+/// updated independently and can be different versions of each other for a long time.
+public class WearableMessage {
+    /// Wire format version, so a newer peer can recognize a payload it cannot parse instead of
+    /// misreading it.
+    private static final int FORMAT_VERSION = 1;
+
+    private static final int TYPE_STRING = 1;
+    private static final int TYPE_INT = 2;
+    private static final int TYPE_LONG = 3;
+    private static final int TYPE_DOUBLE = 4;
+    private static final int TYPE_BOOLEAN = 5;
+    private static final int TYPE_BYTES = 6;
+
+    private final String path;
+    private final Map<String, Object> values = new LinkedHashMap<String, Object>();
+
+    /// Creates an empty message addressed to a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path the peer matches on, conventionally starting with `/`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the path is null or empty
+    public WearableMessage(String path) {
+        if (path == null || path.length() == 0) {
+            throw new IllegalArgumentException("A wearable message needs a path");
+        }
+        this.path = path;
+    }
+
+    /// Returns the path this message is addressed to.
+    ///
+    /// #### Returns
+    ///
+    /// the path
+    public String getPath() {
+        return path;
+    }
+
+    /// Returns the keys carried by this message, in insertion order.
+    ///
+    /// #### Returns
+    ///
+    /// the keys present in the payload
+    public List<String> getKeys() {
+        return new ArrayList<String>(values.keySet());
+    }
+
+    /// Returns true if the payload carries a value under the supplied key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key to look for
+    ///
+    /// #### Returns
+    ///
+    /// true if the key is present
+    public boolean contains(String key) {
+        return values.containsKey(key);
+    }
+
+    /// Adds a string value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `value`: the value; a null value removes the key
+    ///
+    /// #### Returns
+    ///
+    /// this message, for chaining
+    public WearableMessage put(String key, String value) {
+        return set(key, value);
+    }
+
+    /// Adds an int value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `value`: the value
+    ///
+    /// #### Returns
+    ///
+    /// this message, for chaining
+    public WearableMessage put(String key, int value) {
+        return set(key, Integer.valueOf(value));
+    }
+
+    /// Adds a long value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `value`: the value
+    ///
+    /// #### Returns
+    ///
+    /// this message, for chaining
+    public WearableMessage put(String key, long value) {
+        return set(key, Long.valueOf(value));
+    }
+
+    /// Adds a double value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `value`: the value
+    ///
+    /// #### Returns
+    ///
+    /// this message, for chaining
+    public WearableMessage put(String key, double value) {
+        return set(key, Double.valueOf(value));
+    }
+
+    /// Adds a boolean value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `value`: the value
+    ///
+    /// #### Returns
+    ///
+    /// this message, for chaining
+    public WearableMessage put(String key, boolean value) {
+        return set(key, Boolean.valueOf(value));
+    }
+
+    /// Adds a raw byte payload. Keep it small: a message is delivered over a low-bandwidth link and
+    /// the platforms reject oversized payloads outright. Use
+    /// [WearableConnection#transferFile(String,String,byte[])] for anything substantial.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `value`: the bytes; a null value removes the key
+    ///
+    /// #### Returns
+    ///
+    /// this message, for chaining
+    public WearableMessage put(String key, byte[] value) {
+        return set(key, value);
+    }
+
+    private WearableMessage set(String key, Object value) {
+        if (key == null || key.length() == 0) {
+            throw new IllegalArgumentException("A wearable message value needs a key");
+        }
+        if (value == null) {
+            values.remove(key);
+        } else {
+            values.put(key, value);
+        }
+        return this;
+    }
+
+    /// Reads a string value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `defaultValue`: returned when the key is absent or holds another type
+    ///
+    /// #### Returns
+    ///
+    /// the value, or the default
+    public String getString(String key, String defaultValue) {
+        Object o = values.get(key);
+        return o instanceof String ? (String) o : defaultValue;
+    }
+
+    /// Reads an int value. Accepts any numeric value, so a peer that sent a long or a double still
+    /// reads back sensibly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `defaultValue`: returned when the key is absent or holds a non-numeric type
+    ///
+    /// #### Returns
+    ///
+    /// the value, or the default
+    public int getInt(String key, int defaultValue) {
+        Object o = values.get(key);
+        return o instanceof Number ? ((Number) o).intValue() : defaultValue;
+    }
+
+    /// Reads a long value. Accepts any numeric value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `defaultValue`: returned when the key is absent or holds a non-numeric type
+    ///
+    /// #### Returns
+    ///
+    /// the value, or the default
+    public long getLong(String key, long defaultValue) {
+        Object o = values.get(key);
+        return o instanceof Number ? ((Number) o).longValue() : defaultValue;
+    }
+
+    /// Reads a double value. Accepts any numeric value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `defaultValue`: returned when the key is absent or holds a non-numeric type
+    ///
+    /// #### Returns
+    ///
+    /// the value, or the default
+    public double getDouble(String key, double defaultValue) {
+        Object o = values.get(key);
+        return o instanceof Number ? ((Number) o).doubleValue() : defaultValue;
+    }
+
+    /// Reads a boolean value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `defaultValue`: returned when the key is absent or holds another type
+    ///
+    /// #### Returns
+    ///
+    /// the value, or the default
+    public boolean getBoolean(String key, boolean defaultValue) {
+        Object o = values.get(key);
+        return o instanceof Boolean ? ((Boolean) o).booleanValue() : defaultValue;
+    }
+
+    /// Reads a raw byte payload.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key
+    /// - `defaultValue`: returned when the key is absent or holds another type
+    ///
+    /// #### Returns
+    ///
+    /// the value, or the default
+    public byte[] getBytes(String key, byte[] defaultValue) {
+        Object o = values.get(key);
+        return o instanceof byte[] ? (byte[]) o : defaultValue;
+    }
+
+
+    /// Writes a string as a 32-bit length followed by its UTF-8 bytes.
+    ///
+    /// Not `DataOutputStream.writeUTF`: that caps a string at 65,535 encoded bytes and throws
+    /// beyond it. Nothing in the public API says a value has to be short, and a payload that
+    /// silently fails to encode because a string grew is a poor way to find out.
+    private static void writeLongUTF(DataOutputStream out, String value) throws IOException {
+        byte[] utf8 = value.getBytes("UTF-8");
+        out.writeInt(utf8.length);
+        out.write(utf8);
+    }
+
+    /// Reads a string written by [#writeLongUTF(DataOutputStream,String)].
+    private static String readLongUTF(DataInputStream in) throws IOException {
+        byte[] utf8 = new byte[readLength(in)];
+        in.readFully(utf8);
+        return new String(utf8, "UTF-8");
+    }
+
+    /// Reads a length that is about to size an allocation.
+    ///
+    /// A negative or absurd value means the payload is malformed or came from a peer this build
+    /// does not understand. Throwing IOException keeps that inside the decoder's own handler, which
+    /// answers with an empty message -- an unchecked NegativeArraySizeException would escape onto
+    /// the EDT instead.
+    private static int readLength(DataInputStream in) throws IOException {
+        int n = in.readInt();
+        if (n < 0 || n > in.available() + 1) {
+            throw new IOException("Implausible length " + n + " in a wearable payload");
+        }
+        return n;
+    }
+
+    // --- wire format --------------------------------------------------------
+
+    /// Serializes the payload to the compact form the platform bridges carry. Application code does
+    /// not normally call this; [WearableConnection] does it on the way out.
+    ///
+    /// #### Returns
+    ///
+    /// the encoded payload, never null
+    /// The most entries the wire format can carry, set by its 16-bit count field.
+    static final int MAX_WIRE_ENTRIES = 65535;
+
+    public byte[] toByteArray() {
+        ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bo);
+        try {
+            out.writeByte(FORMAT_VERSION);
+            if (values.size() > MAX_WIRE_ENTRIES) {
+                // Refused, not truncated and not silently mangled. The count is a 16-bit field, so
+                // 32768 entries wrote a NEGATIVE short, the reader looped zero times, and the peer
+                // accepted a message with every value gone -- no error anywhere, on either side.
+                // A payload this size is already past what either transport will carry, so failing
+                // here costs nothing that would otherwise have worked.
+                throw new IllegalStateException("A WearableMessage carries at most "
+                        + MAX_WIRE_ENTRIES + " entries; this one has " + values.size());
+            }
+            out.writeShort(values.size());
+            for (Map.Entry<String, Object> e : values.entrySet()) {
+                writeLongUTF(out, e.getKey());
+                Object v = e.getValue();
+                if (v instanceof String) {
+                    out.writeByte(TYPE_STRING);
+                    writeLongUTF(out, (String) v);
+                } else if (v instanceof Integer) {
+                    out.writeByte(TYPE_INT);
+                    out.writeInt(((Integer) v).intValue());
+                } else if (v instanceof Long) {
+                    out.writeByte(TYPE_LONG);
+                    out.writeLong(((Long) v).longValue());
+                } else if (v instanceof Double) {
+                    out.writeByte(TYPE_DOUBLE);
+                    out.writeDouble(((Double) v).doubleValue());
+                } else if (v instanceof Boolean) {
+                    out.writeByte(TYPE_BOOLEAN);
+                    out.writeBoolean(((Boolean) v).booleanValue());
+                } else {
+                    byte[] b = (byte[]) v;
+                    out.writeByte(TYPE_BYTES);
+                    out.writeInt(b.length);
+                    out.write(b);
+                }
+            }
+            out.flush();
+        } catch (IOException err) {
+            // A ByteArrayOutputStream cannot fail; rethrowing keeps callers honest
+            // if that ever stops being true.
+            IllegalStateException wrapped =
+                    new IllegalStateException("Failed to encode wearable payload: " + err);
+            wrapped.initCause(err);
+            throw wrapped;
+        }
+        return bo.toByteArray();
+    }
+
+    /// Reconstructs a payload received from the peer. Application code does not normally call this;
+    /// [WearableConnection] does it on the way in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the path the payload arrived on
+    /// - `data`: the encoded payload, may be null or empty for a payload with no values
+    ///
+    /// #### Returns
+    ///
+    /// the decoded message, never null; a payload this build cannot parse decodes to an empty
+    /// message on the same path rather than throwing
+    public static WearableMessage fromByteArray(String path, byte[] data) {
+        WearableMessage m = new WearableMessage(path);
+        if (data == null || data.length == 0) {
+            return m;
+        }
+        // Decoded into a SEPARATE message and only adopted once the whole payload has validated.
+        // Filling `m` as it went meant a payload that was fine for three fields and then truncated
+        // handed the app those three -- an incomplete update that looks like a valid one, which is
+        // worse than the empty message this method documents as its fallback, because nothing
+        // distinguishes it from a real partial write.
+        WearableMessage decoded = new WearableMessage(path);
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
+        try {
+            int version = in.readByte();
+            if (version != FORMAT_VERSION) {
+                // A peer running a future version of the app. Reading on would
+                // produce garbage values, which is worse than no values at all.
+                com.codename1.io.Log.p("Wearable: ignoring a payload on " + path
+                        + " in wire format " + version + "; this build understands "
+                        + FORMAT_VERSION);
+                return m;
+            }
+            // UNSIGNED: the writer's short is a count, never negative, and reading it signed
+            // halved the range for no reason -- and turned an over-large one into zero rather than
+            // into an error.
+            int count = in.readUnsignedShort();
+            for (int i = 0; i < count; i++) {
+                String key = readLongUTF(in);
+                int type = in.readByte();
+                switch (type) {
+                    case TYPE_STRING:
+                        decoded.put(key, readLongUTF(in));
+                        break;
+                    case TYPE_INT:
+                        decoded.put(key, in.readInt());
+                        break;
+                    case TYPE_LONG:
+                        decoded.put(key, in.readLong());
+                        break;
+                    case TYPE_DOUBLE:
+                        decoded.put(key, in.readDouble());
+                        break;
+                    case TYPE_BOOLEAN:
+                        decoded.put(key, in.readBoolean());
+                        break;
+                    case TYPE_BYTES:
+                        byte[] b = new byte[readLength(in)];
+                        in.readFully(b);
+                        decoded.put(key, b);
+                        break;
+                    default:
+                        com.codename1.io.Log.p("Wearable: unknown value type " + type
+                                + " on " + path + "; the rest of the payload is unreadable");
+                        return m;   // nothing adopted: the partial fields are dropped with it
+                }
+            }
+            // Complete and well-formed, so publish it.
+            return decoded;
+        } catch (IOException err) {
+            com.codename1.io.Log.p("Wearable: unreadable payload on " + path + ": " + err);
+        }
+        return m;
+    }
+
+    @Override
+    public String toString() {
+        return "WearableMessage[" + path + " " + values.keySet() + "]";
+    }
+}

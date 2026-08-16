@@ -22,6 +22,9 @@
  */
 
 #include "TargetConditionals.h"
+#if !TARGET_OS_WATCH
+
+#include "TargetConditionals.h"
 // UIWebView / WebKit are unavailable on tvOS; the legacy browser-peer delegate
 // is dropped on the tvOS slice (matching how it is excluded on watchOS).
 #if !TARGET_OS_TV
@@ -167,3 +170,10 @@ extern int connections;
 @end
 
 #endif // !TARGET_OS_TV
+
+#else
+// Compiled out on watchOS: this file is OpenGL ES / Metal / UIKit-only and the watch
+// slice renders through the Core Graphics backend instead. The typedef keeps the
+// translation unit non-empty, which ISO C requires.
+typedef int cn1_uiwebvieweventdelegate_unused_on_watch;
+#endif // !TARGET_OS_WATCH

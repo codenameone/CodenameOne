@@ -109,6 +109,9 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("Polyline".equals(simpleName)) {
             return com.codename1.maps.Polyline.class;
         }
+        if ("PolylineCodec".equals(simpleName)) {
+            return com.codename1.maps.PolylineCodec.class;
+        }
         if ("Projection".equals(simpleName)) {
             return com.codename1.maps.Projection.class;
         }
@@ -296,8 +299,10 @@ public final class GeneratedAccess_com_codename1_maps {
         if (type == com.codename1.maps.MapComponent.class) return invokeStatic3(name, safeArgs);
         if (type == com.codename1.maps.Mercator.class) return invokeStatic4(name, safeArgs);
         if (type == com.codename1.maps.NativeMap.class) return invokeStatic5(name, safeArgs);
-        if (type == com.codename1.maps.Tile.class) return invokeStatic6(name, safeArgs);
-        if (type == com.codename1.maps.WebMapProvider.class) return invokeStatic7(name, safeArgs);
+        if (type == com.codename1.maps.Polyline.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.maps.PolylineCodec.class) return invokeStatic7(name, safeArgs);
+        if (type == com.codename1.maps.Tile.class) return invokeStatic8(name, safeArgs);
+        if (type == com.codename1.maps.WebMapProvider.class) return invokeStatic9(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -396,6 +401,44 @@ public final class GeneratedAccess_com_codename1_maps {
     }
 
     private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+        if ("fromEncoded".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.maps.Polyline.fromEncoded((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return com.codename1.maps.Polyline.fromEncoded((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        throw unsupportedStatic(com.codename1.maps.Polyline.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
+        if ("decode".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.maps.PolylineCodec.decode((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
+                return com.codename1.maps.PolylineCodec.decode((java.lang.String) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        if ("encode".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.List.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
+                return com.codename1.maps.PolylineCodec.encode((java.util.List) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.util.List.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class, java.lang.Integer.class}, false);
+                return com.codename1.maps.PolylineCodec.encode((java.util.List) adaptedArgs[0], toIntValue(adaptedArgs[1]));
+            }
+        }
+        throw unsupportedStatic(com.codename1.maps.PolylineCodec.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic8(String name, Object[] safeArgs) throws Exception {
         if ("setPaintLoading".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -417,7 +460,7 @@ public final class GeneratedAccess_com_codename1_maps {
         throw unsupportedStatic(com.codename1.maps.Tile.class, name, safeArgs);
     }
 
-    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic9(String name, Object[] safeArgs) throws Exception {
         if ("google".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);

@@ -6274,6 +6274,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return b != null && b.isConnected();
     }
 
+    @Override
+    public com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+        // The Wearable Data Layer glue is injected by the builder only when the app references
+        // com.codename1.wearable; without it this is null and the API no-ops.
+        Context ctx = getContext();
+        return ctx == null ? null : AndroidWearableSupport.getBridge(ctx);
+    }
+
     private com.codename1.surfaces.spi.SurfaceBridge surfaceBridge;
 
     @Override

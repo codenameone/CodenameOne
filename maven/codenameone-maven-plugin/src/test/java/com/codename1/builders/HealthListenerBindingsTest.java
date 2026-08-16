@@ -135,6 +135,45 @@ class HealthListenerBindingsTest {
     }
 
     /**
+     * A second translation root gets a factory of its own.
+     *
+     * <p>The factory names every listener in a {@code new} expression, which the translator
+     * follows, so one shared factory drags each target's listeners into the other target's binary
+     * -- the watch carrying the phone's health graph it can never be asked for. Distinct class
+     * name, distinct file, distinct install statement: the two are compiled by the same javac pass
+     * and separated only by which stub installs which.</p>
+     */
+    @Test
+    void aSecondRootGetsAFactoryOfItsOwn() {
+        String suffix = HealthListenerBindings.WATCH_SUFFIX;
+        String src = HealthListenerBindings.generate(
+                list("com.example.WristWatcher"), suffix);
+        assertNotNull(src);
+        assertTrue(src.contains("public final class CN1HealthListenerBindings"
+                + suffix + " implements"),
+                "the watch factory must not collide with the phone's: " + src);
+        assertTrue(src.contains("new CN1HealthListenerBindings" + suffix + "()"),
+                "and must install ITSELF, not the phone's factory: " + src);
+        assertTrue(src.contains("new com.example.WristWatcher()"), src);
+
+        assertEquals(HealthListenerBindings.FQCN + suffix + ".install();\n",
+                HealthListenerBindings.installStatement(
+                        list("com.example.WristWatcher"), suffix));
+        assertEquals("com/codename1/health/generated/CN1HealthListenerBindings"
+                        + suffix + ".java",
+                HealthListenerBindings.sourcePath(suffix));
+    }
+
+    /** No suffix is the single-translation case, unchanged. */
+    @Test
+    void theUnsuffixedFormIsTheSingleTranslationCase() {
+        assertEquals(HealthListenerBindings.generate(list("com.example.StepWatcher")),
+                HealthListenerBindings.generate(list("com.example.StepWatcher"), ""));
+        assertEquals(HealthListenerBindings.sourcePath(),
+                HealthListenerBindings.sourcePath(""));
+    }
+
+    /**
      * A nested listener is the common case -- developers put it inside the
      * class that subscribes. The persisted key must stay the binary name,
      * since that is what Class.getName() returns, but the constructor call

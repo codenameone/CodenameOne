@@ -194,8 +194,22 @@ To reproduce the SpotBugs gate locally:
 source tools/env.sh   # JDK 8
 cd maven && mvn -B -DskipTests=true -Pcompile-android \
   -pl android,ios,codenameone-maven-plugin -am verify
+mvn -B -DunitTests -DskipTests=true -pl core-unittests verify
 mvn -B -DskipTests=true -f ../vm/ByteCodeTranslator/pom.xml verify
 ```
+
+**Run the `core-unittests` line too, and do not skip it because the first
+command "already covered" that module -- it does not.** `core-unittests` is
+declared inside the `unittests` profile, so `-am` never reaches it and its
+`target/spotbugsXml.xml` is left exactly as some earlier run wrote it. Reading
+that file after the first command reports whatever was true last time, which is
+how a real finding was declared clean locally and then failed `build-test (8)`.
+Delete the report before re-running if you want to be certain you are reading
+this run's answer.
+
+Note the module analyses the **core** classes, not just its own tests: a
+finding there names a `com.codename1.*` framework class, and adding a caller or
+removing one can make a previously-used private method dead.
 
 Findings land in each module's `target/spotbugsXml.xml`.
 

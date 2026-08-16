@@ -370,6 +370,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isCarPlayConnected();
     }
 
+    private IOSWearableBridge wearableBridge;
+
+    @Override
+    public com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+        // Only meaningful in builds that linked the WatchConnectivity natives
+        // (CN1_USE_WATCHCONNECTIVITY, flipped by the builder when the app references
+        // com.codename1.wearable). Always returned: the bridge's own isSupported() answers honestly
+        // through the natives, which stub to unsupported when the define is off.
+        if (wearableBridge == null) {
+            wearableBridge = IOSWearableCallbacks.getBridge(nativeInstance);
+        }
+        return wearableBridge;
+    }
+
     private IOSSurfaceBridge surfaceBridge;
 
     @Override

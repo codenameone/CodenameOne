@@ -242,9 +242,16 @@ public class HealthScannerParityTest {
                     builder + " must report constructibility, or an"
                             + " abstract declarer gets bound instead of"
                             + " its usable subclass");
-            assertTrue(src.contains(
-                    "HealthListenerBindings.generate(healthScan.resolve())"),
+            assertTrue(src.contains("HealthListenerBindings.generate("),
                     builder + " must generate from the resolved set");
+            // Android has one artifact and hands the resolved set straight over. iOS may have two
+            // translation roots, and then each gets its own factory holding only the listeners
+            // that root reaches -- but the input is still the same resolved set, narrowed rather
+            // than recomputed. Asserting the exact call text would have said "iOS must not do
+            // per-root filtering", which is the opposite of what this parity check is for.
+            assertTrue(src.contains("healthScan.resolve()"),
+                    builder + " must feed the generator from the resolved set, not a"
+                            + " separately derived one");
             assertTrue(src.contains("installStatement("),
                     builder + " must install them at startup");
         }

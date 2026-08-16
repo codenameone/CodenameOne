@@ -69,8 +69,14 @@
 - (void)startWithWidth:(int)w height:(int)h scale:(CGFloat)scale;
 
 // Lifecycle hooks the watch app forwards from its scene phases.
+//
+// The active/resign pair drives the paint pump. The background/foreground pair drives the CN1
+// application lifecycle -- the generated stub's stop() and start() -- exactly as the iOS app
+// delegate does; producing no frames is not the same as the app being suspended.
 - (void)applicationDidBecomeActive;
 - (void)applicationWillResignActive;
+- (void)applicationDidEnterBackground;
+- (void)applicationWillEnterForeground;
 
 // Input. crownDelta is in CN1 scroll units; tap coordinates are in points.
 - (void)crownRotatedBy:(CGFloat)crownDelta;

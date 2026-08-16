@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codenameone.developerguide.snippets.generated;
 
 import com.codename1.gpu.*;
@@ -15,6 +38,8 @@ import com.codename1.charts.renderers.*;
 import com.codename1.charts.views.*;
 import com.codename1.capture.*;
 import com.codename1.io.*;
+import com.codename1.surfaces.*;
+import com.codename1.wearable.*;
 import com.codename1.l10n.*;
 import com.codename1.location.*;
 import com.codename1.maps.*;
@@ -55,6 +80,13 @@ class WearablesJava001Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
+    Label stepsLabel;
+    int stepCount = 0;
+    void showWorkout(String id) {
+    }
+    String beginWorkout() {
+        return "w1";
+    }
     void snippet() throws Exception {
         // tag::wearables-java-001[]
         Form f = new Form(BoxLayout.y());
@@ -68,5 +100,63 @@ class WearablesJava001Snippet {
         }
         f.show();
         // end::wearables-java-001[]
+
+        // tag::wearables-java-002[]
+        // On the phone: publish the value the watch should show whenever it next wakes.
+        WearableConnection.putData(new WearableMessage("/steps")
+                .put("count", stepCount)
+                .put("goalReached", stepCount >= 10000));
+        // end::wearables-java-002[]
+
+        // tag::wearables-java-003[]
+        // On the watch: react to it. Register from init(), not from a form -- a value that
+        // arrived while the app was starting is replayed only to listeners that exist by then.
+        WearableConnection.addDataListener(new WearableDataListener() {
+            public void dataChanged(WearableMessage data) {
+                stepsLabel.setText("" + data.getInt("count", 0));
+            }
+
+            public void dataRemoved(String path) {
+                stepsLabel.setText("--");
+            }
+        });
+        // end::wearables-java-003[]
+
+        // tag::wearables-java-004[]
+        // Ask the phone something and use the answer. Only works while both apps are awake,
+        // so check first and fall back to what you already replicated.
+        if (WearableConnection.isReachable()) {
+            WearableConnection.sendMessage(new WearableMessage("/workout/start"),
+                    new WearableReplyHandler() {
+                        public void replyReceived(WearableMessage reply) {
+                            showWorkout(reply.getString("id", null));
+                        }
+
+                        public void replyFailed(String message) {
+                            Log.p("Could not start the workout: " + message);
+                        }
+                    });
+        }
+        // end::wearables-java-004[]
+
+        // tag::wearables-java-005[]
+        // Answer the watch. Reply quickly and do slow work afterwards -- the sender is waiting.
+        WearableConnection.addMessageListener(new WearableMessageListener() {
+            public WearableMessage messageReceived(WearableMessage message, boolean expectsReply) {
+                if ("/workout/start".equals(message.getPath())) {
+                    return new WearableMessage("/workout/start").put("id", beginWorkout());
+                }
+                return null;
+            }
+        });
+        // end::wearables-java-005[]
+
+        // tag::wearables-java-006[]
+        // A complication is a widget in a watch family, published from the same timeline.
+        WidgetKind steps = new WidgetKind("steps")
+                .setDisplayName("Steps")
+                .addSupportedSize(WidgetSize.WATCH_CIRCULAR)
+                .addSupportedSize(WidgetSize.WATCH_RECTANGULAR);
+        // end::wearables-java-006[]
     }
 }

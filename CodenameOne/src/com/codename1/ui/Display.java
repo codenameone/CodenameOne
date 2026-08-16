@@ -4720,6 +4720,18 @@ public final class Display extends CN1Constants {
         return impl.getCarBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.wearable` API to talk to the
+    /// counterpart watch or phone app, or null when this device has no wearable counterpart.
+    /// Internal -- application code uses the `com.codename1.wearable` API rather than this bridge
+    /// directly.
+    ///
+    /// #### Returns
+    ///
+    /// the wearable bridge, or null
+    public com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+        return impl.getWearableBridge();
+    }
+
     /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
     /// surfaces (home-screen widgets and live activities), or null when unsupported on this port.
     /// Internal -- application code uses the `com.codename1.surfaces` API rather than this bridge

@@ -215,6 +215,18 @@ public final class GeneratedAccess_com_codename1_maps_vector {
     }
 
     private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+        if ("centerLatitude".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
+                return com.codename1.maps.vector.WebMercator.centerLatitude(((Number) adaptedArgs[0]).doubleValue(), ((Number) adaptedArgs[1]).doubleValue());
+            }
+        }
+        if ("clampLatitude".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return com.codename1.maps.vector.WebMercator.clampLatitude(((Number) adaptedArgs[0]).doubleValue());
+            }
+        }
         if ("latToWorldY".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class, java.lang.Double.class}, false);
@@ -860,6 +872,7 @@ public final class GeneratedAccess_com_codename1_maps_vector {
     }
 
     private static Object getStaticField2(String name) throws Exception {
+        if ("MAX_LATITUDE".equals(name)) return com.codename1.maps.vector.WebMercator.MAX_LATITUDE;
         if ("TILE_SIZE".equals(name)) return com.codename1.maps.vector.WebMercator.TILE_SIZE;
         throw unsupportedStaticField(com.codename1.maps.vector.WebMercator.class, name);
     }

@@ -1190,6 +1190,69 @@ public final class IOSNative {
     /** True when ActivityKit live activities are available and enabled (iOS 16.1+). */
     native boolean surfacesActivitiesSupported();
 
+    // --- Phone-to-watch link (WatchConnectivity) ----------------------------
+    // Backs com.codename1.wearable. The same natives serve both halves of a pair: WCSession is
+    // symmetric, so the phone app and the watch app run identical code. Payloads cross as opaque
+    // bytes; the value model lives in com.codename1.wearable.WearableMessage.
+
+    /** True when this device supports a phone-to-watch link at all (false on iPad). */
+    native boolean wearableSupported();
+
+    /** True when a counterpart device is paired, in range or not. */
+    native boolean wearablePaired();
+
+    /** True when the peer app can receive a live message right now. */
+    native boolean wearableReachable();
+
+    /** True when the counterpart app is installed on the paired device. */
+    native boolean wearableCompanionInstalled();
+
+    /** The paired device's name, for display. Empty when nothing is paired. */
+    native String wearablePeerName();
+
+    /** The paired device's opaque identifier. Empty when nothing is paired. */
+    native String wearablePeerId();
+
+    /**
+     * Sends a live message, delivered only while the peer is reachable. A non-zero
+     * {@code replyToken} asks for an answer, which comes back through {@code IOSWearableCallbacks}.
+     */
+    native void wearableSendMessage(String path, byte[] payload, int replyToken);
+
+    /** Answers a message that arrived carrying a reply token. */
+    native void wearableSendReply(int replyToken, byte[] payload);
+
+    /** Publishes or replaces the replicated value at a path (the WCSession application context). */
+    native void wearablePutData(String path, byte[] payload);
+
+    /** Reads the replicated value at a path, published by either side. Null when absent. */
+    native byte[] wearableGetData(String path);
+
+    /** Removes the replicated value at a path. */
+    native void wearableRemoveData(String path);
+
+    /** Every path currently holding a replicated value, newline separated. */
+    native String wearableDataPaths();
+
+    /** Queues a background file transfer to the peer. */
+    native void wearableTransferFile(String path, String name, byte[] contents);
+
+    /// Retires a durable inbox entry once the payload has reached the application. Delivery of an
+    /// incoming file parks a copy on disk first, and only this call -- made from the EDT after the
+    /// listener has run -- is allowed to discard it.
+    native void wearableConfirmInbox(String token);
+
+    /// Gives up an inbox entry that was never delivered, keeping the file so a later activation can
+    /// replay it. Only the in-process marker that suppresses replay is cleared.
+    native void wearableReleaseInbox(String token);
+
+    /// Re-offers everything still parked in the durable inbox. Called once a data listener exists.
+    native void wearableReplayInbox();
+
+    /// Forgets that a path's value was received, so the next context update delivers it again.
+    /// Used to recover a delivery the pending-delivery cap discarded.
+    native void wearableForgetReceived(String path);
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */

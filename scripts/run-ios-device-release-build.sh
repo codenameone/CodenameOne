@@ -111,14 +111,28 @@ XCODE_BUILD_CMD=(
   xcodebuild
   "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH"
   -scheme "$SCHEME"
-  -sdk iphoneos
+  # No -sdk: -destination already picks iOS, and -sdk would override SDKROOT for
+  # every target including an embedded watch app, building it against the iOS SDK.
   -configuration Release
   -destination 'generic/platform=iOS'
   -destination-timeout 120
   -derivedDataPath "$DERIVED_DATA_DIR"
-  "ARCHS=arm64"
+  # No ARCHS / EXCLUDED_ARCHS override at all, deliberately.
+  #
+  # An unscoped ARCHS=arm64 is wrong here: this invocation spans two platforms,
+  # and the watch device ABI is arm64_32. The obvious repair -- scoping it as
+  # "ARCHS[sdk=iphoneos*]=arm64" -- is worse, because xcodebuild does NOT accept
+  # per-SDK conditionals in command-line overrides; that syntax is only honoured
+  # in xcconfig files and project settings. On the command line it parses as the
+  # setting ARCHS with the literal value "iphoneos*]=arm64", so EVERY target
+  # warns "None of the architectures in ARCHS are valid" and compiles nothing.
+  # The build then does only resource copies and plist processing, and the first
+  # step to demand a binary (embedding CN1Widgets.appex) is what fails.
+  #
+  # Each target's own $(ARCHS_STANDARD) already resolves correctly per platform
+  # (arm64 for iphoneos, arm64_32 for watchos), which is exactly what we want,
+  # and armv7/armv7s are long gone from VALID_ARCHS. So the right override is none.
   "ONLY_ACTIVE_ARCH=NO"
-  "EXCLUDED_ARCHS=armv7 armv7s"
   "CODE_SIGN_IDENTITY="
   "CODE_SIGNING_REQUIRED=NO"
   "CODE_SIGNING_ALLOWED=NO"
@@ -148,6 +162,15 @@ if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
       esac
       RETRY_CMD+=("$arg")
     done
+    # Actually pass it. The loop above only STRIPS the destination pair; without this the retry
+    # ran with neither a destination nor an SDK, which is not what the message above claims and
+    # not a build of anything in particular.
+    #
+    # -sdk does override SDKROOT for every target, so in this fallback an embedded watch target is
+    # compiled against the iOS SDK and will fail the link. That is deliberate for a last-resort
+    # retry: failing loudly beats the silent mis-build, and the primary path above (destination,
+    # no -sdk) is the one that builds a companion project correctly.
+    RETRY_CMD+=(-sdk iphoneos)
     if "${RETRY_CMD[@]}" | tee "$BUILD_LOG"; then
       rd_log "Retry without destination succeeded"
     else

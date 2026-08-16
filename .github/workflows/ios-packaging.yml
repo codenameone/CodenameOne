@@ -108,10 +108,18 @@ jobs:
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
           POM_HASH=$(find . -name 'pom.xml' -not -path './scripts/*' 2>/dev/null \
               | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')
+          # The build INVOCATION belongs in the key, not just the sources. Derived data
+          # embeds the SDK, destination and per-target product layout an invocation
+          # produced; restoring a tree built by a different one leaves Xcode's build
+          # database claiming targets are up to date when their products are absent
+          # ("Build input file cannot be found ... output of a script phase").
           SCRIPT_HASH=$(shasum -a 256 \
               scripts/setup-workspace.sh \
               scripts/build-ios-port.sh \
               scripts/build-native-themes.sh \
+              scripts/build-ios-app.sh \
+              scripts/run-ios-device-release-build.sh \
+              scripts/run-ios-ui-tests.sh \
               .github/workflows/_build-ios-port.yml \
               | shasum -a 256 | awk '{print $1}')
           echo "hash=${SRC_HASH:0:16}-${POM_HASH:0:16}-${SCRIPT_HASH:0:16}" >> "$GITHUB_OUTPUT"
@@ -165,8 +173,10 @@ jobs:
         with:
           path: ${{ runner.temp }}/cn1-ios-device-release-derived
           key: ${{ runner.os }}-ios-device-release-derived-${{ steps.src_hash.outputs.hash }}
-          restore-keys: |
-            ${{ runner.os }}-ios-device-release-derived-
+          # Deliberately no restore-keys prefix. A partial match here restores derived
+          # data produced by a DIFFERENT build invocation, and a stale Xcode build
+          # database is worse than a cold compile: it reports success for targets it
+          # skipped. An exact hit or nothing.
 
       - name: Build Release iOS device app without signing
         env:
@@ -227,15 +237,21 @@ jobs:
           ./scripts/run-ios-native-tests.sh \
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        # The reuse above is partial: run-ios-native-tests.sh injects the test target into the
-        # pbxproj before building, and Xcode rebuilds the app target after a project change even
-        # though the objects are there. So this step still pays a near-full native build --
-        # 6m55s of the 8m13s it takes on a fast runner, leaving little of a 20-minute budget for
-        # a slow one. Measured on the same commit, a slow runner spent 4m31s on simulator boot
-        # alone (a fast one: 1m15s) and 13 minutes on that build, and the cap fired while the
-        # tests had not started. The real fix is to inject before the UI-smoke step so this build
-        # is genuinely incremental; until then the budget has to cover the build it actually does.
-        timeout-minutes: 40
+        # Two things grew into this budget, and both still apply. The reuse above is partial:
+        # run-ios-native-tests.sh injects the test target into the pbxproj before building, and
+        # Xcode rebuilds the app target after a project change even though the objects are there,
+        # so this step still pays a near-full native build -- 6m55s of the 8m13s it takes on a
+        # fast runner. Measured on one commit, a slow runner spent 4m31s booting the simulator
+        # (a fast one: 1m15s) and 13 minutes on that build, and the cap fired before the tests
+        # started. On top of that the sample now declares a watchMain, so the app scheme carries
+        # an embedded watch app with a ParparVM translation of its own, which xcodebuild builds
+        # before running a single test -- the raise scripts-ios-native.yml already took.
+        #
+        # So the higher of the two, not either alone: the watch build is added work on top of the
+        # rebuild, not a re-description of it. The real fix is to inject before the UI-smoke step
+        # so this build is genuinely incremental; until then the budget has to cover the build it
+        # actually does.
+        timeout-minutes: 45
 
       - name: Upload packaging artifacts
         if: always()

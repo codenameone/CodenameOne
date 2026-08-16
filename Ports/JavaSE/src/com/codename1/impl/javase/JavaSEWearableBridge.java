@@ -1,0 +1,1739 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.javase;
+
+import com.codename1.wearable.WearableConnection;
+import com.codename1.wearable.WearableMessage;
+import com.codename1.wearable.spi.WearableBridge;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The desktop stand-in for `WCSession` / the Wearable Data Layer, so the phone-to-watch API can be
+/// developed and debugged without a device.
+///
+/// The phone app and the watch app run as two separate JVMs -- they are two apps with two sandboxes
+/// on a device, and pretending otherwise in the simulator would let bugs through. Each side creates
+/// one of these, and the two halves find each other through a directory both resolve to (the app
+/// home, which is per-project and therefore shared by the pair):
+///
+/// - **Replicated data** is files under `wearable/data`. Both sides read and write the same
+///   directory, so a value published while the peer was not running is simply there when it starts,
+///   which is exactly the guarantee the real transports make. A poller notices the peer's writes.
+/// - **Live messages** need a live peer, so they go over a loopback socket on a port derived from
+///   that same directory. Whichever side starts first binds it and the other connects; if nobody is
+///   on the other end, [#isReachable()] is false and messages are dropped -- again matching the
+///   device behavior rather than papering over it.
+/// - **File transfers** are modelled as data writes carrying the bytes, since the desktop has no
+///   background-transfer scheduler worth simulating.
+class JavaSEWearableBridge implements WearableBridge {
+    /// Frame kinds on the loopback socket.
+    private static final int FRAME_MESSAGE = 1;
+    private static final int FRAME_REPLY = 2;
+    private static final int FRAME_HELLO = 3;
+    /// How long a freshly accepted socket has to identify itself before it is dropped.
+    private static final int HELLO_TIMEOUT_MILLIS = 5000;
+    /// Ceiling on a single frame. Generous for any real payload, small enough that a corrupt length
+    /// cannot exhaust the heap.
+    private static final int MAX_FRAME_BYTES = 64 * 1024 * 1024;
+
+    private final File dataDir;
+    private final File portFile;
+    private final boolean watchSide;
+    /// True when the project declares a watch app at all. Without one there is nothing to pair with,
+    /// which is what a phone with no watch looks like.
+    private final boolean paired;
+
+    private volatile Socket peer;
+    private volatile DataOutputStream peerOut;
+    private volatile boolean closed;
+
+    /// Last-seen modification time per data file, so the poller reports only genuine changes.
+    private final Map<String, Long> seenData = new HashMap<String, Long>();
+
+    /// Creates the bridge and starts the rendezvous and data-watching threads.
+    ///
+    /// @param home the per-project app home directory both sides resolve to
+    /// @param watchSide true when this JVM is running the watch app
+    /// @param paired true when the project declares a watch app
+    JavaSEWearableBridge(File home, boolean watchSide, boolean paired) {
+        // A delivery the pending-delivery cap discarded is offered again by forgetting that this
+        // scan ever saw the file: the next 500ms pass then treats it as new. Nothing else would --
+        // the seen-marker is written before the delivery is queued.
+        WearableConnection.setDroppedDeliveryHandler(
+                new WearableConnection.DroppedDeliveryHandler() {
+                    public void deliveryDropped(String path) {
+                        synchronized (seenData) {
+                            if (path == null) {
+                                // More was discarded than could be named: forget every file this
+                                // scan has seen, so the next pass re-offers the whole directory.
+                                seenData.clear();
+                                return;
+                            }
+                            seenData.remove(encodePath(path));
+                            seenData.remove(encodePath(path) + TOMB_SUFFIX);
+                        }
+                    }
+                });
+        this.watchSide = watchSide;
+        this.paired = paired;
+        File root = new File(home, "wearable");
+        this.dataDir = new File(root, "data");
+        this.portFile = new File(root, "port");
+        dataDir.mkdirs();
+        primeSeenData();
+        if (paired) {
+            startRendezvous();
+            startDataWatcher();
+        }
+    }
+
+    // --- state --------------------------------------------------------------
+
+    public boolean isSupported() {
+        return paired;
+    }
+
+    public boolean isPaired() {
+        return paired;
+    }
+
+    public boolean isReachable() {
+        return peerOut != null;
+    }
+
+    public boolean isCompanionAppInstalled() {
+        return paired;
+    }
+
+    public String[] getConnectedNodes() {
+        if (!isReachable()) {
+            return new String[0];
+        }
+        // Mirrors the id \t displayName \t nearby form the device ports produce.
+        String name = watchSide ? "Simulated Phone" : "Simulated Watch";
+        return new String[] {(watchSide ? "phone" : "watch") + "\t" + name + "\t1"};
+    }
+
+    // --- messages -----------------------------------------------------------
+
+    public void sendMessage(String path, byte[] payload, int replyToken) {
+        DataOutputStream out = peerOut;
+        if (out == null) {
+            if (replyToken != 0) {
+                WearableConnection.deliverReply(replyToken, null,
+                        "The " + (watchSide ? "phone" : "watch") + " app is not running");
+            }
+            return;
+        }
+        try {
+            writeFrame(out, FRAME_MESSAGE, path, payload, replyToken);
+            if (replyToken != 0) {
+                // The write succeeding is not the answer arriving. If the peer quits before
+                // replying, or never registers a listener for this path, nothing else would ever
+                // complete the handler -- and the API promises it runs exactly once.
+                scheduleReplyTimeout(replyToken);
+            }
+        } catch (IOException err) {
+            dropPeer(out);
+            if (replyToken != 0) {
+                WearableConnection.deliverReply(replyToken, null, "Link lost: " + err);
+            }
+        }
+    }
+
+    /** How long an accepted request may go unanswered before the handler is failed. */
+    private static final int REPLY_TIMEOUT_MILLIS = 30000;
+    /** One timer for every deadline in the process, as on the device ports. */
+    private static final java.util.Timer replyTimer =
+            new java.util.Timer("cn1-wearable-sim-replies", true);
+    private static final Map<Integer, java.util.TimerTask> replyTimeouts =
+            new HashMap<Integer, java.util.TimerTask>();
+
+    private static void scheduleReplyTimeout(final int replyToken) {
+        java.util.TimerTask task = new java.util.TimerTask() {
+            public void run() {
+                synchronized (replyTimeouts) {
+                    replyTimeouts.remove(Integer.valueOf(replyToken));
+                }
+                WearableConnection.deliverReply(replyToken, null,
+                        "The peer did not answer within " + (REPLY_TIMEOUT_MILLIS / 1000)
+                                + " seconds");
+            }
+        };
+        synchronized (replyTimeouts) {
+            replyTimeouts.put(Integer.valueOf(replyToken), task);
+        }
+        replyTimer.schedule(task, REPLY_TIMEOUT_MILLIS);
+    }
+
+    private static void cancelReplyTimeout(int replyToken) {
+        java.util.TimerTask task;
+        synchronized (replyTimeouts) {
+            task = replyTimeouts.remove(Integer.valueOf(replyToken));
+        }
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    public void sendReply(int replyToken, byte[] payload) {
+        DataOutputStream out = peerOut;
+        if (out == null) {
+            return;
+        }
+        try {
+            writeFrame(out, FRAME_REPLY, "", payload, replyToken);
+        } catch (IOException err) {
+            dropPeer(out);
+        }
+    }
+
+    // --- replicated data ----------------------------------------------------
+
+    public void putData(String path, byte[] payload) {
+        // Under writeLock, so the tombstone housekeeping cannot delete a record this call is in
+        // the middle of replacing. See pruneOwnTombstones.
+        synchronized (writeLock) {
+            putDataLocked(path, payload);
+        }
+    }
+
+    private void putDataLocked(String path, byte[] payload) {
+        // The tombstone goes FIRST, before the value it is being replaced by.
+        //
+        // Removing it afterwards leaves an interval in which both records exist, and the peer scans
+        // every 500ms with no ordering guarantee from listFiles() -- so it could deliver the
+        // removal after the new value and leave the listener showing a path as deleted while
+        // getData returns the replacement. A failed delete would make that permanent. Removing it
+        // first leaves only a window in which neither exists, and the next scan finds the value:
+        // every observable ordering converges on the replacement.
+        File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
+        boolean hadTombstone = tomb.isFile();
+        if (hadTombstone && !tomb.delete()) {
+            // A delete that FAILED is not the same as a tombstone that was not there, and the
+            // previous boolean could not tell them apart. Publishing anyway would leave both
+            // records durable, and a peer scanning them in the order listFiles() happens to give
+            // could deliver the tombstone last and settle in the removed state while getData
+            // returns live data -- permanently, since neither record changes again.
+            com.codename1.io.Log.p("Wearable simulator: could not clear the tombstone for " + path
+                    + "; not publishing over it");
+            return;
+        }
+        // The acknowledgement goes only once the tombstone it describes is actually gone, and
+        // never on the abort path above. Deleting it first stranded the tombstone for good when the
+        // publication then failed -- Windows holding the file, say: the peer has already marked the
+        // unchanged tombstone as seen and will not acknowledge it a second time, so once the
+        // filesystem recovers, housekeeping under the cap has no acknowledgement to retire it with.
+        //
+        // Best-effort in the other direction, deliberately: acknowledges() compares stamps and
+        // accepts nothing it cannot parse, so a leftover file confirms no tombstone and the next
+        // scan discards it.
+        new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
+        if (hadTombstone) {
+            synchronized (seenData) {
+                seenData.remove(tomb.getName());
+            }
+        }
+        if (!writeValue(dataFile(path), payload, path) && hadTombstone) {
+            // The replacement did not land -- a full disk, a failed move -- and the tombstone that
+            // recorded the removal has already gone. A peer that was offline would then see
+            // neither the new value nor the removal and keep its pre-removal value for good. Put
+            // the tombstone back: the removal is still the last thing that actually happened.
+            writeValue(tomb, new byte[0], path);
+            return;
+        }
+        // The peer may have written a tombstone between our delete of theirs and this write, which
+        // leaves both records durable. Same reconciliation removeData does, from the other side.
+        resolveValueAgainstTombstone(path);
+    }
+
+    /// @return true when the value was published; false when it could not be written, so a caller
+    /// that has already discarded state on the strength of this publication can put it back
+    private boolean writeValue(File f, byte[] payload, String path) {
+        try {
+            f.getParentFile().mkdirs();
+            // Write-then-rename: the peer polls this directory every 500ms, and writing in place
+            // would let it read a truncated payload mid-write and report a malformed value.
+            //
+            // The staging name is unique per writer, not per path. The phone and the watch are two
+            // JVMs sharing this directory, and both may publish the same path at once: a shared
+            // "<path>.tmp" lets each truncate the other's staging file, and the delete-then-rename
+            // fallback below can then destroy the winner's file outright.
+            File tmp = new File(f.getParentFile(), f.getName() + stagingSuffix());
+            // Chosen BEFORE the bytes are written, because it now travels inside them. It still
+            // depends only on the target file's current stamp, so moving it earlier changes
+            // nothing about the value it picks.
+            long stamp = nextStamp(f);
+            FileOutputStream out = new FileOutputStream(tmp);
+            try {
+                // The author travels INSIDE the value. It used to live in a ".author" sidecar, and
+                // two files are two operations however they are ordered: A could write its author,
+                // B could overwrite that author, and A could then publish its value -- leaving A's
+                // bytes permanently labelled as B's, so B suppressed the genuine peer callback and
+                // A reported its own write as remote. Prefixing the payload makes the label and the
+                // bytes one object, and the rename below publishes both or neither.
+                out.write(VALUE_MAGIC);
+                out.write(watchSide ? 'w' : 'p');
+                for (int i = 7; i >= 0; i--) {
+                    out.write((int) ((stamp >>> (i * 8)) & 0xff));
+                }
+                out.write(payload == null ? new byte[0] : payload);
+                out.flush();
+            } finally {
+                out.close();
+            }
+            // Stamp the staging file, then publish by rename. Stamping AFTER the rename was a race:
+            // writer A could rename, writer B could replace A's file, and A would then set the
+            // modification time on B's file and record that time as its own -- so A's watcher would
+            // skip B's winning value forever. Renaming an already-stamped file makes publication a
+            // single atomic step that can only ever touch this writer's own bytes.
+            tmp.setLastModified(stamp);
+            // Read from the STAGING file, before it is published. Reading f.lastModified() after
+            // the move could see a peer's replacement -- both JVMs publish into this directory --
+            // and this writer would then record the PEER's timestamp as its own, so the scan would
+            // skip that value as locally authored and the peer's publication would never be
+            // announced. The staging file is ours alone until the rename.
+            long staged = tmp.lastModified();
+            try {
+                // An atomic replace, not delete-then-rename. The old fallback deleted whatever was
+                // published before retrying, so a peer publishing the same path in that gap had its
+                // newer value destroyed and replaced by this side's older staging file -- a lost
+                // write, or a momentary removal seen by the peer's watcher.
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.io.IOException | RuntimeException noAtomicMove) {
+                // Some filesystems cannot replace in one step -- Windows renameTo over an existing
+                // file being the usual one. The fallback unlinks first, and it must never unlink a
+                // version it has not looked at: the peer can publish between the failed rename and
+                // the delete, and destroying THAT installs this side's older staging file as the
+                // current value with nothing left to correct it.
+                if (!tmp.renameTo(f)) {
+                    long existing = versionOf(f);
+                    if (existing > versionOf(tmp)) {
+                        // The peer's value is NEWER than the one being written. Ours is superseded,
+                        // so there is nothing to publish -- dropping it is the same outcome the
+                        // ordering rules produce everywhere else, and clobbering would be a lost
+                        // write. Reported as published because the path does hold a value: the
+                        // caller must not resurrect a tombstone over it.
+                        tmp.delete();
+                        return true;
+                    }
+                    if (!deleteIfVersionUnchanged(f, existing) || !tmp.renameTo(f)) {
+                        throw new IOException("could not replace " + f, noAtomicMove);
+                    }
+                }
+            }
+            // Record what the filesystem actually stored, not what we asked for. setLastModified
+            // can be refused outright or quantized (FAT to 2s, some network mounts coarser), and
+            // recording the requested value then left the real mtime unseen -- so the next scan
+            // read this side's own publication as a peer update and invoked its own data listener.
+            // A rename preserves the mtime, so the staged value is what lands on disk.
+            // Coarse timestamps can also erase the phone/watch side bit, which is encoded in the
+            // stamp's low bit.
+            long recorded = staged;
+            if (recorded <= 0) {
+                recorded = stamp;
+            }
+            // Our own write must not come back to us as a peer change. Stored in the same
+            // encoding the scan compares against, and always as locally authored -- this IS our
+            // publication.
+            synchronized (seenData) {
+                seenData.put(f.getName(), Long.valueOf(seenKey(stamp, recorded, true)));
+            }
+            return true;
+        } catch (IOException err) {
+            com.codename1.io.Log.p("Wearable simulator: failed to publish " + path + ": " + err);
+            return false;
+        }
+    }
+
+    public byte[] getData(String path) {
+        File f = dataFile(path);
+        if (!f.exists()) {
+            return null;
+        }
+        try {
+            return readPayload(f);
+        } catch (IOException err) {
+            return null;
+        }
+    }
+
+    public void removeData(String path) {
+        // Under writeLock, so the tombstone housekeeping cannot delete a record this call is in
+        // the middle of replacing. See pruneOwnTombstones.
+        synchronized (writeLock) {
+            removeDataLocked(path);
+        }
+    }
+
+    private void removeDataLocked(String path) {
+        File f = dataFile(path);
+        File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
+        // The TOMBSTONE goes first, and the value is deleted only once it is safely on disk.
+        //
+        // The other order destroyed the only durable record before writing its replacement: a
+        // writeValue that failed -- a full disk, a directory gone read-only -- left the value
+        // deleted and nothing saying it ever existed, so a peer that was offline for the call came
+        // back to no value and no removal and kept its stale copy for good. Nothing is destroyed
+        // now until the record that replaces it exists.
+        //
+        // Writing it first was previously avoided because both records can then be on disk at once.
+        // That is no longer a durable state: a value and a tombstone for the same path are
+        // reconciled by embedded stamp, and this tombstone is newer than the value it replaces.
+        if (!writeValue(tomb, new byte[0], path)) {
+            com.codename1.io.Log.p("Wearable simulator: could not record the removal of " + path
+                    + "; nothing was deleted and the value still stands");
+            return;
+        }
+        if (f.isFile() && !f.delete()) {
+            // The tombstone is already published and it is the newer record, so the reconciliation
+            // below -- and every later scan -- drops this value. Logged because a value that will
+            // not delete is worth knowing about, not because the state is wrong.
+            com.codename1.io.Log.p("Wearable simulator: removed " + path
+                    + " but its value file would not delete; the tombstone supersedes it");
+        }
+        synchronized (seenData) {
+            seenData.remove(f.getName());
+        }
+        // A durable tombstone, because deleting the file says nothing to a peer that is not
+        // running. That peer starts with an empty seenData, sees only a path that is not there, and
+        // never learns the value was removed -- so an app that persisted it stays stale forever.
+        // The other two platforms both keep a tombstone for exactly this; the simulator was the
+        // odd one out.
+        // The other JVM may have published a replacement between the write above and the delete,
+        // in which case BOTH records now exist durably. writeLock cannot prevent that -- it is
+        // process-local and the peer is a separate process -- so the records are reconciled instead
+        // of pretended away.
+        resolveValueAgainstTombstone(path);
+    }
+
+    /// Keeps at most one of the two records for a path, the newer by embedded stamp.
+    ///
+    /// A value and a tombstone for the same path can both end up on disk: two simulator processes
+    /// share this directory, and a publish landing between the value delete and the tombstone write
+    /// -- or the reverse -- leaves one of each. Nothing later is guaranteed to touch that path
+    /// again, so without reconciliation the peer's scan can settle in the removed state while
+    /// getData keeps returning the value, permanently.
+    ///
+    /// The stamps are a Lamport clock with a wall-clock floor and disjoint residues per side, so
+    /// "newer" is meaningful across processes and never a tie. Either side may resolve: unlike the
+    /// Data Layer there is no replication here, just one directory, so deleting the loser cannot
+    /// propagate and rob anyone.
+    private void resolveValueAgainstTombstone(String path) {
+        File value = dataFile(path);
+        File tomb = new File(dataDir, encodePath(path) + TOMB_SUFFIX);
+        if (!value.isFile() || !tomb.isFile()) {
+            return;
+        }
+        long valueStamp = versionOf(value);
+        long tombStamp = versionOf(tomb);
+        boolean tombLost = valueStamp > tombStamp;
+        File loser = tombLost ? tomb : value;
+        // Only while the loser is still the version this decision was made about. The other process
+        // can replace it at the same file name between the read above and the delete -- the value
+        // loses to a tombstone and is then republished with a newer stamp -- and deleting on the
+        // strength of the old reading would discard the actual winner. retireTombstone already
+        // works this way; this path was written without it.
+        if (deleteIfVersionUnchanged(loser, tombLost ? tombStamp : valueStamp)) {
+            synchronized (seenData) {
+                seenData.remove(loser.getName());
+            }
+            if (tombLost) {
+                // The tombstone lost, so its acknowledgement describes nothing.
+                new File(dataDir, tomb.getName() + ACK_SUFFIX).delete();
+            }
+        }
+    }
+
+    /// Deletes a record only while it still carries the version the caller decided about.
+    ///
+    /// Not atomic -- POSIX offers no compare-and-delete -- but it narrows the window from "since
+    /// the enumeration" to "between this check and the unlink", and it is the same guard the
+    /// tombstone retirement uses. A file that has already vanished counts as deleted, so a
+    /// concurrent removal does not leave the caller thinking its record survived.
+    private boolean deleteIfVersionUnchanged(File f, long expected) {
+        if (versionOf(f) != expected) {
+            return false;
+        }
+        return f.delete() || !f.isFile();
+    }
+
+    /// A record's version: the stamp inside it, falling back to its mtime when it carries no frame.
+    private static long versionOf(File f) {
+        try {
+            return tombstoneVersion(readFully(f), f);
+        } catch (IOException vanished) {
+            return Long.MIN_VALUE;
+        }
+    }
+
+    /// The acknowledgement payload for a tombstone: the stamp of the tombstone being
+    /// acknowledged, in decimal.
+    ///
+    /// A tombstone born before this framing existed reports {@link Long#MIN_VALUE}, and that is
+    /// written out as-is: it still identifies that tombstone as distinct from a later one, which is
+    /// all the comparison needs.
+    private static byte[] acknowledgementFor(byte[] tombstone) {
+        try {
+            return Long.toString(framedStamp(tombstone)).getBytes("UTF-8");
+        } catch (java.io.UnsupportedEncodingException everyJvmHasUtf8) {
+            throw new IllegalStateException(everyJvmHasUtf8);
+        }
+    }
+
+    /// Whether this acknowledgement is for THIS tombstone rather than an earlier one at the same
+    /// path.
+    ///
+    /// The file name alone is not enough: putData deletes the tombstone it publishes over but the
+    /// acknowledgement outlived it, so a path removed, republished and removed again found the
+    /// first removal's acknowledgement waiting for the second. The author then retired a tombstone
+    /// no peer had ever seen, which is the exact failure the tombstone exists to prevent.
+    ///
+    /// A stale acknowledgement is deleted rather than merely ignored: leaving it would have the
+    /// peer's next scan see an acknowledged tombstone again the moment the stamps happened to line
+    /// up, and it is dead weight in a directory that is also size-capped.
+    private boolean acknowledges(File ack, long tombstoneStamp) {
+        if (!ack.isFile()) {
+            return false;
+        }
+        byte[] all;
+        try {
+            all = readFully(ack);
+        } catch (IOException unreadable) {
+            // Unreadable is not acknowledged. The tombstone stays, which is the safe direction:
+            // the cost is one file kept past its window, against a peer never learning of a
+            // removal.
+            return false;
+        }
+        String recorded = new String(payloadOf(all), java.nio.charset.Charset.forName("UTF-8")).trim();
+        long acknowledged;
+        try {
+            acknowledged = Long.parseLong(recorded);
+        } catch (NumberFormatException notAStamp) {
+            // Refused outright, NOT folded into a sentinel value. Includes the EMPTY payload the
+            // previous build wrote, which acknowledged by existence alone -- accepting that would
+            // mean an acknowledgement matching every tombstone at its path forever, the failure
+            // this whole change is about.
+            //
+            // Not by assigning Long.MIN_VALUE either, which is what this did: that is also what
+            // framedStamp reports for a tombstone written before the frame existed, so an
+            // unreadable acknowledgement compared EQUAL to an unframed tombstone and retired it.
+            // Two different unknowns are not the same value.
+            //
+            // The cost of refusing is bounded and small: a tombstone the peer already saw under
+            // the old build is kept until MAX_TOMBS evicts it, in a sandbox shared by two
+            // processes of one simulator run. Against that, an unacknowledged tombstone erroneously
+            // retired is a peer that never learns of a removal at all.
+            forgetStaleAcknowledgement(ack);
+            return false;
+        }
+        if (acknowledged == tombstoneStamp) {
+            return true;
+        }
+        forgetStaleAcknowledgement(ack);
+        return false;
+    }
+
+    /// Discards an acknowledgement that confirms nothing -- stale, unreadable, or from the previous
+    /// format -- rather than leaving it to be re-examined on every scan. The peer writes a real one
+    /// the next time it sees the tombstone undelivered.
+    private void forgetStaleAcknowledgement(File ack) {
+        ack.delete();
+        synchronized (seenData) {
+            seenData.remove(ack.getName());
+        }
+    }
+
+    /// Marks a tombstone file. A removal's durable record, consumed by the peer's scan.
+    private static final String TOMB_SUFFIX = ".tomb";
+
+    /// How long a tombstone is kept before its author drops it. Long enough for a peer that was
+    /// closed to be reopened; the alternative -- keeping it forever -- fills the shared directory.
+    private static final long TOMB_TTL_MILLIS = 24 * 60 * 60 * 1000L;
+
+    private static boolean isTombstone(String storageName) {
+        return storageName.endsWith(TOMB_SUFFIX);
+    }
+
+    /// Marks a peer's acknowledgement of a tombstone. Bookkeeping between the two simulators:
+    /// never delivered to a listener and never enumerated as a path.
+    private static final String ACK_SUFFIX = ".ack";
+
+    /// Marks a one-shot transfer this side has already handed to the app but could not delete.
+    ///
+    /// The seen-marker is memory only, and primeSeenData deliberately restores nothing -- that is
+    /// what lets a value published while this side was down still replay. So a transfer whose
+    /// delete was refused survived the restart looking new, and a one-shot file was delivered a
+    /// second time. This record is durable, so the next run knows.
+    private static final String CONSUMED_SUFFIX = ".consumed";
+
+    private static boolean isConsumedMarker(String storageName) {
+        return storageName.endsWith(CONSUMED_SUFFIX);
+    }
+
+    private static boolean isTombstoneAck(String storageName) {
+        return storageName.endsWith(ACK_SUFFIX);
+    }
+
+    /// How many tombstones this side may keep while waiting for a peer that never runs.
+    private static final int MAX_TOMBS = 256;
+
+    /// Tombstones currently in the shared directory, the cap's input.
+    private int ownTombstones() {
+        File[] files = dataDir.listFiles();
+        if (files == null) {
+            return 0;
+        }
+        int n = 0;
+        for (File f : files) {
+            if (isTombstone(f.getName())) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /// The logical path a tombstone stands for.
+    private static String tombstonePath(String storageName) {
+        return decodePath(storageName.substring(0, storageName.length() - TOMB_SUFFIX.length()));
+    }
+
+    public String[] getDataPaths() {
+        File[] files = dataDir.listFiles();
+        if (files == null) {
+            return new String[0];
+        }
+        List<String> out = new ArrayList<String>();
+        for (File f : files) {
+            // A transfer is not a readable replicated path -- getData() on its storage name is not
+            // part of the API -- so it is left out, matching the device ports.
+            if (f.isFile() && !f.getName().endsWith(".tmp") && !isTransfer(f.getName())
+                    && !isTombstone(f.getName()) && !isTombstoneAck(f.getName())
+                    && !isConsumedMarker(f.getName())) {
+                out.add(decodePath(f.getName()));
+            }
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
+    public void transferFile(String path, String name, byte[] contents) {
+        // The desktop has no background-transfer scheduler worth simulating, and a transfer that
+        // arrives eventually is indistinguishable from a data write that arrives eventually. The
+        // bytes still have to be encoded as a payload, though: the receiving side decodes every
+        // value as one, and raw file bytes would arrive as a malformed message with no name.
+        String fileName = name == null ? "file" : name;
+        WearableMessage wrapper = new WearableMessage(path)
+                .put("name", fileName)
+                .put("contents", contents == null ? new byte[0] : contents);
+        // Two files sent to the same logical path must not overwrite each other, so the file name is
+        // part of the storage name -- but it must not become the *delivered* path: a listener routes
+        // on the path the sender passed to transferFile. The marker keeps the two recoverable, and
+        // is a character encodePath can never emit.
+        //
+        // The sequence is what makes each transfer its own file. A transfer is one-shot, so sending
+        // twice to the same path and name before the 500ms watcher has consumed the first -- or at
+        // any time while the peer is offline -- must queue two deliveries, not silently replace one
+        // with the other. (A replicated value is the opposite: putData deliberately overwrites.)
+        // The sender's side is part of the name. Both halves scan this one directory, so without it
+        // a sender cannot tell its own pending transfer from an inbound one: after a restart
+        // primeSeenData() records nothing, and the sender's first scan would consume and delete the
+        // very transfer it is waiting to hand over.
+        writeValue(new File(dataDir, encodePath(path) + TRANSFER_MARKER + encodePath(fileName)
+                        + TRANSFER_MARKER + sideTag()
+                        + TRANSFER_MARKER + Long.toHexString(nextTransferSequence())),
+                wrapper.toByteArray(), path);
+    }
+
+    /** Identifies which half wrote a file: transfers are only consumed by the other side. */
+    private String sideTag() {
+        return watchSide ? "w" : "p";
+    }
+
+    /** True when this transfer was written by the other half, and so is ours to consume. */
+    private boolean isInboundTransfer(String storageName) {
+        if (!isTransfer(storageName)) {
+            return false;
+        }
+        String[] parts = storageName.split(TRANSFER_MARKER);
+        // <path>X<name>X<side>X<seq>; anything shorter predates the side tag, so treat it as inbound
+        // rather than stranding it.
+        return parts.length < 4 || !parts[2].equals(sideTag());
+    }
+
+    /** Distinguishes successive transfers so neither overwrites the other on disk. */
+    private static synchronized long nextTransferSequence() {
+        long now = System.currentTimeMillis();
+        lastTransferSequence = now > lastTransferSequence ? now : lastTransferSequence + 1;
+        return lastTransferSequence;
+    }
+
+    private static long lastTransferSequence;
+
+
+    /**
+     * Separates the logical path from the file name in a transfer's storage name. Uppercase, which
+     * {@link #encodePath} never produces, so it cannot occur inside either half.
+     */
+    private static final String TRANSFER_MARKER = "X";
+
+    /// The path a stored value is delivered on: for a transfer, the path its sender passed to
+    /// {@code transferFile} rather than the filename-suffixed name it is stored under.
+    private static String deliveryPath(String storageName) {
+        int marker = storageName.indexOf(TRANSFER_MARKER);
+        return decodePath(marker < 0 ? storageName : storageName.substring(0, marker));
+    }
+
+    private static boolean isTransfer(String storageName) {
+        return storageName.indexOf(TRANSFER_MARKER) >= 0;
+    }
+
+    // --- rendezvous ---------------------------------------------------------
+
+    /// Both sides race to bind the loopback port; the winner listens, the loser connects and retries
+    /// until the winner exists. Which side wins does not matter, which means the phone and the watch
+    /// can be started in either order.
+    private void startRendezvous() {
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                // Re-run for as long as the bridge lives, because the role is not permanent. A
+                // bind that fails only because an unrelated process momentarily held the port used
+                // to make this half a connector for good: once that process let go, neither half
+                // would bind again, both kept dialling a server that did not exist, and the pair
+                // stayed unreachable until a restart. Losing the election is a fact about right
+                // now, not about the run.
+                while (!closed) {
+                    ServerSocket server = null;
+                    try {
+                        server = new ServerSocket(port(), 1, InetAddress.getByName("127.0.0.1"));
+                    } catch (IOException alreadyBound) {
+                        server = null;
+                    }
+                    if (server != null) {
+                        acceptLoop(server);
+                    } else {
+                        connectOnce();
+                    }
+                }
+            }
+        }, "CN1 wearable link");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private void acceptLoop(ServerSocket server) {
+        try {
+            while (!closed) {
+                try {
+                    Socket s = server.accept();
+                    readLoop(s, adoptPeer(s));
+                } catch (IOException err) {
+                    if (closed) {
+                        return;
+                    }
+                }
+            }
+        } finally {
+            // Released on the way out, so the election that follows can bind again rather than
+            // losing to this thread's own abandoned socket.
+            try {
+                server.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    /// ONE attempt to reach the server, then returns so the election can run again.
+    ///
+    /// It used to loop internally for the bridge's lifetime, which is what made a lost election
+    /// permanent -- the caller never got the chance to try binding again.
+    private void connectOnce() {
+        try {
+            Socket s = new Socket(InetAddress.getByName("127.0.0.1"), port());
+            readLoop(s, adoptPeer(s));
+        } catch (IOException notUpYet) {
+            // The peer app is not running. The caller waits and re-elects -- the user may open it
+            // at any point, and by then this half may be the one that can bind.
+        }
+        if (closed) {
+            return;
+        }
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /// Connects and says hello, returning the output stream WITHOUT publishing it.
+    ///
+    /// The stream stays private until the peer's own hello checks out. Assigning `peerOut` here
+    /// made `isReachable()` true and let `sendMessage()` write application traffic into whatever
+    /// held the derived port -- an unrelated local service, or a colliding project -- for the whole
+    /// five seconds before the identity check timed out. The hello itself is the one thing written
+    /// before verification, which is what verification is for.
+    private DataOutputStream adoptPeer(Socket s) throws IOException {
+        s.setTcpNoDelay(true);
+        // A read deadline, because a service that merely ACCEPTS on our derived port and then says
+        // nothing would otherwise leave the reader blocked in readByte() forever -- with the
+        // simulator reporting itself reachable the whole time.
+        s.setSoTimeout(HELLO_TIMEOUT_MILLIS);
+        DataOutputStream out = new DataOutputStream(s.getOutputStream());
+        // The hello carries the project identity. The port is derived from a hash of the shared
+        // directory truncated to 10,000 values, so two unrelated projects whose paths collide -- or
+        // any other local service already sitting on that port -- would otherwise connect, both
+        // report reachable, and exchange live messages and replies between unrelated apps. A
+        // successful connection to a small shared port range proves nothing about who is on it.
+        writeFrame(out, FRAME_HELLO, projectIdentity(), new byte[0], 0);
+        // `peer` and `peerOut` are both assigned by the reader once the peer's own hello is
+        // verified, NOT here. Publishing either on a bare accepted socket meant an unrelated local
+        // service holding the port made isReachable() true and live messages went into it.
+        return out;
+    }
+
+    private void readLoop(Socket s, DataOutputStream unverified) {
+        boolean helloVerified = false;
+        try {
+            DataInputStream in = new DataInputStream(s.getInputStream());
+            while (!closed) {
+                int kind = in.readByte();
+                String path = in.readUTF();
+                int token = in.readInt();
+                int length = in.readInt();
+                if (length < 0 || length > MAX_FRAME_BYTES) {
+                    // A corrupt or mismatched peer stream. Allocating on this would throw
+                    // NegativeArraySizeException or OutOfMemoryError, neither of which the
+                    // accept/connect loop catches -- it would take the link's thread with it.
+                    throw new IOException("Implausible frame length " + length);
+                }
+                byte[] payload = new byte[length];
+                in.readFully(payload);
+                switch (kind) {
+                    case FRAME_HELLO:
+                        // Validate the identity before anything else is honoured. A peer on a
+                        // colliding port -- another project, or an unrelated local service that
+                        // happens to speak enough of this to get here -- is dropped rather than
+                        // treated as the pair.
+                        if (!expectedPeerIdentity().equals(path)) {
+                            throw new IOException("Wearable simulator: refusing a peer that is not "
+                                    + "this project's counterpart (" + path + ")");
+                        }
+                        helloVerified = true;
+                        // Only now is this a peer. Reachability, the writable stream and the state
+                        // change all follow the identity, not the connection.
+                        peer = s;
+                        peerOut = unverified;
+                        s.setSoTimeout(0);
+                        WearableConnection.notifyStateChanged();
+                        break;
+                    case FRAME_MESSAGE:
+                        if (!helloVerified) {
+                            throw new IOException("Wearable simulator: traffic before a verified hello");
+                        }
+                        WearableConnection.deliverMessage(path, payload, token);
+                        break;
+                    case FRAME_REPLY:
+                        if (!helloVerified) {
+                            throw new IOException("Wearable simulator: traffic before a verified hello");
+                        }
+                        cancelReplyTimeout(token);
+                        WearableConnection.deliverReply(token, payload, null);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        } catch (IOException disconnected) {
+            // Falls through to dropPeer: the peer app exited or the link broke.
+        } finally {
+            dropPeer();
+            // And close THIS socket, which dropPeer does not: it clears the globally verified peer,
+            // and a socket rejected for a failed or timed-out hello never became one. The connector
+            // retries every second, so leaking one descriptor per attempt against an unrelated
+            // service on the derived port would eventually exhaust the simulator's file handles.
+            try {
+                s.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    /// Drops the CURRENT peer, whatever it is. For the reader, which owns the connection it is
+    /// reading, and for shutdown.
+    private void dropPeer() {
+        dropPeer(null);
+    }
+
+    /// Drops the peer only if `failed` is still the stream in use, or unconditionally when null.
+    ///
+    /// A write captures `peerOut` before it blocks, so its IOException can surface after the
+    /// rendezvous thread has already verified a REPLACEMENT connection. Tearing down on that stale
+    /// failure closed a link that was working, and the next election had to run before anything
+    /// could be sent again -- a self-inflicted outage caused by the previous connection's death.
+    private void dropPeer(DataOutputStream failed) {
+        if (failed != null && failed != peerOut) {
+            // A newer connection has taken over; the failure describes one already gone.
+            return;
+        }
+        Socket s = peer;
+        peer = null;
+        peerOut = null;
+        if (s != null) {
+            try {
+                s.close();
+            } catch (IOException ignored) {
+            }
+            WearableConnection.notifyStateChanged();
+        }
+    }
+
+    private static void writeFrame(DataOutputStream out, int kind, String path,
+                                   byte[] payload, int token) throws IOException {
+        byte[] body = payload == null ? new byte[0] : payload;
+        synchronized (out) {
+            out.writeByte(kind);
+            out.writeUTF(path == null ? "" : path);
+            out.writeInt(token);
+            out.writeInt(body.length);
+            out.write(body);
+            out.flush();
+        }
+    }
+
+    /// Identifies the project on the wire, so a port collision cannot be mistaken for a peer.
+    ///
+    /// The absolute shared directory is the identity: it is what "the same project" means here, and
+    /// it is exactly what the port hash throws away.
+    private String projectIdentity() {
+        // The ROLE travels with the identity. The project alone does not identify a counterpart:
+        // two phone simulators, or an orphaned watch process beside a freshly launched one, both
+        // pass a project-only check -- and then each reports the link reachable and exchanges live
+        // traffic with something that is not its pair. A NUL separates the two because a path
+        // cannot contain one.
+        return dataDir.getAbsolutePath() + "\u0000" + (watchSide ? "watch" : "phone");
+    }
+
+    /// The identity this side requires of its peer: the same project, the OTHER role.
+    private String expectedPeerIdentity() {
+        return dataDir.getAbsolutePath() + "\u0000" + (watchSide ? "phone" : "watch");
+    }
+
+    /// Derives a stable loopback port from the shared directory, so two JVMs of the same project
+    /// meet and two different projects do not. Kept in the ephemeral range.
+    private int port() {
+        int h = dataDir.getAbsolutePath().hashCode();
+        return 49152 + Math.abs(h % 10000);
+    }
+
+    // --- data watching ------------------------------------------------------
+
+    /// Notices values the peer published. Polling is enough here: the peer writes rarely, the
+    /// directory is tiny, and this stays honest about replicated data being eventually consistent.
+    private void startDataWatcher() {
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                while (!closed) {
+                    try {
+                        scanData();
+                    } catch (Throwable oneBadPass) {
+                        // This thread is the ONLY thing that notices peer writes, and it had no
+                        // guard: anything thrown out of a scan ended replication for the rest of
+                        // the session, silently. The cause found was a filename with a malformed
+                        // percent escape -- fixed at source in decodePath -- but the shape of the
+                        // failure is what matters here. A scan reads whatever is in a directory on
+                        // a developer's machine; it is not a place to assume well-formed input.
+                        //
+                        // Logged once per pass rather than swallowed, and the next pass retries in
+                        // 500ms: a persistently bad entry keeps complaining instead of quietly
+                        // stopping the port.
+                        System.err.println("[wearable] the simulator data scan failed; retrying: "
+                                + oneBadPass);
+                    }
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException ignored) {
+                        return;
+                    }
+                }
+            }
+        }, "CN1 wearable data");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /// Leaves what is already on disk unrecorded, so the first watcher pass replays it.
+    ///
+    /// A value the peer published while this side was stopped is exactly what a starting app needs
+    /// to see -- that is the guarantee replicated data makes, and recording the files as already
+    /// seen would silently break it. The cost is that a value this app published itself last run is
+    /// replayed to it too, which listeners handle the same way they handle any republish.
+    private void primeSeenData() {
+        // Deliberately empty: see above. Kept as a named step so the reasoning has somewhere to
+        // live rather than being an absence.
+    }
+
+    /// Retires this side's own tombstones: the acknowledged ones past their window, and the
+    /// oldest ones once the directory cap is exceeded.
+    ///
+    /// A pass of its own, over every tombstone, rather than a branch inside the delivery loop. That
+    /// loop only reaches a file whose recorded stamp has changed, and a tombstone never changes
+    /// after it is written -- {@link #writeValue} records the stamp as it creates the file, and an
+    /// acknowledgement lands as a separate file that leaves the tombstone's marker alone. So the
+    /// housekeeping ran exactly once, at creation, when nothing was yet eligible: no tombstone
+    /// written during a run was ever retired and the cap did nothing until a restart.
+    ///
+    /// Throttled, because it reads each tombstone to find its birth stamp and the scan it hangs off
+    /// runs twice a second. Retirement is not latency-sensitive; being a few seconds late costs
+    /// nothing.
+    private void pruneOwnTombstones(File[] files) {
+        if (files == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastTombPrune < TOMB_PRUNE_INTERVAL_MILLIS) {
+            return;
+        }
+        lastTombPrune = now;
+        synchronized (writeLock) {
+            pruneOwnTombstones(files, now);
+        }
+    }
+
+    /// Caller holds {@link #writeLock}, so this side cannot publish or remove underneath the pass.
+    private void pruneOwnTombstones(File[] files, long now) {
+        // Birth stamp alongside the file, because BOTH decisions here are about age and neither
+        // can be answered from the name. Decoded from the frame: the stamp encodes
+        // wallMillis * 2 + sideBit, and comparing it undecoded reads as about minus fifty-seven
+        // years, which is why this cleanup once never fired at all. A file with no frame falls
+        // back to its mtime -- setLastModified can be refused outright, so this is a guess, but it
+        // is the only one available for a file this build did not write.
+        List<File> own = new ArrayList<File>();
+        final Map<String, Long> bornAt = new HashMap<String, Long>();
+        for (File f : files) {
+            if (!f.isFile() || !isTombstone(f.getName())) {
+                continue;
+            }
+            byte[] snapshot;
+            try {
+                snapshot = readFully(f);
+            } catch (IOException vanished) {
+                continue;
+            }
+            if (!authoredLocallyFor(snapshot, f.lastModified())) {
+                continue;
+            }
+            long born = framedStamp(snapshot);
+            own.add(f);
+            bornAt.put(f.getName(), Long.valueOf(tombstoneVersion(snapshot, f)));
+            // Acknowledged AND past its window: the peer has seen this removal, so keeping the
+            // record no longer protects anyone.
+            if (acknowledges(new File(dataDir, f.getName() + ACK_SUFFIX), born)
+                    && now - bornAt.get(f.getName()).longValue() > TOMB_TTL_MILLIS) {
+                retireTombstone(f, bornAt.get(f.getName()).longValue());
+                own.remove(own.size() - 1);
+            }
+        }
+        if (own.size() <= MAX_TOMBS) {
+            return;
+        }
+        // Past the cap the OLDEST go, by birth stamp. listFiles() has no ordering guarantee, so
+        // deleting whichever came back first discarded a removal made seconds ago while removals
+        // from hours earlier stayed -- and it is the recent one an offline peer most needs.
+        Collections.sort(own, new java.util.Comparator<File>() {
+            public int compare(File a, File b) {
+                long x = bornAt.get(a.getName()).longValue();
+                long y = bornAt.get(b.getName()).longValue();
+                return x < y ? -1 : (x > y ? 1 : a.getName().compareTo(b.getName()));
+            }
+        });
+        for (int i = 0; i < own.size() - MAX_TOMBS; i++) {
+            retireTombstone(own.get(i), bornAt.get(own.get(i).getName()).longValue());
+        }
+    }
+
+    /// Deletes a tombstone and its acknowledgement, and forgets both markers -- but only while the
+    /// file is still the VERSION this pass examined.
+    ///
+    /// A tombstone is identified by its path, so a path removed, republished and removed again
+    /// reuses the same file name. Between reading a tombstone here and deleting it, those two calls
+    /// can replace it, and an unguarded delete then destroyed a removal made moments ago while
+    /// vouching for the one it had actually inspected. The offline peer the tombstone exists for
+    /// would have missed that second removal entirely.
+    ///
+    /// {@link #writeLock} serialises this against this JVM's own putData and removeData. The peer
+    /// is a different process and no lock reaches it, which is why the version is re-read here as
+    /// well: it cannot make the delete atomic, but it closes the window to the interval between
+    /// this check and the delete itself, rather than the whole pass.
+    private void retireTombstone(File tomb, long expected) {
+        byte[] current;
+        try {
+            current = readFully(tomb);
+        } catch (IOException alreadyGone) {
+            return;
+        }
+        if (tombstoneVersion(current, tomb) != expected) {
+            return;
+        }
+        File ack = new File(dataDir, tomb.getName() + ACK_SUFFIX);
+        if (!tomb.delete() && tomb.isFile()) {
+            // The tombstone is STILL THERE -- a read-only directory, or another process holding
+            // the file. Everything else stays with it. Dropping the acknowledgement here stranded
+            // the tombstone permanently: the peer has already marked the unchanged file as seen and
+            // will not acknowledge it a second time, so once the directory falls back under the cap
+            // no later pass can retire it either.
+            return;
+        }
+        ack.delete();
+        synchronized (seenData) {
+            seenData.remove(tomb.getName());
+            seenData.remove(ack.getName());
+        }
+    }
+
+    /// A tombstone's birth time in wall-clock millis, from the stamp inside it.
+    ///
+    /// Falls back to the mtime for a file with no frame -- setLastModified can be refused outright,
+    /// so that is a guess, but it is the only answer available for a file this build did not write.
+    private static long tombstoneVersion(byte[] snapshot, File f) {
+        long born = framedStamp(snapshot);
+        return born == Long.MIN_VALUE ? f.lastModified() : born / 2;
+    }
+
+    /// Serialises this side's tombstone housekeeping against its own publications and removals.
+    ///
+    /// The pass reads a tombstone, decides it is retirable and then deletes it, and putData /
+    /// removeData run on application threads with no relation to the scanner. Without this a
+    /// republish-and-remove landing in that gap had its FRESH tombstone deleted on the strength of
+    /// the old one's acknowledgement. It does not reach the peer JVM -- see retireTombstone, which
+    /// re-reads the version for that.
+    private final Object writeLock = new Object();
+
+    /// When the tombstone pass last ran. It reads every tombstone, and the scan it hangs off runs
+    /// twice a second.
+    private long lastTombPrune;
+
+    private static final long TOMB_PRUNE_INTERVAL_MILLIS = 5000L;
+
+    private void scanData() {
+        File[] files = dataDir.listFiles();
+        pruneOwnTombstones(files);
+        List<String> gone;
+        synchronized (seenData) {
+            gone = new ArrayList<String>(seenData.keySet());
+        }
+        if (files != null) {
+            for (File f : files) {
+                if (!f.isFile() || f.getName().endsWith(".tmp")) {
+                    continue;
+                }
+                gone.remove(f.getName());
+                Long previous;
+                synchronized (seenData) {
+                    previous = seenData.get(f.getName());
+                }
+                long stamp = f.lastModified();
+                // The AUTHOR is part of what makes a file "already seen", not the timestamp alone.
+                // On a filesystem with coarse mtime granularity a local publication and a peer
+                // replacement can land in the same tick: the local write has already stored that
+                // timestamp, so the peer's file matched and was skipped without being looked at,
+                // and nothing delivered it until some later write happened to move the stamp. A
+                // cheap header peek separates them -- the two sides never write the same author.
+                long seenKey = peekSeenKey(f, stamp);
+                if (previous != null && previous.longValue() == seenKey) {
+                    continue;
+                }
+                synchronized (seenData) {
+                    seenData.put(f.getName(), Long.valueOf(seenKey));
+                }
+                if (isTransfer(f.getName())
+                        && new File(dataDir, f.getName() + CONSUMED_SUFFIX).isFile()) {
+                    // Handed to the app by THIS side already -- in this run or an earlier one --
+                    // and its delete was refused. Retry that here rather than delivering it again:
+                    // the marker is the only thing standing between a surviving one-shot file and a
+                    // second delivery after a restart, since primeSeenData restores no markers.
+                    if (f.delete()) {
+                        new File(dataDir, f.getName() + CONSUMED_SUFFIX).delete();
+                        synchronized (seenData) {
+                            seenData.remove(f.getName());
+                        }
+                    }
+                    continue;
+                }
+                if (isTransfer(f.getName()) && !isInboundTransfer(f.getName())) {
+                    // Our own outbound transfer, seen again because primeSeenData() deliberately
+                    // records nothing at startup. It is not an inbound delivery: reporting it would
+                    // hand the sender its own file through its own data listener.
+                    continue;
+                }
+                // ONE read, used for both the author test and the payload. Classifying from the
+                // file and then reading it again let this JVM's own putData land in between: the
+                // author check inspected the peer's file, the read returned our freshly published
+                // bytes, and the peer-only listener was handed this device's own publication --
+                // with writeValue having already recorded the local stamp, so no later scan
+                // corrected it.
+                byte[] snapshot;
+                try {
+                    snapshot = readFully(f);
+                } catch (IOException stillBeingWritten) {
+                    synchronized (seenData) {
+                        seenData.remove(f.getName());
+                    }
+                    continue;
+                }
+                // The DELIVERED snapshot decides what was seen, not the earlier peek. A peer can
+                // replace the file between the two with one carrying the same coarse timestamp, so
+                // the peek's classification could be recorded while the peer's bytes were handed
+                // over -- and the next scan, computing the key from that same peer file, would see
+                // a different key and deliver it a second time.
+                synchronized (seenData) {
+                    seenData.put(f.getName(),
+                            Long.valueOf(seenKey(framedStamp(snapshot), stamp,
+                                    authoredLocallyFor(snapshot, stamp))));
+                }
+                if (f.lastModified() != stamp) {
+                    // Replaced while we were reading it, so this snapshot belongs to neither the
+                    // file we classified nor the one now on disk. Forget the marker and let the
+                    // next scan see the winner whole.
+                    //
+                    // Unless the file is GONE. This scan has already taken the name off `gone`, so
+                    // dropping the marker too would leave the next scan with nothing to notice the
+                    // disappearance by -- a peer that republished and then removed a path would
+                    // never produce dataRemoved, and the listener would hold the old value for
+                    // good. Restoring the previous marker puts the name back in the next scan's
+                    // `gone` list, which is what reports the removal.
+                    synchronized (seenData) {
+                        if (!f.exists() && previous != null) {
+                            seenData.put(f.getName(), previous);
+                        } else {
+                            seenData.remove(f.getName());
+                        }
+                    }
+                    continue;
+                }
+                if (isTombstoneAck(f.getName()) || isConsumedMarker(f.getName())) {
+                    // Bookkeeping between the two simulators. Delivering it would announce a path
+                    // ending in ".tomb.ack" or ".consumed" that no app ever published.
+                    continue;
+                }
+                if (isTombstone(f.getName())
+                        && dataFile(tombstonePath(f.getName())).isFile()) {
+                    // BOTH records exist for this path -- the two processes interleaved a publish
+                    // and a removal. Reconcile before delivering either, or the listener settles on
+                    // whichever the enumeration happened to reach first while getData answers from
+                    // the other, and nothing is guaranteed to touch that path again.
+                    resolveValueAgainstTombstone(tombstonePath(f.getName()));
+                    if (!f.isFile()) {
+                        continue;
+                    }
+                }
+                if (isTombstone(f.getName())) {
+                    // A peer's removal. Delivered once -- the seen-marker above has already been
+                    // updated, so a tombstone that does not change is not re-announced.
+                    if (authoredLocallyFor(snapshot, stamp)) {
+                        // Ours. Keep it for the peer to find, and drop it once it is old enough
+                        // that any peer which was going to see it has had every chance.
+                        // Kept for the peer to find. Retiring it is housekeeping and does NOT
+                        // belong here: this loop only reaches a file whose stamp changed, and a
+                        // tombstone never changes after it is written -- writeValue records its
+                        // stamp as it creates it, so the very next scan skips it as already seen.
+                        // An acknowledgement arrives as a SEPARATE file and does not disturb the
+                        // tombstone's marker, so nothing here would ever run again. See
+                        // pruneOwnTombstones, which runs over all of them regardless of what the
+                        // delivery loop has seen.
+                        continue;
+                    }
+                    WearableConnection.deliverDataRemoved(tombstonePath(f.getName()));
+                    // Acknowledged, so the author can retire it. Without this the author has no way
+                    // to know the removal was ever seen and can only guess by age -- and a peer
+                    // that was closed for longer than the window comes back to find neither the
+                    // value nor the tombstone, so it never learns of the removal at all.
+                    //
+                    // Carrying the stamp of the tombstone it acknowledges, not merely existing. A
+                    // path can be removed, republished and removed again inside the window, and a
+                    // name-only check read the FIRST removal's acknowledgement as confirmation of
+                    // the second -- so the author retired a tombstone no peer had seen, and an
+                    // offline peer came back to neither the value nor the removal.
+                    writeValue(new File(dataDir, f.getName() + ACK_SUFFIX),
+                            acknowledgementFor(snapshot), tombstonePath(f.getName()));
+                    continue;
+                }
+                if (!isTransfer(f.getName()) && authoredLocallyFor(snapshot, stamp)) {
+                    // Our own VALUE, for the same reason. primeSeenData() records nothing so that a
+                    // value published while this side was down still replays on startup -- but that
+                    // also replayed values THIS side published before it restarted, reporting them
+                    // through WearableDataListener, whose contract is peer changes only.
+                    //
+                    // The author is already in the stamp: nextStamp puts the two JVMs in disjoint
+                    // residue classes (base * 2 + sideBit) so they cannot collide, and that bit
+                    // says which side wrote the file. No extra bookkeeping needed, and it survives
+                    // a restart because it lives in the file's own timestamp.
+                    continue;
+                }
+                {
+                    final File delivered = f;
+                    final boolean inbound = isInboundTransfer(f.getName());
+                    // Deleted from INSIDE the delivery, not beside it. This file is the only durable
+                    // copy of a one-shot transfer: deleting it as soon as the delivery was queued
+                    // lost it outright if the simulator closed before the listener ran, or if the
+                    // delivery was merely parked because no listener had registered yet.
+                    WearableConnection.deliverDataChangedTracked(deliveryPath(f.getName()),
+                            payloadOf(snapshot), inbound ? new Runnable() {
+                                public void run() {
+                                    // The marker goes only if the file actually did. A delete that
+                                    // fails -- a read-only directory, a Windows handle still open
+                                    // -- would otherwise leave an unchanged one-shot file that the
+                                    // next 500ms scan reads as new, delivering it again and again
+                                    // for as long as the deletion keeps failing.
+                                    if (delivered.delete()) {
+                                        synchronized (seenData) {
+                                            seenData.remove(delivered.getName());
+                                        }
+                                        // Nothing left to protect, so the durable marker goes too.
+                                        new File(dataDir,
+                                                delivered.getName() + CONSUMED_SUFFIX).delete();
+                                    } else {
+                                        // The file survived. The in-memory marker keeps THIS
+                                        // process from re-offering it, but that dies with the
+                                        // process and primeSeenData restores nothing -- so without
+                                        // a durable record the next run would deliver this one-shot
+                                        // file again. The delete is retried on each scan.
+                                        writeValue(new File(dataDir,
+                                                delivered.getName() + CONSUMED_SUFFIX),
+                                                new byte[0], deliveryPath(delivered.getName()));
+                                    }
+                                }
+                            } : null, inbound ? new Runnable() {
+                                public void run() {
+                                    // Evicted from the pending queue before a listener existed. The
+                                    // file is still on disk, but this scan already recorded it as
+                                    // seen, so nothing would offer it again until a restart.
+                                    // Forgetting it puts it back in front of the next scan.
+                                    synchronized (seenData) {
+                                        seenData.remove(delivered.getName());
+                                    }
+                                }
+                            } : null);
+                    // The deletion that used to live here now runs inside the delivery callback
+                    // above. A transfer is one-shot, so the delivered file goes -- leaving it would
+                    // make every restart of the receiving simulator replay it, since
+                    // primeSeenData() deliberately records nothing so that offline VALUES do
+                    // replay. Only an INBOUND transfer is deleted: removing our own would destroy
+                    // one still waiting for the peer to start.
+                }
+            }
+        }
+        for (String name : gone) {
+            synchronized (seenData) {
+                seenData.remove(name);
+            }
+            if (isTransfer(name)) {
+                // A transfer disappearing means the peer consumed it, which is the transport doing
+                // its job -- not the logical path being removed. Reporting dataRemoved here would
+                // tell the sender's own listeners that a path it never removed had gone, and that
+                // path may well still hold an unrelated replicated value.
+                continue;
+            }
+            if (isTombstone(name) || isTombstoneAck(name) || isConsumedMarker(name)) {
+                // A tombstone, its acknowledgement or a consumed marker expiring is housekeeping,
+                // not a removal.
+                continue;
+            }
+            if (new File(dataDir, name + TOMB_SUFFIX).isFile()) {
+                // A tombstone covers this disappearance and announces it exactly once -- for a live
+                // peer AND for one that was closed when the removal happened. Announcing here too
+                // would deliver the same removal twice to a peer that happened to be running.
+                continue;
+            }
+            WearableConnection.deliverDataRemoved(deliveryPath(name));
+        }
+    }
+
+    // --- helpers ------------------------------------------------------------
+
+    private File dataFile(String path) {
+        return new File(dataDir, encodePath(path));
+    }
+
+    /**
+     * A modification stamp strictly newer than the one this file already carries, and than any this
+     * process has written for it. The file system's own granularity can be as coarse as a second, so
+     * "now" is not on its own enough to mark a value as new.
+     */
+    /**
+     * A staging-file suffix unique to this process and call. Still ends in {@code .tmp} so the
+     * watcher's existing skip rule keeps ignoring staging files.
+     */
+    private static synchronized String stagingSuffix() {
+        return "." + PROCESS_TAG + "." + (stagingCounter++) + ".tmp";
+    }
+
+    private static int stagingCounter;
+    /** Identifies this JVM among the pair; the two sides share a directory but not a process. */
+    private static final String PROCESS_TAG =
+            Integer.toHexString(java.lang.management.ManagementFactory.getRuntimeMXBean()
+                    .getName().hashCode());
+
+    private long nextStamp(File f) {
+        synchronized (JavaSEWearableBridge.class) {
+            long now = System.currentTimeMillis();
+            // The file already carries an ENCODED stamp (base * 2 + sideBit), so decode it before
+            // using it as a floor. Feeding the encoded value straight back in doubled the base on
+            // every publish, which runs away exponentially within a few dozen writes.
+            long floor = Math.max(f.lastModified() / 2, lastStamp);
+            long base = now > floor ? now : floor + 1;
+            // Put the two JVMs in disjoint residue classes. lastStamp and this lock are process
+            // local, so both halves publishing the same path in the same millisecond could otherwise
+            // compute the SAME stamp from the same lastModified() -- and each would then record the
+            // other's published stamp as its own and never deliver the peer's value. Doubling and
+            // adding a side bit makes a collision arithmetically impossible while keeping the
+            // strictly-increasing property the watcher relies on.
+            lastStamp = base;
+            return base * 2 + (watchSide ? 1 : 0);
+        }
+    }
+
+    /**
+     * Whether a published stamp was written by THIS side of the pair.
+     *
+     * <p>Reads the side bit {@link #nextStamp} encodes. Only meaningful for stamps this bridge
+     * wrote; a file whose modification time the filesystem quantized may answer either way, which
+     * is why publication records the value the filesystem actually stored rather than the one it
+     * was asked for.</p>
+     */
+    private boolean authoredLocally(long stamp) {
+        return (stamp & 1L) == (watchSide ? 1L : 0L);
+    }
+
+    /**
+     * Author identity that does not depend on the filesystem preserving a single bit.
+     *
+     * <p>The side bit rides in the stamp's low bit, and a filesystem that rounds modification times
+     * -- FAT to two seconds, some network mounts coarser -- erases it. The phone then reads every
+     * watch publication as locally authored and suppresses its callback, which is the pairing
+     * silently not working rather than failing.
+     *
+     * <p>So the author is also written into the value's own header, which the filesystem cannot
+     * round. The stamp stays authoritative when no header is present (a value left by an older
+     * build), because a wrong-but-present answer is worse than the previous behaviour only if it
+     * disagrees, and the header is published by the same rename as the bytes it describes.</p>
+     */
+    /// The writer's own stamp out of the frame, or Long.MIN_VALUE when the bytes carry none.
+    private static long framedStamp(byte[] all) {
+        // Only the current framing carries one; a v1 file falls back to mtime folded with author.
+        if (headerLength(all) != VALUE_HEADER_LENGTH) {
+            return Long.MIN_VALUE;
+        }
+        long v = 0;
+        for (int i = 0; i < 8; i++) {
+            v = (v << 8) | (all[VALUE_MAGIC.length + 1 + i] & 0xffL);
+        }
+        return v;
+    }
+
+    /// Identifies a version of a file.
+    ///
+    /// The writer's embedded stamp when there is one, because it is unique per write and cannot be
+    /// blurred by a filesystem that rounds timestamps -- two writes by the same side within one
+    /// coarse tick were otherwise identical here, so the second was skipped as already-seen and the
+    /// listener kept the older value indefinitely.
+    ///
+    /// Falls back to mtime folded with the author for bytes that carry no frame, which is the best
+    /// available answer for a file this build did not write.
+    private static long seenKey(long framedStamp, long mtime, boolean authoredLocally) {
+        if (framedStamp != Long.MIN_VALUE) {
+            return framedStamp;
+        }
+        return mtime * 2 + (authoredLocally ? 1 : 0);
+    }
+
+    /// Reads just the frame header to decide authorship, so a 500ms scan does not pull whole
+    /// transfer payloads into memory. The delivery path re-derives this from the full snapshot it
+    /// actually hands over, so a file replaced between the two is still caught there.
+    /// The version marker from the header alone, so a 500ms scan does not pull whole transfer
+    /// payloads into memory. The delivery path recomputes this from the full snapshot it hands
+    /// over, so a file replaced between the two is recorded as the file actually delivered.
+    private long peekSeenKey(File f, long mtime) {
+        byte[] head = readHead(f);
+        if (head == null) {
+            return seenKey(Long.MIN_VALUE, mtime, authoredLocally(mtime));
+        }
+        return seenKey(framedStamp(head), mtime, authoredLocallyFor(head, mtime));
+    }
+
+    private boolean peekAuthoredLocally(File f, long stamp) {
+        byte[] head = readHead(f);
+        return head == null ? authoredLocally(stamp) : authoredLocallyFor(head, stamp);
+    }
+
+    /// The frame header, or null when the file is shorter than one or unreadable.
+    private static byte[] readHead(File f) {
+        byte[] head = new byte[VALUE_HEADER_LENGTH];
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            int off = 0;
+            while (off < head.length) {
+                int r = in.read(head, off, head.length - off);
+                if (r < 0) {
+                    break;
+                }
+                off += r;
+            }
+            if (off < VALUE_HEADER_V1_LENGTH) {
+                return null;
+            }
+            if (off < head.length) {
+                // A v1 file, or a v2 file truncated: hand back exactly what was read so
+                // headerLength can judge it rather than guessing from a padded buffer.
+                byte[] shorter = new byte[off];
+                System.arraycopy(head, 0, shorter, 0, off);
+                return shorter;
+            }
+        } catch (IOException unreadable) {
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        return head;
+    }
+
+    private boolean authoredLocallyFor(byte[] snapshot, long stamp) {
+        Boolean recorded = authorOf(snapshot);
+        if (recorded != null) {
+            return recorded.booleanValue() == watchSide;
+        }
+        return authoredLocally(stamp);
+    }
+
+    /// Convenience for callers holding a File rather than its bytes.
+    private boolean authoredLocallyFor(File f, long stamp) {
+        try {
+            return authoredLocallyFor(readFully(f), stamp);
+        } catch (IOException unreadable) {
+            return authoredLocally(stamp);
+        }
+    }
+
+    /// The author recorded in the value's own header: TRUE for the watch, FALSE for the phone,
+    /// null when the file predates the header or is too short to carry one.
+    private static Boolean authorOf(byte[] snapshot) {
+        if (headerLength(snapshot) == 0) {
+            return null;
+        }
+        // Same offset in both framings.
+        byte who = snapshot[VALUE_MAGIC.length];
+        if (who == 'w') {
+            return Boolean.TRUE;
+        }
+        if (who == 'p') {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /// True when these bytes carry the author frame.
+    private static boolean framed(byte[] all) {
+        return headerLength(all) > 0;
+    }
+
+    /// The frame length these bytes carry: 0 when unframed, {@link #VALUE_HEADER_V1_LENGTH} for the
+    /// first framing, {@link #VALUE_HEADER_LENGTH} for the current one.
+    private static int headerLength(byte[] all) {
+        if (matches(all, VALUE_MAGIC) && all.length >= VALUE_HEADER_LENGTH) {
+            return VALUE_HEADER_LENGTH;
+        }
+        if (matches(all, VALUE_MAGIC_V1) && all.length >= VALUE_HEADER_V1_LENGTH) {
+            return VALUE_HEADER_V1_LENGTH;
+        }
+        return 0;
+    }
+
+    private static boolean matches(byte[] all, byte[] magic) {
+        if (all == null || all.length < magic.length) {
+            return false;
+        }
+        for (int i = 0; i < magic.length; i++) {
+            if (all[i] != magic[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The value's bytes with the author frame removed, from an in-memory snapshot.
+    private static byte[] payloadOf(byte[] all) {
+        int skip = headerLength(all);
+        if (skip == 0) {
+            return all;
+        }
+        byte[] body = new byte[all.length - skip];
+        System.arraycopy(all, skip, body, 0, body.length);
+        return body;
+    }
+
+    /// Marks a framed value file. Chosen so a stale sandbox written before the header existed still
+    /// reads correctly: no magic simply means "fall back to the stamp's side bit".
+    private static final byte[] VALUE_MAGIC = {'C', 'N', '1', 'W', 'A', '2'};
+
+    /// The first framing, still read. It carries the author but no stamp, so a sandbox written by
+    /// the immediately preceding build keeps working: rejecting it outright would hand the app its
+    /// own six magic bytes as payload, and WearableMessage would read the 'C' as a wire version and
+    /// decode an empty value.
+    private static final byte[] VALUE_MAGIC_V1 = {'C', 'N', '1', 'W', 'A', '1'};
+    private static final int VALUE_HEADER_V1_LENGTH = VALUE_MAGIC_V1.length + 1;
+
+    /// magic + author + the writer's own 8-byte stamp.
+    ///
+    /// The stamp is in the FILE because the filesystem cannot be trusted to keep it. mtime is what
+    /// the scan used to identify a version, and on a coarse-granularity filesystem two writes by
+    /// the same side within one tick are indistinguishable by mtime and author alike -- so the
+    /// second value was skipped as already-seen and the listener sat on the older one until some
+    /// unrelated write moved the clock. nextStamp already produces a value that is unique per write
+    /// and monotonic per side; writing it down makes the identity exact and independent of what the
+    /// filesystem chose to record.
+    private static final int VALUE_HEADER_LENGTH = VALUE_MAGIC.length + 1 + 8;
+
+
+    /// The value's bytes with the author frame removed. An unframed file is returned whole, so a
+    /// value left by an older build still reads as itself rather than losing its first seven bytes.
+    private static byte[] readPayload(File f) throws IOException {
+        // One read, then inspect the prefix in memory. Reading the file twice -- once for the
+        // header, once for the bytes -- could straddle a republication and return one file's
+        // header with another file's payload.
+        return payloadOf(readFully(f));
+    }
+
+    private static long lastStamp;
+
+    /// Paths are URL-ish (`/workout/start`) and must survive a round trip through a file name on a
+    /// case-insensitive file system, so everything outside a conservative set is percent-escaped.
+    private static String encodePath(String path) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            // '.' is deliberately NOT in this set, which fixes two problems at once and makes
+            // both structural rather than pattern matches.
+            //
+            // Staging files are named "<encoded>.<tag>.<n>.tmp". While an encoded path could
+            // itself contain a dot, a published path of "/sync/state.tmp" was indistinguishable
+            // from a staging file, so its peer callback was skipped forever and getDataPaths()
+            // hid it even though getData() could read it. With dots escaped, a literal dot in a
+            // file name can only have come from the staging suffix.
+            //
+            // It also stops "." and ".." being filesystem references: they encoded to themselves,
+            // so dataFile(".") resolved to the data directory, putData(".") could never replace
+            // it, and removeData(".") could delete the directory when empty.
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+                sb.append(c);
+            } else {
+                sb.append('%').append(Integer.toHexString(0x10000 | c).substring(1));
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The reverse of {@link #encodePath}, tolerant of text that it never produced.
+     *
+     * <p>A '%' NOT followed by four hex digits is literal text. Integer.parseInt threw
+     * NumberFormatException on it instead, and this runs on filenames the simulator's data
+     * directory happens to contain -- one file a person dropped in by hand, or left by an older
+     * build, killed the watcher thread and stayed there across restarts, so replication was dead
+     * on every subsequent launch too.</p>
+     *
+     * <p>The same leniency the Android bridge's decode() has. Two ports reading one wire format
+     * should not disagree about what a malformed name means.</p>
+     */
+    private static String decodePath(String name) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            int value = c == '%' ? hexQuadAt(name, i + 1) : -1;
+            if (value >= 0) {
+                sb.append((char) value);
+                i += 4;
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /// The value of the four hex digits at {@code from}, or -1 if there are not four there.
+    private static int hexQuadAt(String s, int from) {
+        if (from + 4 > s.length()) {
+            return -1;
+        }
+        int value = 0;
+        for (int i = from; i < from + 4; i++) {
+            int digit = Character.digit(s.charAt(i), 16);
+            if (digit < 0) {
+                return -1;
+            }
+            value = (value << 4) | digit;
+        }
+        return value;
+    }
+
+    private static byte[] readFully(File f) throws IOException {
+        FileInputStream in = new FileInputStream(f);
+        try {
+            byte[] out = new byte[(int) f.length()];
+            int read = 0;
+            while (read < out.length) {
+                int n = in.read(out, read, out.length - read);
+                if (n < 0) {
+                    throw new IOException("Truncated while reading " + f);
+                }
+                read += n;
+            }
+            return out;
+        } finally {
+            in.close();
+        }
+    }
+
+    /// Stops the link. Called when the simulator shuts down.
+    void close() {
+        closed = true;
+        dropPeer();
+    }
+}

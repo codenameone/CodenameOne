@@ -55,6 +55,9 @@ public final class GeneratedAccess_java_time {
         if ("Clock".equals(simpleName)) {
             return java.time.Clock.class;
         }
+        if ("DateTimeException".equals(simpleName)) {
+            return java.time.DateTimeException.class;
+        }
         if ("Duration".equals(simpleName)) {
             return java.time.Duration.class;
         }
@@ -89,6 +92,16 @@ public final class GeneratedAccess_java_time {
     }
     public static Object construct(Class<?> type, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
+        if (type == java.time.DateTimeException.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new java.time.DateTimeException((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Throwable.class}, false);
+                return new java.time.DateTimeException((java.lang.String) adaptedArgs[0], (java.lang.Throwable) adaptedArgs[1]);
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
@@ -161,6 +174,12 @@ public final class GeneratedAccess_java_time {
             if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class}, false);
                 return java.time.Duration.ofSeconds(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue());
+            }
+        }
+        if ("parse".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.CharSequence.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.CharSequence.class}, false);
+                return java.time.Duration.parse((java.lang.CharSequence) adaptedArgs[0]);
             }
         }
         throw unsupportedStatic(java.time.Duration.class, name, safeArgs);

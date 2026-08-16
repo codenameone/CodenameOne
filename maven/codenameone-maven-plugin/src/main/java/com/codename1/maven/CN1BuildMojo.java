@@ -1092,6 +1092,91 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
     public static final String BUILD_TARGET_MAC_NATIVE = Executor.BUILD_TARGET_MAC_NATIVE;
     public static final String BUILD_TARGET_LINUX_NATIVE = Executor.BUILD_TARGET_LINUX_NATIVE;
 
+    /**
+     * The entry points a project can declare besides {@code codename1.mainName},
+     * mapped to the build argument each one becomes. A project with a
+     * {@code codename1.watchMain} gets an Apple Watch and a Wear OS app built
+     * from that root; {@code codename1.tvMain} does the same for tvOS. The
+     * accompanying {@code codename1.watchStandalone} says the watch app ships on
+     * its own rather than alongside the phone app.
+     *
+     * <p>These ride the extensible build-argument map rather than the
+     * {@link BuildRequest} wire format, so adding an entry point needs no
+     * protocol change.
+     */
+    private static final Map<String, String> SECONDARY_ENTRY_POINTS;
+    static {
+        Map<String, String> m = new LinkedHashMap<String, String>();
+        m.put("codename1.watchMain", "watchMain");
+        m.put("codename1.watchStandalone", "watchStandalone");
+        m.put("codename1.tvMain", "tvMain");
+        SECONDARY_ENTRY_POINTS = Collections.unmodifiableMap(m);
+    }
+
+    /**
+     * Copies the secondary entry points declared in the project settings onto a
+     * local {@link BuildRequest}. The cloud path does the equivalent by mirroring
+     * them into the {@code codename1.arg.} namespace of the uploaded settings
+     * file, so both paths hand the builders the same arguments.
+     *
+     * @param r the request being assembled
+     * @param props the project's codenameone_settings.properties
+     */
+    private static void putSecondaryEntryPointArguments(BuildRequest r, Properties props) {
+        for (Map.Entry<String, String> entry : SECONDARY_ENTRY_POINTS.entrySet()) {
+            // The overlaid build argument first, exactly as the cloud mirror resolves it.
+            //
+            // Reading only the unprefixed project setting made the two paths disagree about the
+            // same invocation: -Dcodename1.arg.watchMain=... reached the daemon, because the
+            // mirror leaves an existing value alone, and was ignored locally -- so the standard
+            // override built one product in the cloud and a different one, or none, on the
+            // developer's machine. An override that works in one place and silently does nothing
+            // in the other is worse than one that works nowhere.
+            String value = props.getProperty("codename1.arg." + entry.getValue());
+            if (value == null || value.trim().length() == 0) {
+                value = props.getProperty(entry.getKey());
+            }
+            if (value != null && value.trim().length() > 0) {
+                r.putArgument(entry.getValue(), value.trim());
+            }
+        }
+    }
+
+    /**
+     * Copies the secondary entry points into the {@code codename1.arg.} namespace
+     * of the settings file that is uploaded to the build server.
+     *
+     * <p>They are declared without that prefix because they sit next to
+     * {@code codename1.mainName} and that is the shape developers expect. The
+     * server, however, only lifts {@code codename1.arg.*} keys out of the
+     * uploaded file, so without this mirror a cloud build never learns that the
+     * project has a watch or TV app and silently produces neither.
+     *
+     * @param props the settings being prepared for upload, mutated in place
+     */
+    static void mirrorSecondaryEntryPointsToBuildArgs(Properties props) {
+        for (Map.Entry<String, String> entry : SECONDARY_ENTRY_POINTS.entrySet()) {
+            String value = props.getProperty(entry.getKey());
+            if (value == null || value.trim().length() == 0) {
+                continue;
+            }
+            String argKey = "codename1.arg." + entry.getValue();
+            // An existing value WINS. This runs after overlayCommandLineBuildHints, so a
+            // -Dcodename1.arg.watchMain=... passed on the command line is already sitting here --
+            // and overwriting it with the project file's codename1.watchMain made the standard
+            // build-argument override silently do nothing, handing the cloud the wrong lifecycle or
+            // a companion where a standalone Wear build was asked for.
+            //
+            // The mirror exists to carry a project-file setting into the args channel the daemon
+            // reads, which is only needed when nothing has put it there already.
+            String existing = props.getProperty(argKey);
+            if (existing != null && existing.trim().length() > 0) {
+                continue;
+            }
+            props.setProperty(argKey, value.trim());
+        }
+    }
+
     private static boolean isLocalBuildTarget(String buildTarget) {
         if (buildTarget == null) {
             return false;
@@ -1373,6 +1458,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-maven-plugin", cn1MavenPluginVersion);
+
+        mirrorSecondaryEntryPointsToBuildArgs(cn1SettingsProps);
 
         // App-extension provisioning profiles (e.g. the generated CN1Widgets WidgetKit
         // extension) are named by the codename1.ios.appext.<Name>.provision setting, which
@@ -1686,29 +1773,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
-        // watchMain: optional separate lifecycle entry point for the Apple Watch
-        // / Wear OS slice, declared next to codename1.mainName in
-        // codenameone_settings.properties as codename1.watchMain. May legally
-        // point at the same class as mainName, but a distinct entry point lets
-        // the watch slice tree-shake more aggressively. Passed as a build arg so
-        // it rides the extensible args map (no BuildRequest wire-format change)
-        // and reaches WatchNativeBuilder via request.getArg("watchMain").
-        {
-            String cn1WatchMain = props.getProperty("codename1.watchMain");
-            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
-                r.putArgument("watchMain", cn1WatchMain.trim());
-            }
-        }
-        // tvMain: optional separate lifecycle entry point for the Apple TV
-        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
-        // point at the same class as mainName; a distinct value also auto-enables
-        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
-        {
-            String cn1TvMain = props.getProperty("codename1.tvMain");
-            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
-                r.putArgument("tvMain", cn1TvMain.trim());
-            }
-        }
+        putSecondaryEntryPointArguments(r, props);
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
@@ -1949,29 +2014,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
-        // watchMain: optional separate lifecycle entry point for the Apple Watch
-        // / Wear OS slice, declared next to codename1.mainName in
-        // codenameone_settings.properties as codename1.watchMain. May legally
-        // point at the same class as mainName, but a distinct entry point lets
-        // the watch slice tree-shake more aggressively. Passed as a build arg so
-        // it rides the extensible args map (no BuildRequest wire-format change)
-        // and reaches WatchNativeBuilder via request.getArg("watchMain").
-        {
-            String cn1WatchMain = props.getProperty("codename1.watchMain");
-            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
-                r.putArgument("watchMain", cn1WatchMain.trim());
-            }
-        }
-        // tvMain: optional separate lifecycle entry point for the Apple TV
-        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
-        // point at the same class as mainName; a distinct value also auto-enables
-        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
-        {
-            String cn1TvMain = props.getProperty("codename1.tvMain");
-            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
-                r.putArgument("tvMain", cn1TvMain.trim());
-            }
-        }
+        putSecondaryEntryPointArguments(r, props);
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         File iconFile = new File(iconPath);
@@ -2086,29 +2129,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
-        // watchMain: optional separate lifecycle entry point for the Apple Watch
-        // / Wear OS slice, declared next to codename1.mainName in
-        // codenameone_settings.properties as codename1.watchMain. May legally
-        // point at the same class as mainName, but a distinct entry point lets
-        // the watch slice tree-shake more aggressively. Passed as a build arg so
-        // it rides the extensible args map (no BuildRequest wire-format change)
-        // and reaches WatchNativeBuilder via request.getArg("watchMain").
-        {
-            String cn1WatchMain = props.getProperty("codename1.watchMain");
-            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
-                r.putArgument("watchMain", cn1WatchMain.trim());
-            }
-        }
-        // tvMain: optional separate lifecycle entry point for the Apple TV
-        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
-        // point at the same class as mainName; a distinct value also auto-enables
-        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
-        {
-            String cn1TvMain = props.getProperty("codename1.tvMain");
-            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
-                r.putArgument("tvMain", cn1TvMain.trim());
-            }
-        }
+        putSecondaryEntryPointArguments(r, props);
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setType("windows");
@@ -2192,29 +2213,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
-        // watchMain: optional separate lifecycle entry point for the Apple Watch
-        // / Wear OS slice, declared next to codename1.mainName in
-        // codenameone_settings.properties as codename1.watchMain. May legally
-        // point at the same class as mainName, but a distinct entry point lets
-        // the watch slice tree-shake more aggressively. Passed as a build arg so
-        // it rides the extensible args map (no BuildRequest wire-format change)
-        // and reaches WatchNativeBuilder via request.getArg("watchMain").
-        {
-            String cn1WatchMain = props.getProperty("codename1.watchMain");
-            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
-                r.putArgument("watchMain", cn1WatchMain.trim());
-            }
-        }
-        // tvMain: optional separate lifecycle entry point for the Apple TV
-        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
-        // point at the same class as mainName; a distinct value also auto-enables
-        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
-        {
-            String cn1TvMain = props.getProperty("codename1.tvMain");
-            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
-                r.putArgument("tvMain", cn1TvMain.trim());
-            }
-        }
+        putSecondaryEntryPointArguments(r, props);
         r.setVersion(props.getProperty("codename1.version"));
         r.setVendor(props.getProperty("codename1.vendor"));
         r.setType("linux");
@@ -2271,29 +2270,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         r.setDisplayName(props.getProperty("codename1.displayName"));
         r.setPackageName(props.getProperty("codename1.packageName"));
         r.setMainClass(props.getProperty("codename1.mainName"));
-        // watchMain: optional separate lifecycle entry point for the Apple Watch
-        // / Wear OS slice, declared next to codename1.mainName in
-        // codenameone_settings.properties as codename1.watchMain. May legally
-        // point at the same class as mainName, but a distinct entry point lets
-        // the watch slice tree-shake more aggressively. Passed as a build arg so
-        // it rides the extensible args map (no BuildRequest wire-format change)
-        // and reaches WatchNativeBuilder via request.getArg("watchMain").
-        {
-            String cn1WatchMain = props.getProperty("codename1.watchMain");
-            if (cn1WatchMain != null && cn1WatchMain.trim().length() > 0) {
-                r.putArgument("watchMain", cn1WatchMain.trim());
-            }
-        }
-        // tvMain: optional separate lifecycle entry point for the Apple TV
-        // (tvOS) slice, declared as codename1.tvMain. Like watchMain it may
-        // point at the same class as mainName; a distinct value also auto-enables
-        // the tvOS target. Reaches TvNativeBuilder via request.getArg("tvMain").
-        {
-            String cn1TvMain = props.getProperty("codename1.tvMain");
-            if (cn1TvMain != null && cn1TvMain.trim().length() > 0) {
-                r.putArgument("tvMain", cn1TvMain.trim());
-            }
-        }
+        putSecondaryEntryPointArguments(r, props);
         r.setVersion(props.getProperty("codename1.version"));
         String iconPath = props.getProperty("codename1.icon");
         if (iconPath != null) {
