@@ -6828,6 +6828,13 @@ public class AndroidGradleBuilder extends Executor {
         // Unlike rootCheck/accessibilityGuard this is not a launch-time exit gate, it is a
         // standing runtime policy, so it is delivered as a Display property that
         // AndroidImplementation applies rather than as generated code in onCreate.
+        //
+        // This class builds locally. The cloud builder is a separate codebase
+        // (com.codename1.build.daemon.AndroidGradleBuilder in the BuildDaemon repo) and needs
+        // the identical block, or the hint is a silent no-op on cloud builds while the
+        // documentation promises launch-time protection -- worse than not offering it, because
+        // the app ships believing it is guarded. The mirror is BuildDaemon#181 and the two are
+        // meant to land together; keep them in step when either side changes.
         if (tapjackingGuard) {
             // Locale.ENGLISH, not the default locale: in a Turkish locale "STRICT".toLowerCase()
             // yields "strıct" (dotless i), which would silently miss the match below.
