@@ -6596,6 +6596,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (textLayer != null && !textLayer.isSuspended()) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
+            // The semantic overlay stops mirroring labels while the text layer renders them and
+            // starts again once it does not. Nothing else would notice the switch, so ask for a
+            // semantic refresh here -- otherwise find-in-page would keep finding nothing until
+            // some unrelated invalidation happened along.
+            com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidateAll();
             Form current = getCurrentForm();
             if (current != null) {
                 current.repaint();

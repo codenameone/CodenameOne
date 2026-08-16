@@ -124,6 +124,7 @@ public final class JavaScriptSemanticOverlay {
     private final Map<Long, Entry> entries = new HashMap<Long, Entry>();
     private final List<Long> rootOrder = new ArrayList<Long>();
     private boolean textContentEnabled = true;
+    private long focusedNodeId = -1;
 
     /**
      * Creates an overlay bound to a container element that is already attached to the document.
@@ -206,6 +207,7 @@ public final class JavaScriptSemanticOverlay {
         applyText(entry, node);
         applyListeners(entry, node);
         applyCustomActions(entry, node);
+        applyFocus(entry, node);
 
         List<Long> children = node.getChildIds();
         for (int i = 0; i < children.size(); i++) {
@@ -387,6 +389,31 @@ public final class JavaScriptSemanticOverlay {
                 }
             }
         });
+    }
+
+    /**
+     * Moves DOM focus to follow the framework's.
+     *
+     * <p>Elements are retained across invalidations, so the browser's focus stays where it was
+     * unless it is moved deliberately. When the application moves focus itself -- requestFocus(),
+     * keyboard traversal -- a screen reader would otherwise keep announcing the previous element,
+     * and Enter or Space would activate a component that is no longer focused.</p>
+     *
+     * <p>Tracked by id rather than by asking the document what is focused: reading the active
+     * element would be a round trip to the main thread.</p>
+     */
+    private void applyFocus(Entry entry, AccessibilityNodeSnapshot node) {
+        if (!node.isFocused()) {
+            if (focusedNodeId == entry.id) {
+                focusedNodeId = -1;
+            }
+            return;
+        }
+        if (focusedNodeId == entry.id) {
+            return;
+        }
+        focusedNodeId = entry.id;
+        entry.element.focus();
     }
 
     private void applyCustomActions(Entry entry, AccessibilityNodeSnapshot node) {
