@@ -302,7 +302,8 @@ public final class JavaScriptSemanticOverlay {
 
     private void applyText(Entry entry, AccessibilityNodeSnapshot node) {
         String text = null;
-        if (textContentEnabled
+        boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        if (textContentEnabled && !obscured
                 && (node.getRole() == AccessibilityRole.STATIC_TEXT
                 || node.getRole() == AccessibilityRole.HEADING)) {
             text = node.getLabel() == null ? "" : node.getLabel();
@@ -584,8 +585,23 @@ public final class JavaScriptSemanticOverlay {
         if (role != null) {
             out.put("role", role);
         }
-        if (node.getLabel() != null) {
-            out.put("aria-label", node.getLabel());
+        // An obscured field with no separately associated label has its label derived from the
+        // text it contains, so writing that through would put the secret into the page DOM and
+        // have a screen reader read it out as the field's name. Name it from the hint instead,
+        // and never from its content.
+        boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
+        String accessibleName = node.getLabel();
+        if (obscured) {
+            accessibleName = node.getHint();
+        }
+        if (accessibleName == null) {
+            // A dialog is normally named by its pane title -- inferred from the form title --
+            // rather than by a label, and without this the element would have no accessible
+            // name at all and be announced as an unnamed dialog.
+            accessibleName = node.getPaneTitle();
+        }
+        if (accessibleName != null) {
+            out.put("aria-label", accessibleName);
         }
         String description = node.getDescription();
         if (node.getHint() != null) {
@@ -604,7 +620,7 @@ public final class JavaScriptSemanticOverlay {
         if (node.getRoleDescription() != null) {
             out.put("aria-roledescription", node.getRoleDescription());
         }
-        if (node.getValue() != null) {
+        if (node.getValue() != null && !obscured) {
             out.put("aria-valuetext", node.getValue());
         }
         if (node.getSelected() != null) {
@@ -653,7 +669,7 @@ public final class JavaScriptSemanticOverlay {
             out.put("aria-atomic", "true");
         }
         AccessibilityRange range = node.getRange();
-        if (range != null) {
+        if (range != null && !obscured) {
             out.put("aria-valuemin", String.valueOf(range.getMinimum()));
             out.put("aria-valuemax", String.valueOf(range.getMaximum()));
             out.put("aria-valuenow", String.valueOf(range.getCurrent()));
