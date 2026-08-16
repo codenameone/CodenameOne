@@ -99,14 +99,26 @@ public class LinuxSecureStorage extends SecureStorage {
         //
         // In this order because the token is the only way to find the entry: dropping it first
         // would leave nothing to clear the keyring with.
+        Object stored;
         try {
-            Object stored = Storage.getInstance().readObject(key(account));
-            if (stored instanceof byte[]) {
-                LinuxNative.dpapiForget((byte[]) stored);
-            }
+            stored = Storage.getInstance().readObject(key(account));
         } catch (Throwable cannotRead) {
-            // A token that cannot be read cannot be cleared either. The stored object still goes,
-            // which is what this method promises; the keyring entry is reported below.
+            // The token cannot be read, so the keyring entry cannot be found. Deleting the stored
+            // object would throw away the only name it has, so the object stays and this reports
+            // failure: there is a secret in the keyring and this call did not remove it.
+            return false;
+        }
+        if (stored instanceof byte[]) {
+            int forgotten = LinuxNative.dpapiForget((byte[]) stored);
+            if (forgotten < 0) {
+                // The keyring refused or could not be asked. The token is kept deliberately -- it
+                // is the only way to find that entry again, so deleting it here would strand a
+                // recoverable secret with nothing left to name it, which is the state this method
+                // exists to avoid. Reported as a failure rather than a success that did half of
+                // the work.
+                return false;
+            }
+            // 0 means nothing was there, which is what a second forget sees; the token still goes.
         }
         Storage.getInstance().deleteStorageFile(key(account));
         return true;

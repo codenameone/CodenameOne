@@ -568,9 +568,11 @@ public final class LinuxNative {
      * lives in the Secret Service. Dropping the blob alone leaves it there.
      *
      * @param data the token blob
-     * @return true if an entry was removed, false if there was none or the keyring refused
+     * @return 1 if an entry was removed, 0 if there was none under that token, -1 if the keyring
+     *         could not be asked or refused -- which the caller must not confuse with 0, because
+     *         the token is the only way to find the entry again
      */
-    public static native boolean dpapiForget(byte[] data);
+    public static native int dpapiForget(byte[] data);
 
     /* --------------------------------------------------- local notifications */
 

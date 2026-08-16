@@ -563,30 +563,33 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_dpapiUnprotect___byte_1ARRAY_R_
  * forgetting a database key is the difference between erased and merely hidden, and leaves an
  * orphan behind for every key ever forgotten.
  */
-JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_dpapiForget___byte_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data) {
+JAVA_INT com_codename1_impl_linux_LinuxNative_dpapiForget___byte_1ARRAY_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT data) {
     unsigned char* tokenBytes;
     int len;
     char token[128];
     GError* err = 0;
     gboolean cleared;
+    /* -1 could not, 0 nothing to remove, 1 removed. Three answers rather than two because the
+     * caller has to tell "the keyring refused" from "there was nothing there": the first must keep
+     * the token, since the token is the only way to find the entry again, and the second must not,
+     * since keeping it would leave a token naming nothing. Reporting both as false deleted the
+     * token in the refusal case and put the orphan back. */
     if (data == JAVA_NULL || !cn1LoadSecret()) {
-        return JAVA_FALSE;
+        return -1;
     }
     tokenBytes = (unsigned char*) (*(JAVA_ARRAY) data).data;
     len = (int) (*(JAVA_ARRAY) data).length;
     if (len <= 0 || len >= (int) sizeof(token)) {
-        return JAVA_FALSE;
+        return -1;
     }
     memcpy(token, tokenBytes, len);
     token[len] = 0;
     cleared = p_secret_password_clear_sync(&cn1SecretSchema, 0, &err, "token", token, NULL);
     if (err) {
         g_error_free(err);
-        return JAVA_FALSE;
+        return -1;
     }
-    /* False means the keyring had no entry under this token, which is what a second forget sees.
-     * The caller treats that as nothing left to remove rather than as a failure. */
-    return cleared ? JAVA_TRUE : JAVA_FALSE;
+    return cleared ? 1 : 0;
 }
 
 /* ----------------------------------------------------------- file dialog */

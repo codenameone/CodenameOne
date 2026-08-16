@@ -371,7 +371,7 @@ fit in the first window are therefore readable and the rest aren't: reaching the
 insert a second time. Codename One refuses that rather than doing it, and says so in the error,
 including that the changes are already applied and the statement must not be retried. If the
 result set may be large, run the statement with `execute()` and query for what you need
-afterwards. Every other port steps through such a statement once and has no such limit.
+afterward. Every other port steps through such a statement once and has no such limit.
 
 [[sql-legacy]]
 ==== Compatibility with the previous behaviour
