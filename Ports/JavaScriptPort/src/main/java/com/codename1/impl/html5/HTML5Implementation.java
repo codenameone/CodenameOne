@@ -4470,6 +4470,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // displays would otherwise keep a 36 device-pixel font at 36 CSS pixels, so text
                 // and controls would roughly double in size.
                 dDensity = -1;
+                // Derived from the density, and cached on first use, so it has to go with it --
+                // otherwise convertToPixels() keeps answering in the old density's units while
+                // getDeviceDensity() reports the new one.
+                ppi = 0;
                 themeGeneration++;
                 refreshThemeIfStale(getCurrentForm());
             }
@@ -10648,6 +10652,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         try {
             historyIndex++;
             window.getHistory().pushState(String.valueOf(historyIndex), "");
+            historyEntriesPushed++;
         } catch (Throwable ignored) {
             // A sandboxed or file:// document can refuse pushState. Back simply stays inert.
         }
@@ -10688,6 +10693,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             return;
         }
+        historyEntriesPushed = Math.max(0, historyEntriesPushed - 1);
         callSerially(new Runnable() {
             @Override
             public void run() {
@@ -10726,7 +10732,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // Every entry this port pushed has to go, not just one: a form reached through
             // several others still has theirs above the document, and stepping over a single
             // one would leave the browser inside a history the application has no forms for.
-            int remaining = Math.max(1, historyStack.size() - 1);
+            int remaining = Math.max(1, historyEntriesPushed);
             historySuppressPop = true;
             try {
                 window.getHistory().go(-remaining);
@@ -10776,6 +10782,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private static final int HISTORY_STACK_LIMIT = 32;
 
+    /**
+     * How many entries this port has pushed and not yet spent.
+     *
+     * <p>Counted separately from the form chain because that chain is bounded -- it only has to
+     * be long enough to recognise a backward jump -- while the browser keeps every entry. Using
+     * the chain's length to leave the document would land inside the history rather than out of
+     * it once an application had navigated more times than the chain holds.</p>
+     */
+    private int historyEntriesPushed;
+
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
@@ -10815,6 +10831,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             for (int i = 0; i < steps; i++) {
                 historyStack.remove(historyStack.size() - 1);
             }
+            historyEntriesPushed = Math.max(0, historyEntriesPushed - steps);
             if (handlingPopState) {
                 // The user's own Back already spent one entry. If the command skipped forms,
                 // the entries for the ones in between are still above the displayed form and
