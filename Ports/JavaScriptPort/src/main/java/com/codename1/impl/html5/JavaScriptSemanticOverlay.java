@@ -335,6 +335,14 @@ public final class JavaScriptSemanticOverlay {
         if (textContentEnabled && !obscured && isLabelVisibleAsText(node.getRole())) {
             text = node.getLabel() == null ? "" : node.getLabel();
         }
+        if (text == null && !obscured && isTextEntryRole(node.getRole())) {
+            // A textbox's value is its content: ARIA has no attribute that carries it --
+            // aria-valuetext is defined for range roles and is not read as a textbox's value --
+            // so a field holding only a label announces its name over an empty value however
+            // much the user has typed into it. This is the field's value rather than a second
+            // copy of a label, so unlike the mirror above it does not depend on that switch.
+            text = textEntryValue(node);
+        }
         if (text == null) {
             if (entry.textNode != null) {
                 entry.textNode.setTextContent("");
@@ -361,6 +369,36 @@ public final class JavaScriptSemanticOverlay {
         }
         entry.textNode.setTextContent(text);
         entry.text = text;
+    }
+
+    /**
+     * True for roles a user types into, whose value the document has to carry as content.
+     */
+    private boolean isTextEntryRole(AccessibilityRole role) {
+        return role == AccessibilityRole.TEXT_FIELD || role == AccessibilityRole.SEARCH_FIELD;
+    }
+
+    /**
+     * The text a typing field currently holds.
+     *
+     * @param node the field's semantic node
+     * @return its contents, never null
+     */
+    private String textEntryValue(AccessibilityNodeSnapshot node) {
+        if (node.getValue() != null) {
+            return node.getValue();
+        }
+        // A field with no separately associated label has its label inferred from its own text,
+        // and in that case the value is left unset -- so the component is the only place the
+        // contents can be read from.
+        Component owner = node.getComponent();
+        if (owner instanceof TextArea) {
+            String value = ((TextArea) owner).getText();
+            if (value != null) {
+                return value;
+            }
+        }
+        return "";
     }
 
     /**
@@ -699,7 +737,10 @@ public final class JavaScriptSemanticOverlay {
         // label has one derived from its own text, which must never be published; an explicit
         // name set through setAccessibilityText(), setLabelForComponent() or the semantics
         // object is not secret and is the only thing naming the field for a screen reader.
-        if (obscured && isDerivedFromContent(node, accessibleName)) {
+        // The same applies to a plain field: a label inferred from its contents is its value,
+        // not its name, and now that the value is published as the element's content, naming
+        // the field with it too would have a screen reader read the typed text twice.
+        if ((obscured || isTextEntryRole(node.getRole())) && isDerivedFromContent(node, accessibleName)) {
             accessibleName = node.getHint();
         }
         if (accessibleName == null) {
@@ -728,7 +769,7 @@ public final class JavaScriptSemanticOverlay {
         if (node.getRoleDescription() != null) {
             out.put("aria-roledescription", node.getRoleDescription());
         }
-        if (node.getValue() != null && !obscured) {
+        if (node.getValue() != null && !obscured && !isTextEntryRole(node.getRole())) {
             out.put("aria-valuetext", node.getValue());
         }
         if (node.getSelected() != null) {
