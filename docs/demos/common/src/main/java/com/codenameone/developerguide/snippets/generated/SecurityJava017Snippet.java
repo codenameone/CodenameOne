@@ -85,8 +85,13 @@ class SecurityJava017Snippet {
 
         // A blocked gesture never reaches your components, so this listener is how the
         // app learns the tap happened. It fires when the state changes, not per touch.
+        //
+        // Read the state off the event, not from isScreenObscured(). The callback is
+        // delivered on the EDT while the state is updated on the platform's input thread,
+        // so a busy EDT can let a later clean touch land first -- and re-reading the
+        // global state would then skip the warning for the event that caused it.
         DeviceIntegrity.addTapjackingListener(e -> {
-            if (DeviceIntegrity.isScreenObscured()) {
+            if (Boolean.TRUE.equals(e.getSource())) {
                 Dialog.show("Security warning",
                         "Another app is drawing over this screen. Close it before continuing.",
                         "OK", null);

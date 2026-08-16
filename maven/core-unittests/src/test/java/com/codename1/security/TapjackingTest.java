@@ -222,6 +222,25 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
+    void eachEventCarriesTheStateItAnnouncedNotTheLatestOne() {
+        // The documented pattern branches on the event source rather than on
+        // isScreenObscured(), because the state is written on the platform's input thread
+        // while callbacks are delivered on the EDT. Two changes queued before the EDT drains
+        // must therefore still arrive carrying their own values, not both carrying the last.
+        implementation.notifyScreenObscured(true, "obscured");
+        implementation.notifyScreenObscured(false, null);
+        flushSerialCalls();
+
+        assertEquals(2, observed.size());
+        assertEquals(Boolean.TRUE, observed.get(0),
+                "the first callback has to announce the state that raised it");
+        assertEquals(Boolean.FALSE, observed.get(1));
+        // The global query has already moved on -- which is the whole reason the event
+        // carries the value.
+        assertFalse(DeviceIntegrity.isScreenObscured());
+    }
+
+    @Test
     void aCleanTouchOnACleanScreenNotifiesNothing() {
         implementation.notifyScreenObscured(false, null);
         flushSerialCalls();

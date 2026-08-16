@@ -261,7 +261,9 @@ public final class DeviceIntegrity {
     /// ```java
     /// DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
     /// DeviceIntegrity.addTapjackingListener(e -> {
-    ///     if (DeviceIntegrity.isScreenObscured()) {
+    ///     // The state comes off the event, not from isScreenObscured() -- see
+    ///     // addTapjackingListener for why re-reading the global state races here.
+    ///     if (Boolean.TRUE.equals(e.getSource())) {
     ///         Dialog.show("Security warning",
     ///             "Another app is drawing over this screen. Close it before continuing.",
     ///             "OK", null);
@@ -304,9 +306,14 @@ public final class DeviceIntegrity {
     /// dismiss a warning. It does not fire per touch.
     ///
     /// This matters when the policy blocks: a blocked gesture is never delivered to your components,
-    /// so this listener is the only way the app learns the tap happened at all. Callbacks arrive on
-    /// the EDT, and the [com.codename1.ui.events.ActionEvent] source is a `Boolean` carrying the new
-    /// state.
+    /// so this listener is the only way the app learns the tap happened at all.
+    ///
+    /// **Read the state from the event, not from [#isScreenObscured()].** The
+    /// [com.codename1.ui.events.ActionEvent] source is a `Boolean` carrying the state this callback
+    /// is announcing, and that is the value to branch on. Callbacks are delivered on the EDT while
+    /// the state is updated on the platform's input thread, so a busy EDT can let a later clean
+    /// touch land before this runs -- at which point the global query answers false and a warning
+    /// keyed on it would be skipped for the very event that raised it.
     ///
     /// #### Parameters
     ///
