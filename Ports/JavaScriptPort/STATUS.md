@@ -53,9 +53,13 @@ Text that stays on the canvas, by design:
 Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`
 itself and never reaches the implementation.
 
-**Consequence for the screenshot suite:** goldens captured from the canvas via
-`toDataURL` no longer contain text. The suite needs to capture through
-Playwright's `page.screenshot()` and be rebaselined. This has NOT been done yet.
+**Consequence for the screenshot suite:** every test in the suite reads the screen
+back to capture it, and a pixel read returns text to the canvas for good -- the
+two representations cannot both be authoritative, and an application that reads
+pixels is saying which one it needs. The goldens are therefore canvas-text at the
+display's real pixel ratio, and have been rebaselined from a CI run. The DOM
+layer is covered by `scripts/verify-javascript-web-overlay.mjs`, which asserts it
+directly instead of through pixels.
 
 Known gaps in this area:
 
