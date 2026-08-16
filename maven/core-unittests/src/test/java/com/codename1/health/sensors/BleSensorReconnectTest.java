@@ -828,9 +828,12 @@ class BleSensorReconnectTest extends UITestBase {
                 offered++;
             }
             if (bpm % 2 != 0 || times < 2) {
+                // A permanent code on purpose: DATABASE_INACCESSIBLE is
+                // retryable, so it is held rather than counted, and this
+                // test is about what happens to samples that run out of
+                // attempts.
                 out.error(new com.codename1.health.HealthException(
-                        com.codename1.health.HealthError
-                                .DATABASE_INACCESSIBLE,
+                        com.codename1.health.HealthError.INVALID_DATA,
                         "scripted failure for " + bpm + " on attempt "
                                 + times));
                 return;
@@ -936,6 +939,155 @@ class BleSensorReconnectTest extends UITestBase {
         public boolean isWritable(
                 com.codename1.health.HealthDataType type) {
             return writable;
+        }
+    }
+
+    /**
+     * A locked device must not cost the wearer their readings.
+     *
+     * <p>iOS raises {@code DATABASE_INACCESSIBLE} for as long as the
+     * device is locked -- which is exactly when a background observer
+     * fires -- and the docs call it retryable once it unlocks. The
+     * attempt cap counted those failures like any other, so at the
+     * default one-minute batch interval a device locked for three minutes
+     * discarded its samples for good, even though the very next write
+     * would have succeeded.</p>
+     */
+    @Test
+    void aLockedDeviceKeepsItsReadings() throws Exception {
+        LockedStore store = new LockedStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            // Well past the three attempts that retire a permanent
+            // failure. The sample must still be there.
+            for (int i = 0; i < 40 && store.attempts() <= MAX_ATTEMPTS; i++) {
+                pump(100);
+            }
+            assertTrue(store.attempts() > MAX_ATTEMPTS,
+                    "the locked store should have been retried more than"
+                            + " the attempt cap, saw " + store.attempts());
+
+            // And when the device unlocks, the reading is written rather
+            // than long gone.
+            store.unlock();
+            for (int i = 0; i < 60 && !store.wrote(72); i++) {
+                pump(100);
+            }
+            assertTrue(store.wrote(72),
+                    "the reading should have been written once the store"
+                            + " came back");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /** The cap SensorSession applies to permanent failures. */
+    private static final int MAX_ATTEMPTS = 3;
+
+    /**
+     * A store that is locked, as iOS is until first unlock: every write
+     * fails with the retryable DATABASE_INACCESSIBLE until it is opened.
+     */
+    private static final class LockedStore
+            extends com.codename1.health.HealthStore {
+
+        private final Object lock = new Object();
+        private boolean locked = true;
+        private int attempts;
+        private final java.util.List<Integer> written =
+                new ArrayList<Integer>();
+
+        void unlock() {
+            synchronized (lock) {
+                locked = false;
+            }
+        }
+
+        int attempts() {
+            synchronized (lock) {
+                return attempts;
+            }
+        }
+
+        boolean wrote(int bpm) {
+            synchronized (lock) {
+                return written.contains(Integer.valueOf(bpm));
+            }
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        /** True even while locked -- which is what iOS reports. */
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            boolean shut;
+            synchronized (lock) {
+                attempts++;
+                shut = locked;
+                if (!shut) {
+                    for (com.codename1.health.HealthSample s : samples) {
+                        if (s instanceof com.codename1.health.QuantitySample) {
+                            written.add(Integer.valueOf((int) Math.round(
+                                    ((com.codename1.health.QuantitySample) s)
+                                            .getQuantity().getValue(
+                                            com.codename1.health.HealthUnit
+                                                    .COUNT_PER_MINUTE))));
+                        }
+                    }
+                }
+            }
+            if (shut) {
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError
+                                .DATABASE_INACCESSIBLE,
+                        "the device is locked"));
+                return;
+            }
+            out.complete(new com.codename1.health.HealthWriteResult());
         }
     }
 

@@ -422,6 +422,48 @@ public class SensorSession {
     /// stumble is transient, a run of them is not.
     private static final int MAX_WRITE_FAILURES = 3;
 
+    /// The longest a recoverable outage backs off to. A device that stays
+    /// locked costs a handful of wake-ups an hour rather than one per
+    /// batch interval, and the readings are still there when it opens.
+    private static final int MAX_RETRY_BACKOFF_MILLIS = 300000;
+
+    /// The delay the next retry of a recoverable failure will use.
+    /// Guarded by `pendingWrites`; zero means the run has not started.
+    private int retryDelayMillis;
+
+    /// Whether this failure is one that waiting will fix.
+    ///
+    /// The distinction matters because the attempt cap discards samples,
+    /// and these are the failures where discarding is wrong: iOS raises
+    /// DATABASE_INACCESSIBLE for as long as the device is locked -- which
+    /// is exactly when a background observer fires, and is documented as
+    /// retryable once it unlocks -- while RATE_LIMITED and TIMEOUT say in
+    /// as many words that the same write would work later. Counting
+    /// those, a device locked for three minutes at the default one-minute
+    /// batch interval lost its readings for good.
+    ///
+    /// A provider that is missing or needs updating is deliberately not
+    /// here: recovery needs the user to install something, which no
+    /// amount of retrying on a timer brings about, so those keep the cap.
+    private static boolean isRecoverable(Throwable error) {
+        if (!(error instanceof HealthException)) {
+            return false;
+        }
+        HealthError code = ((HealthException) error).getError();
+        return code == HealthError.DATABASE_INACCESSIBLE
+                || code == HealthError.RATE_LIMITED
+                || code == HealthError.TIMEOUT;
+    }
+
+    /// The next backoff step, doubling to the ceiling. Call holding
+    /// `pendingWrites`.
+    private int nextRetryDelay(int baseMillis) {
+        int base = Math.max(1, baseMillis);
+        retryDelayMillis = retryDelayMillis <= 0 ? base
+                : Math.min(retryDelayMillis * 2, MAX_RETRY_BACKOFF_MILLIS);
+        return retryDelayMillis;
+    }
+
     /// How many times each still-pending sample has been in a failed
     /// write. Guarded by `pendingWrites`, the lock the requeue decision
     /// is already taken under.
@@ -589,6 +631,9 @@ public class SensorSession {
                 // their tally goes with them.
                 synchronized (session.pendingWrites) {
                     session.forgetWriteAttempts(batch);
+                    // The store is answering again, so the next outage
+                    // starts its backoff from the top.
+                    session.retryDelayMillis = 0;
                 }
                 return;
             }
@@ -658,7 +703,9 @@ public class SensorSession {
             List<HealthSample> keep =
                     new ArrayList<HealthSample>(retryable.size());
             List<HealthSample> exhausted = new ArrayList<HealthSample>();
+            boolean recoverable = isRecoverable(error);
             boolean requeued;
+            int retryIn;
             synchronized (session.pendingWrites) {
                 // The flag and the buffer under one lock, because
                 // teardown sets that flag and drains the buffer under it
@@ -672,15 +719,26 @@ public class SensorSession {
                 // written in the same breath as the requeue it governs,
                 // and the timer thread and the caller's thread both
                 // arrive here.
-                for (HealthSample sample : retryable) {
-                    if (session.recordWriteFailure(sample)
-                            >= MAX_WRITE_FAILURES) {
-                        exhausted.add(sample);
-                    } else {
-                        keep.add(sample);
+                if (recoverable) {
+                    // Held, not counted. Waiting is the whole remedy, so
+                    // spending an attempt on each try would retire the
+                    // samples for the one reason they should be kept.
+                    keep.addAll(retryable);
+                } else {
+                    for (HealthSample sample : retryable) {
+                        if (session.recordWriteFailure(sample)
+                                >= MAX_WRITE_FAILURES) {
+                            exhausted.add(sample);
+                        } else {
+                            keep.add(sample);
+                        }
                     }
                 }
                 requeued = !session.flushingStopped && !keep.isEmpty();
+                retryIn = recoverable
+                        ? session.nextRetryDelay(
+                                session.options().getStoreBatchMillis())
+                        : session.options().getStoreBatchMillis();
                 if (requeued) {
                     session.pendingWrites.addAll(0, keep);
                     // Everything else this write carried is gone for
@@ -723,8 +781,7 @@ public class SensorSession {
             // stopped-only check and left exactly the session nobody
             // holds a handle to retrying on a timer.
             if (!session.isTerminal()) {
-                session.scheduleFlush(session.options()
-                        .getStoreBatchMillis());
+                session.scheduleFlush(retryIn);
             }
             session.fireError(asHealthException(error));
         }
