@@ -1290,7 +1290,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (!textLayer.isPainting()) {
                 updateTextLayerSuspension();
             }
-            textLayer.beginComponent(c);
+            // Whether this paint can see the whole component decides both whether its runs mean
+            // the full sequence and whether a shorter sequence means the rest are stale. The
+            // display graphics reports its clip in absolute coordinates, the space component
+            // bounds are in; Graphics.getClipX() subtracts the translation and would not be.
+            textLayer.beginComponent(c, coversComponent(c), isEditingText(c));
         }
     }
 
@@ -1330,8 +1334,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // The display graphics reports its clip in absolute coordinates, which is the space
             // component bounds are in. Graphics.getClipX() subtracts the current translation, so
             // it would be component-local and the comparison would almost never hold.
-            textLayer.endComponent(c, graphics.getClipX(), graphics.getClipY(),
-                    graphics.getClipWidth(), graphics.getClipHeight());
+            textLayer.endComponent(c);
         }
     }
 
@@ -1346,6 +1349,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * screen. Creating a drag image would then blank the labels under it until the next
      * repaint.</p>
      */
+    /**
+     * True when the display clip contains the whole component.
+     */
+    private boolean coversComponent(Component c) {
+        if (c == null || graphics == null) {
+            return false;
+        }
+        int x = c.getAbsoluteX();
+        int y = c.getAbsoluteY();
+        return graphics.getClipX() <= x && graphics.getClipY() <= y
+                && graphics.getClipX() + graphics.getClipWidth() >= x + c.getWidth()
+                && graphics.getClipY() + graphics.getClipHeight() >= y + c.getHeight();
+    }
+
     private boolean isDisplayGraphics(Graphics g) {
         return graphics != null && com.codename1.ui.Accessor.nativeGraphics(g) == graphics;
     }

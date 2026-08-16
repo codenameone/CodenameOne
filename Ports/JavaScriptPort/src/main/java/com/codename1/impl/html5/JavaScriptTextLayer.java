@@ -110,6 +110,7 @@ public final class JavaScriptTextLayer {
         private int sequence;
         private boolean cellRenderer;
         private boolean promotable;
+        private boolean covering;
     }
 
     private final HTMLDocument document;
@@ -193,7 +194,7 @@ public final class JavaScriptTextLayer {
      *
      * @param component the component about to paint
      */
-    public void beginComponent(Component component) {
+    public void beginComponent(Component component, boolean covering, boolean editing) {
         while (stack.size() <= depth) {
             stack.add(new Frame());
         }
@@ -205,8 +206,9 @@ public final class JavaScriptTextLayer {
         // Resolved here rather than at flush time: painting happens before the frame is
         // drained, so a value cached per drain would not be set yet on the very first paint and
         // that frame's text would fall back to the canvas and then be promoted on top of itself.
-        frame.promotable = component != null
+        frame.promotable = component != null && !editing
                 && component.getComponentForm() == Display.getInstance().getCurrent();
+        frame.covering = covering;
         if (frame.cellRenderer) {
             cellRendererDepth++;
         }
@@ -218,7 +220,7 @@ public final class JavaScriptTextLayer {
      *
      * @param component the component that finished painting
      */
-    public void endComponent(Component component, int clipX, int clipY, int clipW, int clipH) {
+    public void endComponent(Component component) {
         if (depth == 0) {
             return;
         }
@@ -234,28 +236,13 @@ public final class JavaScriptTextLayer {
         // it, since the hooks still run when nothing intersects -- and releasing the tail then
         // would detach text outside the dirty region whose pixels were never repainted, making
         // unrelated labels, or the other lines of a multiline component, disappear.
-        if (frame.runs != null && frame.component == component
-                && coversComponent(component, clipX, clipY, clipW, clipH)) {
+        if (frame.runs != null && frame.component == component && frame.covering) {
             releaseFrom(frame.runs, frame.sequence);
         }
+        frame.covering = false;
         frame.component = null;
         frame.runs = null;
         frame.sequence = 0;
-    }
-
-    /**
-     * True when a clip contains the whole component, so what it drew is the whole story.
-     */
-    private boolean coversComponent(Component component, int clipX, int clipY,
-            int clipW, int clipH) {
-        if (component == null) {
-            return false;
-        }
-        int x = component.getAbsoluteX();
-        int y = component.getAbsoluteY();
-        return clipX <= x && clipY <= y
-                && clipX + clipW >= x + component.getWidth()
-                && clipY + clipH >= y + component.getHeight();
     }
 
     /**
@@ -286,6 +273,14 @@ public final class JavaScriptTextLayer {
             return false;
         }
         Frame frame = stack.get(depth - 1);
+        if (frame.promotable && !frame.covering) {
+            // The clip shows only part of the component, so this is not the full sequence of
+            // runs and slot N would not mean what it did last time -- a repaint reaching only
+            // the second line of a text area would write that line into the first line's slot.
+            // The runs already on screen are still correct, so they are left exactly as they
+            // are and the canvas is told not to draw either, which would otherwise double it.
+            return true;
+        }
         if (!frame.promotable) {
             // The layer sits above the canvas as a whole, so nothing drawn on the canvas after a
             // run can cover it. A modal dialog paints the form beneath it as its own backdrop;

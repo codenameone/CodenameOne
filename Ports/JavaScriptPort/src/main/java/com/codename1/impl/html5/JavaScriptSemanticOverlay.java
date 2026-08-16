@@ -130,6 +130,7 @@ public final class JavaScriptSemanticOverlay {
     private final List<Long> rootOrder = new ArrayList<Long>();
     private boolean textContentEnabled = true;
     private long focusedNodeId = -1;
+    private Entry pendingFocus;
 
     /**
      * Creates an overlay bound to a container element that is already attached to the document.
@@ -185,6 +186,12 @@ public final class JavaScriptSemanticOverlay {
 
         pruneRemovedNodes(live);
         reconcileChildOrder(container, rootOrder, roots, live);
+
+        if (pendingFocus != null) {
+            focusedNodeId = pendingFocus.id;
+            pendingFocus.element.focus();
+            pendingFocus = null;
+        }
     }
 
     /**
@@ -198,6 +205,7 @@ public final class JavaScriptSemanticOverlay {
         entries.clear();
         rootOrder.clear();
         focusedNodeId = -1;
+        pendingFocus = null;
     }
 
     private void visit(Map<Long, AccessibilityNodeSnapshot> nodes, Long id, long parentId,
@@ -443,8 +451,10 @@ public final class JavaScriptSemanticOverlay {
         if (focusedNodeId == entry.id) {
             return;
         }
-        focusedNodeId = entry.id;
-        entry.element.focus();
+        // Recorded, not applied: a node appearing for the first time -- the first snapshot, or
+        // the first after a form change -- has not been attached yet, and a browser ignores
+        // focus on an element that is not in the document. Applied once the tree is in place.
+        pendingFocus = entry;
     }
 
     private void applyCustomActions(Entry entry, AccessibilityNodeSnapshot node) {
@@ -549,6 +559,9 @@ public final class JavaScriptSemanticOverlay {
             // are stable per component, so without this the node would be considered still
             // focused when it comes back and focus would never be restored to it.
             focusedNodeId = -1;
+        }
+        if (pendingFocus == entry) {
+            pendingFocus = null;
         }
         Long key = Long.valueOf(entry.id);
         if (entry.parentId == -1) {
