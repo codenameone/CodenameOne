@@ -206,7 +206,12 @@ public final class JavaScriptTextLayer {
         // Resolved here rather than at flush time: painting happens before the frame is
         // drained, so a value cached per drain would not be set yet on the very first paint and
         // that frame's text would fall back to the canvas and then be promoted on top of itself.
+        // Peers are painted behind the canvas and pointer routing decides between them by
+        // probing the canvas alpha, so a glyph moved into the DOM stops contributing hit-test
+        // pixels: a transparent link or label over a video would let clicks through to the peer
+        // beneath it. While a form has peers its text stays on the canvas.
         frame.promotable = component != null && !editing
+                && com.codename1.ui.Accessor.getActivePeerCount() == 0
                 && component.getComponentForm() == Display.getInstance().getCurrent();
         frame.covering = covering;
         if (frame.cellRenderer) {

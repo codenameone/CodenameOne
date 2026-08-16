@@ -323,9 +323,11 @@ public final class JavaScriptSemanticOverlay {
     private void applyText(Entry entry, AccessibilityNodeSnapshot node) {
         String text = null;
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
-        if (textContentEnabled && !obscured
-                && (node.getRole() == AccessibilityRole.STATIC_TEXT
-                || node.getRole() == AccessibilityRole.HEADING)) {
+        // Every label the user can see, not only static text: while this overlay is the one
+        // carrying text -- because a pixel readback returned rendering to the canvas -- the
+        // words on buttons, links, tabs, menu items and list items have to be here too, or
+        // find-in-page would go quiet for everything except paragraphs.
+        if (textContentEnabled && !obscured && isLabelVisibleAsText(node.getRole())) {
             text = node.getLabel() == null ? "" : node.getLabel();
         }
         if (text == null) {
@@ -354,6 +356,32 @@ public final class JavaScriptSemanticOverlay {
         }
         entry.textNode.setTextContent(text);
         entry.text = text;
+    }
+
+    /**
+     * True for roles whose label is text the user reads on screen.
+     */
+    private boolean isLabelVisibleAsText(AccessibilityRole role) {
+        switch (role) {
+            case STATIC_TEXT:
+            case HEADING:
+            case BUTTON:
+            case TOGGLE_BUTTON:
+            case CHECKBOX:
+            case RADIO_BUTTON:
+            case SWITCH:
+            case LINK:
+            case TAB:
+            case MENU_ITEM:
+            case LIST_ITEM:
+            case TREE_ITEM:
+            case CELL:
+            case COLUMN_HEADER:
+            case ROW_HEADER:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
