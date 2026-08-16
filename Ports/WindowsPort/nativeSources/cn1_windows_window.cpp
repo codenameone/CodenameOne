@@ -343,10 +343,15 @@ WCHAR* cn1WinJavaStringToWide(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str, UINT32
 /* ------------------------------------------------------------ event queue */
 
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode) {
+    cn1WinPushWindowEvent(0, type, x, y, keyCode);
+}
+
+void cn1WinPushWindowEvent(int windowId, CN1EventType type, int x, int y, int keyCode) {
     EnterCriticalSection(&cn1Win.eventLock);
     LONG next = (cn1Win.eventTail + 1) % CN1_EVENT_QUEUE_CAPACITY;
     if (next != cn1Win.eventHead) {
         CN1Event* e = &cn1Win.events[cn1Win.eventTail];
+        e->windowId = windowId;
         e->type = (JAVA_INT) type;
         e->x = x;
         e->y = y;
@@ -603,6 +608,14 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
              * while the printing worker blocks in SendMessage
              * (cn1_windows_print.cpp). */
             return cn1WinPrintDialogHandleMessage(wParam);
+        case WM_CN1_DESKTOPWINDOW:
+            /* Additional desktop window create/destroy, marshaled from the EDT.
+             * The pump thread must own the HWND, so this is where they are made
+             * (cn1_windows_desktopwindow.cpp). Secondary windows have their own
+             * WndProc; only the op dispatch lives here, because an op arrives
+             * before its window exists. */
+            cn1WinDesktopHandleMessage(wParam, lParam);
+            return 0;
         case WM_CN1_WIDGET:
             /* Floating widget window op (create/pixels/pos/hit-rects/destroy)
              * marshaled from the EDT (cn1_windows_widgets.cpp). The widget
@@ -943,6 +956,7 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_pollEvent___int_1ARRAY_R_b
     if (len > 1) { out[1] = ev.x; }
     if (len > 2) { out[2] = ev.y; }
     if (len > 3) { out[3] = ev.keyCode; }
+    if (len > 4) { out[4] = ev.windowId; }
     return JAVA_TRUE;
 }
 
