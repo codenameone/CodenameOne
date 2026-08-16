@@ -455,14 +455,52 @@ final class IOSProvisioningPreflight {
      * <p>Keyed on what every Apple-issued profile carries and no ordinary plist does: the
      * profile's own UUID, when it expires, the entitlements it grants, and the certificates it
      * was issued to. Checked against real development, distribution and Xcode-team profiles.
-     * Deliberately a small set -- the more that is demanded here, the more likely this refuses
-     * a profile that is perfectly good.
+     *
+     * <p>Each is checked by shape, not merely by name. A corrupted file can keep the key and
+     * lose the value -- an empty UUID, Entitlements as a string, DeveloperCertificates as an
+     * empty array -- and presence alone accepted all of those. With a readable future expiry
+     * and no device list, deriveType then called it an App Store profile and a default release
+     * build sailed through.
+     *
+     * <p>Still deliberately a small set: the more that is demanded here, the more likely this
+     * refuses a profile that is perfectly good, which is the failure mode that matters most.
      */
     private static boolean isProvisioningPlist(Document doc) {
-        return valueForKey(doc, "UUID") != null
+        // ExpirationDate is required to be PRESENT here and is shape-checked downstream:
+        // a profile whose date is the wrong type or unreadable deserves the message that
+        // says so, rather than the generic "this is not a profile" this method produces.
+        return hasNonEmptyString(doc, "UUID")
                 && valueForKey(doc, "ExpirationDate") != null
-                && valueForKey(doc, "Entitlements") != null
-                && valueForKey(doc, "DeveloperCertificates") != null;
+                && hasValueTagged(doc, "Entitlements", "dict")
+                && hasDeveloperCertificates(doc);
+    }
+
+    /** A key whose value is a {@code <string>} with something in it. */
+    private static boolean hasNonEmptyString(Document doc, String key) {
+        Element value = valueForKey(doc, key);
+        return value != null && "string".equals(value.getTagName())
+                && value.getTextContent().trim().length() > 0;
+    }
+
+    /** A key whose value is of the expected plist type. */
+    private static boolean hasValueTagged(Document doc, String key, String tag) {
+        Element value = valueForKey(doc, key);
+        return value != null && tag.equals(value.getTagName());
+    }
+
+    /** An array holding at least one certificate with bytes in it. */
+    private static boolean hasDeveloperCertificates(Document doc) {
+        Element value = valueForKey(doc, "DeveloperCertificates");
+        if (value == null || !"array".equals(value.getTagName())) {
+            return false;
+        }
+        NodeList certificates = value.getElementsByTagName("data");
+        for (int i = 0; i < certificates.getLength(); i++) {
+            if (certificates.item(i).getTextContent().trim().length() > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

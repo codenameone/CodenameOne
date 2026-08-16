@@ -525,6 +525,69 @@ public class IOSProvisioningPreflightTest {
         }
     }
 
+    /**
+     * A corrupted file can keep the key names and lose the values. Presence alone accepted an
+     * empty UUID, Entitlements as a string, or an empty certificate array -- and with a
+     * readable future expiry and no device list, that reads as an App Store profile, so a
+     * default release build passed and uploaded something that cannot sign the app.
+     */
+    @Test
+    public void keysWithUnusableValuesAreNotAProfile() throws Exception {
+        assertNull("an empty UUID is not a UUID", IOSProvisioningPreflight.parse(
+                corrupted("<key>UUID</key><string></string>",
+                        "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>",
+                        "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>")
+                        .getBytes("UTF-8")));
+
+        assertNull("a UUID that is not a string is not a UUID", IOSProvisioningPreflight.parse(
+                corrupted("<key>UUID</key><array><string>x</string></array>",
+                        "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>",
+                        "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>")
+                        .getBytes("UTF-8")));
+
+        assertNull("entitlements are a dictionary", IOSProvisioningPreflight.parse(
+                corrupted("<key>UUID</key><string>u</string>",
+                        "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>",
+                        "<key>Entitlements</key><string>none</string>")
+                        .getBytes("UTF-8")));
+
+        assertNull("an empty certificate array grants nothing", IOSProvisioningPreflight.parse(
+                corrupted("<key>UUID</key><string>u</string>",
+                        "<key>DeveloperCertificates</key><array></array>",
+                        "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>")
+                        .getBytes("UTF-8")));
+
+        assertNull("a certificate array of empty data grants nothing",
+                IOSProvisioningPreflight.parse(
+                        corrupted("<key>UUID</key><string>u</string>",
+                                "<key>DeveloperCertificates</key><array><data> </data></array>",
+                                "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>")
+                                .getBytes("UTF-8")));
+    }
+
+    /** A plist carrying the mandatory fields in their proper shapes still parses. */
+    @Test
+    public void properlyShapedFieldsStillParse() throws Exception {
+        IOSProvisioningPreflight.Profile parsed = IOSProvisioningPreflight.parse(
+                corrupted("<key>UUID</key><string>0f7ac3c1</string>",
+                        "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>",
+                        "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>")
+                        .getBytes("UTF-8"));
+        assertNotNull(parsed);
+        assertEquals("app-store", parsed.type);
+    }
+
+    /** A profile with the three mandatory fields spelled however the caller asks. */
+    private static String corrupted(String uuid, String certificates, String entitlements) {
+        return HEAD
+                + "<key>Name</key><string>Corrupted</string>\n"
+                + uuid + "\n"
+                + "<key>ExpirationDate</key><date>" + FUTURE + "</date>\n"
+                + certificates + "\n"
+                + entitlements + "\n"
+                + "</dict></plist>";
+    }
+
     // ---- a profile is untrusted input ----
 
     /**
