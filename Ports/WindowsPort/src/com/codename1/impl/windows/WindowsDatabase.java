@@ -59,8 +59,15 @@ class WindowsDatabase extends Database {
     /// SQLite's "this is not a database file", which is what a wrong key looks like.
     private static final int SQLITE_NOTADB = 26;
 
-    /** The file this connection is open on, for the shared registry a key change consults. */
-    private final String openKey;
+    /**
+     * The file this connection is open on, for the shared registry a key change consults.
+     *
+     * <p>Not final: before the file exists the filesystem has no identity to give, so the first
+     * connection registers under the path and moves to the identity once its open has created the
+     * file. Leaving it on the path would file that connection apart from every later one, and each
+     * would believe it was the only one.
+     */
+    private String openKey;
 
     /**
      * The name a managed key for this database is filed under.
@@ -102,6 +109,7 @@ class WindowsDatabase extends Database {
                             + "SQLite result " + status);
                 }
             }
+            adoptFileIdentity(path);
             opened = true;
         } finally {
             if (!opened) {
@@ -125,9 +133,49 @@ class WindowsDatabase extends Database {
     /// non-ASCII path that differ only in case would then be two entries. Named here because the
     /// error is in the unsafe direction, and closing it needs the platform asked for the real
     /// name, not a smarter fold.
-    /// The registry key for a path, for callers outside an instance -- the managed key alias.
+    /// The managed key alias for a path, for callers outside an instance.
+    ///
+    /// The path, deliberately, and not the filesystem identity: a managed key has to be found
+    /// again after its database has been deleted and made afresh, and the identity of a file does
+    /// not survive that.
     static String registryKeyFor(String path) {
         return windowsPathKey(path);
+    }
+
+    /// What the open-database registry keys a connection on this path under.
+    ///
+    /// The counterpart to registryKeyFor: this one identifies the file, so a delete or a
+    /// conversion sees the connections that are actually on it however they were spelled.
+    static String connectionRegistryKeyFor(String path) {
+        return connectionKeyFor(path);
+    }
+
+    /// Moves this connection to the identity of the file its open has just created.
+    ///
+    /// Only does anything for the first connection to a database that did not exist: the identity
+    /// could not be asked for before the file was there, so it registered under the path. Every
+    /// later connection asks a filesystem that can answer and registers under the identity, so
+    /// leaving this one on the path would file them apart -- and each would be told it was the
+    /// only connection, which is what lets a key change rewrite the file underneath the other.
+    ///
+    /// The new key is taken before the old one is given back, so there is no instant where this
+    /// connection holds neither and a delete could pass between them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the resolved database file, which exists by now
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the database is being deleted or converted under its real identity
+    private void adoptFileIdentity(String path) throws IOException {
+        String identity = connectionKeyFor(path);
+        if (identity == null || identity.equals(openKey)) {
+            return;
+        }
+        registerOpenDatabase(identity);
+        releaseOpenDatabase(openKey);
+        openKey = identity;
     }
 
     /// Which file a connection is on, as the filesystem sees it.

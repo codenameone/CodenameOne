@@ -3249,6 +3249,17 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return WindowsDatabase.registryKeyFor(resolveDatabasePath(databaseName));
     }
 
+    /// What the open-database registry keys on here, which is the file rather than its name.
+    ///
+    /// The managed alias above stays with the path so a key survives the database being deleted
+    /// and made again. The registry cannot use that: two spellings of one path are one file to
+    /// this filesystem, and a delete or a conversion keyed on the text would not see a connection
+    /// registered under the other spelling.
+    @Override
+    public String databaseRegistryIdentity(String databaseName) {
+        return WindowsDatabase.connectionRegistryKeyFor(resolveDatabasePath(databaseName));
+    }
+
     @Override
     public boolean isDatabaseEncryptionSupported() {
         return WindowsNative.sqlDbIsCipherAvailable();
