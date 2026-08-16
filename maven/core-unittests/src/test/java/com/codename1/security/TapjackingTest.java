@@ -322,6 +322,27 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
+    void reEnablingDetectionAfterOffKeepsTheNewSighting() {
+        // The mirror of the switch-off race: one thread turns protection off while another
+        // re-enables it and reports. The retraction is applied inside the OFF transition rather
+        // than by a later call, so there is no delayed mutation left to wipe the newer sighting
+        // and leave BLOCK active over a state claiming the screen is clear.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+
+        assertTrue(DeviceIntegrity.isScreenObscured(),
+                "the sighting reported after detection was re-enabled has to survive");
+        assertEquals(Boolean.TRUE, observed.get(observed.size() - 1),
+                "and the last thing a listener heard must not be a stale clearing event");
+    }
+
+    @Test
     void switchingBetweenDetectingPoliciesKeepsTheObscuredState() {
         // Only OFF retracts. Tightening BLOCK to STRICT must not pretend the overlay went away.
         DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
