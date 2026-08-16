@@ -1,0 +1,334 @@
+== Desktop Windows
+
+Codename One applications have always had exactly one window. On a phone that's the
+only thing that makes sense: the operating system owns the screen and the application
+fills it. On a desktop it's a real limitation - an inspector panel, a preferences
+window, a second document, a tool palette and a detached console are all ordinary
+desktop expectations that a single-window framework can't express.
+
+`com.codename1.ui.Window` adds them. A `Window` is a separate native operating-system
+window with its own Codename One component hierarchy inside it, its own focus owner,
+its own animations and its own repaint region. The application's main surface stays a
+`Form` and behaves exactly as it always has.
+
+[source,java]
+----
+if (Desktop.isSupported()) {
+    Window inspector = new Window("Inspector", new BorderLayout());
+    inspector.add(BorderLayout.CENTER, new Label("Hello from a second window"));
+    inspector.setWindowSize(420, 320);
+    inspector.centerOnDesktop();
+    inspector.show();
+}
+----
+
+=== Where windows exist
+
+Windows are a desktop feature, and the API says so plainly:
+
+[cols="2,1,4"]
+|===
+|Platform |Windows |Notes
+
+|Java SE desktop app
+|Yes
+|The packaged desktop build and the simulator in desktop-skin mode.
+
+|Java SE simulator with a phone skin
+|No
+|A skin simulates one device screen; a real window inside that simulation is incoherent.
+
+|Native Windows
+|Yes
+|
+
+|Native Linux
+|Yes
+|
+
+|macOS (Mac Catalyst)
+|Opt-in
+|Requires the `macNative.multiWindow` build hint. See <<mac-catalyst-windows>>.
+
+|iOS, Android, JavaScript
+|No
+|These platforms have no windowing system.
+|===
+
+Always guard with `Desktop.isSupported()` (or the shorthand `CN.isMultiWindowSupported()`).
+Constructing a `Window` where windows are unsupported throws
+`UnsupportedOperationException` immediately:
+
+[source,java]
+----
+Window w = new Window("Tools");   // throws on a phone
+----
+
+There's no fallback to showing a `Form` instead. A pretend window produces layout and
+lifecycle bugs that are far harder to find than an exception
+on the line that asked for it. The exception is thrown by the constructor rather than by
+`show()`, so a wrong assumption surfaces at the point it was made.
+
+Everything else degrades cleanly. `Desktop.getWindows()` returns an empty array rather
+than null, `Desktop.getFocusedWindow()` returns null, and `Desktop.getMonitors()` still
+reports the main display, so portable code that loops over windows or positions against
+a monitor compiles and runs everywhere.
+
+=== Window and Form
+
+`Form` and `Window` are siblings. Both extend `Container`, and both implement the new
+`TopLevelContainer` interface, which is the contract shared by anything that can sit at
+the root of a component hierarchy:
+
+[source,java]
+----
+TopLevelContainer top = someComponent.getTopLevelContainer();
+top.getContentPane().add(new Label("works in either"));
+top.registerAnimated(myAnimation);
+Component focused = top.getFocused();
+----
+
+`TopLevelContainer` carries only what genuinely applies to both. It has the
+content pane, the layered panes, the title, the toolbar and commands, animation
+registration, focus, editing state, the theme manager and the show/size listeners. It
+does *not* carry `Form`'s mobile navigation surface - form transitions, the back command,
+`previousForm` or the tint used to dim a form behind a dialog - because none of those
+mean anything for a desktop window. Members that already exist on `Component` or
+`Container` are reached through `asContainer()`.
+
+==== getComponentForm() returns null inside a Window
+
+This is the one behavioral sharp edge, and it's worth stating plainly:
+
+[source,java]
+----
+Label l = new Label("hi");
+window.add(BorderLayout.CENTER, l);
+
+l.getTopLevelContainer();   // the Window
+l.getComponentForm();       // null -- a Window is not a Form
+----
+
+`getComponentForm()` keeps its original meaning: it names the enclosing `Form`, and
+inside a window the honest answer is none. Codename One's own components were migrated
+to `getTopLevelContainer()`, so the framework works inside a window. Third-party
+components that still call `getComponentForm()` won't, until they adopt the new call.
+
+The failure mode is usually silence rather than an exception, because most of that code
+is written as `Form f = getComponentForm(); if (f != null) { ... }`. If a component
+behaves as though it's detached when you put it in a window - it doesn't scroll, doesn't
+take focus, or doesn't animate - that's almost always the cause.
+
+=== Window lifecycle
+
+[source,java]
+----
+Window w = new Window("Preferences", new BorderLayout());
+w.add(BorderLayout.CENTER, buildPreferencesUi());
+w.setWindowSize(500, 400);
+
+w.addCloseListener(evt -> {
+    if (hasUnsavedChanges()) {
+        evt.consume();          // veto the close
+        promptToSave();
+    }
+});
+
+w.show();
+----
+
+`show()` creates the native window the first time it's called and maps it on screen.
+`hide()` hides the window while keeping it alive, so it can be shown again. `dispose()` destroys
+the native window and releases everything behind it; calling it twice is harmless.
+
+`setCloseOperation()` decides what the platform's own close control does:
+
+[cols="1,4"]
+|===
+|`DISPOSE_ON_CLOSE` |Destroy the window. The default.
+|`HIDE_ON_CLOSE` |Hide it, so it can be shown again later.
+|`DO_NOTHING_ON_CLOSE` |Do nothing; the application calls `dispose()` itself.
+|===
+
+Consuming the event in a close listener vetoes the close regardless of the operation,
+which is how a window asks the user to save first.
+
+Every open window is disposed when the application shuts down, so a window can't outlive
+the event dispatch thread that paints it.
+
+=== Window chrome and geometry
+
+[source,java]
+----
+w.setResizable(false);
+w.setDecorated(false);      // no native title bar; draw your own with a Toolbar
+w.setAlwaysOnTop(true);     // a floating palette
+w.setUtilityWindow(true);   // keep it out of the task bar where the platform allows
+w.setMinimumWindowSize(new Dimension(320, 240));
+----
+
+Geometry has two coordinate systems and two sets of names, which is deliberate:
+
+* `getWindowBounds()`, `setWindowBounds()`, `setWindowSize()` and `setWindowLocation()`
+  are *native* coordinates and include the platform's own chrome.
+* `getWidth()` and `getHeight()`, inherited from `Component`, are the Codename One
+  content size in Codename One pixels.
+
+`centerOnDesktop()` centers the window on the *work area* of the monitor it's on, so it
+doesn't land under the task bar or the dock. `centerOn(other)` centers it over another
+top level. `minimize()`, `restore()` and `toggleMaximize()` do what they say, where the
+platform allows a program to ask.
+
+=== Modal windows
+
+[source,java]
+----
+Window dialog = new Window("Confirm", new BorderLayout());
+dialog.add(BorderLayout.CENTER, new Label("Really delete everything?"));
+dialog.setOwnerWindow(mainWindow);
+dialog.setModalityType(Window.MODALITY_WINDOW);
+dialog.showModal();          // blocks here until the window is disposed
+----
+
+`showModal()` parks the calling code until the window is disposed, exactly as a modal
+`Dialog` does. It doesn't freeze the application: the event dispatch thread keeps
+running, so every other window carries on painting and animating while the modal is up.
+
+Three modality types are available:
+
+[cols="1,4"]
+|===
+|`MODALITY_NONE` |Blocks nothing. The default.
+|`MODALITY_WINDOW` |Blocks input to the window that owns it.
+|`MODALITY_APPLICATION` |Blocks input to every other window and to the main form.
+|===
+
+Input blocking is enforced by Codename One rather than by the platform, so modality
+behaves identically everywhere whether the underlying window system implements its
+own. Ports additionally set the native modal flag, which is what gives you the platform's
+expected focus, stacking and task-bar behavior - but correctness never depends on it.
+
+=== Monitors and per-monitor DPI
+
+`Desktop` is the front door for the display side of a windowing system, alongside
+`Display` rather than replacing any of it. `Display` answers how big the application's main surface is, which is the only question a
+phone has. `Desktop` answers which screens exist and which windows are open.
+
+[source,java]
+----
+for (Monitor m : Desktop.getInstance().getMonitors()) {
+    System.out.println(m.getName()
+            + " bounds=" + m.getBounds()
+            + " workArea=" + m.getWorkArea()
+            + " scale=" + m.getScale()
+            + " dpi=" + m.getDotsPerInch()
+            + (m.isPrimary() ? " (primary)" : ""));
+}
+
+Monitor under = Desktop.getInstance().getMonitorAt(x, y);
+Rectangle whole = Desktop.getInstance().getDesktopBounds();   // union of every monitor
+----
+
+Prefer `getWorkArea()` over `getBounds()` when placing or maximizing a window: the work
+area excludes the task bar, the dock and any reserved panels, and the bounds don't.
+
+Note that desktop coordinates span every monitor, so a display placed to the left of or
+above the primary one legitimately has a negative origin.
+
+==== A window reports its own monitor's characteristics
+
+On a desktop with mixed displays - a high-resolution laptop panel next to a conventional
+external monitor is the common case - two windows of the same application can correctly
+render at different scales:
+
+[source,java]
+----
+w.getMonitor();     // the Monitor this window currently sits on
+w.getScale();       // that monitor's backing scale, e.g. 1.0 or 2.0
+w.getDensity();     // that monitor's density bucket
+----
+
+These answer for the window's own monitor, not for the global display. When the user
+drags a window onto a display with a different scale, Codename One re-reads the scale,
+marks the hierarchy's preferred sizes stale and lays it out again. Skipping that step is
+what produces a window that is blurry or the wrong physical size after a move.
+
+`Display.convertToPixels()` keeps its existing global meaning, the main window's monitor,
+so no existing application changes behavior.
+
+To react to displays being attached, removed or reconfigured:
+
+[source,java]
+----
+Desktop.getInstance().addMonitorListener(evt -> refreshWindowPlacement());
+----
+
+=== Window events
+
+[source,java]
+----
+w.addWindowListener(evt -> {
+    WindowEvent we = (WindowEvent) evt;
+    switch (we.getType()) {
+        case Shown: case Hidden: case Resized: case Moved: ...
+    }
+});
+
+Desktop.getInstance().addWindowListener(evt -> ...);   // any window
+----
+
+`Display.addWindowListener()` is unchanged and still reports only the application's main
+window, so existing code that casts `getSource()` to `Display` keeps working.
+
+=== Peer components and native text editing
+
+Both work inside a window. A `BrowserComponent`, a video player, a map or a native text
+field placed in a `Window` is attached to *that* window's native view hierarchy, not to
+the main window's.
+
+This is worth knowing about because it was the single most common way an early
+multi-window implementation looks correct and isn't: the peer or the text caret appears
+on the main window while the content it belongs to is in another one.
+
+=== Unsupported inside a window
+
+* `Dialog.show()` routes through the main surface and will appear on the main window. Use
+  `Sheet` or `InteractionDialog` inside a window instead - both attach to the window's own
+  layered pane and work normally.
+* `Form` transitions into or out of a window.
+* `HTMLComponent`.
+* Accessibility on secondary windows.
+
+`Display.getDisplayWidth()` and `getDisplayHeight()` continue to report the *main*
+window. Components inside a window should size against their own top level.
+
+[[mac-catalyst-windows]]
+=== Mac Catalyst
+
+Multi-window on the macOS (Mac Catalyst) target is opt-in through a build hint:
+
+----
+macNative.multiWindow=true
+----
+
+The hint is required because a second Codename One window is a second `UIWindowScene`,
+and that needs the process-wide `UIApplicationSupportsMultipleScenes` key in
+`Info.plist`. Enabling that key changes Catalyst windowing for the whole application, so
+it stays off for every app by default. The hint gates both the plist key and the
+windowing API together, so the two can't disagree: with the hint off,
+`Desktop.isSupported()` reports false on Catalyst and constructing a `Window` throws.
+
+Catalyst also differs in one implementation detail worth knowing: a window's Codename One
+content is rendered into an off-screen raster and presented to the scene's view, rather
+than the window owning a second GPU surface. Native peers and text editing still use the
+scene's real view hierarchy, so they behave normally.
+
+=== Threading
+
+Everything runs on the event dispatch thread, as usual. Creating, showing, moving and
+disposing a window are all EDT operations; calling them from a background thread is
+marshalled for you the same way `Form.show()` is.
+
+There is one event dispatch thread for the whole application no matter how many windows
+are open. A window that animates keeps the thread awake; a minimized or hidden window
+does no work at all.
