@@ -116,7 +116,7 @@ abstract class FontWeight {
 
 @JavaName('com.codename1.flutter.TextStyle')
 class TextStyle {
-  external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily});
+  external TextStyle({double? fontSize, FontWeight? fontWeight, Color? color, String? fontFamily, double? letterSpacing, double? height});
 }
 
 @JavaName('com.codename1.flutter.IconData')
@@ -271,7 +271,7 @@ class SingleChildScrollView extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.Image')
 class Image extends Widget {
-  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit});
+  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package});
   external static Image network(String src, {Key? key, double? width, double? height, BoxFit? fit});
 }
 

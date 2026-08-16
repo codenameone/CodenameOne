@@ -42,7 +42,16 @@ public class AssetImage extends ImageProvider {
      * qualifier ({@code packages/<package>/<name>}).
      */
     public String resolvedName() {
-        if (packageName != null && !assetName.startsWith("packages/")) {
+        return qualify(assetName, packageName);
+    }
+
+    /**
+     * Prefixes an asset name with its owning package, Flutter's
+     * {@code packages/<package>/<name>}. Shared so every way of naming an asset —
+     * {@code AssetImage}, {@code Image.asset} — resolves to the same file.
+     */
+    public static String qualify(String assetName, String packageName) {
+        if (assetName != null && packageName != null && !assetName.startsWith("packages/")) {
             return "packages/" + packageName + "/" + assetName;
         }
         return assetName;

@@ -5623,7 +5623,40 @@ public final class JavaEmitter {
                 }
             }
         }
+        reportUnknownNamedArgs(ct, args);
         return sb.toString();
+    }
+
+    /**
+     * Reports every named argument the callee does not declare.
+     *
+     * <p>Canonical expansion walks the PARAMETERS and looks up an argument for each, so an
+     * argument nobody declared is simply never read — it vanishes with no diagnostic and no
+     * runtime complaint. That is how {@code ListView.builder(shrinkWrap: true, ...)} came to
+     * be built without shrink-wrapping: the value was written, transpiled, and dropped.</p>
+     *
+     * <p>Silently ignoring what the source asked for is the worst failure mode available
+     * here, because the app looks like it works. Reporting turns each one into a line of a
+     * to-do list instead: either the runtime grows the parameter, or the gap is a known one.</p>
+     */
+    private void reportUnknownNamedArgs(CtorDecl ct, Args args) {
+        if (ct == null || args == null || args.named == null || args.named.isEmpty()) {
+            return;
+        }
+        for (NamedArg na : args.named) {
+            boolean declared = false;
+            for (Param p : ct.params) {
+                if (p.named && na.name.equals(p.name)) {
+                    declared = true;
+                    break;
+                }
+            }
+            if (!declared) {
+                diags.warn(na.value, "E0140",
+                        "named argument '" + na.name + "' is not declared by the callee and "
+                                + "will be IGNORED; add it to the runtime API and its Dart stub");
+            }
+        }
     }
 
     /** Program method calls: positional plus named-in-declared-order. */

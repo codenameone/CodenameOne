@@ -73,8 +73,13 @@ public class Image extends Widget {
      * Dart's {@code Image.asset} named constructor in canonical positional
      * form.
      */
-    public static Image asset(String name, Key key, Double width, Double height, BoxFit fit) {
-        Image i = new Image(name, null);
+    public static Image asset(String name, Key key, Double width, Double height, BoxFit fit,
+                              String packageName) {
+        // The package qualifier is part of the PATH, exactly as in AssetImage: an asset
+        // shipped by a package lives at packages/<package>/<name>. Dropping it - which is
+        // what happened while this factory had no such parameter - leaves the image looking
+        // for a file that is not there, and the widget renders nothing with no error.
+        Image i = new Image(com.codename1.flutter.AssetImage.qualify(name, packageName), null);
         i.key(key);
         i.width = width;
         i.height = height;

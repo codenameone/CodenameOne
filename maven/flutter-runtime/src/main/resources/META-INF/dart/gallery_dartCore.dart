@@ -308,14 +308,14 @@ class NumberFormat {
 @JavaName('com.codename1.flutter.fonts.GoogleFonts')
 abstract class GoogleFonts {
   external static GoogleFontsConfig get config;
-  external static TextStyle eczar({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle libreFranklin({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle merriweather({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle montserrat({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle oswald({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle robotoCondensed({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle robotoMono({double fontSize, FontWeight fontWeight, Color color});
-  external static TextStyle workSans({double fontSize, FontWeight fontWeight, Color color});
+  external static TextStyle eczar({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle libreFranklin({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle merriweather({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle montserrat({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle oswald({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle robotoCondensed({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle robotoMono({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle workSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
   external static TextTheme ralewayTextTheme([TextTheme textTheme]);
   external static TextTheme rubikTextTheme([TextTheme textTheme]);
   external static TextTheme workSansTextTheme([TextTheme textTheme]);

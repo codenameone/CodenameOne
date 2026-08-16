@@ -20,7 +20,8 @@ public abstract class GoogleFonts {
     private GoogleFonts() {
     }
 
-    private static TextStyle style(double fontSize, FontWeight fontWeight, Color color) {
+    private static TextStyle style(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
         TextStyle t = new TextStyle();
         if (fontSize > 0) {
             t.fontSize(fontSize);
@@ -31,39 +32,53 @@ public abstract class GoogleFonts {
         if (color != null) {
             t.color(color);
         }
+        if (letterSpacing != null) {
+            t.letterSpacing(letterSpacing.doubleValue());
+        }
+        if (height != null) {
+            t.height(height.doubleValue());
+        }
         return t;
     }
 
-    public static TextStyle eczar(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle eczar(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle libreFranklin(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle libreFranklin(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle merriweather(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle merriweather(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle montserrat(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle montserrat(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle oswald(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle oswald(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle robotoCondensed(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle robotoCondensed(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle robotoMono(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle robotoMono(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
-    public static TextStyle workSans(double fontSize, FontWeight fontWeight, Color color) {
-        return style(fontSize, fontWeight, color);
+    public static TextStyle workSans(double fontSize, FontWeight fontWeight, Color color,
+            Double letterSpacing, Double height) {
+        return style(fontSize, fontWeight, color, letterSpacing, height);
     }
 
     public static TextTheme ralewayTextTheme(TextTheme textTheme) {
