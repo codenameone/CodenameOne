@@ -155,6 +155,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // of silently succeeding with the cached artifact.
         applyHardeningPreflight();
 
+        // Signing problems that are visible in the .mobileprovision on disk should not cost a
+        // cloud build slot to discover. See applyIOSProvisioningPreflight.
+        applyIOSProvisioningPreflight();
+
         if (platform.contains("android")) {
             if (!BUILD_TARGET_ANDROID_PROJECT.equals(buildTarget)) {
                 File apkFile = androidApkFile();
@@ -323,6 +327,81 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // is newer than the sources (getSourcesModificationTime does not account for build hints).
         overlayCommandLineBuildHints(settings);
         applyHardeningPreflight(settings);
+    }
+
+    /**
+     * Refuses an iOS device build whose provisioning profile makes signing impossible, before
+     * the build is packaged and sent.
+     *
+     * <p>These failures used to be discoverable only on a build server: an unreadable profile
+     * surfaced as an XML parser stack trace that never named the profile, and a profile of the
+     * wrong kind surfaced as an {@code exportArchive} error minutes into the build, after the
+     * whole app had already been compiled and archived. Both are decided by a file sitting in
+     * the project.
+     *
+     * <p>Only cloud iOS device builds are checked. A local Xcode-project generation signs
+     * later (or not at all), and the native-Mac targets ride the same platform with a different
+     * signing identity, so neither is this check's business.
+     */
+    private void applyIOSProvisioningPreflight() throws MojoFailureException {
+        if (!isIOSDeviceBuild()) {
+            return;
+        }
+        Properties settings = new Properties();
+        File settingsFile = new File(getCN1ProjectDir(), "codenameone_settings.properties");
+        if (settingsFile.isFile()) {
+            try (FileInputStream fis = new FileInputStream(settingsFile)) {
+                settings.load(fis);
+            } catch (IOException ex) {
+                getLog().debug("Could not read codenameone_settings.properties for the iOS provisioning pre-flight", ex);
+                return;
+            }
+        } else {
+            return;
+        }
+        overlayCommandLineBuildHints(settings);
+
+        // Only what the file itself decides. Whether the profile's KIND matches the export
+        // method cannot be judged yet: a CN1Lib can supply ios.*.distributionMethod through
+        // its appended/required properties, which createAntProject merges further down, so
+        // that comparison waits for applyIOSProvisioningPreflight(Properties) below.
+        report(IOSProvisioningPreflight.checkProfileFile(settings,
+                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
+    }
+
+    private boolean isIOSDeviceBuild() {
+        return IOSProvisioningPreflight.appliesTo(platform, buildTarget);
+    }
+
+    /**
+     * The full pre-flight, run against the settings the build is actually submitted with --
+     * the project's own, plus the command-line overlay, plus every CN1Lib-contributed
+     * property. This is where a profile-kind/distribution-method mismatch is decided, since
+     * a library can still change the method after the early pass has run.
+     */
+    private void applyIOSProvisioningPreflight(Properties mergedSettings) throws MojoFailureException {
+        if (!isIOSDeviceBuild()) {
+            return;
+        }
+        report(IOSProvisioningPreflight.check(mergedSettings,
+                IOSProvisioningPreflight.isReleaseTarget(buildTarget), new Date()));
+    }
+
+    private void report(List<IOSProvisioningPreflight.Problem> problems) throws MojoFailureException {
+        String fatal = null;
+        for (IOSProvisioningPreflight.Problem problem : problems) {
+            if (problem.fatal) {
+                getLog().error(problem.message);
+                if (fatal == null) {
+                    fatal = problem.message;
+                }
+            } else {
+                getLog().warn(problem.message);
+            }
+        }
+        if (fatal != null) {
+            throw new MojoFailureException(fatal);
+        }
     }
 
     /**
@@ -1453,6 +1532,11 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // local-build refusal / force-off and produce a locally hardened artifact whose mapping is never
         // uploaded (so its crashes could never be retraced).
         applyHardeningPreflight(cn1SettingsProps);
+
+        // Same reason, for the same reason: a CN1Lib can supply ios.*.distributionMethod, so the
+        // profile's kind is compared against the export method only now that those properties
+        // have been merged -- an early refusal would reject a build the merge was about to fix.
+        applyIOSProvisioningPreflight(cn1SettingsProps);
 
 
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);

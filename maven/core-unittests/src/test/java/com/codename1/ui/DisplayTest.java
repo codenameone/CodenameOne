@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -8,6 +30,8 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -21,6 +45,26 @@ public class DisplayTest extends UITestBase {
         CN.getCurrentForm().getAnimationManager().flush();
     }
 
+    /**
+     * How long a queued runnable may take to reach the EDT before the suite calls it wedged.
+     * Generous next to any real flush (they finish in milliseconds) and short next to a CI job
+     * timeout, which is the point: a wedge should cost seconds, not the whole job.
+     */
+    private static final int EDT_FLUSH_TIMEOUT_MS = 30000;
+
+    /**
+     * Runs a flush on the EDT and waits for it -- with a deadline.
+     *
+     * <p>This used to call {@code callSeriallyAndWait}, which waits forever. Anything that
+     * wedges the EDT therefore wedged the whole suite: {@code BleSensorReconnectTest} printed
+     * its "Running" line, went silent, and the JDK 8 CI leg was cancelled 55 minutes later at
+     * the job timeout, with no test named as the culprit and no evidence of what it was
+     * waiting on. Every test in this suite reaches the EDT through here, so one deadlocked
+     * session anywhere costs an hour of CI and reports nothing.
+     *
+     * <p>A wedge is now a fast, named failure carrying the stack of every live thread --
+     * which is exactly the evidence needed to find the lock cycle behind it.
+     */
     public static void flushEdt() {
         final Display display = Display.getInstance();
         if (display.isEdt()) {
@@ -28,11 +72,108 @@ public class DisplayTest extends UITestBase {
             return;
         }
 
+        // Still callSeriallyAndWait, deliberately: its RunnableWrapper is what carries the
+        // invokeAndBlock nesting, and a plain callSerially plus a latch drops that -- which
+        // showed up at once as StorageImageAsyncTest timing out against a display it could no
+        // longer see. Only the deadline is new. The latch is what makes the EDT's write to it
+        // visible here, and reports whether the runnable ever ran.
+        final CountDownLatch done = new CountDownLatch(1);
+        final Throwable[] failure = new Throwable[1];
         display.callSeriallyAndWait(new Runnable() {
             public void run() {
-                display.flushEdt();
+                try {
+                    display.flushEdt();
+                } catch (Throwable t) {
+                    // Caught rather than allowed to escape. An exception leaving here never
+                    // reaches the test thread -- RunnableWrapper would not mark itself done,
+                    // so the wait below would burn its full timeout and then find a counted-down
+                    // latch and report success, losing the failure and charging 30s for it.
+                    failure[0] = t;
+                } finally {
+                    done.countDown();
+                }
+            }
+        }, EDT_FLUSH_TIMEOUT_MS);
+        if (done.getCount() != 0) {
+            throw new IllegalStateException("The EDT did not run a queued runnable within "
+                    + EDT_FLUSH_TIMEOUT_MS + "ms -- it is wedged, most likely on a lock held by"
+                    + " a thread that is itself waiting for the EDT.\n" + dumpAllThreads());
+        }
+        if (failure[0] != null) {
+            // Rethrown on the calling thread, so it fails the test that caused it rather than
+            // being logged on the EDT and surfacing as something confusing later in the suite.
+            rethrow(failure[0]);
+        }
+    }
+
+    /** Rethrows what the EDT threw, keeping its own stack as the cause. */
+    private static void rethrow(Throwable t) {
+        if (t instanceof RuntimeException) {
+            throw (RuntimeException) t;
+        }
+        if (t instanceof Error) {
+            throw (Error) t;
+        }
+        throw new IllegalStateException("The EDT flush failed: " + t, t);
+    }
+
+    /** Every live thread and where it is, for a wedge that has to be diagnosed from a CI log. */
+    private static String dumpAllThreads() {
+        StringBuilder sb = new StringBuilder("--- thread dump ---\n");
+        Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
+        for (Map.Entry<Thread, StackTraceElement[]> e : traces.entrySet()) {
+            Thread t = e.getKey();
+            sb.append('"').append(t.getName()).append("\" ").append(t.getState());
+            if (t.isDaemon()) {
+                sb.append(" daemon");
+            }
+            sb.append('\n');
+            for (StackTraceElement frame : e.getValue()) {
+                sb.append("\tat ").append(frame).append('\n');
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * What the EDT throws must fail the test that caused it.
+     *
+     * <p>An {@code Error} -- which is what a JUnit assertion inside a
+     * queued runnable produces -- passes straight through
+     * {@code edtLoopImpl}, whose catch covers only
+     * {@code RuntimeException}. Letting it escape the runnable meant
+     * {@code RunnableWrapper} never marked itself done: the wait burned
+     * its full 30 seconds, then found the latch counted down and reported
+     * success. So an assertion that failed on the EDT cost half a minute
+     * and was recorded as a pass.</p>
+     */
+    @Test
+    void aFailureOnTheEdtReachesTheCallingThread() {
+        final AssertionError boom = new AssertionError("asserted on the EDT");
+        // Queued from inside another serial call, so it is still pending when the
+        // flush below starts and is processed by that flush rather than by the
+        // outer EDT loop -- which catches Throwable and only logs it.
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        throw boom;
+                    }
+                });
             }
         });
+
+        long started = System.currentTimeMillis();
+        try {
+            flushEdt();
+            fail("the error the EDT threw should have reached this thread");
+        } catch (AssertionError actual) {
+            assertSame(boom, actual,
+                    "the original error should arrive, not a substitute");
+        }
+        assertTrue(System.currentTimeMillis() - started < 5000,
+                "a failure should arrive at once, not after the wedge timeout");
     }
 
     @AfterEach

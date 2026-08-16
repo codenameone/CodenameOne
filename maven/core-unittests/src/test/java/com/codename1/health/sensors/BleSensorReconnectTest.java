@@ -387,6 +387,711 @@ class BleSensorReconnectTest extends UITestBase {
     }
 
     /**
+     * A store that keeps refusing must not be asked forever.
+     *
+     * <p>A running session put the failed batch back and re-armed the
+     * timer on every failure, so the same samples went out every
+     * storeBatchMillis for as long as it streamed -- at the 10ms interval
+     * used here, a hundred writes and a hundred error callbacks a second,
+     * on a device whose store had a revoked permission or no room left.
+     * It also kept the EDT permanently non-idle, which is what made this
+     * class take 839s on one CI leg against 9.5s locally, and eventually
+     * blew a 60-minute job.</p>
+     *
+     * <p>The unwritable-type case was already dropped rather than
+     * retried; this is the same failure where the type is writable and
+     * the store still says no.</p>
+     */
+    @Test
+    void aRefusingStoreIsNotRetriedForever() throws Exception {
+        CountingStore store = new CountingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+            assertEquals(SensorSessionState.STREAMING, session.getState());
+
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            // The batch is attempted, and attempted again -- a store that
+            // is merely busy deserves that much.
+            int attempts = pumpFor(200, store);
+            assertTrue(attempts > 1,
+                    "a failed batch should be retried at least once, saw "
+                            + attempts);
+
+            // ...but the retries stop, while the session is still
+            // streaming. Without the bound this count climbs for as long
+            // as the test is willing to wait.
+            assertEquals(SensorSessionState.STREAMING, session.getState(),
+                    "giving up on the batch must not end the session");
+            int settled = pumpFor(300, store);
+            assertEquals(settled, pumpFor(300, store),
+                    "a refusing store must stop being retried; it was"
+                            + " asked again");
+            assertTrue(settled <= 6,
+                    "the ladder should be bounded, saw " + settled
+                            + " attempts");
+
+            // A later reading is still offered to the store: what is
+            // dropped is the batch, not the session.
+            int beforeNewSample = store.writeCount();
+            p.notifyHeartRate(73);
+            flushSerialCalls();
+            assertTrue(pumpFor(200, store) > beforeNewSample,
+                    "a new reading should still be attempted");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * A reading that arrives while the store is down keeps its own
+     * attempts.
+     *
+     * <p>A failed batch goes back at the head of the buffer, so the next
+     * flush claims it together with whatever arrived meanwhile. Counting
+     * failures per session rather than per sample meant the tally hit its
+     * limit on the oldest samples and threw the newest away with them --
+     * health data discarded after a single attempt, which is worse than
+     * the retry storm the bound was added to stop.</p>
+     *
+     * <p>Driven a write at a time rather than on a timer: the point is
+     * what happens to a reading that joins a batch already two attempts
+     * in, and only holding each write open makes that arrangement
+     * certain rather than lucky.</p>
+     */
+    @Test
+    void aNewReadingIsNotDiscardedWithAnOlderBatch() throws Exception {
+        DeferredRefusingStore store = new DeferredRefusingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // The first reading spends two of its three attempts.
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+            assertTrue(awaitWrite(store).contains(72),
+                    "the first reading should have been offered");
+            store.failPending();
+            assertTrue(awaitWrite(store).contains(72),
+                    "a failed batch should be retried");
+            store.failPending();
+
+            // The second reading joins the batch the first is most of the
+            // way through.
+            p.notifyHeartRate(73);
+            flushSerialCalls();
+            java.util.List<Integer> merged = awaitWrite(store);
+            assertTrue(merged.contains(72) && merged.contains(73),
+                    "the new reading should be batched with the old one,"
+                            + " saw " + merged);
+            store.failPending();
+
+            // That failure was the first reading's third: it is dropped.
+            // The second has had one attempt and must still be offered.
+            java.util.List<Integer> afterDrop = awaitWrite(store);
+            assertTrue(afterDrop.contains(73),
+                    "the newer reading must keep its own attempts rather"
+                            + " than be discarded with the older one, saw "
+                            + afterDrop);
+            assertFalse(afterDrop.contains(72),
+                    "the older reading has used its attempts and should be"
+                            + " gone, saw " + afterDrop);
+        } finally {
+            store.failPending();
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * Pumps until the store is handed a batch, and reports what was in
+     * it. Bounded, so a batch that never arrives fails the test rather
+     * than hanging it.
+     */
+    private java.util.List<Integer> awaitWrite(DeferredRefusingStore store)
+            throws Exception {
+        for (int i = 0; i < 40; i++) {
+            java.util.List<Integer> batch = store.pendingBatch();
+            if (batch != null) {
+                return batch;
+            }
+            pump(50);
+        }
+        fail("the store was never handed a batch");
+        return null;
+    }
+
+    /**
+     * A store that refuses everything, one write at a time: it holds each
+     * write open until the test fails it, so the test decides exactly
+     * which samples are in flight together.
+     */
+    private static class DeferredRefusingStore
+            extends com.codename1.health.HealthStore {
+
+        private int offers;
+
+        int offerCount() {
+            synchronized (lock) {
+                return offers;
+            }
+        }
+
+        /// Both fields are written on whichever thread the flush runs on
+        /// and read by the test thread.
+        private final Object lock = new Object();
+        private AsyncResource<com.codename1.health.HealthWriteResult>
+                pending;
+        private java.util.List<Integer> pendingSamples;
+
+        /// The readings in the write currently open, or null if none is.
+        java.util.List<Integer> pendingBatch() {
+            synchronized (lock) {
+                return pendingSamples == null ? null
+                        : new java.util.ArrayList<Integer>(pendingSamples);
+            }
+        }
+
+        /// Refuses the open write, if there is one.
+        void failPending() {
+            AsyncResource<com.codename1.health.HealthWriteResult> out;
+            synchronized (lock) {
+                out = pending;
+                pending = null;
+                pendingSamples = null;
+            }
+            if (out != null) {
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError.UNKNOWN,
+                        "this store refuses everything"));
+            }
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            java.util.List<Integer> bpms =
+                    new java.util.ArrayList<Integer>();
+            for (com.codename1.health.HealthSample sample : samples) {
+                if (sample instanceof com.codename1.health.QuantitySample) {
+                    double bpm = ((com.codename1.health.QuantitySample)
+                            sample).getQuantity().getValue(
+                            com.codename1.health.HealthUnit
+                                    .COUNT_PER_MINUTE);
+                    bpms.add(Integer.valueOf((int) Math.round(bpm)));
+                }
+            }
+            synchronized (lock) {
+                pending = out;
+                pendingSamples = bpms;
+                offers++;
+            }
+        }
+    }
+
+    /**
+     * A partly successful write must not leave its committed samples
+     * behind in the attempt tally.
+     *
+     * <p>{@code uncommitted()} drops the committed prefix before the
+     * retry bookkeeping runs, and the tally was only cleared for samples
+     * this class explicitly dropped. So every partial failure left the
+     * records that DID reach the store sitting in the identity map,
+     * strongly referenced, for as long as the session streamed -- a map
+     * that only ever grew on a long ride with a flaky store.</p>
+     */
+    @Test
+    void aPartlyCommittedWriteDoesNotAccumulateAttempts() throws Exception {
+        FlakyPrefixStore store = new FlakyPrefixStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // The low reading fails once and is committed on its next
+            // attempt, in the same write whose later chunk fails -- so it
+            // is a committed prefix of a failed write, and it already had
+            // a tally entry from the attempt before.
+            for (int round = 0; round < 4; round++) {
+                p.notifyHeartRate(70 + round * 10);
+                p.notifyHeartRate(72 + round * 10);
+                flushSerialCalls();
+                pump(200);
+            }
+
+            // Wait for the writes to stop before looking at the books.
+            // The retry timer claims a batch by emptying the buffer and
+            // only settles the tally when that write comes back, so a
+            // comparison taken mid-flight sees attempts without their
+            // pending samples and fails for a leak that is not there.
+            awaitQuietStore(store);
+
+            // One snapshot, under the monitor the production code takes,
+            // so a retry cannot move one number between the two reads.
+            int[] books = attemptsAndPending(session);
+            assertEquals(0, books[1],
+                    "every sample should have been committed or dropped by"
+                            + " now; " + books[1] + " are still pending");
+            assertEquals(0, books[0],
+                    "the attempt tally kept " + books[0] + " samples with"
+                            + " nothing pending -- the committed ones"
+                            + " leaked");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * Pumps until the store has been left alone for a while, so nothing
+     * is in flight when the books are read. Bounded, so a session that
+     * never settles fails the test rather than hanging it.
+     */
+    private void awaitQuietStore(FlakyPrefixStore store) throws Exception {
+        for (int i = 0; i < 40; i++) {
+            int before = store.offerCount();
+            pump(200);
+            if (store.offerCount() == before) {
+                return;
+            }
+        }
+        fail("the store was still being written to after 8s");
+    }
+
+    /**
+     * The tally size and the pending-buffer size, read together while
+     * holding the monitor the session takes for both -- so this cannot
+     * catch a retry halfway through moving samples from one to the other.
+     * Reflection because neither has a getter, and neither should.
+     *
+     * @return {tally size, pending size}
+     */
+    private static int[] attemptsAndPending(SensorSession session)
+            throws Exception {
+        java.lang.reflect.Field attemptsField =
+                SensorSession.class.getDeclaredField("writeAttempts");
+        attemptsField.setAccessible(true);
+        java.lang.reflect.Field pendingField =
+                SensorSession.class.getDeclaredField("pendingWrites");
+        pendingField.setAccessible(true);
+        java.util.Map<?, ?> attempts =
+                (java.util.Map<?, ?>) attemptsField.get(session);
+        java.util.Collection<?> pending =
+                (java.util.Collection<?>) pendingField.get(session);
+        synchronized (pending) {
+            return new int[] {attempts.size(), pending.size()};
+        }
+    }
+
+    /**
+     * Writes one record at a time. The even readings fail their first
+     * attempt and are committed on the next; the odd ones never succeed.
+     * So a retried batch commits a sample that already carries a failed
+     * attempt, and then fails -- which is the partial-commit case.
+     */
+    private static final class FlakyPrefixStore
+            extends com.codename1.health.HealthStore {
+
+        /// Offered counts per reading, touched from the flush thread.
+        private final java.util.Map<Integer, Integer> offers =
+                new java.util.HashMap<Integer, Integer>();
+
+        /// Total writes handed to this store, so the test can tell when
+        /// the session has stopped trying.
+        private int offered;
+
+        int offerCount() {
+            synchronized (offers) {
+                return offered;
+            }
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        /** One record per chunk, so the batch splits sample by sample. */
+        @Override
+        public int getMaxWriteBatchSize() {
+            return 1;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            com.codename1.health.QuantitySample q =
+                    (com.codename1.health.QuantitySample) samples.get(0);
+            int bpm = (int) Math.round(q.getQuantity().getValue(
+                    com.codename1.health.HealthUnit.COUNT_PER_MINUTE));
+            int times;
+            synchronized (offers) {
+                Integer prev = offers.get(Integer.valueOf(bpm));
+                times = (prev == null ? 0 : prev.intValue()) + 1;
+                offers.put(Integer.valueOf(bpm), Integer.valueOf(times));
+                offered++;
+            }
+            if (bpm % 2 != 0 || times < 2) {
+                // A permanent code on purpose: DATABASE_INACCESSIBLE is
+                // retryable, so it is held rather than counted, and this
+                // test is about what happens to samples that run out of
+                // attempts.
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError.INVALID_DATA,
+                        "scripted failure for " + bpm + " on attempt "
+                                + times));
+                return;
+            }
+            com.codename1.health.HealthWriteResult r =
+                    new com.codename1.health.HealthWriteResult();
+            r.addSampleId("committed-" + bpm);
+            out.complete(r);
+        }
+    }
+
+    /**
+     * A store that stops accepting the type must not leave the samples it
+     * already failed in the attempt tally.
+     *
+     * <p>When nothing in a batch is retryable any more the callback
+     * reports the error and returns early, and that return skipped the
+     * bookkeeping. A sample that had failed once already carried a tally
+     * entry, so it stayed referenced for the life of the session -- and a
+     * provider that comes and goes, which is exactly what Health Connect
+     * does when its SDK status changes or a permission is revoked
+     * mid-ride, accumulated one per round.</p>
+     */
+    @Test
+    void aStoreThatStopsAcceptingTheTypeDropsItsTally() throws Exception {
+        WithdrawingStore store = new WithdrawingStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            // One failure while the type is still writable, so the sample
+            // earns a tally entry. Driven a write at a time: on the timer
+            // the sample can burn all three attempts and be dropped before
+            // the type is withdrawn, and then there is nothing left to
+            // leak and the test passes whatever the code does.
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+            assertTrue(awaitWrite(store).contains(72),
+                    "the sample should have been offered");
+            store.failPending();
+
+            // The retry claims it again. This write has to be in flight
+            // BEFORE the type is withdrawn: once it is not writable, the
+            // flush is refused before it ever reaches the store, and the
+            // callback that clears the tally never runs.
+            assertTrue(awaitWrite(store).contains(72),
+                    "the requeued sample should have been offered again");
+
+            // The store stops accepting the type while that write is out.
+            // Failing it now is what leaves the callback with nothing
+            // retryable -- the path that used to return without clearing
+            // anything.
+            store.withdrawType();
+            store.failPending();
+            pump(300);
+
+            int[] books = attemptsAndPending(session);
+            assertEquals(0, books[0],
+                    "the tally kept " + books[0] + " samples after the store"
+                            + " stopped accepting the type");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /**
+     * A {@link DeferredRefusingStore} that can also stop accepting the
+     * type, so a test can put the session in the state where a failure
+     * leaves nothing retryable.
+     */
+    private static final class WithdrawingStore
+            extends DeferredRefusingStore {
+
+        private volatile boolean writable = true;
+
+        void withdrawType() {
+            writable = false;
+        }
+
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return writable;
+        }
+    }
+
+    /**
+     * A locked device must not cost the wearer their readings.
+     *
+     * <p>iOS raises {@code DATABASE_INACCESSIBLE} for as long as the
+     * device is locked -- which is exactly when a background observer
+     * fires -- and the docs call it retryable once it unlocks. The
+     * attempt cap counted those failures like any other, so at the
+     * default one-minute batch interval a device locked for three minutes
+     * discarded its samples for good, even though the very next write
+     * would have succeeded.</p>
+     */
+    @Test
+    void aLockedDeviceKeepsItsReadings() throws Exception {
+        LockedStore store = new LockedStore();
+        com.codename1.health.Health health =
+                new com.codename1.health.Health() {
+                    @Override
+                    public boolean isSupported() {
+                        return true;
+                    }
+
+                    @Override
+                    public com.codename1.health.HealthStore getStore() {
+                        return store;
+                    }
+                };
+        implementation.setHealth(health);
+        try {
+            FakePeripheral p = new FakePeripheral();
+            SensorSessionOptions options = new SensorSessionOptions()
+                    .setWriteToStore(true)
+                    .setStoreBatchMillis(10);
+            BleSensorSession session = new BleSensorSession("fake",
+                    HealthSensorProfile.HEART_RATE, options, p);
+            started.add(session);
+            AsyncResource<SensorSession> out =
+                    new AsyncResource<SensorSession>();
+            session.start(out);
+            flushSerialCalls();
+
+            p.notifyHeartRate(72);
+            flushSerialCalls();
+
+            // Well past the three attempts that retire a permanent
+            // failure. The sample must still be there.
+            for (int i = 0; i < 40 && store.attempts() <= MAX_ATTEMPTS; i++) {
+                pump(100);
+            }
+            assertTrue(store.attempts() > MAX_ATTEMPTS,
+                    "the locked store should have been retried more than"
+                            + " the attempt cap, saw " + store.attempts());
+
+            // And when the device unlocks, the reading is written rather
+            // than long gone.
+            store.unlock();
+            for (int i = 0; i < 60 && !store.wrote(72); i++) {
+                pump(100);
+            }
+            assertTrue(store.wrote(72),
+                    "the reading should have been written once the store"
+                            + " came back");
+        } finally {
+            implementation.setHealth(null);
+        }
+    }
+
+    /** The cap SensorSession applies to permanent failures. */
+    private static final int MAX_ATTEMPTS = 3;
+
+    /**
+     * A store that is locked, as iOS is until first unlock: every write
+     * fails with the retryable DATABASE_INACCESSIBLE until it is opened.
+     */
+    private static final class LockedStore
+            extends com.codename1.health.HealthStore {
+
+        private final Object lock = new Object();
+        private boolean locked = true;
+        private int attempts;
+        private final java.util.List<Integer> written =
+                new ArrayList<Integer>();
+
+        void unlock() {
+            synchronized (lock) {
+                locked = false;
+            }
+        }
+
+        int attempts() {
+            synchronized (lock) {
+                return attempts;
+            }
+        }
+
+        boolean wrote(int bpm) {
+            synchronized (lock) {
+                return written.contains(Integer.valueOf(bpm));
+            }
+        }
+
+        @Override
+        public boolean isSupported() {
+            return true;
+        }
+
+        @Override
+        public boolean isTypeSupported(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        /** True even while locked -- which is what iOS reports. */
+        @Override
+        public boolean isWritable(
+                com.codename1.health.HealthDataType type) {
+            return true;
+        }
+
+        @Override
+        protected void doWrite(
+                java.util.List<com.codename1.health.HealthSample> samples,
+                AsyncResource<com.codename1.health.HealthWriteResult> out) {
+            boolean shut;
+            synchronized (lock) {
+                attempts++;
+                shut = locked;
+                if (!shut) {
+                    for (com.codename1.health.HealthSample s : samples) {
+                        if (s instanceof com.codename1.health.QuantitySample) {
+                            written.add(Integer.valueOf((int) Math.round(
+                                    ((com.codename1.health.QuantitySample) s)
+                                            .getQuantity().getValue(
+                                            com.codename1.health.HealthUnit
+                                                    .COUNT_PER_MINUTE))));
+                        }
+                    }
+                }
+            }
+            if (shut) {
+                out.error(new com.codename1.health.HealthException(
+                        com.codename1.health.HealthError
+                                .DATABASE_INACCESSIBLE,
+                        "the device is locked"));
+                return;
+            }
+            out.complete(new com.codename1.health.HealthWriteResult());
+        }
+    }
+
+    /**
      * A session that has ended must not keep retrying its store writes.
      *
      * <p>The re-arm guard tested only for STOPPED, but the reconnect
@@ -467,13 +1172,18 @@ class BleSensorReconnectTest extends UITestBase {
         }
     }
 
-    /** Pumps the EDT for a while and reports the store's write count. */
+    /**
+     * Pumps the EDT for a while and reports the store's write count.
+     *
+     * <p>The slice is 100ms rather than 10ms because every flush is a blocking round trip to
+     * the EDT, and on the JDK 8 CI leg one costs on the order of a second where it costs
+     * milliseconds locally and on JDK 17/21. At 10ms slices this class issued ~500 of them and
+     * took 839s there against 9.5s locally -- which is what pushed the job past its 60-minute
+     * timeout. What the test needs is wall-clock time for the timers to fire and a drain
+     * afterwards, not a drain every 10ms.
+     */
     private int pumpFor(long millis, WriteCounter store) throws Exception {
-        long until = System.currentTimeMillis() + millis;
-        while (System.currentTimeMillis() < until) {
-            flushSerialCalls();
-            Thread.sleep(10);
-        }
+        pump(millis);
         return store.writeCount();
     }
 
@@ -728,12 +1438,15 @@ class BleSensorReconnectTest extends UITestBase {
         flushSerialCalls();
     }
 
-    /** Pumps the EDT for a while so timers can fire. */
+    /**
+     * Pumps the EDT for a while so timers can fire -- see {@link #pumpFor} for why the slice
+     * is 100ms and not 10ms.
+     */
     private void pump(long millis) throws Exception {
         long until = System.currentTimeMillis() + millis;
         while (System.currentTimeMillis() < until) {
+            Thread.sleep(Math.min(100, Math.max(1, until - System.currentTimeMillis())));
             flushSerialCalls();
-            Thread.sleep(10);
         }
     }
 
