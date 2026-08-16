@@ -694,44 +694,66 @@ class BleSensorReconnectTest extends UITestBase {
                 pump(200);
             }
 
-            // The tally may hold what is still waiting to be written; it
-            // may not hold what already reached the store.
-            assertTrue(writeAttemptCount(session) <= pendingWriteCount(session),
-                    "the attempt tally kept "
-                            + writeAttemptCount(session) + " samples with only "
-                            + pendingWriteCount(session)
-                            + " still pending -- the committed ones leaked");
+            // Wait for the writes to stop before looking at the books.
+            // The retry timer claims a batch by emptying the buffer and
+            // only settles the tally when that write comes back, so a
+            // comparison taken mid-flight sees attempts without their
+            // pending samples and fails for a leak that is not there.
+            awaitQuietStore(store);
+
+            // One snapshot, under the monitor the production code takes,
+            // so a retry cannot move one number between the two reads.
+            int[] books = attemptsAndPending(session);
+            assertEquals(0, books[1],
+                    "every sample should have been committed or dropped by"
+                            + " now; " + books[1] + " are still pending");
+            assertEquals(0, books[0],
+                    "the attempt tally kept " + books[0] + " samples with"
+                            + " nothing pending -- the committed ones"
+                            + " leaked");
         } finally {
             implementation.setHealth(null);
         }
     }
 
-    private static int writeAttemptCount(SensorSession session)
-            throws Exception {
-        return sizeOfField(session, "writeAttempts");
-    }
-
-    private static int pendingWriteCount(SensorSession session)
-            throws Exception {
-        return sizeOfField(session, "pendingWrites");
-    }
-
-    /** Reads a private collection's size -- the tally has no getter. */
-    private static int sizeOfField(SensorSession session, String name)
-            throws Exception {
-        java.lang.reflect.Field f =
-                SensorSession.class.getDeclaredField(name);
-        f.setAccessible(true);
-        Object value = f.get(session);
-        if (value instanceof java.util.Map) {
-            java.util.Map<?, ?> m = (java.util.Map<?, ?>) value;
-            synchronized (value) {
-                return m.size();
+    /**
+     * Pumps until the store has been left alone for a while, so nothing
+     * is in flight when the books are read. Bounded, so a session that
+     * never settles fails the test rather than hanging it.
+     */
+    private void awaitQuietStore(FlakyPrefixStore store) throws Exception {
+        for (int i = 0; i < 40; i++) {
+            int before = store.offerCount();
+            pump(200);
+            if (store.offerCount() == before) {
+                return;
             }
         }
-        java.util.Collection<?> c = (java.util.Collection<?>) value;
-        synchronized (value) {
-            return c.size();
+        fail("the store was still being written to after 8s");
+    }
+
+    /**
+     * The tally size and the pending-buffer size, read together while
+     * holding the monitor the session takes for both -- so this cannot
+     * catch a retry halfway through moving samples from one to the other.
+     * Reflection because neither has a getter, and neither should.
+     *
+     * @return {tally size, pending size}
+     */
+    private static int[] attemptsAndPending(SensorSession session)
+            throws Exception {
+        java.lang.reflect.Field attemptsField =
+                SensorSession.class.getDeclaredField("writeAttempts");
+        attemptsField.setAccessible(true);
+        java.lang.reflect.Field pendingField =
+                SensorSession.class.getDeclaredField("pendingWrites");
+        pendingField.setAccessible(true);
+        java.util.Map<?, ?> attempts =
+                (java.util.Map<?, ?>) attemptsField.get(session);
+        java.util.Collection<?> pending =
+                (java.util.Collection<?>) pendingField.get(session);
+        synchronized (pending) {
+            return new int[] {attempts.size(), pending.size()};
         }
     }
 
@@ -747,6 +769,16 @@ class BleSensorReconnectTest extends UITestBase {
         /// Offered counts per reading, touched from the flush thread.
         private final java.util.Map<Integer, Integer> offers =
                 new java.util.HashMap<Integer, Integer>();
+
+        /// Total writes handed to this store, so the test can tell when
+        /// the session has stopped trying.
+        private int offered;
+
+        int offerCount() {
+            synchronized (offers) {
+                return offered;
+            }
+        }
 
         @Override
         public boolean isSupported() {
@@ -784,6 +816,7 @@ class BleSensorReconnectTest extends UITestBase {
                 Integer prev = offers.get(Integer.valueOf(bpm));
                 times = (prev == null ? 0 : prev.intValue()) + 1;
                 offers.put(Integer.valueOf(bpm), Integer.valueOf(times));
+                offered++;
             }
             if (bpm % 2 != 0 || times < 2) {
                 out.error(new com.codename1.health.HealthException(
