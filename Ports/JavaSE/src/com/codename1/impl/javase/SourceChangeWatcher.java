@@ -491,7 +491,7 @@ public class SourceChangeWatcher implements Runnable {
         } else if (hotReloadSetting == 2) {
             // Not using hotswap agent, but the option is selected to refresh current form.
             stopped = true;
-            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            java.awt.Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
             JavaSEPort.instance.deinitializeSync();
             win.dispose();
             registerCurrentFormForReload();
@@ -500,7 +500,7 @@ public class SourceChangeWatcher implements Runnable {
 
         } else if (hotReloadSetting == 1) {
             stopped = true;
-            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            java.awt.Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
             JavaSEPort.instance.deinitializeSync();
             win.dispose();
             System.setProperty("reload.simulator", "true");
@@ -618,7 +618,7 @@ public class SourceChangeWatcher implements Runnable {
             return true;
         } else if (hotReloadSetting == 2) {
             stopped = true;
-            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            java.awt.Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
             JavaSEPort.instance.deinitializeSync();
             win.dispose();
             registerCurrentFormForReload();
@@ -627,7 +627,7 @@ public class SourceChangeWatcher implements Runnable {
 
         } else if (hotReloadSetting == 1) {
             stopped = true;
-            Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
+            java.awt.Window win = SwingUtilities.getWindowAncestor(JavaSEPort.instance.canvas);
             JavaSEPort.instance.deinitializeSync();
             win.dispose();
             System.setProperty("reload.simulator", "true");

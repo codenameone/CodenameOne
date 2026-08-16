@@ -2512,6 +2512,44 @@ public final class Display extends CN1Constants {
         pointerPressedImpl(0, x, y);
     }
 
+    /// Pushes a key release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    public void windowKeyReleased(int windowId, int keyCode) {
+        if (windowId > 0) {
+            keyRepeatCharged = false;
+            longPressCharged = false;
+            addSingleArgumentEvent(KEY_RELEASED | (windowId << 8), keyCode);
+        }
+    }
+
+    /// Returns the native window peer owning the given component, or null when it
+    /// belongs to the application's main surface. Ports use this to place native
+    /// peers and native text editors into the correct window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to locate
+    ///
+    /// #### Returns
+    ///
+    /// the owning window's native peer, or null for the main surface
+    public Object getWindowPeerForComponent(Component cmp) {
+        if (cmp == null) {
+            return null;
+        }
+        TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top instanceof Window) {
+            return ((Window) top).getNativePeer();
+        }
+        return null;
+    }
+
     /// Pushes a pointer press aimed at one native window into Codename One.
     /// Invoked by the implementation, off the event dispatch thread.
     ///

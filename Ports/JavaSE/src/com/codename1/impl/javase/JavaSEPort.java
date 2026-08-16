@@ -2903,6 +2903,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         private AWTEventListener magnificationWheelFallbackListener;
         private boolean gestureDebug = Boolean.getBoolean("cn1.javase.gestureDebug");
         public int x, y;
+        /**
+         * The desktop window this canvas renders, or 0 for the application's main
+         * surface. Input from this canvas is tagged with it so the framework routes
+         * the event to the right component hierarchy.
+         */
+        int windowId;
 
         C() {
             super(null);
@@ -3180,6 +3186,25 @@ public class JavaSEPort extends CodenameOneImplementation {
          */
         int blitCounter;
         
+        /**
+         * Snapshot of what this canvas last painted, used by the windowed screenshot
+         * tests: the ordinary screenshot path can only see the primary surface.
+         */
+        BufferedImage captureBuffer() {
+            synchronized (bufferLock) {
+                BufferedImage src = buffer != null ? buffer : edtBuffer;
+                if (src == null) {
+                    return null;
+                }
+                BufferedImage out = new BufferedImage(src.getWidth(), src.getHeight(),
+                        BufferedImage.TYPE_INT_RGB);
+                java.awt.Graphics g = out.getGraphics();
+                g.drawImage(src, 0, 0, null);
+                g.dispose();
+                return out;
+            }
+        }
+
         public void blit() {
             if(menuDisplayed){
                 return;
@@ -3680,7 +3705,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (testRecorder != null) {
                 testRecorder.eventKeyPressed(code);
             }
-            JavaSEPort.this.keyPressed(code);
+            JavaSEPort.this.windowKeyPressed(windowId, code);
         }
 
         public void keyReleased(KeyEvent e) {
@@ -3716,7 +3741,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (testRecorder != null) {
                 testRecorder.eventKeyReleased(code);
             }
-            JavaSEPort.this.keyReleased(code);
+            JavaSEPort.this.windowKeyReleased(windowId, code);
         }
 
         public void mouseClicked(MouseEvent e) {
@@ -3811,7 +3836,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             testRecorder.eventPointerPressed(x, y);
                         }
                         updatePointerMetadata(e, true);
-                        JavaSEPort.this.pointerPressed(x, y);
+                        JavaSEPort.this.windowPointerPressed(windowId, x, y);
                     }
                 } else {
                     if (getSkin() != null) {
@@ -3842,7 +3867,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             if (testRecorder != null) {
                                 testRecorder.eventKeyPressed(code);
                             }
-                            JavaSEPort.this.keyPressed(code);
+                            JavaSEPort.this.windowKeyPressed(windowId, code);
                         }
                     }
                 }
@@ -3876,7 +3901,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             testRecorder.eventPointerReleased(x, y);
                         }
                         updatePointerMetadata(e, true);
-                        JavaSEPort.this.pointerReleased(x, y);
+                        JavaSEPort.this.windowPointerReleased(windowId, x, y);
                     }
                 }
                 if (triggeredKeyCode != null) {
@@ -3884,7 +3909,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (testRecorder != null) {
                         testRecorder.eventKeyReleased(code);
                     }
-                    JavaSEPort.this.keyReleased(code);
+                    JavaSEPort.this.windowKeyReleased(windowId, code);
                     triggeredKeyCode = null;
                 }
             } 
@@ -3914,7 +3939,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                             testRecorder.eventPointerDragged(x, y);
                         }
                         updatePointerMetadata(e, false);
-                        JavaSEPort.this.pointerDragged(x, y);
+                        JavaSEPort.this.windowPointerDragged(windowId, x, y);
                     }
                 }
                 return;
@@ -20456,6 +20481,41 @@ public class JavaSEPort extends CodenameOneImplementation {
         return old;
     }
    
+    private JavaSEWindowManager windowManager;
+
+    /**
+     * Creates the canvas backing one desktop window, tagged with the id its input
+     * events are routed by.
+     */
+    C createWindowCanvas(int windowId) {
+        C c = new C();
+        c.windowId = windowId;
+        return c;
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * Returns null while a phone skin is loaded: a skin simulates a single device
+     * screen with its own coordinates and zoom, and a real operating system window
+     * inside that simulation would be incoherent. Mirrors the predicate
+     * isFullScreenSupported already uses.
+     */
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return null;
+        }
+        if (isSimulator() && !Preferences.userNodeForPackage(JavaSEPort.class)
+                .getBoolean("desktopSkin", false)) {
+            return null;
+        }
+        if (windowManager == null) {
+            windowManager = new JavaSEWindowManager(this);
+        }
+        return windowManager;
+    }
+
     @Override
     public Object createNativeBrowserWindow(String startURL) {
         

@@ -3239,6 +3239,113 @@ public abstract class CodenameOneImplementation {
         pointerPressed(xPointerEvent, yPointerEvent);
     }
 
+    /// Delivers a pointer press that happened in one of the additional native
+    /// windows. Ports call this instead of `#pointerPressed(int, int)` when the
+    /// event came from a window rather than the main surface; window id zero routes
+    /// to the main surface, so a port may use this form unconditionally.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id handed to
+    /// `WindowManager#createWindow(int, java.lang.String, int, int, int, int, boolean, boolean, java.lang.Object)`
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerPressed(int windowId, int x, int y) {
+        if (windowId == 0) {
+            pointerPressed(x, y);
+            return;
+        }
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        Display.getInstance().windowPointerPressed(windowId, xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a pointer release that happened in one of the additional native
+    /// windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerReleased(int windowId, int x, int y) {
+        if (windowId == 0) {
+            pointerReleased(x, y);
+            return;
+        }
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        Display.getInstance().windowPointerReleased(windowId, xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a pointer drag that happened in one of the additional native windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerDragged(int windowId, int x, int y) {
+        if (windowId == 0) {
+            pointerDragged(x, y);
+            return;
+        }
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        Display.getInstance().windowPointerDragged(windowId, xPointerEvent, yPointerEvent);
+    }
+
+    /// Delivers a key press that happened in one of the additional native windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `keyCode`: the key code
+    protected void windowKeyPressed(int windowId, int keyCode) {
+        if (windowId == 0) {
+            keyPressed(keyCode);
+            return;
+        }
+        Display.getInstance().windowKeyPressed(windowId, keyCode);
+    }
+
+    /// Delivers a key release that happened in one of the additional native windows.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the window's id, or zero for the main surface
+    ///
+    /// - `keyCode`: the key code
+    protected void windowKeyReleased(int windowId, int keyCode) {
+        if (windowId == 0) {
+            keyReleased(keyCode);
+            return;
+        }
+        Display.getInstance().windowKeyReleased(windowId, keyCode);
+    }
+
+    /// Returns the native window peer owning the given component, or null when the
+    /// component belongs to the main surface. Ports use this to place native peers
+    /// and native text editors into the right window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component to locate
+    ///
+    /// #### Returns
+    ///
+    /// the owning window's native peer, or null for the main surface
+    public final Object getWindowPeerForComponent(Component cmp) {
+        return Display.getInstance().getWindowPeerForComponent(cmp);
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///
