@@ -4452,8 +4452,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 return;
             }
             double ratio = window.getDevicePixelRatio();
-            if (ratio > 0) {
+            if (ratio > 0 && ratio != devicePixelRatio) {
                 devicePixelRatio = ratio;
+                // Density, the styles resolved from it and the font sizes derived from those are
+                // all fixed at the ratio in force when they were resolved. Moving between
+                // displays would otherwise keep a 36 device-pixel font at 36 CSS pixels, so text
+                // and controls would roughly double in size.
+                dDensity = -1;
+                Form current = getCurrentForm();
+                if (current != null) {
+                    current.refreshTheme();
+                }
             }
         } catch (Throwable ignored) {
             // Keep whatever was resolved at start-up.

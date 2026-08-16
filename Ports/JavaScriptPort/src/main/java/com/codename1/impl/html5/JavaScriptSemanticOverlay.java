@@ -27,6 +27,8 @@ import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.ui.Component;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityCheckedState;
 import com.codename1.ui.accessibility.AccessibilityCollectionInfo;
@@ -651,7 +653,7 @@ public final class JavaScriptSemanticOverlay {
         // label has one derived from its own text, which must never be published; an explicit
         // name set through setAccessibilityText(), setLabelForComponent() or the semantics
         // object is not secret and is the only thing naming the field for a screen reader.
-        if (obscured && accessibleName != null && accessibleName.equals(node.getValue())) {
+        if (obscured && isDerivedFromContent(node, accessibleName)) {
             accessibleName = node.getHint();
         }
         if (accessibleName == null) {
@@ -774,6 +776,26 @@ public final class JavaScriptSemanticOverlay {
             }
         }
         return out;
+    }
+
+    /**
+     * True when a node's label is the text the component holds, rather than a name given to it.
+     *
+     * <p>A field with no separately associated label has its label inferred from its own
+     * contents. For an obscured field that content is the secret, so the inferred label must
+     * never be published -- but a name set explicitly must survive. The value is not a reliable
+     * comparison on its own: an inferred label is taken from the component's text while the
+     * node's value is left unset.</p>
+     */
+    private boolean isDerivedFromContent(AccessibilityNodeSnapshot node, String label) {
+        if (label == null) {
+            return false;
+        }
+        if (label.equals(node.getValue())) {
+            return true;
+        }
+        Component owner = node.getComponent();
+        return owner instanceof TextArea && label.equals(((TextArea) owner).getText());
     }
 
     private String ariaRole(AccessibilityRole role) {
