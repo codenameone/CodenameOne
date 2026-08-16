@@ -591,7 +591,11 @@ public final class JavaScriptSemanticOverlay {
         // and never from its content.
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
         String accessibleName = node.getLabel();
-        if (obscured) {
+        // Only a label that IS the secret is withheld. A field with no separately associated
+        // label has one derived from its own text, which must never be published; an explicit
+        // name set through setAccessibilityText(), setLabelForComponent() or the semantics
+        // object is not secret and is the only thing naming the field for a screen reader.
+        if (obscured && accessibleName != null && accessibleName.equals(node.getValue())) {
             accessibleName = node.getHint();
         }
         if (accessibleName == null) {

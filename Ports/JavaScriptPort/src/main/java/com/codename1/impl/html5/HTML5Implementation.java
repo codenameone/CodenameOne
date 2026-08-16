@@ -3848,6 +3848,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             outputCanvas.getStyle().setProperty("height", dimensions.getStyleHeight());
             canvas.getStyle().setProperty("width", dimensions.getStyleWidth());
             canvas.getStyle().setProperty("height", dimensions.getStyleHeight());
+        } else {
+            // Back to a 1x display, where the backing store is the CSS size and no override is
+            // wanted. Leaving the HiDPI width/height behind would stretch the new store over the
+            // old dimensions and put the canvas and the overlays out of alignment.
+            outputCanvas.getStyle().removeProperty("width");
+            outputCanvas.getStyle().removeProperty("height");
+            canvas.getStyle().removeProperty("width");
+            canvas.getStyle().removeProperty("height");
         }
     }
 
@@ -4437,6 +4445,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private void refreshDevicePixelRatio() {
         try {
+            // ?pixelRatio=N pins the factor deliberately -- the screenshot harness and the skin
+            // designer depend on it -- so the physical ratio must not overwrite it.
+            String override = getParameterByName("pixelRatio");
+            if (override != null && override.length() > 0) {
+                return;
+            }
             double ratio = window.getDevicePixelRatio();
             if (ratio > 0) {
                 devicePixelRatio = ratio;
@@ -10768,8 +10782,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 historyStack.remove(historyStack.size() - 1);
             }
             if (handlingPopState) {
-                // The user's own Back already spent an entry, and this form change is the result
-                // of servicing it. Traversing again would move twice for one press.
+                // The user's own Back already spent one entry. If the command skipped forms,
+                // the entries for the ones in between are still above the displayed form and
+                // have to go as well, or the next Back would pop one with no form to match.
+                if (steps > 1) {
+                    historySuppressPop = true;
+                    try {
+                        window.getHistory().go(-(steps - 1));
+                    } catch (Throwable ignored) {
+                        historySuppressPop = false;
+                    }
+                }
                 return;
             }
             historySuppressPop = true;
