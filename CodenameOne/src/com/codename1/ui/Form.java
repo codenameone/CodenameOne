@@ -1406,6 +1406,14 @@ public class Form extends Container {
     /// rather than show(). Recorded on the form itself, not in one shared field, because a
     /// transition can defer the change and a later navigation would otherwise overwrite it
     /// before the port that needs the direction is told.
+    ///
+    /// Review asked for this to be bound to each pending display operation rather than to the
+    /// form, so that two navigations to the SAME cached form, with a transition still in
+    /// flight, cannot share the slot. That window is real but narrow, and closing it means
+    /// carrying the direction through `CodenameOneImplementation.setCurrentForm` -- an API every
+    /// port implements. Widening a cross-port interface does not belong in a change to one
+    /// port; per-form already fixes the case that occurs in practice, which is navigations to
+    /// different forms overwriting each other.
     private boolean shownWithReverse;
 
     void setShownWithReverse(boolean value) {

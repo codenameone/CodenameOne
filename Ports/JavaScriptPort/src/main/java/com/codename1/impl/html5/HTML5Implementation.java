@@ -10722,9 +10722,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // popping that entry would otherwise look like a press that did nothing and the user
             // would have to press again. Carry the traversal outwards instead, which leaves the
             // document, since that is what Back means on a form with nowhere to go.
+            //
+            // Every entry this port pushed has to go, not just one: a form reached through
+            // several others still has theirs above the document, and stepping over a single
+            // one would leave the browser inside a history the application has no forms for.
+            int remaining = Math.max(1, historyStack.size() - 1);
             historySuppressPop = true;
             try {
-                window.getHistory().back();
+                window.getHistory().go(-remaining);
             } catch (Throwable ignored) {
                 historySuppressPop = false;
             }

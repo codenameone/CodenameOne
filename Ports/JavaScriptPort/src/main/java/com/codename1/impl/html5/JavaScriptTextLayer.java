@@ -282,9 +282,13 @@ public final class JavaScriptTextLayer {
             // The clip shows only part of the component, so this is not the full sequence of
             // runs and slot N would not mean what it did last time -- a repaint reaching only
             // the second line of a text area would write that line into the first line's slot.
-            // The runs already on screen are still correct, so they are left exactly as they
-            // are and the canvas is told not to draw either, which would otherwise double it.
-            return true;
+            // Leave the pool untouched.
+            //
+            // Whether the canvas should draw depends on whether there is already DOM text for
+            // this component: if there is, it still stands and drawing would double it; if there
+            // is not -- a first paint clipped by a scroll viewport or the screen edge -- then
+            // suppressing the draw as well would simply lose the text.
+            return hasAttachedRuns(frame.runs);
         }
         if (!frame.promotable) {
             // The layer sits above the canvas as a whole, so nothing drawn on the canvas after a
@@ -415,6 +419,21 @@ public final class JavaScriptTextLayer {
         cellRendererDepth = 0;
         drawSequence = 0;
         reattachedThisFrame = false;
+    }
+
+    /**
+     * True when a component already has text on screen in this layer.
+     */
+    private boolean hasAttachedRuns(ComponentRuns runs) {
+        if (runs == null) {
+            return false;
+        }
+        for (int i = 0; i < runs.runs.size(); i++) {
+            if (runs.runs.get(i).attached) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Run obtain(ComponentRuns runs, int index) {
