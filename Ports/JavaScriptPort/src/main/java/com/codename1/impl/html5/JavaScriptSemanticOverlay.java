@@ -109,6 +109,8 @@ public final class JavaScriptSemanticOverlay {
         private long parentId = -1;
         private boolean listenersBound;
         private boolean activateEnabled;
+        private boolean incrementEnabled;
+        private boolean decrementEnabled;
         private int tabIndex = Integer.MIN_VALUE;
 
         Entry(long id, HTMLElement element, String tag) {
@@ -205,7 +207,7 @@ public final class JavaScriptSemanticOverlay {
         Entry entry = obtain(node);
         applyParent(entry, parentId);
         applyAttributes(entry, node);
-        applyGeometry(entry, node, ratio);
+        applyGeometry(entry, node, parentId == -1 ? null : nodes.get(Long.valueOf(parentId)), ratio);
         applyText(entry, node);
         applyListeners(entry, node);
         applyCustomActions(entry, node);
@@ -286,12 +288,19 @@ public final class JavaScriptSemanticOverlay {
         }
     }
 
-    private void applyGeometry(Entry entry, AccessibilityNodeSnapshot node, double ratio) {
+    private void applyGeometry(Entry entry, AccessibilityNodeSnapshot node,
+            AccessibilityNodeSnapshot parent, double ratio) {
         Rectangle bounds = node.getBounds();
+        // The snapshot reports absolute screen coordinates, but an entry is positioned inside
+        // its parent entry, which is itself absolutely positioned -- so the parent's offset
+        // would be counted twice, pushing descendants away from their component and, with the
+        // parent clipping its content, often out of sight entirely.
+        int originX = parent == null ? 0 : parent.getBounds().getX();
+        int originY = parent == null ? 0 : parent.getBounds().getY();
         StringBuilder css = new StringBuilder(
                 "position:absolute;opacity:0.001;pointer-events:none;overflow:hidden;");
-        css.append("left:").append(bounds.getX() / ratio).append("px;");
-        css.append("top:").append(bounds.getY() / ratio).append("px;");
+        css.append("left:").append((bounds.getX() - originX) / ratio).append("px;");
+        css.append("top:").append((bounds.getY() - originY) / ratio).append("px;");
         css.append("width:").append(Math.max(1, bounds.getWidth()) / ratio).append("px;");
         css.append("height:").append(Math.max(1, bounds.getHeight()) / ratio).append("px;");
         String geometry = css.toString();
@@ -354,6 +363,10 @@ public final class JavaScriptSemanticOverlay {
     private void applyListeners(Entry entry, AccessibilityNodeSnapshot node) {
         AccessibilityAction activate = node.getAction(AccessibilityAction.ACTIVATE);
         entry.activateEnabled = activate != null && activate.isEnabled();
+        AccessibilityAction increment = node.getAction(AccessibilityAction.INCREMENT);
+        entry.incrementEnabled = increment != null && increment.isEnabled();
+        AccessibilityAction decrement = node.getAction(AccessibilityAction.DECREMENT);
+        entry.decrementEnabled = decrement != null && decrement.isEnabled();
         if (entry.listenersBound) {
             return;
         }
@@ -385,11 +398,14 @@ public final class JavaScriptSemanticOverlay {
                 String action = null;
                 if ((code == 13 || code == 32) && bound.activateEnabled) {
                     action = AccessibilityAction.ACTIVATE;
-                } else if (code == 38 || code == 39) {
+                } else if ((code == 38 || code == 39) && bound.incrementEnabled) {
                     action = AccessibilityAction.INCREMENT;
-                } else if (code == 37 || code == 40) {
+                } else if ((code == 37 || code == 40) && bound.decrementEnabled) {
                     action = AccessibilityAction.DECREMENT;
                 }
+                // Arrows are only taken when the node actually offers the action. Consuming them
+                // on an ordinary focusable node would stop them reaching the window-level key
+                // handler that performs directional focus traversal, trapping the keyboard.
                 if (action == null) {
                     return;
                 }
@@ -595,6 +611,11 @@ public final class JavaScriptSemanticOverlay {
      * Actions the browser already provides a way to perform, so the overlay does not add a
      * button for them.
      *
+     * <p>The scroll actions are NOT included: the projection is a div, not a native scroll
+     * container, so nothing else would perform them, and a list exposes only the items it is
+     * currently showing -- without a control for them there is no way to reach the rest. They
+     * take no argument, so a custom control dispatches them correctly.</p>
+     *
      * <p>SET_TEXT is included deliberately, and review has asked twice about it. A custom action
      * button can only dispatch with a null argument, which for SET_TEXT means replacing the
      * field's contents with nothing -- a button that silently clears the field is worse than no
@@ -606,8 +627,7 @@ public final class JavaScriptSemanticOverlay {
     private boolean isStandardWebAction(String id) {
         return AccessibilityAction.ACTIVATE.equals(id) || AccessibilityAction.FOCUS.equals(id)
                 || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id)
-                || AccessibilityAction.SET_TEXT.equals(id) || AccessibilityAction.SCROLL_FORWARD.equals(id)
-                || AccessibilityAction.SCROLL_BACKWARD.equals(id);
+                || AccessibilityAction.SET_TEXT.equals(id);
     }
 
     /**
