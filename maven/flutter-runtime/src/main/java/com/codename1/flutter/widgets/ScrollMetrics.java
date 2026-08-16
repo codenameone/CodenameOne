@@ -55,6 +55,15 @@ public class ScrollMetrics {
         return pixels <= minScrollExtent || pixels >= maxScrollExtent;
     }
 
+    /**
+     * Whether the scroll offset has been dragged PAST an extent — Flutter's
+     * {@code outOfRange}. Distinct from {@link #atEdge()}: sitting exactly on the edge is
+     * in range, and the physics leave a drag untouched until it actually overshoots.
+     */
+    public boolean outOfRange() {
+        return pixels < minScrollExtent || pixels > maxScrollExtent;
+    }
+
     public boolean hasContentDimensions() {
         return hasContentDimensions;
     }

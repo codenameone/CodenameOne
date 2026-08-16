@@ -164,15 +164,45 @@ public final class FlutterUI {
      * <p>500 makes the two simulations agree to three decimal places rather than being a
      * number tuned by eye.</p>
      *
-     * <p>This is an app-level theme constant, so it applies to the whole app rather than
+     * <p>The OVERSCROLL agrees by construction too, once the coefficient matches. Codename
+     * One compresses an over-edge drag with {@code c*x*D/(c*x + D)} for finger distance
+     * {@code x} and viewport {@code D}. Flutter looks nothing like that at first glance -
+     * {@link com.codename1.flutter.widgets.BouncingScrollPhysics} damps each individual
+     * drag delta by {@code 0.52*(1 - overscroll/D)^2} - but integrating that friction over
+     * a continuous drag gives {@code 0.52*x*D/(0.52*x + D)}: the SAME curve, and the only
+     * difference is the coefficient. Codename One uses 0.55, which is UIScrollView's;
+     * Flutter uses 0.52.
+     *
+     * <p>So this is one constant rather than a reimplementation, and
+     * {@code RubberBandParityTest} checks the two really do agree rather than taking the
+     * derivation's word for it.</p>
+     *
+     * <p>These are app-level theme constants, so they apply to the whole app rather than
      * only to Flutter subtrees. That is right for {@code runApp}, which owns the app; a
-     * host app embedding Flutter through {@code wrap} can set it back afterwards.</p>
+     * host app embedding Flutter through {@code wrap} can set them back afterwards.</p>
      */
+    /**
+     * The theme constants that make Codename One's scrolling behave like Flutter's.
+     *
+     * <p>Package-private and separate from the install so a test can check the KEYS, which
+     * is not a formality: a theme constant is only a constant if its key carries the
+     * {@code @}, because {@code buildTheme} strips that prefix to decide what is a constant
+     * and what is an ordinary style property. Without it the entries are stored happily,
+     * {@code addThemeProps} reports nothing wrong, and {@code getThemeConstant} keeps
+     * returning the default — which is exactly what happened here: the fling-distance
+     * constant looked installed for a long time and never once took effect.</p>
+     */
+    static java.util.Hashtable<String, Object> scrollPhysicsProps() {
+        java.util.Hashtable<String, Object> physics = new java.util.Hashtable<String, Object>();
+        physics.put("@DecayMotionScaleFactorInt", "500");
+        // Hundredths: 52 = 0.52, Flutter's BouncingScrollPhysics friction factor.
+        physics.put("@rubberBandCoefficientInt", "52");
+        return physics;
+    }
+
     private static void installFlutterScrollPhysics() {
         try {
-            java.util.Hashtable<String, Object> physics = new java.util.Hashtable<String, Object>();
-            physics.put("DecayMotionScaleFactorInt", "500");
-            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(physics);
+            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(scrollPhysicsProps());
         } catch (Throwable t) {
             com.codename1.io.Log.p("Flutter runtime: could not install scroll physics: " + t);
         }

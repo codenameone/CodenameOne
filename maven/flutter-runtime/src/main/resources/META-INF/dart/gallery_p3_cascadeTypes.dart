@@ -61,6 +61,8 @@ class TextEditingValue {
 // to drive its ballistic carousel physics.
 @JavaName('com.codename1.flutter.widgets.ScrollMetrics')
 abstract class ScrollMetrics {
+  // Dragged PAST an extent, as opposed to sitting exactly on it (atEdge).
+  external bool get outOfRange;
   external double get pixels;
   external double get minScrollExtent;
   external double get maxScrollExtent;
@@ -231,4 +233,23 @@ class RestorableTimeOfDay extends RestorableProperty<TimeOfDay> {
   external RestorableTimeOfDay(TimeOfDay defaultValue);
   external TimeOfDay get value;
   external set value(TimeOfDay v);
+}
+
+// The direction a scrollable's content grows in — named for where the content END lies.
+@JavaName('com.codename1.flutter.AxisDirection')
+enum AxisDirection { up, right, down, left }
+
+// An immutable snapshot of a scrollable's extents. Unlike a live ScrollPosition this
+// describes a moment rather than tracking one, which is what makes the physics testable:
+// applyPhysicsToUserOffset is a pure function of the metrics handed to it.
+@JavaName('com.codename1.flutter.widgets.FixedScrollMetrics')
+class FixedScrollMetrics extends ScrollMetrics {
+  external FixedScrollMetrics({
+    double? minScrollExtent,
+    double? maxScrollExtent,
+    double? pixels,
+    double? viewportDimension,
+    AxisDirection? axisDirection,
+    double? devicePixelRatio,
+  });
 }

@@ -73,4 +73,39 @@ public class ScrollPhysics {
     public boolean allowImplicitScrolling() {
         return true;
     }
+
+    /**
+     * Converts a raw drag delta into the offset actually applied to the scroll position —
+     * Flutter's {@code ScrollPhysics.applyPhysicsToUserOffset}.
+     *
+     * <p>The base passes the drag straight through: one pixel of finger is one pixel of
+     * content. {@link BouncingScrollPhysics} is where that stops being true.</p>
+     */
+    public double applyPhysicsToUserOffset(ScrollMetrics position, double offset) {
+        return parent == null ? offset : parent.applyPhysicsToUserOffset(position, offset);
+    }
+
+    /** Whether the scrollable should respond to a drag at all. */
+    public boolean shouldAcceptUserOffset(ScrollMetrics position) {
+        if (parent != null) {
+            return parent.shouldAcceptUserOffset(position);
+        }
+        return position.pixels() != 0.0
+                || position.minScrollExtent() != position.maxScrollExtent();
+    }
+
+    // The fling thresholds, in logical pixels (per second for the velocities). Values are
+    // Flutter's, confirmed against the SDK by the flutter_scroll_physics behavioral case
+    // rather than transcribed from its constants.
+    public double minFlingVelocity() {
+        return parent == null ? 100.0 : parent.minFlingVelocity();
+    }
+
+    public double maxFlingVelocity() {
+        return parent == null ? 8000.0 : parent.maxFlingVelocity();
+    }
+
+    public double minFlingDistance() {
+        return parent == null ? 18.0 : parent.minFlingDistance();
+    }
 }

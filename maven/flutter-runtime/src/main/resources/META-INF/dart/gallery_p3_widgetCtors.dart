@@ -157,6 +157,13 @@ class SpringDescription {
 @JavaName('com.codename1.flutter.widgets.ScrollPhysics')
 class ScrollPhysics {
   external ScrollPhysics({ScrollPhysics? parent});
+  // The drag pipeline: a raw finger delta becomes the offset actually applied to the
+  // scroll position, which is where overscroll resistance lives.
+  external double applyPhysicsToUserOffset(ScrollMetrics position, double offset);
+  external bool shouldAcceptUserOffset(ScrollMetrics position);
+  external double get minFlingVelocity;
+  external double get maxFlingVelocity;
+  external double get minFlingDistance;
   // Physics-subclass plumbing used by the home page's _SnappingScrollPhysics —
   // Flutter's `ScrollPhysics.applyTo/buildParent/toleranceFor/
   // createBallisticSimulation`. `spring` is the default spring an overriding
@@ -195,6 +202,8 @@ class ClampingScrollPhysics extends ScrollPhysics {
 @JavaName('com.codename1.flutter.widgets.BouncingScrollPhysics')
 class BouncingScrollPhysics extends ScrollPhysics {
   external BouncingScrollPhysics({ScrollPhysics? parent});
+  // The rubber band, as a function of how far past the edge you already are.
+  external double frictionFactor(double overscrollFraction);
 }
 
 @JavaName('com.codename1.flutter.widgets.AlwaysScrollableScrollPhysics')
