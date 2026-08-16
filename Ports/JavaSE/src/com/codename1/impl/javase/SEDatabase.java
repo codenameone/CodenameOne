@@ -745,9 +745,10 @@ public class SEDatabase extends Database {
             return;
         }
         if (declared != supplied) {
-            // Closed here rather than by the caller: the query paths only clean up from their
-            // SQLException handler, which this does not go through.
-            cleanup(s);
+            // Not closed here. It used to be, because the query paths only cleaned up from their
+            // SQLException handler and this does not go through one -- but patching the callee
+            // covered this one throw and nothing else, and bind() raising a runtime exception
+            // walked straight past it. The callers own the statement now, so this just reports.
             throw new IOException("The statement has " + declared + " parameters but "
                     + supplied + " were supplied");
         }
@@ -835,6 +836,7 @@ public class SEDatabase extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         PreparedStatement s = null;
+        boolean handedOver = false;
         try {
             s = conn.prepareStatement(sql);
             checkParameterCount(s, params == null ? 0 : params.length);
@@ -853,10 +855,19 @@ public class SEDatabase extends Database {
             // be rewound: getCount() and last() would run the writes a second time.
             cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
             registerCursor(cursor);
+            // Only now is the statement somebody else's: the cursor closes it. Until this line
+            // every way out of here has to close it, and before the finally below there was one
+            // that did not -- anything other than a SQLException, which is what a parameter whose
+            // toString() throws raises, and what the parameter-count check throws. The statement
+            // stayed open with nothing holding it, once per call, for the life of the database.
+            handedOver = true;
             return cursor;
         } catch (SQLException ex) {
-            cleanup(s);
             throw new IOException(ex.getMessage(), ex);
+        } finally {
+            if (!handedOver) {
+                cleanup(s);
+            }
         }
     }
 
@@ -873,6 +884,7 @@ public class SEDatabase extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         PreparedStatement s = null;
+        boolean handedOver = false;
         try {
             s = conn.prepareStatement(sql);
             checkParameterCount(s, params.length);
@@ -883,10 +895,19 @@ public class SEDatabase extends Database {
             // be rewound: getCount() and last() would run the writes a second time.
             cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
             registerCursor(cursor);
+            // Only now is the statement somebody else's: the cursor closes it. Until this line
+            // every way out of here has to close it, and before the finally below there was one
+            // that did not -- anything other than a SQLException, which is what a parameter whose
+            // toString() throws raises, and what the parameter-count check throws. The statement
+            // stayed open with nothing holding it, once per call, for the life of the database.
+            handedOver = true;
             return cursor;
         } catch (SQLException ex) {
-            cleanup(s);
             throw new IOException(ex.getMessage(), ex);
+        } finally {
+            if (!handedOver) {
+                cleanup(s);
+            }
         }
     }
 
@@ -896,6 +917,7 @@ public class SEDatabase extends Database {
         requireSingleStatement(sql);
         requireQueryStatement(sql);
         PreparedStatement s = null;
+        boolean handedOver = false;
         try {
             s = conn.prepareStatement(sql);
             // The driver would report unbound parameters itself, but with its own wording. Going
@@ -908,10 +930,19 @@ public class SEDatabase extends Database {
             // be rewound: getCount() and last() would run the writes a second time.
             cursor.statementWrites(com.codename1.impl.SQLStatementSplitter.writesData(sql));
             registerCursor(cursor);
+            // Only now is the statement somebody else's: the cursor closes it. Until this line
+            // every way out of here has to close it, and before the finally below there was one
+            // that did not -- anything other than a SQLException, which is what a parameter whose
+            // toString() throws raises, and what the parameter-count check throws. The statement
+            // stayed open with nothing holding it, once per call, for the life of the database.
+            handedOver = true;
             return cursor;
         } catch (SQLException ex) {
-            cleanup(s);
             throw new IOException(ex.getMessage(), ex);
+        } finally {
+            if (!handedOver) {
+                cleanup(s);
+            }
         }
     }
 

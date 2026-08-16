@@ -434,6 +434,80 @@ public class SEDatabaseConformanceTest {
         }
     }
 
+    @Test
+    public void aParameterThatCannotBeConvertedStillClosesTheStatement() throws Exception {
+        // The statement is prepared before the parameters are bound, and only the cursor that
+        // takes it will close it. Anything that goes wrong in between therefore has to close it
+        // here -- and until this was fixed only a SQLException did, so a parameter whose
+        // toString() throws left a prepared statement open with nothing holding it. Once per
+        // call, for the life of the database.
+        final java.util.List<java.sql.PreparedStatement> prepared =
+                new java.util.ArrayList<java.sql.PreparedStatement>();
+        final boolean[] closed = {false};
+        Connection real = java.sql.DriverManager.getConnection("jdbc:sqlite:"
+                + new File(dbFile.getParentFile(), "cn1-stmt-leak.db").getAbsolutePath());
+        Connection watching = (Connection) java.lang.reflect.Proxy.newProxyInstance(
+                Connection.class.getClassLoader(), new Class[] {Connection.class},
+                new java.lang.reflect.InvocationHandler() {
+                    public Object invoke(Object proxy, java.lang.reflect.Method method,
+                            Object[] args) throws Throwable {
+                        Object out;
+                        try {
+                            out = method.invoke(real, args);
+                        } catch (java.lang.reflect.InvocationTargetException err) {
+                            throw err.getCause();
+                        }
+                        if (!(out instanceof java.sql.PreparedStatement)) {
+                            return out;
+                        }
+                        final java.sql.PreparedStatement statement =
+                                (java.sql.PreparedStatement) out;
+                        java.sql.PreparedStatement watched = (java.sql.PreparedStatement)
+                                java.lang.reflect.Proxy.newProxyInstance(
+                                        java.sql.PreparedStatement.class.getClassLoader(),
+                                        new Class[] {java.sql.PreparedStatement.class},
+                                        new java.lang.reflect.InvocationHandler() {
+                                            public Object invoke(Object p, java.lang.reflect.Method m,
+                                                    Object[] a) throws Throwable {
+                                                if ("close".equals(m.getName())) {
+                                                    closed[0] = true;
+                                                }
+                                                try {
+                                                    return m.invoke(statement, a);
+                                                } catch (java.lang.reflect.InvocationTargetException err) {
+                                                    throw err.getCause();
+                                                }
+                                            }
+                                        });
+                        prepared.add(watched);
+                        return watched;
+                    }
+                });
+
+        SEDatabase watchedDb = new SEDatabase(watching);
+        try {
+            watchedDb.execute("CREATE TABLE IF NOT EXISTS leak (v TEXT)");
+            closed[0] = false;
+            boolean threw = false;
+            try {
+                watchedDb.executeQuery("SELECT * FROM leak WHERE v = ?",
+                        new Object[] {new Object() {
+                            @Override
+                            public String toString() {
+                                throw new IllegalStateException("this value cannot be converted");
+                            }
+                        }});
+            } catch (Exception expected) {
+                threw = true;
+            }
+            assertTrue(threw, "a parameter that cannot be converted has to fail the query");
+            assertTrue(closed[0], "and the statement it prepared has to be closed");
+        } finally {
+            watchedDb.close();
+            real.close();
+        }
+    }
+
     /// A connection that refuses to say which URL it is open on, which is the case the registry
     /// has to treat as "could be anything".
     private static Connection unreadableConnection() {
