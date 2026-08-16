@@ -1,0 +1,229 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestWindowManager;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class WindowTest extends UITestBase {
+
+    @FormTest
+    void unsupportedPlatformThrowsOnConstruction() {
+        // the default: no window manager, which is what every mobile port reports
+        assertFalse(Desktop.isSupported(),
+                "Desktop windowing should be off unless a test turns it on");
+        assertThrows(UnsupportedOperationException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                new Window("nope");
+            }
+        }, "Constructing a Window without a windowing system must throw, not degrade");
+    }
+
+    @FormTest
+    void unsupportedPlatformStillAnswersDesktopQueriesSafely() {
+        assertEquals(0, Desktop.getInstance().getWindows().length,
+                "getWindows() must be empty rather than null where there are no windows");
+        assertNull(Desktop.getInstance().getFocusedWindow());
+        assertEquals(1, Desktop.getInstance().getMonitors().length,
+                "A platform with no windowing system still reports its single display");
+        assertNotNull(Desktop.getInstance().getPrimaryMonitor());
+    }
+
+    @FormTest
+    void showCreatesExactlyOneNativeWindowAndDisposeReleasesIt() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("Inspector", new BorderLayout());
+        w.setWindowSize(640, 480);
+        w.show();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertNotNull(peer, "show() should have created a native window");
+        assertEquals(1, wm.getWindows().size(), "show() must not create a second window");
+        assertTrue(peer.isVisible());
+        assertEquals("Inspector", peer.getTitle());
+        assertEquals(1, Desktop.getInstance().getWindows().length);
+
+        w.dispose();
+        assertTrue(peer.isDisposed());
+        assertFalse(peer.isVisible());
+        assertEquals(0, Desktop.getInstance().getWindows().length,
+                "A disposed window must leave the desktop registry");
+
+        // disposing twice is harmless
+        w.dispose();
+        assertEquals(1, wm.getWindows().size());
+    }
+
+    @FormTest
+    void titleAndBoundsReachTheNativeWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("first");
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        w.setTitle("second");
+        assertEquals("second", peer.getTitle());
+
+        w.setWindowBounds(new com.codename1.ui.geom.Rectangle(10, 20, 300, 200));
+        assertEquals(10, peer.getX());
+        assertEquals(20, peer.getY());
+        assertEquals(300, peer.getWidth());
+        assertEquals(200, peer.getHeight());
+        w.dispose();
+    }
+
+    @FormTest
+    void componentsInAWindowResolveTheWindowNotAForm() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("host", new BorderLayout());
+        Label content = new Label("hello");
+        w.add(BorderLayout.CENTER, content);
+        w.show();
+
+        assertSame(w, content.getTopLevelContainer(),
+                "A component in a Window must resolve that Window as its top level");
+        assertNull(content.getComponentForm(),
+                "getComponentForm() keeps its meaning and is null inside a Window");
+        assertSame(w.getContentPane(), content.getParent(),
+                "add() on a Window should reach the content pane, as it does on a Form");
+        w.dispose();
+    }
+
+    @FormTest
+    void formStillResolvesItselfAsTopLevel() {
+        Form f = new Form("main", new BorderLayout());
+        Label content = new Label("hello");
+        f.add(BorderLayout.CENTER, content);
+        f.show();
+        flushSerialCalls();
+
+        assertSame(f, content.getTopLevelContainer());
+        assertSame(f, content.getComponentForm(),
+                "The Form path must be completely unaffected");
+    }
+
+    @FormTest
+    void closeRequestHonoursTheCloseOperation() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("closable");
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        w.closeRequested();
+        assertFalse(peer.isDisposed(), "HIDE_ON_CLOSE must not destroy the window");
+        assertFalse(peer.isVisible());
+
+        w.setCloseOperation(Window.DISPOSE_ON_CLOSE);
+        w.closeRequested();
+        assertTrue(peer.isDisposed());
+    }
+
+    @FormTest
+    void aCloseListenerCanVetoTheClose() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("vetoed");
+        w.show();
+        final AtomicInteger calls = new AtomicInteger();
+        w.addCloseListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                calls.incrementAndGet();
+                evt.consume();
+            }
+        });
+
+        w.closeRequested();
+        assertEquals(1, calls.get());
+        assertFalse(wm.getLastWindow().isDisposed(),
+                "Consuming the close event must veto the close");
+        w.dispose();
+    }
+
+    @FormTest
+    void windowChromeReachesTheNativeWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("chrome");
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        assertTrue(peer.isDecorated(), "windows are decorated by default");
+        w.setDecorated(false);
+        assertFalse(peer.isDecorated());
+
+        w.setResizable(false);
+        assertFalse(peer.isResizable());
+
+        w.setAlwaysOnTop(true);
+        assertTrue(peer.isAlwaysOnTop());
+
+        w.requestWindowFocus();
+        assertTrue(peer.isFocusRequested());
+        w.dispose();
+    }
+
+    @FormTest
+    void modalityMarksTheNativeWindow() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.show();
+        assertEquals(Window.MODALITY_NONE, w.getModalityType());
+
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        assertEquals(Window.MODALITY_APPLICATION, w.getModalityType());
+        assertTrue(wm.getLastWindow().isModal());
+        w.dispose();
+    }
+
+    @FormTest
+    void windowsGetIndependentIds() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a");
+        Window b = new Window("b");
+        a.show();
+        b.show();
+
+        assertEquals(2, Desktop.getInstance().getWindows().length);
+        assertSame(a, Desktop.getInstance().windowById(a.getWindowId()));
+        assertSame(b, Desktop.getInstance().windowById(b.getWindowId()));
+        assertTrue(a.getWindowId() != b.getWindowId(),
+                "Each window needs its own id, since events are routed by it");
+        a.dispose();
+        b.dispose();
+    }
+}

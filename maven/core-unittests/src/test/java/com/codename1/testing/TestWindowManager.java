@@ -1,0 +1,425 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.impl.WindowManager;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A window manager with no operating system behind it, so the desktop windowing
+ * API can be driven from a headless unit test.
+ *
+ * <p>The monitor table is scriptable, which is the point: it lets a test describe a
+ * three monitor desktop at mixed scale factors and assert that a window picks up the
+ * characteristics of the one it sits on, without needing a second physical
+ * display.</p>
+ *
+ * @author Shai Almog
+ */
+public class TestWindowManager extends WindowManager {
+
+    /** One fake native window. */
+    public static final class FakeWindow {
+        private int windowId;
+        private String title;
+        private int x;
+        private int y;
+        private int width;
+        private int height;
+        private boolean decorated;
+        private boolean resizable;
+        private boolean visible;
+        private boolean disposed;
+        private boolean modal;
+        private boolean alwaysOnTop;
+        private boolean focusRequested;
+        private int monitor;
+        private int paintCount;
+
+        public int getWindowId() {
+            return windowId;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public boolean isVisible() {
+            return visible;
+        }
+
+        public boolean isDisposed() {
+            return disposed;
+        }
+
+        public boolean isModal() {
+            return modal;
+        }
+
+        public boolean isAlwaysOnTop() {
+            return alwaysOnTop;
+        }
+
+        public boolean isFocusRequested() {
+            return focusRequested;
+        }
+
+        public boolean isDecorated() {
+            return decorated;
+        }
+
+        public boolean isResizable() {
+            return resizable;
+        }
+
+        /** Number of times this window's surface has been flushed. */
+        public int getPaintCount() {
+            return paintCount;
+        }
+
+        /** Which monitor this window currently sits on. */
+        public void setMonitor(int monitor) {
+            this.monitor = monitor;
+        }
+
+        public int getMonitor() {
+            return monitor;
+        }
+    }
+
+    /** One fake monitor. */
+    public static final class FakeMonitor {
+        private final int[] bounds;
+        private final int[] workArea;
+        private final double scale;
+        private final int dpi;
+        private final String name;
+
+        public FakeMonitor(int x, int y, int w, int h, double scale, int dpi, String name) {
+            this.bounds = new int[]{x, y, w, h};
+            this.workArea = new int[]{x, y, w, h};
+            this.scale = scale;
+            this.dpi = dpi;
+            this.name = name;
+        }
+
+        /** Reserves space at the bottom, standing in for a task bar or dock. */
+        public FakeMonitor withReservedBottom(int px) {
+            workArea[3] = bounds[3] - px;
+            return this;
+        }
+
+        public double getScale() {
+            return scale;
+        }
+    }
+
+    private final List<FakeWindow> windows = new ArrayList<FakeWindow>();
+    private final List<FakeMonitor> monitors = new ArrayList<FakeMonitor>();
+    private int primaryMonitor;
+
+    public TestWindowManager() {
+        monitors.add(new FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+    }
+
+    /** Replaces the monitor table. */
+    public void setMonitors(List<FakeMonitor> replacement) {
+        monitors.clear();
+        monitors.addAll(replacement);
+    }
+
+    public void setPrimaryMonitor(int index) {
+        primaryMonitor = index;
+    }
+
+    /** Every window created through this manager, including disposed ones. */
+    public List<FakeWindow> getWindows() {
+        return new ArrayList<FakeWindow>(windows);
+    }
+
+    /** The most recently created window, which is what most tests assert against. */
+    public FakeWindow getLastWindow() {
+        if (windows.isEmpty()) {
+            return null;
+        }
+        return windows.get(windows.size() - 1);
+    }
+
+    public FakeWindow findWindow(int windowId) {
+        for (FakeWindow w : windows) {
+            if (w.windowId == windowId) {
+                return w;
+            }
+        }
+        return null;
+    }
+
+    public void reset() {
+        windows.clear();
+        monitors.clear();
+        monitors.add(new FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        primaryMonitor = 0;
+    }
+
+    private static FakeWindow win(Object peer) {
+        return peer instanceof FakeWindow ? (FakeWindow) peer : null;
+    }
+
+    // ---- lifecycle -----------------------------------------------------------
+
+    @Override
+    public Object createWindow(int windowId, String title, int x, int y, int width, int height,
+            boolean decorated, boolean resizable, Object parentPeer) {
+        FakeWindow w = new FakeWindow();
+        w.windowId = windowId;
+        w.title = title;
+        w.x = x;
+        w.y = y;
+        w.width = width;
+        w.height = height;
+        w.decorated = decorated;
+        w.resizable = resizable;
+        windows.add(w);
+        return w;
+    }
+
+    @Override
+    public void show(Object peer) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.visible = true;
+        }
+    }
+
+    @Override
+    public void hide(Object peer) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.visible = false;
+        }
+    }
+
+    @Override
+    public void dispose(Object peer) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.visible = false;
+            w.disposed = true;
+        }
+    }
+
+    // ---- attributes -----------------------------------------------------------
+
+    @Override
+    public void setTitle(Object peer, String title) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.title = title;
+        }
+    }
+
+    @Override
+    public void setBounds(Object peer, int x, int y, int width, int height) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.x = x;
+            w.y = y;
+            w.width = width;
+            w.height = height;
+        }
+    }
+
+    @Override
+    public int[] getBounds(Object peer, int[] out) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            out[0] = w.x;
+            out[1] = w.y;
+            out[2] = w.width;
+            out[3] = w.height;
+        }
+        return out;
+    }
+
+    @Override
+    public int getWidth(Object peer) {
+        FakeWindow w = win(peer);
+        return w == null ? 0 : w.width;
+    }
+
+    @Override
+    public int getHeight(Object peer) {
+        FakeWindow w = win(peer);
+        return w == null ? 0 : w.height;
+    }
+
+    @Override
+    public void setResizable(Object peer, boolean resizable) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.resizable = resizable;
+        }
+    }
+
+    @Override
+    public void setDecorated(Object peer, boolean decorated) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.decorated = decorated;
+        }
+    }
+
+    @Override
+    public void setAlwaysOnTop(Object peer, boolean alwaysOnTop) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.alwaysOnTop = alwaysOnTop;
+        }
+    }
+
+    @Override
+    public void setModal(Object peer, boolean modal) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.modal = modal;
+        }
+    }
+
+    @Override
+    public void setIcon(Object peer, Image icon) {
+    }
+
+    @Override
+    public void requestFocus(Object peer) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.focusRequested = true;
+        }
+    }
+
+    // ---- rendering ---------------------------------------------------------------
+
+    @Override
+    public Object getNativeGraphics(Object peer) {
+        // The headless implementation's graphics is a plain marker object; the tests
+        // assert that a window was flushed, not what it drew.
+        return new Object();
+    }
+
+    @Override
+    public void flushGraphics(Object peer, int x, int y, int width, int height) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.paintCount++;
+        }
+    }
+
+    // ---- monitors ------------------------------------------------------------------
+
+    @Override
+    public int getMonitorCount() {
+        return monitors.size();
+    }
+
+    @Override
+    public int[] getMonitorBounds(int monitor, int[] out) {
+        int[] b = monitors.get(clamp(monitor)).bounds;
+        System.arraycopy(b, 0, out, 0, 4);
+        return out;
+    }
+
+    @Override
+    public int[] getMonitorWorkArea(int monitor, int[] out) {
+        int[] b = monitors.get(clamp(monitor)).workArea;
+        System.arraycopy(b, 0, out, 0, 4);
+        return out;
+    }
+
+    @Override
+    public int getMonitorDensity(int monitor) {
+        int dpi = getMonitorDotsPerInch(monitor);
+        if (dpi >= 280) {
+            return Display.DENSITY_VERY_HIGH;
+        }
+        if (dpi >= 200) {
+            return Display.DENSITY_HIGH;
+        }
+        if (dpi >= 140) {
+            return Display.DENSITY_MEDIUM;
+        }
+        return Display.DENSITY_LOW;
+    }
+
+    @Override
+    public double getMonitorScale(int monitor) {
+        return monitors.get(clamp(monitor)).scale;
+    }
+
+    @Override
+    public int getMonitorDotsPerInch(int monitor) {
+        return monitors.get(clamp(monitor)).dpi;
+    }
+
+    @Override
+    public String getMonitorName(int monitor) {
+        return monitors.get(clamp(monitor)).name;
+    }
+
+    @Override
+    public int getPrimaryMonitor() {
+        return primaryMonitor;
+    }
+
+    @Override
+    public int getMonitorForWindow(Object peer) {
+        FakeWindow w = win(peer);
+        return w == null ? primaryMonitor : w.monitor;
+    }
+
+    private int clamp(int monitor) {
+        if (monitor < 0 || monitor >= monitors.size()) {
+            return 0;
+        }
+        return monitor;
+    }
+}

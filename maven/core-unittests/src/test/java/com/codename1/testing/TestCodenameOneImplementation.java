@@ -822,6 +822,27 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return mediaAsync;
     }
 
+    private TestWindowManager windowManager;
+
+    /// Returns the fake window manager, or null when multi-window support is off.
+    /// Null is the capability query, so the default -- no manager -- is the
+    /// unsupported platform every mobile port reports.
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        return windowManager;
+    }
+
+    /// Turns desktop windowing on or off for a test.
+    public TestWindowManager setMultiWindowSupported(boolean supported) {
+        windowManager = supported ? new TestWindowManager() : null;
+        return windowManager;
+    }
+
+    /// Returns the fake window manager as its concrete type, for assertions.
+    public TestWindowManager getTestWindowManager() {
+        return windowManager;
+    }
+
     @Override
     public Object createNativeBrowserWindow(String startURL) {
         return nativeBrowserWindow;
@@ -1244,6 +1265,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void reset() {
+        windowManager = null;
         desktop = false;
         nativeTitle = false;
         desktopTitleBarMode = "toolbar";
