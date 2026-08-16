@@ -10706,6 +10706,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * Waits for a back command to either navigate or turn out to have been refused.
+     *
+     * @param before the form that was displayed when the command was dispatched
+     * @param attempt how many times this has already looked
+     */
+    private void awaitBackOutcome(final Form before, final int attempt) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (Display.getInstance().getCurrent() != before) {
+                    handlingPopState = false;
+                    return;
+                }
+                if (attempt < 40) {
+                    awaitBackOutcome(before, attempt + 1);
+                    return;
+                }
+                // The same form is still showing, so a pop guard refused the navigation -- but
+                // the entry has already been spent. Put it back, or the next Back would leave
+                // the app instead of asking the guard again.
+                handlingPopState = false;
+                pushHistoryState();
+            }
+        });
+    }
+
+    /**
      * Leaves a number of forms, one at a time.
      *
      * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
@@ -10779,23 +10806,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
             return;
         }
+        // Held until the form change actually lands, not just until the command returns: a
+        // transition defers the change, and if the flag were already clear by then the change
+        // would look like an ordinary showBack() and traverse the entry this gesture had
+        // already spent.
         handlingPopState = true;
-        try {
-            current.dispatchCommand(back, new ActionEvent(back));
-        } finally {
-            handlingPopState = false;
-        }
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (Display.getInstance().getCurrent() == current) {
-                    // A pop guard refused the navigation and the same form is still showing,
-                    // but the entry has already been spent. Put it back, or the next Back would
-                    // leave the app instead of asking the guard again.
-                    pushHistoryState();
-                }
-            }
-        });
+        current.dispatchCommand(back, new ActionEvent(back));
+        awaitBackOutcome(current, 0);
         // Nothing is pushed to replace the entry that was just popped. Every form show pushes
         // one, so the history depth already tracks the navigation depth: popping one entry and
         // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
