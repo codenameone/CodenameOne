@@ -1289,7 +1289,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (textLayer != null && isDisplayGraphics(g)) {
             if (!textLayer.isPainting()) {
                 updateTextLayerSuspension();
-                textLayer.beginFrame();
             }
             textLayer.beginComponent(c);
         }
@@ -1620,13 +1619,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (textLayerEnabled) {
             textLayer = new JavaScriptTextLayer(document, textLayerContainer);
         }
-        // Paint locking caches a component's pixels in an image and serves that image instead
-        // of painting, returning from Component.paintInternal() before the per-component hooks
-        // run. A locked component therefore stops reporting its text while its DOM runs stay on
-        // screen, so the cached image's rasterized text and the live DOM text are both visible.
-        // The two representations cannot be reconciled, and the lock is only an optimisation,
-        // so it is switched off for this port.
-        Display.getInstance().setProperty("paintLockEnabled", "false");
+        if (textLayerEnabled) {
+            // Paint locking caches a component's pixels in an image and serves that image
+            // instead of painting, returning from Component.paintInternal() before the
+            // per-component hooks run. A locked component therefore stops reporting its text
+            // while its DOM runs stay on screen, so the cached image's rasterized text and the
+            // live DOM text are both visible. The two cannot be reconciled, and the lock is only
+            // an optimisation, so it is switched off -- but only when there are DOM runs for it
+            // to conflict with. With the text layer off the canvas-only path keeps the caching
+            // that Tabs, among others, relies on during a swipe.
+            Display.getInstance().setProperty("paintLockEnabled", "false");
+        }
         installHistoryListener();
         outputCanvas.setAttribute("role", "presentation");
         outputCanvas.setAttribute("aria-hidden", "true");
@@ -3462,6 +3465,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // them up.
             Form displayed = Display.getInstance().getCurrent();
             textLayer.syncToForm(displayed);
+            // The stacking counter resets here, at the frame boundary, and not when a component
+            // paint opens: paintDirty() paints individual dirty components, so resetting there
+            // would restart at 1 for a partial repaint while the rest of the form still carried
+            // higher indices from the last full frame -- and an upper component's text could
+            // then fall beneath a lower one's.
+            textLayer.beginFrame();
             if (textLayer.consumeReattachFlag() && displayed != null) {
                 // A run came back after being detached, so it holds a fresh stacking index
                 // while everything that did not repaint still holds an older one. One full
@@ -3871,6 +3880,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     });
         }
+        // With the text layer active the visible text is already in the document, and the
+        // overlay's near-transparent copy would show up as a second find-in-page match that
+        // navigates to something the user cannot see. The label still reaches assistive
+        // technology through aria-label.
+        semanticOverlay.setTextContentEnabled(textLayer == null);
         semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
     }
 

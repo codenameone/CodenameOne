@@ -123,6 +123,7 @@ public final class JavaScriptSemanticOverlay {
     private final ActionDispatcher dispatcher;
     private final Map<Long, Entry> entries = new HashMap<Long, Entry>();
     private final List<Long> rootOrder = new ArrayList<Long>();
+    private boolean textContentEnabled = true;
 
     /**
      * Creates an overlay bound to a container element that is already attached to the document.
@@ -136,6 +137,20 @@ public final class JavaScriptSemanticOverlay {
         this.document = document;
         this.container = container;
         this.dispatcher = dispatcher;
+    }
+
+    /**
+     * Controls whether this overlay puts label text into the document.
+     *
+     * <p>It should not when something else already renders that text visibly: the overlay's
+     * copy is nearly transparent but still findable, so browser find-in-page would report two
+     * matches and could navigate to the invisible one. Assistive technology is unaffected --
+     * the label reaches it through {@code aria-label} either way.</p>
+     *
+     * @param value true to mirror labels as text nodes
+     */
+    public void setTextContentEnabled(boolean value) {
+        textContentEnabled = value;
     }
 
     /**
@@ -284,8 +299,9 @@ public final class JavaScriptSemanticOverlay {
 
     private void applyText(Entry entry, AccessibilityNodeSnapshot node) {
         String text = null;
-        if (node.getRole() == AccessibilityRole.STATIC_TEXT
-                || node.getRole() == AccessibilityRole.HEADING) {
+        if (textContentEnabled
+                && (node.getRole() == AccessibilityRole.STATIC_TEXT
+                || node.getRole() == AccessibilityRole.HEADING)) {
             text = node.getLabel() == null ? "" : node.getLabel();
         }
         if (text == null) {
