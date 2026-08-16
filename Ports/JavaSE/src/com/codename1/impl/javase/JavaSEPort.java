@@ -3499,6 +3499,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             while(g2dInstance == null) {
                 
                 g2dInstance = edtBuffer.createGraphics();
+                registerScreenGraphics(g2dInstance, this);
                 updateGraphicsScale(g2dInstance);
                 try {
                     Thread.sleep(10);
@@ -3510,6 +3511,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         private BufferedImage createBufferedImage() {
+            unregisterScreenGraphics(g2dInstance);
             g2dInstance = null;
             if (getScreenCoordinates() != null) {
                 return new BufferedImage(Math.max(20, (int) (getScreenCoordinates().width * zoomLevel)), Math.max(20, (int) (getScreenCoordinates().height * zoomLevel)), BufferedImage.TYPE_INT_RGB);
@@ -4044,6 +4046,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     JavaSEPort.this.sizeChanged(queuedW, queuedH);
 
                     if (doResetGraphics) {
+                        unregisterScreenGraphics(g2dInstance);
                         g2dInstance = null;
                     }
 
@@ -12296,9 +12299,19 @@ public class JavaSEPort extends CodenameOneImplementation {
     public Object getNativeGraphics() {
         //if (ng == null) {
             ng = new NativeScreenGraphics();
+            ng.owner = canvas;
         //}
         return ng;
         //return new NativeScreenGraphics();
+    }
+
+    /**
+     * Screen graphics for a secondary window's canvas rather than the primary one.
+     */
+    Object getNativeGraphics(C owner) {
+        NativeScreenGraphics g = new NativeScreenGraphics();
+        g.owner = owner;
+        return g;
     }
 
     /**
@@ -14024,13 +14037,51 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (ng.sourceImage != null) {
             return ng.sourceImage.createGraphics();
         }
-        Graphics2D g2d = canvas.getGraphics2D();
+        C owner = ng.owner != null ? ng.owner : canvas;
+        Graphics2D g2d = owner.getGraphics2D();
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         return g2d;
     }
     
+    /**
+     * True when this Graphics2D is some canvas's screen buffer rather than a mutable
+     * image's. With desktop windows there is more than one canvas, so this is a
+     * membership test over the registered screen buffers rather than an identity
+     * comparison against the primary canvas. Consumers use it to decide whether to
+     * undo the zoom scale when drawing native peers, so answering wrongly for a
+     * secondary window would mis-scale its peers.
+     */
     public boolean isScreenGraphics(Graphics2D g) {
-        return g == canvas.getGraphics2D();
+        if (g == null) {
+            return false;
+        }
+        synchronized (screenGraphicsRegistry) {
+            return screenGraphicsRegistry.containsKey(g);
+        }
+    }
+
+    /**
+     * Registered screen buffers, keyed by identity. Maintained in the only two places
+     * C.g2dInstance is written: getGraphics2D() creates one, createBufferedImage()
+     * and the size-change reset discard it.
+     */
+    private final java.util.Map<Graphics2D, C> screenGraphicsRegistry =
+            new java.util.IdentityHashMap<Graphics2D, C>();
+
+    private void registerScreenGraphics(Graphics2D g, C owner) {
+        if (g != null) {
+            synchronized (screenGraphicsRegistry) {
+                screenGraphicsRegistry.put(g, owner);
+            }
+        }
+    }
+
+    private void unregisterScreenGraphics(Graphics2D g) {
+        if (g != null) {
+            synchronized (screenGraphicsRegistry) {
+                screenGraphicsRegistry.remove(g);
+            }
+        }
     }
 
     /**
@@ -14448,6 +14499,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         Graphics2D cachedGraphics;
         Transform transform;
         LinkedList<Shape> clipStack = new LinkedList<Shape>();
+        /**
+         * The canvas this screen graphics draws into. Null means the primary canvas,
+         * which is the only possibility before desktop windows; a secondary window
+         * carries its own canvas here so getGraphics() resolves to that window's
+         * buffer instead of the primary one's.
+         */
+        C owner;
     }
     
     private Object lastNativeGraphics;
