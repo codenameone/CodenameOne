@@ -221,20 +221,6 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileExists___java_lang_Str
 }
 
 /*
- * The filesystem's identity for a file: the volume it lives on and the index it has there.
- *
- * The database registry keys connections on this so that two spellings of one path are one entry.
- * NTFS is case insensitive by its own Unicode table, and String.toLowerCase on this target folds
- * through towlower under whatever locale the process happens to have -- commonly ASCII alone. So
- * "E.db" and its accented twin could be one file to the filesystem and two keys to us, and the
- * check that stops a delete or a rekey while another connection is open would not see the other
- * connection. Asking the filesystem removes the guessing: short names, hard links and any case
- * spelling all answer with the same index.
- *
- * FILE_FLAG_BACKUP_SEMANTICS so a directory can be identified too, and every share mode so
- * identifying a file never blocks the connection already using it.
- */
-/*
  * Upper-case a string the way the filesystem does.
  *
  * NTFS decides that two names are one file with an upcase table, and CharUpperW is that table --

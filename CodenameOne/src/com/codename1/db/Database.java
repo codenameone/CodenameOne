@@ -273,11 +273,7 @@ public abstract class Database {
             // reported to an application: a custom "file://" name is handed back unchanged by
             // getDatabasePath, while the connection was registered under the native path it
             // resolves to. Checking the URL would find nothing and unlink the file anyway.
-            // The registry identity, not the managed alias. They are the same string on every
-            // port but one: where the filesystem decides that two spellings are one file, the
-            // connections are registered under what it says, and a claim keyed on the path would
-            // miss them and unlink the file underneath an open handle.
-            key = Display.getInstance().databaseRegistryIdentity(databaseName);
+            key = Display.getInstance().databaseManagedKeyIdentity(databaseName);
         } catch (RuntimeException cannotResolve) {
             // A port that will not resolve a name cannot be checked this way; its own delete
             // answers for it. The JavaScript port is the one that does this, and it counts its
@@ -380,9 +376,7 @@ public abstract class Database {
     private static synchronized String claimForConversion(String databaseName) throws IOException {
         String key;
         try {
-            // The registry identity, for the reason delete(String) gives: a conversion has to see
-            // the same connections the registry holds.
-            key = Display.getInstance().databaseRegistryIdentity(databaseName);
+            key = Display.getInstance().databaseManagedKeyIdentity(databaseName);
         } catch (RuntimeException cannotResolve) {
             return null;
         }

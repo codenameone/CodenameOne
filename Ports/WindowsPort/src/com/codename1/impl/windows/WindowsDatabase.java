@@ -62,22 +62,18 @@ class WindowsDatabase extends Database {
     /**
      * The file this connection is open on, for the shared registry a key change consults.
      *
-     * <p>Not final: before the file exists the filesystem has no identity to give, so the first
-     * connection registers under the path and moves to the identity once its open has created the
-     * file. Leaving it on the path would file that connection apart from every later one, and each
-     * would believe it was the only one.
      */
-    private String openKey;
+    private final String openKey;
 
     /**
      * The name a managed key for this database is filed under.
      *
-     * <p>Kept apart from {@link #openKey} deliberately. That one now answers "which file is this",
-     * which the filesystem answers with a volume and an index -- and an index belongs to a file,
-     * not to a name, so it changes when the file is deleted and made again. A key filed under it
-     * would be lost by the first delete-and-recreate, which is exactly what a caller does between
-     * two runs. The alias stays with the path, which is what the application asked for and what it
-     * will ask for again.
+     * <p>The same string {@link #openKey} uses. They were apart for a while, when the registry
+     * keyed on the filesystem's own identity for the file: that merged two spellings of one name,
+     * but it named a file rather than a name, so it vanished the moment the file was unlinked and
+     * changed when the file was made again -- which broke a delete halfway through and lost a
+     * managed key across a recreate. The folding below merges those spellings with none of that,
+     * so one key does both jobs.
      */
     private final String aliasKey;
 
@@ -85,8 +81,8 @@ class WindowsDatabase extends Database {
         this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.aliasKey = windowsPathKey(path);
-        this.openKey = connectionKeyFor(path);
+        this.openKey = windowsPathKey(path);
+        this.aliasKey = openKey;
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
@@ -109,7 +105,6 @@ class WindowsDatabase extends Database {
                             + "SQLite result " + status);
                 }
             }
-            adoptFileIdentity(path);
             opened = true;
         } finally {
             if (!opened) {
@@ -152,78 +147,20 @@ class WindowsDatabase extends Database {
         return windowsPathKey(path);
     }
 
-    /// What the open-database registry keys a connection on this path under.
-    ///
-    /// The counterpart to registryKeyFor: this one identifies the file, so a delete or a
-    /// conversion sees the connections that are actually on it however they were spelled.
-    static String connectionRegistryKeyFor(String path) {
-        return connectionKeyFor(path);
-    }
-
-    /// Moves this connection to the identity of the file its open has just created.
-    ///
-    /// Only does anything for the first connection to a database that did not exist: the identity
-    /// could not be asked for before the file was there, so it registered under the path. Every
-    /// later connection asks a filesystem that can answer and registers under the identity, so
-    /// leaving this one on the path would file them apart -- and each would be told it was the
-    /// only connection, which is what lets a key change rewrite the file underneath the other.
-    ///
-    /// The new key is taken before the old one is given back, so there is no instant where this
-    /// connection holds neither and a delete could pass between them.
-    ///
-    /// #### Parameters
-    ///
-    /// - `path`: the resolved database file, which exists by now
-    ///
-    /// #### Throws
-    ///
-    /// - `IOException`: if the database is being deleted or converted under its real identity
-    private void adoptFileIdentity(String path) throws IOException {
-        String identity = connectionKeyFor(path);
-        if (identity == null || identity.equals(openKey)) {
-            return;
-        }
-        registerOpenDatabase(identity);
-        releaseOpenDatabase(openKey);
-        openKey = identity;
-    }
-
-    /// Which file a connection is on, as the filesystem sees it.
-    ///
-    /// Asked of the filesystem rather than folded from the text, because this decides whether two
-    /// connections are on one file and the text cannot decide it. The default filesystem is case
-    /// insensitive by its own Unicode table; String.toLowerCase on this target folds through
-    /// towlower under whatever locale the process has, commonly ASCII alone. So two spellings of a
-    /// non-ASCII name are one file to the filesystem and were two entries here -- and a delete or
-    /// a rekey through one spelling could not see the connection held under the other.
-    ///
-    /// Falls back to the folded path when the filesystem has no answer, which is the case before
-    /// the file exists. Nothing can be holding a file that is not there, so the fallback protects
-    /// nothing that needs protecting; what it leaves is a narrow window where two spellings create
-    /// the same file at once, and the open that follows either one keys on the identity.
-    ///
-    /// #### Parameters
-    ///
-    /// - `path`: the resolved database file
-    ///
-    /// #### Returns
-    ///
-    /// the registry key for that file
-    private static String connectionKeyFor(String path) {
-        if (path != null) {
-            String identity = WindowsNative.fileIdentity(path);
-            if (identity != null && identity.length() > 0) {
-                return identity;
-            }
-        }
-        return windowsPathKey(path);
-    }
-
     private static String windowsPathKey(String path) {
         if (path == null) {
             return null;
         }
-        String normalized = normalizeDatabasePathKey(path.replace('\\', '/'));
+        // A UNC path keeps its two leading separators. The shared normalizer collapses them, so
+        // "//server/share/db" and "/server/share/db" -- a share, and a path on the current
+        // drive -- came out as one string: two unrelated databases sharing one implicit key, and
+        // forgetting either one would leave both unreadable.
+        String slashed = path.replace('\\', '/');
+        boolean unc = slashed.startsWith("//");
+        String normalized = normalizeDatabasePathKey(slashed);
+        if (unc && !normalized.startsWith("//")) {
+            normalized = "/" + normalized;
+        }
         // Folded by the platform, because the platform is what decides two names are one file.
         // NTFS compares through an upcase table; String.toLowerCase on this target goes through
         // towlower, which reads the C locale and commonly maps ASCII alone -- so two spellings of

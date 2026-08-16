@@ -9676,28 +9676,6 @@ public abstract class CodenameOneImplementation {
         return databaseName;
     }
 
-    /// What the registry of open databases keys on, which is not always the managed key alias.
-    ///
-    /// The two were one question until a filesystem answered them differently. A managed key has
-    /// to be found again after the database it belongs to has been deleted and made afresh, so its
-    /// alias has to name the file the application asks for -- a path. Whether two connections are
-    /// on one file is a different question, and on a case-insensitive filesystem the path cannot
-    /// answer it: the folding rules belong to the filesystem, so only the filesystem knows that
-    /// two spellings are one file. A port that can ask it overrides this; the answer identifies a
-    /// file rather than a name, and changes when that file is replaced, which is exactly why it
-    /// must not be used as the alias.
-    ///
-    /// #### Parameters
-    ///
-    /// - `databaseName`: the name the application opens the database under
-    ///
-    /// #### Returns
-    ///
-    /// the key the port registers its connections under, the managed alias by default
-    public String databaseRegistryIdentity(String databaseName) {
-        return databaseManagedKeyIdentity(databaseName);
-    }
-
     /// How many connections this port has open on a database.
     ///
     /// `Database#delete(String)` asks before unlinking, because deleting a file something still
