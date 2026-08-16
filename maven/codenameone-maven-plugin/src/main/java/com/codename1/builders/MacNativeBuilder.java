@@ -672,6 +672,14 @@ class MacNativeBuilder {
                 .append("  if base == 'OpenGLES.framework'\n")
                 .append("    removed_refs << ref\n")
                 .append("    bf.remove_from_project\n")
+                .append("  elsif base == 'WatchConnectivity.framework'\n")
+                // WatchConnectivity does not exist on Mac Catalyst -- CN1WatchConnectivity.h
+                // already compiles its code out there via !TARGET_OS_MACCATALYST -- but the
+                // framework REFERENCE stayed in the shared phase, so the Catalyst slice linked
+                // against something the macOS SDK does not ship. Same treatment as OpenGLES:
+                // out of the unconditional phase, back in for the iOS SDKs below.
+                .append("    removed_refs << ref\n")
+                .append("    bf.remove_from_project\n")
                 .append("  elsif base == 'GLKit.framework'\n")
                 .append("    bf.settings ||= {}\n")
                 .append("    attrs = (bf.settings['ATTRIBUTES'] || []).dup\n")
@@ -691,6 +699,15 @@ class MacNativeBuilder {
                 .append("  bs['OTHER_LDFLAGS[sdk=iphoneos*]'] = existing + ' -framework OpenGLES'\n")
                 .append("  existing_sim = bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] || '$(inherited)'\n")
                 .append("  bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = existing_sim + ' -framework OpenGLES'\n")
+                // Only when the app actually uses the wearable API, so a project that does not
+                // link nothing extra -- and unconditionally safe either way, since the flag is
+                // scoped to the iOS SDKs the framework exists on.
+                .append(owner.usesWearable()
+                        ? "  bs['OTHER_LDFLAGS[sdk=iphoneos*]'] = "
+                                + "bs['OTHER_LDFLAGS[sdk=iphoneos*]'] + ' -framework WatchConnectivity'\n"
+                                + "  bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] = "
+                                + "bs['OTHER_LDFLAGS[sdk=iphonesimulator*]'] + ' -framework WatchConnectivity'\n"
+                        : "")
                 .append("  bs['DEAD_CODE_STRIPPING[sdk=macosx*]'] = 'YES'\n")
                 .append("end\n");
         s.append("xcproj.save\n");

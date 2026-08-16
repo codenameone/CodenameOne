@@ -542,6 +542,18 @@ void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_O
     // thread and the CN1WatchHost paint pump keep running; the EDT runs the app.
     extern JAVA_VOID com_codename1_impl_ios_IOSImplementation_callback__(struct ThreadLocalData* threadStateData);
     com_codename1_impl_ios_IOSImplementation_callback__(threadStateData);
+    // HERE, and not after the stub's main returns: this thread never returns. The callback above
+    // is the point at which IOSImplementation exists and its lifecycle is installed, so it is the
+    // only honest place to say the Java side can be told about a background or foreground
+    // transition. Publishing it from the generated bootstrap after the stub's main looked
+    // equivalent and was dead code -- the loop below is entered first and never left, so the flag
+    // stayed false and every transition queued forever, which is the stop()/start() the watch app
+    // was missing in the first place.
+    //
+    // Safe this early because the transition forwarders serial-dispatch onto the EDT, so a phase
+    // released now queues BEHIND the app start this callback just scheduled.
+    extern void cn1_watch_runtime_markJavaReady(void);
+    cn1_watch_runtime_markJavaReady();
     while (1) {
         [NSThread sleepForTimeInterval:3600];
     }
@@ -15140,6 +15152,335 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported___R_boole
 }
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+// --- Phone-to-watch link (com.codename1.wearable / WatchConnectivity) --------
+//
+// Compiled into BOTH the phone target and the watch target: WCSession is symmetric, so the two
+// halves of a pair run identical code. Gated on CN1_USE_WATCHCONNECTIVITY, which the builder
+// defines only when the app references com.codename1.wearable, so other apps link no framework and
+// carry no symbols. Payloads cross as opaque bytes; the value model lives in Java.
+
+#if defined(CN1_USE_WATCHCONNECTIVITY) && !TARGET_OS_TV && !TARGET_OS_MACCATALYST
+
+#import "CN1WatchConnectivity.h"
+
+// Callbacks the delegate calls when the peer sends something. Each hops into the Java callback
+// surface, which owns EDT dispatch and the cold-start queue.
+
+void cn1_wearable_deliverMessage(const char *path, const void *payload, int payloadLength, int replyToken) {
+    JAVA_OBJECT jPath = path == NULL ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:path]);
+    JAVA_OBJECT jBody = payload == NULL ? JAVA_NULL
+            : nsDataToByteArr([NSData dataWithBytes:payload length:payloadLength]);
+    com_codename1_impl_ios_IOSWearableCallbacks_nativeMessageReceived___java_lang_String_byte_1ARRAY_int(
+            CN1_THREAD_GET_STATE_PASS_ARG jPath, jBody, replyToken);
+}
+
+void cn1_wearable_deliverReply(int replyToken, const void *payload, int payloadLength, const char *error) {
+    JAVA_OBJECT jBody = payload == NULL ? JAVA_NULL
+            : nsDataToByteArr([NSData dataWithBytes:payload length:payloadLength]);
+    JAVA_OBJECT jError = error == NULL ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:error]);
+    com_codename1_impl_ios_IOSWearableCallbacks_nativeReplyReceived___int_byte_1ARRAY_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG replyToken, jBody, jError);
+}
+
+void cn1_wearable_deliverDataChanged(const char *path, const void *payload, int payloadLength) {
+    JAVA_OBJECT jPath = path == NULL ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:path]);
+    JAVA_OBJECT jBody = payload == NULL ? JAVA_NULL
+            : nsDataToByteArr([NSData dataWithBytes:payload length:payloadLength]);
+    com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChanged___java_lang_String_byte_1ARRAY(
+            CN1_THREAD_GET_STATE_PASS_ARG jPath, jBody);
+}
+
+void cn1_wearable_deliverDataChangedTracked(const char *path, const void *payload, int payloadLength,
+                                            const char *inboxToken) {
+    JAVA_OBJECT jPath = path == NULL ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:path]);
+    JAVA_OBJECT jBody = payload == NULL ? JAVA_NULL
+            : nsDataToByteArr([NSData dataWithBytes:payload length:payloadLength]);
+    JAVA_OBJECT jToken = inboxToken == NULL ? JAVA_NULL
+            : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:inboxToken]);
+    com_codename1_impl_ios_IOSWearableCallbacks_nativeDataChangedTracked___java_lang_String_byte_1ARRAY_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG jPath, jBody, jToken);
+}
+
+void com_codename1_impl_ios_IOSNative_wearableConfirmInbox___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+    if (token == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    cn1_wearable_confirmInbox([toNSString(CN1_THREAD_GET_STATE_PASS_ARG token) UTF8String]);
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_wearableReleaseInbox___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+    if (token == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    cn1_wearable_releaseInbox([toNSString(CN1_THREAD_GET_STATE_PASS_ARG token) UTF8String]);
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_wearableReplayInbox__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    cn1_wearable_replayInbox();
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_wearableForgetReceived___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    POOL_BEGIN();
+    // NULL is PASSED THROUGH, not filtered. It is the rescan request: the pending-delivery cap
+    // discarded more paths than it could name, and cn1_wearable_forgetReceived reads a null path as
+    // "forget every received marker and re-offer the whole held context". Returning early here --
+    // the reflex for a null argument -- silently dropped the one signal that recovers an overflow,
+    // so those values stayed marked delivered and never reached the listener that finally arrived.
+    cn1_wearable_forgetReceived(path == JAVA_NULL
+            ? NULL : [toNSString(CN1_THREAD_GET_STATE_PASS_ARG path) UTF8String]);
+    POOL_END();
+}
+
+void cn1_wearable_deliverDataRemoved(const char *path) {
+    JAVA_OBJECT jPath = path == NULL ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG [NSString stringWithUTF8String:path]);
+    com_codename1_impl_ios_IOSWearableCallbacks_nativeDataRemoved___java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG jPath);
+}
+
+void cn1_wearable_notifyStateChanged(void) {
+    com_codename1_impl_ios_IOSWearableCallbacks_nativeStateChanged__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
+}
+
+// Turns a Java byte[] into NSData. A null array becomes empty data rather than nil so the callers
+// never have to branch.
+static NSData *cn1WearableToNSData(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT arr) {
+    if (arr == JAVA_NULL) {
+        return [NSData data];
+    }
+    JAVA_ARRAY byteArray = (JAVA_ARRAY) arr;
+    JAVA_ARRAY_BYTE *data = (JAVA_ARRAY_BYTE *) byteArray->data;
+    return [NSData dataWithBytes:data length:byteArray->length];
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    BOOL b = [[CN1WatchConnectivity shared] isSupported];
+    POOL_END();
+    return b ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearablePaired__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    BOOL b = [[CN1WatchConnectivity shared] isPaired];
+    POOL_END();
+    return b ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableReachable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    BOOL b = [[CN1WatchConnectivity shared] isReachable];
+    POOL_END();
+    return b ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableCompanionInstalled__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    BOOL b = [[CN1WatchConnectivity shared] isCompanionInstalled];
+    POOL_END();
+    return b ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearablePeerName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    // WCSession exposes no peer name, so name the form factor: from the phone the peer is the
+    // watch, from the watch it is the phone.
+#if TARGET_OS_WATCH
+    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG @"iPhone");
+#else
+    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG @"Apple Watch");
+#endif
+    POOL_END();
+    return r;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearablePeerId__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+#if TARGET_OS_WATCH
+    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG @"phone");
+#else
+    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG @"watch");
+#endif
+    POOL_END();
+    return r;
+}
+
+void com_codename1_impl_ios_IOSNative_wearableSendMessage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_INT replyToken) {
+    POOL_BEGIN();
+    NSString *p = path == JAVA_NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    [[CN1WatchConnectivity shared] sendMessage:p
+                                       payload:cn1WearableToNSData(CN1_THREAD_STATE_PASS_ARG payload)
+                                    replyToken:(int) replyToken];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_wearableSendReply___int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT replyToken, JAVA_OBJECT payload) {
+    POOL_BEGIN();
+    [[CN1WatchConnectivity shared] sendReply:(int) replyToken
+                                     payload:cn1WearableToNSData(CN1_THREAD_STATE_PASS_ARG payload)];
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_wearablePutData___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT payload) {
+    POOL_BEGIN();
+    NSString *p = path == JAVA_NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    [[CN1WatchConnectivity shared] putData:p
+                                   payload:cn1WearableToNSData(CN1_THREAD_STATE_PASS_ARG payload)];
+    POOL_END();
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableGetData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    POOL_BEGIN();
+    NSString *p = path == JAVA_NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSData *d = [[CN1WatchConnectivity shared] getData:p];
+    JAVA_OBJECT r = d == nil ? JAVA_NULL : nsDataToByteArr(d);
+    POOL_END();
+    return r;
+}
+
+void com_codename1_impl_ios_IOSNative_wearableRemoveData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    POOL_BEGIN();
+    NSString *p = path == JAVA_NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    [[CN1WatchConnectivity shared] removeData:p];
+    POOL_END();
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableDataPaths__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSArray<NSString *> *paths = [[CN1WatchConnectivity shared] dataPaths];
+    // Escaped before joining, because a newline is only "impossible" in a path by convention and
+    // nothing enforces it: WearableMessage rejects null and empty paths and nothing else, and
+    // Android and JavaSE both carry a path containing one perfectly well. Joining raw meant
+    // "/sync\nstate" came back to the app as two phantom paths that getData() could not read,
+    // making getDataPaths() disagree with the other two platforms about what exists.
+    //
+    // '%' first, so unescaping cannot turn a literal "%0a" in a path into a delimiter.
+    NSMutableArray<NSString *> *escaped = [NSMutableArray arrayWithCapacity:paths.count];
+    for (NSString *p in paths) {
+        NSString *e = [p stringByReplacingOccurrencesOfString:@"%" withString:@"%25"];
+        e = [e stringByReplacingOccurrencesOfString:@"\n" withString:@"%0a"];
+        [escaped addObject:e];
+    }
+    JAVA_OBJECT r = fromNSString(CN1_THREAD_STATE_PASS_ARG [escaped componentsJoinedByString:@"\n"]);
+    POOL_END();
+    return r;
+}
+
+void com_codename1_impl_ios_IOSNative_wearableTransferFile___java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT name, JAVA_OBJECT contents) {
+    POOL_BEGIN();
+    NSString *p = path == JAVA_NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString *n = name == JAVA_NULL ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG name);
+    [[CN1WatchConnectivity shared] transferFile:p
+                                           name:n
+                                       contents:cn1WearableToNSData(CN1_THREAD_STATE_PASS_ARG contents)];
+    POOL_END();
+}
+
+#else // CN1_USE_WATCHCONNECTIVITY
+
+// The app never references com.codename1.wearable (or this is tvOS / Mac Catalyst, where
+// WatchConnectivity does not exist). No framework is linked and everything answers unsupported,
+// which makes the public API an inert no-op.
+
+void cn1_wearable_deliverMessage(const char *path, const void *payload, int payloadLength, int replyToken) {
+}
+void cn1_wearable_deliverReply(int replyToken, const void *payload, int payloadLength, const char *error) {
+}
+void cn1_wearable_deliverDataChanged(const char *path, const void *payload, int payloadLength) {
+}
+void cn1_wearable_deliverDataChangedTracked(const char *path, const void *payload, int payloadLength,
+                                            const char *inboxToken) {
+}
+void cn1_wearable_confirmInbox(const char *inboxToken) {
+}
+void cn1_wearable_releaseInbox(const char *inboxToken) {
+}
+void cn1_wearable_replayInbox(void) {
+}
+void cn1_wearable_forgetReceived(const char *path) {
+}
+void cn1_wearable_deliverDataRemoved(const char *path) {
+}
+void cn1_wearable_notifyStateChanged(void) {
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearablePaired__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableReachable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableCompanionInstalled__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearablePeerName__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearablePeerId__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_wearableSendMessage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT payload, JAVA_INT replyToken) {
+}
+void com_codename1_impl_ios_IOSNative_wearableSendReply___int_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT replyToken, JAVA_OBJECT payload) {
+}
+void com_codename1_impl_ios_IOSNative_wearablePutData___java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT payload) {
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableGetData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_wearableRemoveData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableDataPaths__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_wearableTransferFile___java_lang_String_java_lang_String_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT name, JAVA_OBJECT contents) {
+}
+void com_codename1_impl_ios_IOSNative_wearableConfirmInbox___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+}
+void com_codename1_impl_ios_IOSNative_wearableReleaseInbox___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token) {
+}
+void com_codename1_impl_ios_IOSNative_wearableReplayInbox__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+}
+void com_codename1_impl_ios_IOSNative_wearableForgetReceived___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path) {
+}
+
+#endif // CN1_USE_WATCHCONNECTIVITY
+
+// Return-typed aliases the translator emits for methods with a non-void return.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearableSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearablePaired___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearablePaired__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableReachable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearableReachable__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_wearableCompanionInstalled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearableCompanionInstalled__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearablePeerName___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearablePeerName__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearablePeerId___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearablePeerId__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableGetData___java_lang_String_R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    return com_codename1_impl_ios_IOSNative_wearableGetData___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, path);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_wearableDataPaths___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_wearableDataPaths__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {

@@ -100,6 +100,9 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         if ("RichPureEditor".equals(simpleName)) {
             return com.codename1.ui.editor.RichPureEditor.class;
         }
+        if ("RichRunPainter".equals(simpleName)) {
+            return com.codename1.ui.editor.RichRunPainter.class;
+        }
         if ("RichTextImporter".equals(simpleName)) {
             return com.codename1.ui.editor.RichTextImporter.class;
         }
@@ -192,6 +195,12 @@ public final class GeneratedAccess_com_codename1_ui_editor {
                 return new com.codename1.ui.editor.RichPureEditor((com.codename1.ui.editor.EditorHost) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
+        if (type == com.codename1.ui.editor.RichRunPainter.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.ui.editor.RichRunPainter();
+            }
+        }
         if (type == com.codename1.ui.editor.RichView.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.editor.EditorHost.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.editor.EditorHost.class}, false);
@@ -235,9 +244,10 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         if (type == com.codename1.ui.editor.HtmlImporter.class) return invokeStatic1(name, safeArgs);
         if (type == com.codename1.ui.editor.HtmlSerializer.class) return invokeStatic2(name, safeArgs);
         if (type == com.codename1.ui.editor.LanguageDef.class) return invokeStatic3(name, safeArgs);
-        if (type == com.codename1.ui.editor.RichTextImporter.class) return invokeStatic4(name, safeArgs);
-        if (type == com.codename1.ui.editor.RichTextSerializer.class) return invokeStatic5(name, safeArgs);
-        if (type == com.codename1.ui.editor.ThemePalette.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.editor.RichRunPainter.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.ui.editor.RichTextImporter.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.ui.editor.RichTextSerializer.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.editor.ThemePalette.class) return invokeStatic7(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -282,6 +292,28 @@ public final class GeneratedAccess_com_codename1_ui_editor {
     }
 
     private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+        if ("headingScale".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.ui.editor.RichRunPainter.headingScale(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("isHeading".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.ui.editor.RichRunPainter.isHeading(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("sizeLevelScale".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return com.codename1.ui.editor.RichRunPainter.sizeLevelScale(toIntValue(adaptedArgs[0]));
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.editor.RichRunPainter.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("convert".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.RichTextFormat.class, com.codename1.ui.RichTextFormat.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.RichTextFormat.class, com.codename1.ui.RichTextFormat.class}, false);
@@ -309,7 +341,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedStatic(com.codename1.ui.editor.RichTextImporter.class, name, safeArgs);
     }
 
-    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("serialize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.editor.EditorDocument.class, com.codename1.ui.editor.InlineStyles.class, com.codename1.ui.editor.RichBlocks.class, java.util.List.class, java.util.List.class, com.codename1.ui.RichTextFormat.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.editor.EditorDocument.class, com.codename1.ui.editor.InlineStyles.class, com.codename1.ui.editor.RichBlocks.class, java.util.List.class, java.util.List.class, com.codename1.ui.RichTextFormat.class}, false);
@@ -319,7 +351,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedStatic(com.codename1.ui.editor.RichTextSerializer.class, name, safeArgs);
     }
 
-    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
         if ("forName".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -409,58 +441,65 @@ public final class GeneratedAccess_com_codename1_ui_editor {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.editor.RichRunPainter) {
+            try {
+                return invoke11((com.codename1.ui.editor.RichRunPainter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.editor.TextStyle) {
             try {
-                return invoke11((com.codename1.ui.editor.TextStyle) target, name, safeArgs);
+                return invoke12((com.codename1.ui.editor.TextStyle) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.ThemePalette) {
             try {
-                return invoke12((com.codename1.ui.editor.ThemePalette) target, name, safeArgs);
+                return invoke13((com.codename1.ui.editor.ThemePalette) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.Tokenizer) {
             try {
-                return invoke13((com.codename1.ui.editor.Tokenizer) target, name, safeArgs);
+                return invoke14((com.codename1.ui.editor.Tokenizer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.UndoManager) {
             try {
-                return invoke14((com.codename1.ui.editor.UndoManager) target, name, safeArgs);
+                return invoke15((com.codename1.ui.editor.UndoManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.EditorHost) {
             try {
-                return invoke15((com.codename1.ui.editor.EditorHost) target, name, safeArgs);
+                return invoke16((com.codename1.ui.editor.EditorHost) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.InlineStyles.StylePredicate) {
             try {
-                return invoke16((com.codename1.ui.editor.InlineStyles.StylePredicate) target, name, safeArgs);
+                return invoke17((com.codename1.ui.editor.InlineStyles.StylePredicate) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.InlineStyles.StyleTransform) {
             try {
-                return invoke17((com.codename1.ui.editor.InlineStyles.StyleTransform) target, name, safeArgs);
+                return invoke18((com.codename1.ui.editor.InlineStyles.StyleTransform) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.editor.SyntaxHighlighter) {
             try {
-                return invoke18((com.codename1.ui.editor.SyntaxHighlighter) target, name, safeArgs);
+                return invoke19((com.codename1.ui.editor.SyntaxHighlighter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -6216,7 +6255,58 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.ui.editor.TextStyle typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.ui.editor.RichRunPainter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("fontFor".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Boolean.class}, false);
+                return typedTarget.fontFor(toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue(), ((Boolean) adaptedArgs[2]).booleanValue());
+            }
+        }
+        if ("getBaseSizePx".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBaseSizePx();
+            }
+        }
+        if ("paintRun".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.String.class, com.codename1.ui.editor.TextStyle.class, com.codename1.ui.Font.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class, java.lang.String.class, com.codename1.ui.editor.TextStyle.class, com.codename1.ui.Font.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.paintRun((com.codename1.ui.Graphics) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (com.codename1.ui.editor.TextStyle) adaptedArgs[2], (com.codename1.ui.Font) adaptedArgs[3], toIntValue(adaptedArgs[4]), toIntValue(adaptedArgs[5]), toIntValue(adaptedArgs[6]));
+            }
+        }
+        if ("runFont".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.editor.TextStyle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.editor.TextStyle.class}, false);
+                return typedTarget.runFont(toIntValue(adaptedArgs[0]), (com.codename1.ui.editor.TextStyle) adaptedArgs[1]);
+            }
+        }
+        if ("runPx".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.editor.TextStyle.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.editor.TextStyle.class}, false);
+                return typedTarget.runPx(toIntValue(adaptedArgs[0]), (com.codename1.ui.editor.TextStyle) adaptedArgs[1]);
+            }
+        }
+        if ("setBaseFont".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Font.class}, false);
+                typedTarget.setBaseFont((com.codename1.ui.Font) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setBaseSizePx".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setBaseSizePx(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        if ("setTextColor".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.setTextColor(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke12(com.codename1.ui.editor.TextStyle typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -6226,6 +6316,11 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         if ("getFontSizeLevel".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getFontSizeLevel();
+            }
+        }
+        if ("getFontSizePx".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFontSizePx();
             }
         }
         if ("getForeColor".equals(name)) {
@@ -6280,6 +6375,12 @@ public final class GeneratedAccess_com_codename1_ui_editor {
                 return typedTarget.withFontSizeLevel(toIntValue(adaptedArgs[0]));
             }
         }
+        if ("withFontSizePx".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.withFontSizePx(toIntValue(adaptedArgs[0]));
+            }
+        }
         if ("withForeColor".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -6319,7 +6420,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.ui.editor.ThemePalette typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.ui.editor.ThemePalette typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("colorForKind".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -6369,7 +6470,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.ui.editor.Tokenizer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.ui.editor.Tokenizer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("tokenize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);
@@ -6379,7 +6480,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.ui.editor.UndoManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke15(com.codename1.ui.editor.UndoManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("breakRun".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.breakRun(); return null;
@@ -6421,7 +6522,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke15(com.codename1.ui.editor.EditorHost typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke16(com.codename1.ui.editor.EditorHost typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("editorChanged".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.editorChanged(); return null;
@@ -6459,7 +6560,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke16(com.codename1.ui.editor.InlineStyles.StylePredicate typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke17(com.codename1.ui.editor.InlineStyles.StylePredicate typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("test".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.editor.TextStyle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.editor.TextStyle.class}, false);
@@ -6469,7 +6570,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke17(com.codename1.ui.editor.InlineStyles.StyleTransform typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke18(com.codename1.ui.editor.InlineStyles.StyleTransform typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("apply".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.editor.TextStyle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.editor.TextStyle.class}, false);
@@ -6479,7 +6580,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke18(com.codename1.ui.editor.SyntaxHighlighter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke19(com.codename1.ui.editor.SyntaxHighlighter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("tokenize".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Integer.class}, false);

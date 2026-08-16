@@ -316,9 +316,28 @@ jobs:
           fi
           deployment_url="$(grep 'Deployment complete!' "${deploy_log}" | grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' | tail -n1 || true)"
           preview_url="$(grep 'Deployment alias URL:' "${deploy_log}" | grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' | tail -n1 || true)"
-          if [ -z "${deployment_url}" ] || [ -z "${preview_url}" ]; then
-            echo "Could not determine the immutable deployment URL and preview alias from deploy output." >&2
+          if [ -z "${deployment_url}" ]; then
+            echo "wrangler reported success but printed no immutable deployment URL." >&2
             exit 1
+          fi
+          if [ -z "${preview_url}" ]; then
+            # Cloudflare does not always echo "Deployment alias URL", even though the branch
+            # alias is created either way -- one deploy of this branch printed it and the next
+            # did not. The upload, the alias and the deployment had all succeeded, so failing
+            # here reported a working preview as a broken build.
+            #
+            # The alias is derived from the branch name, and PREVIEW_BRANCH is built from a PR
+            # number so it is always lowercase, hyphenated and well inside the 28-character
+            # limit Cloudflare truncates at -- no sanitising to replicate. Rebuild it, and only
+            # accept it if it actually serves.
+            candidate="https://${PREVIEW_BRANCH}.${CF_PAGES_PROJECT_NAME}.pages.dev"
+            if curl -fsS -o /dev/null --max-time 30 "${candidate}"; then
+              preview_url="${candidate}"
+              echo "No alias line in the deploy output; recovered it from the branch name: ${preview_url}"
+            else
+              preview_url="${deployment_url}"
+              echo "::warning::No alias line in the deploy output and ${candidate} did not respond; using the immutable deployment URL as the preview link."
+            fi
           fi
           echo "deployment_url=${deployment_url}" >> "${GITHUB_OUTPUT}"
           echo "preview_url=${preview_url}" >> "${GITHUB_OUTPUT}"

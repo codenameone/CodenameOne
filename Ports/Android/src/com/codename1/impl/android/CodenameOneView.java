@@ -158,6 +158,16 @@ public class CodenameOneView {
         final Activity activity = CodenameOneView.this.implementation.getActivity();
         final Rect rect = this.safeArea;
         final View rootView = activity.getWindow().getDecorView();
+        // Snapshotted for the single change test at the end. Each branch used to answer that
+        // question for itself, and the round inset is applied AFTER all of them -- so on an API 28+
+        // round watch reporting no cutout and no system bars, the branch decided nothing had
+        // changed, applyRoundScreenInset then changed all four, and no revalidation was asked for.
+        // The form stayed sized to the full rectangle with its corners under the bezel until some
+        // unrelated change forced a pass, which is the same fault the API 23-27 branch had.
+        final int wasTop = rect.top;
+        final int wasLeft = rect.left;
+        final int wasRight = rect.right;
+        final int wasBottom = rect.bottom;
         if (Build.VERSION.SDK_INT >= VERSION_CODE_P) {
             try {
                 Method getRootWindowInsetsMethod = View.class.getMethod("getRootWindowInsets");
@@ -215,22 +225,14 @@ public class CodenameOneView {
 
                     // Only apply if at least one is non-zero
                     if (left != 0 || top != 0 || right != 0 || bottom != 0) {
-                        boolean isChanged = rect.left != left
-                                || rect.right != right
-                                || rect.top != top
-                                || rect.bottom != bottom;
+                        // Assigned and left at that. Whether anything actually moved is decided
+                        // once, at the end of the method, after the round inset has also been
+                        // applied -- this branch cannot see that half, and testing in both places
+                        // would schedule the same pass twice.
                         rect.left = left;
                         rect.top = top;
                         rect.right = right;
                         rect.bottom = bottom;
-
-                        if (isChanged) {
-                            Display.getInstance().callSerially(new Runnable() {
-                                public void run() {
-                                    AndroidImplementation.getInstance().revalidate();
-                                }
-                            });
-                        }
                     }
                 }
             } catch (Throwable e) {
@@ -243,6 +245,15 @@ public class CodenameOneView {
         } else if (Build.VERSION.SDK_INT >= VERSION_CODE_M) {
             rootView.post(new Runnable() {
                 public void run() {
+                    // Remembered before anything is written, because this branch runs LATE and has
+                    // to answer the same question the API 28 branch answers inline: did the safe
+                    // area actually move? A round watch is the case where it always does -- the
+                    // system reports no inset at all, so the whole rectangle comes from
+                    // applyRoundScreenInset below.
+                    int postedTop = rect.top;
+                    int postedLeft = rect.left;
+                    int postedRight = rect.right;
+                    int postedBottom = rect.bottom;
                     WindowInsets insets = rootView.getRootWindowInsets();
                     if (insets != null) {
                         rect.top = insets.getSystemWindowInsetTop();
@@ -255,6 +266,23 @@ public class CodenameOneView {
                         rect.right = 0;
                         rect.bottom = 0;
                     }
+                    // This branch assigns asynchronously, so the round inset has to be reapplied
+                    // here -- applying it at the end of updateSafeArea would run first and be
+                    // overwritten by the four assignments above.
+                    applyRoundScreenInset(rect);
+                    if (rect.top != postedTop || rect.left != postedLeft
+                            || rect.right != postedRight || rect.bottom != postedBottom) {
+                        // Nothing else will ask for it. The form is laid out before this callback
+                        // runs, and the surface callback that would otherwise re-lay it returns
+                        // early when the constructor already recorded these dimensions -- so a
+                        // round Wear form stayed laid out against zero insets, with its corners
+                        // under the bezel, until some unrelated change forced a pass.
+                        Display.getInstance().callSerially(new Runnable() {
+                            public void run() {
+                                AndroidImplementation.getInstance().revalidate();
+                            }
+                        });
+                    }
                 }
             });
         } else {
@@ -263,6 +291,53 @@ public class CodenameOneView {
             rect.left = 0;
             rect.right = 0;
             rect.bottom = 0;
+        }
+        applyRoundScreenInset(rect);
+        // One test, after every contributor has had its say -- the platform insets above and the
+        // round inset just applied. A round face is the case that needs it: the system reports no
+        // inset at all there, so the whole safe area comes from applyRoundScreenInset and every
+        // branch above concludes nothing changed.
+        if (rect.top != wasTop || rect.left != wasLeft
+                || rect.right != wasRight || rect.bottom != wasBottom) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    AndroidImplementation.getInstance().revalidate();
+                }
+            });
+        }
+    }
+
+    /**
+     * Widens the safe area to clear the curve on a round Wear OS display.
+     *
+     * A round watch face reports no display cutout, so everything above leaves the safe area at
+     * zero and a layout drawn to the full rectangle has its corners cut off by the bezel. The
+     * largest rectangle that fits inside a circle of diameter d has side d/sqrt(2), so each edge
+     * loses about 14.6% -- that is what is reserved here, on top of whatever the system already
+     * asked for.
+     */
+    private void applyRoundScreenInset(Rect rect) {
+        if (!isRoundScreen()) {
+            return;
+        }
+        int d = Math.min(this.width, this.height);
+        if (d <= 0) {
+            return;
+        }
+        int inset = (int) Math.ceil(d * (1 - 1 / Math.sqrt(2)) / 2);
+        rect.left = Math.max(rect.left, inset);
+        rect.top = Math.max(rect.top, inset);
+        rect.right = Math.max(rect.right, inset);
+        rect.bottom = Math.max(rect.bottom, inset);
+    }
+
+    /** True on a circular watch face, which is most Wear OS hardware. */
+    private boolean isRoundScreen() {
+        try {
+            return this.implementation.getActivity().getResources()
+                    .getConfiguration().isScreenRound();
+        } catch (Throwable preApi23) {
+            return false;
         }
     }
 
@@ -702,29 +777,113 @@ public class CodenameOneView {
      * Routes Android generic motion events into Codename One. This captures the
      * mouse wheel and trackpad scroll axes (vertical and horizontal) from
      * external pointing devices (BT mouse, Chromebook trackpad, DeX) which are
-     * not delivered through onTouchEvent.
+     * not delivered through onTouchEvent, and the Wear OS rotary input (the
+     * rotating side button / bezel) which reports on a different axis again.
      */
     public boolean onGenericMotionEvent(MotionEvent event) {
         if (this.implementation.getCurrentForm() == null) {
             return false;
         }
         if (event.getActionMasked() == MotionEvent.ACTION_SCROLL) {
+            int x = (int) event.getX();
+            int y = (int) event.getY();
+            int step = this.implementation.convertToPixels(20, true);
+
+            // Wear OS rotary input arrives from SOURCE_ROTARY_ENCODER on AXIS_SCROLL, not on the
+            // mouse axes below -- a watch app that only handled those could not scroll at all. It
+            // is the Digital Crown's counterpart, so it feeds the same wheel path, and Android
+            // scales it by the device's own scroll factor rather than a fixed step.
+            if (isRotaryEncoder(event)) {
+                float rotary = event.getAxisValue(MotionEvent.AXIS_SCROLL);
+                if (rotary == 0) {
+                    return false;
+                }
+                int scrollY = Math.round(-rotary * rotaryScrollFactor(step));
+                // NOT event.getX()/getY(). A rotary event is not a pointer event: it carries no
+                // meaningful position and in practice reports (0,0), so feeding those coordinates
+                // to pointerWheelMoved synthesized a drag over whatever occupies the top-left --
+                // usually the title bar -- and the crown scrolled nothing on most screens.
+                //
+                // The crown scrolls what has focus, so aim at the focused component's scrollable
+                // ancestor instead, falling back to the content pane when nothing is focused.
+                int[] target = rotaryTarget();
+                this.implementation.pointerWheelMoved(target[0], target[1], 0, scrollY, true,
+                        motionModifierMask(event));
+                return true;
+            }
+
             float vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL);
             float hscroll = event.getAxisValue(MotionEvent.AXIS_HSCROLL);
             if (vscroll == 0 && hscroll == 0) {
                 return false;
             }
-            int x = (int) event.getX();
-            int y = (int) event.getY();
             // A positive scrollY reveals content above (drag down); Android reports a
             // positive VSCROLL when scrolling away from the user, so negate to match.
-            int step = this.implementation.convertToPixels(20, true);
             int scrollY = Math.round(-vscroll * step);
             int scrollX = Math.round(-hscroll * step);
             this.implementation.pointerWheelMoved(x, y, scrollX, scrollY, true, motionModifierMask(event));
             return true;
         }
         return false;
+    }
+
+    /**
+     * A point inside whatever the crown should scroll.
+     *
+     * <p>Starts at the focused component itself -- a focused {@code TextArea} or {@code List} is
+     * frequently the scrollable thing, with nothing scrollable above it -- and walks up to the
+     * nearest vertically scrollable ancestor; without a focus, the content pane's centre. Any
+     * point inside the right container will do -- the wheel path only uses it to decide which
+     * component receives the scroll -- so the centre is chosen because it cannot land on a border
+     * or a child that happens to sit at the container's origin.</p>
+     */
+    private int[] rotaryTarget() {
+        com.codename1.ui.Form f = this.implementation.getCurrentForm();
+        com.codename1.ui.Component anchor = null;
+        if (f != null) {
+            com.codename1.ui.Component c = f.getFocused();
+            while (c != null && !c.isScrollableY()) {
+                c = c.getParent();
+            }
+            anchor = c != null ? c : f.getContentPane();
+        }
+        if (anchor == null) {
+            return new int[] {0, 0};
+        }
+        return new int[] {
+            anchor.getAbsoluteX() + anchor.getWidth() / 2,
+            anchor.getAbsoluteY() + anchor.getHeight() / 2
+        };
+    }
+
+    /**
+     * True when the event came from the Wear OS rotary input. SOURCE_ROTARY_ENCODER and AXIS_SCROLL
+     * both arrived in API 23, which is also the Wear OS standalone baseline, so older devices
+     * simply never match.
+     */
+    private static boolean isRotaryEncoder(MotionEvent event) {
+        if (android.os.Build.VERSION.SDK_INT < 23) {
+            return false;
+        }
+        return (event.getSource() & InputDevice.SOURCE_ROTARY_ENCODER) == InputDevice.SOURCE_ROTARY_ENCODER;
+    }
+
+    /**
+     * How many pixels one detent of rotary travel should scroll. Android publishes a per-device
+     * factor for exactly this; fall back to the shared wheel step when it is unavailable so the
+     * gesture still does something sensible.
+     */
+    private float rotaryScrollFactor(int fallbackStep) {
+        try {
+            float f = ViewConfiguration.get(this.implementation.getActivity())
+                    .getScaledVerticalScrollFactor();
+            if (f > 0) {
+                return f;
+            }
+        } catch (Throwable notAvailable) {
+            // Pre-API-26 or an unusual device configuration.
+        }
+        return fallbackStep;
     }
 
     /**

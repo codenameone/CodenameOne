@@ -58,6 +58,16 @@ final class HealthListenerBindings {
     static final String CLASS_NAME = "CN1HealthListenerBindings";
     static final String FQCN = PACKAGE + "." + CLASS_NAME;
 
+    /// Suffix of the factory generated for a separate watch translation root.
+    ///
+    /// A second entry point gets a factory of its OWN rather than sharing the phone's. The
+    /// factory names every listener in a `new` expression, which is a hard reference the
+    /// translator follows, so one shared factory drags every phone-only listener -- and whatever
+    /// those listeners reach -- into a watch binary that can never be asked for them, and the
+    /// reverse. Two factories, each holding only what its own root reaches, is what actually lets
+    /// the two translations be shaken down independently.
+    static final String WATCH_SUFFIX = "Watch";
+
     private HealthListenerBindings() {
     }
 
@@ -72,9 +82,21 @@ final class HealthListenerBindings {
      *                           {@code HealthBackgroundListener}
      */
     static String generate(Map<String, String> sourceByBinaryName) {
+        return generate(sourceByBinaryName, "");
+    }
+
+    /**
+     * The same, for one named translation root. {@code classSuffix} is
+     * appended to the class name so a second root can carry a factory
+     * holding only the listeners it reaches; pass {@code ""} for the single
+     * translation every ordinary build produces.
+     */
+    static String generate(Map<String, String> sourceByBinaryName,
+            String classSuffix) {
         if (sourceByBinaryName == null || sourceByBinaryName.isEmpty()) {
             return null;
         }
+        String className = CLASS_NAME + suffix(classSuffix);
         List<String> sorted =
                 new ArrayList<String>(sourceByBinaryName.keySet());
         Collections.sort(sorted);
@@ -94,11 +116,11 @@ final class HealthListenerBindings {
                 .append(" the classes\n");
         sb.append(" * survive shrinking and obfuscation. Do not edit.\n");
         sb.append(" */\n");
-        sb.append("public final class ").append(CLASS_NAME)
+        sb.append("public final class ").append(className)
                 .append(" implements HealthBackgroundListenerFactory {\n\n");
         sb.append("    public static void install() {\n");
         sb.append("        HealthStore.setBackgroundListenerFactory(new ")
-                .append(CLASS_NAME).append("());\n");
+                .append(className).append("());\n");
         sb.append("    }\n\n");
         sb.append("    public HealthBackgroundListener create(String")
                 .append(" className) {\n");
@@ -139,14 +161,30 @@ final class HealthListenerBindings {
      * {@code null} when nothing was generated.
      */
     static String installStatement(Map<String, String> sourceByBinaryName) {
+        return installStatement(sourceByBinaryName, "");
+    }
+
+    /** The install statement for the factory of one named translation root. */
+    static String installStatement(Map<String, String> sourceByBinaryName,
+            String classSuffix) {
         if (sourceByBinaryName == null || sourceByBinaryName.isEmpty()) {
             return null;
         }
-        return FQCN + ".install();\n";
+        return FQCN + suffix(classSuffix) + ".install();\n";
     }
 
     /** The path the generated source is written to, relative to a source root. */
     static String sourcePath() {
-        return PACKAGE.replace('.', '/') + "/" + CLASS_NAME + ".java";
+        return sourcePath("");
+    }
+
+    /** The path for the factory of one named translation root. */
+    static String sourcePath(String classSuffix) {
+        return PACKAGE.replace('.', '/') + "/" + CLASS_NAME
+                + suffix(classSuffix) + ".java";
+    }
+
+    private static String suffix(String classSuffix) {
+        return classSuffix == null ? "" : classSuffix;
     }
 }

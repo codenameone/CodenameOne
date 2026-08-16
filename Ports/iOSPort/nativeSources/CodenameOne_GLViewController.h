@@ -58,6 +58,16 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 //#define GOOGLE_SIGNIN
 //#define GOOGLE_CONNECT_PODS
 //#define INCLUDE_GOOGLE_CONNECT
+#if TARGET_OS_WATCH
+// Neither Google SDK ships a watchOS slice, and the watch app cannot present a sign-in web flow
+// anyway. Both defines are switched on by the builder EDITING THIS FILE, so they arrive on every
+// slice of the project at once -- the watch translation stages the same header and then failed to
+// build with "'GoogleSignIn/GoogleSignIn.h' file not found", from a native source the watch never
+// calls into. Undefining here rather than guarding each import turns off the implementation blocks
+// in the .m files too, since every one of them is gated on the same two macros.
+#undef GOOGLE_SIGNIN
+#undef INCLUDE_GOOGLE_CONNECT
+#endif
 #ifndef GOOGLE_SIGNIN
 #ifdef INCLUDE_GOOGLE_CONNECT
 #ifdef GOOGLE_CONNECT_PODS
@@ -162,6 +172,17 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // WidgetKit home-screen widgets are unavailable on watchOS / tvOS; undo the define there.
 #if TARGET_OS_WATCH || TARGET_OS_TV
 #undef CN1_USE_WIDGETS
+#endif
+
+// CN1_USE_WATCHCONNECTIVITY gates the phone-to-watch link (CN1WatchConnectivity.{h,m} + the
+// IOSNative wearable* trampolines) backing com.codename1.wearable. IPhoneBuilder uncomments this
+// only when the classpath scanner saw com.codename1.wearable.*, so apps that never talk to a watch
+// ship without any WatchConnectivity symbols and link no framework. Unlike the defines above this
+// one deliberately SURVIVES on watchOS: WCSession is symmetric, and the watch half of a pair needs
+// exactly the same code as the phone half. It does not exist on tvOS or Mac Catalyst.
+//#define CN1_USE_WATCHCONNECTIVITY
+#if TARGET_OS_TV || TARGET_OS_MACCATALYST
+#undef CN1_USE_WATCHCONNECTIVITY
 #endif
 
 // CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge

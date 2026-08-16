@@ -244,6 +244,12 @@ public final class GeneratedAccess_com_codename1_security {
     }
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("confirmAttestation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.security.DeviceIntegrity.confirmAttestation((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
         if ("getCompromiseReasons".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.security.DeviceIntegrity.getCompromiseReasons();
@@ -278,6 +284,11 @@ public final class GeneratedAccess_com_codename1_security {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return com.codename1.security.DeviceIntegrity.requestIntegrityToken((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("resetAttestation".equals(name)) {
+            if (safeArgs.length == 0) {
+                com.codename1.security.DeviceIntegrity.resetAttestation(); return null;
             }
         }
         if ("setSecureScreen".equals(name)) {

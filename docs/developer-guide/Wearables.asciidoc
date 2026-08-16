@@ -1,12 +1,35 @@
 == Wearables (Apple Watch and Wear OS)
 
-Codename One can build and run your application UI on smartwatches: Apple Watch
-(watchOS) and Android Wear OS. The same Java/Kotlin code base that drives your
-phone app drives the watch app -- you write Codename One UI as usual, and the
-build pipeline produces the appropriate watch artifact for each platform.
+Codename One builds a watch app from the same project as your phone app, on both
+Apple Watch and Wear OS. This chapter covers the whole picture: how one project
+produces two apps, how you run the pair while you develop, how the two apps
+exchange information, and how to put a complication on a watch face.
 
-The two platforms reach the watch through different mechanisms, and
-understanding the difference explains why the build hints and the supported
+=== One Project, Two Apps
+
+Declaring a watch lifecycle class next to your phone main class is the entire
+opt-in:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-001,indent=0]
+----
+
+There are no wearable build hints. The watch bundle identifier, deployment
+target, signing team and display name are all derived from settings your project
+already has, and one declaration builds the watch app on both platforms.
+
+Note the asymmetry: `codename1.mainName` is a simple class name resolved against
+`codename1.packageName`, while `codename1.watchMain` is fully qualified.
+
+What the two apps share is the code base: your classes, your resources, your
+theme and your CSS. What they don't share is anything at runtime. They're two
+apps, on two devices, in two sandboxes, with separate lifecycles. In particular
+`Storage`, `Preferences` and the SQLite database are *per device*: writing on
+the phone doesn't make the value appear on the watch. Moving information
+between them is what <<wearable-data>> is for.
+
+The two platforms get there by different routes, which is why their supported
 feature sets differ:
 
 * *Wear OS is Android.* A Wear OS app is an ordinary Android app that declares
@@ -20,8 +43,46 @@ feature sets differ:
   The graphics-heavy, GPU-bound and UIKit-peer APIs that have no watchOS
   equivalent are unavailable on the watch (see <<watch-supported-apis>>).
 
-In both cases the build is *additive*: with the watch hints turned off your
-phone build is byte-for-byte unchanged.
+Without a watch main class the build is byte-for-byte what it was, so adding one
+never changes a phone build you already ship.
+
+=== Companion or Standalone
+
+By default the watch app is a *companion*: on Apple Watch it ships inside the
+phone app and the pair installs together. If the watch app is the product and
+there is no phone app to pair with, declare it standalone:
+
+[source,properties]
+----
+include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
+----
+
+Wear OS has no companion form yet. An Android project that sets a watch main
+class without `codename1.watchStandalone` builds the phone APK alone -- the
+build says so -- so a Wear app has to be declared standalone today. Apple Watch
+supports both.
+
+On Android a standalone build turns the single APK into the Wear OS app, and that
+is what ships. On Apple the watch target is built standalone -- detached from the
+phone app rather than embedded in it -- but the archive step still targets the
+phone scheme, so submission needs one manual step in Xcode. See
+<<watch-distribution>> before you archive.
+
+=== Running the Pair While You Develop
+
+The simulator can run both halves. Choose a watch skin (Apple Watch 41mm or 45mm,
+Wear round or Wear square) to develop the watch UI on its own, or pick *Watch ->
+Launch Watch App* to start the watch app beside the phone app.
+
+The watch app runs in its own process rather than in another window of the same
+one, because that's what it becomes on a device -- a second app with its own sandbox.
+The two processes find each other, so `sendMessage` and `putData` genuinely
+round-trip on your desktop and you can develop the conversation between the two
+apps without deploying anything.
+
+TIP: Check your layout against the *Wear round* skin. A round face is where a
+design that assumes a rectangle falls apart, and its safe area is inset
+accordingly.
 
 === Detecting the Watch Form Factor
 
@@ -58,9 +119,173 @@ A watch screen is small and is frequently round. A few practical guidelines:
   without forking your code (the override layer activates on watch devices the
   same way platform overrides do elsewhere).
 
-TIP: You can lay out and iterate on a watch UI in the simulator by guarding the
-watch layout with `CN.isWatch()` and exercising both branches; the device build
-then renders the same code on the real watch.
+=== Sharing Data Between the Phone and the Watch
+[[wearable-data]]
+
+The two apps share no storage. `Storage`, `Preferences` and the SQLite database
+are per device, and there's no container that spans the pair, so a value written
+on the phone is simply not on the watch. `com.codename1.wearable` is the channel
+between them, and it's the same API on Apple Watch and Wear OS.
+
+The platforms offer three transports because they answer three different
+questions. Choosing the wrong one is the usual reason a watch app "never gets the
+update":
+
+[cols="2,2,2"]
+|===
+|You need |Use |Delivered
+
+|An answer, now, while both apps are awake
+|`WearableConnection.sendMessage`
+|Immediately, or it fails
+
+|The peer to end up with the latest value, whenever it next looks
+|`WearableConnection.putData`
+|Eventually, survives sleep and relaunch
+
+|To move a file or a large blob
+|`WearableConnection.transferFile`
+|In the background, possibly much later
+
+|Data the watch needs with no phone involved at all
+|Ordinary `Storage` plus the network
+|As usual
+
+|Something rendered while your app isn't running
+|`com.codename1.surfaces` (see <<watch-complications>>)
+|By the system, from a published timeline
+|===
+
+A message is a phone call: it only connects if someone picks up. Replicated data
+is a noticeboard: you pin the current value at a path, and the peer reads it
+whenever it wakes. Reach for data by default and for messages only when you
+genuinely need an answer now.
+
+==== Replicating State
+
+Publish on one side:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WearablesJava001Snippet.java[tag=wearables-java-002,indent=0]
+----
+
+React on the other:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WearablesJava001Snippet.java[tag=wearables-java-003,indent=0]
+----
+
+Each path holds one value, so this replicates state rather than queueing events:
+two rapid updates to the same path may reach the peer as one. That's what makes
+it the right default -- the peer always converges on the latest value, however
+long it was away.
+
+IMPORTANT: Register listeners from your app's `init()`. The platform starts an
+app purely to hand it a payload, so what arrives may well be the thing that
+launched you. Codename One queues those deliveries and replays them on the EDT,
+but only to listeners that exist by the time it does.
+
+==== Asking a Question
+
+When you need an answer rather than a value, send a message and handle the reply:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WearablesJava001Snippet.java[tag=wearables-java-004,indent=0]
+----
+
+Then answer it on the other side:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WearablesJava001Snippet.java[tag=wearables-java-005,indent=0]
+----
+
+A reply is never guaranteed: the peer may be asleep, out of range, or running a
+version of your app that doesn't know the path. `replyFailed` is the normal
+case, not the exceptional one.
+
+==== Knowing What's There
+
+`isSupported()` asks whether the platform provides the link, not whether a watch
+is there. It's false on a desktop build and on any platform with no wearable
+API, and every call is then a harmless no-op, so this API needs no platform
+conditionals around it -- but an iPhone with no paired watch still answers true,
+because Apple's API is present either way.
+
+Ask the other three about the counterpart. `isPaired()`,
+`isCompanionAppInstalled()` and `isReachable()` distinguish the cases worth
+telling a user about: no watch, a watch without your watch app installed, and a
+sleeping watch.
+
+Don't decide your UI from one call at startup. These answers come from state
+queried asynchronously, so the first calls in a cold process can report false for
+a device that's paired -- nothing is known until the first query lands. Register
+a `WearableStateListener` and react when the answer changes.
+
+One Android limit is worth knowing. The Data Layer exposes pairing only through
+the nodes it knows about, so a paired watch that has never run your watch app
+appears in no list and `isPaired()` reports false until it runs once. Treat
+false as "no counterpart known" rather than proof there is none, and prefer
+showing setup guidance to hiding it. Apple's API answers pairing directly and
+has no such gap. Gate a wearable feature on those rather than on `isSupported()`,
+or you will offer it to someone holding a phone and nothing else. Add a
+`WearableStateListener` rather than polling.
+
+=== Complications and Tiles
+[[watch-complications]]
+
+A complication -- the small live readout on a watch face -- is the same idea as a
+home-screen widget: content-driven, rendered while your app isn't running, fed
+by a timeline. Codename One models it as such, so a complication is a watch
+*family* of `com.codename1.surfaces` rather than an API of its own:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WearablesJava001Snippet.java[tag=wearables-java-006,indent=0]
+----
+
+Everything you already know about surfaces applies: the same node catalog, the
+same `${key}` state interpolation, the same timeline that lets the OS advance
+content on its own clock with no app wake-ups. `SurfaceVector` is especially at
+home here, because most complications are a gauge, a dial or a ring.
+
+[cols="2,2,2"]
+|===
+|Family |Apple Watch |Wear OS
+
+|`WATCH_CIRCULAR`
+|`accessoryCircular`
+|Ranged-value or monochromatic-image complication
+
+|`WATCH_RECTANGULAR`
+|`accessoryRectangular`
+|Long-text complication, or a Tile for a richer layout
+
+|`WATCH_INLINE`
+|`accessoryInline`
+|Short-text complication. Text only -- anything else is dropped
+
+|`WATCH_CORNER`
+|`accessoryCorner`
+|Renders as circular; Wear OS has no corner slot
+|===
+
+Design for a glance. A complication is a few dozen pixels someone reads in under
+a second, so one number or one gauge beats any layout that has to be read.
+
+NOTE: `WATCH_RECTANGULAR` and `LOCKSCREEN` share a family on Apple. If you
+publish both, each surface gets the layout you designed for it; if you publish
+only one, it's used for both.
+
+IMPORTANT: The watch families and the descriptor pipeline behind them are in
+place, and declaring them is forward-compatible. The platform targets that render
+them on a watch face -- the watchOS widget extension and the Wear OS complication
+data source and Tile service -- aren't generated yet, so a kind that declares
+only watch families produces no on-device surface today. Declaring a phone family
+alongside them keeps the widget working meanwhile.
 
 === Apple Watch (watchOS)
 
@@ -75,73 +300,59 @@ tap input into the runtime.
 .Codename One UI rendered on the watchOS simulator via the Core Graphics backend
 image::img/wearables/apple-watch-simulator.png[Codename One running on the Apple Watch simulator,scaledwidth=30%]
 
-==== Enabling the watchOS Build
+[[watch-distribution]]
+==== What the Watch App Runs Today
+[[watch-entry-point]]
 
-Set the build hint:
+`codename1.watchMain` is the watch app's entry point on both platforms. The
+watchOS build writes a stub of its own for that class and runs a second
+translation rooted there, so the watch binary starts your watch lifecycle class
+and carries what that class reaches rather than everything the phone reaches. On
+Wear OS the declared class is the watch launcher. Put the watch UI in the class
+you declared.
 
-[source,properties]
-----
-include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-001,indent=0]
-----
+One case differs by design: naming the phone's own main class as
+`codename1.watchMain` keeps a single translation, because both entry points
+reach the same code and translating twice would produce the same binary twice.
+There the watch starts the phone lifecycle, and `CN.isWatch()` is how you decide
+what the watch shows. That check is still worth keeping in shared code, but it's
+no longer what selects the watch UI when the two entry points differ.
 
-Alternatively, declare a watch entry point and the watch slice is produced
-automatically as part of the regular iOS build:
+One rough edge is left at archive time. Under manual signing the embedded watch
+target has no provisioning profile of its own, since the host app's profile is
+the one installed, so give the watch bundle id -- `<your.package>.watchkitapp` --
+its own profile before you submit. That applies to `codename1.watchStandalone`
+too, where the watch bundle is the only one being signed.
 
-[source,properties]
-----
-include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-002,indent=0]
-----
+The watch app's icon is generated for you, scaled from the project icon into the
+watch target's own asset catalog, so there's nothing to add by hand. Replace that
+set in the generated project if you want the watch to carry different artwork
+from the phone.
 
-If you don't declare a distinct `watchMain`, the watch app reuses your phone
-main class as its lifecycle entry point.
+None of this affects building, running or testing on the simulator or a device.
 
-NOTE: `codename1.watchMain` (and `watchNative.enabled`) affect only the Apple
-Watch (watchOS) build. They have no effect on Android: a Wear OS build is never
-produced implicitly -- you enable it explicitly with `android.wear=true` (see
-<<wear-os-android>>). A project can target both wearables at once by setting a
-`watchMain` (or `watchNative.enabled=true`) and `android.wear=true` together.
+==== Native Code and the Watch Slice
+[[watch-native-code]]
 
-==== watchOS Build Hints
+Your Objective-C is compiled for the watch as well as the phone. The translator
+copies native sources through to every slice it produces, so a `.m` that imports
+UIKit, or an iOS-only SDK, is a build error on watchOS even when no watch code
+calls it.
 
-[cols="2,1,4"]
-|===
-|Build hint |Default |Description
+Guard it the way the framework guards its own -- there are several hundred such
+guards across the iOS port:
 
-|`watchNative.enabled`
-|`false`
-|Force the watch target on even without a distinct `watchMain`.
+....
+#if !TARGET_OS_WATCH
+#import <UIKit/UIKit.h>
+// ... the iOS-only implementation
+#endif
+....
 
-|`codename1.watchMain` (a.k.a. `watchMain`)
-|_(none)_
-|Fully-qualified watch lifecycle entry class. Setting it also turns on the watch
-build.
-
-|`watchNative.distribution`
-|`companion`
-|`companion` embeds the watch app in the iOS app; `standalone` builds a
-watch-only app with no paired phone app.
-
-|`watchNative.bundleId`
-|`<package>.watchkitapp`
-|Bundle identifier of the watch app.
-
-|`watchNative.minDeploymentTarget`
-|`10.0`
-|`WATCHOS_DEPLOYMENT_TARGET` for the watch target.
-
-|`watchNative.displayName`
-|_(app display name)_
-|The watch app name shown on the watch.
-
-|`watchNative.teamId`
-|_(falls back to the iOS team id)_
-|Apple Developer Team ID used to sign the watch target.
-
-|`watchNative.embedCompanion`
-|`false`
-|Embed the watch app into the iOS app as a build dependency. Off by default so
-the iOS build is unaffected; enable it for a packaged companion submission.
-|===
+The same applies in reverse to a native interface only the watch uses. There is
+no build hint for this and no attempt to infer it: which of your native sources
+can compile for watchOS is a question about that source, and the preprocessor is
+where it's answered.
 
 ==== Supported and Unsupported APIs on watchOS
 [[watch-supported-apis]]
@@ -165,69 +376,71 @@ so keep watch screens light.
 
 ==== Building and Debugging
 
-A `companion` build produces an iOS `.ipa` that carries the embedded watch app;
-a `standalone` build produces a watch-only product. The generated project is a
-standard Xcode project, so you can open it and debug/profile the watch target
-with the native Xcode tools as usual. Cloud builds support the watch target
-through the same iOS build -- set the hints above and build for iOS.
+A companion build produces an iOS `.ipa` that carries the embedded watch app. A
+standalone build generates the watch target, but the archive step still targets
+the phone scheme, so the artifact handed back is the iOS app: open the generated
+project and archive the watch scheme yourself to produce the watch application.
+The build logs this. The generated project is a standard Xcode project, so you
+can open it and debug or profile the watch target with the native Xcode tools as
+usual. Cloud builds generate the watch target through the same iOS build --
+declare the watch main class and build for iOS -- and the same applies there,
+so a standalone cloud build returns the iOS archive.
 
 === Android (Wear OS)
 [[wear-os-android]]
 
 A Wear OS app is a regular Android app. The Codename One Android port renders the
 UI with the same pipeline it uses on phones, so no special rendering backend is
-required -- you only need to mark the build as a watch app.
+required. The same `codename1.watchMain` declaration drives both platforms.
 
-==== Enabling the Wear OS Build
+What it produces differs, though, and that difference is worth stating precisely.
+Set `codename1.watchStandalone` and the Android build *is* the watch app: one APK
+that installs and runs on the watch. Leave it unset and the Android build stays a
+phone build -- a companion Wear APK alongside the phone APK isn't generated yet,
+so on Android the companion configuration currently gives you the phone app and
+the wearable link, not a second artifact. The build logs this rather than leaving
+you to discover it. On Apple the companion case does produce and embed the watch
+app, which is why the two platforms have a section each.
 
-[source,properties]
-----
-include::../demos/common/src/main/snippets/developer-guide/wearables.properties[tag=wearables-properties-003,indent=0]
-----
-
-This injects the watch hardware feature into the manifest:
+A standalone Wear app declares the watch hardware feature in the manifest:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.xml[tag=wearables-xml-001,indent=0]
 ----
 
-By default it also declares the app *standalone*, so it installs and runs
-directly on the watch without a paired phone app:
+It also marks itself standalone, so it installs and runs directly on the watch
+without a paired phone app:
 
 [source,xml]
 ----
 include::../demos/common/src/main/snippets/developer-guide/wearables.xml[tag=wearables-xml-002,indent=0]
 ----
 
-Setting `android.wear=true` also raises the minimum SDK to API 23 (the Wear OS
-2.0 standalone baseline) if your project requests a lower level.
+A standalone Wear build also raises the minimum SDK to API 23, the Wear OS 2.0
+standalone baseline, if your project requests a lower level.
 
-==== Wear OS Build Hints
+==== Wear OS Input and Screen Shape
 
-[cols="2,1,4"]
-|===
-|Build hint |Default |Description
+Two things behave differently on a watch and are handled for you:
 
-|`android.wear`
-|`false`
-|Mark the build as a Wear OS app (manifest feature + standalone meta-data +
-minimum SDK floor).
-
-|`android.wear.standalone`
-|`true`
-|Declare the app standalone. Set to `false` for a watch app that requires a
-companion phone app.
-
-|`android.playService.wearable`
-|`false`
-|Add the `play-services-wearable` dependency (only needed if you use the
-Wearable Data Layer / message APIs directly).
-|===
+* *Rotary input.* The rotating side button or bezel scrolls the focused
+  scrollable container, exactly as the Digital Crown does on Apple Watch. It
+  arrives on its own input source rather than the mouse-wheel axes, and is scaled
+  by the device's own scroll factor.
+* *Round screens.* A circular face reports no display cutout, so a layout drawn
+  to the full rectangle would have its corners eaten by the bezel. The safe area
+  is inset to the largest rectangle that fits inside the circle -- about 15% a
+  side -- so honoring the form's safe-area insets is enough.
 
 TIP: Because a Wear OS app is an ordinary Android app, you can also declare any
 additional manifest features and permissions with the generic
 `android.uses_feature.<name>` and `android.uses_permission.<name>` hints.
+
+NOTE: Referencing `com.codename1.wearable` adds the `play-services-wearable`
+dependency and the listener service automatically. The
+`android.playService.wearable` hint remains for apps that want to call the Data
+Layer APIs directly.
 
 === Summary
 
@@ -236,21 +449,34 @@ additional manifest features and permissions with the generic
 | |Apple Watch (watchOS) |Wear OS (Android)
 
 |Enable
-|`watchNative.enabled=true` or `codename1.watchMain`
-|`android.wear=true`
+|`codename1.watchMain`
+|`codename1.watchMain`
 
 |Rendering
 |Dedicated Core Graphics backend + separate watch target
 |Standard Android rendering pipeline
 
 |Distribution
-|Companion (embedded in iOS app) or standalone
-|Standalone (default) or companion
+|Companion (embedded in the phone app) or standalone
+|Standalone only -- companion doesn't yet produce a Wear artifact
 
 |Runtime detection
 |`CN.isWatch()`
 |`CN.isWatch()`
+
+|Talking to the phone app
+|`com.codename1.wearable` over WatchConnectivity
+|`com.codename1.wearable` over the Wearable Data Layer
+
+|Complications (no target generated yet)
+|WidgetKit accessory families, declarable only
+|Complication data source and Tiles, declarable only
 |===
 
-The wearable build is additive on both platforms: with the hints off, your phone
-builds are unchanged.
+The complication row describes where each platform's watch surfaces will come
+from, not something you can ship today. You can declare the watch families on a
+surface kind, and nothing builds a complication or tile from them yet -- see
+<<watch-complications>> for what that means in practice.
+
+The wearable build is additive on both platforms: without a watch main class,
+your phone builds are unchanged.

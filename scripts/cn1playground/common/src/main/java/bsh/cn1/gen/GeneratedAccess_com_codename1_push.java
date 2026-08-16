@@ -70,8 +70,38 @@ public final class GeneratedAccess_com_codename1_push {
         if ("PushCallback".equals(simpleName)) {
             return com.codename1.push.PushCallback.class;
         }
+        if ("PushClient".equals(simpleName)) {
+            return com.codename1.push.PushClient.class;
+        }
+        if ("Builder".equals(simpleName)) {
+            return com.codename1.push.PushClient.Builder.class;
+        }
         if ("PushContent".equals(simpleName)) {
             return com.codename1.push.PushContent.class;
+        }
+        if ("PushError".equals(simpleName)) {
+            return com.codename1.push.PushError.class;
+        }
+        if ("PushListener".equals(simpleName)) {
+            return com.codename1.push.PushListener.class;
+        }
+        if ("PushMessage".equals(simpleName)) {
+            return com.codename1.push.PushMessage.class;
+        }
+        if ("Builder".equals(simpleName)) {
+            return com.codename1.push.PushMessage.Builder.class;
+        }
+        if ("PushRegistrationSink".equals(simpleName)) {
+            return com.codename1.push.PushRegistrationSink.class;
+        }
+        if ("PushSubscription".equals(simpleName)) {
+            return com.codename1.push.PushSubscription.class;
+        }
+        if ("PushTransport".equals(simpleName)) {
+            return com.codename1.push.PushTransport.class;
+        }
+        if ("Callback".equals(simpleName)) {
+            return com.codename1.push.PushTransport.Callback.class;
         }
         return null;
     }
@@ -121,6 +151,18 @@ public final class GeneratedAccess_com_codename1_push {
                 return new com.codename1.push.PushBuilder();
             }
         }
+        if (type == com.codename1.push.PushError.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.Boolean.class}, false);
+                return new com.codename1.push.PushError((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue());
+            }
+        }
+        if (type == com.codename1.push.PushSubscription.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Long.class, java.util.List.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Long.class, java.util.List.class}, false);
+                return new com.codename1.push.PushSubscription((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], (java.lang.String) adaptedArgs[3], ((Number) adaptedArgs[4]).longValue(), (java.util.List) adaptedArgs[5]);
+            }
+        }
         throw unsupportedConstruct(type, safeArgs);
     }
 
@@ -128,7 +170,9 @@ public final class GeneratedAccess_com_codename1_push {
         Object[] safeArgs = safeArgs(args);
         if (type == com.codename1.push.Push.class) return invokeStatic0(name, safeArgs);
         if (type == com.codename1.push.PushActionCategory.class) return invokeStatic1(name, safeArgs);
-        if (type == com.codename1.push.PushContent.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.push.PushClient.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.push.PushContent.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.push.PushMessage.class) return invokeStatic4(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -217,6 +261,32 @@ public final class GeneratedAccess_com_codename1_push {
     }
 
     private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+        if ("builder".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.push.PushClient.builder((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("dispatch".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.push.PushClient.dispatch((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getActiveCallback".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.push.PushClient.getActiveCallback();
+            }
+        }
+        if ("hasActiveClient".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.push.PushClient.hasActiveClient();
+            }
+        }
+        throw unsupportedStatic(com.codename1.push.PushClient.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("exists".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.push.PushContent.exists();
@@ -289,6 +359,21 @@ public final class GeneratedAccess_com_codename1_push {
         throw unsupportedStatic(com.codename1.push.PushContent.class, name, safeArgs);
     }
 
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+        if ("builder".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.push.PushMessage.builder();
+            }
+        }
+        if ("parse".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.push.PushMessage.parse((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.push.PushMessage.class, name, safeArgs);
+    }
+
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
@@ -320,23 +405,93 @@ public final class GeneratedAccess_com_codename1_push {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.push.PushClient) {
+            try {
+                return invoke4((com.codename1.push.PushClient) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushClient.Builder) {
+            try {
+                return invoke5((com.codename1.push.PushClient.Builder) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.push.PushContent) {
             try {
-                return invoke4((com.codename1.push.PushContent) target, name, safeArgs);
+                return invoke6((com.codename1.push.PushContent) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushError) {
+            try {
+                return invoke7((com.codename1.push.PushError) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushMessage) {
+            try {
+                return invoke8((com.codename1.push.PushMessage) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushMessage.Builder) {
+            try {
+                return invoke9((com.codename1.push.PushMessage.Builder) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushSubscription) {
+            try {
+                return invoke10((com.codename1.push.PushSubscription) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.push.PushActionsProvider) {
             try {
-                return invoke5((com.codename1.push.PushActionsProvider) target, name, safeArgs);
+                return invoke11((com.codename1.push.PushActionsProvider) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.push.PushCallback) {
             try {
-                return invoke6((com.codename1.push.PushCallback) target, name, safeArgs);
+                return invoke12((com.codename1.push.PushCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushListener) {
+            try {
+                return invoke13((com.codename1.push.PushListener) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushRegistrationSink) {
+            try {
+                return invoke14((com.codename1.push.PushRegistrationSink) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushTransport) {
+            try {
+                return invoke15((com.codename1.push.PushTransport) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.push.PushTransport.Callback) {
+            try {
+                return invoke16((com.codename1.push.PushTransport.Callback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -489,7 +644,58 @@ public final class GeneratedAccess_com_codename1_push {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.push.PushContent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.push.PushClient typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getAppId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAppId();
+            }
+        }
+        if ("getSubscription".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSubscription();
+            }
+        }
+        if ("register".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.register(); return null;
+            }
+        }
+        if ("unregister".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.unregister(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke5(com.codename1.push.PushClient.Builder typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("build".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.build();
+            }
+        }
+        if ("listener".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushListener.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushListener.class}, false);
+                return typedTarget.listener((com.codename1.push.PushListener) adaptedArgs[0]);
+            }
+        }
+        if ("registrationSink".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushRegistrationSink.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushRegistrationSink.class}, false);
+                return typedTarget.registrationSink((com.codename1.push.PushRegistrationSink) adaptedArgs[0]);
+            }
+        }
+        if ("transport".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushTransport.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushTransport.class}, false);
+                return typedTarget.transport((com.codename1.push.PushTransport) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke6(com.codename1.push.PushContent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getActionId".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getActionId();
@@ -538,7 +744,194 @@ public final class GeneratedAccess_com_codename1_push {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.push.PushActionsProvider typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.push.PushError typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getCode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCode();
+            }
+        }
+        if ("getMessage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMessage();
+            }
+        }
+        if ("isRetryable".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isRetryable();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.push.PushMessage typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getBody".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBody();
+            }
+        }
+        if ("getCollapseKey".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCollapseKey();
+            }
+        }
+        if ("getData".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getData();
+            }
+        }
+        if ("getDeepLink".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDeepLink();
+            }
+        }
+        if ("getId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getId();
+            }
+        }
+        if ("getImageUrl".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getImageUrl();
+            }
+        }
+        if ("getPlatformOptions".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPlatformOptions();
+            }
+        }
+        if ("getSurface".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSurface();
+            }
+        }
+        if ("getTitle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTitle();
+            }
+        }
+        if ("toJson".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toJson();
+            }
+        }
+        if ("toMap".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toMap();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke9(com.codename1.push.PushMessage.Builder typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("body".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.body((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("build".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.build();
+            }
+        }
+        if ("collapseKey".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.collapseKey((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("data".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Object.class}, false);
+                return typedTarget.data((java.lang.String) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
+            }
+        }
+        if ("deepLink".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.deepLink((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("id".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.id((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("imageUrl".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.imageUrl((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("platform".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.util.Map.class}, false);
+                return typedTarget.platform((java.lang.String) adaptedArgs[0], (java.util.Map) adaptedArgs[1]);
+            }
+        }
+        if ("silent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.silent(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("surface".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.util.Map.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Map.class}, false);
+                return typedTarget.surface((java.util.Map) adaptedArgs[0]);
+            }
+        }
+        if ("title".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.title((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("ttlSeconds".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.ttlSeconds(toIntValue(adaptedArgs[0]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke10(com.codename1.push.PushSubscription typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getCapabilities".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCapabilities();
+            }
+        }
+        if ("getExpiresAt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getExpiresAt();
+            }
+        }
+        if ("getInstallationId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getInstallationId();
+            }
+        }
+        if ("getPlatform".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPlatform();
+            }
+        }
+        if ("getToken".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getToken();
+            }
+        }
+        if ("getTransportId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTransportId();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke11(com.codename1.push.PushActionsProvider typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getPushActionCategories".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getPushActionCategories();
@@ -547,7 +940,7 @@ public final class GeneratedAccess_com_codename1_push {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.push.PushCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.push.PushCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("push".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -569,9 +962,101 @@ public final class GeneratedAccess_com_codename1_push {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
+    private static Object invoke13(com.codename1.push.PushListener typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushError.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushError.class}, false);
+                typedTarget.onError((com.codename1.push.PushError) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onMessage".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushMessage.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushMessage.class}, false);
+                typedTarget.onMessage((com.codename1.push.PushMessage) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onRegistration".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false);
+                typedTarget.onRegistration((com.codename1.push.PushSubscription) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke14(com.codename1.push.PushRegistrationSink typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("registered".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false);
+                typedTarget.registered((com.codename1.push.PushSubscription) adaptedArgs[0]); return null;
+            }
+        }
+        if ("unregistered".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false);
+                typedTarget.unregistered((com.codename1.push.PushSubscription) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke15(com.codename1.push.PushTransport typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getId();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSupported();
+            }
+        }
+        if ("register".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushTransport.Callback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushTransport.Callback.class}, false);
+                typedTarget.register((com.codename1.push.PushTransport.Callback) adaptedArgs[0]); return null;
+            }
+        }
+        if ("unregister".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushTransport.Callback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushTransport.Callback.class}, false);
+                typedTarget.unregister((com.codename1.push.PushTransport.Callback) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke16(com.codename1.push.PushTransport.Callback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("failed".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushError.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushError.class}, false);
+                typedTarget.failed((com.codename1.push.PushError) adaptedArgs[0]); return null;
+            }
+        }
+        if ("message".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.message((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("registered".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.push.PushSubscription.class}, false);
+                typedTarget.registered((com.codename1.push.PushSubscription) adaptedArgs[0]); return null;
+            }
+        }
+        if ("unregistered".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.unregistered(); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
     public static Object getStaticField(Class<?> type, String name) throws Exception {
         if (type == com.codename1.push.Push.class) return getStaticField0(name);
         if (type == com.codename1.push.PushCallback.class) return getStaticField1(name);
+        if (type == com.codename1.push.PushMessage.class) return getStaticField2(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -588,6 +1073,11 @@ public final class GeneratedAccess_com_codename1_push {
         if ("REGISTRATION_PHONE_REGISTRATION_ERROR".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_PHONE_REGISTRATION_ERROR;
         if ("REGISTRATION_TOO_MANY_REGISTRATIONS".equals(name)) return com.codename1.push.PushCallback.REGISTRATION_TOO_MANY_REGISTRATIONS;
         throw unsupportedStaticField(com.codename1.push.PushCallback.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
+        if ("SCHEMA_VERSION".equals(name)) return com.codename1.push.PushMessage.SCHEMA_VERSION;
+        throw unsupportedStaticField(com.codename1.push.PushMessage.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {

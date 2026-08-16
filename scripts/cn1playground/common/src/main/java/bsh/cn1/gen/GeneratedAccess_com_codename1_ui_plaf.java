@@ -2076,6 +2076,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.createPressedVersion();
             }
         }
+        if ("cssBoxModel".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.cssBoxModel(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
         if ("equals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Object.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class}, false);
@@ -2211,6 +2217,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("isBottomRight".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isBottomRight();
+            }
+        }
+        if ("isCssBoxModel".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCssBoxModel();
             }
         }
         if ("isEmptyBorder".equals(name)) {

@@ -386,6 +386,58 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// Returns the JavaSE phone-to-watch bridge, created lazily on first use.
+    ///
+    /// The bridge is live only when the project actually declares a watch app
+    /// (`codename1.watchMain`); without one there is nothing to pair with, so the whole
+    /// `com.codename1.wearable` API stays inert exactly as it would on a phone with no watch.
+    @Override
+    public synchronized com.codename1.wearable.spi.WearableBridge getWearableBridge() {
+        // Synchronized because this is a lazy singleton with side effects. Two threads registering
+        // wearable listeners at once both passed the null check and built their OWN bridge: each
+        // started a data watcher and a rendezvous thread and replaced the shared dropped-delivery
+        // handler, so the loser stayed alive through its threads and the same peer file produced
+        // duplicate callbacks while its evicted deliveries recovered through the wrong instance.
+        if (wearableBridge == null) {
+            // Deliberately the *shared* home, not this process's sandbox: the two halves have
+            // separate storage (see watchSandbox) but must rendezvous in one directory, which is the
+            // desktop stand-in for a transport the OS would provide.
+            //
+            // setAppHomeDir() is called with an absolute path in some flows (CNPanelUtil passes
+            // getAbsolutePath()), so prefixing user.home unconditionally would build a path like
+            // "$HOME//abs/path" and the two processes would never find each other.
+            File configured = new File(getSharedHomeDir());
+            File home = configured.isAbsolute() ? configured
+                    : new File(System.getProperty("user.home"), getSharedHomeDir());
+            wearableBridge = new JavaSEWearableBridge(home, isWatchCompanionProcess(),
+                    getWatchMainClass() != null);
+        }
+        return wearableBridge;
+    }
+
+    /// Returns the project's declared watch lifecycle class, or null when it declares none. Read
+    /// from the same `codename1.watchMain` setting the device builds use, which the simulator
+    /// launcher exposes as a system property.
+    static String getWatchMainClass() {
+        // The system property is how the companion process is told what to run. A normal `mvn
+        // cn1:run` sets no such property, so fall back to the project settings on disk -- otherwise
+        // the whole watch feature would be invisible under the standard simulator launch.
+        String s = System.getProperty("codename1.watchMain");
+        if (s == null || s.trim().length() == 0) {
+            Properties cnop = loadCodenameOneSettings();
+            s = cnop == null ? null : cnop.getProperty("codename1.watchMain");
+        }
+        if (s == null || s.trim().length() == 0) {
+            return null;
+        }
+        return s.trim();
+    }
+
+    /// True when this JVM is the watch half of a simulated pair rather than the phone half.
+    static boolean isWatchCompanionProcess() {
+        return "watch".equals(System.getProperty("cn1.wearable.side"));
+    }
+
     /// Returns the JavaSE external-surfaces bridge, created lazily on first use. In simulator mode
     /// published widget timelines render in the Widgets preview window (Widgets menu); in desktop
     /// mode they render in frameless always-on-top floating windows that persist across runs.
@@ -676,9 +728,91 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private static File baseResourceDir;
     private static final String DEFAULT_SKIN = "/iPhoneX.skin";
+    /// Skin the watch half of a simulated pair comes up on. The other shipped watch skins
+    /// (AppleWatch41mm, WearRound, WearSquare) are selectable from the skin menu once it is running;
+    /// WearRound in particular is worth checking a layout against, because a round face is where a
+    /// design that assumes a rectangle falls apart.
+    private static final String WATCH_COMPANION_SKIN = "/AppleWatch45mm.skin";
+    /// Every watch skin shipped on the classpath, so the menu can offer the other form factors.
+    ///
+    /// The menu is built from the "skins" preference, and only the skin actually LOADED gets added
+    /// to it -- so launching the companion registered the 45mm face and the other three could never
+    /// be chosen, which made the round face in particular unreachable. That is the one worth
+    /// checking a layout against, since a round face is where a design that assumes a rectangle
+    /// falls apart.
+    private static final String[] BUNDLED_WATCH_SKINS = {
+        "/AppleWatch45mm.skin", "/AppleWatch41mm.skin", "/WearRound.skin", "/WearSquare.skin"
+    };
+
+    /// Adds the bundled watch skins that are actually on the classpath to the skin menu's list.
+    ///
+    /// Merged rather than assigned: the preference holds whatever the user has added, and a skin
+    /// already listed is left where it is.
+    private static void registerBundledWatchSkins(Preferences pref) {
+        String skinNames = pref.get("skins", DEFAULT_SKINS);
+        if (skinNames == null) {
+            skinNames = DEFAULT_SKINS;
+        }
+        StringBuilder merged = new StringBuilder(skinNames);
+        boolean added = false;
+        for (String skin : BUNDLED_WATCH_SKINS) {
+            if (JavaSEPort.class.getResource(skin) == null) {
+                continue;
+            }
+            if (skinNames.contains(skin + ";") || skinNames.endsWith(skin)) {
+                continue;
+            }
+            if (merged.length() > 0 && merged.charAt(merged.length() - 1) != ';') {
+                merged.append(';');
+            }
+            merged.append(skin).append(';');
+            added = true;
+        }
+        if (added) {
+            pref.put("skins", merged.toString());
+        }
+    }
     private static final String DEFAULT_SKINS = DEFAULT_SKIN+";";
     private static String appHomeDir = ".cn1";
-    
+    /// The app home both halves of a simulated pair resolve to, without the watch suffix below. The
+    /// watch gets its own storage sandbox, but the two still have to meet somewhere to exchange data.
+    private static String sharedHomeDir = ".cn1";
+
+    /// The companion watch process, so "Launch Watch App" runs one rather than one per click.
+    private static Process watchProcess;
+    /// The shutdown hook that kills the launched watch is installed once, not once per launch.
+    private static boolean watchShutdownHookInstalled;
+    private static final Object WATCH_PROCESS_LOCK = new Object();
+
+    static {
+        // A launched watch inherits the phone's shared home through this property. Without it the
+        // child falls back to ".cn1" while a phone started from a generated desktop stub uses
+        // ".<mainName>", and the pair rendezvous in two different directories -- paired-looking,
+        // never reachable. Applied before watchSandbox so the watch still gets its own storage
+        // sandbox off the shared root.
+        String inherited = System.getProperty("cn1.app.home");
+        if (inherited != null && inherited.length() > 0) {
+            sharedHomeDir = inherited;
+            appHomeDir = inherited;
+        }
+        appHomeDir = watchSandbox(appHomeDir);
+    }
+
+    /// The storage sandbox for this process. On a device the phone app and the watch app are two apps
+    /// with two containers: `Storage`, the databases and `FileSystemStorage` are per-app, and there is
+    /// no shared container. Letting the two simulator processes share one home would hide exactly the
+    /// bugs this pairing exists to surface -- a watch reading a value only the phone ever wrote, or
+    /// either side overwriting the other's state -- so the watch half is given its own.
+    ///
+    /// @param base the project's app home directory name or path
+    /// @return the same value on the phone side, a sibling on the watch side
+    private static String watchSandbox(String base) {
+        if (base == null || !"watch".equals(System.getProperty("cn1.wearable.side"))) {
+            return base;
+        }
+        return base + "-watch";
+    }
+
     /**
      * Allowed video extensions for the gallery.
      */
@@ -779,7 +913,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @param aAppHomeDir the appHomeDir to set
      */
     public static void setAppHomeDir(String aAppHomeDir) {
-        appHomeDir = aAppHomeDir;
+        sharedHomeDir = aAppHomeDir;
+        appHomeDir = watchSandbox(aAppHomeDir);
+    }
+
+    /// The app home shared by both halves of a simulated pair, which is where the wearable bridge
+    /// rendezvous lives. Distinct from {@link #getAppHomeDir()}, which is this process's own sandbox.
+    ///
+    /// @return the unsuffixed app home directory
+    static String getSharedHomeDir() {
+        return sharedHomeDir;
     }
     protected TestRecorder testRecorder;
     private Hashtable contacts;
@@ -892,6 +1035,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static String currentSimulatorNativeTheme;
     private static int softkeyCount = 1;
     private static boolean tablet;
+    /// True when the loaded skin declares `watch=true`, which is how an Apple Watch or Wear OS skin
+    /// identifies itself. Drives `isWatch()` and the `"watch"` resource/CSS override layer, so a
+    /// watch layout can be developed here rather than only on a device.
+    private static boolean watch;
     private static String DEFAULT_FONT = "Arial-plain-11";
     private static EventDispatcher formChangeListener;
     private static boolean autoAdjustFontSize = true;
@@ -967,6 +1114,10 @@ public class JavaSEPort extends CodenameOneImplementation {
     // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
     // apps that never touch the surfaces API pay nothing.
     private JavaSEWidgetBridge surfaceBridge;
+    // Phone-to-watch link (com.codename1.wearable). Both halves of a paired pair run their own
+    // simulator process and meet through the shared app home; created lazily so apps that never
+    // touch the wearable API pay nothing.
+    private JavaSEWearableBridge wearableBridge;
     // Desktop floating widget windows manager, created beside the bridge in desktop mode only.
     private JavaSEWidgetWindows widgetWindows;
     // Application frame used for simulator
@@ -4216,6 +4367,18 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
 
     private void initializeCoordinates(BufferedImage map, Properties props, Map<Point, Integer> coordinates, java.awt.Rectangle screenPosition) {
+        if (map == null) {
+            // A skin with no coordinate map. The map is where the screen rectangle and the bezel
+            // hotspots normally come from, so the only thing left to believe is what the skin
+            // declares -- and a skin that declares its display geometry has said everything this
+            // method would have inferred. Without this the loader died on a NullPointerException
+            // one line down, which reads as a corrupt skin rather than a missing optional file.
+            screenPosition.x = Integer.parseInt(props.getProperty("displayX", "0"));
+            screenPosition.y = Integer.parseInt(props.getProperty("displayY", "0"));
+            screenPosition.width = Integer.parseInt(props.getProperty("displayWidth", "0"));
+            screenPosition.height = Integer.parseInt(props.getProperty("displayHeight", "0"));
+            return;
+        }
         int[] buffer = new int[map.getWidth() * map.getHeight()];
         map.getRGB(0, 0, map.getWidth(), map.getHeight(), buffer, 0, map.getWidth());
         int screenX1 = Integer.MAX_VALUE;
@@ -4710,6 +4873,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Integer.parseInt(props.getProperty("smallFontSize", "" + sm)),
                     Integer.parseInt(props.getProperty("largeFontSize", "" + la)));
             tablet = props.getProperty("tablet", "false").equalsIgnoreCase("true");
+            watch = props.getProperty("watch", "false").equalsIgnoreCase("true");
             rotateTouchKeysOnLandscape = props.getProperty("rotateKeys", "false").equalsIgnoreCase("true");
             touchDevice = props.getProperty("touch", "true").equalsIgnoreCase("true");
             keyboardType = Integer.parseInt(props.getProperty("keyboardType", "0"));
@@ -5414,7 +5578,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void update() {
             Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
             boolean desktopSkin = pref.getBoolean("desktopSkin", false);
-            setEnabled(!desktopSkin);
+            // A watch does not rotate, and offering it here did not merely show something no
+            // device does. The watch skins ship one set of artwork -- skin_l.png IS the portrait
+            // image, because there is no landscape watch to draw -- so rotating paired that
+            // portrait picture and its portrait coordinate map with a landscape safe area, and
+            // every layout preview taken in that state was measured against a screen the skin
+            // does not have.
+            setEnabled(!desktopSkin && !watch);
             Boolean selected = (Boolean)getValue(SELECTED_KEY);
             if (selected == null) {
                 selected = false;
@@ -5589,6 +5759,117 @@ public class JavaSEPort extends CodenameOneImplementation {
         carMenu.addSeparator();
         carMenu.add(disconnectCar);
         return carMenu;
+    }
+
+    /// Builds the simulator "Watch" menu, which launches the project's watch app beside the phone
+    /// app so the pair can be developed together.
+    ///
+    /// The watch app runs in its own JVM rather than in another window of this one. A watch app and
+    /// a phone app are two apps in two sandboxes on a device; sharing a `Display` here would let
+    /// bugs through that only appear once the pair is real. The two processes find each other
+    /// through the shared app home (see {@link JavaSEWearableBridge}), so `sendMessage` and
+    /// `putData` genuinely round-trip on the desktop.
+    private JMenu buildWatchMenu() {
+        JMenu watchMenu = new JMenu("Watch");
+        registerMenuWithBlit(watchMenu);
+        JMenuItem launch = new JMenuItem("Launch Watch App");
+        launch.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                launchWatchCompanion();
+            }
+        });
+        watchMenu.add(launch);
+        return watchMenu;
+    }
+
+    /// Starts the watch app in a second simulator process, on a watch skin, wired to this one.
+    void launchWatchCompanion() {
+        String watchMain = getWatchMainClass();
+        if (watchMain == null) {
+            javax.swing.JOptionPane.showMessageDialog(window,
+                    "This project declares no watch app.\n\n"
+                    + "Add codename1.watchMain=<your watch lifecycle class> to\n"
+                    + "codenameone_settings.properties and run again. That one setting builds the\n"
+                    + "watch app on both Apple Watch and Wear OS.",
+                    "Watch App", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (JavaSEPort.class.getResource(WATCH_COMPANION_SKIN) == null) {
+            // Without the skin the companion comes up on a phone skin, CN.isWatch() stays false and
+            // the whole point of the window is lost -- say so rather than launching something
+            // misleading.
+            javax.swing.JOptionPane.showMessageDialog(window,
+                    "The watch skin " + WATCH_COMPANION_SKIN + " is not on the classpath.\n\n"
+                    + "It ships with the Codename One JavaSE port; a stale or partial build of that\n"
+                    + "port is the usual cause. Rebuild it and try again.",
+                    "Watch App", javax.swing.JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        try {
+            List<String> cmd = new ArrayList<String>();
+            cmd.add(new File(new File(System.getProperty("java.home"), "bin"), "java").getAbsolutePath());
+            cmd.add("-cp");
+            cmd.add(System.getProperty("java.class.path"));
+            // The watch half needs to know which side it is, which class to start, and to come up on
+            // a watch skin so CN.isWatch() is true and the "watch" override layer applies.
+            cmd.add("-Dcn1.wearable.side=watch");
+            // The child must inherit THIS process's shared home. A generated desktop stub calls
+            // setAppHomeDir(".<mainName>"), and without passing it on the watch would fall back to
+            // the default ".cn1" -- so the phone bridge rendezvous under <mainName>/wearable while
+            // the watch waits under .cn1/wearable. Both windows then show a paired project that
+            // never becomes reachable and never exchanges anything, with nothing to indicate why.
+            cmd.add("-Dcn1.app.home=" + getSharedHomeDir());
+            cmd.add("-Dcodename1.watchMain=" + watchMain);
+            cmd.add("-Dskin=" + WATCH_COMPANION_SKIN);
+            cmd.add("-Ddskin=" + WATCH_COMPANION_SKIN);
+            if (System.getProperty("cn1.class.path") != null) {
+                cmd.add("-Dcn1.class.path=" + System.getProperty("cn1.class.path"));
+            }
+            cmd.add(Simulator.class.getName());
+            cmd.add(watchMain);
+            // Without -force the launcher ignores this argument whenever the project configures a
+            // package name, and starts codename1.packageName + codename1.mainName instead -- which
+            // would put the phone lifecycle on a watch skin and look like the watch app.
+            cmd.add("-force");
+            synchronized (WATCH_PROCESS_LOCK) {
+                if (watchProcess != null && watchProcess.isAlive()) {
+                    // One companion, not one per click. The rendezvous server services a single
+                    // accepted socket synchronously, so a second watch connects into the backlog,
+                    // reports itself reachable and is then never read until the first exits -- and
+                    // depending on startup order two watches can even pair with each other before
+                    // the phone. Re-selecting the action is a request for the watch, not for
+                    // another watch.
+                    javax.swing.JOptionPane.showMessageDialog(window,
+                            "The watch app is already running.",
+                            "Watch App", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                    return;
+                }
+                watchProcess = new ProcessBuilder(cmd).inheritIO().start();
+                // The child does NOT outlive the phone. An orphaned watch keeps the rendezvous
+                // port, pairs with the next phone run, and then the watch launched from THAT run
+                // cannot connect -- so the developer is talking to the previous build's watch
+                // while looking at the new one. Registered once, on first launch.
+                if (!watchShutdownHookInstalled) {
+                    watchShutdownHookInstalled = true;
+                    Runtime.getRuntime().addShutdownHook(new Thread() {
+                        public void run() {
+                            Process p;
+                            synchronized (WATCH_PROCESS_LOCK) {
+                                p = watchProcess;
+                            }
+                            if (p != null && p.isAlive()) {
+                                p.destroy();
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (Exception err) {
+            javax.swing.JOptionPane.showMessageDialog(window,
+                    "Could not launch the watch app:\n" + err,
+                    "Watch App", javax.swing.JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     /// Builds the simulator "Widgets" menu, which opens the Widgets preview window rendering the
@@ -7110,6 +7391,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(extensionMenu);
             }
             bar.add(buildCarMenu());
+            // Only offered on the phone half of a pair: the watch app has nothing to launch.
+            if (!isWatchCompanionProcess()) {
+                bar.add(buildWatchMenu());
+            }
             bar.add(buildWidgetsMenu());
             bar.add(MCPDesktopMenu.build("Codename One Simulator", window));
             bar.add(helpMenu);
@@ -7357,6 +7642,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         // OTA downloads from the legacy codenameone.com gallery move
         // into the submenu so the top level isn't cluttered with old
         // device skins most users never installed.
+        // Seeded here rather than at launch: the menu is what needs them, and a developer who
+        // never launches the companion can still open a watch skin to check a layout.
+        registerBundledWatchSkins(pref);
         String skinNames = pref.get("skins", DEFAULT_SKINS);
         if (skinNames == null || skinNames.length() < DEFAULT_SKINS.length()) {
             skinNames = DEFAULT_SKINS;
@@ -9672,6 +9960,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                     String f = System.getProperty("skin");
                     if (f != null) {
                         loadSkinFile(f, window);
+                        if (isWatchCompanionProcess()) {
+                            // Forced for the FIRST load only. The property is how the companion is
+                            // guaranteed to come up on a watch skin at all -- CN.isWatch() and the
+                            // "watch" override layer both depend on it -- but a reload runs this
+                            // same code in the same JVM, and a permanent property outranks the
+                            // preference the skin menu writes. Selecting Apple Watch 41mm, Wear
+                            // Round or Wear Square therefore saved the choice, reloaded, and came
+                            // straight back up on 45mm, which made every other watch form factor
+                            // unusable in the companion.
+                            //
+                            // Clearing it is enough: loadSkinFile has just written this skin to the
+                            // preference, so a reload with no choice made still finds a watch skin,
+                            // and dskin remains set so hasSkins() is unaffected.
+                            System.clearProperty("skin");
+                        }
                     } else {
                         String d = System.getProperty("dskin");
                         f = pref.get("skin", d);
@@ -14254,6 +14557,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         return tablet || isDesktop();
     }
 
+    /// A watch skin makes the simulator report the watch form factor, so `CN.isWatch()` branches and
+    /// the `"watch"` theme/CSS override layer can be exercised on the desktop instead of only on a
+    /// device.
+    public boolean isWatch() {
+        return watch;
+    }
+
     public boolean isDesktop() {
         return portraitSkin == null;
     }
@@ -15183,6 +15493,16 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public String[] getPlatformOverrides() {
+        if(isWatch()) {
+            // "watch" leads, matching the iOS and Android ports, so a resource or
+            // CSS override written for a device also applies here. The skin's own
+            // overrideNames follow, which is where "applewatch" / "android-watch"
+            // come from.
+            String[] out = new String[platformOverrides.length + 1];
+            out[0] = "watch";
+            System.arraycopy(platformOverrides, 0, out, 1, platformOverrides.length);
+            return out;
+        }
         if(isDesktop()) {
             return new String[] {"desktop", "tablet"};
         }
