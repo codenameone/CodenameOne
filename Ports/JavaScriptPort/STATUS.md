@@ -66,8 +66,14 @@ Known gaps in this area:
   One's own layout metric but is approximate against the browser's font metrics
   to about a pixel. A text-parity harness comparing `getBoundingClientRect()`
   against the Codename One width/position is the way to tighten this.
-- Occlusion within a form (a `Sheet` or `InteractionDialog` over text in the same
-  form) is not handled; only cross-form occlusion is.
+- Occlusion within a form is not handled; only cross-form occlusion is, along with
+  the glass pane, a dragged component and transitions. A `Sheet`, an
+  `InteractionDialog`, or an opaque sibling in a `LayeredLayout` painting over a
+  text-bearing component will not cover its promoted text, because the layer is
+  above the canvas as a whole. Whether a later sibling covers an earlier one is
+  not known at the time the earlier one paints, so the only general answer is to
+  promote the covering content too -- which is the DOM renderer this deliberately
+  is not.
 
 Main-thread browser state
 -------------------------

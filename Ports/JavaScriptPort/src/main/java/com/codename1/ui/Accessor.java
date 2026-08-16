@@ -55,6 +55,15 @@ public class Accessor {
      * promoted text. While either is present the layer stands down and text goes back to the
      * canvas, where paint order still decides what is on top.</p>
      *
+     * <p>Review asked for this to cover overlapping siblings too -- a LayeredLayout where an
+     * opaque component paints over a text-bearing one. That case is real and is a known
+     * limitation, recorded in STATUS.md, but it cannot be answered from here: whether a later
+     * sibling will cover an earlier one is not known when the earlier one paints, and the only
+     * general answer is to promote the covering content as well, which is the DOM renderer this
+     * change deliberately does not build. What is detectable is handled -- another form's
+     * content, a glass pane, a dragged image, a transition -- and the rest is honest about being
+     * a limitation rather than papered over with a guess.</p>
+     *
      * @param f the form to test, may be null
      * @return true when text promotion must be suspended for this form
      */

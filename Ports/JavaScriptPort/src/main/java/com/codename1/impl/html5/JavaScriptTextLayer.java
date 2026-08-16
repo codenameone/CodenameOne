@@ -218,7 +218,7 @@ public final class JavaScriptTextLayer {
      *
      * @param component the component that finished painting
      */
-    public void endComponent(Component component) {
+    public void endComponent(Component component, int clipX, int clipY, int clipW, int clipH) {
         if (depth == 0) {
             return;
         }
@@ -229,13 +229,33 @@ public final class JavaScriptTextLayer {
             frame.cellRenderer = false;
         }
         frame.promotable = false;
-        if (frame.runs != null && frame.component == component) {
-            // The component drew fewer runs than last time, so the tail of its pool is stale.
+        // Only when the paint could see the whole component does drawing fewer runs mean the
+        // rest are stale. A partial repaint hands it a clip that covers part of it -- or none of
+        // it, since the hooks still run when nothing intersects -- and releasing the tail then
+        // would detach text outside the dirty region whose pixels were never repainted, making
+        // unrelated labels, or the other lines of a multiline component, disappear.
+        if (frame.runs != null && frame.component == component
+                && coversComponent(component, clipX, clipY, clipW, clipH)) {
             releaseFrom(frame.runs, frame.sequence);
         }
         frame.component = null;
         frame.runs = null;
         frame.sequence = 0;
+    }
+
+    /**
+     * True when a clip contains the whole component, so what it drew is the whole story.
+     */
+    private boolean coversComponent(Component component, int clipX, int clipY,
+            int clipW, int clipH) {
+        if (component == null) {
+            return false;
+        }
+        int x = component.getAbsoluteX();
+        int y = component.getAbsoluteY();
+        return clipX <= x && clipY <= y
+                && clipX + clipW >= x + component.getWidth()
+                && clipY + clipH >= y + component.getHeight();
     }
 
     /**

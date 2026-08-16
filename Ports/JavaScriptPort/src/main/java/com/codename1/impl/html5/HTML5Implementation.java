@@ -1327,7 +1327,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public void afterComponentPaint(Component c, Graphics g) {
         super.afterComponentPaint(c, g);
         if (textLayer != null && isDisplayGraphics(g)) {
-            textLayer.endComponent(c);
+            textLayer.endComponent(c, g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
         }
     }
 
@@ -1630,7 +1630,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // that Tabs, among others, relies on during a swipe.
             Display.getInstance().setProperty("paintLockEnabled", "false");
         }
-        installHistoryListener();
         outputCanvas.setAttribute("role", "presentation");
         outputCanvas.setAttribute("aria-hidden", "true");
         
@@ -1688,23 +1687,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         };
         
+        // The one popstate handler. It used to run the back command directly, with no notion of
+        // which direction the traversal went or of the entries the port itself spends, so it is
+        // routed through the history logic instead of having a second listener beside it --
+        // which would make a single Back run two back commands.
         final EventListener popstateListener = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                JavaScriptBrowserLifecycleCoordinator.handlePopState(new JavaScriptBrowserLifecycleCoordinator.BackNavigationHooks() {
-                    @Override
-                    public void callSerially(Runnable runnable) {
-                        HTML5Implementation.this.callSerially(runnable);
-                    }
-
-                    @Override
-                    public void runBackCommand() {
-                        Form f = getCurrentForm();
-                        if (f != null && f.getBackCommand() != null) {
-                            f.getBackCommand().actionPerformed(new ActionEvent(f, ActionEvent.Type.Other));
-                        }
-                    }
-                });
+                handlePopStateEvent(evt);
             }
             
         };
@@ -10648,48 +10638,43 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Routes a browser Back gesture to the current form's back command, so the browser control
      * and the in-app control agree.
      */
-    private void installHistoryListener() {
-        try {
-            EventUtil.addEventListener(window, "popstate", new EventListener() {
-                @Override
-                public void handleEvent(Event evt) {
-                    // popstate fires for Forward as well as Back. Without telling them apart,
-                    // pressing Forward would run the form's back command and immediately undo
-                    // the navigation the user asked for.
-                    final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
-                    final boolean backward = restored < historyIndex;
-                    historyIndex = restored;
-                    if (historySuppressPop) {
-                        // The port asked for this one, to spend the entry belonging to a form an
-                        // in-app back command had already left.
-                        historySuppressPop = false;
-                        return;
-                    }
-                    if (!backward) {
-                        // Forward traversal. The port cannot replay it -- it has no way to know
-                        // which form an entry stood for, and re-showing one would need the
-                        // application's own navigation -- so rather than leave the browser
-                        // sitting on an entry the app is not on, step back to the entry that
-                        // does match. Forward is inert, which is the honest degradation.
-                        historySuppressPop = true;
-                        try {
-                            window.getHistory().back();
-                        } catch (Throwable ignored) {
-                            historySuppressPop = false;
-                        }
-                        return;
-                    }
-                    callSerially(new Runnable() {
-                        @Override
-                        public void run() {
-                            dispatchBrowserBack();
-                        }
-                    });
-                }
-            });
-        } catch (Throwable ignored) {
-            // Without popstate the Back button leaves the app, which is the old behaviour.
+    /**
+     * Handles a history traversal.
+     *
+     * <p>popstate fires for Forward as well as Back. Without telling them apart, pressing
+     * Forward would run the form's back command and immediately undo the navigation the user
+     * asked for.</p>
+     */
+    private void handlePopStateEvent(Event evt) {
+        final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
+        final boolean backward = restored < historyIndex;
+        historyIndex = restored;
+        if (historySuppressPop) {
+            // The port asked for this one, to spend an entry belonging to a form an in-app back
+            // command had already left.
+            historySuppressPop = false;
+            return;
         }
+        if (!backward) {
+            // Forward traversal. The port cannot replay it -- it has no way to know which form
+            // an entry stood for, and re-showing one would need the application's own
+            // navigation -- so rather than leave the browser sitting on an entry the app is not
+            // on, step back to the entry that does match. Forward is inert, which is the honest
+            // degradation.
+            historySuppressPop = true;
+            try {
+                window.getHistory().back();
+            } catch (Throwable ignored) {
+                historySuppressPop = false;
+            }
+            return;
+        }
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                dispatchBrowserBack();
+            }
+        });
     }
 
     /**
