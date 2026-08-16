@@ -50,10 +50,23 @@ class DatabaseImpl extends Database {
     /** The file this connection is open on, for the shared registry a key change consults. */
     private final String openKey;
 
+    /**
+     * The name a managed key for this database is filed under.
+     *
+     * <p>Not the same string as {@link #openKey}. That one identifies the file for the registry
+     * and is the absolute path, which on iOS moves: a restored application gets a fresh container,
+     * so the same database comes back under a different one. An alias that moved with it would
+     * leave the restored keychain holding the key under the old container while the open derived
+     * a new one under the new container -- a wrong key against intact data. So the alias is the
+     * path with the container taken off, and it is derived by the same method the open path uses.
+     */
+    private final String aliasKey;
+
     public DatabaseImpl(String databaseName, String path) throws IOException {
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
         this.openKey = normalizeDatabasePathKey(path);
+        this.aliasKey = IOSImplementation.managedKeyAliasForPath(path);
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
@@ -79,6 +92,7 @@ class DatabaseImpl extends Database {
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
         this.openKey = normalizeDatabasePathKey(path);
+        this.aliasKey = IOSImplementation.managedKeyAliasForPath(path);
         // See the other constructor: the registration is what refuses an open during a key change,
         // so it has to happen before the file is touched.
         registerOpenDatabase(openKey);
@@ -222,7 +236,7 @@ class DatabaseImpl extends Database {
                 // The resolved file, as the open path does: an implicit managed key is stored
                 // under what is passed here, and re-keying under the raw name would write a second
                 // key that the next open, which resolves the file, would not find.
-                key = config.resolveKeyMaterial(openKey);
+                key = config.resolveKeyMaterial(aliasKey);
             }
             IOSImplementation.nativeInstance.sqlDbRekey(peer, key);
         } finally {

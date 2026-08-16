@@ -11200,7 +11200,25 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public String databaseManagedKeyIdentity(String databaseName) {
-        return Database.normalizeDatabaseKey(containerRelativeDatabaseName(databaseName));
+        return managedKeyAliasForPath(resolveDatabasePath(databaseName));
+    }
+
+    /// The managed alias for an already resolved database file.
+    ///
+    /// Keyed on the path rather than the name so the connection object can ask the same question:
+    /// it holds the path, not the name it was opened under, and a key written under one alias and
+    /// looked for under another is a wrong key reported against intact data. One method, so the
+    /// open and the re-key cannot answer differently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the resolved database file
+    ///
+    /// #### Returns
+    ///
+    /// the identity a managed key for that file is filed under
+    static String managedKeyAliasForPath(String path) {
+        return Database.normalizeDatabaseKey(containerRelative(path));
     }
 
     /// Where a database sits inside this application, rather than where the device is keeping it
@@ -11230,8 +11248,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// #### Returns
     ///
     /// the identity to store a managed key under, never null
-    private String containerRelativeDatabaseName(String databaseName) {
-        String path = resolveDatabasePath(databaseName);
+    private static String containerRelative(String path) {
         String container = applicationContainerPath();
         if (container != null && path.startsWith(container)) {
             return path.substring(container.length());
@@ -11248,7 +11265,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// #### Returns
     ///
     /// the container path with a trailing separator, or null if it cannot be determined
-    private String applicationContainerPath() {
+    private static String applicationContainerPath() {
         String home = FileSystemStorage.getInstance().getAppHomePath();
         if (home == null || home.length() == 0) {
             return null;
