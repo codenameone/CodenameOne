@@ -308,14 +308,14 @@ class NumberFormat {
 @JavaName('com.codename1.flutter.fonts.GoogleFonts')
 abstract class GoogleFonts {
   external static GoogleFontsConfig get config;
-  external static TextStyle eczar({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle libreFranklin({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle merriweather({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle montserrat({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle oswald({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle robotoCondensed({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle robotoMono({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
-  external static TextStyle workSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height});
+  external static TextStyle eczar({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle libreFranklin({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle merriweather({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle montserrat({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle oswald({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle robotoCondensed({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle robotoMono({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
+  external static TextStyle workSans({double fontSize, FontWeight fontWeight, Color color, double? letterSpacing, double? height, TextStyle? textStyle, FontStyle? fontStyle, Object? decoration, double? wordSpacing});
   external static TextTheme ralewayTextTheme([TextTheme textTheme]);
   external static TextTheme rubikTextTheme([TextTheme textTheme]);
   external static TextTheme workSansTextTheme([TextTheme textTheme]);
@@ -406,3 +406,8 @@ abstract class GlobalWidgetsLocalizations {
 }
 
 // RestorableDateTime is contributed by the restoration stub set.
+
+// Upright or italic — Flutter's FontStyle. Fortnightly's masthead is the only place in the
+// gallery that asks for italics, but a font call naming it must still resolve.
+@JavaName('com.codename1.flutter.FontStyle')
+enum FontStyle { normal, italic }

@@ -53,7 +53,7 @@ class ScrollablesTest {
             builtIndexes.add(i);
             contexts.add(c);
             return new ProbeBox(10, 20);
-        }, null, null, null, null, null);
+        }, null, null, null, null, null, null, null, null, null);
 
         ScrollRenderElement scroll = mountAndLayout(lv, BoxConstraints.tight(100, 50));
 
@@ -73,7 +73,7 @@ class ScrollablesTest {
     void builderWithoutItemCountThrowsUnsupportedError() {
         assertThrows(UnsupportedError.class,
                 () -> ListView.builder(null, null, (c, i) -> new ProbeBox(1, 1),
-                        null, null, null, null, null));
+                        null, null, null, null, null, null, null, null, null));
     }
 
     @Test
@@ -128,7 +128,7 @@ class ScrollablesTest {
         for (int i = 0; i < 6; i++) {
             cells.add(new ProbeBox(1, 1));
         }
-        GridView gv = GridView.count(null, 2L, null, 10.0, 20.0, null, cells);
+        GridView gv = GridView.count(null, null, null, null, 2L, null, 10.0, 20.0, null, cells);
 
         ScrollRenderElement scroll = mountAndLayout(gv, BoxConstraints.tight(220, 500));
         RenderElement content = contentOf(scroll);
@@ -154,7 +154,7 @@ class ScrollablesTest {
         DartList<Widget> cells = new DartList<Widget>();
         cells.add(new ProbeBox(1, 1));
         cells.add(new ProbeBox(1, 1));
-        GridView gv = GridView.count(null, 2L, 2.0, null, null, null, cells);
+        GridView gv = GridView.count(null, null, null, null, 2L, 2.0, null, null, null, cells);
 
         ScrollRenderElement scroll = mountAndLayout(gv, BoxConstraints.tight(200, 500));
         RenderElement content = contentOf(scroll);

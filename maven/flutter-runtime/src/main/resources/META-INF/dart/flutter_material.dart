@@ -420,7 +420,7 @@ class ThemeData {
       Color? hintColor, Color? disabledColor, IconThemeData? iconTheme, AppBarTheme? appBarTheme,
       ChipThemeData? chipTheme, CardTheme? cardTheme, DividerThemeData? dividerTheme, dynamic platform,
       NavigationRailThemeData? navigationRailTheme,
-      bool? applyElevationOverlayColor});
+      bool? applyElevationOverlayColor, BottomAppBarThemeData? bottomAppBarTheme, BottomSheetThemeData? bottomSheetTheme, Object? inputDecorationTheme, IconThemeData? primaryIconTheme, PageTransitionsTheme? pageTransitionsTheme, Color? indicatorColor, TextSelectionThemeData? textSelectionTheme, Object? tabBarTheme, Object? snackBarTheme, Object? tooltipTheme});
 }
 
 @JavaName('com.codename1.flutter.material.ColorScheme')
@@ -434,8 +434,8 @@ class ColorScheme {
       Color? outline, Color? outlineVariant, Color? shadow, Color? scrim, Color? inverseSurface,
       Color? onInverseSurface});
   external static ColorScheme fromSeed({Color seedColor, Brightness? brightness});
-  external static ColorScheme light();
-  external static ColorScheme dark();
+  external static ColorScheme light({Color? primary, Color? onPrimary, Color? primaryContainer, Color? onPrimaryContainer, Color? secondary, Color? onSecondary, Color? secondaryContainer, Color? onSecondaryContainer, Color? tertiary, Color? onTertiary, Color? error, Color? onError, Color? errorContainer, Color? onErrorContainer, Color? surface, Color? onSurface, Color? surfaceVariant, Color? onSurfaceVariant, Color? background, Color? onBackground, Color? outline, Color? shadow, Color? inverseSurface, Color? onInverseSurface, Color? inversePrimary, Brightness? brightness});
+  external static ColorScheme dark({Color? primary, Color? onPrimary, Color? primaryContainer, Color? onPrimaryContainer, Color? secondary, Color? onSecondary, Color? secondaryContainer, Color? onSecondaryContainer, Color? tertiary, Color? onTertiary, Color? error, Color? onError, Color? errorContainer, Color? onErrorContainer, Color? surface, Color? onSurface, Color? surfaceVariant, Color? onSurfaceVariant, Color? background, Color? onBackground, Color? outline, Color? shadow, Color? inverseSurface, Color? onInverseSurface, Color? inversePrimary, Brightness? brightness});
   external Brightness get brightness;
   external Color get primary;
   external Color get onPrimary;
@@ -525,13 +525,13 @@ abstract class Alignment {
 @JavaName('com.codename1.flutter.widgets.ListView')
 class ListView extends Widget {
   external ListView({Key? key, List<Widget> children, EdgeInsets? padding, bool? shrinkWrap});
-  external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection, Object? controller});
-  external static ListView separated({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap});
+  external static ListView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, EdgeInsets? padding, bool? shrinkWrap, Object? physics, Object? scrollDirection, Object? controller, String? restorationId, bool? primary, double? itemExtent, bool? reverse});
+  external static ListView separated({Key? key, bool? primary, int? itemCount, IndexedWidgetBuilder itemBuilder, IndexedWidgetBuilder separatorBuilder, EdgeInsets? padding, bool? shrinkWrap});
 }
 
 @JavaName('com.codename1.flutter.widgets.GridView')
 class GridView extends Widget {
-  external static GridView count({Key? key, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children});
+  external static GridView count({Key? key, String? restorationId, Object? physics, bool? primary, int crossAxisCount, double? childAspectRatio, double? mainAxisSpacing, double? crossAxisSpacing, EdgeInsets? padding, List<Widget> children});
   external static GridView builder({Key? key, int? itemCount, IndexedWidgetBuilder itemBuilder, Object? gridDelegate, EdgeInsets? padding, bool? shrinkWrap, Object? physics});
 }
 
@@ -543,7 +543,7 @@ class SingleChildScrollView extends Widget {
 @JavaName('com.codename1.flutter.widgets.Image')
 class Image extends Widget {
   external Image({Key? key, ImageProvider? image, double? width, double? height, BoxFit? fit, bool? excludeFromSemantics, Object? frameBuilder});
-  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package});
+  external static Image asset(String name, {Key? key, double? width, double? height, BoxFit? fit, String? package, bool? excludeFromSemantics, bool? gaplessPlayback, int? cacheWidth, int? cacheHeight, Color? color, Object? colorBlendMode, Object? alignment, Object? semanticLabel});
   external static Image network(String src, {Key? key, double? width, double? height, BoxFit? fit});
 }
 
@@ -823,3 +823,24 @@ class TextSpan extends InlineSpan {
   // Flattens this span tree to its raw text — Flutter's `InlineSpan.toPlainText`.
   external String toPlainText();
 }
+
+// Colours for text selection. Recorded rather than applied - selection is drawn with
+// Codename One's own theme colours - but three of the four studies name one, so the type
+// has to exist for their themes to transpile.
+@JavaName('com.codename1.flutter.material.TextSelectionThemeData')
+class TextSelectionThemeData {
+  external TextSelectionThemeData({Color? cursorColor, Color? selectionColor, Color? selectionHandleColor});
+}
+
+// Per-platform page transition builders. Route transitions come from Codename One's own
+// machinery; Rally configures one of these, so the type must resolve.
+@JavaName('com.codename1.flutter.material.PageTransitionsTheme')
+class PageTransitionsTheme {
+  external PageTransitionsTheme({Object? builders});
+}
+
+// A route transition for one platform. Recorded, not run - Codename One drives its own
+// transitions - but Rally builds a Map<TargetPlatform, PageTransitionsBuilder>, so the
+// type must resolve for its theme to compile.
+@JavaName('com.codename1.flutter.material.PageTransitionsBuilder')
+class PageTransitionsBuilder {}

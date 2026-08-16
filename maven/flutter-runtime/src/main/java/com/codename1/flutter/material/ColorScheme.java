@@ -83,12 +83,82 @@ public class ColorScheme {
 
     private static final Color DEFAULT_SEED = new Color(0xFF6750A4);
 
-    public static ColorScheme light() {
-        return fromSeed(DEFAULT_SEED, Brightness.light);
+    /**
+     * {@code ColorScheme.light}/{@code .dark} — the seeded defaults with any explicitly
+     * named role applied over them.
+     *
+     * <p>These took no parameters at all, so a scheme written out role by role (which is
+     * how all four studies define their palettes) was built entirely from the default seed
+     * and every colour the app asked for was dropped. The roles are applied over the seeded
+     * base rather than replacing it, so naming one does not blank the rest.</p>
+     */
+    public static ColorScheme light(Color primary, Color onPrimary, Color primaryContainer,
+            Color onPrimaryContainer, Color secondary, Color onSecondary,
+            Color secondaryContainer, Color onSecondaryContainer, Color tertiary,
+            Color onTertiary, Color error, Color onError, Color errorContainer,
+            Color onErrorContainer, Color surface, Color onSurface, Color surfaceVariant,
+            Color onSurfaceVariant, Color background, Color onBackground, Color outline,
+            Color shadow, Color inverseSurface, Color onInverseSurface, Color inversePrimary,
+            Brightness brightness) {
+        return applyRoles(fromSeed(DEFAULT_SEED, Brightness.light), primary, onPrimary,
+                primaryContainer, onPrimaryContainer, secondary, onSecondary,
+                secondaryContainer, onSecondaryContainer, tertiary, onTertiary, error, onError,
+                errorContainer, onErrorContainer, surface, onSurface, surfaceVariant,
+                onSurfaceVariant, background, onBackground, outline, shadow, inverseSurface,
+                onInverseSurface, inversePrimary, brightness);
     }
 
-    public static ColorScheme dark() {
-        return fromSeed(DEFAULT_SEED, Brightness.dark);
+    public static ColorScheme dark(Color primary, Color onPrimary, Color primaryContainer,
+            Color onPrimaryContainer, Color secondary, Color onSecondary,
+            Color secondaryContainer, Color onSecondaryContainer, Color tertiary,
+            Color onTertiary, Color error, Color onError, Color errorContainer,
+            Color onErrorContainer, Color surface, Color onSurface, Color surfaceVariant,
+            Color onSurfaceVariant, Color background, Color onBackground, Color outline,
+            Color shadow, Color inverseSurface, Color onInverseSurface, Color inversePrimary,
+            Brightness brightness) {
+        return applyRoles(fromSeed(DEFAULT_SEED, Brightness.dark), primary, onPrimary,
+                primaryContainer, onPrimaryContainer, secondary, onSecondary,
+                secondaryContainer, onSecondaryContainer, tertiary, onTertiary, error, onError,
+                errorContainer, onErrorContainer, surface, onSurface, surfaceVariant,
+                onSurfaceVariant, background, onBackground, outline, shadow, inverseSurface,
+                onInverseSurface, inversePrimary, brightness);
+    }
+
+    private static ColorScheme applyRoles(ColorScheme c, Color primary, Color onPrimary,
+            Color primaryContainer, Color onPrimaryContainer, Color secondary,
+            Color onSecondary, Color secondaryContainer, Color onSecondaryContainer,
+            Color tertiary, Color onTertiary, Color error, Color onError,
+            Color errorContainer, Color onErrorContainer, Color surface, Color onSurface,
+            Color surfaceVariant, Color onSurfaceVariant, Color background,
+            Color onBackground, Color outline, Color shadow, Color inverseSurface,
+            Color onInverseSurface, Color inversePrimary, Brightness brightness) {
+        if (primary != null) { c.primary(primary); }
+        if (onPrimary != null) { c.onPrimary(onPrimary); }
+        if (primaryContainer != null) { c.primaryContainer(primaryContainer); }
+        if (onPrimaryContainer != null) { c.onPrimaryContainer(onPrimaryContainer); }
+        if (secondary != null) { c.secondary(secondary); }
+        if (onSecondary != null) { c.onSecondary(onSecondary); }
+        if (secondaryContainer != null) { c.secondaryContainer(secondaryContainer); }
+        if (onSecondaryContainer != null) { c.onSecondaryContainer(onSecondaryContainer); }
+        if (tertiary != null) { c.tertiary(tertiary); }
+        if (onTertiary != null) { c.onTertiary(onTertiary); }
+        if (error != null) { c.error(error); }
+        if (onError != null) { c.onError(onError); }
+        if (errorContainer != null) { c.errorContainer(errorContainer); }
+        if (onErrorContainer != null) { c.onErrorContainer(onErrorContainer); }
+        if (surface != null) { c.surface(surface); }
+        if (onSurface != null) { c.onSurface(onSurface); }
+        if (surfaceVariant != null) { c.surfaceVariant(surfaceVariant); }
+        if (onSurfaceVariant != null) { c.onSurfaceVariant(onSurfaceVariant); }
+        if (background != null) { c.background(background); }
+        if (onBackground != null) { c.onBackground(onBackground); }
+        if (outline != null) { c.outline(outline); }
+        if (shadow != null) { c.shadow(shadow); }
+        if (inverseSurface != null) { c.inverseSurface(inverseSurface); }
+        if (onInverseSurface != null) { c.onInverseSurface(onInverseSurface); }
+        if (inversePrimary != null) { c.inversePrimary(inversePrimary); }
+        if (brightness != null) { c.brightness(brightness); }
+        return c;
     }
 
     // ------------------------------------------------------------------

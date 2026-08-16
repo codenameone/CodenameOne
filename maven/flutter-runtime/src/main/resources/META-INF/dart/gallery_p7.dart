@@ -687,7 +687,7 @@ class FadeScaleTransition extends Widget {
 // `animations` package's `SharedAxisPageTransitionsBuilder`. (SharedAxis-
 // TransitionType itself already lives in gallery_p4_apitail.dart.)
 @JavaName('com.codename1.flutter.animations.SharedAxisPageTransitionsBuilder')
-class SharedAxisPageTransitionsBuilder {
+class SharedAxisPageTransitionsBuilder extends PageTransitionsBuilder {
   external SharedAxisPageTransitionsBuilder({SharedAxisTransitionType transitionType,
       Color? fillColor});
 }

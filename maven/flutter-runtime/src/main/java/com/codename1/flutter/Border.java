@@ -15,7 +15,8 @@ public final class Border extends BoxBorder {
     }
 
     /** {@code Border.all(color: ..., width: ..., style: ...)}. */
-    public static Border all(Color color, double width, BorderStyle style) {
+    public static Border all(Color color, double width, BorderStyle style,
+            Double strokeAlign) {
         BorderSide side = new BorderSide();
         if (color != null) {
             side.color(color);

@@ -29,18 +29,19 @@ public class M2Showcase extends StatelessWidget {
     public Widget build(BuildContext context) {
         // ListView.builder(itemCount: 20, itemBuilder: (c, i) -> ...)
         var $t0 = ListView.builder(null, 20L, (c, i) -> this._buildItem(c, i),
-                null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         // GridView.count(crossAxisCount: 2, children: ...)
-        var $t1 = GridView.count(null, 2L, null, null, null, null,
+        var $t1 = GridView.count(null, null, null, null, 2L, null, null, null, null,
                 DartList.<Widget>of(new Text("a"), new Text("b"), new Text("c"), new Text("d")));
 
         // GridView.count with every named argument
-        var $t2 = GridView.count(null, 3L, 1.5, 4.0, 4.0, EdgeInsets.all(8.0),
+        var $t2 = GridView.count(null, null, null, null, 3L, 1.5, 4.0, 4.0, EdgeInsets.all(8.0),
                 DartList.<Widget>of(new Icon(Icons.home), new Icon(Icons.settings)));
 
         // Image.asset('logo.png', width: 100)
-        var $t3 = Image.asset("logo.png", null, 100.0, null, null);
+        var $t3 = Image.asset("logo.png", null, 100.0, null, null,
+                null, null, null, null, null, null, null, null, null);
         var $t4 = Image.network("https://example.com/x.png", null, 64.0, 64.0, BoxFit.cover);
 
         // Stack + Positioned + Align

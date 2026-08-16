@@ -11,7 +11,8 @@ import com.codename1.flutter.Color;
  * builder emits a {@link SharedAxisTransition} when the navigation renderer
  * lands.
  */
-public class SharedAxisPageTransitionsBuilder {
+public class SharedAxisPageTransitionsBuilder
+        extends com.codename1.flutter.material.PageTransitionsBuilder {
 
     private SharedAxisTransitionType transitionType;
     private Color fillColor;

@@ -12,6 +12,23 @@ public final class BorderSide {
     private double width = 1.0;
     private BorderStyle style = BorderStyle.solid;
 
+    /// Where the stroke sits relative to the path it follows: -1 fully inside, 0 centred
+    /// on it, 1 fully outside. Codename One strokes centred, so these are carried for the
+    /// geometry pass rather than honoured today - but a border naming one has to compile.
+    public static final double strokeAlignInside = -1.0;
+    public static final double strokeAlignCenter = 0.0;
+    public static final double strokeAlignOutside = 1.0;
+
+    private Double strokeAlign;
+
+    public void strokeAlign(double v) {
+        this.strokeAlign = v;
+    }
+
+    public Double getStrokeAlign() {
+        return strokeAlign;
+    }
+
     public BorderSide() {
     }
 

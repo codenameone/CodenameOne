@@ -29,7 +29,8 @@ public class SelectableText extends StatelessWidget {
      * positional form.
      */
     public static SelectableText rich(TextSpan textSpan, Key key, TextStyle style,
-                                      TextAlign textAlign, Long maxLines) {
+                                      TextAlign textAlign, Long maxLines,
+                                      Object textDirection) {
         SelectableText t = new SelectableText(null);
         t.key(key);
         t.textSpan = textSpan;

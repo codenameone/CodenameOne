@@ -74,7 +74,10 @@ public class Image extends Widget {
      * form.
      */
     public static Image asset(String name, Key key, Double width, Double height, BoxFit fit,
-                              String packageName) {
+                              String packageName, Boolean excludeFromSemantics,
+                              Boolean gaplessPlayback, Long cacheWidth, Long cacheHeight,
+                              com.codename1.flutter.Color color, Object colorBlendMode,
+                              Object alignment, String semanticLabel) {
         // The package qualifier is part of the PATH, exactly as in AssetImage: an asset
         // shipped by a package lives at packages/<package>/<name>. Dropping it - which is
         // what happened while this factory had no such parameter - leaves the image looking

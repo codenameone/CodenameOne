@@ -3273,6 +3273,21 @@ public final class JavaEmitter {
         return null;
     }
 
+    /**
+     * {@code SomeEnum.values} — Dart exposes an enum's members as a GETTER returning a
+     * {@code List}, Java as a static method returning an ARRAY.
+     *
+     * <p>Both halves of that matter. Emitting the Dart spelling is a field access to
+     * something that does not exist; emitting the bare {@code values()} hands back an array
+     * to code that will go on to call Dart's list members on it. Wrapping restores the
+     * declared type, so indexing, iteration and {@code length} all work as written.</p>
+     */
+    private Out enumValues(String enumName, Ctx ctx) {
+        ctx.importClass("dart.core.DartList");
+        return new Out("DartList.of(" + simpleEnumName(enumName, ctx) + ".values())",
+                TypeRef.of("List", new TypeRef(enumName)));
+    }
+
     private Out emitPropertyGet(PropertyGet pg, Ctx ctx) {
         // `prefix.member` where prefix is an `import '...' as prefix` name: the member
         // is a top-level const/var/class/enum/function of another user (or stub) library.
@@ -3289,6 +3304,18 @@ public final class JavaEmitter {
                     pg.target instanceof Ident ? ((Ident) pg.target).name : null, ctx);
             if (top != null) {
                 return top;
+            }
+        }
+        // `SomeEnum.values` - Dart exposes an enum's members as a GETTER, Java as a static
+        // METHOD. Intercepted here rather than in the class-reference path below because a
+        // bare `Enum.values` (a for-in subject, say) arrives as a plain property get whose
+        // target is a type name, not a class reference.
+        if (pg.name.equals("values") && pg.target instanceof Ident
+                && ctx.lookup(((Ident) pg.target).name) == null) {
+            String en = ((Ident) pg.target).name;
+            if (program.enums.containsKey(en) || stubs.isStubEnum(en)) {
+                importEnum(en, ctx);
+                return enumValues(en, ctx);
             }
         }
         // Named constants on the primitive numeric types (double.infinity, double.nan, ...).
@@ -3374,6 +3401,9 @@ public final class JavaEmitter {
             String cls = tt.arg(0).name;
             if (program.enums.containsKey(cls) || stubs.isStubEnum(cls)) {
                 importEnum(cls, ctx);
+                if (name.equals("values")) {
+                    return enumValues(cls, ctx);
+                }
                 return new Out(simpleEnumName(cls, ctx) + "." + name, new TypeRef(cls));
             }
             if (stubs.isStubClass(cls)) {
@@ -5623,7 +5653,7 @@ public final class JavaEmitter {
                 }
             }
         }
-        reportUnknownNamedArgs(ct, args);
+        reportUnknownNamedArgs(ct, owner, args);
         return sb.toString();
     }
 
@@ -5639,22 +5669,34 @@ public final class JavaEmitter {
      * here, because the app looks like it works. Reporting turns each one into a line of a
      * to-do list instead: either the runtime grows the parameter, or the gap is a known one.</p>
      */
-    private void reportUnknownNamedArgs(CtorDecl ct, Args args) {
+    private void reportUnknownNamedArgs(CtorDecl ct, ClassDecl owner, Args args) {
         if (ct == null || args == null || args.named == null || args.named.isEmpty()) {
             return;
         }
         for (NamedArg na : args.named) {
             boolean declared = false;
             for (Param p : ct.params) {
-                if (p.named && na.name.equals(p.name)) {
+                // By NAME alone, deliberately. A parameter written `required T name` inside
+                // the braces is not always flagged named by the parser, and requiring the
+                // flag reported arguments that are in fact declared and passed correctly -
+                // a false positive is fatal for a diagnostic that is meant to become an error.
+                if (na.name.equals(p.name)) {
                     declared = true;
                     break;
                 }
             }
             if (!declared) {
-                diags.warn(na.value, "E0140",
-                        "named argument '" + na.name + "' is not declared by the callee and "
-                                + "will be IGNORED; add it to the runtime API and its Dart stub");
+                String callee = owner != null ? owner.name : "<callee>";
+                if (ct.name != null) {
+                    callee = callee + "." + ct.name;
+                }
+                // An ERROR, not a warning. Dart itself rejects an undeclared named
+                // argument, so accepting one is our divergence from the language, and the
+                // way we diverged was the worst available: the value was dropped and the
+                // app looked like it worked. Failing the build is what Flutter does.
+                diags.error(na.value, "E0140",
+                        callee + " does not declare named argument '" + na.name
+                                + "'; add it to the runtime API and its Dart stub");
             }
         }
     }

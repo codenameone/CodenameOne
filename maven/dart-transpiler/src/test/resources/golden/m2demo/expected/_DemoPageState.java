@@ -80,7 +80,7 @@ public class _DemoPageState extends State<DemoPage> {
             $t10.child($t11);
             $t9.child($t10);
             return $t9;
-        }, null, null, null, null, null));
+        }, null, null, null, null, null, null, null, null, null));
         $t2.children(DartList.<Widget>of($t3, new Divider(), $t8));
         $t0.body($t2);
         return $t0;

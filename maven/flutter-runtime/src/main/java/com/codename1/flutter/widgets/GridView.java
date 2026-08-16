@@ -50,7 +50,8 @@ public class GridView extends Widget {
      * Dart's {@code GridView.count} named constructor in canonical positional
      * form.
      */
-    public static GridView count(Key key, long crossAxisCount, Double childAspectRatio,
+    public static GridView count(Key key, String restorationId, Object physics, Boolean primary,
+                                 long crossAxisCount, Double childAspectRatio,
                                  Double mainAxisSpacing, Double crossAxisSpacing,
                                  EdgeInsets padding, DartList<Widget> children) {
         GridView g = new GridView();

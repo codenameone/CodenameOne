@@ -309,7 +309,11 @@ abstract class BoxBorder extends ShapeBorder {}
 
 @JavaName('com.codename1.flutter.BorderSide')
 class BorderSide {
-  external BorderSide({Color? color, double width = 1.0, BorderStyle style = BorderStyle.solid});
+  external BorderSide({Color? color, double width = 1.0, BorderStyle style = BorderStyle.solid, double? strokeAlign});
+  // Where the stroke sits relative to the path: -1 inside, 0 centred, 1 outside.
+  external static double get strokeAlignInside;
+  external static double get strokeAlignCenter;
+  external static double get strokeAlignOutside;
   external static BorderSide get none;
   // Linearly interpolates between two BorderSide values — Flutter's
   // `BorderSide.lerp(a, b, t)`.
@@ -324,7 +328,7 @@ class BorderSide {
 @JavaName('com.codename1.flutter.Border')
 class Border extends BoxBorder {
   external Border({BorderSide top, BorderSide right, BorderSide bottom, BorderSide left});
-  external static Border all({Color? color, double width = 1.0, BorderStyle style = BorderStyle.solid});
+  external static Border all({Color? color, double width = 1.0, BorderStyle style = BorderStyle.solid, double? strokeAlign});
   external static Border symmetric({BorderSide vertical, BorderSide horizontal});
   external BorderSide get top;
   external BorderSide get right;

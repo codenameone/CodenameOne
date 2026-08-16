@@ -123,7 +123,20 @@ public class ThemeData {
     public void elevatedButtonTheme(Object v) { this.elevatedButtonTheme = v; }
     public void textButtonTheme(Object v) { this.textButtonTheme = v; }
     public void outlinedButtonTheme(Object v) { this.outlinedButtonTheme = v; }
-    public void pageTransitionsTheme(Object v) { this.pageTransitionsTheme = v; }
+    /// The text-selection colours a study sets ({@code TextSelectionThemeData}). Held for
+    /// the styling pass; selection rendering does not read it yet, but dropping the value
+    /// entirely made the setting look unsupported rather than pending.
+    private TextSelectionThemeData textSelectionTheme;
+
+    public void textSelectionTheme(TextSelectionThemeData v) {
+        this.textSelectionTheme = v;
+    }
+
+    public TextSelectionThemeData getTextSelectionTheme() {
+        return textSelectionTheme;
+    }
+
+    public void pageTransitionsTheme(PageTransitionsTheme v) { this.pageTransitionsTheme = v; }
     public void visualDensity(Object v) { this.visualDensity = v; }
     public void typography(Object v) { this.typography = v; }
     public void platform(Object v) { this.platform = v; }
@@ -231,7 +244,12 @@ public class ThemeData {
                               IconThemeData iconTheme, AppBarTheme appBarTheme, ChipThemeData chipTheme,
                               CardTheme cardTheme, DividerThemeData dividerTheme, Object platform,
                               NavigationRailThemeData navigationRailTheme,
-                              Boolean applyElevationOverlayColor) {
+                              Boolean applyElevationOverlayColor,
+                              BottomAppBarThemeData bottomAppBarTheme, BottomSheetThemeData bottomSheetTheme,
+                              Object inputDecorationTheme, IconThemeData primaryIconTheme,
+                              PageTransitionsTheme pageTransitionsTheme, Color indicatorColor,
+                              TextSelectionThemeData textSelectionTheme, Object tabBarTheme,
+                              Object snackBarTheme, Object tooltipTheme) {
         ThemeData c = shallowClone();
         if (colorScheme != null) c.colorScheme = colorScheme;
         if (textTheme != null) c.textTheme = textTheme;
@@ -255,6 +273,18 @@ public class ThemeData {
         if (navigationRailTheme != null) c.navigationRailTheme = navigationRailTheme;
         if (platform != null) c.platform = platform;
         if (applyElevationOverlayColor != null) c.applyElevationOverlayColor = applyElevationOverlayColor;
+        // The sub-themes a study overrides when it re-skins the app. copyWith had no
+        // parameters for these, so a study's own bottom bar, sheet, input and tab styling
+        // was dropped on the floor and it rendered with the base Material theme.
+        if (bottomAppBarTheme != null) c.bottomAppBarTheme(bottomAppBarTheme);
+        if (bottomSheetTheme != null) c.bottomSheetTheme(bottomSheetTheme);
+        if (inputDecorationTheme != null) c.inputDecorationTheme(inputDecorationTheme);
+        if (primaryIconTheme != null) c.primaryIconTheme(primaryIconTheme);
+        if (pageTransitionsTheme != null) c.pageTransitionsTheme(pageTransitionsTheme);
+        if (indicatorColor != null) c.indicatorColor(indicatorColor);
+        if (textSelectionTheme != null) c.textSelectionTheme(textSelectionTheme);
+        if (snackBarTheme != null) c.snackBarTheme(snackBarTheme);
+        if (tooltipTheme != null) c.tooltipTheme(tooltipTheme);
         return c;
     }
 }
