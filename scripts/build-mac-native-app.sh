@@ -146,12 +146,15 @@ ensure_setting "codename1.arg.macNative.fixedWindowSize" \
 # UIApplicationSupportsMultipleScenes in Info.plist, which is process-wide
 # and changes Catalyst windowing for the whole application.
 #
-# OFF by default, and measured rather than assumed: with it on, this suite's
-# OrientationLockScreenshotTest stops being able to restore portrait after its
-# landscape capture and times out. Catalyst treats a multiple-scene app's
-# windows more like Mac windows and honours orientation requests less, so the
-# regression is inherent to the key, not to the window code. Set
-# MAC_NATIVE_MULTI_WINDOW=true to build a Catalyst app that can open windows.
+# OFF by default because the key is process-wide and an older attempt at
+# enabling it destabilised this suite. Measured here across three runs with it
+# ON: the app boots, all 178 tests run, and no crash of the kind that warning
+# describes occurs. One run saw OrientationLockScreenshotTest time out restoring
+# portrait, but it passed with the key still on in the following runs, so that
+# was a slow-machine flake rather than a consequence of multiple scenes.
+# It stays opt-in regardless: real apps should not have Catalyst windowing
+# changed underneath them without asking. Set MAC_NATIVE_MULTI_WINDOW=true to
+# build a Catalyst app that can open windows.
 ensure_setting "codename1.arg.macNative.multiWindow" \
     "${MAC_NATIVE_MULTI_WINDOW:-false}"
 

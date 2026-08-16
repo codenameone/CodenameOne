@@ -144,8 +144,12 @@ public abstract class WindowHostTest extends BaseTest {
      */
     private void awaitRenderable(final int index, final int width, final int height,
                                  final long deadline) {
-        boolean ready = window != null && window.isWindowShowing()
-                && window.getWidth() > 1 && window.getHeight() > 1;
+        // Readiness is "a capture succeeds", not "the window says it is showing".
+        // A window reports the size it was asked for before the platform has
+        // actually produced it -- on Mac Catalyst the scene arrives asynchronously --
+        // so size and visibility are both true well before anything is renderable.
+        Image probe = window == null ? null : window.capture();
+        boolean ready = probe != null;
         if (ready || System.currentTimeMillis() >= deadline) {
             captureAndAdvance(index, width, height, ready);
             return;
@@ -164,7 +168,7 @@ public abstract class WindowHostTest extends BaseTest {
             fail("Window never became renderable for " + name
                     + " (showing=" + (window != null && window.isWindowShowing())
                     + " size=" + (window == null ? "none" : window.getWidth() + "x" + window.getHeight())
-                    + ")");
+                    + "); capture() never returned an image");
             return;
         }
         Image shot = window.capture();

@@ -97,8 +97,9 @@ public class WindowModalTest extends BaseTest {
      * makes the windows renderable happens on this thread.
      */
     private void awaitRenderable(final long deadline) {
-        boolean ready = background.isWindowShowing() && background.getWidth() > 1
-                && modal.isWindowShowing();
+        // Readiness is "a capture succeeds": a window reports the size it was asked
+        // for before the platform has actually produced it.
+        boolean ready = background.capture() != null && modal.isWindowShowing();
         if (ready) {
             capture();
             return;
