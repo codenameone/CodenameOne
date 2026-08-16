@@ -209,6 +209,50 @@ public final class IOSNative {
     // Toolbar acts as the window title bar, and make the window movable by its background so the
     // toolbar drags it. Passing false restores the standard titled window. A no-op on iOS/iPadOS.
     native void setMacWindowUndecorated(boolean undecorated);
+
+    // ---- Mac Catalyst desktop windows (CN1MacWindows.m) ---------------------
+    //
+    // A window is addressed by the slot returned from macWindowCreate. The
+    // windowId passed in is the framework's own id, stored natively and echoed
+    // back on every callback so events route without a lookup. Every one of these
+    // is a no-op on iOS proper, where the implementation is compiled out.
+
+    native int macWindowCreate(int windowId, String title, int x, int y, int width, int height,
+            boolean decorated, boolean resizable);
+
+    native void macWindowDestroy(int slot);
+
+    native void macWindowShow(int slot, boolean visible);
+
+    native void macWindowSetTitle(int slot, String title);
+
+    native void macWindowSetBounds(int slot, int x, int y, int width, int height);
+
+    native void macWindowGetBounds(int slot, int[] out);
+
+    native int macWindowGetWidth(int slot);
+
+    native int macWindowGetHeight(int slot);
+
+    native void macWindowSetState(int slot, int state);
+
+    /**
+     * Presents one rendered frame. The pixels are the window's own raster; the
+     * native side wraps them in a CGImage and assigns it to the view's layer.
+     */
+    native void macWindowPresent(int slot, int[] argb, int width, int height);
+
+    native int macMonitorCount();
+
+    native int macPrimaryMonitor();
+
+    native void macMonitorBounds(int monitor, boolean workArea, int[] out);
+
+    native int macMonitorDpi(int monitor);
+
+    native int macMonitorScaleTimes100(int monitor);
+
+    native int macMonitorForWindow(int slot);
     
     native void setImageName(long nativeImage, String name);
     

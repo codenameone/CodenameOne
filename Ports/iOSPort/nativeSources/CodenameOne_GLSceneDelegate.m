@@ -25,6 +25,12 @@
 
 #import "CodenameOne_GLSceneDelegate.h"
 
+#if TARGET_OS_MACCATALYST
+#import "CN1MacWindows.h"
+/* True when the scene was claimed by a Codename One Window. */
+extern BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
+#endif
+
 #ifdef CN1_USE_UI_SCENE
 @implementation CodenameOne_GLSceneDelegate
 
@@ -35,6 +41,14 @@
     if (![scene isKindOfClass:[UIWindowScene class]]) {
         return;
     }
+#if TARGET_OS_MACCATALYST
+    // A second scene of the app role belongs to a com.codename1.ui.Window, not to
+    // the application's main form. Hand it to the window layer, which owns it from
+    // here; only the first scene installs the main root view controller.
+    if (CN1MacWindowAdoptScene((UIWindowScene *)scene)) {
+        return;
+    }
+#endif
     UIWindow *window = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1InstallRootViewControllerIntoWindow:window];

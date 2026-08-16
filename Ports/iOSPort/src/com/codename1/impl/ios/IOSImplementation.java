@@ -963,6 +963,32 @@ public class IOSImplementation extends CodenameOneImplementation {
         return isDesktop() && "native".equals(getDesktopTitleBarMode());
     }
 
+    private MacWindowManager windowManager;
+
+    /**
+     * @inheritDoc
+     *
+     * Desktop windows exist only on the Mac Catalyst slice, and only when the app
+     * opted in through the {@code macNative.multiWindow} build hint. That hint also
+     * gates the {@code UIApplicationSupportsMultipleScenes} key in Info.plist, which
+     * is process-wide and is what actually makes a second scene possible -- turning
+     * it on unconditionally previously destabilised the Catalyst screenshot suite,
+     * so it stays opt-in.
+     */
+    @Override
+    public com.codename1.impl.WindowManager getWindowManager() {
+        if (!isDesktop()) {
+            return null;
+        }
+        if (!"true".equals(Display.getInstance().getProperty("macNative.multiWindow", "false"))) {
+            return null;
+        }
+        if (windowManager == null) {
+            windowManager = new MacWindowManager(this);
+        }
+        return windowManager;
+    }
+
     // Tracks the last desktop title-bar mode pushed to the native window chrome so the (idempotent)
     // native call is only made when the mode actually changes.
     private String lastMacChromeMode;
@@ -1789,6 +1815,48 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private final static int[] singleDimensionX = new int[1];
     private final static int[] singleDimensionY = new int[1];
+    // ---- Mac Catalyst desktop windows -------------------------------------
+    //
+    // Invoked from CN1MacWindows.m by way of the delivery bridge in IOSNative.m.
+    // Every one of these arrives on the platform's own thread; Display marshals
+    // onto the event dispatch thread where that matters.
+
+    /// Invoked when the user activates a window's close control.
+    public static void windowCloseCallback(int windowId) {
+        Display.getInstance().windowCloseRequested(windowId);
+    }
+
+    /// Invoked when a window gains or loses keyboard focus.
+    public static void windowFocusCallback(int windowId, boolean gained) {
+        Display.getInstance().windowFocusChanged(windowId, gained);
+    }
+
+    /// Invoked when a window's drawable area changes size.
+    public static void windowSizeCallback(int windowId, int width, int height) {
+        Display.getInstance().windowSizeChanged(windowId, width, height);
+    }
+
+    /// Invoked for a pointer event inside a window. The type is 1 for a press,
+    /// 2 for a release and 3 for a drag, matching CN1MacWindowView.
+    public static void windowPointerCallback(int windowId, int type, int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
+        switch (type) {
+            case 1:
+                Display.getInstance().windowPointerPressed(windowId, xs, ys);
+                break;
+            case 2:
+                Display.getInstance().windowPointerReleased(windowId, xs, ys);
+                break;
+            default:
+                Display.getInstance().windowPointerDragged(windowId, xs, ys);
+                break;
+        }
+    }
+
     public static void pointerPressedCallback(int x, int y) {
         if(dropEvents) {
             return;

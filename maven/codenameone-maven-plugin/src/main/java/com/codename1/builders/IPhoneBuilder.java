@@ -5656,6 +5656,9 @@ public class IPhoneBuilder extends Executor {
             }
         }
         boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
+        // Opt-in multi-window for the Mac Catalyst slice. See the comment on
+        // UIApplicationSupportsMultipleScenes below for why this is not on by default.
+        boolean multiWindow = "true".equalsIgnoreCase(request.getArg("macNative.multiWindow", "false"));
         // CarPlay requires the UIScene lifecycle and a dedicated
         // CPTemplateApplicationSceneSessionRoleApplication scene wired to
         // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
@@ -5687,11 +5690,17 @@ public class IPhoneBuilder extends Executor {
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
-                    // Keep single-scene (false): the CarPlay scene is a distinct scene ROLE
-                    // (CPTemplateApplicationSceneSessionRoleApplication), not a second window of the
-                    // app role, so it does not need multiple-scene support. Setting this true changed
-                    // Mac Catalyst windowing and crashed the screenshot suite (26 GB / signal loop).
-                    + "    <false/>\n"
+                    // Single-scene (false) unless the app explicitly opts in. The CarPlay scene is a
+                    // distinct scene ROLE (CPTemplateApplicationSceneSessionRoleApplication), not a
+                    // second window of the app role, so it does not need multiple-scene support --
+                    // and setting this true unconditionally changed Mac Catalyst windowing and
+                    // crashed the screenshot suite (26 GB / signal loop).
+                    //
+                    // com.codename1.ui.Window needs it, since a second window IS a second scene of
+                    // the app role, so macNative.multiWindow turns it on. That hint also gates
+                    // IOSImplementation.getWindowManager(), so the plist key and the API that needs
+                    // it are switched by the same flag and cannot disagree.
+                    + (multiWindow ? "    <true/>\n" : "    <false/>\n")
                     + "    <key>UISceneConfigurations</key>\n"
                     + "    <dict>\n"
                     + windowScene
