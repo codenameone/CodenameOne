@@ -3874,11 +3874,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     });
         }
-        // With the text layer active the visible text is already in the document, and the
-        // overlay's near-transparent copy would show up as a second find-in-page match that
-        // navigates to something the user cannot see. The label still reaches assistive
-        // technology through aria-label.
-        semanticOverlay.setTextContentEnabled(textLayer == null);
+        // The overlay mirrors labels as text only when nothing else is rendering them. While the
+        // text layer is promoting, its near-transparent copy would be a second find-in-page
+        // match that navigates to something the user cannot see. Once a pixel readback has
+        // returned text to the canvas the layer is no longer rendering anything, so the mirror
+        // has to come back or find-in-page would stay broken for the rest of the session.
+        semanticOverlay.setTextContentEnabled(textLayer == null || textLayerDisabledByReadback);
         semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
     }
 
@@ -10721,6 +10722,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // form, finds no back command, and appears to do nothing. Going back fires popstate,
             // which is why the next one is marked as already accounted for.
             historyStack.remove(depth - 1);
+            if (handlingPopState) {
+                // The user's own Back already spent the entry, and this form change is the
+                // result of servicing it. Going back again here would traverse twice for one
+                // press and walk straight out of the document.
+                return;
+            }
             historySuppressPop = true;
             try {
                 window.getHistory().back();
