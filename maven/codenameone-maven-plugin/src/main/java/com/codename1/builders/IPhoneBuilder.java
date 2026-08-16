@@ -24,6 +24,7 @@ package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSWalletExtensionBuilder;
+import com.codename1.util.MatterExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -292,6 +293,36 @@ public class IPhoneBuilder extends Executor {
     // phone target and the watch target -- WCSession is symmetric, so both halves of a pair need
     // it. Apps that never touch the API see no change.
     private boolean usesWearable;
+
+    // Smart home (com.codename1.home.*). Three flags rather than one, because
+    // the three things they gate cost very different amounts.
+    //
+    // usesSmartHome links HomeKit and compiles the natives -- cheap, and
+    // needed even by an app that only asks whether HomeKit exists.
+    //
+    // usesHomeAccessoryData is what earns the com.apple.developer.homekit
+    // ENTITLEMENT, and it is deliberately narrower. That entitlement has to be
+    // granted on the App ID, so handing it to an app that merely called
+    // getAvailability() would fail its codesigning for a capability it never
+    // asked for -- the same trap the HealthKit block below documents at
+    // length.
+    //
+    // usesHomeCommissioning is the expensive one: MatterSupport, a second
+    // entitlement, an app group, a background mode, Bonjour services and a
+    // whole generated app-extension target.
+    private boolean usesSmartHome;
+    private boolean usesHomeAccessoryData;
+    private boolean usesHomeCommissioning;
+
+    /// Whether the generated Xcode project gets the MatterAddDeviceExtension
+    /// target. True only when the app referenced
+    /// com.codename1.home.commissioning and did not opt out with
+    /// ios.home.commissioning=false.
+    private boolean matterExtensionEnabled;
+
+    /// The app group the Matter extension and its host share. Resolved
+    /// alongside the extension and read again when the target is written.
+    private String matterAppGroup;
 
     /**
      * Whether the API scan saw {@code com.codename1.wearable}.
@@ -1346,6 +1377,29 @@ public class IPhoneBuilder extends Executor {
                     if (!usesCar && cls.indexOf("com/codename1/car/") == 0) {
                         usesCar = true;
                     }
+                    // Smart home (com.codename1.home.*). Gated on actual usage so
+                    // HomeKit, its entitlement and the CN1SmartHome natives are only
+                    // added for apps that reference the API.
+                    if (cls.indexOf("com/codename1/home/") == 0) {
+                        usesSmartHome = true;
+                        if (cls.indexOf("com/codename1/home/commissioning/") == 0) {
+                            usesHomeCommissioning = true;
+                            // Adding an accessory means touching the home, so it earns
+                            // the HomeKit entitlement on its own -- the commissioning
+                            // sheet puts the device into the user's HomeKit home.
+                            usesHomeAccessoryData = true;
+                        } else if (!"com/codename1/home/SmartHome".equals(cls)
+                                && !isSmartHomeAvailabilityType(cls)) {
+                            // Naming any type beyond the facade and the
+                            // capability enums means the app is working with
+                            // accessories. The facade alone is decided by the
+                            // usesClassMethod hook below, because
+                            // SmartHome.getAvailability() and SmartHome.read()
+                            // are the same class reference and only one of
+                            // them needs an entitlement.
+                            usesHomeAccessoryData = true;
+                        }
+                    }
                     // External surfaces (com.codename1.surfaces.*): home-screen widgets
                     // and live activities. Gated on actual usage so the CN1Widgets
                     // extension / app group / CN1_USE_WIDGETS natives are only added for
@@ -1435,6 +1489,16 @@ public class IPhoneBuilder extends Executor {
                     // store; Health.getSensors() means BLE only. The class
                     // reference alone cannot tell them apart, so the facade
                     // is decided here.
+                    // SmartHome.read()/write()/refresh() touch the home;
+                    // SmartHome.getAvailability() asks whether HomeKit exists and
+                    // reads nothing. Both are the same class reference, so the
+                    // entitlement decision has to be made here.
+                    if ("com/codename1/home/SmartHome".equals(cls)) {
+                        usesSmartHome = true;
+                        if (SmartHomeManifestFragments.isAccessoryDataCall(method)) {
+                            usesHomeAccessoryData = true;
+                        }
+                    }
                     if ("com/codename1/health/Health".equals(cls)) {
                         usesHealth = true;
                         if (method.startsWith("getStore")
@@ -3155,6 +3219,177 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // Smart home (com.codename1.home.*).
+            if (usesSmartHome) {
+                String hk = "HomeKit.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = hk;
+                } else if (!addLibs.toLowerCase().contains("homekit")) {
+                    addLibs = addLibs + ";" + hk;
+                }
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_HOMEKIT",
+                            "#define CN1_INCLUDE_HOMEKIT");
+                } catch (Exception ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_HOMEKIT", ex);
+                }
+
+                // iOS TERMINATES an app that creates HMHomeManager without a
+                // usage description -- it does not fail gracefully, it kills
+                // the process on launch. So this is a hard failure rather
+                // than a defaulted placeholder, and for the same second
+                // reason the health strings are: Apple reviews this text
+                // against what the app actually does, so a generic string is
+                // what gets it rejected, and injecting one would be a privacy
+                // claim made in the developer's name.
+                //
+                // Trimmed, and blank counts as absent -- a hint present but
+                // empty produces exactly the empty string iOS refuses.
+                String homeUsage = trimToNull(request.getArg(
+                        "ios.NSHomeKitUsageDescription", null));
+                if (homeUsage != null) {
+                    request.putArgument("ios.NSHomeKitUsageDescription",
+                            homeUsage);
+                }
+                if (usesHomeAccessoryData && homeUsage == null) {
+                    throw new BuildException(
+                        "This app uses com.codename1.home but declares no "
+                      + "HomeKit privacy string.\n"
+                      + "  Add ios.NSHomeKitUsageDescription=<why your app "
+                      + "needs the user's home>\n"
+                      + "to codenameone_settings.properties. iOS terminates "
+                      + "an app that reaches HomeKit without it, and "
+                      + "Codename One does not inject a placeholder: Apple "
+                      + "reviews this text against your app's behaviour and "
+                      + "rejects generic copy.");
+                }
+
+                // The entitlement, and ONLY for an app that touches the home.
+                //
+                // com.apple.developer.homekit has to be enabled on the App ID
+                // and present in the provisioning profile, so entitling an
+                // app that merely rendered "not supported on this device"
+                // would fail its codesigning for a capability it never
+                // wanted -- and the failure surfaces as an opaque codesign
+                // error minutes into a cloud build. Exactly the trap the
+                // HealthKit block below spells out.
+                String homeEntitlement = request.getArg(
+                        "ios.entitlements.com.apple.developer.homekit", null);
+                if (usesHomeAccessoryData && homeEntitlement != null
+                        && !"true".equalsIgnoreCase(homeEntitlement)) {
+                    // Refused rather than overridden, because neither reading
+                    // wins on its own: forcing it on contradicts an explicit
+                    // instruction, and honouring it signs the app without the
+                    // capability so every HomeKit call fails at runtime while
+                    // the build looked perfectly healthy.
+                    error("This app uses com.codename1.home but sets "
+                            + "ios.entitlements.com.apple.developer.homekit="
+                            + homeEntitlement + ". HomeKit cannot be used "
+                            + "without that entitlement: the app would be "
+                            + "signed without the capability and every "
+                            + "accessory call would fail at runtime. Remove "
+                            + "the hint to have it added for you, set it to "
+                            + "true, or stop touching the home.",
+                            new RuntimeException(
+                                "homekit entitlement disabled"));
+                }
+                if (usesHomeAccessoryData && homeEntitlement == null) {
+                    request.putArgument(
+                        "ios.entitlements.com.apple.developer.homekit",
+                        "true");
+                }
+                if ("true".equalsIgnoreCase(
+                        request.getArg("ios.home.required", "false"))) {
+                    String caps = request.getArg(
+                            "ios.UIRequiredDeviceCapabilities", "");
+                    if (!caps.contains("homekit")) {
+                        request.putArgument("ios.UIRequiredDeviceCapabilities",
+                                caps.length() == 0 ? "homekit"
+                                        : caps + "," + "homekit");
+                    }
+                }
+            }
+
+            // Adding a Matter accessory. Everything here is skipped for an app
+            // that only reads its lights, which is why commissioning lives in
+            // a package of its own -- the scanner matches on a prefix and
+            // cannot express an exclusion.
+            matterExtensionEnabled = usesHomeCommissioning
+                    && !"false".equals(request.getArg(
+                            "ios.home.commissioning", "true"));
+            if (matterExtensionEnabled) {
+                String ms = "MatterSupport.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = ms;
+                } else if (!addLibs.toLowerCase().contains("mattersupport")) {
+                    addLibs = addLibs + ";" + ms;
+                }
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_MATTER_SETUP",
+                            "#define CN1_INCLUDE_MATTER_SETUP");
+                } catch (Exception ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_MATTER_SETUP", ex);
+                }
+                if (request.getArg("ios.entitlements.com.apple.developer"
+                        + ".matter.allow-setup-payload", null) == null) {
+                    request.putArgument("ios.entitlements.com.apple.developer"
+                            + ".matter.allow-setup-payload", "true");
+                }
+                // The app group is the only channel between the extension and
+                // the app, and Apple refuses to launch an extension whose
+                // group does not match its host's. ios.app_groups is the
+                // established comma-separated hint the entitlements generator
+                // already consumes, shared with the widgets flow.
+                String matterGroup = request.getArg("ios.home.appGroup",
+                        MatterExtensionBuilder.defaultAppGroup(
+                                request.getPackageName()));
+                String appGroups = request.getArg("ios.app_groups", "");
+                if (!appGroups.contains(matterGroup)) {
+                    request.putArgument("ios.app_groups",
+                            appGroups.length() == 0 ? matterGroup
+                                    : appGroups + "," + matterGroup);
+                }
+                matterAppGroup = matterGroup;
+                // Commissioning talks to the accessory over BLE before it has
+                // a network, and over mDNS afterwards. Both need declaring,
+                // and the Bonjour service types are the ones the Matter
+                // specification defines -- an app that omits them gets an
+                // accessory that is found and then cannot be reached.
+                String modes = request.getArg("ios.background_modes", "");
+                if (!modes.contains("bluetooth-central")) {
+                    modes = modes.length() == 0 ? "bluetooth-central"
+                            : modes + ",bluetooth-central";
+                    request.putArgument("ios.background_modes", modes);
+                }
+                if (request.getArg("ios.NSBluetoothAlwaysUsageDescription",
+                        null) == null) {
+                    request.putArgument(
+                            "ios.NSBluetoothAlwaysUsageDescription",
+                            "Used to set up new smart home accessories.");
+                }
+                if (request.getArg("ios.NSLocalNetworkUsageDescription", null)
+                        == null) {
+                    request.putArgument("ios.NSLocalNetworkUsageDescription",
+                            "Used to find smart home accessories on your "
+                            + "network.");
+                }
+                String bonjour = request.getArg("ios.NSBonjourServices", null);
+                String matterServices = "_matter._tcp.,_matterc._udp.";
+                if (bonjour == null) {
+                    request.putArgument("ios.NSBonjourServices",
+                            matterServices);
+                } else if (!bonjour.contains("_matterc._udp")) {
+                    request.putArgument("ios.NSBonjourServices",
+                            bonjour + "," + matterServices);
+                }
+            }
+
             // First-class health (com.codename1.health.*). Gated on
             // usesHealthStore, NOT usesHealth: an app that only streams a
             // heart-rate strap through com.codename1.health.sensors is
@@ -4210,6 +4445,14 @@ public class IPhoneBuilder extends Executor {
                         appendWalletExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
                     }
 
+                    if (matterExtensionEnabled) {
+                        // Same ordering note as the widget extension below: this runs after
+                        // the global deployment-target pass, so the extension keeps its own
+                        // IPHONEOS_DEPLOYMENT_TARGET of 16.1 while the app keeps whatever it
+                        // targets.
+                        appendMatterExtensionTarget(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
                     if (surfacesExtensionEnabled) {
                         // appExtensionsBuilder is appended to the schemes script AFTER the
                         // global deployment-target pass (deploymentTargetStr), so the
@@ -4677,6 +4920,30 @@ public class IPhoneBuilder extends Executor {
     ///
     /// These travel through the BLE sensor layer, which needs no HealthKit
     /// entitlement, no framework and no purpose string.
+    /**
+     * Whether a {@code com.codename1.home} class is one an app can name while
+     * only asking whether smart home is <b>available</b>.
+     *
+     * <p>The distinction earns its keep because the HomeKit entitlement has to
+     * be granted on the App ID: an app that renders "smart home is not
+     * supported on this device" and nothing else would otherwise be handed an
+     * entitlement its profile does not carry, and fail codesigning for a
+     * capability it never wanted. Exactly the trap the HealthKit block
+     * documents.</p>
+     *
+     * <p>The capability enums are what such an app touches: it reads an
+     * availability, branches on it, and possibly shows a typed error. None of
+     * that reaches an accessory.</p>
+     */
+    private static boolean isSmartHomeAvailabilityType(String cls) {
+        return "com/codename1/home/HomeAvailability".equals(cls)
+                || "com/codename1/home/HomeBackend".equals(cls)
+                || "com/codename1/home/HomeAuthorizationStatus".equals(cls)
+                || "com/codename1/home/HomeError".equals(cls)
+                || "com/codename1/home/HomeException".equals(cls)
+                || "com/codename1/home/HomeConfigurationException".equals(cls);
+    }
+
     private static boolean isSharedHealthModel(String cls) {
         return "com/codename1/health/HealthSample".equals(cls)
                 || "com/codename1/health/QuantitySample".equals(cls)
@@ -5098,6 +5365,85 @@ public class IPhoneBuilder extends Executor {
      * and appends the ruby that wires them into the generated Xcode project as
      * app_extension targets. Driven by the ios.wallet.* build hints.
      */
+    /**
+     * Writes the MatterAddDeviceExtension folder under dist/ and appends the ruby that wires it
+     * into the generated Xcode project.
+     *
+     * <p>Apple requires this extension before an app may add a Matter accessory: the add-device
+     * sheet runs outside the app and talks to it. An app without one gets a runtime failure from
+     * the first commissioning call and nothing at build time to warn it -- which is precisely why
+     * generating it is the builder's job rather than something a Codename One developer is asked
+     * to hand-write in Xcode.</p>
+     *
+     * <p>Only reached when the scanner saw {@code com.codename1.home.commissioning}.</p>
+     */
+    private void appendMatterExtensionTarget(StringBuilder sb, BuildRequest request, File distDir)
+            throws IOException {
+        String name = MatterExtensionBuilder.EXTENSION_NAME;
+        String displayName = request.getArg("ios.home.commissioning.displayName",
+                request.getDisplayName() == null ? name : request.getDisplayName());
+        IOSWalletExtensionBuilder.writeFileMap(
+                MatterExtensionBuilder.buildFileMap(request.getPackageName(),
+                        matterAppGroup, displayName),
+                new File(distDir, name));
+        log("Adding Matter add-device extension target " + name
+                + " (app group " + matterAppGroup + ")");
+
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_BUNDLE_IDENTIFIER", request.getPackageName() + "." + name);
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
+        buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
+        buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
+                MatterExtensionBuilder.DEPLOYMENT_TARGET);
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
+                "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+        buildSettingsMap.put("SKIP_INSTALL", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_OBJC_ARC", "YES");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        // The handler is Swift, because MatterSupport has no Objective-C interface. Naming the
+        // version explicitly keeps the extension building when the app target's own Swift
+        // settings differ or are absent entirely -- most Codename One apps have no Swift at all.
+        buildSettingsMap.put("SWIFT_VERSION", request.getArg("ios.swiftVersion", "5.0"));
+        buildSettingsMap.put("ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES", "YES");
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.home.commissioning.buildSettings.")) {
+                buildSettingsMap.put(
+                        key.substring("ios.home.commissioning.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        // Guarded so re-running the script does not create a duplicate target; the build
+        // re-executes fix_xcode_schemes.rb after dependency integration.
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + name + "', :ios, '"
+                + MatterExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
+                + "service_target.add_system_framework('MatterSupport')\n"
+                + "service_group = xcproj.new_group('" + name + "')\n");
+        appendFilesToXcodeProjGroup(sb, new File(distDir, name), "service_group", "service_target",
+                distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('"
+                + name + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| "
+                + "p.name=='Embed App Extensions'} || "
+                + "main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_phase.add_file_reference(fileref)\n"
+                + "service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + buildSettingKey + "'] = \""
+                    + buildSettingsMap.get(buildSettingKey) + "\"\n");
+        }
+        sb.append("}\n");
+        sb.append("end\n");
+        sb.append("xcproj.save(project_file)\n");
+    }
+
     private void appendWalletExtensionTargets(StringBuilder sb, BuildRequest request, File distDir) throws IOException {
         IOSWalletExtensionBuilder walletBuilder = new IOSWalletExtensionBuilder()
                 .setAppGroupId(request.getArg("ios.wallet.appGroup", ""))

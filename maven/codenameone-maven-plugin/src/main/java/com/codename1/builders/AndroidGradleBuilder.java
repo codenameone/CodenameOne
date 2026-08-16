@@ -627,6 +627,14 @@ public class AndroidGradleBuilder extends Executor {
     private String healthApplicationFragment = "";
     private String healthGradleDependency = "";
 
+    // Smart home (com.codename1.home.*). usesSmartHome gates the whole
+    // feature; usesHomeCommissioning is tracked separately because on iOS it
+    // costs an entire extra Xcode target, and both builders read the same
+    // package split so the two agree about what an app asked for.
+    private boolean usesSmartHome;
+    private boolean usesHomeCommissioning;
+    private String smartHomeQueriesFragment = "";
+
     private boolean integrateMoPub = false;
 
     private static final boolean isMac;
@@ -1463,6 +1471,12 @@ public class AndroidGradleBuilder extends Executor {
         // com.codename1.maps package and returns the onCreate snippet that
         // registers it. Keeps the core framework free of any map SDK.
         String mapsProviderSupport = MapsProviderInjector.injectAndroid(this, request, srcDir);
+        // Only for apps that referenced com.codename1.home. The delegate this
+        // copies in is what makes the API answer anything other than
+        // "unsupported" on Android, and it has to be registered before any
+        // application code runs -- see SmartHomeInjector.
+        String smartHomeSupport = usesSmartHome
+                ? SmartHomeInjector.injectAndroid(this, srcDir) : "";
         File dummyClassesDir = new File(tmpFile, "Classes");
         dummyClassesDir.mkdirs();
         File libsDir = new File(projectDir, "libs");
@@ -1936,6 +1950,17 @@ public class AndroidGradleBuilder extends Executor {
                     // (Scan* handles vs the GATT/stream types); the
                     // usesClassMethod hook below catches facade-only
                     // callers.
+                    // Smart home (com.codename1.home.*). Gated on actual
+                    // usage so the Play services home dependency and the
+                    // injected bridge are only added for apps that reference
+                    // the API.
+                    if (cls.indexOf("com/codename1/home/") == 0) {
+                        usesSmartHome = true;
+                        if (cls.indexOf("com/codename1/home/commissioning/")
+                                == 0) {
+                            usesHomeCommissioning = true;
+                        }
+                    }
                     if (cls.indexOf("com/codename1/health/") == 0) {
                         usesHealth = true;
                         // The facade itself is not evidence of the store:
@@ -2436,6 +2461,31 @@ public class AndroidGradleBuilder extends Executor {
                     usesBluetoothScan, usesBluetoothConnect,
                     usesBluetoothPeripheral, usesBluetoothClassic,
                     neverForLocation, bleRequired, targetSDKVersionInt);
+        }
+
+        // Smart home (com.codename1.home.*).
+        //
+        // Deliberately no permissions. Play services runs the entire
+        // add-device interaction in its OWN activity, holding its own
+        // permissions, and the play-services-home AAR declares none -- so an
+        // app that never scans for anything does not get a Bluetooth prompt
+        // it cannot explain. See SmartHomeManifestFragments.
+        if (usesSmartHome) {
+            log("Smart home fragments version "
+                    + SmartHomeManifestFragments.FRAGMENT_VERSION
+                    + (usesHomeCommissioning ? " (with commissioning)" : ""));
+            if (targetSDKVersionInt >= 30) {
+                // Package visibility. Without this
+                // getLaunchIntentForPackage answers null even when Google
+                // Home is installed, so SmartHome.openEcosystemApp() -- the
+                // recovery an app offers a user with no home set up --
+                // silently does nothing.
+                smartHomeQueriesFragment =
+                        SmartHomeManifestFragments.injectQueries("");
+            }
+            minSDK = maxInt(
+                    Integer.toString(SmartHomeManifestFragments.MINIMUM_SDK),
+                    minSDK);
         }
 
         // First-class health (com.codename1.health.*). Gated on
@@ -3467,7 +3517,8 @@ public class AndroidGradleBuilder extends Executor {
         if (targetSDKVersionInt >= 30) {
             xQueries = "<queries>\n"
                     + request.getArg("android.manifest.queries", "")
-                    + healthQueriesFragment + "</queries>\n";
+                    + healthQueriesFragment + smartHomeQueriesFragment
+                    + "</queries>\n";
         }
 
         //Delete the Facebook implemetation if this app does not use FB.
@@ -5132,6 +5183,7 @@ public class AndroidGradleBuilder extends Executor {
                     + facebookHashCode
                     + facebookSupport
                     + mapsProviderSupport
+                    + smartHomeSupport
                     + streamMode
                     + registerNativeImplementationsAndCreateStubs(
                             new URLClassLoader(

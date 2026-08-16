@@ -443,6 +443,56 @@ public final class PlatformFeatureCatalog {
                          "Communicates with nearby heart rate and fitness sensors.")
                 .description("Bluetooth health sensors (heart rate, power, cadence, scales, cuffs, glucose)"));
 
+        // Smart home (com.codename1.home.*): HomeKit on Apple platforms,
+        // Google Play services Matter commissioning on Android.
+        //
+        // NOTE three deliberate omissions.
+        //
+        //  - NO iosPlist default for NSHomeKitUsageDescription. Same reason
+        //    the health entry injects no purpose string: Apple reviews this
+        //    text against what the app actually does, so a generic
+        //    placeholder is precisely what gets an app rejected. iOS also
+        //    terminates an app that reaches HomeKit without one, so a
+        //    placeholder would not even achieve the "keeps the build working"
+        //    goal. IPhoneBuilder fails the build with an actionable message.
+        //
+        //  - NO androidPermissions. Play services runs the whole add-device
+        //    interaction in its OWN activity, so the app needs no Bluetooth,
+        //    location or local-network permission -- and the AAR's manifest
+        //    declares none, which is the authority here. Adding them "to be
+        //    safe" would put a Bluetooth permission prompt in front of users
+        //    of an app that never scans.
+        //
+        //  - The HomeKit framework linkage and the CN1_INCLUDE_HOMEKIT define
+        //    flip happen in IPhoneBuilder, because the entitlement decision is
+        //    tied to them and has to distinguish an app that touches
+        //    accessories from one that only asks whether HomeKit exists.
+        //    iosFrameworks here is documentation, matching the bluetooth and
+        //    health entries above.
+        e.add(new Entry("com/codename1/home/")
+                .iosFrameworks("HomeKit")
+                .androidGradle("com.google.android.gms:play-services-home:"
+                        + "16.0.0-beta1")
+                .androidMinimumSdk(21)
+                .description("Smart home accessories (HomeKit, Matter, "
+                        + "Google Home)"));
+
+        // Adding a Matter accessory. Its own entry, and its own package on the
+        // Java side, because on iOS it is far more expensive than the rest:
+        // the MatterSupport framework, a com.apple.developer.matter
+        // .allow-setup-payload entitlement, an app group and a whole generated
+        // app-extension target. An app that only reads its lights should carry
+        // none of that, and since entries match on a prefix with no way to
+        // express an exclusion, the package boundary has to BE the permission
+        // boundary.
+        //
+        // The deployment floor is real: MatterSupport arrived in iOS 16.1 and
+        // linking it below that fails at launch rather than at build time.
+        e.add(new Entry("com/codename1/home/commissioning/")
+                .iosFrameworks("MatterSupport")
+                .iosMinimumDeploymentTarget("16.1")
+                .description("Matter accessory commissioning"));
+
         // On-device Stable Diffusion: bundled Core ML model on iOS,
         // ONNX runtime on Android. Flag the >2 GB upload concern so
         // the cloud build server can abort early with a helpful

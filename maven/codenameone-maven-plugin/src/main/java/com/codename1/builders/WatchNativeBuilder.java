@@ -146,7 +146,12 @@ class WatchNativeBuilder {
             //
             // This is the "device-only framework" the SDK probe was once written to protect. It
             // never needed protecting.
-            + "BackgroundTasks.framework";
+            + "BackgroundTasks.framework;"
+            // MatterSupport IS in the watchOS SDK -- verified with the ls above -- but the watch
+            // slice compiles the add-device flow out (CN1SmartHome.h #undefs
+            // CN1_INCLUDE_MATTER_SETUP for TARGET_OS_WATCH), because Apple's sheet is iOS and
+            // iPadOS only. Present but unreferenced is exactly what this list is for.
+            + "MatterSupport.framework";
 
     /**
      * Frameworks the watch target MAY link, so that every framework this builder can emit is
@@ -164,7 +169,10 @@ class WatchNativeBuilder {
             + "CoreLocation.framework;CoreMedia.framework;CoreML.framework;"
             + "CoreMotion.framework;CoreText.framework;CoreVideo.framework;"
             + "DeviceCheck.framework;EventKit.framework;GameKit.framework;"
-            + "HealthKit.framework;LocalAuthentication.framework;MobileCoreServices.framework;"
+            // HomeKit is present on watchOS and the watch slice genuinely uses it: CN1SmartHome.m
+            // compiles for the watch and a wrist app controlling a light is the obvious case.
+            + "HealthKit.framework;HomeKit.framework;"
+            + "LocalAuthentication.framework;MobileCoreServices.framework;"
             + "NaturalLanguage.framework;NetworkExtension.framework;PhotosUI.framework;"
             + "QuartzCore.framework;Security.framework;UserNotifications.framework;"
             + "WatchConnectivity.framework";
