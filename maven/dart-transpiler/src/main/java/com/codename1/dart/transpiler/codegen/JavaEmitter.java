@@ -687,7 +687,12 @@ public final class JavaEmitter {
                 }
             }
             if (extendsIt || implementsIt) {
-                subs.add(c.name);
+                // The EMITTED name, not the Dart one. A subtype whose name collides with a
+                // stub class is emitted under a library-qualified name, and a permits clause
+                // naming the Dart name then refers to a class that does not exist - which is
+                // not a niche case, since the Flutter stubs declare Rect, Size, Color and
+                // plenty of other names an app will reasonably use for its own sealed types.
+                subs.add(javaClassName(c));
             }
         }
         return subs;

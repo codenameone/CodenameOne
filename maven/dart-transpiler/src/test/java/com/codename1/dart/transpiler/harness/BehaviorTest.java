@@ -48,10 +48,21 @@ public class BehaviorTest {
         assumeTrue(java17 != null, "JAVA17_HOME not set — skipping behavioral execution");
         assumeTrue(dartRuntime != null && core != null, "runtime jars not built — skipping");
         String rtClasspath = dartRuntime.getAbsolutePath() + File.pathSeparator + core.getAbsolutePath();
+        // A case that touches a widget API needs the Flutter runtime to link against.
+        // Cases that do not are unaffected by its presence, so this is unconditional
+        // rather than another thing each case has to declare.
+        File flutterRuntime = TestSupport.findJar("codenameone-flutter-runtime");
+        if (flutterRuntime != null) {
+            rtClasspath = rtClasspath + File.pathSeparator + flutterRuntime.getAbsolutePath();
+        }
 
+        List<File> stubEntries = new ArrayList<File>();
+        if (flutterRuntime != null) {
+            stubEntries.add(flutterRuntime);
+        }
         TestSupport.Result r = TestSupport.transpile(new String[][] {
                 {"main.dart", TestSupport.read(new File(dir, "main.dart"))}
-        });
+        }, stubEntries);
         assertTrue(!r.diags.hasErrors(), "diagnostics: " + r.diags.asList());
 
         File work = Files.createTempDirectory("dart-behavior-" + dir.getName()).toFile();

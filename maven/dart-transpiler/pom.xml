@@ -103,5 +103,18 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Test scope only, and only so a behavioral case can exercise a WIDGET api: the
+          case is resolved against this module's Dart stubs and then executed against its
+          classes. The transpiler itself does not depend on the Flutter runtime - it
+          reads whatever stubs are on the app's classpath - so this must never leave
+          test scope, or the compiler starts shipping a UI framework.
+        -->
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-flutter-runtime</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

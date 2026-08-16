@@ -35,13 +35,28 @@ public final class TestSupport {
 
     /** Transpiles a set of in-memory dart sources (fileName -> content). */
     public static Result transpile(String[][] sources) {
+        return transpile(sources, java.util.Collections.<File>emptyList());
+    }
+
+    /**
+     * Transpiles against the Dart stubs published by {@code stubEntries} — the jars or
+     * class directories an app would have on its classpath.
+     *
+     * <p>This is how the real mojo resolves the API surface, and a case that touches a
+     * widget needs it: the embedded stub set is only the built-ins plus material, so
+     * anything a runtime module declares for itself (Curves, the animation family) is
+     * unresolvable without the jar that declares it.</p>
+     */
+    public static Result transpile(String[][] sources, java.util.List<File> stubEntries) {
         Diagnostics diags = new Diagnostics();
         AstBuilder builder = new AstBuilder(diags);
         Program program = new Program();
         for (String[] s : sources) {
             program.add(builder.parse(s[0], s[1]));
         }
-        StubRegistry stubs = StubRegistry.loadEmbedded(diags);
+        // loadFromClasspath falls back to the embedded set when nothing contributes, so an
+        // empty list keeps the previous behaviour exactly.
+        StubRegistry stubs = StubRegistry.loadFromClasspath(stubEntries, diags);
         JavaEmitter emitter = new JavaEmitter(program, stubs, diags, PKG);
         return new Result(emitter.emit(), diags);
     }
