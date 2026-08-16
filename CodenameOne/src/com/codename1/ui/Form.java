@@ -3102,9 +3102,25 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// - Component#setPreferredTabIndex(int)
     public TabIterator getTabIterator(Component start) {
-        updateTabIndices(0);
+        return buildTabIterator(this, start);
+    }
+
+    /// Builds the traversal order for a top level. Shared with `Window`, which needs
+    /// the identical ordering rules but is not a `Form`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the top level to walk
+    ///
+    /// - `start`: the component to start from
+    ///
+    /// #### Returns
+    ///
+    /// the traversal iterator
+    static TabIterator buildTabIterator(Container root, Component start) {
+        root.updateTabIndices(0);
         java.util.List<Component> out = new ArrayList<Component>();
-        out.addAll(ComponentSelector.select("*", this).filter(new TabIteratorFilter()));
+        out.addAll(ComponentSelector.select("*", root).filter(new TabIteratorFilter()));
         Collections.sort(out, new TabIteratorComparator());
         return new TabIterator(out, start);
     }

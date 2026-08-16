@@ -338,7 +338,12 @@ public final class Display extends CN1Constants {
 
     // huge false positive from PMD...
     @SuppressWarnings("PMD.SingularField")
-    private Form eventForm;
+    private Container eventForm;
+
+    /// Window ids remembered so a key repeat or long press started in a window is
+    /// delivered back to that window rather than to the main form.
+    private int keyRepeatWindowId;
+    private int longPointerWindowId;
 
     /// Private constructor to prevent instanciation
     private Display() {
@@ -1149,7 +1154,10 @@ public final class Display extends CN1Constants {
         try {
             // when there is no current form the EDT is useful only
             // for features such as call serially
-            while (impl.getCurrentForm() == null) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
+            // A window shown before the first Form.show() must not be starved: this
+            // phase never calls edtLoopImpl(), so it neither drains input nor paints.
+            while (impl.getCurrentForm() == null
+                    && !Desktop.getInstance().hasVisibleWindows()) { // PMD Fix: AvoidBranchingStatementAsLastInLoop
                 synchronized (lock) {
                     while (shouldEDTSleep() && pendingIdleSerialCalls.isEmpty()) {
                         try {
@@ -1241,6 +1249,10 @@ public final class Display extends CN1Constants {
                 }
             }
         }
+        // Dispose any window still open, on the EDT, before the implementation goes
+        // away. Doing this from the static deinitialize() would run the teardown off
+        // the EDT, which is exactly the thread the window's tree expects.
+        Desktop.getInstance().disposeAll();
         impl.deinitialize();
         //INSTANCE.impl = null;
         //INSTANCE.codenameOneGraphics = null;
@@ -1354,25 +1366,43 @@ public final class Display extends CN1Constants {
 
         if (current != null) {
             current.repaintAnimations();
-            // check key repeat events
-            long t = System.currentTimeMillis();
-            if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
-                current.keyRepeated(keyRepeatValue);
-                int keyRepeatNextIntervalTime = 10;
-                nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
-            }
-            if (longPressCharged && longPressInterval <= t - longKeyPressTime) {
-                longPressCharged = false;
-                current.longKeyPress(keyRepeatValue);
-            }
-            if (longPointerCharged && longPressInterval <= t - longKeyPressTime) {
-                longPointerCharged = false;
-                current.longPointerPress(pointerX, pointerY);
-            }
+        }
+
+        // Additional native windows, painted after the main surface so its call
+        // ordering is untouched. One field read per frame when none are open.
+        if (Desktop.getInstance().hasOpenWindows()) {
+            paintOpenWindows();
+        }
+
+        // Key repeat and long press are routed back to whichever top level the
+        // originating press came from, not blindly to the current form.
+        long t = System.currentTimeMillis();
+        Container repeatTarget = repeatTarget(keyRepeatWindowId, current);
+        if (repeatTarget != null && keyRepeatCharged && nextKeyRepeatEvent <= t) {
+            repeatTarget.keyRepeated(keyRepeatValue);
+            int keyRepeatNextIntervalTime = 10;
+            nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
+        }
+        if (repeatTarget != null && longPressCharged && longPressInterval <= t - longKeyPressTime) {
+            longPressCharged = false;
+            repeatTarget.longKeyPress(keyRepeatValue);
+        }
+        Container pointerTarget = repeatTarget(longPointerWindowId, current);
+        if (pointerTarget != null && longPointerCharged && longPressInterval <= t - longKeyPressTime) {
+            longPointerCharged = false;
+            pointerTarget.longPointerPress(pointerX, pointerY);
         }
         processSerialCalls();
 
         time = System.currentTimeMillis() - currentTime;
+    }
+
+    /// Resolves the top level a repeat or long press should be delivered to.
+    private Container repeatTarget(int windowId, Form current) {
+        if (windowId == 0) {
+            return current;
+        }
+        return Desktop.getInstance().windowById(windowId);
     }
 
     boolean hasNoSerialCallsPending() {
@@ -2208,7 +2238,26 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
-        addSingleArgumentEvent(KEY_PRESSED, keyCode);
+        keyPressedImpl(0, keyCode);
+    }
+
+    /// Pushes a key press event aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `keyCode`: keycode of the key event
+    public void windowKeyPressed(int windowId, int keyCode) {
+        if (windowId > 0) {
+            keyPressedImpl(windowId, keyCode);
+        }
+    }
+
+    private void keyPressedImpl(int windowId, final int keyCode) {
+        keyRepeatWindowId = windowId;
+        addSingleArgumentEvent(KEY_PRESSED | (windowId << 8), keyCode);
 
         lastInteractionWasKeypad = lastInteractionWasKeypad || (keyCode != MenuBar.leftSK && keyCode != MenuBar.clearSK && keyCode != MenuBar.backSK);
 
@@ -2303,7 +2352,7 @@ public final class Display extends CN1Constants {
         }
     }
 
-    private void addPointerDragEventWithTimestamp(int x, int y) {
+    private void addPointerDragEventWithTimestamp(int windowId, int x, int y) {
         synchronized (lock) {
             if (this.dropEvents) {
                 return;
@@ -2317,7 +2366,7 @@ public final class Display extends CN1Constants {
                     if (!hasInputEventStackCapacity(4)) {
                         return;
                     }
-                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED;
+                    inputEventStack[inputEventStackPointer] = POINTER_DRAGGED | (windowId << 8);
                     inputEventStackPointer++;
                     lastDragOffset = inputEventStackPointer;
                     inputEventStack[inputEventStackPointer] = x;
@@ -2371,15 +2420,35 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
+        pointerDraggedImpl(0, x, y);
+    }
+
+    /// Pushes a pointer drag aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x positions of the pointer
+    ///
+    /// - `y`: the y positions of the pointer
+    public void windowPointerDragged(int windowId, int[] x, int[] y) {
+        if (windowId > 0) {
+            pointerDraggedImpl(windowId, x, y);
+        }
+    }
+
+    private void pointerDraggedImpl(int windowId, final int[] x, final int[] y) {
         if (x.length == 0) {
             // Native ports have been observed to deliver zero-length pointer arrays
             return;
         }
         longPointerCharged = false;
         if (x.length == 1) {
-            addPointerDragEventWithTimestamp(x[0], y[0]);
+            addPointerDragEventWithTimestamp(windowId, x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_DRAGGED_MULTI, x, y);
+            addPointerEvent(POINTER_DRAGGED_MULTI | (windowId << 8), x, y);
         }
     }
 
@@ -2440,16 +2509,36 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
+        pointerPressedImpl(0, x, y);
+    }
 
+    /// Pushes a pointer press aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x positions of the pointer
+    ///
+    /// - `y`: the y positions of the pointer
+    public void windowPointerPressed(int windowId, int[] x, int[] y) {
+        if (windowId > 0) {
+            pointerPressedImpl(windowId, x, y);
+        }
+    }
+
+    private void pointerPressedImpl(int windowId, final int[] x, final int[] y) {
         lastInteractionWasKeypad = false;
         longPointerCharged = true;
+        longPointerWindowId = windowId;
         longKeyPressTime = System.currentTimeMillis();
         pointerX = x[0];
         pointerY = y[0];
         if (x.length == 1) {
-            addPointerEvent(POINTER_PRESSED, x[0], y[0]);
+            addPointerEvent(POINTER_PRESSED | (windowId << 8), x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_PRESSED_MULTI, x, y);
+            addPointerEvent(POINTER_PRESSED_MULTI | (windowId << 8), x, y);
         }
     }
 
@@ -2465,10 +2554,31 @@ public final class Display extends CN1Constants {
         if (impl.getCurrentForm() == null) {
             return;
         }
+        pointerReleasedImpl(0, x, y);
+    }
+
+    /// Pushes a pointer release aimed at one native window into Codename One.
+    /// Invoked by the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x positions of the pointer
+    ///
+    /// - `y`: the y positions of the pointer
+    public void windowPointerReleased(int windowId, int[] x, int[] y) {
+        if (windowId > 0) {
+            longPointerCharged = false;
+            pointerReleasedImpl(windowId, x, y);
+        }
+    }
+
+    private void pointerReleasedImpl(int windowId, final int[] x, final int[] y) {
         if (x.length == 1) {
-            addPointerEvent(POINTER_RELEASED, x[0], y[0]);
+            addPointerEvent(POINTER_RELEASED | (windowId << 8), x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_RELEASED_MULTI, x, y);
+            addPointerEvent(POINTER_RELEASED_MULTI | (windowId << 8), x, y);
         }
     }
 
@@ -2509,6 +2619,117 @@ public final class Display extends CN1Constants {
 
         lastSizeChangeEventWH = w + h;
         addSizeChangeEvent(SIZE_CHANGED, w, h);
+    }
+
+    /// Notifies Codename One that a native window changed size. Invoked by the
+    /// implementation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `w`: the new drawable width
+    ///
+    /// - `h`: the new drawable height
+    public void windowSizeChanged(int windowId, int w, int h) {
+        if (windowId > 0) {
+            addSizeChangeEvent(SIZE_CHANGED | (windowId << 8), w, h);
+        }
+    }
+
+    /// Notifies Codename One that a native window became visible.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowShowNotify(int windowId) {
+        if (windowId > 0) {
+            addSingleArgumentEvent(SHOW_NOTIFY | (windowId << 8), 0);
+        }
+    }
+
+    /// Notifies Codename One that a native window stopped being visible.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowHideNotify(int windowId) {
+        if (windowId > 0) {
+            addSingleArgumentEvent(HIDE_NOTIFY | (windowId << 8), 0);
+        }
+    }
+
+    /// Notifies Codename One that a native window gained or lost keyboard focus.
+    /// Marshalled onto the event dispatch thread, since it runs application code.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `gained`: true when the window gained focus
+    public void windowFocusChanged(final int windowId, final boolean gained) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Window w = Desktop.getInstance().windowById(windowId);
+                if (gained) {
+                    Desktop.getInstance().setFocusedWindow(w);
+                } else if (Desktop.getInstance().getFocusedWindow() == w) { //NOPMD CompareObjectsWithEquals
+                    Desktop.getInstance().setFocusedWindow(null);
+                }
+            }
+        });
+    }
+
+    /// Notifies Codename One that the user activated a native window's close control.
+    /// Marshalled onto the event dispatch thread, since it runs application code and
+    /// may dispose the window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowCloseRequested(final int windowId) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Window w = Desktop.getInstance().windowById(windowId);
+                if (w != null) {
+                    w.closeRequested();
+                }
+            }
+        });
+    }
+
+    /// Notifies Codename One that a native window moved to a monitor with different
+    /// characteristics, so that its scale and layout are recomputed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowMonitorChanged(final int windowId) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                Window w = Desktop.getInstance().windowById(windowId);
+                if (w != null) {
+                    w.monitorChanged();
+                }
+                Desktop.getInstance().fireMonitorChanged();
+            }
+        });
+    }
+
+    /// Notifies Codename One that the set of attached monitors changed.
+    public void monitorsChanged() {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                for (Window w : Desktop.getInstance().getWindows()) {
+                    w.monitorChanged();
+                }
+                Desktop.getInstance().fireMonitorChanged();
+            }
+        });
     }
 
     private void addNotifyEvent(int type) {
@@ -2579,15 +2800,31 @@ public final class Display extends CN1Constants {
 
     /// Invoked on the EDT to propagate the event
     private int handleEvent(int offset, int[] inputEventStackTmp) {
-        Form f = getCurrentUpcomingForm(true);
+        // The window id is packed into the high bits of the type word. Window 0 is
+        // the main surface, and for it the packed word is numerically identical to
+        // what it always was, so the main path is unchanged.
+        int packed = inputEventStackTmp[offset];
+        int type = packed & 0xFF;
+        int windowId = packed >>> 8;
 
-        // might happen when returning from a deinitialized version of Codename One
-        if (f == null) {
-            return offset;
+        Container f;
+        if (windowId == 0) {
+            f = getCurrentUpcomingForm(true);
+        } else {
+            f = Desktop.getInstance().windowById(windowId);
+        }
+
+        // might happen when returning from a deinitialized version of Codename One,
+        // or when a window was disposed while its events were still in flight
+        if (f == null || isBlockedByModal(windowId)) {
+            // NOTE: drain the packet rather than returning offset unchanged. The
+            // caller loops while (offset < end), so returning it unchanged spins the
+            // EDT forever, and returning a sentinel would drop the rest of the batch
+            // -- which may contain main form events.
+            return skipEvent(type, offset + 1, inputEventStackTmp);
         }
 
         // no need to synchronize since we are reading only and modifying the stack frame offset
-        int type = inputEventStackTmp[offset];
         offset++;
 
         switch (type) {
@@ -2600,14 +2837,15 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Form xf = eventForm;
+                Container xf = eventForm;
                 eventForm = null;
 
                 //make sure the released event is sent to the same Form who got a
                 //pressed event
+                int releasedKey = inputEventStackTmp[offset];
+                offset++;
                 if (xf == f || multiKeyMode) { //NOPMD CompareObjectsWithEquals
-                    f.keyReleased(inputEventStackTmp[offset]);
-                    offset++;
+                    f.keyReleased(releasedKey);
                 }
                 break;
             case POINTER_PRESSED:
@@ -2648,16 +2886,18 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Form x = eventForm;
+                Container x = eventForm;
                 eventForm = null;
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
+                int releasedX = inputEventStackTmp[offset];
+                offset++;
+                int releasedY = inputEventStackTmp[offset];
+                offset++;
                 if (x == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
-                    xArray1[0] = inputEventStackTmp[offset];
-                    offset++;
-                    yArray1[0] = inputEventStackTmp[offset];
-                    offset++;
+                    xArray1[0] = releasedX;
+                    yArray1[0] = releasedY;
                     currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
                     f.pointerReleased(xArray1, yArray1);
                 }
@@ -2671,18 +2911,18 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Form xy = eventForm;
+                Container xy = eventForm;
                 eventForm = null;
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
+                int[] releasedMultiX = readArrayStackArgument(inputEventStackTmp, offset);
+                offset += releasedMultiX.length + 1;
+                int[] releasedMultiY = readArrayStackArgument(inputEventStackTmp, offset);
+                offset += releasedMultiY.length + 1;
                 if (xy == f || f.shouldSendPointerReleaseToOtherForm()) { //NOPMD CompareObjectsWithEquals
-                    int[] array1 = readArrayStackArgument(inputEventStackTmp, offset);
-                    offset += array1.length + 1;
-                    int[] array2 = readArrayStackArgument(inputEventStackTmp, offset);
-                    offset += array2.length + 1;
-                    currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
-                    f.pointerReleased(array1, array1);
+                    currentPointerEvent = impl.buildPointerEvent(releasedMultiX[0], releasedMultiY[0], false);
+                    f.pointerReleased(releasedMultiX, releasedMultiY);
                 }
                 recursivePointerReleaseA = false;
                 recursivePointerReleaseB = false;
@@ -2769,6 +3009,53 @@ public final class Display extends CN1Constants {
         return offset;
     }
 
+    /// Consumes one event's payload without dispatching it, so that a packet aimed at
+    /// a window that has gone away does not desynchronise the rest of the batch.
+    ///
+    /// The lengths here mirror the switch in `#handleEvent(int, int[])` exactly; the
+    /// multi touch forms are self describing, each array being a length followed by
+    /// that many values.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event type, with the window id already stripped
+    ///
+    /// - `offset`: the offset just past the type word
+    ///
+    /// - `stack`: the event stack
+    ///
+    /// #### Returns
+    ///
+    /// the offset of the next event
+    private int skipEvent(int type, int offset, int[] stack) {
+        switch (type) {
+            case KEY_PRESSED:
+            case KEY_RELEASED:
+                return offset + 1;
+            case POINTER_PRESSED:
+            case POINTER_RELEASED:
+            case POINTER_HOVER_RELEASED:
+            case POINTER_HOVER_PRESSED:
+            case SIZE_CHANGED:
+                return offset + 2;
+            case POINTER_DRAGGED:
+            case POINTER_HOVER:
+                return offset + 3;
+            case POINTER_PRESSED_MULTI:
+            case POINTER_RELEASED_MULTI:
+            case POINTER_DRAGGED_MULTI: {
+                int len1 = stack[offset];
+                offset += len1 + 1;
+                int len2 = stack[offset];
+                return offset + len2 + 1;
+            }
+            case HIDE_NOTIFY:
+            case SHOW_NOTIFY:
+            default:
+                return offset;
+        }
+    }
+
     /// This method should be invoked by components that broadcast events on the pointerReleased callback.
     /// This method will indicate if a drag occured since the pointer press event, notice that this method will not
     /// behave as expected for multi-touch events.
@@ -2784,11 +3071,16 @@ public final class Display extends CN1Constants {
     boolean shouldEDTSleep() {
         Form current = impl.getCurrentForm();
         return ((current == null || (!current.hasAnimations())) &&
+                !anyWindowHasAnimations() &&
                 (animationQueue == null || animationQueue.isEmpty()) &&
                 inputEventStackPointer == 0 &&
                 (!impl.hasPendingPaints()) &&
                 hasNoSerialCallsPending() && !keyRepeatCharged
-                && !longPointerCharged) || (isMinimized() && hasNoSerialCallsPending());
+                && !longPointerCharged)
+                // a minimized main window must not park the EDT while a tool window
+                // is still on screen and animating
+                || (isMinimized() && !Desktop.getInstance().hasVisibleWindows()
+                        && hasNoSerialCallsPending());
     }
 
     Form getCurrentInternal() {
@@ -2977,6 +3269,112 @@ public final class Display extends CN1Constants {
     /// - `cmp`: the given component to repaint
     void repaint(final Animation cmp) {
         impl.repaint(cmp);
+    }
+
+    // ---- desktop windows ---------------------------------------------------------
+
+    /// Windows blocking input, innermost last. A modal window drops input aimed at
+    /// anything it blocks; enforcing this here rather than in the ports means
+    /// modality behaves identically on every platform, whether or not the platform
+    /// implements its own.
+    private final ArrayList<Window> modalWindows = new ArrayList<Window>();
+
+    /// Creates the `Graphics` a window paints through and hands it to the
+    /// implementation. `Graphics` cannot be constructed outside this package, which
+    /// is why this lives here rather than on the window or the implementation --
+    /// exactly as `#init(java.lang.Object)` does for the main surface.
+    Graphics createWindowGraphics(Window w) {
+        Graphics g = new Graphics(impl.getWindowManager().getNativeGraphics(w.getNativePeer()));
+        g.paintPeersBehind = impl.paintNativePeersBehind();
+        impl.setPaintSurfaceGraphics(w.getPaintSurface(), g);
+        return g;
+    }
+
+    /// Wakes the event dispatch thread, used when a window becomes visible before
+    /// the first form has been shown and the loop would otherwise still be parked.
+    void wakeEdt() {
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+    }
+
+    void pushModalWindow(Window w) {
+        modalWindows.add(w);
+    }
+
+    void popModalWindow(Window w) {
+        modalWindows.remove(w);
+    }
+
+    void windowDisposed(Window w) {
+        modalWindows.remove(w);
+        if (eventForm == w) { //NOPMD CompareObjectsWithEquals
+            eventForm = null;
+        }
+        if (keyRepeatWindowId == w.getWindowId()) {
+            keyRepeatCharged = false;
+            keyRepeatWindowId = 0;
+        }
+        if (longPointerWindowId == w.getWindowId()) {
+            longPointerCharged = false;
+            longPointerWindowId = 0;
+        }
+    }
+
+    /// Indicates whether input aimed at the given window is currently blocked by a
+    /// modal window above it.
+    private boolean isBlockedByModal(int windowId) {
+        int len = modalWindows.size();
+        if (len == 0) {
+            return false;
+        }
+        Window top = modalWindows.get(len - 1);
+        if (top.getWindowId() == windowId) {
+            return false;
+        }
+        if (top.getModalityType() == Window.MODALITY_APPLICATION) {
+            return true;
+        }
+        // window modal: only the owner is blocked
+        TopLevelContainer owner = top.getOwnerWindow();
+        if (owner instanceof Window) {
+            return ((Window) owner).getWindowId() == windowId;
+        }
+        // owned by the main form
+        return windowId == 0;
+    }
+
+    /// Paints every open window after the main surface. Iterates by index and
+    /// re-reads the size because a nested event loop -- a modal dialog, or
+    /// invokeAndBlock -- can dispose a window part way through.
+    private void paintOpenWindows() {
+        ArrayList<Window> open = Desktop.getInstance().windowList();
+        for (int iter = 0; iter < open.size(); iter++) {
+            Window w = open.get(iter);
+            if (!w.isWindowShowing()) {
+                continue;
+            }
+            Graphics g = w.getWindowGraphics();
+            Object peer = w.getNativePeer();
+            if (g == null || peer == null) {
+                continue;
+            }
+            g.setGraphics(impl.getWindowManager().getNativeGraphics(peer));
+            w.flushRevalidateQueue();
+            impl.paintDirtyWindow(w.getPaintSurface());
+            w.repaintAnimations();
+        }
+    }
+
+    private boolean anyWindowHasAnimations() {
+        ArrayList<Window> open = Desktop.getInstance().windowList();
+        for (int iter = 0; iter < open.size(); iter++) {
+            Window w = open.get(iter);
+            if (w.isWindowShowing() && w.hasAnimations()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
