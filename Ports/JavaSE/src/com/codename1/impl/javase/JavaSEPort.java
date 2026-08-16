@@ -10542,8 +10542,26 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public void stopTextEditing() {
         if (textCmp != null && textCmp.getParent() != null) {
-            canvas.remove(textCmp);
+            // remove from whichever canvas it was attached to, which is not
+            // necessarily the primary one
+            textCmp.getParent().remove(textCmp);
         }
+    }
+
+    /**
+     * The canvas a native editor for this component belongs on. Editing inside a
+     * desktop Window has to attach the Swing editor to that window's canvas, or the
+     * caret appears on the main window instead.
+     */
+    private C editorCanvasFor(com.codename1.ui.Component cmp) {
+        Object peer = Display.getInstance().getWindowPeerForComponent(cmp);
+        if (peer instanceof JavaSEWindowManager.Peer) {
+            C owner = ((JavaSEWindowManager.Peer) peer).canvas;
+            if (owner != null) {
+                return owner;
+            }
+        }
+        return canvas;
     }
 
     @Override
@@ -10830,7 +10848,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         textCmp.setBorder(null);
         textCmp.setOpaque(false);
                 
-        canvas.add(textCmp);
+        editorCanvasFor(cmp).add(textCmp);
         int marginTop = cmp.getSelectedStyle().getPadding(Component.TOP);
         int marginLeft = cmp.getSelectedStyle().getPadding(Component.LEFT);
         int marginRight = cmp.getSelectedStyle().getPadding(Component.RIGHT);
@@ -19225,12 +19243,31 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 init = true;
                 cnt.setVisible(true);
-                frm.add(cnt, 0);
-                frm.repaint();
+                JFrame target = resolveOwningFrame();
+                target.add(cnt, 0);
+                target.repaint();
             }
             
         }
         
+        /**
+         * The frame this peer belongs in. A peer inside a desktop Window has to be
+         * parented to that window's frame rather than to the main one, or it appears
+         * on the wrong window. Resolved at attach time rather than at construction
+         * because the peer is created before it is added to a hierarchy, so its
+         * window is not known yet.
+         */
+        private JFrame resolveOwningFrame() {
+            Object peer = Display.getInstance().getWindowPeerForComponent(this);
+            if (peer instanceof JavaSEWindowManager.Peer) {
+                JFrame owner = ((JavaSEWindowManager.Peer) peer).frame;
+                if (owner != null) {
+                    return owner;
+                }
+            }
+            return frm;
+        }
+
         /**
          * Removes the native container from the Swing component hierarchy.
          * This can be called on or off the swing event thread.  If called off the swing event
