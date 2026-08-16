@@ -241,12 +241,17 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
-    void eachEventCarriesTheStateItAnnouncedNotTheLatestOne() {
+    void eachDeliveredEventCarriesTheStateItAnnounced() {
         // The documented pattern branches on the event source rather than on
-        // isScreenObscured(), because the state is written on the platform's input thread
-        // while callbacks are delivered on the EDT. Two changes queued before the EDT drains
-        // must therefore still arrive carrying their own values, not both carrying the last.
+        // isScreenObscured(), because the state is written on the platform's input thread while
+        // callbacks are delivered on the EDT. Each transition that survives to delivery must
+        // therefore carry its own value rather than whatever the global happens to be by then.
+        //
+        // Drained between the two, because a transition superseded before it is delivered is
+        // deliberately dropped rather than announced late -- see
+        // aTransitionSupersededBeforeDeliveryIsDropped.
         implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
         implementation.notifyScreenObscured(false, null);
         flushSerialCalls();
 
@@ -254,8 +259,6 @@ class TapjackingTest extends UITestBase {
         assertEquals(Boolean.TRUE, observed.get(0),
                 "the first callback has to announce the state that raised it");
         assertEquals(Boolean.FALSE, observed.get(1));
-        // The global query has already moved on -- which is the whole reason the event
-        // carries the value.
         assertFalse(DeviceIntegrity.isScreenObscured());
     }
 
@@ -319,6 +322,22 @@ class TapjackingTest extends UITestBase {
         DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
         flushSerialCalls();
         assertFalse(DeviceIntegrity.isScreenObscured());
+    }
+
+    @Test
+    void aTransitionSupersededBeforeDeliveryIsDropped() {
+        // Both calls come from off the EDT, as a port's input thread would, so the obscured
+        // announcement is queued rather than delivered inline. By the time it arrives the
+        // switch-off has already cleared the state, so delivering it would leave the listener
+        // holding true while the API reports false. It has to be dropped on arrival -- checking
+        // only before queuing cannot catch this.
+        implementation.notifyScreenObscured(true, "obscured");
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
+        flushSerialCalls();
+
+        assertFalse(DeviceIntegrity.isScreenObscured());
+        assertFalse(observed.contains(Boolean.TRUE),
+                "the superseded obscured event must never reach the listener");
     }
 
     @Test

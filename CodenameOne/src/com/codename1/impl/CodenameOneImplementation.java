@@ -11394,7 +11394,7 @@ public abstract class CodenameOneImplementation {
     /// same rule [com.codename1.security.shield.ShieldSignals] applies to its own bus -- a
     /// superseded announcement is not worth making, because it was already wrong when it was
     /// queued.
-    private void fireTapjackingState(boolean obscured) {
+    private void fireTapjackingState(final boolean obscured) {
         com.codename1.ui.util.EventDispatcher listeners;
         synchronized (tapjackingLock) {
             if (screenObscured != obscured) {
@@ -11402,11 +11402,35 @@ public abstract class CodenameOneImplementation {
             }
             listeners = tapjackingListeners;
         }
-        if (listeners != null && listeners.hasListeners()) {
-            // Boolean source so a listener can read the new state straight off the event without
-            // a second call back into the API -- which is also what makes dispatching outside the
-            // lock safe, since the event does not depend on the state still being current.
-            listeners.fireActionEvent(new ActionEvent(Boolean.valueOf(obscured)));
+        if (listeners == null || !listeners.hasListeners()) {
+            return;
+        }
+        final com.codename1.ui.util.EventDispatcher target = listeners;
+        Runnable dispatch = new Runnable() {
+            public void run() {
+                // Re-checked on arrival, not only before queuing. The check above cannot be
+                // enough: a report from the platform's input thread is delivered through
+                // callSerially, and in the gap the EDT can clear the state and announce that
+                // synchronously -- so the older value would arrive last and leave a listener
+                // holding the opposite of what the API reports. Dropping a superseded
+                // announcement is the same rule ShieldSignals applies to its own bus, for the
+                // same reason: it was already wrong when it was queued.
+                synchronized (tapjackingLock) {
+                    if (screenObscured != obscured) {
+                        return;
+                    }
+                }
+                // Boolean source so a listener can read the new state straight off the event
+                // without a second call back into the API.
+                target.fireActionEvent(new ActionEvent(Boolean.valueOf(obscured)));
+            }
+        };
+        // Queued rather than fired directly whenever we are off the EDT, so that the recheck
+        // above happens where the listener actually runs. On the EDT there is no gap to close.
+        if (Display.isInitialized() && !Display.getInstance().isEdt()) {
+            Display.getInstance().callSerially(dispatch);
+        } else {
+            dispatch.run();
         }
     }
 
