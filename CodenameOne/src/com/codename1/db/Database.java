@@ -1010,7 +1010,11 @@ public abstract class Database {
         if (upper.startsWith("DETACH")) {
             String schema = attachmentSchemaOf(trimmed, true);
             if (schema != null && attachments != null) {
-                String key = (String) attachments.remove(schema);
+                // Upper-cased on both sides: a schema name is case insensitive to the engine, so
+                // ATTACH ... AS Aux followed by DETACH aux detaches it -- and a case-sensitive
+                // lookup here missed that, leaving the attached file registered until the
+                // connection closed and every delete of it refused in the meantime.
+                String key = (String) attachments.remove(schema.toUpperCase());
                 if (key != null) {
                     releaseOpenDatabase(key);
                 }
@@ -1037,15 +1041,26 @@ public abstract class Database {
         try {
             registerOpenDatabase(key);
         } catch (IOException beingDeleted) {
-            // The attach has already happened, so there is nothing to undo and nothing useful to
-            // report from here. Not registering leaves this attachment invisible to a delete,
-            // which is the state everything was in before this method existed.
+            // A delete of that file claimed it first. The attach has already happened, so leaving
+            // it would hand the deleting thread a file SQLite still holds -- it counts no
+            // connection, unlinks it, and everything written through this schema afterwards is
+            // lost. Undone here instead: the attachment is dropped, which is the state the
+            // deleting thread already believes in.
+            try {
+                execute("DETACH DATABASE \"" + schema.replace("\"", "\"\"") + "\"");
+            } catch (IOException cannotDetach) {
+                // Nothing further is possible from here: the delete holds the claim and will
+                // proceed, and this connection keeps an attachment to a file that is about to
+                // lose its name. Writes through it are already lost at that point; saying so is
+                // the caller's next failure rather than something this hook can prevent.
+                return;
+            }
             return;
         }
         if (attachments == null) {
             attachments = new java.util.Hashtable();
         }
-        attachments.put(schema, key);
+        attachments.put(schema.toUpperCase(), key);
     }
 
     /// The schema name an ATTACH or DETACH statement names, or null if it cannot be read.
@@ -1069,31 +1084,54 @@ public abstract class Database {
         return null;
     }
 
-    /// The file an ATTACH statement names, or null when it is not a plain literal.
+    /// The file an ATTACH statement names, or null when the statement does not name one outright.
+    ///
+    /// Only a quoted literal counts. `ATTACH DATABASE ? AS aux` is the ordinary parameterized
+    /// form, and reading the `?` as a filename registered a path nobody asked for while the file
+    /// actually attached went untracked -- worse than not looking, because it reads as protection.
+    /// Anything that is not a literal is left alone: the attachment is then invisible to a delete,
+    /// which is where this started, and that is the conservative end of a choice between doing
+    /// nothing and doing something wrong.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: one ATTACH statement
+    ///
+    /// #### Returns
+    ///
+    /// the file it names, or null
     private static String attachmentFileOf(String statement) {
         String[] words = splitWords(statement);
-        for (int iter = 1; iter < words.length; iter++) {
+        String found = null;
+        for (int iter = 1; iter < words.length && found == null; iter++) {
             String word = words[iter];
-            if ("DATABASE".equals(word.toUpperCase())) {
-                continue;
+            String upper = word.toUpperCase();
+            if (!"DATABASE".equals(upper)) {
+                found = "AS".equals(upper) ? "" : word;
             }
-            if ("AS".equals(word.toUpperCase())) {
-                return null;
-            }
-            String file = unquote(word);
-            if (file.length() == 0) {
-                return null;
-            }
-            // An absolute path is a custom database to every port, and they resolve one only when
-            // it arrives as a file URL. A bare name is left as it is, which is what a port expects
-            // for a database in its own directory.
-            if (file.charAt(0) == '/' || file.charAt(0) == '\\'
-                    || (file.length() > 1 && file.charAt(1) == ':')) {
-                return "file://" + file;
-            }
-            return file;
         }
-        return null;
+        if (found == null || found.length() == 0) {
+            return null;
+        }
+        // Quoted, and single-quoted at that: a double-quoted word is an identifier to SQLite, and
+        // a bare word is an expression -- a placeholder, a column, a concatenation. None of those
+        // is a filename this can resolve.
+        if (found.length() < 2 || found.charAt(0) != '\''
+                || found.charAt(found.length() - 1) != '\'') {
+            return null;
+        }
+        String file = found.substring(1, found.length() - 1);
+        if (file.length() == 0) {
+            return null;
+        }
+        // An absolute path is a custom database to every port, and they resolve one only when it
+        // arrives as a file URL. A bare name is left as it is, which is what a port expects for a
+        // database in its own directory.
+        if (file.charAt(0) == '/' || file.charAt(0) == '\\'
+                || (file.length() > 1 && file.charAt(1) == ':')) {
+            return "file://" + file;
+        }
+        return file;
     }
 
     /// Splits a statement into words, keeping quoted runs together.
