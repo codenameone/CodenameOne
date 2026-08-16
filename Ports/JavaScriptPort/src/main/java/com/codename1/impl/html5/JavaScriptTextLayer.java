@@ -111,6 +111,7 @@ public final class JavaScriptTextLayer {
         private boolean cellRenderer;
         private boolean promotable;
         private boolean covering;
+        private boolean clipEmpty;
     }
 
     private final HTMLDocument document;
@@ -194,7 +195,8 @@ public final class JavaScriptTextLayer {
      *
      * @param component the component about to paint
      */
-    public void beginComponent(Component component, boolean covering, boolean editing) {
+    public void beginComponent(Component component, boolean covering, boolean editing,
+            boolean clipEmpty) {
         while (stack.size() <= depth) {
             stack.add(new Frame());
         }
@@ -214,6 +216,7 @@ public final class JavaScriptTextLayer {
                 && com.codename1.ui.Accessor.getActivePeerCount() == 0
                 && component.getComponentForm() == Display.getInstance().getCurrent();
         frame.covering = covering;
+        frame.clipEmpty = clipEmpty;
         if (frame.cellRenderer) {
             cellRendererDepth++;
         }
@@ -241,10 +244,18 @@ public final class JavaScriptTextLayer {
         // it, since the hooks still run when nothing intersects -- and releasing the tail then
         // would detach text outside the dirty region whose pixels were never repainted, making
         // unrelated labels, or the other lines of a multiline component, disappear.
-        if (frame.runs != null && frame.component == component && frame.covering) {
-            releaseFrom(frame.runs, frame.sequence);
+        if (frame.runs != null && frame.component == component) {
+            if (frame.clipEmpty) {
+                // Scrolled out of its container, so it drew nothing and will not draw again
+                // until it returns. Its text has to go now or it would hang outside the
+                // container it belongs to.
+                releaseFrom(frame.runs, 0);
+            } else if (frame.covering) {
+                releaseFrom(frame.runs, frame.sequence);
+            }
         }
         frame.covering = false;
+        frame.clipEmpty = false;
         frame.component = null;
         frame.runs = null;
         frame.sequence = 0;
@@ -278,18 +289,6 @@ public final class JavaScriptTextLayer {
             return false;
         }
         Frame frame = stack.get(depth - 1);
-        if (frame.promotable && !frame.covering) {
-            // The clip shows only part of the component, so this is not the full sequence of
-            // runs and slot N would not mean what it did last time -- a repaint reaching only
-            // the second line of a text area would write that line into the first line's slot.
-            // Leave the pool untouched.
-            //
-            // Whether the canvas should draw depends on whether there is already DOM text for
-            // this component: if there is, it still stands and drawing would double it; if there
-            // is not -- a first paint clipped by a scroll viewport or the screen edge -- then
-            // suppressing the draw as well would simply lose the text.
-            return hasAttachedRuns(frame.runs);
-        }
         if (!frame.promotable) {
             // The layer sits above the canvas as a whole, so nothing drawn on the canvas after a
             // run can cover it. A modal dialog paints the form beneath it as its own backdrop;
@@ -304,7 +303,15 @@ public final class JavaScriptTextLayer {
             frame.runs = new ComponentRuns();
             byComponent.put(frame.component, frame.runs);
         }
-        Run run = obtain(frame.runs, frame.sequence);
+        // A paint that can see the whole component draws its runs in order, so position in that
+        // order identifies them. A clipped paint draws only the lines the clip reaches, so the
+        // same position would mean a different line -- a repaint reaching only the second line
+        // of a text area would write it into the first line's slot. There the run is matched by
+        // what it says instead, which is stable across partial paints, and the run is still
+        // updated so a component scrolling across the viewport edge keeps up rather than
+        // freezing at its last fully visible position.
+        Run run = frame.covering ? obtain(frame.runs, frame.sequence)
+                : obtainByContent(frame.runs, str);
         frame.sequence++;
 
         double scale = ratio <= 0 ? 1 : ratio;
@@ -422,18 +429,18 @@ public final class JavaScriptTextLayer {
     }
 
     /**
-     * True when a component already has text on screen in this layer.
+     * Finds the run already showing this text, or adds one.
+     *
+     * <p>Used when the paint is clipped and ordering cannot be trusted.</p>
      */
-    private boolean hasAttachedRuns(ComponentRuns runs) {
-        if (runs == null) {
-            return false;
-        }
+    private Run obtainByContent(ComponentRuns runs, String content) {
         for (int i = 0; i < runs.runs.size(); i++) {
-            if (runs.runs.get(i).attached) {
-                return true;
+            Run candidate = runs.runs.get(i);
+            if (content.equals(candidate.content)) {
+                return candidate;
             }
         }
-        return false;
+        return obtain(runs, runs.runs.size());
     }
 
     private Run obtain(ComponentRuns runs, int index) {

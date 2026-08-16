@@ -1294,7 +1294,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // the full sequence and whether a shorter sequence means the rest are stale. The
             // display graphics reports its clip in absolute coordinates, the space component
             // bounds are in; Graphics.getClipX() subtracts the translation and would not be.
-            textLayer.beginComponent(c, coversComponent(c), isEditingText(c));
+            textLayer.beginComponent(c, coversComponent(c), isEditingText(c),
+                    graphics.getClipWidth() <= 0 || graphics.getClipHeight() <= 0);
         }
     }
 
@@ -3894,12 +3895,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     });
         }
-        // The overlay mirrors labels as text only when nothing else is rendering them. While the
-        // text layer is promoting, its near-transparent copy would be a second find-in-page
-        // match that navigates to something the user cannot see. Once a pixel readback has
-        // returned text to the canvas the layer is no longer rendering anything, so the mirror
-        // has to come back or find-in-page would stay broken for the rest of the session.
-        semanticOverlay.setTextContentEnabled(textLayer == null || textLayerDisabledByReadback);
+        // Always on: the reasoning is recorded in the overlay, but in short a screen reader has
+        // no other reliable route to an ordinary label, since the visible text layer is
+        // aria-hidden and a role-less div's aria-label is not dependably announced.
+        semanticOverlay.setTextContentEnabled(true);
         semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
     }
 

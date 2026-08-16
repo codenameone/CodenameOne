@@ -323,10 +323,15 @@ public final class JavaScriptSemanticOverlay {
     private void applyText(Entry entry, AccessibilityNodeSnapshot node) {
         String text = null;
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
-        // Every label the user can see, not only static text: while this overlay is the one
-        // carrying text -- because a pixel readback returned rendering to the canvas -- the
-        // words on buttons, links, tabs, menu items and list items have to be here too, or
-        // find-in-page would go quiet for everything except paragraphs.
+        // Labels are mirrored whether or not the text layer is rendering them.
+        //
+        // Review has pulled both ways here. Mirroring means a browser find can match a label
+        // twice, once in the visible layer and once in this near-transparent copy. Not
+        // mirroring means a screen reader loses ordinary labels entirely: the visible layer is
+        // aria-hidden, STATIC_TEXT has no ARIA role of its own, and an aria-label on a role-less
+        // div is not reliably announced -- nor does it work as live-region content. A duplicate
+        // find match is an annoyance; silent labels are a broken screen reader, so the mirror
+        // stays.
         if (textContentEnabled && !obscured && isLabelVisibleAsText(node.getRole())) {
             text = node.getLabel() == null ? "" : node.getLabel();
         }
