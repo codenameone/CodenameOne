@@ -8744,7 +8744,14 @@ public class JavaSEPort extends CodenameOneImplementation {
                         // the tapjacking listeners and the ShieldSignal silent, so the
                         // switch would report a state it did not actually cause -- which
                         // is the failure this menu exists to avoid.
-                        notifyScreenObscured(v, v ? "simulated" : null);
+                        //
+                        // Only while the policy is detecting, though. OFF promises no
+                        // detection and no reporting, and the Android port keeps that
+                        // promise by returning from tapjacked() before it reports; a
+                        // simulator that raised the signal anyway would behave unlike the
+                        // device it is standing in for. setTapjackingProtection below
+                        // picks the flag up if detection is switched on afterwards.
+                        applySimulatedScreenOverlay();
                     }
                 }));
 
@@ -19534,6 +19541,25 @@ public class JavaSEPort extends CodenameOneImplementation {
         // As above: the desktop has no overlay windows to hide, so this is
         // recorded rather than acted on.
         JavaSEShield.hideOverlayWindows = hide;
+    }
+
+    @Override
+    public void setTapjackingProtection(com.codename1.security.TapjackingPolicy policy) {
+        super.setTapjackingProtection(policy);
+        // Switching detection on has to pick up an overlay the Simulate menu already has
+        // switched on, and switching it off has to retract it -- otherwise isScreenObscured()
+        // keeps answering true under a policy that promises no detection at all.
+        applySimulatedScreenOverlay();
+    }
+
+    /**
+     * Pushes the Simulate &gt; App Shield &gt; Screen Overlay toggle into the real
+     * reporting path, but only while a policy that actually detects is in force,
+     * so the simulator matches what the Android port would report.
+     */
+    private void applySimulatedScreenOverlay() {
+        boolean obscured = getTapjackingPolicy().isDetecting() && JavaSEShield.simScreenObscured;
+        notifyScreenObscured(obscured, obscured ? "simulated" : null);
     }
 
     @Override

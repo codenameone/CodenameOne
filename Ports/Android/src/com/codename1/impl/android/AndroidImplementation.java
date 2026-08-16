@@ -2018,6 +2018,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             if (getTapjackingPolicy().isDetecting()) {
                 setTapjackingProtection(getTapjackingPolicy());
             }
+            if (hideOverlayWindowsRequested) {
+                setHideOverlayWindows(true);
+            }
 
             if (Build.VERSION.SDK_INT >= 16) {
                 final View semanticHost = myView.getAndroidView();
@@ -13906,6 +13909,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return Build.VERSION.SDK_INT >= 31 && hasHideOverlayWindowsPermission();
     }
 
+    /** The last value passed to setHideOverlayWindows, replayed onto a recreated window. */
+    private boolean hideOverlayWindowsRequested;
+
     private boolean hasHideOverlayWindowsPermission() {
         try {
             Context ctx = getContext();
@@ -13921,6 +13927,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void setHideOverlayWindows(final boolean hide) {
+        // Recorded before the guards below because it is a request, not a result: the flag
+        // lives on the Window, and a configuration change destroys and recreates the activity
+        // without touching this implementation instance. initSurface() replays it onto the new
+        // window, otherwise an app that hid overlays on a sensitive screen would come back from
+        // a rotation with them allowed again and no way to notice.
+        hideOverlayWindowsRequested = hide;
         if (Build.VERSION.SDK_INT < 31) {
             return;
         }
