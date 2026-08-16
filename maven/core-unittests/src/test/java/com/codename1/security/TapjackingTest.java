@@ -241,17 +241,13 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
-    void eachDeliveredEventCarriesTheStateItAnnounced() {
+    void eachEventCarriesTheStateItAnnouncedNotTheLatestOne() {
         // The documented pattern branches on the event source rather than on
         // isScreenObscured(), because the state is written on the platform's input thread while
         // callbacks are delivered on the EDT. Each transition that survives to delivery must
         // therefore carry its own value rather than whatever the global happens to be by then.
         //
-        // Drained between the two, because a transition superseded before it is delivered is
-        // deliberately dropped rather than announced late -- see
-        // aTransitionSupersededBeforeDeliveryIsDropped.
         implementation.notifyScreenObscured(true, "obscured");
-        flushSerialCalls();
         implementation.notifyScreenObscured(false, null);
         flushSerialCalls();
 
@@ -325,19 +321,37 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
-    void aTransitionSupersededBeforeDeliveryIsDropped() {
-        // Both calls come from off the EDT, as a port's input thread would, so the obscured
-        // announcement is queued rather than delivered inline. By the time it arrives the
-        // switch-off has already cleared the state, so delivering it would leave the listener
-        // holding true while the API reports false. It has to be dropped on arrival -- checking
-        // only before queuing cannot catch this.
+    void queuedTransitionsArriveInOrderAndEndOnTheCurrentState() {
+        // Two transitions raised before the EDT drains, from off the EDT as a port's input
+        // thread would. Both are real history and both must arrive, in the order they happened,
+        // with the last one matching what the API now reports. Validating each against the
+        // current state at delivery instead would drop the first and lose the fact that
+        // anything was ever obscured.
         implementation.notifyScreenObscured(true, "obscured");
         DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
         flushSerialCalls();
 
         assertFalse(DeviceIntegrity.isScreenObscured());
-        assertFalse(observed.contains(Boolean.TRUE),
-                "the superseded obscured event must never reach the listener");
+        assertEquals(2, observed.size());
+        assertEquals(Boolean.TRUE, observed.get(0));
+        assertEquals(Boolean.FALSE, observed.get(1),
+                "the last event delivered has to agree with the state the API reports");
+    }
+
+    @Test
+    void anOverlayThatWithdrawsBeforeTheEdtDrainsIsStillReported() {
+        // The case that matters for the feature's whole purpose: a malicious overlay covers the
+        // ACTION_DOWN and withdraws before the EDT gets a turn. The gesture was blocked, and
+        // this listener is the only way the app can learn that, so coalescing the pair into a
+        // single "clear" callback would lose the security event entirely.
+        implementation.notifyScreenObscured(true, "obscured");
+        implementation.notifyScreenObscured(false, null);
+        flushSerialCalls();
+
+        assertFalse(DeviceIntegrity.isScreenObscured());
+        assertTrue(observed.contains(Boolean.TRUE),
+                "the app has to be told the screen was obscured, even briefly");
+        assertEquals(Boolean.FALSE, observed.get(observed.size() - 1));
     }
 
     @Test

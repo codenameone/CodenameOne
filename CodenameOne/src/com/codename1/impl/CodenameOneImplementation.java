@@ -11360,7 +11360,6 @@ public abstract class CodenameOneImplementation {
     /// [com.codename1.security.DeviceIntegrity#setTapjackingProtection(TapjackingPolicy)]. Ports
     /// that can also apply a platform level filter override this, call `super`, and apply it.
     public void setTapjackingProtection(TapjackingPolicy policy) {
-        boolean retracted;
         synchronized (tapjackingLock) {
             tapjackingPolicy = policy == null ? TapjackingPolicy.OFF : policy;
             // Switching off has to retract the state, because switching off is also what stops
@@ -11375,62 +11374,60 @@ public abstract class CodenameOneImplementation {
             // detection and reported a fresh sighting, wiping that newer observation and leaving
             // BLOCK active over a state claiming the screen was clear. Policy and state move
             // together or the pair is not an invariant at all.
-            retracted = !tapjackingPolicy.isDetecting() && screenObscured;
-            if (!tapjackingPolicy.isDetecting()) {
+            if (!tapjackingPolicy.isDetecting() && screenObscured) {
                 screenObscured = false;
+                // Queued here, still holding the lock, so this retraction cannot be overtaken
+                // by an obscured report that changed the state before it.
+                queueTapjackingState(false);
             }
-        }
-        if (retracted) {
-            // Dispatch only, no state mutation, and outside the lock: holding one across
-            // application code invites the deadlock ShieldSignals documents at length.
-            fireTapjackingState(false);
         }
     }
 
-    /// Announces a tapjacking state change to the listeners. Pure dispatch: the state has
-    /// already been written under [#tapjackingLock] by the caller.
+    /// Queues a tapjacking state change for the listeners.
     ///
-    /// Drops itself when the value it would announce is no longer the one the API reports, the
-    /// same rule [com.codename1.security.shield.ShieldSignals] applies to its own bus -- a
-    /// superseded announcement is not worth making, because it was already wrong when it was
-    /// queued.
-    private void fireTapjackingState(final boolean obscured) {
-        com.codename1.ui.util.EventDispatcher listeners;
-        synchronized (tapjackingLock) {
-            if (screenObscured != obscured) {
-                return;
-            }
-            listeners = tapjackingListeners;
-        }
-        if (listeners == null || !listeners.hasListeners()) {
+    /// **Must be called while holding [#tapjackingLock].** That is the whole mechanism: queuing
+    /// inside the same critical section that wrote the state makes the delivery order identical
+    /// to the order the state actually changed in, on any number of threads. `callSerially`
+    /// appends to one FIFO whoever calls it, the EDT included, so nothing can overtake anything.
+    ///
+    /// Ordering is what this guarantees, deliberately, rather than currency. An earlier attempt
+    /// validated each announcement against the current state at delivery and dropped it if it no
+    /// longer matched. That silently swallowed real history: an overlay that appears and
+    /// withdraws before the EDT drains -- exactly what a malicious overlay does after a blocked
+    /// ACTION_DOWN -- would be coalesced into a single "clear" callback, and the app would never
+    /// learn that a gesture had been blocked, which is the one thing this listener exists to
+    /// tell it. Every transition is now delivered, in order, each carrying its own value; the
+    /// last one delivered is by construction the current state.
+    private void queueTapjackingState(boolean obscured) {
+        final com.codename1.ui.util.EventDispatcher target = tapjackingListeners;
+        // Display.isInitialized() implies codenameOneRunning, which is what makes callSerially
+        // queue rather than run the task inline -- and running it inline here would execute
+        // application code while this lock is held, the deadlock ShieldSignals documents. It is
+        // not a real gap either way: a listener can only be registered through Display, so
+        // before init there is nobody to tell.
+        if (target == null || !target.hasListeners() || !Display.isInitialized()) {
             return;
         }
-        final com.codename1.ui.util.EventDispatcher target = listeners;
-        Runnable dispatch = new Runnable() {
-            public void run() {
-                // Re-checked on arrival, not only before queuing. The check above cannot be
-                // enough: a report from the platform's input thread is delivered through
-                // callSerially, and in the gap the EDT can clear the state and announce that
-                // synchronously -- so the older value would arrive last and leave a listener
-                // holding the opposite of what the API reports. Dropping a superseded
-                // announcement is the same rule ShieldSignals applies to its own bus, for the
-                // same reason: it was already wrong when it was queued.
-                synchronized (tapjackingLock) {
-                    if (screenObscured != obscured) {
-                        return;
-                    }
-                }
-                // Boolean source so a listener can read the new state straight off the event
-                // without a second call back into the API.
-                target.fireActionEvent(new ActionEvent(Boolean.valueOf(obscured)));
-            }
-        };
-        // Queued rather than fired directly whenever we are off the EDT, so that the recheck
-        // above happens where the listener actually runs. On the EDT there is no gap to close.
-        if (Display.isInitialized() && !Display.getInstance().isEdt()) {
-            Display.getInstance().callSerially(dispatch);
-        } else {
-            dispatch.run();
+        // Boolean source so a listener can read the state straight off the event without a
+        // second call back into the API, which is what makes an ordered replay meaningful.
+        Display.getInstance().callSerially(
+                new TapjackingDispatch(target, new ActionEvent(Boolean.valueOf(obscured))));
+    }
+
+    /// One queued tapjacking announcement. A named static class rather than an anonymous one
+    /// because it captures nothing from the implementation instance -- the same shape, and for
+    /// the same reason, as ShieldSignals' own dispatch.
+    private static final class TapjackingDispatch implements Runnable {
+        private final com.codename1.ui.util.EventDispatcher target;
+        private final ActionEvent event;
+
+        TapjackingDispatch(com.codename1.ui.util.EventDispatcher target, ActionEvent event) {
+            this.target = target;
+            this.event = event;
+        }
+
+        public void run() {
+            target.fireActionEvent(event);
         }
     }
 
@@ -11507,6 +11504,13 @@ public abstract class CodenameOneImplementation {
             }
             changed = obscured != screenObscured;
             screenObscured = obscured;
+            if (changed) {
+                // Queued inside the lock so the delivery order matches the order the state
+                // changed in. The listener, unlike the signal bus below, is a state-change
+                // notification: announcing every touch would put a runnable on the EDT for
+                // every event of every gesture.
+                queueTapjackingState(obscured);
+            }
         }
         if (obscured) {
             // Submitted on every obscured touch rather than only on the transition, because
@@ -11525,12 +11529,6 @@ public abstract class CodenameOneImplementation {
                 Log.e(t);
             }
         }
-        if (!changed) {
-            // The listener, unlike the bus, is a state-change notification. Firing it per
-            // touch would queue a runnable onto the EDT for every event of every gesture.
-            return;
-        }
-        fireTapjackingState(obscured);
     }
 
     /// Asks the OS to hide non-system windows drawn over this app while it is in the foreground.
