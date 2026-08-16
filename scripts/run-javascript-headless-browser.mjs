@@ -36,43 +36,46 @@ let suiteFinished = false;
 // authoritative capture here -- Playwright screenshots the composited page, canvas and
 // overlays together -- and write it over the app's file in the same directory. Everything
 // downstream (the delivered artifacts, the golden comparison) is unchanged.
+//
+// The capture is driven by a hook the page calls, NOT by a console marker. browser_bridge.js
+// awaits __cn1CompositeCapture inside the screenshot host call, and the worker is blocked on
+// that call, so the suite cannot advance while the screenshot is being taken. Watching for a
+// log line instead would race the next test's form onto the screen and write it under the
+// previous test's name.
 const screenshotDir = process.env.CN1SS_WS_DIR;
-const CAPTURE_MARKER = /CN1SS:INFO:test=([A-Za-z0-9_.$-]+)\s+png_bytes=/;
-let captureChain = Promise.resolve();
+const TEST_START_MARKER = /CN1SS:INFO:suite starting test=([A-Za-z0-9_.$-]+)/;
+let currentTest = null;
 let capturedCount = 0;
 
-async function drainScreenshots() {
-  if (!screenshotDir) {
-    return;
+function trackCurrentTest(text) {
+  const match = TEST_START_MARKER.exec(text);
+  if (match) {
+    currentTest = match[1];
   }
-  try {
-    await captureChain;
-  } catch { /* individual failures already logged */ }
-  append(`screenshot:composited:total=${capturedCount}`);
 }
 
-function capturePageScreenshot(page, text) {
+async function installCompositeCapture(page) {
   if (!screenshotDir) {
     return;
   }
-  const match = CAPTURE_MARKER.exec(text);
-  if (!match) {
-    return;
-  }
-  const testName = match[1];
-  // Serialized, and queued the moment the app reports its own capture: the suite has not
-  // advanced yet at that point, so the composited page still shows the frame under test.
-  captureChain = captureChain.then(async () => {
+  await page.exposeFunction('__cn1CompositeCapture', async () => {
+    if (!currentTest) {
+      return false;
+    }
+    const testName = currentTest;
     try {
       const buffer = await page.screenshot({ animations: 'disabled' });
       fs.writeFileSync(`${screenshotDir}/${testName}.png`, buffer);
       capturedCount++;
       append(`screenshot:composited:${testName}:${buffer.length}`);
+      return true;
     } catch (err) {
       // Leave the app's canvas-only PNG in place rather than losing the test entirely.
       append(`screenshot:failed:${testName}:${String(err)}`);
+      return false;
     }
   });
+  append('screenshot:composited:hook-installed');
 }
 
 function append(line) {
@@ -202,13 +205,15 @@ try {
     deviceScaleFactor: 2
   });
 
+  await installCompositeCapture(page);
+
   page.on('console', msg => {
     const text = msg.text();
     append(`console:${msg.type()}:${text}`);
     if (text.indexOf(SUITE_FINISHED_MARKER) >= 0) {
       suiteFinished = true;
     }
-    capturePageScreenshot(page, text);
+    trackCurrentTest(text);
   });
   page.on('pageerror', err => append(`pageerror:${String(err)}`));
   page.on('requestfailed', req => append(`requestfailed:${req.url()} ${req.failure()?.errorText || ''}`));
@@ -274,7 +279,6 @@ try {
     process.on(sig, async () => {
       append(`profiler:signal:${sig}`);
       await finalizeProfile();
-      await drainScreenshots();
       try { await browser.close(); } catch { /* ignore */ }
       process.exit(0);
     });
@@ -311,8 +315,8 @@ try {
   }
   await finalizeProfile();
 } finally {
-  // Drain queued captures before tearing the page down, or the last test of a run loses its
-  // screenshot and shows up as a spurious golden miss.
-  await drainScreenshots();
+  if (screenshotDir) {
+    append(`screenshot:composited:total=${capturedCount}`);
+  }
   await browser.close();
 }

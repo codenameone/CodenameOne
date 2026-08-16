@@ -31,5 +31,31 @@ public class Accessor {
     public static int getActivePeerCount() {
         return Form.activePeerCount;
     }
-            
+
+    /**
+     * Returns the implementation-level graphics a {@link Graphics} is drawing through.
+     *
+     * <p>The port needs this to tell a paint aimed at the display from one aimed at an
+     * offscreen image. Both raise the same per-component paint callbacks, but only the
+     * display paint may touch the DOM text layer.</p>
+     *
+     * @param g the graphics to unwrap, may be null
+     * @return the native graphics object, or null
+     */
+    public static Object nativeGraphics(Graphics g) {
+        return g == null ? null : g.getGraphics();
+    }
+
+    /**
+     * Returns true when a component and its whole ancestor chain are visible.
+     *
+     * <p>A hidden component stops painting without being detached, so this is what tells the
+     * text layer that runs it is still holding can never be refreshed again.</p>
+     *
+     * @param c the component to test, may be null
+     * @return true when the component would be painted by its form
+     */
+    public static boolean isDisplayable(Component c) {
+        return c != null && c.isVisible() && !c.isHidden(true);
+    }
 }

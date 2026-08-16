@@ -309,8 +309,13 @@ public final class JavaScriptTextLayer {
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
             Map.Entry<Component, ComponentRuns> entry = it.next();
-            Form owner = entry.getKey().getComponentForm();
-            if (owner != null && owner == form) {
+            Component component = entry.getKey();
+            // Still on the displayed form AND still able to paint. Hiding a component -- or any
+            // ancestor of it -- stops it painting without detaching it, so its runs would never
+            // be refreshed or released again and would sit above the canvas indefinitely, even
+            // though the parent's repaint has already cleared the pixels underneath.
+            if (component.getComponentForm() == form && form != null
+                    && com.codename1.ui.Accessor.isDisplayable(component)) {
                 continue;
             }
             releaseFrom(entry.getValue(), 0);

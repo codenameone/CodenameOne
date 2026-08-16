@@ -5027,15 +5027,31 @@
         return runAttempt(index + 1);
       });
     }
+    // The port promotes text into a DOM layer above the canvas, so a canvas readback is no
+    // longer the whole frame. When a test harness has installed a composited capture hook,
+    // give it the frame BEFORE this promise settles: the worker is blocked on this host call,
+    // so the suite cannot advance to the next test while the screenshot is being taken. Doing
+    // it off a console marker instead would race the next test's form onto the screen.
+    function withCompositedCapture(value) {
+      var hook = global.__cn1CompositeCapture;
+      if (typeof hook !== 'function') {
+        return value;
+      }
+      return Promise.resolve(hook()).then(function() {
+        return value;
+      }, function() {
+        return value;
+      });
+    }
     return runAttempt(0).then(function(result) {
       if (!result || !result.dataUrl) {
         global.__cn1LastCaptureMeta = null;
-        return includeMeta ? {
+        return withCompositedCapture(includeMeta ? {
           dataUrl: '',
           canvasScore: -1,
           canvasLastPaintSeq: baselinePaintSeq | 0,
           canvasPaintedSinceStart: 0
-        } : '';
+        } : '');
       }
       global.__cn1LastScreenshotSignature = result.canvasSignature || '';
       diag('SCREENSHOT_START', 'canvasCount', result.canvasCount);
@@ -5072,9 +5088,9 @@
         canvasSignature: result.canvasSignature || 'none'
       };
       if (includeMeta) {
-        return global.__cn1LastCaptureMeta;
+        return withCompositedCapture(global.__cn1LastCaptureMeta);
       }
-      return String(result.dataUrl || '');
+      return withCompositedCapture(String(result.dataUrl || ''));
     });
   });
 

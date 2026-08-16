@@ -1269,7 +1269,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             NativeOverlay no = (NativeOverlay)overlay;
             no.updateIfMovedAndFocused();
         }
-        if (textLayer != null) {
+        if (textLayer != null && isDisplayGraphics(g)) {
             textLayer.beginComponent(c);
         }
     }
@@ -1277,9 +1277,24 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void afterComponentPaint(Component c, Graphics g) {
         super.afterComponentPaint(c, g);
-        if (textLayer != null) {
+        if (textLayer != null && isDisplayGraphics(g)) {
             textLayer.endComponent(c);
         }
+    }
+
+    /**
+     * True when a paint is aimed at the display rather than at an offscreen image.
+     *
+     * <p>These callbacks fire for every component paint, including the ones that render into a
+     * buffer -- {@code Component.toImage()}, {@code ComponentImage}, a paint lock, a drag image,
+     * a transition buffer. Those paint through a plain {@link HTML5Graphics}, so no run is
+     * promoted; opening and closing a text-layer frame around them would make the component
+     * look like it had stopped drawing any text and release the DOM runs it still has on
+     * screen. Creating a drag image would then blank the labels under it until the next
+     * repaint.</p>
+     */
+    private boolean isDisplayGraphics(Graphics g) {
+        return graphics != null && com.codename1.ui.Accessor.nativeGraphics(g) == graphics;
     }
     
     
