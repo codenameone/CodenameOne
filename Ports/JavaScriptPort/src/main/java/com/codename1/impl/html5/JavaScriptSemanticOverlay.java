@@ -29,6 +29,7 @@ import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.ui.accessibility.AccessibilityAction;
 import com.codename1.ui.accessibility.AccessibilityCheckedState;
+import com.codename1.ui.accessibility.AccessibilityCollectionInfo;
 import com.codename1.ui.accessibility.AccessibilityCollectionItemInfo;
 import com.codename1.ui.accessibility.AccessibilityLiveRegion;
 import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
@@ -381,14 +382,24 @@ public final class JavaScriptSemanticOverlay {
             public void handleEvent(Event event) {
                 JSOImplementations.KeyEvent key = (JSOImplementations.KeyEvent) event;
                 int code = key.getKeyCode();
+                String action = null;
                 if ((code == 13 || code == 32) && bound.activateEnabled) {
-                    event.preventDefault();
-                    dispatcher.performAction(nodeId, AccessibilityAction.ACTIVATE, null);
+                    action = AccessibilityAction.ACTIVATE;
                 } else if (code == 38 || code == 39) {
-                    dispatcher.performAction(nodeId, AccessibilityAction.INCREMENT, null);
+                    action = AccessibilityAction.INCREMENT;
                 } else if (code == 37 || code == 40) {
-                    dispatcher.performAction(nodeId, AccessibilityAction.DECREMENT, null);
+                    action = AccessibilityAction.DECREMENT;
                 }
+                if (action == null) {
+                    return;
+                }
+                // The event would otherwise bubble to the window-level key handler and drive
+                // the same component a second time: Enter would fire a button's action through
+                // the semantic action and again through its pressed/released path, and an arrow
+                // key would step a slider twice.
+                event.preventDefault();
+                event.stopPropagation();
+                dispatcher.performAction(nodeId, action, null);
             }
         });
     }
@@ -679,6 +690,18 @@ public final class JavaScriptSemanticOverlay {
             out.put("aria-valuenow", String.valueOf(range.getCurrent()));
             if (range.getText() != null) {
                 out.put("aria-valuetext", range.getText());
+            }
+        }
+        AccessibilityCollectionInfo collection = node.getCollectionInfo();
+        if (collection != null) {
+            if (collection.getRowCount() >= 0) {
+                out.put("aria-rowcount", String.valueOf(collection.getRowCount()));
+            }
+            if (collection.getColumnCount() >= 0) {
+                out.put("aria-colcount", String.valueOf(collection.getColumnCount()));
+            }
+            if (collection.getSelectionMode() == AccessibilityCollectionInfo.SELECTION_MULTIPLE) {
+                out.put("aria-multiselectable", "true");
             }
         }
         AccessibilityCollectionItemInfo item = node.getCollectionItemInfo();
