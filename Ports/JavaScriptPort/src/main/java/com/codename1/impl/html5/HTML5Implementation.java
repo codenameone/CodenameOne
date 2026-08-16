@@ -6602,18 +6602,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // is telling us which representation it needs, so promotion stops for good at the first
         // such call and the text returns to the canvas, where the reads can see it.
         //
-        // The repaint has to be carried out here, not merely requested: repaint() only enqueues
-        // the form, and draining the command buffer does not run the paint queue. Without
-        // paintDirty() the read would return the frame that was composed while the text was
-        // still promoted, so a one-shot capture would come back without it.
+        // The repaint is requested, not carried out here. Review asked for the rasterizing
+        // paint to complete before the surface is read, so that a ONE-SHOT capture already
+        // contains the text rather than only the second of a polling pair. That is the right
+        // instinct, but driving paintDirty() from inside the capture measurably breaks
+        // rendering: it makes graphics-draw-gradient-stops come back with its gradients
+        // unpainted, reproducibly and across a re-run, while every other golden is unchanged.
+        // Forcing a paint from within a read re-enters the render queue at a point it is not
+        // built for, and trading a whole screen of gradients for one frame of text is the wrong
+        // way round.
+        //
+        // So the first capture taken while text is promoted is still text-less, and everything
+        // painted afterwards carries its text again. Callers that poll -- the usual shape, since
+        // a capture normally waits for something to appear -- settle on the next read. Making
+        // the single-shot case correct needs the read to be deferred to the next frame, which
+        // means an async capture path, and that is worth doing separately rather than smuggling
+        // it in here.
         if (textLayer != null && !textLayer.isSuspended()) {
             textLayer.setSuspended(true);
             textLayerDisabledByReadback = true;
             Form current = getCurrentForm();
             if (current != null) {
                 current.repaint();
-                paintDirty();
-                flushGraphics();
             }
         }
         drainPendingDisplayFrame();
