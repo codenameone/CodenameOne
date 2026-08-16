@@ -55,10 +55,16 @@ public class IOSProvisioningPreflightTest {
             + "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
             + "<plist version=\"1.0\"><dict>\n";
 
+    /**
+     * The shape of a real profile: the fields every Apple-issued one carries, which is what
+     * tells a provisioning profile apart from any other plist the setting might point at.
+     */
     private static String profile(String name, String expiry, String body) {
         return HEAD
                 + "<key>Name</key><string>" + name + "</string>\n"
+                + "<key>UUID</key><string>0f7ac3c1-4d0e-4e8a-9d1f-8b6a2c5e7d90</string>\n"
                 + "<key>ExpirationDate</key><date>" + expiry + "</date>\n"
+                + "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>\n"
                 + body
                 + "</dict></plist>";
     }
@@ -392,6 +398,49 @@ public class IOSProvisioningPreflightTest {
     public void mergedPassCatchesTheMismatch() throws Exception {
         Properties merged = settings(write(appStore("HBZ_PROD_DISTRIBUTION")), true, "ad-hoc");
         assertFatal(check(merged, true), "HBZ_PROD_DISTRIBUTION", "App Store distribution");
+    }
+
+    // ---- it has to actually be a profile ----
+
+    /**
+     * An ordinary plist parses perfectly well. {@code Info.plist} has no device list, so it
+     * would have been classified as an App Store profile -- and a release build, whose
+     * default method is app-store, would have passed this check and uploaded a file that
+     * cannot provision or sign anything.
+     */
+    @Test
+    public void anOrdinaryPlistIsNotAProfile() throws Exception {
+        String infoPlist = HEAD
+                + "<key>CFBundleName</key><string>MyApp</string>\n"
+                + "<key>CFBundleIdentifier</key><string>com.example.myapp</string>\n"
+                + "<key>CFBundleVersion</key><string>1.0</string>\n"
+                + "</dict></plist>";
+        assertNull("an Info.plist is not a provisioning profile",
+                IOSProvisioningPreflight.parse(infoPlist.getBytes("UTF-8")));
+
+        File f = writeRaw(infoPlist.getBytes("UTF-8"));
+        assertFatal(check(settings(f, true, null), true),
+                "not a valid .mobileprovision file");
+    }
+
+    /** A profile missing the fields every Apple-issued one carries is not one either. */
+    @Test
+    public void aPlistWithoutTheProfileFieldsIsNotAProfile() throws Exception {
+        String half = HEAD
+                + "<key>Name</key><string>Looks Like A Profile</string>\n"
+                + "<key>ExpirationDate</key><date>" + FUTURE + "</date>\n"
+                + "</dict></plist>";
+        assertNull("UUID, Entitlements and DeveloperCertificates are all required",
+                IOSProvisioningPreflight.parse(half.getBytes("UTF-8")));
+    }
+
+    /** ...and a real one still is. */
+    @Test
+    public void aRealProfileStillParses() throws Exception {
+        IOSProvisioningPreflight.Profile parsed =
+                IOSProvisioningPreflight.parse(appStore("Store").getBytes("UTF-8"));
+        assertNotNull(parsed);
+        assertEquals("Store", parsed.name);
     }
 
     // ---- a profile is untrusted input ----

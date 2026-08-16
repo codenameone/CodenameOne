@@ -380,6 +380,14 @@ final class IOSProvisioningPreflight {
         DocumentBuilder db = secureDocumentBuilder();
         Document doc = db.parse(new ByteArrayInputStream(plist));
 
+        if (!isProvisioningPlist(doc)) {
+            // An ordinary plist parses perfectly well. Info.plist has no device list, so
+            // deriveType would have called it an App Store profile, and a release build --
+            // whose default method is app-store -- would have sailed through this check and
+            // uploaded a file that cannot provision or sign anything.
+            return null;
+        }
+
         Profile profile = new Profile();
         Element name = valueForKey(doc, "Name");
         if (name != null) {
@@ -424,6 +432,23 @@ final class IOSProvisioningPreflight {
         dbf.setXIncludeAware(false);
         dbf.setExpandEntityReferences(false);
         return dbf.newDocumentBuilder();
+    }
+
+    /**
+     * Whether this plist is a provisioning profile rather than some other plist the setting
+     * happens to point at.
+     *
+     * <p>Keyed on what every Apple-issued profile carries and no ordinary plist does: the
+     * profile's own UUID, when it expires, the entitlements it grants, and the certificates it
+     * was issued to. Checked against real development, distribution and Xcode-team profiles.
+     * Deliberately a small set -- the more that is demanded here, the more likely this refuses
+     * a profile that is perfectly good.
+     */
+    private static boolean isProvisioningPlist(Document doc) {
+        return valueForKey(doc, "UUID") != null
+                && valueForKey(doc, "ExpirationDate") != null
+                && valueForKey(doc, "Entitlements") != null
+                && valueForKey(doc, "DeveloperCertificates") != null;
     }
 
     /**
