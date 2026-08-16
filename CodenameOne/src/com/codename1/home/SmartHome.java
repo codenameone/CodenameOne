@@ -196,6 +196,39 @@ public final class SmartHome {
         return instance;
     }
 
+    /// Replaces the singleton with one wired to the supplied bridge, for
+    /// tests.
+    ///
+    /// Package-private, so only this package's tests can reach it -- the same
+    /// arrangement `com.codename1.maps.spi.MapProviderRegistry` uses for the
+    /// same reason. Global state that a test suite shares is otherwise
+    /// order-dependent: a test that runs after one which resolved a bridge
+    /// sees that bridge, and the failure looks like a bug in whichever test
+    /// happened to run second.
+    ///
+    /// Passing `null` gives a bridgeless instance without waiting for
+    /// `Display` to be absent, which is what the degradation tests need.
+    ///
+    /// #### Parameters
+    ///
+    /// - `testBridge`: the bridge to install, or `null` for none
+    static synchronized void resetForTest(HomeBridge testBridge) {
+        SmartHome replacement = new SmartHome();
+        replacement.installBridge(testBridge);
+        instance = replacement;
+    }
+
+    /// Holds the instance monitor, not the class one.
+    ///
+    /// `resetForTest` is `static synchronized`, which locks the class -- a
+    /// different monitor from the one [#bridge()] uses, so assigning the
+    /// fields there directly left them written under one lock and read under
+    /// another.
+    private synchronized void installBridge(HomeBridge testBridge) {
+        this.bridge = testBridge;
+        this.bridgeResolved = true;
+    }
+
     /// Resolved on first use rather than in the constructor.
     ///
     /// A static initializer or a constructor lookup would run before
@@ -616,16 +649,21 @@ public final class SmartHome {
         if (request == null) {
             throw new IllegalArgumentException("request is required");
         }
-        HomeBridge b = bridge();
-        if (b == null) {
-            return failed(HomeError.NOT_SUPPORTED,
-                    "this platform has no smart-home support");
-        }
+        // Before the bridge check, deliberately. A request that asks for
+        // nothing has no platform component, so answering "nothing" is
+        // correct everywhere -- and a caller who built a request from a list
+        // that filtered down to empty should not get a different answer on
+        // the desktop than on a phone.
         if (request.isEmpty()) {
             EdtResult<List<TraitReading>> empty =
                     new EdtResult<List<TraitReading>>();
             empty.complete(Collections.<TraitReading>emptyList());
             return empty;
+        }
+        HomeBridge b = bridge();
+        if (b == null) {
+            return failed(HomeError.NOT_SUPPORTED,
+                    "this platform has no smart-home support");
         }
         int id = nextRequestId();
         EdtResult<List<TraitReading>> result = pendingReads.open(id);
@@ -715,16 +753,17 @@ public final class SmartHome {
         if (writes == null) {
             throw new IllegalArgumentException("writes are required");
         }
-        HomeBridge b = bridge();
-        if (b == null) {
-            return failed(HomeError.NOT_SUPPORTED,
-                    "this platform has no smart-home support");
-        }
+        // Before the bridge check, for the same reason as in read().
         if (writes.isEmpty()) {
             EdtResult<List<TraitWriteResult>> empty =
                     new EdtResult<List<TraitWriteResult>>();
             empty.complete(Collections.<TraitWriteResult>emptyList());
             return empty;
+        }
+        HomeBridge b = bridge();
+        if (b == null) {
+            return failed(HomeError.NOT_SUPPORTED,
+                    "this platform has no smart-home support");
         }
         int count = writes.size();
         String[] accessoryIds = new String[count];
