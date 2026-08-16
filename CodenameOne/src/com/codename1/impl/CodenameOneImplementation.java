@@ -11398,11 +11398,17 @@ public abstract class CodenameOneImplementation {
     /// - `obscured`: true when the observed touch was obscured
     /// - `detail`: a short machine readable description of which flag fired, or null
     public void notifyScreenObscured(boolean obscured, String detail) {
-        if (obscured == screenObscured) {
-            return;
-        }
+        boolean changed = obscured != screenObscured;
         screenObscured = obscured;
         if (obscured) {
+            // Submitted on every obscured touch rather than only on the transition, because
+            // the bus and the listener want different things. ShieldSignals.add already
+            // de-duplicates: it refreshes the stored observation -- detail and timestamp --
+            // and stays silent when nothing changed. Gating this on the transition meant a
+            // partially obscured touch followed by a fully obscured one left the bus
+            // reporting "partiallyObscured" while BLOCK was dropping a fully obscured
+            // attack, and left "when did this device last look obscured" answering with the
+            // first sighting long after the fact.
             try {
                 com.codename1.security.shield.ShieldSignals.add(
                         com.codename1.security.shield.ShieldSignal.TAPJACK, 80, detail);
@@ -11410,6 +11416,11 @@ public abstract class CodenameOneImplementation {
                 // Reporting must never break input handling: this runs on the touch path.
                 Log.e(t);
             }
+        }
+        if (!changed) {
+            // The listener, unlike the bus, is a state-change notification. Firing it per
+            // touch would queue a runnable onto the EDT for every event of every gesture.
+            return;
         }
         if (tapjackingListeners != null && tapjackingListeners.hasListeners()) {
             // Boolean source so a listener can read the new state straight off the event without

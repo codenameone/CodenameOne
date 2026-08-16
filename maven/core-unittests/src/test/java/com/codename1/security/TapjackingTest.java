@@ -163,6 +163,39 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
+    void escalatingFromPartialToFullyObscuredUpdatesTheSignal() {
+        // The two are separate observations under one id. Reporting only the transition left
+        // the bus saying "partiallyObscured" while a fully obscured attack was being blocked.
+        implementation.notifyScreenObscured(true, "partiallyObscured");
+        flushSerialCalls();
+        assertEquals("partiallyObscured", findTapjackSignal().getDetail());
+
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+        assertEquals("obscured", findTapjackSignal().getDetail(),
+                "the bus has to hold the most recent observation, not the first one");
+
+        // Still one state change, so still one listener callback.
+        assertEquals(1, observed.size());
+    }
+
+    @Test
+    void repeatedSightingsRefreshTheSignalTimestamp() throws Exception {
+        // "When did this device last look obscured" is a question the answer gets used for,
+        // so an ongoing attack must not keep reporting the timestamp of the first sighting.
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+        long first = findTapjackSignal().getTimestamp();
+
+        Thread.sleep(15L);
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+
+        assertTrue(findTapjackSignal().getTimestamp() >= first,
+                "a repeat sighting must refresh the stored observation");
+    }
+
+    @Test
     void repeatedObscuredTouchesDoNotNotifyAgain() {
         // A port calls this per touch. Re-notifying would put a runnable on the EDT for
         // every one of them.
