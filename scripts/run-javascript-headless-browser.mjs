@@ -27,6 +27,54 @@ const SUITE_FINISHED_MARKER = 'CN1SS:SUITE:FINISHED';
 
 let suiteFinished = false;
 
+// The app captures its own screenshot by reading back the canvas and ships the bytes over
+// the shared cn1ss WebSocket transport. That transport is fine, but a canvas readback is no
+// longer the whole picture: the port promotes text into a DOM layer above the canvas, so a
+// canvas-only capture is missing every label on screen.
+//
+// Rather than fork the transport that iOS, Android, watch and TV also use, take the
+// authoritative capture here -- Playwright screenshots the composited page, canvas and
+// overlays together -- and write it over the app's file in the same directory. Everything
+// downstream (the delivered artifacts, the golden comparison) is unchanged.
+const screenshotDir = process.env.CN1SS_WS_DIR;
+const CAPTURE_MARKER = /CN1SS:INFO:test=([A-Za-z0-9_.$-]+)\s+png_bytes=/;
+let captureChain = Promise.resolve();
+let capturedCount = 0;
+
+async function drainScreenshots() {
+  if (!screenshotDir) {
+    return;
+  }
+  try {
+    await captureChain;
+  } catch { /* individual failures already logged */ }
+  append(`screenshot:composited:total=${capturedCount}`);
+}
+
+function capturePageScreenshot(page, text) {
+  if (!screenshotDir) {
+    return;
+  }
+  const match = CAPTURE_MARKER.exec(text);
+  if (!match) {
+    return;
+  }
+  const testName = match[1];
+  // Serialized, and queued the moment the app reports its own capture: the suite has not
+  // advanced yet at that point, so the composited page still shows the frame under test.
+  captureChain = captureChain.then(async () => {
+    try {
+      const buffer = await page.screenshot({ animations: 'disabled' });
+      fs.writeFileSync(`${screenshotDir}/${testName}.png`, buffer);
+      capturedCount++;
+      append(`screenshot:composited:${testName}:${buffer.length}`);
+    } catch (err) {
+      // Leave the app's canvas-only PNG in place rather than losing the test entirely.
+      append(`screenshot:failed:${testName}:${String(err)}`);
+    }
+  });
+}
+
 function append(line) {
   const text = `[playwright] ${line}\n`;
   if (logFile) {
@@ -160,6 +208,7 @@ try {
     if (text.indexOf(SUITE_FINISHED_MARKER) >= 0) {
       suiteFinished = true;
     }
+    capturePageScreenshot(page, text);
   });
   page.on('pageerror', err => append(`pageerror:${String(err)}`));
   page.on('requestfailed', req => append(`requestfailed:${req.url()} ${req.failure()?.errorText || ''}`));
@@ -225,6 +274,7 @@ try {
     process.on(sig, async () => {
       append(`profiler:signal:${sig}`);
       await finalizeProfile();
+      await drainScreenshots();
       try { await browser.close(); } catch { /* ignore */ }
       process.exit(0);
     });
@@ -261,5 +311,8 @@ try {
   }
   await finalizeProfile();
 } finally {
+  // Drain queued captures before tearing the page down, or the last test of a run loses its
+  // screenshot and shows up as a spurious golden miss.
+  await drainScreenshots();
   await browser.close();
 }
