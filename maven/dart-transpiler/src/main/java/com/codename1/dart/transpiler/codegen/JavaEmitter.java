@@ -4398,6 +4398,34 @@ public final class JavaEmitter {
             }
         }
         Out target = emitExprRaw(c.target, null, ctx);
+        if (c.nullAware) {
+            // a?.m() - the SAME shorting a?.b gets, and it was missing here: only the
+            // function-valued `call` case honoured the flag, so every other `?.m()` emitted
+            // an unguarded invocation. The gallery's `_timeDilationTimer?.cancel()` is one,
+            // and toggling slow motion threw a NullPointerException on the very first use
+            // because that timer is null until something has been dilated.
+            //
+            // Lift the receiver into a temp and start a short: the call runs on the
+            // non-null temp, and the temp being null shorts this and any trailing
+            // selectors, exactly as Dart specifies.
+            Out mat = materializeShort(target);
+            String tmp = ctx.newTemp();
+            ctx.writer().line("var " + tmp + " = " + mat.code + ";");
+            Out called = emitMethodCallOn(
+                    new Out(tmp, copyNonNull(mat.type), mat.fromError), c, ctx);
+            if (called.code == null || called.code.isEmpty()) {
+                // The callee emitted its own guarded statement (the function-valued `call`
+                // path does this) - there is no expression left to short.
+                return called;
+            }
+            if (called.type != null && called.type.is("void")) {
+                // A void call cannot be the value of a ternary. In statement position the
+                // guard is an `if`, which is also what the result is used for: nothing.
+                ctx.writer().line("if (" + tmp + " != null) { " + called.code + "; }");
+                return new Out("", TypeRef.VOID);
+            }
+            return new Out(called.code, boxType(called.type), called.fromError, tmp);
+        }
         Out result = emitMethodCallOn(target, c, ctx);
         // a plain method call after a `?.` stays inside the short (a?.b.c())
         return result.withShort(target.shortGuard);
