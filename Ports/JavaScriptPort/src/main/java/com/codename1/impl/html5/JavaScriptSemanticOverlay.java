@@ -492,7 +492,20 @@ public final class JavaScriptSemanticOverlay {
             @Override
             public void handleEvent(Event event) {
                 event.preventDefault();
+                // The button sits inside the node it belongs to, whose own click listener would
+                // otherwise also run and fire the node's main action alongside this one.
+                event.stopPropagation();
                 dispatcher.performAction(nodeId, action.getId(), null);
+            }
+        });
+        button.addEventListener("keydown", new EventListener() {
+            @Override
+            public void handleEvent(Event event) {
+                // Keep the key from reaching the enclosing node's handler, which would treat
+                // Enter or Space as the node's main action and suppress this button's click --
+                // so a keyboard or screen-reader user would get the wrong action entirely. Not
+                // prevented, only stopped: the browser still turns it into a click here.
+                event.stopPropagation();
             }
         });
         entry.element.appendChild(button);
@@ -578,6 +591,18 @@ public final class JavaScriptSemanticOverlay {
         }
     }
 
+    /**
+     * Actions the browser already provides a way to perform, so the overlay does not add a
+     * button for them.
+     *
+     * <p>SET_TEXT is included deliberately, and review has asked twice about it. A custom action
+     * button can only dispatch with a null argument, which for SET_TEXT means replacing the
+     * field's contents with nothing -- a button that silently clears the field is worse than no
+     * button. Editing reaches the framework a different way here: the port puts a real native
+     * input over the field, and that input is what assistive technology and the browser both
+     * drive. Exposing SET_TEXT properly needs that input to be present before editing starts
+     * rather than created on demand, which is its own change.</p>
+     */
     private boolean isStandardWebAction(String id) {
         return AccessibilityAction.ACTIVATE.equals(id) || AccessibilityAction.FOCUS.equals(id)
                 || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id)
