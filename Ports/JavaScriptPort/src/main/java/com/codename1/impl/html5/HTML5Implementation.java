@@ -168,6 +168,7 @@ import com.codename1.html5.js.dom.HTMLButtonElement;
 import com.codename1.html5.js.dom.HTMLCanvasElement;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
+import com.codename1.html5.js.dom.PopStateEvent;
 import com.codename1.html5.js.dom.HTMLImageElement;
 import com.codename1.html5.js.dom.HTMLInputElement;
 import com.codename1.html5.js.dom.HTMLTextAreaElement;
@@ -622,6 +623,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * built its container.
      */
     JavaScriptTextLayer textLayer;
+
+    /**
+     * False when ?cn1TextLayer=0 asked for canvas-only text.
+     */
+    private boolean textLayerEnabled = true;
+
+    /**
+     * True once the application has read the screen back as pixels, which permanently returns
+     * text to the canvas so those reads can see it.
+     */
+    private boolean textLayerDisabledByReadback;
+
+    /**
+     * False when ?cn1Semantics=0 asked for no ARIA projection.
+     */
+    private boolean semanticOverlayEnabled = true;
     
     
     /**
@@ -1272,6 +1289,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (textLayer != null && isDisplayGraphics(g)) {
             if (!textLayer.isPainting()) {
                 updateTextLayerSuspension();
+                textLayer.beginFrame();
             }
             textLayer.beginComponent(c);
         }
@@ -1289,6 +1307,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         Form currentForm = Display.getInstance().getCurrent();
         boolean overlayBlocked = com.codename1.ui.Accessor.paintsOverChildren(currentForm);
         boolean shouldSuspend = Display.getInstance().isInTransition() || overlayBlocked;
+        if (textLayerDisabledByReadback) {
+            // A pixel read has already claimed the canvas as the source of truth.
+            return;
+        }
         if (shouldSuspend == textLayer.isSuspended()) {
             return;
         }
@@ -1590,7 +1612,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         textLayerContainer.setAttribute("aria-hidden", "true");
         textLayerContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483645;");
         outputCanvas.getParentNode().insertBefore(textLayerContainer, outputCanvas);
-        textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+        // ?cn1TextLayer=0 / ?cn1Semantics=0 turn the two DOM layers off at runtime. Both are
+        // new behaviour layered onto a canvas renderer, so being able to take one out without
+        // rebuilding is what makes a rendering or timing regression bisectable.
+        textLayerEnabled = !"0".equals(getParameterByName("cn1TextLayer"));
+        semanticOverlayEnabled = !"0".equals(getParameterByName("cn1Semantics"));
+        if (textLayerEnabled) {
+            textLayer = new JavaScriptTextLayer(document, textLayerContainer);
+        }
         // Paint locking caches a component's pixels in an image and serves that image instead
         // of painting, returning from Component.paintInternal() before the per-component hooks
         // run. A locked component therefore stops reporting its text while its DOM runs stay on
@@ -3431,7 +3460,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // Releases runs whose component has been removed, hidden, or whose form is no
             // longer displayed; none of those ever paints again, so nothing else would clean
             // them up.
-            textLayer.syncToForm(Display.getInstance().getCurrent());
+            Form displayed = Display.getInstance().getCurrent();
+            textLayer.syncToForm(displayed);
+            if (textLayer.consumeReattachFlag() && displayed != null) {
+                // A run came back after being detached, so it holds a fresh stacking index
+                // while everything that did not repaint still holds an older one. One full
+                // repaint puts the whole form on the same footing.
+                displayed.repaint();
+            }
         }
         // Record the whole frame into the display surface's command buffer (the
         // display graphics draws onto DISPLAY_SURFACE_ID) and ship it in one
@@ -3823,7 +3859,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void accessibilityTreeChanged(int changeType) {
-        if (accessibilityContainer == null) {
+        if (accessibilityContainer == null || !semanticOverlayEnabled) {
             return;
         }
         if (semanticOverlay == null) {
@@ -6541,12 +6577,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
             super.screenshot(callback);
             return;
         }
+        // A screenshot has to be what the user sees, and promoted text lives in a DOM layer
+        // that a surface read cannot reach. Put the text back on the canvas for the duration:
+        // suspend promotion, repaint the form through the display graphics so the strings
+        // rasterize, read, then restore. Without this every screenshot -- including the ones
+        // applications take themselves -- comes back with its labels missing.
+        // Reading the screen back as pixels and promoting text into the DOM cannot both be
+        // authoritative: a surface read cannot see a DOM layer, so a screenshot taken while
+        // text is promoted comes back with its labels missing. An application that reads pixels
+        // is telling us which representation it needs, so promotion stops for good at the first
+        // such call and the text returns to the canvas, where the reads can see it.
+        //
+        // The frame already in the buffer was composed with the text promoted, so this first
+        // screenshot is still text-less; everything painted afterwards carries its text again.
+        // Callers that poll -- waiting for something to appear before capturing -- therefore
+        // settle on the second read.
+        if (textLayer != null && !textLayer.isSuspended()) {
+            textLayer.setSuspended(true);
+            textLayerDisabledByReadback = true;
+            Form current = getCurrentForm();
+            if (current != null) {
+                current.repaint();
+            }
+        }
         drainPendingDisplayFrame();
         // Read the display SURFACE pixels by id (the one legitimate pixel
         // read-back) instead of getContext().getImageData() on the canvas
         // host-ref. nativeSurfaceReadRGB returns ARGB straight into ``rgb``.
         final int[] rgb = new int[width * height];
         nativeSurfaceReadRGB(DISPLAY_SURFACE_ID, 0, 0, width, height, rgb);
+
         callback.onSucess(Image.createImage(rgb, width, height));
     }
 
@@ -10482,12 +10542,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * back command would not work. Going through the window binding puts the call on the main
      * thread, where the History API actually exists.</p>
      */
+    /**
+     * Monotonic id stamped into each pushed history entry. popstate fires for forward
+     * traversal too, and comparing the restored id against this one is what tells the two
+     * apart.
+     */
+    private int historyIndex;
+
     private void pushHistoryState() {
         if (handlingPopState) {
             return;
         }
         try {
-            window.getHistory().pushState(null, "");
+            historyIndex++;
+            window.getHistory().pushState(String.valueOf(historyIndex), "");
         } catch (Throwable ignored) {
             // A sandboxed or file:// document can refuse pushState. Back simply stays inert.
         }
@@ -10502,6 +10570,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
             EventUtil.addEventListener(window, "popstate", new EventListener() {
                 @Override
                 public void handleEvent(Event evt) {
+                    // popstate fires for Forward as well as Back. Without telling them apart,
+                    // pressing Forward would run the form's back command and immediately undo
+                    // the navigation the user asked for.
+                    final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
+                    final boolean backward = restored < historyIndex;
+                    historyIndex = restored;
+                    if (!backward) {
+                        return;
+                    }
                     callSerially(new Runnable() {
                         @Override
                         public void run() {
@@ -10515,6 +10592,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
+    /**
+     * Reads the id stamped into a history entry. Entries this port did not push -- the document
+     * entry the app started on -- carry no id and read as being before everything.
+     */
+    private int parseHistoryIndex(String state) {
+        if (state == null || state.length() == 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(state);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     private void dispatchBrowserBack() {
         final Form current = Display.getInstance().getCurrent();
         if (current == null) {
@@ -10522,15 +10614,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         Command back = current.getBackCommand();
         if (back == null) {
-            // Nothing to go back to inside the app, so keep unwinding. Entries can outlive the
-            // navigation that created them -- an in-app Back consumes a form without consuming
-            // an entry -- and swallowing the press here would make those leftovers visible as
-            // Back presses that appear to do nothing.
-            try {
-                window.getHistory().back();
-            } catch (Throwable ignored) {
-                // Nothing left to pop; the browser leaves the document on its own.
-            }
+            // Nothing to go back to inside the app. The press is left alone: the entry has
+            // already been popped, so pressing Back once more leaves the document, which is
+            // what the user asked for on a form with no back action.
             return;
         }
         handlingPopState = true;

@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.html5;
 
+import com.codename1.html5.js.dom.CSSStyleDeclaration;
 import com.codename1.html5.js.dom.Event;
 import com.codename1.html5.js.dom.EventListener;
 import com.codename1.html5.js.dom.HTMLDocument;
@@ -95,6 +96,9 @@ public final class JavaScriptSemanticOverlay {
         private final HTMLElement element;
         private final String tag;
         private final Map<String, String> attributes = new HashMap<String, String>();
+        // Held for the same reason as in the text layer: getStyle() is a round trip that parks
+        // the worker, and geometry is rewritten on every CHANGE_BOUNDS.
+        private final CSSStyleDeclaration style;
         private final List<Long> childOrder = new ArrayList<Long>();
         private Map<String, HTMLElement> customActions;
         private Map<String, String> customActionLabels;
@@ -110,6 +114,7 @@ public final class JavaScriptSemanticOverlay {
             this.id = id;
             this.element = element;
             this.tag = tag;
+            this.style = element.getStyle();
         }
     }
 
@@ -272,7 +277,7 @@ public final class JavaScriptSemanticOverlay {
         css.append("height:").append(Math.max(1, bounds.getHeight()) / ratio).append("px;");
         String geometry = css.toString();
         if (!geometry.equals(entry.geometry)) {
-            entry.element.getStyle().setCssText(geometry);
+            entry.style.setCssText(geometry);
             entry.geometry = geometry;
         }
     }

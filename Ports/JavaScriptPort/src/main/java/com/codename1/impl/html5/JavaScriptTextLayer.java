@@ -22,6 +22,7 @@
  */
 package com.codename1.impl.html5;
 
+import com.codename1.html5.js.dom.CSSStyleDeclaration;
 import com.codename1.html5.js.dom.HTMLDocument;
 import com.codename1.html5.js.dom.HTMLElement;
 import com.codename1.impl.html5.HTML5Implementation.NativeFont;
@@ -72,14 +73,22 @@ public final class JavaScriptTextLayer {
     private static final class Run {
         private final HTMLElement clip;
         private final HTMLElement text;
+        // Held rather than re-fetched. getStyle() is a property read, which crosses to the main
+        // thread and parks the worker until it answers; doing that twice per run per frame was
+        // enough to wedge the VM on a screen that repaints continuously.
+        private final CSSStyleDeclaration clipStyle;
+        private final CSSStyleDeclaration textStyle;
         private String clipCss;
         private String textCss;
         private String content;
         private boolean attached;
+        private boolean everAttached;
 
         Run(HTMLElement clip, HTMLElement text) {
             this.clip = clip;
             this.text = text;
+            this.clipStyle = clip.getStyle();
+            this.textStyle = text.getStyle();
         }
     }
 
@@ -110,6 +119,8 @@ public final class JavaScriptTextLayer {
     private int depth;
     private int cellRendererDepth;
     private boolean suspended;
+    private int drawSequence;
+    private boolean reattachedThisFrame;
 
     /**
      * Creates a text layer.
@@ -145,6 +156,32 @@ public final class JavaScriptTextLayer {
      */
     public boolean isSuspended() {
         return suspended;
+    }
+
+    /**
+     * Marks the start of a frame, before any component has painted.
+     *
+     * <p>Resets the draw counter that orders overlapping runs. DOM insertion order alone would
+     * reflect the order runs were first attached, not the order the frame paints them, so a run
+     * that is detached and later re-attached would jump to the top of the stack.</p>
+     */
+    public void beginFrame() {
+        drawSequence = 0;
+    }
+
+    /**
+     * Reports, and clears, whether a run was attached after having been detached.
+     *
+     * <p>Only repainted runs get a fresh stacking index, so after a re-attach the frame holds a
+     * mix of old and new indices. The caller repaints the whole form to put them back in
+     * agreement.</p>
+     *
+     * @return true when a run was re-attached since the last call
+     */
+    public boolean consumeReattachFlag() {
+        boolean value = reattachedThisFrame;
+        reattachedThisFrame = false;
+        return value;
     }
 
     /**
@@ -267,9 +304,13 @@ public final class JavaScriptTextLayer {
         clipCss.append("top:").append(clipY / scale).append("px;");
         clipCss.append("width:").append(clipW / scale).append("px;");
         clipCss.append("height:").append(clipH / scale).append("px;");
+        // Stacking follows the frame's draw order rather than DOM insertion order, so a run
+        // that is hidden and shown again lands back underneath whatever paints after it.
+        drawSequence++;
+        clipCss.append("z-index:").append(drawSequence).append(";");
         String clipDeclaration = clipCss.toString();
         if (!clipDeclaration.equals(run.clipCss)) {
-            run.clip.getStyle().setCssText(clipDeclaration);
+            run.clipStyle.setCssText(clipDeclaration);
             run.clipCss = clipDeclaration;
         }
 
@@ -293,7 +334,7 @@ public final class JavaScriptTextLayer {
         // anything at all across the bridge.
         String textDeclaration = textCss.toString();
         if (!textDeclaration.equals(run.textCss)) {
-            run.text.getStyle().setCssText(textDeclaration);
+            run.textStyle.setCssText(textDeclaration);
             run.textCss = textDeclaration;
         }
 
@@ -304,6 +345,12 @@ public final class JavaScriptTextLayer {
         if (!run.attached) {
             container.appendChild(run.clip);
             run.attached = true;
+            if (run.everAttached) {
+                // Previously attached, so other runs are still carrying stacking indices from
+                // an earlier frame. Ask for a full repaint to bring them all into one pass.
+                reattachedThisFrame = true;
+            }
+            run.everAttached = true;
         }
         return true;
     }
@@ -345,6 +392,8 @@ public final class JavaScriptTextLayer {
         stack.clear();
         depth = 0;
         cellRendererDepth = 0;
+        drawSequence = 0;
+        reattachedThisFrame = false;
     }
 
     private Run obtain(ComponentRuns runs, int index) {
