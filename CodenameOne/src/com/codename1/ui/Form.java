@@ -103,6 +103,12 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// Used in `Container#revalidate()`.
     boolean revalidateFromRoot = "true".equals(CN.getProperty("Form.revalidateFromRoot", "true"));
+
+    /// {@inheritDoc}
+    @Override
+    boolean isRevalidateFromRoot() {
+        return revalidateFromRoot;
+    }
     private Command sourceCommand;
     private boolean globalAnimationLock;
     private Painter glassPane;
@@ -3052,6 +3058,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the current focus component for this form
+    @Override
     public Component getFocused() {
         return focused;
     }
@@ -4449,6 +4456,7 @@ public class Form extends Container implements TopLevelContainer {
 
     /// Finds next focusable component.  This will first check `Component#getNextFocusDown()`
     /// on the currently focused component.  Failing that it will scan the form based on Y-coord.
+    @Override
     Component findNextFocusDown() {
         if (focused != null) {
             if (focused.getNextFocusDown() != null) {
@@ -4461,6 +4469,7 @@ public class Form extends Container implements TopLevelContainer {
 
     /// Finds next focusable component in upward direction.  This will first check `Component#getNextFocusUp()`
     /// on the currently focused component.  Failing that it will scan the form based on Y-coord.
+    @Override
     Component findNextFocusUp() {
         if (focused != null) {
             if (focused.getNextFocusUp() != null) {
@@ -4473,6 +4482,7 @@ public class Form extends Container implements TopLevelContainer {
 
     /// Finds next focusable component in rightward direction.  This will first check `Component#getNextFocusRight()`
     /// on the currently focused component.  Failing that it will scan the form based on X-coord.
+    @Override
     Component findNextFocusRight() {
         if (focused != null) {
             if (focused.getNextFocusRight() != null) {
@@ -4485,6 +4495,7 @@ public class Form extends Container implements TopLevelContainer {
 
     /// Finds next focusable component in leftward direction.  This will first check `Component#getNextFocusLeft()`
     /// on the currently focused component.  Failing that it will scan the form based on X-coord.
+    @Override
     Component findNextFocusLeft() {
         if (focused != null) {
             if (focused.getNextFocusLeft() != null) {
