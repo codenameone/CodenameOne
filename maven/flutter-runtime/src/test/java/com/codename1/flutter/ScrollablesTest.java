@@ -53,7 +53,7 @@ class ScrollablesTest {
             builtIndexes.add(i);
             contexts.add(c);
             return new ProbeBox(10, 20);
-        }, null);
+        }, null, null, null, null, null);
 
         ScrollRenderElement scroll = mountAndLayout(lv, BoxConstraints.tight(100, 50));
 
@@ -72,7 +72,8 @@ class ScrollablesTest {
     @Test
     void builderWithoutItemCountThrowsUnsupportedError() {
         assertThrows(UnsupportedError.class,
-                () -> ListView.builder(null, null, (c, i) -> new ProbeBox(1, 1), null));
+                () -> ListView.builder(null, null, (c, i) -> new ProbeBox(1, 1),
+                        null, null, null, null, null));
     }
 
     @Test

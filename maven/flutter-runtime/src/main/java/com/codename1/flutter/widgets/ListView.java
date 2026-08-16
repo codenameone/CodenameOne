@@ -71,12 +71,18 @@ public class ListView extends Widget {
     }
 
     /**
-     * Dart's {@code ListView.builder} named constructor in canonical
-     * positional form.
+     * Dart's {@code ListView.builder} named constructor, in canonical positional form.
+     *
+     * <p>The trailing parameters are not decoration. A named argument this factory does not
+     * declare is dropped by the transpiler without a word, so {@code shrinkWrap: true} —
+     * which is how a list inside a Column says "size to your content" — used to be
+     * discarded, and the list took the whole height it was offered instead. The settings
+     * page's expanding options list is exactly that shape.</p>
      */
     public static ListView builder(Key key, Long itemCount,
                                    Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
-                                   EdgeInsets padding) {
+                                   EdgeInsets padding, Boolean shrinkWrap, Object physics,
+                                   com.codename1.flutter.Axis scrollDirection, Object controller) {
         if (itemCount == null) {
             throw new UnsupportedError(
                     "ListView.builder without itemCount (an infinite list) is not supported in M2; "
@@ -87,6 +93,10 @@ public class ListView extends Widget {
         l.itemCount = itemCount;
         l.itemBuilder = itemBuilder;
         l.padding = padding;
+        l.shrinkWrap = shrinkWrap != null && shrinkWrap.booleanValue();
+        if (scrollDirection != null) {
+            l.scrollDirection(scrollDirection);
+        }
         return l;
     }
 
@@ -151,7 +161,7 @@ public class ListView extends Widget {
                                      Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
                                      Funcs.Func2<BuildContext, Long, Widget> separatorBuilder,
                                      EdgeInsets padding, Boolean shrinkWrap) {
-        ListView l = builder(key, itemCount, itemBuilder, padding);
+        ListView l = builder(key, itemCount, itemBuilder, padding, shrinkWrap, null, null, null);
         if (shrinkWrap != null) {
             l.shrinkWrap(shrinkWrap);
         }

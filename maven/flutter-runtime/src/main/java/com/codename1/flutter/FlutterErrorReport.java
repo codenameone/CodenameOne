@@ -37,14 +37,25 @@ public final class FlutterErrorReport {
         private final String message;
         private final String building;
         private final String route;
+        private final String origin;
         private int count;
 
-        Entry(String type, String message, String building, String route) {
+        Entry(String type, String message, String building, String route, String origin) {
             this.type = type;
             this.message = message;
             this.building = building;
             this.route = route;
+            this.origin = origin;
             this.count = 1;
+        }
+
+        /// The first few frames of the throw site, or null when the platform has none.
+        ///
+        /// "Null check operator used on a null value" names no widget and no line on its
+        /// own, and transpiled code has plenty of `!` in it; without this, finding one
+        /// means bisecting the tree by hand.
+        public String origin() {
+            return origin;
         }
 
         public String type() {
@@ -81,6 +92,9 @@ public final class FlutterErrorReport {
             }
             if (route != null) {
                 sb.append("  [route ").append(route).append("]");
+            }
+            if (origin != null) {
+                sb.append("  [at ").append(origin).append("]");
             }
             return sb.toString();
         }
@@ -122,6 +136,40 @@ public final class FlutterErrorReport {
         return installed;
     }
 
+    /// The first frames of a throwable's own stack, trimmed to the generated and runtime
+    /// code that actually matters. Best effort: a platform that reports no frames simply
+    /// yields null rather than failing the report.
+    private static String originOf(Object error) {
+        if (!(error instanceof Throwable)) {
+            return null;
+        }
+        try {
+            StackTraceElement[] frames = ((Throwable) error).getStackTrace();
+            if (frames == null || frames.length == 0) {
+                return null;
+            }
+            StringBuilder sb = new StringBuilder();
+            int shown = 0;
+            for (int i = 0; i < frames.length && shown < 4; i++) {
+                String cn = frames[i].getClassName();
+                if (cn.startsWith("dart.runtime.DartRuntime")) {
+                    continue;   // the thrower itself, never the answer
+                }
+                if (sb.length() > 0) {
+                    sb.append(" <- ");
+                }
+                sb.append(cn).append('.').append(frames[i].getMethodName());
+                if (frames[i].getLineNumber() > 0) {
+                    sb.append(':').append(frames[i].getLineNumber());
+                }
+                shown++;
+            }
+            return sb.length() == 0 ? null : sb.toString();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     /** Records the route now on screen, so later errors can name where they happened. */
     public static synchronized void route(String name) {
         currentRoute = name;
@@ -136,13 +184,14 @@ public final class FlutterErrorReport {
         String message = error instanceof Throwable ? ((Throwable) error).getMessage()
                 : (error == null ? null : String.valueOf(error));
         String building = dart.runtime.DartRuntime.diagnosticContext();
+        String origin = originOf(error);
         String key = type + "|" + message + "|" + building + "|" + currentRoute;
         Entry existing = ENTRIES.get(key);
         if (existing != null) {
             existing.count++;
             return;   // already reported once; counting is enough
         }
-        Entry entry = new Entry(type, message, building, currentRoute);
+        Entry entry = new Entry(type, message, building, currentRoute, origin);
         ENTRIES.put(key, entry);
         ORDER.add(entry);
         try {
@@ -172,8 +221,9 @@ public final class FlutterErrorReport {
             existing.count++;
             return;
         }
+        // No origin: an unimplemented report names its own widget already.
         Entry entry = new Entry("unimplemented", widget + ": " + effect,
-                dart.runtime.DartRuntime.diagnosticContext(), currentRoute);
+                dart.runtime.DartRuntime.diagnosticContext(), currentRoute, null);
         ENTRIES.put(key, entry);
         ORDER.add(entry);
         try {
