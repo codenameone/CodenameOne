@@ -442,6 +442,19 @@ public final class WindowsNative {
 
     public static native boolean fileExists(String path);
 
+    /**
+     * The filesystem's own identity for a file, as volume and index, or null when it has none to
+     * give -- the file does not exist, or the volume does not number its files.
+     *
+     * <p>Two spellings of one path are one file to NTFS, which folds case by its own Unicode
+     * rules; folding the text here cannot match those rules, so the identity is asked of the
+     * filesystem rather than derived from the name.
+     *
+     * @param path the file to identify
+     * @return an opaque identity string, or null
+     */
+    public static native String fileIdentity(String path);
+
     public static native boolean fileIsDirectory(String path);
 
     public static native long fileLength(String path);

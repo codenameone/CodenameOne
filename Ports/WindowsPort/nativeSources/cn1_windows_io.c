@@ -33,6 +33,8 @@
 #ifdef _WIN32
 
 #include "cn1_windows.h"
+
+extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 #include <shlobj.h>
 #include <shellapi.h>  /* ShellExecuteW -- not pulled in by WIN32_LEAN_AND_MEAN */
 #include <commdlg.h>   /* GetOpenFileNameW / GetSaveFileNameW (comdlg32) */
@@ -216,6 +218,50 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileExists___java_lang_Str
     attrs = GetFileAttributesW(path);
     free(path);
     return (attrs != INVALID_FILE_ATTRIBUTES) ? JAVA_TRUE : JAVA_FALSE;
+}
+
+/*
+ * The filesystem's identity for a file: the volume it lives on and the index it has there.
+ *
+ * The database registry keys connections on this so that two spellings of one path are one entry.
+ * NTFS is case insensitive by its own Unicode table, and String.toLowerCase on this target folds
+ * through towlower under whatever locale the process happens to have -- commonly ASCII alone. So
+ * "E.db" and its accented twin could be one file to the filesystem and two keys to us, and the
+ * check that stops a delete or a rekey while another connection is open would not see the other
+ * connection. Asking the filesystem removes the guessing: short names, hard links and any case
+ * spelling all answer with the same index.
+ *
+ * FILE_FLAG_BACKUP_SEMANTICS so a directory can be identified too, and every share mode so
+ * identifying a file never blocks the connection already using it.
+ */
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_fileIdentity___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT32 len = 0;
+    WCHAR* path = cn1WinJavaStringToWide(threadStateData, __cn1Arg1, &len);
+    HANDLE h;
+    BY_HANDLE_FILE_INFORMATION info;
+    char identity[96];
+    if (path == NULL) {
+        return JAVA_NULL;
+    }
+    h = CreateFileW(path, FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    free(path);
+    if (h == INVALID_HANDLE_VALUE) {
+        /* No file, no identity. The caller falls back to the name, which is all there is to go on
+         * before the file exists. */
+        return JAVA_NULL;
+    }
+    if (!GetFileInformationByHandle(h, &info)) {
+        CloseHandle(h);
+        return JAVA_NULL;
+    }
+    CloseHandle(h);
+    snprintf(identity, sizeof(identity), "winfile:%lu:%lu:%lu",
+            (unsigned long) info.dwVolumeSerialNumber,
+            (unsigned long) info.nFileIndexHigh,
+            (unsigned long) info.nFileIndexLow);
+    return newStringFromCString(threadStateData, identity);
 }
 
 JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_fileIsDirectory___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {

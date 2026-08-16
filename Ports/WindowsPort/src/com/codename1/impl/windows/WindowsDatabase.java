@@ -62,11 +62,24 @@ class WindowsDatabase extends Database {
     /** The file this connection is open on, for the shared registry a key change consults. */
     private final String openKey;
 
+    /**
+     * The name a managed key for this database is filed under.
+     *
+     * <p>Kept apart from {@link #openKey} deliberately. That one now answers "which file is this",
+     * which the filesystem answers with a volume and an index -- and an index belongs to a file,
+     * not to a name, so it changes when the file is deleted and made again. A key filed under it
+     * would be lost by the first delete-and-recreate, which is exactly what a caller does between
+     * two runs. The alias stays with the path, which is what the application asked for and what it
+     * will ask for again.
+     */
+    private final String aliasKey;
+
     WindowsDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.openKey = windowsPathKey(path);
+        this.aliasKey = windowsPathKey(path);
+        this.openKey = connectionKeyFor(path);
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
@@ -114,6 +127,37 @@ class WindowsDatabase extends Database {
     /// name, not a smarter fold.
     /// The registry key for a path, for callers outside an instance -- the managed key alias.
     static String registryKeyFor(String path) {
+        return windowsPathKey(path);
+    }
+
+    /// Which file a connection is on, as the filesystem sees it.
+    ///
+    /// Asked of the filesystem rather than folded from the text, because this decides whether two
+    /// connections are on one file and the text cannot decide it. The default filesystem is case
+    /// insensitive by its own Unicode table; String.toLowerCase on this target folds through
+    /// towlower under whatever locale the process has, commonly ASCII alone. So two spellings of a
+    /// non-ASCII name are one file to the filesystem and were two entries here -- and a delete or
+    /// a rekey through one spelling could not see the connection held under the other.
+    ///
+    /// Falls back to the folded path when the filesystem has no answer, which is the case before
+    /// the file exists. Nothing can be holding a file that is not there, so the fallback protects
+    /// nothing that needs protecting; what it leaves is a narrow window where two spellings create
+    /// the same file at once, and the open that follows either one keys on the identity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the resolved database file
+    ///
+    /// #### Returns
+    ///
+    /// the registry key for that file
+    private static String connectionKeyFor(String path) {
+        if (path != null) {
+            String identity = WindowsNative.fileIdentity(path);
+            if (identity != null && identity.length() > 0) {
+                return identity;
+            }
+        }
         return windowsPathKey(path);
     }
 
@@ -237,7 +281,7 @@ class WindowsDatabase extends Database {
                 // The resolved file, as the open path does: an implicit managed key is stored
                 // under what is passed here, and re-keying under the raw name would write a second
                 // key that the next open, which resolves the file, would not find.
-                key = config.resolveKeyMaterial(openKey);
+                key = config.resolveKeyMaterial(aliasKey);
             }
             WindowsNative.sqlDbRekey(peer, key);
         } finally {
