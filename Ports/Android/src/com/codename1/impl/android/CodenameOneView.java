@@ -649,6 +649,13 @@ public class CodenameOneView {
     private boolean tapjackBlockedGesture = false;
 
     /**
+     * The hover counterpart of {@link #tapjackBlockedGesture}, tracked separately
+     * because hover enter/exit interleaves with touch rather than nesting inside
+     * it -- a stylus can hover while a finger is down.
+     */
+    private boolean tapjackBlockedHover = false;
+
+    /**
      * MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED. Added in API 21 but absent
      * from the android.jar this port compiles against, so the value is inlined --
      * the same approach the port already takes for FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
@@ -833,7 +840,25 @@ public class CodenameOneView {
         if (this.implementation.getCurrentForm() == null) {
             return false;
         }
-        if (tapjacked(event)) {
+        // Hover is a paired sequence rather than a gesture: the enter puts a component into a
+        // hovered state that only the exit takes it out of. Filtering it the way touches are
+        // filtered would mean an overlay appearing mid-hover swallows the exit for an enter
+        // that was already delivered, leaving the component hovered permanently. So a sequence
+        // that STARTS obscured is withheld in full -- no enter was delivered, so no exit is
+        // owed -- while one that started clean always gets its release, whatever the flags say
+        // by then.
+        boolean hoverBlocked = tapjacked(event);
+        int hoverAction = event.getActionMasked();
+        if (hoverAction == MotionEvent.ACTION_HOVER_ENTER) {
+            tapjackBlockedHover = hoverBlocked;
+        }
+        if (tapjackBlockedHover) {
+            if (hoverAction == MotionEvent.ACTION_HOVER_EXIT) {
+                tapjackBlockedHover = false;
+            }
+            return true;
+        }
+        if (hoverBlocked && hoverAction != MotionEvent.ACTION_HOVER_EXIT) {
             return true;
         }
         final int x = (int) event.getX();

@@ -230,6 +230,38 @@ class TapjackingTest extends UITestBase {
     }
 
     @Test
+    void switchingProtectionOffClearsTheObscuredState() {
+        // Switching off is also what stops anything from clearing it later: ports stop
+        // reporting under OFF, so a state left set here would answer true for the rest of
+        // the process.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+        assertTrue(DeviceIntegrity.isScreenObscured());
+
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.OFF);
+        flushSerialCalls();
+
+        assertFalse(DeviceIntegrity.isScreenObscured());
+        assertEquals(2, observed.size(), "the listener is owed its closing transition");
+        assertEquals(Boolean.FALSE, observed.get(1));
+    }
+
+    @Test
+    void switchingBetweenDetectingPoliciesKeepsTheObscuredState() {
+        // Only OFF retracts. Tightening BLOCK to STRICT must not pretend the overlay went away.
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.BLOCK);
+        implementation.notifyScreenObscured(true, "obscured");
+        flushSerialCalls();
+
+        DeviceIntegrity.setTapjackingProtection(TapjackingPolicy.STRICT);
+        flushSerialCalls();
+
+        assertTrue(DeviceIntegrity.isScreenObscured());
+        assertEquals(1, observed.size());
+    }
+
+    @Test
     void aRemovedListenerStopsReceiving() {
         DeviceIntegrity.removeTapjackingListener(listener);
         implementation.notifyScreenObscured(true, "obscured");

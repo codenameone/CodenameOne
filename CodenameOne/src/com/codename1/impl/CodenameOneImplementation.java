@@ -11351,6 +11351,14 @@ public abstract class CodenameOneImplementation {
     /// that can also apply a platform level filter override this, call `super`, and apply it.
     public void setTapjackingProtection(TapjackingPolicy policy) {
         tapjackingPolicy = policy == null ? TapjackingPolicy.OFF : policy;
+        if (!tapjackingPolicy.isDetecting()) {
+            // Switching off has to retract the state, because switching off is also what stops
+            // anything from retracting it later: a port stops reporting under OFF -- the Android
+            // one returns from tapjacked() before it reports -- so a screenObscured left true
+            // here would have isScreenObscured() answering true for the rest of the process and
+            // the listener would never receive its closing transition.
+            notifyScreenObscured(false, null);
+        }
     }
 
     /// The tapjacking policy currently in force. Never null.
