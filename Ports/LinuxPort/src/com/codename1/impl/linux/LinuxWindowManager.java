@@ -1,0 +1,315 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.linux;
+
+import com.codename1.impl.WindowManager;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+
+/**
+ * The native Linux implementation of the desktop windowing contract.
+ *
+ * <p>Each Codename One window is a slot in the native table in
+ * {@code cn1_linux_desktopwindow.c}, with its own GtkWindow, drawing area, peer
+ * overlay and cairo back buffer. The application's main window keeps its own file
+ * statics and is not part of that table, so the single-window path is unchanged.</p>
+ *
+ * @author Shai Almog
+ */
+public class LinuxWindowManager extends WindowManager {
+
+    /** Flag selectors matching {@code cn1DesktopFlagOnMain}. */
+    private static final int FLAG_RESIZABLE = 0;
+    private static final int FLAG_ALWAYS_ON_TOP = 1;
+    private static final int FLAG_MODAL = 2;
+    private static final int FLAG_DECORATED = 3;
+
+    /** State selectors matching {@code cn1DesktopStateOnMain}. */
+    private static final int STATE_RESTORE = 0;
+    private static final int STATE_MINIMIZE = 1;
+    private static final int STATE_TOGGLE_MAXIMIZE = 2;
+    private static final int STATE_PRESENT = 3;
+
+    /** One native window, identified by its slot in the native table. */
+    static final class Peer {
+        final int slot;
+        final int windowId;
+
+        Peer(int slot, int windowId) {
+            this.slot = slot;
+            this.windowId = windowId;
+        }
+    }
+
+    private static int slot(Object p) {
+        return p instanceof Peer ? ((Peer) p).slot : -1;
+    }
+
+    // ---- lifecycle -----------------------------------------------------------
+
+    @Override
+    public Object createWindow(int windowId, String title, int x, int y, int width, int height,
+            boolean decorated, boolean resizable, Object parentPeer) {
+        int s = LinuxNative.desktopWindowCreate(windowId, title == null ? "" : title,
+                x, y, width, height, decorated, resizable);
+        if (s < 0) {
+            return null;
+        }
+        return new Peer(s, windowId);
+    }
+
+    @Override
+    public void show(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowShow(s, true);
+        }
+    }
+
+    @Override
+    public void hide(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowShow(s, false);
+        }
+    }
+
+    @Override
+    public void dispose(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowDestroy(s);
+        }
+    }
+
+    // ---- attributes ------------------------------------------------------------
+
+    @Override
+    public void setTitle(Object peer, String title) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetTitle(s, title == null ? "" : title);
+        }
+    }
+
+    @Override
+    public void setBounds(Object peer, int x, int y, int width, int height) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetBounds(s, x, y, width, height);
+        }
+    }
+
+    @Override
+    public int[] getBounds(Object peer, int[] out) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowGetBounds(s, out);
+        }
+        return out;
+    }
+
+    @Override
+    public int getWidth(Object peer) {
+        int s = slot(peer);
+        return s < 0 ? 0 : LinuxNative.desktopWindowGetWidth(s);
+    }
+
+    @Override
+    public int getHeight(Object peer) {
+        int s = slot(peer);
+        return s < 0 ? 0 : LinuxNative.desktopWindowGetHeight(s);
+    }
+
+    @Override
+    public void setResizable(Object peer, boolean resizable) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetFlag(s, FLAG_RESIZABLE, resizable);
+        }
+    }
+
+    @Override
+    public void setDecorated(Object peer, boolean decorated) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetFlag(s, FLAG_DECORATED, decorated);
+        }
+    }
+
+    @Override
+    public void setAlwaysOnTop(Object peer, boolean alwaysOnTop) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetFlag(s, FLAG_ALWAYS_ON_TOP, alwaysOnTop);
+        }
+    }
+
+    @Override
+    public void setModal(Object peer, boolean modal) {
+        // Codename One blocks input itself; this only gives the window manager the
+        // hint it needs for correct stacking and focus.
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetFlag(s, FLAG_MODAL, modal);
+        }
+    }
+
+    @Override
+    public void setIcon(Object peer, Image icon) {
+        // Not supported yet: the port has no GdkPixbuf conversion for a CN1 image.
+    }
+
+    @Override
+    public void requestFocus(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetState(s, STATE_PRESENT);
+        }
+    }
+
+    @Override
+    public void minimize(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetState(s, STATE_MINIMIZE);
+        }
+    }
+
+    @Override
+    public void restore(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetState(s, STATE_RESTORE);
+        }
+    }
+
+    @Override
+    public void toggleMaximize(Object peer) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetState(s, STATE_TOGGLE_MAXIMIZE);
+        }
+    }
+
+    // ---- rendering ------------------------------------------------------------------
+
+    @Override
+    public Object getNativeGraphics(Object peer) {
+        int s = slot(peer);
+        if (s < 0) {
+            return null;
+        }
+        return Long.valueOf(LinuxNative.desktopWindowGraphics(s));
+    }
+
+    @Override
+    public void flushGraphics(Object peer, int x, int y, int width, int height) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowFlush(s, x, y, width, height);
+        }
+    }
+
+    @Override
+    public void setPaintDirtyRegionClip(Object peer, int x, int y, int width, int height) {
+        int s = slot(peer);
+        if (s < 0) {
+            return;
+        }
+        long g = LinuxNative.desktopWindowGraphics(s);
+        if (g != 0) {
+            // Cairo draws into a persistent surface, so a clip set while a component
+            // paints has to be confined to the region about to be flushed or an
+            // oversized fill leaves stale pixels behind (issue #5273).
+            LinuxNative.setFlushRect(g, x, y, width, height);
+        }
+    }
+
+    // ---- monitors ----------------------------------------------------------------------
+
+    @Override
+    public int getMonitorCount() {
+        return Math.max(1, LinuxNative.monitorCount());
+    }
+
+    @Override
+    public int[] getMonitorBounds(int monitor, int[] out) {
+        LinuxNative.monitorBounds(monitor, false, out);
+        return out;
+    }
+
+    @Override
+    public int[] getMonitorWorkArea(int monitor, int[] out) {
+        LinuxNative.monitorBounds(monitor, true, out);
+        return out;
+    }
+
+    @Override
+    public int getMonitorDensity(int monitor) {
+        int dpi = getMonitorDotsPerInch(monitor);
+        if (dpi >= 280) {
+            return Display.DENSITY_VERY_HIGH;
+        }
+        if (dpi >= 200) {
+            return Display.DENSITY_HIGH;
+        }
+        if (dpi >= 140) {
+            return Display.DENSITY_MEDIUM;
+        }
+        return Display.DENSITY_LOW;
+    }
+
+    @Override
+    public double getMonitorScale(int monitor) {
+        // GTK exposes only an integer scale factor, which is what actually governs
+        // how the toolkit renders, so that is what a window's scale reports.
+        int scale = LinuxNative.monitorScale(monitor);
+        return scale > 0 ? scale : 1.0;
+    }
+
+    @Override
+    public int getMonitorDotsPerInch(int monitor) {
+        int dpi = LinuxNative.monitorDpi(monitor);
+        return dpi > 0 ? dpi : 96;
+    }
+
+    @Override
+    public String getMonitorName(int monitor) {
+        return "display-" + monitor;
+    }
+
+    @Override
+    public int getPrimaryMonitor() {
+        return Math.max(0, LinuxNative.primaryMonitor());
+    }
+
+    @Override
+    public int getMonitorForWindow(Object peer) {
+        int s = slot(peer);
+        if (s < 0) {
+            return getPrimaryMonitor();
+        }
+        return Math.max(0, LinuxNative.monitorForWindow(s));
+    }
+}

@@ -55,6 +55,9 @@
 #define CN1_EVENT_RING 1024
 typedef struct {
     int type, x, y, key;
+    /* Which window the event came from. Zero is the application's main window,
+     * which is every event this port produced before desktop windows existed. */
+    int windowId;
 } CN1Event;
 static CN1Event cn1EventRing[CN1_EVENT_RING];
 static int cn1EventHead = 0;
@@ -62,6 +65,10 @@ static int cn1EventTail = 0;
 static pthread_mutex_t cn1EventLock = PTHREAD_MUTEX_INITIALIZER;
 
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
+    cn1LinuxPushWindowEvent(0, type, x, y, keyCode);
+}
+
+void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode) {
     pthread_mutex_lock(&cn1EventLock);
     int next = (cn1EventTail + 1) % CN1_EVENT_RING;
     if (next != cn1EventHead) {
@@ -69,6 +76,7 @@ void cn1LinuxPushEvent(int type, int x, int y, int keyCode) {
         cn1EventRing[cn1EventTail].x = x;
         cn1EventRing[cn1EventTail].y = y;
         cn1EventRing[cn1EventTail].key = keyCode;
+        cn1EventRing[cn1EventTail].windowId = windowId;
         cn1EventTail = next;
     }
     pthread_mutex_unlock(&cn1EventLock);
@@ -82,6 +90,7 @@ int cn1LinuxPopEvent(int* out) {
         out[1] = cn1EventRing[cn1EventHead].x;
         out[2] = cn1EventRing[cn1EventHead].y;
         out[3] = cn1EventRing[cn1EventHead].key;
+        out[4] = cn1EventRing[cn1EventHead].windowId;
         cn1EventHead = (cn1EventHead + 1) % CN1_EVENT_RING;
         has = 1;
     }
@@ -720,7 +729,7 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_flushGraphics___long_int_int_int_
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT out) {
-    int scratch[4];
+    int scratch[5];
     if (out == JAVA_NULL) {
         return JAVA_FALSE;
     }
@@ -732,6 +741,9 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boole
             arr[1] = scratch[1];
             arr[2] = scratch[2];
             arr[3] = scratch[3];
+            if (len >= 5) {
+                arr[4] = scratch[4];
+            }
             return JAVA_TRUE;
         }
     }

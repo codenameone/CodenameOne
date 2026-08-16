@@ -159,11 +159,69 @@ public final class LinuxNative {
             float m11, float m02, float m12);
 
     /**
-     * Drains one queued input event into {@code out} ([type, x, y, keyCode]);
-     * returns true if an event was dequeued. See the {@code CN1_EVENT_*}
-     * constants in cn1_linux.h for the type codes.
+     * Drains one queued input event into {@code out}
+     * ([type, x, y, keyCode, windowId]); returns true if an event was dequeued.
+     * See the {@code CN1_EVENT_*} constants in cn1_linux.h for the type codes.
+     *
+     * <p>{@code windowId} is zero for the application's main window, which is every
+     * event this port produced before desktop windows existed. A shorter array is
+     * still accepted and simply drops the trailing field.</p>
      */
     public static native boolean pollEvent(int[] out);
+
+    // ---- additional desktop windows (cn1_linux_desktopwindow.c) --------------
+    //
+    // A window is addressed by the slot index returned from desktopWindowCreate.
+    // The windowId passed in is the framework's own id, which the native layer
+    // stores and echoes back on every event so input routes without a lookup.
+
+    /** Creates a hidden GtkWindow; returns its slot, or -1 on failure. */
+    public static native int desktopWindowCreate(int windowId, String title, int x, int y,
+            int width, int height, boolean decorated, boolean resizable);
+
+    public static native void desktopWindowDestroy(int slot);
+
+    public static native void desktopWindowShow(int slot, boolean visible);
+
+    public static native void desktopWindowSetTitle(int slot, String title);
+
+    public static native void desktopWindowSetBounds(int slot, int x, int y, int width, int height);
+
+    /** Fills {@code out} with x, y, width and height in desktop coordinates. */
+    public static native void desktopWindowGetBounds(int slot, int[] out);
+
+    public static native int desktopWindowGetWidth(int slot);
+
+    public static native int desktopWindowGetHeight(int slot);
+
+    /** The window's CN1Graphics pointer. */
+    public static native long desktopWindowGraphics(int slot);
+
+    /** Queues a redraw of the given region of the window's drawing area. */
+    public static native void desktopWindowFlush(int slot, int x, int y, int width, int height);
+
+    /** 0 resizable, 1 always on top, 2 modal, 3 decorated. */
+    public static native void desktopWindowSetFlag(int slot, int flag, boolean value);
+
+    /** 0 restore, 1 minimize, 2 toggle maximize, 3 present (raise and focus). */
+    public static native void desktopWindowSetState(int slot, int state);
+
+    // ---- monitors ----
+
+    public static native int monitorCount();
+
+    public static native int primaryMonitor();
+
+    /** Fills {@code out} with a monitor's geometry, or its work area when asked. */
+    public static native void monitorBounds(int monitor, boolean workArea, int[] out);
+
+    /** GTK's integer scale factor for a monitor. */
+    public static native int monitorScale(int monitor);
+
+    /** Physical resolution derived from the monitor's reported millimetre size. */
+    public static native int monitorDpi(int monitor);
+
+    public static native int monitorForWindow(int slot);
 
     /** Rebuilds the GTK/ATK virtual accessibility hierarchy. */
     public static native void accessibilityBegin();

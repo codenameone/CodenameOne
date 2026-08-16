@@ -70,7 +70,14 @@ typedef enum {
      * fireRotationGesture, the same hooks the macOS trackpad drives. */
     CN1_EVENT_PINCH = 10,
     CN1_EVENT_ROTATE = 11,
-    CN1_EVENT_ACCESSIBILITY_ACTION = 12
+    CN1_EVENT_ACCESSIBILITY_ACTION = 12,
+    /* Additional desktop windows. These carry a non-zero windowId; everything
+     * above carries zero, meaning the application's main window. */
+    CN1_EVENT_WINDOW_CLOSE = 13,
+    CN1_EVENT_WINDOW_FOCUS = 14,      /* keyCode 1 == gained, 0 == lost      */
+    CN1_EVENT_WINDOW_MONITOR = 15,    /* window moved to a different monitor */
+    CN1_EVENT_WINDOW_SHOWN = 16,
+    CN1_EVENT_WINDOW_HIDDEN = 17
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
@@ -92,6 +99,18 @@ typedef enum {
 
 /* Pushes one event onto the ring buffer (called from the GTK thread). */
 void cn1LinuxPushEvent(int type, int x, int y, int keyCode);
+/* Same, but tagged with the desktop window the event came from. */
+void cn1LinuxPushWindowEvent(int windowId, int type, int x, int y, int keyCode);
+
+/* Additional desktop windows (cn1_linux_desktopwindow.c). The main window's
+ * statics are left alone: a secondary window carries its own GtkWindow, overlay,
+ * drawing area and cairo back buffer, so the single-window path is unchanged.
+ * Every entry point here must run on the GTK main thread; callers marshal with
+ * cn1LinuxRunOnMainAndWait. */
+#define CN1_MAX_DESKTOP_WINDOWS 32
+struct CN1Graphics* cn1LinuxDesktopGraphics(int slot);
+GtkWidget* cn1LinuxDesktopWidget(int slot);
+GtkWidget* cn1LinuxDesktopFixed(int slot);
 
 /*
  * Pops one event into out[0..3] = {type, x, y, keyCode}; returns 1 if one was
