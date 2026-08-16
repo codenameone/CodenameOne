@@ -309,7 +309,18 @@ final class IOSProvisioningPreflight {
         }
 
         String describe = profile.name == null ? file.getName() : "\"" + profile.name + "\"";
-        if (profile.expirationDate != null && profile.expirationDate.before(now)) {
+        if (profile.expirationDate == null) {
+            // The key is there -- isProvisioningPlist insisted on that -- but its value is not
+            // a date this can read. Skipping the expiry check on that basis let a corrupted
+            // profile through on the strength of its type alone, which is the build slot this
+            // check exists to save. Every Apple-issued profile carries a readable expiry.
+            problems.add(new Problem("The provisioning profile " + describe + " at "
+                    + file.getAbsolutePath() + " has no readable expiry date, so it is not a"
+                    + " usable .mobileprovision file. Re-download it from the Apple Developer"
+                    + " portal, or re-generate it with the certificate wizard.", true));
+            return;
+        }
+        if (profile.expirationDate.before(now)) {
             problems.add(new Problem("The provisioning profile " + describe + " expired on "
                     + profile.expirationDate + ". Generate a new one in the Apple Developer portal "
                     + "and update " + settingKey + ".", true));
@@ -393,6 +404,8 @@ final class IOSProvisioningPreflight {
         if (name != null) {
             profile.name = name.getTextContent().trim();
         }
+        // Left null when the value is not a <date>, or is one this cannot read; the caller
+        // treats that as an unusable profile rather than as "no expiry to check".
         Element expires = valueForKey(doc, "ExpirationDate");
         if (expires != null && "date".equals(expires.getTagName())) {
             profile.expirationDate = parseDate(expires.getTextContent().trim());

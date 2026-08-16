@@ -443,6 +443,30 @@ public class IOSProvisioningPreflightTest {
         assertEquals("Store", parsed.name);
     }
 
+    /**
+     * A profile whose expiry cannot be read is not usable, and must not pass on the strength
+     * of its type alone. The key being present was all {@code isProvisioningPlist} asked for,
+     * so without this a corrupted date silently skipped the expiry check entirely.
+     */
+    @Test
+    public void anUnreadableExpiryIsRefused() throws Exception {
+        String garbledDate = profile("Corrupted", "not-a-date",
+                "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>\n");
+        assertFatal(check(settings(write(garbledDate), true, "app-store"), true),
+                "no readable expiry date");
+
+        // ...and so is one whose expiry is the wrong plist type altogether.
+        String wrongType = HEAD
+                + "<key>Name</key><string>Wrong Type</string>\n"
+                + "<key>UUID</key><string>0f7ac3c1-4d0e-4e8a-9d1f-8b6a2c5e7d90</string>\n"
+                + "<key>ExpirationDate</key><string>2099-01-01T00:00:00Z</string>\n"
+                + "<key>DeveloperCertificates</key><array><data>Zm9v</data></array>\n"
+                + "<key>Entitlements</key><dict><key>get-task-allow</key><false/></dict>\n"
+                + "</dict></plist>";
+        assertFatal(check(settings(write(wrongType), true, "app-store"), true),
+                "no readable expiry date");
+    }
+
     // ---- a profile is untrusted input ----
 
     /**
