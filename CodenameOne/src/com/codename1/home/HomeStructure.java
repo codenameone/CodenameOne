@@ -141,6 +141,14 @@ public final class HomeStructure {
 
     /// Whether this is the user's default home.
     ///
+    /// **Always `false` on iOS.** Apple deprecated
+    /// `HMHomeManager.primaryHome` in iOS 16.1 as "no longer supported" and
+    /// shipped nothing to replace it, so the platform genuinely cannot say
+    /// which home the user thinks of as theirs. The iOS port reports `false`
+    /// for every home rather than guessing, and
+    /// [SmartHome#getPrimaryStructure()] falls back to the first -- which is
+    /// at least not a claim about what the user prefers.
+    ///
     /// #### Returns
     ///
     /// `true` for the primary structure
