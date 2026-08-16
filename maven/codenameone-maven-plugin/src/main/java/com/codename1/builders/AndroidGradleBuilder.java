@@ -4238,6 +4238,22 @@ public class AndroidGradleBuilder extends Executor {
                     "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n");
         }
 
+        // Window.setHideOverlayWindows (Android 12+) throws SecurityException without this
+        // permission, so declaring it is what makes DeviceIntegrity.setHideOverlayWindows do
+        // anything at all. It is a normal (install-time) permission -- no runtime prompt, no
+        // special access screen -- so it is declared only for projects that asked for the
+        // overlay mitigation rather than added to every build.
+        //
+        // android.hideOverlayWindows exists for apps that drive the runtime API directly
+        // without the launch-time guard; android.tapjackingGuard implies it unless the project
+        // opted out with .hideOverlays=false.
+        if ("true".equalsIgnoreCase(request.getArg("android.hideOverlayWindows", "false"))
+                || (tapjackingGuard && request.getArg(
+                        "android.tapjackingGuard.hideOverlays", "true").equalsIgnoreCase("true"))) {
+            permissions += permissionAdd(request, "\"android.permission.HIDE_OVERLAY_WINDOWS\"",
+                    "    <uses-permission android:name=\"android.permission.HIDE_OVERLAY_WINDOWS\" />\n");
+        }
+
         if (capturePermission) {
             String andc = request.getArg("android.captureRecord", "enabled");
             if (request.getArg("and.captureRecord", andc).equals("enabled")) {

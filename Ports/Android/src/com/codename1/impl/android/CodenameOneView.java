@@ -693,12 +693,37 @@ public class CodenameOneView {
              */
             return true;
         }
+        // Tapjacking has to be resolved before ANY side effect of the touch, not merely before
+        // the pointer dispatch below. The keyboard re-summon that follows is one such side
+        // effect: an obscured ACTION_UP reaching it would reopen the keyboard for a gesture the
+        // BLOCK/STRICT policy promised to withhold. Anything added to this method later belongs
+        // after this block for the same reason.
+        //
+        // Returns true rather than the consumeEvent computed further down. That value is false
+        // when the touch landed on a native peer, and returning it would send the event back to
+        // AndroidAsyncView.dispatchTouchEvent, which hands it to super.dispatchTouchEvent and
+        // straight on to the peer -- delivering to a BrowserComponent or a native text field
+        // precisely the touch we are withholding from everything else. Claiming the event is
+        // what actually drops it.
+        boolean tapjackBlocked = tapjacked(event);
+        int tapjackAction = event.getAction();
+        if (tapjackAction == MotionEvent.ACTION_DOWN) {
+            tapjackBlockedGesture = tapjackBlocked;
+        }
+        if (tapjackBlockedGesture) {
+            if (tapjackAction == MotionEvent.ACTION_UP || tapjackAction == MotionEvent.ACTION_CANCEL) {
+                tapjackBlockedGesture = false;
+                cn1GrabbedPointer = false;
+            }
+            return true;
+        }
+
         if (event.getAction() == MotionEvent.ACTION_UP) {
             // EditText re-summons a dismissed keyboard on every tap; give the pure
             // editors the same behavior while their input session is bound
             AndroidImplementation.showSoftInputForActiveClient();
         }
-        
+
         
 
         int[] x = null;
@@ -763,27 +788,6 @@ public class CodenameOneView {
             isPeer = !Sheet.isSheetVisibleAt(primaryX, primaryY);
         }
         boolean consumeEvent = !isPeer || cn1GrabbedPointer;
-
-        // Tapjacking: a gesture that starts obscured is dropped in full.
-        //
-        // Returns true unconditionally rather than the consumeEvent computed above. That value
-        // is false when the touch landed on a native peer, and returning it would send the event
-        // back to AndroidAsyncView.dispatchTouchEvent, which then hands it to
-        // super.dispatchTouchEvent and straight on to the peer -- delivering to a
-        // BrowserComponent or a native text field precisely the touch we are withholding from
-        // everything else. Claiming the event is what actually drops it.
-        boolean blocked = tapjacked(event);
-        int tapjackAction = event.getAction();
-        if (tapjackAction == MotionEvent.ACTION_DOWN) {
-            tapjackBlockedGesture = blocked;
-        }
-        if (tapjackBlockedGesture) {
-            if (tapjackAction == MotionEvent.ACTION_UP || tapjackAction == MotionEvent.ACTION_CANCEL) {
-                tapjackBlockedGesture = false;
-                cn1GrabbedPointer = false;
-            }
-            return true;
-        }
 
         updatePointerMetadata(event, false);
 

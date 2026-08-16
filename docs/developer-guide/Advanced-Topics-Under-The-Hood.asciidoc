@@ -225,10 +225,13 @@ If none of the services are defined to true then plus, auth, base, analytics, gc
 |Boolean true/false defaults to false. Switches on tapjacking / screen-overlay protection at launch, so touches that arrive while another app's window covers this one are detected and dropped. See the security chapter.
 
 |android.tapjackingGuard.mode
-|`block` (default), `strict`, `report` or `off`. `block` drops gestures that start on a fully obscured window, `report` only observes, `strict` also drops partially obscured touches (which benign system UI can trigger). Only relevant if `android.tapjackingGuard=true`.
+|`block` (default), `strict`, `report` or `off`. `block` drops gestures that start on a fully obscured window, `report` only observes, `strict` also drops touches where only part of the window is covered (which benign system UI can trigger). Only relevant if `android.tapjackingGuard=true`.
 
 |android.tapjackingGuard.hideOverlays
-|Boolean true/false defaults to true. Also asks Android 12+ to hide overlay windows drawn over the app, which is the only mitigation that covers native peer components. Only relevant if `android.tapjackingGuard=true`.
+|Boolean true/false defaults to true. Also asks Android 12+ to hide overlay windows drawn over the app, which is the only mitigation that covers native peer components, and declares the `HIDE_OVERLAY_WINDOWS` permission it requires. Only relevant if `android.tapjackingGuard=true`.
+
+|android.hideOverlayWindows
+|Boolean true/false defaults to false. Declares the `android.permission.HIDE_OVERLAY_WINDOWS` permission needed by `DeviceIntegrity.setHideOverlayWindows()` on Android 12+, for apps that call the runtime API without enabling `android.tapjackingGuard`. A normal install-time permission, so the user sees no prompt.
 
 |android.fridaDetection
 |Boolean true/false defaults to false. Indicates whether the app should check for the presence of the https://www.frida.re/[Frida] dynamic instrumentation toolkit on the device. If Frida is detected, the app will exit. This uses the [frida-blocker](https://github.com/shannah/frida-blocker) library to perform the frida detection.

@@ -65,7 +65,10 @@ import com.codename1.util.AsyncResource;
 ///   launch and exits (or logs) when an untrusted one is active.
 /// - `android.tapjackingGuard=true` (optionally `android.tapjackingGuard.mode=block|strict|report`
 ///   and `android.tapjackingGuard.hideOverlays=true|false`) -- applies a tapjacking policy at
-///   startup and, by default, also asks Android 12+ to hide overlay windows, with no app code.
+///   startup and, by default, also asks Android 12+ to hide overlay windows (declaring the
+///   `HIDE_OVERLAY_WINDOWS` permission that needs), with no app code.
+/// - `android.hideOverlayWindows=true` -- declares that permission on its own, for apps that call
+///   [#setHideOverlayWindows(boolean)] directly without the launch-time guard.
 ///
 /// #### Platform support
 ///
@@ -325,9 +328,15 @@ public final class DeviceIntegrity {
     /// overlay rather than filtering the touches it enables. Pair it with [#setSecureScreen(boolean)]
     /// when entering a sensitive screen and clear both on the way out.
     ///
-    /// Requires Android 12 or newer -- check [#isHideOverlayWindowsSupported()]. On older Android
-    /// releases, and on every other platform, this is a no-op and the touch level policy set by
-    /// [#setTapjackingProtection(TapjackingPolicy)] is what protects the app.
+    /// Two things are required, and [#isHideOverlayWindowsSupported()] reports both rather than
+    /// claiming a protection you are not getting: Android 12 (API 31) or newer, and the
+    /// `android.permission.HIDE_OVERLAY_WINDOWS` manifest permission. Android throws without the
+    /// permission, so this call is skipped and logged instead. The `android.tapjackingGuard` build
+    /// hint declares it; apps that use only the runtime API should set `android.hideOverlayWindows`.
+    /// It is a normal install-time permission, so the user is never prompted.
+    ///
+    /// On older Android releases, and on every other platform, this is a no-op and the touch level
+    /// policy set by [#setTapjackingProtection(TapjackingPolicy)] is what protects the app.
     ///
     /// #### Parameters
     ///
@@ -336,8 +345,10 @@ public final class DeviceIntegrity {
         Display.getInstance().setHideOverlayWindows(hide);
     }
 
-    /// True when [#setHideOverlayWindows(boolean)] is actually enforced by this platform, i.e. on
-    /// Android 12 and newer. False elsewhere, where the call is silently ignored.
+    /// True when [#setHideOverlayWindows(boolean)] is actually enforced: Android 12 or newer **and**
+    /// the app holds `android.permission.HIDE_OVERLAY_WINDOWS`. False elsewhere, including on an
+    /// Android 12 device whose build never declared the permission -- the API level alone would be a
+    /// claim the app could not verify.
     public static boolean isHideOverlayWindowsSupported() {
         return Display.getInstance().isHideOverlayWindowsSupported();
     }
