@@ -1017,31 +1017,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             inputEl.setAttribute("class", "cn1-edit-string");
             inputEl.getStyle().setProperty("outline", "none");  // for chrome
             
-            String inputType = "text";
-            if (ta.isSingleLineTextArea()) {
-                
-                switch (ta.getConstraint()) {
-                    case TextArea.PASSWORD:
-                        inputType = "password";
-                        break;
-                    case TextArea.EMAILADDR:
-                        inputType = "email";
-                        break;
-                    case TextArea.NUMERIC:
-                        inputType = "number";
-                        break;
-                    case TextArea.PHONENUMBER:
-                        inputType = "tel";
-                        break;
-                    case TextArea.URL:
-                        inputType = "url";
-                        break;
-                    
-                }
-                inputEl.setAttribute("type", inputType);
-                
-                
-            }
+            applyInputConstraints(inputEl, ta);
             
             
             
@@ -5595,6 +5571,108 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private boolean nextEditPending, prevEditPending;
     
     
+    /**
+     * Configures the native editing element from a text component's constraint.
+     *
+     * <p>The constraint is a base type in the low bits with flags above it, so it has to be
+     * masked rather than compared whole -- {@code PASSWORD} is {@code 0x10000}, which means a
+     * field declared {@code PASSWORD | EMAILADDR} previously matched no case at all and was
+     * edited as clear text.</p>
+     *
+     * <p>Beyond the input type this carries the attributes a browser actually reads:
+     * {@code inputmode} selects the on-screen keyboard, {@code autocomplete} is what lets a
+     * password manager or address autofill offer a value, and {@code autocapitalize} /
+     * {@code spellcheck} reproduce what the equivalent constraint does on a native platform.
+     * An application can override the autocomplete token -- to distinguish a sign-in field
+     * from a change-password field, say -- with the {@code cn1$autocomplete} client property.</p>
+     */
+    private String applyInputConstraints(HTMLInputElement inputEl, TextArea ta) {
+        int constraint = ta.getConstraint();
+        int base = constraint & 0xffff;
+        boolean password = (constraint & TextArea.PASSWORD) != 0;
+        boolean sensitive = (constraint & TextArea.SENSITIVE) != 0
+                || (constraint & TextArea.NON_PREDICTIVE) != 0;
+
+        String resolvedType = "text";
+        if (password) {
+            resolvedType = "password";
+        } else if (base == TextArea.EMAILADDR) {
+            resolvedType = "email";
+        } else if (base == TextArea.NUMERIC) {
+            resolvedType = "number";
+        } else if (base == TextArea.PHONENUMBER) {
+            resolvedType = "tel";
+        } else if (base == TextArea.URL) {
+            resolvedType = "url";
+        }
+        if (ta.isSingleLineTextArea()) {
+            inputEl.setAttribute("type", resolvedType);
+        } else {
+            // A textarea has no type attribute, and callers treat "text" as the plain case.
+            resolvedType = "text";
+        }
+
+        String inputMode = null;
+        if (!password) {
+            if (base == TextArea.NUMERIC) {
+                inputMode = "numeric";
+            } else if (base == TextArea.DECIMAL) {
+                inputMode = "decimal";
+            } else if (base == TextArea.PHONENUMBER) {
+                inputMode = "tel";
+            } else if (base == TextArea.EMAILADDR) {
+                inputMode = "email";
+            } else if (base == TextArea.URL) {
+                inputMode = "url";
+            }
+        }
+        if (inputMode == null) {
+            inputEl.removeAttribute("inputmode");
+        } else {
+            inputEl.setAttribute("inputmode", inputMode);
+        }
+
+        Object override = ta.getClientProperty("cn1$autocomplete");
+        String autocomplete;
+        if (override != null) {
+            autocomplete = override.toString();
+        } else if (password) {
+            autocomplete = "current-password";
+        } else if (sensitive) {
+            autocomplete = "off";
+        } else if (base == TextArea.EMAILADDR) {
+            autocomplete = "email";
+        } else if (base == TextArea.PHONENUMBER) {
+            autocomplete = "tel";
+        } else if (base == TextArea.URL) {
+            autocomplete = "url";
+        } else {
+            autocomplete = "on";
+        }
+        inputEl.setAttribute("autocomplete", autocomplete);
+
+        // A stable name lets a password manager pair a username with a password rather than
+        // treating each edit as an unrelated field.
+        String name = ta.getName();
+        if (name == null || name.length() == 0) {
+            inputEl.removeAttribute("name");
+        } else {
+            inputEl.setAttribute("name", name);
+        }
+
+        String autoCapitalize = "none";
+        if ((constraint & TextArea.INITIAL_CAPS_WORD) != 0) {
+            autoCapitalize = "words";
+        } else if ((constraint & TextArea.INITIAL_CAPS_SENTENCE) != 0) {
+            autoCapitalize = "sentences";
+        }
+        inputEl.setAttribute("autocapitalize", autoCapitalize);
+        inputEl.setAttribute("spellcheck",
+                password || sensitive || base == TextArea.EMAILADDR || base == TextArea.URL
+                        ? "false" : "true");
+        return resolvedType;
+    }
+
     @Override
     public void editString(final Component cmp, int maxSize, int constraint, final String origText, int initiatingKeycode) {
         if (cmp.getNativeOverlay() != null) {
@@ -5869,32 +5947,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             inputEl.getStyle().setProperty("margin", "0");
             inputEl.getStyle().setProperty("outline", "none");  // for chrome
             
-            int cnst = ta.getConstraint();
-            String inputType = "text";
-            if (ta.isSingleLineTextArea()) {
-                
-                switch (cnst) {
-                    case TextArea.PASSWORD:
-                        inputType = "password";
-                        break;
-                    case TextArea.EMAILADDR:
-                        inputType = "email";
-                        break;
-                    case TextArea.NUMERIC:
-                        inputType = "number";
-                        break;
-                    case TextArea.PHONENUMBER:
-                        inputType = "tel";
-                        break;
-                    case TextArea.URL:
-                        inputType = "url";
-                        break;
-                    
-                }
-                inputEl.setAttribute("type", inputType);
-                
-                
-            }
+            final String inputType = applyInputConstraints(inputEl, ta);
             
 
 
