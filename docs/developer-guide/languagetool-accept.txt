@@ -642,6 +642,10 @@ BlueZ
 # -----------------------------------------------------------------------------
 unhardened
 unretraceable
+# Tapjacking (security.asciidoc). The standard industry name for the Android
+# overlay attack; "tapjack" is the signal id the API reports it under.
+[Tt]apjack(ing|ed|s)?
+[Uu]nobscured
 [Dd]eobfuscation
 [Mm]inif(y|ies|ied|ier|ication)
 [Uu]nminif(y|ies|ied|ier|ication)

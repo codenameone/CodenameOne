@@ -331,6 +331,11 @@ public final class Display extends CN1Constants {
     private boolean lockOrientation;
     private boolean disableScreenshots;
 
+    /// Tapjacking settings supplied through setProperty before an implementation existed, applied
+    /// in init(). See the deferral in init() and the setProperty branches below.
+    private com.codename1.security.TapjackingPolicy pendingTapjackingPolicy;
+    private boolean pendingHideOverlayWindows;
+
     // huge false positive from PMD...
     @SuppressWarnings("PMD.SingularField")
     private Form eventForm;
@@ -373,6 +378,18 @@ public final class Display extends CN1Constants {
             if (INSTANCE.disableScreenshots) {
                 impl.setDisableScreenshots(true);
                 INSTANCE.disableScreenshots = false;
+            }
+
+            // Same deferral as disableScreenshots above: the android.tapjackingGuard build hint
+            // sets these properties from the activity stub, which can run before there is an impl
+            // to hand them to.
+            if (INSTANCE.pendingTapjackingPolicy != null) {
+                impl.setTapjackingProtection(INSTANCE.pendingTapjackingPolicy);
+                INSTANCE.pendingTapjackingPolicy = null;
+            }
+            if (INSTANCE.pendingHideOverlayWindows) {
+                impl.setHideOverlayWindows(true);
+                INSTANCE.pendingHideOverlayWindows = false;
             }
 
             // only enable but never disable the third softbutton
@@ -4009,6 +4026,22 @@ public final class Display extends CN1Constants {
             }
             impl.setDisableScreenshots("true".equalsIgnoreCase(value));
         }
+        if ("TapjackingProtection".equals(key)) {
+            com.codename1.security.TapjackingPolicy policy = parseTapjackingPolicy(value);
+            if (impl == null) {
+                pendingTapjackingPolicy = policy;
+                return;
+            }
+            impl.setTapjackingProtection(policy);
+        }
+        if ("HideOverlayWindows".equals(key)) {
+            boolean hide = "true".equalsIgnoreCase(value);
+            if (impl == null) {
+                pendingHideOverlayWindows = hide;
+                return;
+            }
+            impl.setHideOverlayWindows(hide);
+        }
         if ("Component.revalidateOnStyleChange".equals(key)) {
             Component.setRevalidateOnStyleChange("true".equalsIgnoreCase(value));
         }
@@ -4024,6 +4057,27 @@ public final class Display extends CN1Constants {
         } else {
             localProperties.put(key, value);
         }
+    }
+
+    /// Maps the `TapjackingProtection` property value onto the enum. The value reaches us from a
+    /// build hint, so an unrecognised one is a project configuration mistake rather than something
+    /// the app can handle: fall back to the safest useful reading, which is BLOCK, because the
+    /// property is only ever set when the developer asked for protection in the first place.
+    private static com.codename1.security.TapjackingPolicy parseTapjackingPolicy(String value) {
+        if (value == null) {
+            return com.codename1.security.TapjackingPolicy.OFF;
+        }
+        String v = value.trim();
+        if ("off".equalsIgnoreCase(v)) {
+            return com.codename1.security.TapjackingPolicy.OFF;
+        }
+        if ("report".equalsIgnoreCase(v)) {
+            return com.codename1.security.TapjackingPolicy.REPORT;
+        }
+        if ("strict".equalsIgnoreCase(v)) {
+            return com.codename1.security.TapjackingPolicy.STRICT;
+        }
+        return com.codename1.security.TapjackingPolicy.BLOCK;
     }
 
     /// Returns true if executing this URL should work, returns false if it will not
@@ -6922,6 +6976,43 @@ public final class Display extends CN1Constants {
     /// Marks the current screen secure (Android `FLAG_SECURE`), blocking screenshots/recording/scraping.
     public void setSecureScreen(boolean secure) {
         impl.setSecureScreen(secure);
+    }
+
+    /// Sets the tapjacking policy. See
+    /// `com.codename1.security.DeviceIntegrity#setTapjackingProtection(TapjackingPolicy)`.
+    public void setTapjackingProtection(com.codename1.security.TapjackingPolicy policy) {
+        impl.setTapjackingProtection(policy);
+    }
+
+    /// The tapjacking policy currently in force, never null.
+    public com.codename1.security.TapjackingPolicy getTapjackingPolicy() {
+        return impl.getTapjackingPolicy();
+    }
+
+    /// True when the most recently observed touch arrived over an obscured window. See
+    /// `com.codename1.security.DeviceIntegrity#isScreenObscured()`.
+    public boolean isScreenObscured() {
+        return impl.isScreenObscured();
+    }
+
+    /// Registers a listener notified when the obscured state changes.
+    public void addTapjackingListener(ActionListener l) {
+        impl.addTapjackingListener(l);
+    }
+
+    /// Removes a listener added by `addTapjackingListener()`.
+    public void removeTapjackingListener(ActionListener l) {
+        impl.removeTapjackingListener(l);
+    }
+
+    /// Asks the OS to hide overlay windows drawn over this app (Android 12+).
+    public void setHideOverlayWindows(boolean hide) {
+        impl.setHideOverlayWindows(hide);
+    }
+
+    /// True where `setHideOverlayWindows()` is actually enforced by the platform.
+    public boolean isHideOverlayWindowsSupported() {
+        return impl.isHideOverlayWindowsSupported();
     }
 
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's

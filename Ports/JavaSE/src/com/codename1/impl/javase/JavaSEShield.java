@@ -76,6 +76,18 @@ public final class JavaSEShield {
     public static boolean simRepackaged;
     public static boolean simUntrustedAccessibility;
 
+    /**
+     * True when the simulated device reports that another app's window is drawn
+     * over this one, i.e. a tapjacking attempt.
+     *
+     * <p>Deliberately not part of {@link #simReasons()}. The compromise reasons
+     * describe a standing property of the device and feed
+     * {@code isDeviceCompromised()}; being obscured is a transient condition with
+     * benign causes, and folding it in would make a device look rooted because
+     * the notification shade was open.</p>
+     */
+    public static boolean simScreenObscured;
+
     // --- token ------------------------------------------------------------
 
     /** Simulated token lifetime. */
@@ -122,6 +134,9 @@ public final class JavaSEShield {
     /** True when the window is displaying a screen marked secure. */
     public static boolean secureScreen;
 
+    /** True when the app has asked the OS to hide overlay windows. */
+    public static boolean hideOverlayWindows;
+
     /** The compromise reasons the simulated device reports. */
     public static String[] simReasons() {
         List<String> out = new ArrayList<String>();
@@ -161,11 +176,13 @@ public final class JavaSEShield {
         simDebugger = false;
         simRepackaged = false;
         simUntrustedAccessibility = false;
+        simScreenObscured = false;
         tokenTtlSeconds = 300;
         serveExpiredToken = false;
         forcePinMismatch = false;
         failPinFetch = false;
         secureScreen = false;
+        hideOverlayWindows = false;
         onForcePinMismatchConsumed = null;
     }
 
@@ -185,6 +202,9 @@ public final class JavaSEShield {
           .append(forcePinMismatch ? "forcing mismatch" : "normal")
           .append(failPinFetch ? ", pin fetch failing" : "").append('\n');
         sb.append("Secure screen: ").append(secureScreen).append('\n');
+        sb.append("Screen overlay: ")
+          .append(simScreenObscured ? "obscured (tapjacking)" : "clear").append('\n');
+        sb.append("Hide overlay windows: ").append(hideOverlayWindows).append('\n');
         return sb.toString();
     }
 }
