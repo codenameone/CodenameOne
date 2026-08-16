@@ -2416,6 +2416,14 @@ void com_codename1_impl_ios_IOSNative_macWindowPresent___int_int_1ARRAY_int_int(
 #endif
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macMultiWindowSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMultiWindowSupported() ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
 JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorCount___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_MACCATALYST
     return CN1MacMonitorCount();

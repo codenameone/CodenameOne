@@ -242,6 +242,13 @@ public final class IOSNative {
      */
     native void macWindowPresent(int slot, int[] argb, int width, int height);
 
+    /**
+     * True when the app's Info.plist actually enables multiple scenes. Without it
+     * the system refuses to activate a second scene, so this is what decides
+     * whether the windowing API reports itself supported.
+     */
+    native boolean macMultiWindowSupported();
+
     native int macMonitorCount();
 
     native int macPrimaryMonitor();

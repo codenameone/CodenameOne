@@ -29,7 +29,6 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.Window;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.util.UITimer;
 
 /**
  * A modal window over a second window.
@@ -87,13 +86,35 @@ public class WindowModalTest extends BaseTest {
         // still application-modal, so the framework blocks input to the one behind it.
         modal.show();
 
-        UITimer.timer(1200, false, CN.getCurrentForm(), new Runnable() {
+        // Wait for the windows to be renderable rather than for a fixed delay; a
+        // platform may create the native window asynchronously.
+        awaitRenderable(System.currentTimeMillis() + 10000);
+        return true;
+    }
+
+    /**
+     * Polls on the event dispatch thread rather than sleeping on it: the paint that
+     * makes the windows renderable happens on this thread.
+     */
+    private void awaitRenderable(final long deadline) {
+        boolean ready = background.isWindowShowing() && background.getWidth() > 1
+                && modal.isWindowShowing();
+        if (ready) {
+            capture();
+            return;
+        }
+        if (System.currentTimeMillis() >= deadline) {
+            fail("Windows never became renderable (background showing="
+                    + background.isWindowShowing() + " modal showing="
+                    + modal.isWindowShowing() + ")");
+            return;
+        }
+        CN.callSerially(new Runnable() {
             @Override
             public void run() {
-                capture();
+                awaitRenderable(deadline);
             }
         });
-        return true;
     }
 
     private void capture() {

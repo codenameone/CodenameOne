@@ -142,6 +142,18 @@ ensure_setting "codename1.arg.macNative.appCategory" \
 # default for real apps -- only the screenshot sample sets this.
 ensure_setting "codename1.arg.macNative.fixedWindowSize" \
     "${MAC_NATIVE_FIXED_WINDOW_SIZE:-1024x685}"
+# Additional native windows (com.codename1.ui.Window). This flips
+# UIApplicationSupportsMultipleScenes in Info.plist, which is process-wide
+# and changes Catalyst windowing for the whole application.
+#
+# OFF by default, and measured rather than assumed: with it on, this suite's
+# OrientationLockScreenshotTest stops being able to restore portrait after its
+# landscape capture and times out. Catalyst treats a multiple-scene app's
+# windows more like Mac windows and honours orientation requests less, so the
+# regression is inherent to the key, not to the window code. Set
+# MAC_NATIVE_MULTI_WINDOW=true to build a Catalyst app that can open windows.
+ensure_setting "codename1.arg.macNative.multiWindow" \
+    "${MAC_NATIVE_MULTI_WINDOW:-false}"
 
 bma_log "macNative.* hints in codenameone_settings.properties:"
 grep -n 'codename1\.arg\.macNative' "$CN1_SETTINGS_FILE" || true

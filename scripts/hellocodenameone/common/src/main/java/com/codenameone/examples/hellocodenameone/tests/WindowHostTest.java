@@ -29,7 +29,6 @@ import com.codename1.ui.Desktop;
 import com.codename1.ui.Image;
 import com.codename1.ui.Window;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.util.UITimer;
 
 /**
  * Base class for the windowed screenshot suite: it hosts a piece of UI inside a real
@@ -59,6 +58,9 @@ public abstract class WindowHostTest extends BaseTest {
         {900, 700},   // large
         {1000, 400},  // deliberately non-square: proves layout follows the window
     };
+
+    /** How long to wait for a newly shown window to become renderable. */
+    private static final int WINDOW_READY_TIMEOUT_MS = 10000;
 
     private Window window;
 
@@ -124,20 +126,48 @@ public abstract class WindowHostTest extends BaseTest {
         window.setWindowSize(width, height);
         window.show();
 
-        // Give the platform a beat to map the window and the framework a beat to lay
-        // it out and paint it. The window is not the current form, so the suite's
-        // usual "is the current form settled" gate does not apply to it.
-        UITimer.timer(1200, false, CN.getCurrentForm(), new Runnable() {
+        // Wait for the window to actually be renderable rather than for a fixed
+        // delay. Some platforms create the native window asynchronously -- Mac
+        // Catalyst has to ask the system to activate a scene and is handed one back
+        // later -- so a fixed sleep is both too long on the fast ports and too short
+        // on the slow ones. The window is also not the current form, so the suite's
+        // usual "current form has settled" gate does not apply to it.
+        awaitRenderable(index, width, height,
+                System.currentTimeMillis() + WINDOW_READY_TIMEOUT_MS);
+    }
+
+    /**
+     * Polls on the event dispatch thread until the window can actually be rendered.
+     * Re-queuing through callSerially rather than sleeping matters: the paint that
+     * makes the window renderable happens on this very thread, so blocking it here
+     * would prevent the condition from ever becoming true.
+     */
+    private void awaitRenderable(final int index, final int width, final int height,
+                                 final long deadline) {
+        boolean ready = window != null && window.isWindowShowing()
+                && window.getWidth() > 1 && window.getHeight() > 1;
+        if (ready || System.currentTimeMillis() >= deadline) {
+            captureAndAdvance(index, width, height, ready);
+            return;
+        }
+        CN.callSerially(new Runnable() {
             @Override
             public void run() {
-                captureAndAdvance(index, width, height);
+                awaitRenderable(index, width, height, deadline);
             }
         });
     }
 
-    private void captureAndAdvance(final int index, int width, int height) {
+    private void captureAndAdvance(final int index, int width, int height, boolean ready) {
         String name = baseImageName() + "-" + width + "x" + height;
-        Image shot = window == null ? null : window.capture();
+        if (!ready) {
+            fail("Window never became renderable for " + name
+                    + " (showing=" + (window != null && window.isWindowShowing())
+                    + " size=" + (window == null ? "none" : window.getWidth() + "x" + window.getHeight())
+                    + ")");
+            return;
+        }
+        Image shot = window.capture();
         if (shot == null) {
             fail("Window capture returned null for " + name);
             return;

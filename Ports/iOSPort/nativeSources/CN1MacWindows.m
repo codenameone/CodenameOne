@@ -497,6 +497,20 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height) {
     }
 }
 
+BOOL CN1MacMultiWindowSupported(void) {
+    id value = [[NSBundle mainBundle]
+            objectForInfoDictionaryKey:@"UIApplicationSceneManifest"];
+    if (![value isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+    {
+        id multi = [(NSDictionary*) value
+                objectForKey:@"UIApplicationSupportsMultipleScenes"];
+        return [multi respondsToSelector:@selector(boolValue)]
+                && [multi boolValue] ? YES : NO;
+    }
+}
+
 /* ------------------------------------------------------------- monitors */
 
 int CN1MacMonitorCount(void) {

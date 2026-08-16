@@ -75,6 +75,12 @@ void CN1MacWindowPresent(int slot, void* argb, int width, int height);
 /* The UIView a native peer or text editor should be added to. */
 UIView* CN1MacWindowContentView(int slot);
 
+/* True when the app's Info.plist actually enables multiple scenes. This is the
+ * single source of truth for whether windows can work: without the key the
+ * system refuses to activate a second scene, so the API must report unsupported
+ * rather than hand back windows that never appear. */
+BOOL CN1MacMultiWindowSupported(void);
+
 int CN1MacMonitorCount(void);
 int CN1MacPrimaryMonitor(void);
 void CN1MacMonitorBounds(int monitor, BOOL workArea, int* out);

@@ -203,6 +203,19 @@ public class MacWindowManager extends WindowManager {
                 w.rasterWidth, w.rasterHeight);
     }
 
+    @Override
+    public Object capture(Object p) {
+        // The window's content already lives in a mutable image -- that is how it is
+        // rendered on this platform -- so a capture is simply that raster. The live
+        // image is returned rather than a copy, so a caller that wants a stable frame
+        // should capture between paints, which is what the screenshot harness does.
+        Peer w = peer(p);
+        if (w == null) {
+            return null;
+        }
+        return w.mutableImage;
+    }
+
     // ---- monitors ----------------------------------------------------------------------
 
     @Override
