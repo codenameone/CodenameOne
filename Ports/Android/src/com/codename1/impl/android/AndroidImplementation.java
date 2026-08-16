@@ -2012,12 +2012,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             myView.getAndroidView().setVisibility(View.VISIBLE);
 
-            // A tapjacking policy set before the surface existed -- which is the normal case
-            // for the android.tapjackingGuard build hint -- stored the policy but had no view to
-            // put the filter flag on. Re-apply it now that there is one.
-            if (getTapjackingPolicy().isDetecting()) {
-                setTapjackingProtection(getTapjackingPolicy());
-            }
             if (hideOverlayWindowsRequested) {
                 setHideOverlayWindows(true);
             }
@@ -13865,33 +13859,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         act.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
                     }
                 } catch(Throwable t) {
-                    com.codename1.io.Log.e(t);
-                }
-            }
-        });
-    }
-
-    @Override
-    public void setTapjackingProtection(com.codename1.security.TapjackingPolicy policy) {
-        super.setTapjackingProtection(policy);
-        final boolean filter = getTapjackingPolicy().blocks(true, false);
-        final Activity act = getActivity();
-        if (act == null || myView == null) {
-            return;
-        }
-        final View v = myView.getAndroidView();
-        if (v == null) {
-            return;
-        }
-        // Defense in depth only. AndroidAsyncView.dispatchTouchEvent bypasses the framework's
-        // onFilterTouchEventForSecurity, so this flag does not protect CN1 components -- that is
-        // CodenameOneView.tapjacked()'s job. It does cover the super.dispatchTouchEvent fallback
-        // path, which is how a native peer would otherwise still receive an obscured touch.
-        act.runOnUiThread(new Runnable() {
-            public void run() {
-                try {
-                    v.setFilterTouchesWhenObscured(filter);
-                } catch (Throwable t) {
                     com.codename1.io.Log.e(t);
                 }
             }

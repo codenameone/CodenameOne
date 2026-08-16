@@ -645,6 +645,17 @@ public class CodenameOneView {
      * <p>Latched for the duration of a gesture rather than evaluated per event:
      * dropping only the ACTION_DOWN would deliver a pointerReleased with no
      * matching pointerPressed and leave the framework holding half a gesture.</p>
+     *
+     * <p>That latch is also why the port deliberately does <em>not</em> switch
+     * {@code setFilterTouchesWhenObscured} on for the native-peer fallback, which
+     * would otherwise look like free defense in depth. It filters per event, so an
+     * overlay appearing after a clean ACTION_DOWN on a peer would have the
+     * framework reject the ACTION_UP the peer was already owed, leaving a
+     * BrowserComponent or native text field stuck pressed with nothing to release
+     * it -- the same pairing failure the latch exists to avoid. A gesture that
+     * starts obscured never reaches {@code super.dispatchTouchEvent} at all,
+     * because this method claims it, so the peer is protected by the whole-gesture
+     * decision rather than by a per-event one.</p>
      */
     private boolean tapjackBlockedGesture = false;
 
