@@ -72,6 +72,18 @@ public class Accessor {
      * @return true when the component would be painted by its form
      */
     public static boolean isDisplayable(Component c) {
-        return c != null && c.isVisible() && !c.isHidden(true);
+        if (c == null || c.isHidden(true)) {
+            return false;
+        }
+        // isVisible() reports the component's own flag and isHidden(true) walks the ancestors
+        // for the separate zero-preferred-size hidden state, so neither notices a parent that
+        // was simply made invisible. Walk the chain: a child of an invisible parent does not
+        // paint, and its runs would otherwise be kept after the parent's repaint cleared them.
+        for (Component current = c; current != null; current = current.getParent()) {
+            if (!current.isVisible()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

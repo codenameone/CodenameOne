@@ -12937,9 +12937,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     
     
+    private static final String DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
     @Override
     public Boolean isDarkMode() {
-        return Boolean.valueOf(matchesMediaQuery("(prefers-color-scheme: dark)"));
+        return Boolean.valueOf(matchesMediaQuery(DARK_SCHEME_QUERY));
     }
 
     /**
@@ -12999,9 +13001,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     return;
                 }
                 Form current = Display.getInstance().getCurrent();
-                if (current != null) {
-                    current.repaint();
+                if (current == null) {
+                    return;
                 }
+                if (DARK_SCHEME_QUERY.equals(query)) {
+                    // Components hold the Style instances they resolved, and the dark variant is
+                    // chosen at resolution time, so repainting alone would redraw the old colours.
+                    current.refreshTheme();
+                }
+                current.repaint();
             }
         });
     }
