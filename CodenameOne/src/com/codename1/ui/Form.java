@@ -66,7 +66,6 @@ import java.util.Set;
 ///
 /// @author Chen Fishbein
 public class Form extends Container implements TopLevelContainer {
-    private static final String Z_INDEX_PROP = "cn1$_zIndex";
     static int activePeerCount;
     static int rippleX;
     static int rippleY;
@@ -957,6 +956,7 @@ public class Form extends Container implements TopLevelContainer {
     /// This method is only invoked when the underlying canvas for the form is hidden
     /// this method isn't called for form based events and is generally usable for
     /// suspend/resume based behavior
+    @Override
     protected void hideNotify() {
         setVisible(false);
     }
@@ -964,6 +964,7 @@ public class Form extends Container implements TopLevelContainer {
     /// This method is only invoked when the underlying canvas for the form is shown
     /// this method isn't called for form based events and is generally usable for
     /// suspend/resume based behavior
+    @Override
     protected void showNotify() {
         setVisible(true);
     }
@@ -1000,6 +1001,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - `w`: the new width of the Form
     ///
     /// - `h`: the new height of the Form
+    @Override
     void sizeChangedInternal(int w, int h) {
         int oldWidth = getWidth();
         int oldHeight = getHeight();
@@ -1657,55 +1659,7 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// the layered pane instance
     public Container getLayeredPane(Class c, boolean top) {
-        Container layeredPaneImpl = getLayeredPaneImpl();
-        if (c == null) {
-            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-            // over layeredPaneImpl because the latter won't find components while an animation
-            // is in progress.... We could end up adding a whole bunch of layered panes
-            // by accident
-            for (Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
-                if (cmp != null && cmp.getClientProperty("cn1$_cls") == null) {
-                    return (Container) cmp;
-                }
-            }
-        }
-        String n = c != null ? c.getName() : null;
-        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-        // over layeredPaneImpl because the latter won't find components while an animation
-        // is in progress.... We could end up adding a whole bunch of layered panes
-        // by accident
-        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
-        if (n != null) {
-            for (Component cmp : children) {
-                if (cmp != null && n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                    return (Container) cmp;
-                }
-            }
-        }
-
-        Container cnt = new Container();
-        int zIndex = 0;
-        int componentCount = children.size();
-        if (top) {
-            if (componentCount > 0) {
-                Integer z = (Integer) children.get(componentCount - 1).getClientProperty(Z_INDEX_PROP);
-                if (z != null) {
-                    zIndex = z.intValue();
-                }
-            }
-            layeredPaneImpl.add(cnt);
-        } else {
-            if (componentCount > 0) {
-                Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);
-                if (z != null) {
-                    zIndex = z.intValue();
-                }
-            }
-            layeredPaneImpl.addComponent(0, cnt);
-        }
-        cnt.putClientProperty("cn1$_cls", n);
-        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
-        return cnt;
+        return TopLevelSupport.layeredPane(getLayeredPaneImpl(), c, top);
     }
 
     /// Returns the layered pane for the class and if one doesn't exist a new one is created dynamically and returned
@@ -1721,55 +1675,7 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// the layered pane instance
     public Container getLayeredPane(Class c, int zIndex) {
-        Container layeredPaneImpl = getLayeredPaneImpl();
-
-        if (c == null) {
-            // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-            // over layeredPaneImpl because the latter won't find components while an animation
-            // is in progress.... We could end up adding a whole bunch of layered panes
-            // by accident
-            for (Component cmp : layeredPaneImpl.getChildrenAsList(true)) {
-                if (cmp != null && cmp.getClientProperty("cn1$_cls") == null) {
-                    return (Container) cmp;
-                }
-            }
-        }
-        String n = c != null ? c.getName() : null;
-        // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
-        // over layeredPaneImpl because the latter won't find components while an animation
-        // is in progress.... We could end up adding a whole bunch of layered panes
-        // by accident
-        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
-        if (n != null) {
-            for (Component cmp : children) {
-                if (cmp != null && n.equals(cmp.getClientProperty("cn1$_cls"))) {
-                    return (Container) cmp;
-                }
-            }
-        }
-
-        Container cnt = new Container();
-        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
-        int len = children.size();
-        int insertIndex = -1;
-
-        for (int i = 0; i < len; i++) {
-            Component cmp = children.get(i);
-            Integer cmpZIndex = (Integer) cmp.getClientProperty(Z_INDEX_PROP);
-            int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
-            if (cmpZ >= zIndex) {
-                insertIndex = i;
-                break;
-            }
-        }
-
-        if (insertIndex == -1) {
-            layeredPaneImpl.add(cnt);
-        } else {
-            layeredPaneImpl.addComponent(insertIndex, cnt);
-        }
-        cnt.putClientProperty("cn1$_cls", n);
-        return cnt;
+        return TopLevelSupport.layeredPane(getLayeredPaneImpl(), c, zIndex);
     }
 
     /// Returns the layered pane for the class and if one doesn't exist a new one is created
@@ -3138,6 +3044,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// false by default
+    @Override
     protected boolean shouldSendPointerReleaseToOtherForm() {
         return false;
     }

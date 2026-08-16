@@ -30,7 +30,122 @@ package com.codename1.ui;
 /// @author Shai Almog
 final class TopLevelSupport {
 
+    /// Client property recording a layer's depth within a layered pane.
+    static final String Z_INDEX_PROP = "cn1$_zIndex";
+
+    /// Client property recording the class a layer belongs to.
+    static final String CLASS_PROP = "cn1$_cls";
+
     private TopLevelSupport() {
+    }
+
+    /// Returns the layer belonging to the given class, creating it at the top or the
+    /// bottom of the stack if it does not exist yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layeredPaneImpl`: the container holding the layers
+    ///
+    /// - `c`: the class owning the layer, or null for the global layer
+    ///
+    /// - `top`: true to create the layer above the existing ones
+    ///
+    /// #### Returns
+    ///
+    /// the layer for the given class
+    static Container layeredPane(Container layeredPaneImpl, Class c, boolean top) {
+        Container existing = findLayer(layeredPaneImpl, c);
+        if (existing != null) {
+            return existing;
+        }
+        // getChildrenAsList(true) rather than iterating the container directly: the
+        // latter will not find components while an animation is in progress, and we
+        // would then add a duplicate layer.
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        Container cnt = new Container();
+        int zIndex = 0;
+        int componentCount = children.size();
+        if (top) {
+            if (componentCount > 0) {
+                Integer z = (Integer) children.get(componentCount - 1).getClientProperty(Z_INDEX_PROP);
+                if (z != null) {
+                    zIndex = z.intValue();
+                }
+            }
+            layeredPaneImpl.add(cnt);
+        } else {
+            if (componentCount > 0) {
+                Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);
+                if (z != null) {
+                    zIndex = z.intValue();
+                }
+            }
+            layeredPaneImpl.addComponent(0, cnt);
+        }
+        cnt.putClientProperty(CLASS_PROP, c != null ? c.getName() : null);
+        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
+        return cnt;
+    }
+
+    /// Returns the layer belonging to the given class, creating it at an explicit
+    /// depth if it does not exist yet.
+    ///
+    /// #### Parameters
+    ///
+    /// - `layeredPaneImpl`: the container holding the layers
+    ///
+    /// - `c`: the class owning the layer, or null for the global layer
+    ///
+    /// - `zIndex`: the depth at which to create the layer, higher sits in front
+    ///
+    /// #### Returns
+    ///
+    /// the layer for the given class
+    static Container layeredPane(Container layeredPaneImpl, Class c, int zIndex) {
+        Container existing = findLayer(layeredPaneImpl, c);
+        if (existing != null) {
+            return existing;
+        }
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        Container cnt = new Container();
+        cnt.putClientProperty(Z_INDEX_PROP, zIndex);
+        int len = children.size();
+        int insertIndex = -1;
+        for (int i = 0; i < len; i++) {
+            Component cmp = children.get(i);
+            Integer cmpZIndex = (Integer) cmp.getClientProperty(Z_INDEX_PROP);
+            int cmpZ = cmpZIndex == null ? 0 : cmpZIndex.intValue();
+            if (cmpZ >= zIndex) {
+                insertIndex = i;
+                break;
+            }
+        }
+        if (insertIndex == -1) {
+            layeredPaneImpl.add(cnt);
+        } else {
+            layeredPaneImpl.addComponent(insertIndex, cnt);
+        }
+        cnt.putClientProperty(CLASS_PROP, c != null ? c.getName() : null);
+        return cnt;
+    }
+
+    private static Container findLayer(Container layeredPaneImpl, Class c) {
+        java.util.List<Component> children = layeredPaneImpl.getChildrenAsList(true);
+        if (c == null) {
+            for (Component cmp : children) {
+                if (cmp != null && cmp.getClientProperty(CLASS_PROP) == null) {
+                    return (Container) cmp;
+                }
+            }
+            return null;
+        }
+        String n = c.getName();
+        for (Component cmp : children) {
+            if (cmp != null && n.equals(cmp.getClientProperty(CLASS_PROP))) {
+                return (Container) cmp;
+            }
+        }
+        return null;
     }
 
     /// Resolves the top level containing the given component.

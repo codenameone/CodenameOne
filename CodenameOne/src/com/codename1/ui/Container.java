@@ -1726,6 +1726,37 @@ public class Container extends Component implements Iterable<Component> {
         return null;
     }
 
+    /// Reacts to the surface this top level occupies changing size. Inert unless
+    /// this container is a top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: the new width
+    ///
+    /// - `h`: the new height
+    void sizeChangedInternal(int w, int h) {
+    }
+
+    /// Invoked when this top level stops being visible. Inert unless this container
+    /// is a top level.
+    void hideNotify() {
+    }
+
+    /// Invoked when this top level becomes visible. Inert unless this container is a
+    /// top level.
+    void showNotify() {
+    }
+
+    /// Indicates that this top level wants a pointer release even when the matching
+    /// press went somewhere else.
+    ///
+    /// #### Returns
+    ///
+    /// false unless a top level opts in
+    boolean shouldSendPointerReleaseToOtherForm() {
+        return false;
+    }
+
     /// Requests focus for a component. Inert unless this container is a top level.
     ///
     /// #### Parameters
