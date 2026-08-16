@@ -540,12 +540,50 @@ public class DatabaseImpl extends Database {
 
         @Override
         protected String readString(int index) throws IOException {
-            return SQLiteNative.columnString(stmt, index);
+            return requireRead(SQLiteNative.columnString(stmt, index));
         }
 
         @Override
         protected byte[] readBlob(int index) throws IOException {
-            return SQLiteNative.columnBlob(stmt, index);
+            return requireRead(SQLiteNative.columnBlob(stmt, index));
+        }
+
+        /// Tells a value that is null from a read that failed and reported null.
+        ///
+        /// The bindings cannot throw across into Java -- an exception raised in one unwinds the
+        /// worker instead -- so a failure comes back as the same null a NULL column gives, and
+        /// returning it would report SQL NULL for a blob the engine could not read or an array
+        /// the runtime could not allocate. Those are the two readers where that can happen: both
+        /// allocate the whole value, and a large one is exactly what fails.
+        ///
+        /// The error is the discriminator, and it is cleared as each binding is entered, so a
+        /// message here belongs to this read and not to something earlier.
+        ///
+        /// Not applied to the number readers, where the failure value is 0 and 0 is a perfectly
+        /// good column value. Checking there would mean asking the engine for an error string
+        /// after every zero read, on a path that allocates nothing and whose only realistic
+        /// failure is a handle that is already invalid -- which fails at the step before this.
+        ///
+        /// #### Parameters
+        ///
+        /// - `value`: what the binding returned
+        ///
+        /// #### Returns
+        ///
+        /// the value, when it really was null
+        ///
+        /// #### Throws
+        ///
+        /// - `IOException`: if the binding recorded a failure instead
+        private <T> T requireRead(T value) throws IOException {
+            if (value != null) {
+                return value;
+            }
+            String failure = SQLiteNative.lastError();
+            if (failure != null && failure.length() > 0) {
+                throw new IOException(failure);
+            }
+            return value;
         }
 
         @Override

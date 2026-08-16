@@ -286,6 +286,7 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         // The last row of a writing statement is only reachable through the window that holds
         // it, which is this one or none.
         if (statementWrites) {
+            requireAnsweredWithoutRunning("last()");
             requireInWindow(counted() - 1);
         }
         last_read_column_index = -1;
@@ -389,6 +390,11 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
             beforeFirst();
             return false;
         }
+        if (row > 0) {
+            // Row zero is the exception: the window a run fills begins there, so it is the one
+            // position that can be promised before the statement has run.
+            requireAnsweredWithoutRunning("position(" + row + ")");
+        }
         requireInWindow(row);
         onRow = moved(ABSOLUTE, row);
         return onRow;
@@ -488,6 +494,58 @@ public class AndroidCursor implements Cursor, CursorExt, RowExt {
         } catch (RuntimeException failed) {
             throw readFailed(index, failed);
         }
+    }
+
+    /// Whether the statement behind this cursor has been run.
+    ///
+    /// Answered from whether the platform holds a window, which it fills by running the statement
+    /// and not before. It is the difference between a seek that can be decided from rows already
+    /// in memory and one that would have to run the statement to find out.
+    ///
+    /// A cursor that is not windowed answers no window ever, so this reports not-run and the
+    /// callers refuse rather than risk it. That is the safe direction: the cursors this class
+    /// wraps are the platform's own, and a refusal costs a query where a wrong answer costs a
+    /// repeated write.
+    ///
+    /// #### Returns
+    ///
+    /// true if the statement has already been run
+    private boolean statementHasRun() {
+        if (!(c instanceof android.database.AbstractWindowedCursor)) {
+            return false;
+        }
+        return ((android.database.AbstractWindowedCursor) c).getWindow() != null;
+    }
+
+    /// Refuses a seek that could only be answered by running a statement that writes.
+    ///
+    /// The window a writing statement is read through is the one its single run fills, and that
+    /// window starts at row zero. So on a cursor that has not run yet, row zero is the only
+    /// position that can be promised; whether any other is reachable is not knowable without
+    /// running the statement -- which performs the insert or the update.
+    ///
+    /// Refusing here, before anything runs, is what makes the answer usable. Running first and
+    /// refusing afterwards left the write committed behind a failure, so the caller could not
+    /// tell whether it had happened and a retry would do it again. Either the statement runs and
+    /// the rows are read forward, or nothing runs at all.
+    ///
+    /// #### Parameters
+    ///
+    /// - `what`: the seek being attempted, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the statement would have to run to answer this
+    private void requireAnsweredWithoutRunning(String what) throws IOException {
+        if (!statementWrites || statementHasRun()) {
+            return;
+        }
+        throw new IOException(what + " cannot be answered on a cursor over a statement that "
+                + "changes the database, because the statement has not run yet and running it to "
+                + "find out would perform those changes and then fail -- leaving you unable to "
+                + "tell whether they happened. Nothing has been run. Read the rows forward with "
+                + "next(), or run the statement with execute() and query for what you need "
+                + "afterwards.");
     }
 
     /// Whether this cursor still sits where it was created, before the first row.

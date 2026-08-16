@@ -6710,6 +6710,11 @@ let cn1SqliteLastError = "";
  * error, close and finalize report the last error of what they are closing.
  */
 function cn1SqliteGuard(fn, failureValue) {
+  // Cleared on entry so that what lastError() reports belongs to this call. The readers whose
+  // failure value is also a legal value -- a null blob, a null string -- cannot tell the two apart
+  // from the value alone, and an error left over from something earlier would make every one of
+  // them look like a failure.
+  cn1SqliteLastError = "";
   try {
     return fn();
   } catch (err) {
