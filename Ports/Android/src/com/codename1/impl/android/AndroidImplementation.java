@@ -6298,7 +6298,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /// Returns the smart-home bridge. Always returned rather than
     /// conditionally null: the bridge answers honestly through
     /// {@link AndroidSmartHomeSupport}, which is empty unless the builder
-    /// injected a delegate -- so {@code SmartHome} reports NOT_SUPPORTED
+    /// injected a delegate, so {@code SmartHome} reports NOT_SUPPORTED
     /// without this getter needing to know how the app was built.
     ///
     /// Note that a delegate being present does not mean the graph is
