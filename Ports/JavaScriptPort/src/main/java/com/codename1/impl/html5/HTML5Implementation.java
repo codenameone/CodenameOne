@@ -10622,6 +10622,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         return;
                     }
                     if (!backward) {
+                        // Forward traversal. The port cannot replay it -- it has no way to know
+                        // which form an entry stood for, and re-showing one would need the
+                        // application's own navigation -- so rather than leave the browser
+                        // sitting on an entry the app is not on, step back to the entry that
+                        // does match. Forward is inert, which is the honest degradation.
+                        historySuppressPop = true;
+                        try {
+                            window.getHistory().back();
+                        } catch (Throwable ignored) {
+                            historySuppressPop = false;
+                        }
                         return;
                     }
                     callSerially(new Runnable() {

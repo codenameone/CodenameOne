@@ -192,6 +192,7 @@ public final class JavaScriptSemanticOverlay {
         container.setInnerHTML("");
         entries.clear();
         rootOrder.clear();
+        focusedNodeId = -1;
     }
 
     private void visit(Map<Long, AccessibilityNodeSnapshot> nodes, Long id, long parentId,
@@ -500,6 +501,12 @@ public final class JavaScriptSemanticOverlay {
     }
 
     private void unlinkFromParentOrder(Entry entry) {
+        if (focusedNodeId == entry.id) {
+            // Detaching the element moves browser focus to the document, and accessibility ids
+            // are stable per component, so without this the node would be considered still
+            // focused when it comes back and focus would never be restored to it.
+            focusedNodeId = -1;
+        }
         Long key = Long.valueOf(entry.id);
         if (entry.parentId == -1) {
             rootOrder.remove(key);
