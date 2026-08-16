@@ -39,10 +39,11 @@ public class Accessor {
      * an earlier form again as ordinary forward navigation, and treating that as a back would
      * spend history entries the user can still reach.</p>
      *
+     * @param f the form being displayed
      * @return true when the change came from showBack()
      */
-    public static boolean isNavigatingBack() {
-        return Display.getInstance().isNavigatingBack();
+    public static boolean isNavigatingBack(Form f) {
+        return f != null && f.isShownWithReverse();
     }
 
     /**

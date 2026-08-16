@@ -1402,6 +1402,20 @@ public class Form extends Container {
         return previousForm;
     }
 
+    /// True when the pending display of this form is a backward navigation -- showBack()
+    /// rather than show(). Recorded on the form itself, not in one shared field, because a
+    /// transition can defer the change and a later navigation would otherwise overwrite it
+    /// before the port that needs the direction is told.
+    private boolean shownWithReverse;
+
+    void setShownWithReverse(boolean value) {
+        shownWithReverse = value;
+    }
+
+    boolean isShownWithReverse() {
+        return shownWithReverse;
+    }
+
     void setPreviousForm(Form previousForm) {
         this.previousForm = previousForm;
     }

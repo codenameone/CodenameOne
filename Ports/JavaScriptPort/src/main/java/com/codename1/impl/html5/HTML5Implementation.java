@@ -4453,10 +4453,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // displays would otherwise keep a 36 device-pixel font at 36 CSS pixels, so text
                 // and controls would roughly double in size.
                 dDensity = -1;
-                Form current = getCurrentForm();
-                if (current != null) {
-                    current.refreshTheme();
-                }
+                themeGeneration++;
+                refreshThemeIfStale(getCurrentForm());
             }
         } catch (Throwable ignored) {
             // Keep whatever was resolved at start-up.
@@ -10759,6 +10757,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public void setCurrentForm(Form f) {
         super.setCurrentForm(f);
+        // A form built before the last scheme or density change still holds the styles it
+        // resolved then, so it is brought up to date as it appears rather than coming back in
+        // the old palette.
+        refreshThemeIfStale(f);
         if (!historyRootShown) {
             // The first form has nothing behind it. Pushing for it left a dead entry that the
             // first Back popped without navigating anywhere, so leaving the app from the root
@@ -10774,7 +10776,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // A, B, then A again -- and treating that as a back would spend entries the user can
         // still reach.
         if (previousIndex >= 0 && previousIndex < depth - 1
-                && (handlingPopState || com.codename1.ui.Accessor.isNavigatingBack())) {
+                && (handlingPopState || com.codename1.ui.Accessor.isNavigatingBack(f))) {
             // Backward navigation, from a toolbar back command or showBack(). Keeping the whole
             // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
             // to A -- each be recognised.
@@ -13001,6 +13003,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     private static final String DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
+    /**
+     * Bumped whenever something invalidates resolved styles for every form, not just the one on
+     * screen -- a colour-scheme switch, a change of display density.
+     */
+    private int themeGeneration;
+
+    private static final String THEME_GENERATION_PROPERTY = "cn1$themeGeneration";
+
+    /**
+     * Re-resolves a form's styles if they predate the current generation.
+     *
+     * <p>A form that is not displayed still holds the Style instances it resolved, and nothing
+     * refreshes them when it is shown again, so without this a cached form would come back
+     * wearing the palette that was in force when it was last built.</p>
+     */
+    private void refreshThemeIfStale(Form f) {
+        if (f == null) {
+            return;
+        }
+        Object seen = f.getClientProperty(THEME_GENERATION_PROPERTY);
+        int generation = seen instanceof Integer ? ((Integer) seen).intValue() : 0;
+        if (generation == themeGeneration) {
+            return;
+        }
+        f.putClientProperty(THEME_GENERATION_PROPERTY, Integer.valueOf(themeGeneration));
+        if (generation != 0 || themeGeneration != 0) {
+            f.refreshTheme();
+        }
+    }
+
     @Override
     public Boolean isDarkMode() {
         return Boolean.valueOf(matchesMediaQuery(DARK_SCHEME_QUERY));
@@ -13068,8 +13100,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
                 if (DARK_SCHEME_QUERY.equals(query)) {
                     // Components hold the Style instances they resolved, and the dark variant is
-                    // chosen at resolution time, so repainting alone would redraw the old colours.
-                    current.refreshTheme();
+                    // chosen at resolution time, so repainting alone would redraw the old
+                    // colours. Forms that are not on screen hold theirs too, and refreshing only
+                    // this one would bring the old palette back when the user navigated to a
+                    // cached form -- so the generation is bumped and every form refreshes as it
+                    // is shown.
+                    themeGeneration++;
+                    refreshThemeIfStale(current);
                 }
                 current.repaint();
             }
