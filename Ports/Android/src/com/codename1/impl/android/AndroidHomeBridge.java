@@ -140,31 +140,14 @@ final class AndroidHomeBridge implements HomeBridge {
     }
 
     @Override
-    public void requestAuthorization(final int requestId) {
+    public void requestAuthorization(int requestId) {
         SmartHomeDelegate d = delegate();
         if (d == null) {
             SmartHome.deliverAuthorization(requestId,
                     HomeAuthorizationStatus.UNKNOWN.ordinal(), unsupported());
             return;
         }
-        d.requestAuthorization(new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                SmartHome.deliverAuthorization(requestId,
-                        AndroidSmartHomeSupport.getDelegate() == null
-                                ? HomeAuthorizationStatus.UNKNOWN.ordinal()
-                                : AndroidSmartHomeSupport.getDelegate()
-                                        .authorizationStatus(),
-                        null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverAuthorization(requestId,
-                        HomeAuthorizationStatus.UNKNOWN.ordinal(),
-                        encode(errorName, message));
-            }
-        });
+        d.requestAuthorization(new Authorized(requestId));
     }
 
     @Override
@@ -229,24 +212,13 @@ final class AndroidHomeBridge implements HomeBridge {
     }
 
     @Override
-    public void refresh(final int requestId) {
+    public void refresh(int requestId) {
         SmartHomeDelegate d = delegate();
         if (d == null) {
             SmartHome.deliverRefreshed(requestId, unsupported());
             return;
         }
-        d.refresh(new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                SmartHome.deliverRefreshed(requestId, null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverRefreshed(requestId,
-                        encode(errorName, message));
-            }
-        });
+        d.refresh(new Refreshed(requestId));
     }
 
     // ------------------------------------------------------------------
@@ -259,7 +231,7 @@ final class AndroidHomeBridge implements HomeBridge {
     }
 
     @Override
-    public void readTraits(final int requestId, String[] accessoryIds,
+    public void readTraits(int requestId, String[] accessoryIds,
             String[] serviceIds, String[] traitIds, boolean allowCached) {
         SmartHomeDelegate d = delegate();
         if (d == null) {
@@ -267,18 +239,7 @@ final class AndroidHomeBridge implements HomeBridge {
             return;
         }
         d.readTraits(accessoryIds, serviceIds, traitIds, allowCached,
-                new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                SmartHome.deliverReadings(requestId, orEmpty(payload), null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverReadings(requestId, NOTHING,
-                        encode(errorName, message));
-            }
-        });
+                new Readings(requestId));
     }
 
     @Override
@@ -287,7 +248,7 @@ final class AndroidHomeBridge implements HomeBridge {
     }
 
     @Override
-    public void writeTraits(final int requestId, String[] accessoryIds,
+    public void writeTraits(int requestId, String[] accessoryIds,
             String[] serviceIds, String[] traitIds, int[] kinds,
             double[] numericValues, String[] stringValues, int[] unitWireIds,
             String authorizationData) {
@@ -298,19 +259,7 @@ final class AndroidHomeBridge implements HomeBridge {
         }
         d.writeTraits(accessoryIds, serviceIds, traitIds, kinds, numericValues,
                 stringValues, unitWireIds, authorizationData,
-                new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                SmartHome.deliverWriteResults(requestId, orEmpty(payload),
-                        null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverWriteResults(requestId, NOTHING,
-                        encode(errorName, message));
-            }
-        });
+                new WriteResults(requestId));
     }
 
     // ------------------------------------------------------------------
@@ -331,21 +280,7 @@ final class AndroidHomeBridge implements HomeBridge {
             return;
         }
         d.subscribe(subscriptionId, accessoryIds, serviceIds, traitIds,
-                new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                // Registration is not something the caller waits on: the
-                // handle came back synchronously and is already live.
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                // Deliberately not failed over. A subscription covering
-                // twenty traits where one accessory refused notifications is
-                // still worth having, and the caller was told through
-                // TraitConstraint.notifiesOnChange before they subscribed.
-            }
-        });
+                new Subscribed());
     }
 
     @Override
@@ -357,36 +292,13 @@ final class AndroidHomeBridge implements HomeBridge {
     }
 
     @Override
-    public void drainChanges(final int requestId) {
+    public void drainChanges(int requestId) {
         SmartHomeDelegate d = delegate();
         if (d == null) {
             SmartHome.deliverDrained(requestId, 0, null);
             return;
         }
-        d.drainChanges(new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                int delivered = 0;
-                if (payload != null && payload.length > 0) {
-                    try {
-                        delivered = Integer.parseInt(payload[0].trim());
-                    } catch (NumberFormatException notANumber) {
-                        // The count is informational -- the changes
-                        // themselves already went through the event sink --
-                        // so an unreadable one is worth zero rather than a
-                        // failed drain.
-                        delivered = 0;
-                    }
-                }
-                SmartHome.deliverDrained(requestId, delivered, null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverDrained(requestId, 0,
-                        encode(errorName, message));
-            }
-        });
+        d.drainChanges(new Drained(requestId));
     }
 
     // ------------------------------------------------------------------
@@ -460,7 +372,7 @@ final class AndroidHomeBridge implements HomeBridge {
     }
 
     @Override
-    public void commission(final int requestId, String setupPayload,
+    public void commission(int requestId, String setupPayload,
             String structureId, String roomId, String suggestedName,
             int timeoutMillis) {
         SmartHomeDelegate d = delegate();
@@ -471,53 +383,17 @@ final class AndroidHomeBridge implements HomeBridge {
             return;
         }
         d.commission(setupPayload, structureId, roomId, suggestedName,
-                timeoutMillis, new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                String accessoryId = null;
-                String accessoryName = null;
-                String home = null;
-                int mine = 0;
-                if (payload != null && payload.length > 0
-                        && payload[0] != null) {
-                    String[] f = payload[0].split("\t", -1);
-                    accessoryId = f.length > 0 && f[0].length() > 0 ? f[0]
-                            : null;
-                    accessoryName = f.length > 1 ? f[1] : null;
-                    home = f.length > 2 && f[2].length() > 0 ? f[2] : null;
-                    mine = f.length > 3 && "1".equals(f[3]) ? 1 : 0;
-                }
-                SmartHome.deliverCommissioningResult(requestId, accessoryId,
-                        accessoryName, home, mine, null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverCommissioningResult(requestId, null, null,
-                        null, 0, encode(errorName, message));
-            }
-        });
+                timeoutMillis, new Commissioned(requestId));
     }
 
     @Override
-    public void identify(final int requestId, String accessoryId) {
+    public void identify(int requestId, String accessoryId) {
         SmartHomeDelegate d = delegate();
         if (d == null) {
             SmartHome.deliverIdentifyResult(requestId, unsupported());
             return;
         }
-        d.identify(accessoryId, new SmartHomeDelegate.Callback() {
-            @Override
-            public void onSuccess(String[] payload) {
-                SmartHome.deliverIdentifyResult(requestId, null);
-            }
-
-            @Override
-            public void onError(String errorName, String message) {
-                SmartHome.deliverIdentifyResult(requestId,
-                        encode(errorName, message));
-            }
-        });
+        d.identify(accessoryId, new Identified(requestId));
     }
 
     // ------------------------------------------------------------------
@@ -558,6 +434,202 @@ final class AndroidHomeBridge implements HomeBridge {
         public void onError(String errorName, String message) {
             SmartHome.deliverStarted(requestId,
                     HomeAvailability.NOT_SUPPORTED.ordinal(),
+                    encode(errorName, message));
+        }
+    }
+
+    /// Every callback here is a named static class rather than an anonymous
+    /// one. Anonymous classes capture the enclosing bridge, which pins it for
+    /// as long as the platform holds the callback and is what SpotBugs
+    /// reports as SIC_INNER_SHOULD_BE_STATIC_ANON -- a zero-findings gate in
+    /// this repo, so the choice is made for us. The names also read better in
+    /// a stack trace than AndroidHomeBridge$7.
+    private static final class Authorized implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        Authorized(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            // Re-read rather than trusting the payload: the delegate answers
+            // when the flow finishes, and what the user actually chose is the
+            // status afterwards.
+            SmartHomeDelegate d = AndroidSmartHomeSupport.getDelegate();
+            SmartHome.deliverAuthorization(requestId,
+                    d == null ? HomeAuthorizationStatus.UNKNOWN.ordinal()
+                              : d.authorizationStatus(),
+                    null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverAuthorization(requestId,
+                    HomeAuthorizationStatus.UNKNOWN.ordinal(),
+                    encode(errorName, message));
+        }
+    }
+
+    private static final class Refreshed implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        Refreshed(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            SmartHome.deliverRefreshed(requestId, null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverRefreshed(requestId, encode(errorName, message));
+        }
+    }
+
+    private static final class Readings implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        Readings(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            SmartHome.deliverReadings(requestId, orEmpty(payload), null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverReadings(requestId, NOTHING,
+                    encode(errorName, message));
+        }
+    }
+
+    private static final class WriteResults
+            implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        WriteResults(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            SmartHome.deliverWriteResults(requestId, orEmpty(payload), null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverWriteResults(requestId, NOTHING,
+                    encode(errorName, message));
+        }
+    }
+
+    /// Registration is not something the caller waits on -- the handle came
+    /// back synchronously and is already live -- and a failure is deliberately
+    /// not propagated: a subscription covering twenty traits where one
+    /// accessory refused notifications is still worth having, and
+    /// TraitConstraint.notifiesOnChange already told the caller which ones
+    /// report.
+    private static final class Subscribed
+            implements SmartHomeDelegate.Callback {
+
+        @Override
+        public void onSuccess(String[] payload) {
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+        }
+    }
+
+    private static final class Drained implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        Drained(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            int delivered = 0;
+            if (payload != null && payload.length > 0 && payload[0] != null) {
+                try {
+                    delivered = Integer.parseInt(payload[0].trim());
+                } catch (NumberFormatException notANumber) {
+                    // The count is informational -- the changes themselves
+                    // already went through the event sink -- so an unreadable
+                    // one is worth zero rather than a failed drain.
+                    delivered = 0;
+                }
+            }
+            SmartHome.deliverDrained(requestId, delivered, null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverDrained(requestId, 0, encode(errorName, message));
+        }
+    }
+
+    private static final class Commissioned
+            implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        Commissioned(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            String accessoryId = null;
+            String accessoryName = null;
+            String home = null;
+            int mine = 0;
+            if (payload != null && payload.length > 0 && payload[0] != null) {
+                String[] f = payload[0].split("\t", -1);
+                accessoryId = f.length > 0 && f[0].length() > 0 ? f[0] : null;
+                accessoryName = f.length > 1 ? f[1] : null;
+                home = f.length > 2 && f[2].length() > 0 ? f[2] : null;
+                mine = f.length > 3 && "1".equals(f[3]) ? 1 : 0;
+            }
+            SmartHome.deliverCommissioningResult(requestId, accessoryId,
+                    accessoryName, home, mine, null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverCommissioningResult(requestId, null, null, null, 0,
+                    encode(errorName, message));
+        }
+    }
+
+    private static final class Identified
+            implements SmartHomeDelegate.Callback {
+
+        private final int requestId;
+
+        Identified(int requestId) {
+            this.requestId = requestId;
+        }
+
+        @Override
+        public void onSuccess(String[] payload) {
+            SmartHome.deliverIdentifyResult(requestId, null);
+        }
+
+        @Override
+        public void onError(String errorName, String message) {
+            SmartHome.deliverIdentifyResult(requestId,
                     encode(errorName, message));
         }
     }
