@@ -96,7 +96,7 @@ API_AVAILABLE(ios(12.0))
 static id g_cn1OidcCurrentSession = nil;
 static id g_cn1OidcCurrentContext = nil;
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     if (@available(iOS 12.0, *)) {
         return JAVA_TRUE;
@@ -104,7 +104,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported__(
     return JAVA_FALSE;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_String_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT authUrlObj, JAVA_OBJECT redirectSchemeObj) {
     if (@available(iOS 12.0, *)) {
         // fall through
@@ -175,12 +175,12 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_
 // to satisfy the ParparVM linker for the native-method declarations on
 // IOSNative.java.
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_oidcSystemBrowserSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_String_java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_oidcStartAuthorization___java_lang_String_java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT authUrlObj, JAVA_OBJECT redirectSchemeObj) {
     return JAVA_NULL;
 }

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Tag;
@@ -204,6 +226,28 @@ public class HeavyLoadBenchmarkTest {
     }
 
     private void runTranslator(String classpath, Path outputDir) throws Exception {
+        // This benchmark deliberately translates the PUBLISHED codenameone-ios
+        // 7.0.214 jar and its bundled nativeios sources, because it wants a large
+        // workload that does not move when the repo does. That artifact predates the
+        // native-signature fixes, so with the check on (CI sets CN1_NATIVE_VERIFY)
+        // it reports natives this repo has already corrected and cannot correct in a
+        // shipped jar -- and, being an in-process call to main(), it would take the
+        // surefire JVM down with it. The check belongs on sources we control.
+        String previousVerify = System.getProperty(
+                NativeSignatureVerifier.MODE_PROPERTY);
+        System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, "off");
+        try {
+            translate(classpath, outputDir);
+        } finally {
+            if (previousVerify == null) {
+                System.clearProperty(NativeSignatureVerifier.MODE_PROPERTY);
+            } else {
+                System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, previousVerify);
+            }
+        }
+    }
+
+    private void translate(String classpath, Path outputDir) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         if (!Files.exists(translatorResources)) {
              translatorResources = Paths.get("vm", "ByteCodeTranslator", "src").normalize().toAbsolutePath();

@@ -208,22 +208,29 @@ public class ByteCodeTranslator {
                 : "linux".equalsIgnoreCase(appType) ? "linux" : null);
 
         ByteCodeTranslator b = new ByteCodeTranslator();
-        if (!recognizedOutputType) {
-            handleDefaultOutput(b, sources, dest);
-            return;
-        }
-        switch (output) {
-            case OUTPUT_TYPE_IOS:
-                handleIosOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks);
-                break;
-            case OUTPUT_TYPE_CLEAN:
-                handleCleanOutput(b, sources, dest, appName, appType);
-                break;
-            case OUTPUT_TYPE_JAVASCRIPT:
-                handleJavascriptOutput(b, sources, dest, appName);
-                break;
-            default:
+        try {
+            if (!recognizedOutputType) {
                 handleDefaultOutput(b, sources, dest);
+                return;
+            }
+            switch (output) {
+                case OUTPUT_TYPE_IOS:
+                    handleIosOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks);
+                    break;
+                case OUTPUT_TYPE_CLEAN:
+                    handleCleanOutput(b, sources, dest, appName, appType);
+                    break;
+                case OUTPUT_TYPE_JAVASCRIPT:
+                    handleJavascriptOutput(b, sources, dest, appName);
+                    break;
+                default:
+                    handleDefaultOutput(b, sources, dest);
+            }
+        } catch (NativeSignatureVerifier.VerificationFailedException ex) {
+            // The verifier has already printed the per-method diagnosis. A stack
+            // trace here would only push it out of view in the build log.
+            System.err.println(ex.getMessage());
+            System.exit(4);
         }
     }
 

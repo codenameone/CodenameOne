@@ -293,6 +293,7 @@ public class WindowsNativeBuilder extends Executor {
         if (!heapOverridden) {
             parparCmd.add("-Xmx" + heapMB + "m");
         }
+        NativeVerifyOption.addTo(parparCmd, request, "windows");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         // Output type: the portable "clean" C target. The "windows" app type
