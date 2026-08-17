@@ -180,6 +180,51 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
+     * A coverage test for the sector a filled arc actually paints.
+     *
+     * <p>The bounding rectangle of an arc holds a good deal the arc never reaches -- the corners
+     * of a full ellipse's box, and everything outside the wedge of a partial one. The sector is
+     * traced as a closed outline and asked the same question as any other shape.</p>
+     */
+    private static JavaScriptTextLayer.CoverTest arcCoverTest(int x, int y, int width, int height,
+            int startAngle, int arcAngle) {
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        double cx = x + width / 2.0;
+        double cy = y + height / 2.0;
+        double rx = width / 2.0;
+        double ry = height / 2.0;
+        int span = Math.abs(arcAngle) >= 360 ? 360 : Math.abs(arcAngle);
+        int steps = Math.max(8, span / 4);
+        boolean whole = span >= 360;
+        int points = steps + 1 + (whole ? 0 : 1);
+        final float[][] outline = new float[][] { new float[points], new float[points] };
+        int at = 0;
+        if (!whole) {
+            // The straight edges of a wedge run from the centre out to each end of the arc.
+            outline[0][at] = (float) cx;
+            outline[1][at] = (float) cy;
+            at++;
+        }
+        double from = arcAngle < 0 ? startAngle + arcAngle : startAngle;
+        for (int i = 0; i <= steps; i++) {
+            double degrees = from + (span * (double) i) / steps;
+            double radians = Math.toRadians(degrees);
+            // Angles run counter-clockwise from three o'clock, while y grows downwards.
+            outline[0][at] = (float) (cx + rx * Math.cos(radians));
+            outline[1][at] = (float) (cy - ry * Math.sin(radians));
+            at++;
+        }
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int rectX, int rectY, int rectW, int rectH) {
+                return outlineMeetsRect(outline, rectX, rectY, rectW, rectH);
+            }
+        };
+    }
+
+    /**
      * Flattens a shape's outline into one array of x coordinates and one of y coordinates per
      * subpath, so it can be asked whether it meets a rectangle.
      *
@@ -652,7 +697,7 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
-        noteCanvasCover(x, y, width, height);
+        noteCanvasCover(x, y, width, height, arcCoverTest(x, y, width, height, startAngle, arcAngle));
         addOp(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
