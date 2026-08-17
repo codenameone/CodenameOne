@@ -10892,12 +10892,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // would run the same form's back command twice.
             return;
         }
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                replayTraversal();
-            }
-        });
+        // Which entries were crossed is read from the event here, synchronously, because the
+        // event does not outlive the call. Running the back command belongs on the EDT, and
+        // that is the coordinator's shape.
+        JavaScriptBrowserLifecycleCoordinator.handlePopState(
+                new JavaScriptBrowserLifecycleCoordinator.BackNavigationHooks() {
+                    @Override
+                    public void callSerially(Runnable runnable) {
+                        HTML5Implementation.this.callSerially(runnable);
+                    }
+
+                    @Override
+                    public void runBackCommand() {
+                        replayTraversal();
+                    }
+                });
     }
 
     /**
