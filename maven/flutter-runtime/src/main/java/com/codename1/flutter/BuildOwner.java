@@ -104,6 +104,22 @@ public class BuildOwner {
                 + ",\"hot\":" + RenderElement.hotLayoutClasses(6) + "}";
     }
 
+    /// Adds the hosts owned by anything inside {@code e}'s subtree to {@code out}.
+    private static void collectNestedHosts(Element e, final Set<RenderHost> out) {
+        e.visitChildren(new dart.runtime.Funcs.VoidFunc1<Element>() {
+            @Override
+            public void call(Element child) {
+                if (child == null) {
+                    return;
+                }
+                if (child.host() != null) {
+                    out.add(child.host());
+                }
+                collectNestedHosts(child, out);
+            }
+        });
+    }
+
     void flushBuild() {
         long started = traceFrames ? System.currentTimeMillis() : 0;
         int rebuilt = 0;
@@ -133,6 +149,13 @@ public class BuildOwner {
             if (e.host != null) {
                 affectedHosts.add(e.host);
             }
+            // ...and every NESTED host inside what was just rebuilt. An element records the
+            // host it was mounted into, but a rebuilt subtree can contain scroll panes and
+            // effect panes that carry hosts of their own, and those hold the components.
+            // Revalidating only the outer host leaves a nested one holding children it
+            // never laid out - which renders as a page whose scaffold is present and whose
+            // contents have simply vanished, with no error anywhere.
+            collectNestedHosts(e, affectedHosts);
         }
         long built = traceFrames ? System.currentTimeMillis() : 0;
         for (RenderHost h : affectedHosts) {

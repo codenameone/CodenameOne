@@ -144,20 +144,16 @@ public class InheritedElement extends StatelessElement {
                     + (widget() == null ? "?" : widget().getClass().getSimpleName())
                     + ": " + who);
         }
-        // STILL GATED OFF. Three orderings have been tried - inline in update(), deferred
-        // to a serial call, and deferred with MaterialApp no longer re-resolving its
-        // initial route on every build - and every one of them empties the settings page on
-        // a device while all 204 headless tests pass. A blank page is worse than a stale
-        // switch, so this stays off until the teardown is understood.
+        // Deferred, not inline: this runs from update(), part-way through a build flush
+        // that is still replacing this subtree, and a reader marked dirty at that moment
+        // rebuilds against a tree being torn down around it.
         //
-        // What is known: ModelBindingScope has 14 readers and the first is the top-level
-        // Builder that returns the MaterialApp, so any notification rebuilds the entire app.
-        // The census (cn1.flutter.inheritedCensus) lists them. What is NOT known is which
-        // reader's rebuild does the damage - that is the next thing to find out, by
-        // notifying them one at a time.
-        if ("true".equals(com.codename1.ui.Display.getInstance()
-                .getProperty("cn1.flutter.inheritedNotify", "false"))) {
-            com.codename1.ui.CN.callSerially(mark);
-        }
+        // This was gated off for a while because turning it on emptied whole pages. That
+        // turned out not to be a fault of the notification at all: a rebuilt subtree can
+        // contain scroll and effect panes carrying RenderHosts of their own, and the build
+        // flush only revalidated the host the rebuilt element was mounted into - so a
+        // nested host kept children it never laid out. Fixed in BuildOwner, and readers are
+        // notified normally now.
+        com.codename1.ui.CN.callSerially(mark);
     }
 }
