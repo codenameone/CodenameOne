@@ -2339,6 +2339,19 @@ void com_codename1_impl_ios_IOSNative_homeUnsubscribe___java_lang_String(
         NSSet *keys = [cn1homeWatches objectForKey:subId];
         [cn1homeWatches removeObjectForKey:subId];
         [cn1homeUndelivered removeObjectForKey:subId];
+        // And this subscription's polling baselines, which are keyed by
+        // subscription id and would otherwise outlive it. Subscription ids
+        // only ever go up and nothing stops the bridge, so a screen opened
+        // and closed a few hundred times would hold every baseline string it
+        // ever recorded for the life of the process.
+        if (keys != nil) {
+            NSString *prefix = [subId stringByAppendingString:@"\t"];
+            for (NSString *polled in [cn1homeLastPolled allKeys]) {
+                if ([polled hasPrefix:prefix]) {
+                    [cn1homeLastPolled removeObjectForKey:polled];
+                }
+            }
+        }
         if (keys != nil) {
             // Notifications are turned off only for characteristics no other
             // subscription still watches. Disabling one another watcher needs
