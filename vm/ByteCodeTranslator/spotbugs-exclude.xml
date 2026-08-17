@@ -191,4 +191,22 @@
         <Class name="com.codename1.tools.translator.JavascriptBundleWriter" />
         <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
     </Match>
+    <!--
+    DevicePush is a command-line tool that pairs with a phone and pushes to it.
+
+    DM_EXIT: same CLI-exit pattern as ByteCodeTranslator and Parser above. A
+    refused push has to fail the build that invoked it.
+
+    REC_CATCH_EXCEPTION: enumerating this machine's network interfaces and
+    probing 254 addresses must never be what stops a push. Anything thrown while
+    looking is answered by "no device found", which is the truth from the user's
+    point of view, and is recoverable by naming the address.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.tools\.translator\.DevicePush(\$.*)?" />
+        <Or>
+            <Bug pattern="DM_EXIT" />
+            <Bug pattern="REC_CATCH_EXCEPTION" />
+        </Or>
+    </Match>
 </FindBugsFilter>

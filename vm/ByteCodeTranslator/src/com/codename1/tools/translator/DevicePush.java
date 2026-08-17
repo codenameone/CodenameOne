@@ -100,6 +100,13 @@ public final class DevicePush {
     /** Must equal InterpPairingSecret.ITERATIONS, or nothing pairs. */
     private static final int PAIRING_ITERATIONS = 20000;
 
+    /**
+     * One instance, seeded once. A fresh SecureRandom per call re-seeds every
+     * time, which is both slower and worse, and these values are a peer id and
+     * a pairing code -- guessing either is the whole attack.
+     */
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private DevicePush() {
     }
 
@@ -264,7 +271,7 @@ public final class DevicePush {
             // forgotten it -- reinstalled, or "forget paired computers". Both
             // recover the same way, and doing it automatically beats making the
             // user work out why a push that worked yesterday does not today.
-            String code = String.format("%06d", new SecureRandom().nextInt(1000000));
+            String code = String.format("%06d", RANDOM.nextInt(1000000));
             System.out.println();
             System.out.println("    ==============================");
             System.out.println("      Pairing code:  " + code);
@@ -432,7 +439,7 @@ public final class DevicePush {
                 java.util.concurrent.Executors.newFixedThreadPool(64);
         try {
             for (final String candidate : candidates) {
-                pool.submit(new Runnable() {
+                pool.execute(new Runnable() {
                     public void run() {
                         if (found.get() != null) {
                             return;
@@ -531,7 +538,7 @@ public final class DevicePush {
             return new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
         }
         String id = hex(randomBytes(16));
-        Files.createDirectories(f.getParent());
+        createParent(f);
         Files.write(f, id.getBytes(StandardCharsets.UTF_8));
         return id;
     }
@@ -570,7 +577,7 @@ public final class DevicePush {
             }
         }
         p.setProperty(deviceId, hex(secret));
-        Files.createDirectories(f.getParent());
+        createParent(f);
         OutputStream out = Files.newOutputStream(f);
         try {
             p.store(out, "Codename One device runtime -- shared secrets, one per paired device");
@@ -584,6 +591,14 @@ public final class DevicePush {
                     PosixFilePermissions.fromString("rw-------"));
         } catch (UnsupportedOperationException notPosix) {
             // Windows: the default ACL is the user's own, which is the intent.
+        }
+    }
+
+    /** Creates the .codenameone directory, if the path has one to create. */
+    private static void createParent(Path f) throws IOException {
+        Path parent = f.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
         }
     }
 
@@ -632,7 +647,7 @@ public final class DevicePush {
 
     private static byte[] randomBytes(int count) {
         byte[] out = new byte[count];
-        new SecureRandom().nextBytes(out);
+        RANDOM.nextBytes(out);
         return out;
     }
 
