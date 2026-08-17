@@ -529,7 +529,26 @@ public final class JavaScriptTextLayer {
      * @param w width
      * @param h height
      */
+    /**
+     * Decides whether a draw really reaches a rectangle, for a draw whose shape is not the
+     * rectangle it reports.
+     */
+    public interface CoverTest {
+        /**
+         * @param x left edge of the rectangle in question, in Codename One pixels
+         * @param y top edge
+         * @param w width
+         * @param h height
+         * @return true when the draw covers all of it
+         */
+        boolean covers(int x, int y, int w, int h);
+    }
+
     public void noteCanvasCover(int x, int y, int w, int h) {
+        noteCanvasCover(x, y, w, h, null);
+    }
+
+    public void noteCanvasCover(int x, int y, int w, int h, CoverTest test) {
         if (suspended || w <= 0 || h <= 0 || byComponent.isEmpty()) {
             return;
         }
@@ -567,6 +586,12 @@ public final class JavaScriptTextLayer {
                 if (run.coverW <= 0 || run.coverH <= 0
                         || run.coverX + run.coverW <= x || x + w <= run.coverX
                         || run.coverY + run.coverH <= y || y + h <= run.coverY) {
+                    continue;
+                }
+                if (test != null && !test.covers(run.coverX, run.coverY, run.coverW, run.coverH)) {
+                    // The draw's own outline does not reach this text, whatever its bounding
+                    // rectangle says -- a filled triangle around a label. Nothing is hidden, so
+                    // the text stays where it is.
                     continue;
                 }
                 if (covered == null) {

@@ -152,7 +152,7 @@ public class BufferedGraphics extends HTML5Graphics {
      * Reports the bounds of a filled shape as covering, so promoted text underneath goes back to
      * the canvas where the shape can actually paint over it.
      */
-    private void noteCanvasCover(Shape shape) {
+    private void noteCanvasCover(final Shape shape) {
         if (shape == null) {
             return;
         }
@@ -160,13 +160,29 @@ public class BufferedGraphics extends HTML5Graphics {
         if (bounds == null) {
             return;
         }
-        noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+        if (shape.isRectangle()) {
+            noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+            return;
+        }
+        // A shape covers what it encloses, not what its bounding rectangle encloses: a filled
+        // triangle drawn around a label reaches none of it. The shape itself decides, corner by
+        // corner, and only text it covers entirely goes back to the canvas.
+        noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
+                new JavaScriptTextLayer.CoverTest() {
+                    @Override
+                    public boolean covers(int x, int y, int w, int h) {
+                        int right = x + Math.max(0, w - 1);
+                        int bottom = y + Math.max(0, h - 1);
+                        return shape.contains(x, y) && shape.contains(right, y)
+                                && shape.contains(x, bottom) && shape.contains(right, bottom);
+                    }
+                });
     }
 
     /**
      * Reports the bounds of a filled polygon as covering.
      */
-    private void noteCanvasCover(int[] xPoints, int[] yPoints, int nPoints) {
+    private void noteCanvasCover(final int[] xPoints, final int[] yPoints, final int nPoints) {
         if (xPoints == null || yPoints == null || nPoints <= 0) {
             return;
         }
@@ -180,7 +196,41 @@ public class BufferedGraphics extends HTML5Graphics {
             minY = Math.min(minY, yPoints[i]);
             maxY = Math.max(maxY, yPoints[i]);
         }
-        noteCanvasCover(minX, minY, maxX - minX, maxY - minY);
+        // Like a filled shape, a polygon covers what it encloses rather than what its bounding
+        // rectangle does, so each corner of a candidate run is tested against the outline.
+        noteCanvasCover(minX, minY, maxX - minX, maxY - minY,
+                new JavaScriptTextLayer.CoverTest() {
+                    @Override
+                    public boolean covers(int x, int y, int w, int h) {
+                        int right = x + Math.max(0, w - 1);
+                        int bottom = y + Math.max(0, h - 1);
+                        return inPolygon(xPoints, yPoints, nPoints, x, y)
+                                && inPolygon(xPoints, yPoints, nPoints, right, y)
+                                && inPolygon(xPoints, yPoints, nPoints, x, bottom)
+                                && inPolygon(xPoints, yPoints, nPoints, right, bottom);
+                    }
+                });
+    }
+
+    /**
+     * Whether a point lies inside a polygon, by the even-odd rule the canvas fills it with.
+     */
+    private static boolean inPolygon(int[] xPoints, int[] yPoints, int nPoints, int x, int y) {
+        boolean inside = false;
+        int count = Math.min(nPoints, Math.min(xPoints.length, yPoints.length));
+        for (int i = 0, j = count - 1; i < count; j = i++) {
+            int yi = yPoints[i];
+            int yj = yPoints[j];
+            if ((yi > y) == (yj > y)) {
+                continue;
+            }
+            double crossing = (double) (xPoints[j] - xPoints[i]) * (y - yi)
+                    / (double) (yj - yi) + xPoints[i];
+            if (x < crossing) {
+                inside = !inside;
+            }
+        }
+        return inside;
     }
 
     /**
@@ -193,6 +243,10 @@ public class BufferedGraphics extends HTML5Graphics {
      * application did not draw.</p>
      */
     private void noteCanvasCover(int x, int y, int w, int h) {
+        noteCanvasCover(x, y, w, h, null);
+    }
+
+    private void noteCanvasCover(int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
         if (layer == null || w <= 0 || h <= 0) {
             return;
@@ -204,7 +258,7 @@ public class BufferedGraphics extends HTML5Graphics {
             return;
         }
         if (transform == null || transform.isIdentity()) {
-            reportCover(x, y, w, h);
+            reportCover(x, y, w, h, test);
             return;
         }
         // Where the image lands, not where it was asked for: text is only promoted under an
@@ -225,7 +279,7 @@ public class BufferedGraphics extends HTML5Graphics {
             } catch (Throwable ignored) {
                 // A transform the platform will not project -- treat the draw as covering what
                 // it was asked to cover, which is what the untransformed rectangle says.
-                layer.noteCanvasCover(x, y, w, h);
+                reportCover(x, y, w, h, test);
                 return;
             }
             minX = Math.min(minX, out[0]);
@@ -233,8 +287,11 @@ public class BufferedGraphics extends HTML5Graphics {
             maxX = Math.max(maxX, out[0]);
             maxY = Math.max(maxY, out[1]);
         }
+        // The outline test belongs to untransformed coordinates, so it is dropped here rather
+        // than asked the wrong question: what remains is the projected bounding box, which is
+        // what the draw is known to be inside.
         reportCover((int) Math.floor(minX), (int) Math.floor(minY),
-                (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY));
+                (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY), null);
     }
 
     /**
@@ -244,7 +301,7 @@ public class BufferedGraphics extends HTML5Graphics {
      * but whose clip excludes it changes nothing there, and taking that run off the layer would
      * lose the only copy of the text for the frame and its promotion for good.</p>
      */
-    private void reportCover(int x, int y, int w, int h) {
+    private void reportCover(int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
         if (layer == null) {
             return;
@@ -258,7 +315,7 @@ public class BufferedGraphics extends HTML5Graphics {
         if (right <= left || bottom <= top) {
             return;
         }
-        layer.noteCanvasCover(left, top, right - left, bottom - top);
+        layer.noteCanvasCover(left, top, right - left, bottom - top, test);
     }
 
     /// Buffers a blit of a raw canvas (an offscreen WebGL render target) into the
