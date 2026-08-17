@@ -80,7 +80,10 @@ jobs:
           export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME}/bin:${PATH}"
           cd maven
-          mvn -B install -Plocal-dev-javase -DskipTests \
+          # Retried: Central has been answering 403 on this runner pool, and Maven treats a
+          # failed build-extension resolution as permanent -- the job dies in setup having
+          # proved nothing. Same rationale as setup-workspace.sh's mvn_retry.
+          ../scripts/ci-mvn-retry.sh -B install -Plocal-dev-javase -DskipTests \
             -Darchetype.test.skip=true -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${GITHUB_WORKSPACE}/maven/target/cn1-binaries"
 
