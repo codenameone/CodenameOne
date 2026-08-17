@@ -104,9 +104,7 @@ Accounting pauses while inside a host call. A legitimate `invokeAndBlock` waitin
 
 [source,java]
 ----
-runtime.setEdtBudgetMs(2000);   // 0 disables the check
-runtime.setMaxDepth(512);
-runtime.requestCancel();        // safe from another thread
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/DeviceRuntimeSnippets.java[tag=device-runtime-limits,indent=0]
 ----
 
 == Frames, threads and blocking
@@ -283,8 +281,7 @@ the choice.
 
 [source,bash]
 ----
-scripts/cn1-push.sh src/main/java 18234
-scripts/cn1-push.sh src/main/java 18234 --main com.example.Other
+include::../demos/common/src/main/snippets/developer-guide/device-runtime.sh[tag=device-runtime-bash-001,indent=0]
 ----
 
 === A pushed `main` runs on the event thread
@@ -376,8 +373,7 @@ Make a probe answer the question rather than trusting the message. Reading a hos
 
 [source,java]
 ----
-Object o = System.out;
-throw new IllegalStateException("read as " + o.getClass().getName());
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/DeviceRuntimeSnippets.java[tag=device-runtime-which-device,indent=0]
 ----
 
 `java.io.PrintStream` is iOS. `com.android.internal.os.AndroidPrintStream` is Android. Anything that could have come from either device has told you nothing.

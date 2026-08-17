@@ -1270,7 +1270,12 @@ public final class InterpRuntime {
                 pushBoxed(f, returnKind, r);
                 return;
             }
-            throw new InterpThrowable(new AbstractMethodError(
+            // IncompatibleClassChangeError rather than the AbstractMethodError
+            // this really is: CLDC11's AbstractMethodError keeps its
+            // constructors package-private, so the framework cannot throw one
+            // with a message, and a message naming the method is worth more
+            // here than the exactly right type.
+            throw new InterpThrowable(new IncompatibleClassChangeError(
                     owner + "." + name + desc + " is not implemented"), snapshotStack());
         }
 
