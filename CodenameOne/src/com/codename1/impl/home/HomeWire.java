@@ -401,9 +401,9 @@ public final class HomeWire {
             int[] parsed = new int[ordinals.size()];
             int count = 0;
             for (String ordinal : ordinals) {
+                int value;
                 try {
-                    parsed[count] = Integer.parseInt(ordinal);
-                    count++;
+                    value = Integer.parseInt(ordinal);
                 } catch (NumberFormatException skip) {
                     // One unreadable ordinal must not cost the whole trait.
                     // Left out of the list, which widens what the accessory
@@ -412,6 +412,17 @@ public final class HomeWire {
                     // not say".
                     continue;
                 }
+                if (!trait.acceptsEnumValue(
+                        TraitValue.ofEnumOrdinal(value))) {
+                    // A constant a newer build knows and this one does not.
+                    // Dropped for the same reason and in the same direction:
+                    // getValidOrdinals promises every entry is in the trait's
+                    // domain, and a caller building a selector from it would
+                    // otherwise index past values().
+                    continue;
+                }
+                parsed[count] = value;
+                count++;
             }
             if (count == 0) {
                 return TraitConstraint.of(trait, readable, writable, notifies);

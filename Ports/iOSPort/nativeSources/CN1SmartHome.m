@@ -2142,11 +2142,21 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
                 // TraitConstraint.notifiesOnChange already told the caller.
                 continue;
             }
-            [c enableNotification:YES completionHandler:^(NSError *ignored) {
-                // Unreported on purpose. A subscription is registered whether
-                // or not every characteristic in it accepted a notification,
-                // and failing the whole thing because one sensor refused
-                // would take the other nineteen down with it.
+            [c enableNotification:YES completionHandler:^(NSError *error) {
+                if (error == nil) {
+                    return;
+                }
+                // The subscription is still registered -- failing the whole
+                // thing because one sensor refused would take the other
+                // nineteen down with it -- but the caller has to be told
+                // that what it is watching may now be stale. This is the one
+                // backend with no polling fallback: if the registration
+                // failed and nothing said so, the listener would sit on the
+                // last value it saw for as long as the screen is open, even
+                // after the accessory came back.
+                com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
+                    getThreadLocalData(),
+                    fromNSString(getThreadLocalData(), subId));
             }];
         }
         [cn1homeWatches setObject:keys forKey:subId];
