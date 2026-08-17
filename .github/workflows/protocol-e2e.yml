@@ -39,7 +39,10 @@ jobs:
           export JAVA_HOME="${JAVA_HOME_8}"
           export PATH="${JAVA_HOME_8}/bin:$PATH"
           cd maven
-          mvn -B -pl core,javase,css-compiler,codenameone-maven-plugin -am install \
+          # Retried: Maven treats a Central connection reset while resolving a build plugin as a
+          # permanent failure, which fails this job before any project code compiles. Same
+          # rationale as setup-workspace.sh's mvn_retry.
+          ../scripts/ci-mvn-retry.sh -B -pl core,javase,css-compiler,codenameone-maven-plugin -am install \
               -Plocal-dev-javase -DskipTests -Dmaven.javadoc.skip=true
 
       - name: Ensure a virtual display (xvfb) for the simulator
