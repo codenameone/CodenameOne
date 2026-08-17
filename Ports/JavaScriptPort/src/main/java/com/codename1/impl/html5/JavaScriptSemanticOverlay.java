@@ -128,6 +128,7 @@ public final class JavaScriptSemanticOverlay {
     private final ActionDispatcher dispatcher;
     private final Map<Long, Entry> entries = new HashMap<Long, Entry>();
     private final List<Long> rootOrder = new ArrayList<Long>();
+    private HTMLElement actionsContainer;
     private boolean textContentEnabled = true;
     private long focusedNodeId = -1;
     private Entry pendingFocus;
@@ -202,6 +203,7 @@ public final class JavaScriptSemanticOverlay {
         // and removing each from its parent would not be equivalent here, because a parent may
         // already have been dropped from the map by the time its children are visited.
         container.setInnerHTML("");
+        actionsContainer = null;
         entries.clear();
         rootOrder.clear();
         focusedNodeId = -1;
@@ -243,6 +245,7 @@ public final class JavaScriptSemanticOverlay {
             // slot is filled -- otherwise the reconcile pass would see the id already in place
             // and never attach the replacement element.
             detach(entry);
+            releaseCustomActions(entry);
             unlinkFromParentOrder(entry);
             entries.remove(key);
         }
@@ -569,7 +572,7 @@ public final class JavaScriptSemanticOverlay {
                 it.hasNext();) {
             Map.Entry<String, HTMLElement> existing = it.next();
             if (desired == null || !desired.contains(existing.getKey())) {
-                entry.element.removeChild(existing.getValue());
+                actionsContainer().removeChild(existing.getValue());
                 if (entry.customActionLabels != null) {
                     entry.customActionLabels.remove(existing.getKey());
                 }
@@ -584,6 +587,14 @@ public final class JavaScriptSemanticOverlay {
         HTMLElement button = document.createElement("button");
         button.setAttribute("type", "button");
         button.setAttribute("aria-label", label);
+        // Names the node this acts on as the button's description, since the button no longer
+        // sits inside it: "Delete" on its own says nothing about what would be deleted.
+        String owner = entry.attributes.get("id");
+        if (owner == null) {
+            owner = elementId(entry.id);
+        }
+        button.setAttribute("aria-controls", owner);
+        button.setAttribute("aria-describedby", owner);
         button.setTextContent(label);
         button.getStyle().setCssText(
                 "position:absolute;opacity:0.001;pointer-events:none;width:1px;height:1px;");
@@ -591,24 +602,44 @@ public final class JavaScriptSemanticOverlay {
             @Override
             public void handleEvent(Event event) {
                 event.preventDefault();
-                // The button sits inside the node it belongs to, whose own click listener would
-                // otherwise also run and fire the node's main action alongside this one.
+                // The overlay root carries handlers of its own, and this is not one of the
+                // node's own actions -- it must not read as a click on anything above it.
                 event.stopPropagation();
                 dispatcher.performAction(nodeId, action.getId(), null);
             }
         });
-        button.addEventListener("keydown", new EventListener() {
-            @Override
-            public void handleEvent(Event event) {
-                // Keep the key from reaching the enclosing node's handler, which would treat
-                // Enter or Space as the node's main action and suppress this button's click --
-                // so a keyboard or screen-reader user would get the wrong action entirely. Not
-                // prevented, only stopped: the browser still turns it into a click here.
-                event.stopPropagation();
-            }
-        });
-        entry.element.appendChild(button);
+        // Held apart from the semantic tree rather than inside the node. Accessibility APIs
+        // treat everything inside a widget role -- button, checkbox, switch -- as presentational,
+        // so a button nested there may never be exposed at all; and a role=list accepts only
+        // list items as children, which the scroll actions were breaking.
+        actionsContainer().appendChild(button);
         return button;
+    }
+
+    /**
+     * The region holding custom-action controls, created on first use.
+     *
+     * @return the container element
+     */
+    private HTMLElement actionsContainer() {
+        if (actionsContainer == null) {
+            actionsContainer = document.createElement("div");
+            actionsContainer.setAttribute("id", "cn1-accessibility-actions");
+            actionsContainer.getStyle().setCssText(
+                    "position:absolute;left:0;top:0;width:0;height:0;overflow:hidden;");
+            container.appendChild(actionsContainer);
+        }
+        return actionsContainer;
+    }
+
+    /**
+     * The document id given to a node's element when the application supplied none.
+     *
+     * @param nodeId the accessibility node id
+     * @return a stable element id
+     */
+    private String elementId(long nodeId) {
+        return "cn1-a11y-" + nodeId;
     }
 
     private void pruneRemovedNodes(Set<Long> live) {
@@ -619,9 +650,27 @@ public final class JavaScriptSemanticOverlay {
             }
             Entry entry = existing.getValue();
             detach(entry);
+            releaseCustomActions(entry);
             unlinkFromParentOrder(entry);
             it.remove();
         }
+    }
+
+    /**
+     * Drops a node's custom-action controls, which live outside it and would otherwise stay in
+     * the document after the node they act on has gone.
+     *
+     * @param entry the node being removed
+     */
+    private void releaseCustomActions(Entry entry) {
+        if (entry.customActions == null) {
+            return;
+        }
+        for (Iterator<HTMLElement> it = entry.customActions.values().iterator(); it.hasNext();) {
+            actionsContainer().removeChild(it.next());
+        }
+        entry.customActions = null;
+        entry.customActionLabels = null;
     }
 
     private void unlinkFromParentOrder(Entry entry) {
@@ -763,9 +812,10 @@ public final class JavaScriptSemanticOverlay {
         if (description != null) {
             out.put("aria-description", description);
         }
-        if (node.getIdentifier() != null) {
-            out.put("id", node.getIdentifier());
-        }
+        // Always an id, generated when the application did not give one: a custom action is
+        // rendered outside the node it acts on, and aria-controls is how the two are tied back
+        // together -- which needs the node to be referable.
+        out.put("id", node.getIdentifier() != null ? node.getIdentifier() : elementId(node.getId()));
         if (node.getRoleDescription() != null) {
             out.put("aria-roledescription", node.getRoleDescription());
         }
