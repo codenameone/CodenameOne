@@ -98,6 +98,11 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private static final Pattern ID_PATTERN = Pattern.compile("[a-z][a-z0-9_]{2,63}");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Za-z0-9_]+)\\}");
     private static final Pattern ROUTE_PLACEHOLDER = Pattern.compile("\\{([A-Za-z0-9_]+)\\}");
+    /// Mirrors the grammar the generated ISO-8601 parser accepts, for validating a declared
+    /// default at build time. The generated parser remains the authority at runtime.
+    private static final Pattern DATE_DEFAULT = Pattern.compile(
+            "\\d{4}-\\d{2}-\\d{2}([Tt ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?"
+                    + "([Zz]|[+-]\\d{2}:?\\d{2})?)?");
 
     /// Apple rejects an App Shortcut phrase that does not name the app.
     private static final String APP_NAME_TOKEN = "${applicationName}";
@@ -448,6 +453,16 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 pd.kind = "entity";
                 pd.entityBinary = args[i].getClassName();
             }
+            if (pd.defaultValue.length() > 0 && !defaultFitsType(pd)) {
+                // numeric() emits 0 for a default it cannot parse, an unparseable boolean
+                // becomes false and an unparseable date becomes null -- so an omitted value
+                // reached the handler as something other than what the declaration said. The
+                // annotation is a constant; there is no reason to discover this at runtime.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " has defaultValue \"" + pd.defaultValue + "\", which is not a valid "
+                        + pd.kind + ". " + defaultHint(pd.kind));
+                continue;
+            }
             if (!pd.options.isEmpty() && pd.defaultValue.length() > 0
                     && !pd.options.contains(pd.defaultValue)) {
                 // The generated oneOf() enforces the vocabulary, defaults included, so this
@@ -504,6 +519,72 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         + "asks for it, using the title on its @IntentParam.");
             }
         }
+    }
+
+    /// True when a declared default can actually be represented by the parameter's type.
+    ///
+    /// The generated coercion is the authority on what a value may look like at runtime; this
+    /// mirrors its grammar for the one case that is a compile-time constant. Keep the two in
+    /// step -- a default this accepts and the runtime rejects is worse than either alone.
+    private static boolean defaultFitsType(ParamDef p) {
+        String v = p.defaultValue;
+        if ("string".equals(p.kind) || "entity".equals(p.kind)) {
+            return true;
+        }
+        if ("boolean".equals(p.kind)) {
+            return "true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v)
+                    || "1".equals(v) || "0".equals(v);
+        }
+        if ("date".equals(p.kind)) {
+            if (isLong(v)) {
+                return true;
+            }
+            return DATE_DEFAULT.matcher(v).matches();
+        }
+        if ("int".equals(p.kind)) {
+            if (!isLong(v)) {
+                return false;
+            }
+            long parsed = Long.parseLong(v.trim());
+            return parsed >= Integer.MIN_VALUE && parsed <= Integer.MAX_VALUE;
+        }
+        if ("long".equals(p.kind)) {
+            return isLong(v);
+        }
+        // float / double
+        try {
+            double d = Double.parseDouble(v.trim());
+            if (Double.isNaN(d) || Double.isInfinite(d)) {
+                return false;
+            }
+            return !"float".equals(p.kind)
+                    || (d >= -Float.MAX_VALUE && d <= Float.MAX_VALUE);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static boolean isLong(String v) {
+        try {
+            Long.parseLong(v.trim());
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /// What a valid default for this kind looks like, so the message is actionable.
+    private static String defaultHint(String kind) {
+        if ("boolean".equals(kind)) {
+            return "Use \"true\" or \"false\".";
+        }
+        if ("date".equals(kind)) {
+            return "Use epoch milliseconds, or ISO-8601 such as \"2026-03-14\".";
+        }
+        if ("int".equals(kind) || "long".equals(kind)) {
+            return "Use a whole number the type can hold.";
+        }
+        return "Use a finite number the type can hold.";
     }
 
     private static String join(List<String> values) {
@@ -835,7 +916,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "asLong(params, " + key + ", " + numeric(fallback, "0") + "L)";
         }
         if ("float".equals(p.kind)) {
-            return "(float) asDouble(params, " + key + ", " + numeric(fallback, "0") + "d)";
+            return "asFloat(params, " + key + ", " + numeric(fallback, "0") + "f)";
         }
         return "asDouble(params, " + key + ", " + numeric(fallback, "0") + "d)";
     }
@@ -988,36 +1069,39 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        return def;\n");
         sb.append("    }\n\n");
 
+        // Absent means fall back to the declared default. Present-but-invalid does not: the
+        // caller supplied something, and quietly turning 1.5 into 1 or an out-of-range value
+        // into a wrapped one hands the handler a number nobody sent. oneOf() has always
+        // rejected a supplied value outside its vocabulary; these now agree with it, so
+        // optionality is about presence and never about validity.
         sb.append("    private static long asLong(Map<String, Object> p, String k, long def) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
-        sb.append("        if (o instanceof Number) { return ((Number) o).longValue(); }\n");
-        sb.append("        if (o instanceof String) {\n");
-        sb.append("            try { return Long.parseLong(((String) o).trim()); }\n");
-        sb.append("            catch (NumberFormatException e) { return def; }\n");
-        sb.append("        }\n");
-        sb.append("        return def;\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredLong(p, k);\n");
         sb.append("    }\n\n");
 
         sb.append("    private static int asInt(Map<String, Object> p, String k, int def) {\n");
-        sb.append("        return (int) asLong(p, k, def);\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredInt(p, k);\n");
         sb.append("    }\n\n");
 
         sb.append("    private static double asDouble(Map<String, Object> p, String k, double def) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
-        sb.append("        if (o instanceof Number) { return ((Number) o).doubleValue(); }\n");
-        sb.append("        if (o instanceof String) {\n");
-        sb.append("            try { return Double.parseDouble(((String) o).trim()); }\n");
-        sb.append("            catch (NumberFormatException e) { return def; }\n");
-        sb.append("        }\n");
-        sb.append("        return def;\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredDouble(p, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static float asFloat(Map<String, Object> p, String k, float def) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredFloat(p, k);\n");
         sb.append("    }\n\n");
 
         sb.append("    private static boolean asBoolean(Map<String, Object> p, String k, boolean def) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
-        sb.append("        if (o instanceof Boolean) { return ((Boolean) o).booleanValue(); }\n");
-        sb.append("        if (o instanceof String) { return \"true\".equalsIgnoreCase(((String) o).trim()); }\n");
-        sb.append("        if (o instanceof Number) { return ((Number) o).intValue() != 0; }\n");
-        sb.append("        return def;\n");
+        sb.append("        if (o == null) { return def; }\n");
+        sb.append("        return requiredBoolean(p, k);\n");
         sb.append("    }\n\n");
 
         sb.append("    private static String oneOf(Map<String, Object> p, String k, String def,\n");

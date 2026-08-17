@@ -737,6 +737,98 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// A malformed default is a compile-time constant that silently became something else:
+    /// numeric() emits 0 for an int it cannot parse, an unparseable boolean becomes false, and
+    /// an unparseable date becomes null. An omitted value then reached the handler as a value
+    /// the declaration never named.
+    @Test
+    public void aMalformedDefaultIsRejectedForItsType() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"minutes\",\n"
+                        + "        required = false, defaultValue = \"abc\") int m) { }\n")),
+                "not a valid int");
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"hard\",\n"
+                        + "        required = false, defaultValue = \"maybe\") boolean b) { }\n")),
+                "not a valid boolean");
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"when\",\n"
+                        + "        required = false, defaultValue = \"soon\")\n"
+                        + "        java.util.Date d) { }\n")),
+                "not a valid date");
+        // Out of range for the declared type, not merely unparseable.
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"minutes\",\n"
+                        + "        required = false, defaultValue = \"4294967296\") int m) { }\n")),
+                "not a valid int");
+    }
+
+    @Test
+    public void wellFormedDefaultsAreAccepted() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(\n"
+                        + "        @IntentParam(value = \"minutes\", required = false,\n"
+                        + "                     defaultValue = \"20\") int m,\n"
+                        + "        @IntentParam(value = \"hard\", required = false,\n"
+                        + "                     defaultValue = \"true\") boolean b,\n"
+                        + "        @IntentParam(value = \"ratio\", required = false,\n"
+                        + "                     defaultValue = \"1.5\") double r,\n"
+                        + "        @IntentParam(value = \"epoch\", required = false,\n"
+                        + "                     defaultValue = \"1773446400000\") java.util.Date e,\n"
+                        + "        @IntentParam(value = \"iso\", required = false,\n"
+                        + "                     defaultValue = \"2026-03-14\") java.util.Date i) { }\n"));
+
+        run(classes, true);
+
+        assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
+    /// Making a parameter optional must not change whether a supplied value is checked. It
+    /// changes what happens when the value is absent, and nothing else.
+    @Test
+    public void anOptionalNumberRejectsASuppliedValueItCannotRepresent() throws Exception {
+        File classes = compile(source(
+                "public static int seen = -1;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static IntentResult log(@IntentParam(value = \"minutes\",\n"
+                        + "        required = false, defaultValue = \"20\") int m) {\n"
+                        + "    seen = m;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            // Absent: the declared default, which is what optional means.
+            invoke.invoke(registry, "log_workout", new LinkedHashMap<String, Object>(), null);
+            assertEquals(20, seen.getInt(null));
+
+            // Supplied but not representable: rejected, exactly as when it is required.
+            assertRejected(invoke, registry, "log_workout", "minutes", Double.valueOf(1.5),
+                    "whole number");
+            assertRejected(invoke, registry, "log_workout", "minutes",
+                    Long.valueOf(4294967296L), "range");
+            assertEquals("the handler must not have run again", 20, seen.getInt(null));
+        } finally {
+            loader.close();
+        }
+    }
+
     /// A variable segment can only be satisfied by a route segment that accepts any value.
     /// Matching it against a literal passed the build and then produced a URL the declared
     /// route could never match, so navigation silently did nothing on a device.

@@ -204,22 +204,41 @@ public class JavaSEIntentBridge implements IntentBridge {
         }
     }
 
-    /// True when a published document mentions every `{type, id}` pair named in a
-    /// removal request. Crude on purpose -- this is a preview, not an index.
+    /// True when a published document names the `{type, id}` pair a removal request names.
+    ///
+    /// Matched on `uid`, which the serializer writes as `type:id` on both sides, because that
+    /// is the identity the platform indexes use. Matching the bare id made removing `order:42`
+    /// also hide `customer:42` -- the simulator disagreeing with a device about which entry a
+    /// removal refers to, which is exactly the kind of divergence that makes a preview
+    /// worthless for testing.
     private static boolean overlaps(String publishedJson, String refsJson) {
-        int idAt = refsJson.indexOf("\"id\"");
-        if (idAt < 0) {
+        String uid = quotedValue(refsJson, "uid");
+        if (uid == null) {
             return false;
         }
-        int quote = refsJson.indexOf('"', refsJson.indexOf(':', idAt) + 1);
+        return publishedJson.contains("\"" + uid + "\"");
+    }
+
+    /// The string value of a quoted JSON field, or null. Crude on purpose -- this is a preview,
+    /// not an index -- but it reads the field it was asked for rather than the first one it
+    /// finds.
+    private static String quotedValue(String json, String field) {
+        int at = json.indexOf("\"" + field + "\"");
+        if (at < 0) {
+            return null;
+        }
+        int colon = json.indexOf(':', at);
+        if (colon < 0) {
+            return null;
+        }
+        int quote = json.indexOf('"', colon + 1);
         if (quote < 0) {
-            return false;
+            return null;
         }
-        int end = refsJson.indexOf('"', quote + 1);
+        int end = json.indexOf('"', quote + 1);
         if (end < 0) {
-            return false;
+            return null;
         }
-        String id = refsJson.substring(quote + 1, end);
-        return publishedJson.contains("\"" + id + "\"");
+        return json.substring(quote + 1, end);
     }
 }
