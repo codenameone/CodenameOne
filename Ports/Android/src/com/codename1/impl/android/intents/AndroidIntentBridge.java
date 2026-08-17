@@ -252,7 +252,14 @@ public class AndroidIntentBridge implements IntentBridge {
                     if (Display.isInitialized() && Display.getInstance().getCurrent() != null
                             && AndroidImplementation.getActivity() != null) {
                         deliverPendingForegroundRequests();
-                        return;
+                        // Anything parked while that was running keeps this waiter alive.
+                        // Exiting on "I just emptied it" instead loses the request: the parking
+                        // thread saw waiting==true and declined to start a waiter of its own,
+                        // and a moment later there is none.
+                        if (finishIfIdle()) {
+                            return;
+                        }
+                        continue;
                     }
                     if (dropExpired()) {
                         return;
@@ -261,7 +268,6 @@ public class AndroidIntentBridge implements IntentBridge {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-            } finally {
                 synchronized (FOREGROUND) {
                     waiting = false;
                 }
@@ -269,7 +275,21 @@ public class AndroidIntentBridge implements IntentBridge {
         }
     }
 
-    /// Drops requests whose wait has run out. Returns true when nothing is left to wait for.
+    /// Clears `waiting` and reports true only when the queue is genuinely empty, both decided
+    /// under one lock so a request cannot arrive between the two.
+    private static boolean finishIfIdle() {
+        synchronized (FOREGROUND) {
+            if (FOREGROUND.isEmpty()) {
+                waiting = false;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// Drops requests whose wait has run out. Returns true when nothing is left to wait for,
+    /// having cleared `waiting` in the same critical section so a request parked in between
+    /// cannot find a waiter that is about to stop existing.
     private static boolean dropExpired() {
         long now = System.currentTimeMillis();
         synchronized (FOREGROUND) {
@@ -280,7 +300,11 @@ public class AndroidIntentBridge implements IntentBridge {
                     FOREGROUND.remove(i);
                 }
             }
-            return FOREGROUND.isEmpty();
+            if (FOREGROUND.isEmpty()) {
+                waiting = false;
+                return true;
+            }
+            return false;
         }
     }
 

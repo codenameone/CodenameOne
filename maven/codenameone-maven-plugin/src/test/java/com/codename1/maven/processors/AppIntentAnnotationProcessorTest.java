@@ -43,6 +43,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -436,6 +437,92 @@ public class AppIntentAnnotationProcessorTest {
             assertEquals("a legitimate offset still applies",
                     new java.util.Date(1773489600000L - 3600000L),
                     read(invoke, registry, seen, "2026-03-14T12:00:00+01:00"));
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// Double.parseDouble accepts "NaN" and "Infinity", and the string form is the one a
+    /// language model actually writes. A handler that receives NaN cannot recover from it by
+    /// any arithmetic it performs afterwards.
+    @Test
+    public void aRequiredNumberRejectsNonFiniteText() throws Exception {
+        File classes = compile(source(
+                "public static double seen = -1;\n"
+                        + "@AppIntent(value = \"set_ratio\", title = \"Set\")\n"
+                        + "public static IntentResult set(@IntentParam(\"r\") double r) {\n"
+                        + "    seen = r;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+
+            assertRejected(invoke, registry, "set_ratio", "r", "NaN", "finite");
+            assertRejected(invoke, registry, "set_ratio", "r", "Infinity", "finite");
+            assertRejected(invoke, registry, "set_ratio", "r", "-Infinity", "finite");
+            assertRejected(invoke, registry, "set_ratio", "r", Double.valueOf(Double.NaN),
+                    "finite");
+
+            Map<String, Object> ok = new LinkedHashMap<String, Object>();
+            ok.put("r", "2.5");
+            invoke.invoke(registry, "set_ratio", ok, null);
+            assertEquals(2.5d,
+                    loader.loadClass("com.example.Handlers").getField("seen").getDouble(null), 0d);
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// Reading HH:mm and ignoring whatever follows accepted "12:34junk" as a moment in time.
+    @Test
+    public void anIsoTimeMustBeFullyConsumed() throws Exception {
+        File classes = compile(source(
+                "public static java.util.Date seen;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log a workout\")\n"
+                        + "public static IntentResult logWorkout(\n"
+                        + "        @IntentParam(value = \"when\", required = false)\n"
+                        + "        java.util.Date when) {\n"
+                        + "    seen = when;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            assertNull("trailing text after HH:mm", read(invoke, registry, seen,
+                    "2026-03-14T12:34junk"));
+            assertNull("trailing text after seconds", read(invoke, registry, seen,
+                    "2026-03-14T12:34:56junk"));
+            assertNull("a dot with no digits", read(invoke, registry, seen,
+                    "2026-03-14T12:34:56."));
+            assertNull("non-digits in the fraction", read(invoke, registry, seen,
+                    "2026-03-14T12:34:56.1x2"));
+
+            // The forms that are real still parse, so this bounds the grammar rather than
+            // shrinking it.
+            assertNotNull(read(invoke, registry, seen, "2026-03-14T12:34"));
+            assertNotNull(read(invoke, registry, seen, "2026-03-14T12:34:56"));
+            assertNotNull(read(invoke, registry, seen, "2026-03-14T12:34:56.789"));
+            assertNotNull(read(invoke, registry, seen, "2026-03-14T12:34:56.789Z"));
         } finally {
             loader.close();
         }

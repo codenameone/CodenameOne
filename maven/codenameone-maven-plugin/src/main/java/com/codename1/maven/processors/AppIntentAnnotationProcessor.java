@@ -1050,29 +1050,36 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
         sb.append("    private static double requiredDouble(Map<String, Object> p, String k) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        double d;\n");
         sb.append("        if (o instanceof Number) {\n");
-        sb.append("            double d = ((Number) o).doubleValue();\n");
-        sb.append("            if (Double.isNaN(d) || Double.isInfinite(d)) {\n");
-        sb.append("                throw new IllegalArgumentException(o\n");
-        sb.append("                        + \" is not a finite number for \" + k);\n");
-        sb.append("            }\n");
-        sb.append("            return d;\n");
-        sb.append("        }\n");
-        sb.append("        if (o instanceof String) {\n");
-        sb.append("            try { return Double.parseDouble(((String) o).trim()); }\n");
+        sb.append("            d = ((Number) o).doubleValue();\n");
+        sb.append("        } else if (o instanceof String) {\n");
+        sb.append("            try { d = Double.parseDouble(((String) o).trim()); }\n");
         sb.append("            catch (NumberFormatException e) {\n");
         sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
         sb.append("                        + \"\\\" is not a number for \" + k);\n");
         sb.append("            }\n");
+        sb.append("        } else {\n");
+        sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
         sb.append("        }\n");
-        sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        // One check for both branches. Double.parseDouble accepts "NaN" and "Infinity", so
+        // testing only the Number branch left the string form -- the one a model actually
+        // writes -- to reach the handler as a value no arithmetic on it can recover from.
+        sb.append("        if (Double.isNaN(d) || Double.isInfinite(d)) {\n");
+        sb.append("            throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                    + \"\\\" is not a finite number for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return d;\n");
         sb.append("    }\n\n");
 
         // A plain (float) cast on the double silently produces Infinity for anything past
         // Float.MAX_VALUE, so 1e100 would reach the handler as a non-finite float.
         sb.append("    private static float requiredFloat(Map<String, Object> p, String k) {\n");
         sb.append("        double d = requiredDouble(p, k);\n");
-        sb.append("        if (d < -3.4028234663852886E38 || d > 3.4028234663852886E38) {\n");
+        // Belt and braces: requiredDouble already rejects NaN, and if that ever stops being
+        // true both comparisons below are false for it and it would sail through.
+        sb.append("        if (Double.isNaN(d)\n");
+        sb.append("                || d < -3.4028234663852886E38 || d > 3.4028234663852886E38) {\n");
         sb.append("            throw new IllegalArgumentException(d\n");
         sb.append("                    + \" is out of range for \" + k);\n");
         sb.append("        }\n");
@@ -1174,14 +1181,23 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("                        if (z.charAt(0) == '-') { offsetMinutes = -offsetMinutes; }\n");
         sb.append("                    }\n");
         sb.append("                }\n");
+        // The whole time substring has to be consumed. Reading HH:mm and ignoring the rest
+        // accepted "12:34junk" as a valid moment, which is the failure this parser exists to
+        // avoid: a required date that silently becomes a timestamp nobody supplied.
         sb.append("                if (time.length() < 5 || time.charAt(2) != ':') { return null; }\n");
         sb.append("                hour = Integer.parseInt(time.substring(0, 2));\n");
         sb.append("                minute = Integer.parseInt(time.substring(3, 5));\n");
-        sb.append("                if (time.length() >= 8 && time.charAt(5) == ':') {\n");
+        sb.append("                if (time.length() != 5) {\n");
+        sb.append("                    if (time.length() < 8 || time.charAt(5) != ':') { return null; }\n");
         sb.append("                    second = Integer.parseInt(time.substring(6, 8));\n");
-        sb.append("                    if (time.length() > 9 && time.charAt(8) == '.') {\n");
-        sb.append("                        String frac = (time.substring(9) + \"000\").substring(0, 3);\n");
-        sb.append("                        millis = Integer.parseInt(frac);\n");
+        sb.append("                    if (time.length() != 8) {\n");
+        sb.append("                        if (time.length() < 10 || time.charAt(8) != '.') { return null; }\n");
+        sb.append("                        String digits = time.substring(9);\n");
+        sb.append("                        for (int f = 0; f < digits.length(); f++) {\n");
+        sb.append("                            char fc = digits.charAt(f);\n");
+        sb.append("                            if (fc < '0' || fc > '9') { return null; }\n");
+        sb.append("                        }\n");
+        sb.append("                        millis = Integer.parseInt((digits + \"000\").substring(0, 3));\n");
         sb.append("                    }\n");
         sb.append("                }\n");
         sb.append("            }\n");
