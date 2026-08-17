@@ -139,9 +139,14 @@ public final class AccessoryService {
         if (trait == null) {
             return null;
         }
-        for (int i = 0; i < constraints.size(); i++) {
-            TraitConstraint c = constraints.get(i);
-            if (c.getTrait() == trait) {
+        for (TraitConstraint c : constraints) {
+            // Reference equality on purpose: Trait instances are interned
+            // constants, so == is the identity test the class documents and
+            // is what every lookup here relies on. Trait does not override
+            // equals, so .equals() would be the same comparison spelled
+            // longer and would suggest a value comparison that does not
+            // exist.
+            if (c.getTrait() == trait) { //NOPMD CompareObjectsWithEquals
                 return c;
             }
         }
@@ -175,8 +180,8 @@ public final class AccessoryService {
             return Collections.<Trait>emptyList();
         }
         List<Trait> out = new ArrayList<Trait>(constraints.size());
-        for (int i = 0; i < constraints.size(); i++) {
-            out.add(constraints.get(i).getTrait());
+        for (TraitConstraint c : constraints) {
+            out.add(c.getTrait());
         }
         return Collections.unmodifiableList(out);
     }

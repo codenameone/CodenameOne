@@ -4790,6 +4790,14 @@ public class IPhoneBuilder extends Executor {
             // pbxproj and create the bridging header.  This avoids adding
             // Swift-specific settings to pure Objective-C projects.
             File distDir = new File(tmpFile, "dist");
+            if (matterExtensionEnabled) {
+                // Into <MainClass>-src so the schemes script compiles it into
+                // the APP target, the same arrangement the surfaces Swift glue
+                // uses -- and before hasSwiftFiles, which this file is what
+                // makes true for an app whose own natives are pure Objective-C.
+                SmartHomeInjector.injectIosCommissioningShim(this,
+                        new File(distDir, request.getMainClass() + "-src"));
+            }
             if (hasSwiftFiles(distDir)) {
                 File bridgingHeader = new File(distDir, "cn1-Bridging-Header.h");
                 if (!bridgingHeader.exists()) {

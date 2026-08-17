@@ -400,9 +400,9 @@ public final class HomeWire {
             }
             int[] parsed = new int[ordinals.size()];
             int count = 0;
-            for (int i = 0; i < ordinals.size(); i++) {
+            for (String ordinal : ordinals) {
                 try {
-                    parsed[count] = Integer.parseInt(ordinals.get(i));
+                    parsed[count] = Integer.parseInt(ordinal);
                     count++;
                 } catch (NumberFormatException skip) {
                     // One unreadable ordinal must not cost the whole trait.

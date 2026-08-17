@@ -65,6 +65,9 @@ public final class SmartHomeInjector {
     private static final String TEMPLATE =
             "/com/codename1/builders/home/MatterCommissioningBridge.javas";
 
+    private static final String IOS_SHIM =
+            "/com/codename1/builders/home/CN1MatterCommissioning.swifts";
+
     private static final String TARGET_PACKAGE =
             "com" + File.separator + "codename1" + File.separator + "impl"
             + File.separator + "android" + File.separator + "home";
@@ -94,6 +97,43 @@ public final class SmartHomeInjector {
                     "Failed to inject the smart-home bridge", ex);
         }
         return REGISTER_CALL;
+    }
+
+    /**
+     * Copies the MatterSupport commissioning shim into the app target's own
+     * sources.
+     *
+     * <p>It lives here rather than in the port's {@code nativeSources} because
+     * everything there is unpacked into every iOS build. An unused {@code .m}
+     * compiles away behind an {@code #ifdef}; an unused {@code .swift} does
+     * not, and its mere presence is what flips the whole project into Swift
+     * mode. Shipped that way it reached every Codename One app, including the
+     * watch and tv slices, which restage the app's own sources and where
+     * {@code MatterAddDeviceRequest} does not exist.</p>
+     *
+     * <p>Call this before the builder decides whether the project has Swift
+     * sources: this file is what makes that answer true for an app whose own
+     * natives are pure Objective-C, and the bridging header and
+     * {@code SWIFT_VERSION} settings that follow are what let it build.</p>
+     *
+     * @param exec      the running builder, for resource access
+     * @param appSrcDir the app target's source directory, {@code
+     *                  <MainClass>-src}
+     */
+    public static void injectIosCommissioningShim(Executor exec,
+            File appSrcDir) {
+        try {
+            appSrcDir.mkdirs();
+            copyResource(exec, IOS_SHIM,
+                    new File(appSrcDir, "CN1MatterCommissioning.swift"));
+        } catch (Exception ex) {
+            // Loud for the same reason as the Android side: without the shim
+            // the app builds and then reports commissioning unsupported at
+            // runtime, which reads as a device problem.
+            throw new RuntimeException(
+                    "Failed to inject the MatterSupport commissioning shim",
+                    ex);
+        }
     }
 
     private static void copyResource(Executor exec, String resource, File out)

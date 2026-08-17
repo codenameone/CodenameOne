@@ -108,8 +108,8 @@ public final class PendingMap<T> {
         // Outside the monitor: completing a resource runs its callbacks, and
         // a callback that starts another request would otherwise deadlock
         // against this lock.
-        for (int i = 0; i < doomed.size(); i++) {
-            doomed.get(i).error(failure);
+        for (EdtResult<T> result : doomed) {
+            result.error(failure);
         }
     }
 

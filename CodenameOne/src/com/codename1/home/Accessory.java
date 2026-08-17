@@ -252,8 +252,7 @@ public final class Accessory {
         if (serviceId == null) {
             return null;
         }
-        for (int i = 0; i < services.size(); i++) {
-            AccessoryService s = services.get(i);
+        for (AccessoryService s : services) {
             if (serviceId.equals(s.getId())) {
                 return s;
             }
@@ -271,9 +270,9 @@ public final class Accessory {
     ///
     /// the primary service, or `null`
     public AccessoryService getPrimaryService() {
-        for (int i = 0; i < services.size(); i++) {
-            if (services.get(i).isPrimary()) {
-                return services.get(i);
+        for (AccessoryService s : services) {
+            if (s.isPrimary()) {
+                return s;
             }
         }
         return services.isEmpty() ? null : services.get(0);
@@ -297,9 +296,9 @@ public final class Accessory {
             return Collections.<AccessoryService>emptyList();
         }
         List<AccessoryService> out = new ArrayList<AccessoryService>();
-        for (int i = 0; i < services.size(); i++) {
-            if (services.get(i).supports(trait)) {
-                out.add(services.get(i));
+        for (AccessoryService s : services) {
+            if (s.supports(trait)) {
+                out.add(s);
             }
         }
         return Collections.unmodifiableList(out);
@@ -318,8 +317,8 @@ public final class Accessory {
         if (trait == null) {
             return false;
         }
-        for (int i = 0; i < services.size(); i++) {
-            if (services.get(i).supports(trait)) {
+        for (AccessoryService s : services) {
+            if (s.supports(trait)) {
                 return true;
             }
         }

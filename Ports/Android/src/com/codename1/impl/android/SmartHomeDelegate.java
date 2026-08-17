@@ -291,13 +291,15 @@ public interface SmartHomeDelegate {
     ///
     /// - `unitWireIds`: each value's `com.codename1.home.TraitUnit` wire id
     ///
-    /// - `authorizationData`: a door-lock PIN, or `null`. Must not be logged.
+    /// - `authorizationData`: the door-lock PIN for each write, empty where
+    ///   none. Per write rather than per batch, because a batch can hold two
+    ///   locks with different PINs. Must not be logged.
     ///
     /// - `callback`: receives one encoded outcome per write
     void writeTraits(String[] accessoryIds, String[] serviceIds,
             String[] traitIds, int[] kinds, double[] numericValues,
-            String[] stringValues, int[] unitWireIds, String authorizationData,
-            Callback callback);
+            String[] stringValues, int[] unitWireIds,
+            String[] authorizationData, Callback callback);
 
     /// Whether this backend pushes trait changes without being asked.
     ///

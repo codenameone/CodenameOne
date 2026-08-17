@@ -345,9 +345,9 @@ public final class SmartHome {
             return Collections.emptyList();
         }
         List<String> out = new ArrayList<String>(problems.length);
-        for (int i = 0; i < problems.length; i++) {
-            if (problems[i] != null && problems[i].length() > 0) {
-                out.add(problems[i]);
+        for (String problem : problems) {
+            if (problem != null && problem.length() > 0) {
+                out.add(problem);
             }
         }
         return Collections.unmodifiableList(out);
@@ -544,9 +544,9 @@ public final class SmartHome {
     /// `null` when there are none
     public HomeStructure getPrimaryStructure() {
         List<HomeStructure> all = getStructures();
-        for (int i = 0; i < all.size(); i++) {
-            if (all.get(i).isPrimary()) {
-                return all.get(i);
+        for (HomeStructure structure : all) {
+            if (structure.isPrimary()) {
+                return structure;
             }
         }
         return all.isEmpty() ? null : all.get(0);
@@ -565,9 +565,8 @@ public final class SmartHome {
         if (accessoryId == null) {
             return null;
         }
-        List<HomeStructure> all = getStructures();
-        for (int i = 0; i < all.size(); i++) {
-            Accessory a = all.get(i).getAccessory(accessoryId);
+        for (HomeStructure structure : getStructures()) {
+            Accessory a = structure.getAccessory(accessoryId);
             if (a != null) {
                 return a;
             }
@@ -773,7 +772,9 @@ public final class SmartHome {
         double[] numeric = new double[count];
         String[] text = new String[count];
         int[] units = new int[count];
-        String authorization = null;
+        // Per write, not per batch: two locks in one batch can want different
+        // PINs, and a single slot would hand one of them the other's.
+        String[] authorization = new String[count];
         List<TraitWrite> copy = new ArrayList<TraitWrite>(count);
         for (int i = 0; i < count; i++) {
             TraitWrite w = writes.get(i);
@@ -790,9 +791,8 @@ public final class SmartHome {
             numeric[i] = HomeWire.numericOf(v);
             text[i] = v.getKind() == TraitValueKind.STRING ? v.getString() : "";
             units[i] = v.getUnit().getWireId();
-            if (w.getAuthorizationData() != null) {
-                authorization = w.getAuthorizationData();
-            }
+            authorization[i] = w.getAuthorizationData() == null ? ""
+                    : w.getAuthorizationData();
         }
         int id = nextRequestId();
         EdtResult<List<TraitWriteResult>> result = pendingWrites.open(id);
@@ -1460,8 +1460,8 @@ public final class SmartHome {
         }
         List<HomeStructure> out =
                 new ArrayList<HomeStructure>(structureLines.length);
-        for (int i = 0; i < structureLines.length; i++) {
-            String[] f = HomeWire.split(structureLines[i]);
+        for (String line : structureLines) {
+            String[] f = HomeWire.split(line);
             String structureId = HomeWire.field(f, 0);
             if (structureId.length() == 0) {
                 continue;
@@ -1482,8 +1482,8 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
-            HomeRoom room = HomeWire.decodeRoom(lines[i], structureId);
+        for (String line : lines) {
+            HomeRoom room = HomeWire.decodeRoom(line, structureId);
             if (room != null) {
                 out.add(room);
             }
@@ -1497,8 +1497,8 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
-            HomeZone zone = HomeWire.decodeZone(lines[i]);
+        for (String line : lines) {
+            HomeZone zone = HomeWire.decodeZone(line);
             if (zone != null) {
                 out.add(zone);
             }
@@ -1513,12 +1513,12 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
-            String accessoryId = HomeWire.field(HomeWire.split(lines[i]), 0);
+        for (String line : lines) {
+            String accessoryId = HomeWire.field(HomeWire.split(line), 0);
             if (accessoryId.length() == 0) {
                 continue;
             }
-            Accessory accessory = HomeWire.decodeAccessory(lines[i],
+            Accessory accessory = HomeWire.decodeAccessory(line,
                     buildServices(b, accessoryId));
             if (accessory != null) {
                 out.add(accessory);
@@ -1534,12 +1534,12 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
-            String serviceId = HomeWire.field(HomeWire.split(lines[i]), 0);
+        for (String line : lines) {
+            String serviceId = HomeWire.field(HomeWire.split(line), 0);
             if (serviceId.length() == 0) {
                 continue;
             }
-            AccessoryService service = HomeWire.decodeService(lines[i],
+            AccessoryService service = HomeWire.decodeService(line,
                     buildConstraints(b, accessoryId, serviceId));
             if (service != null) {
                 out.add(service);
@@ -1555,9 +1555,9 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
+        for (String line : lines) {
             TraitConstraint constraint =
-                    HomeWire.decodeTraitConstraint(lines[i]);
+                    HomeWire.decodeTraitConstraint(line);
             if (constraint != null) {
                 out.add(constraint);
             }
@@ -1571,12 +1571,12 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
-            String sceneId = HomeWire.field(HomeWire.split(lines[i]), 0);
+        for (String line : lines) {
+            String sceneId = HomeWire.field(HomeWire.split(line), 0);
             if (sceneId.length() == 0) {
                 continue;
             }
-            Scene scene = HomeWire.decodeScene(lines[i], structureId,
+            Scene scene = HomeWire.decodeScene(line, structureId,
                     buildSceneActions(b, structureId, sceneId));
             if (scene != null) {
                 out.add(scene);
@@ -1592,8 +1592,8 @@ public final class SmartHome {
         if (lines == null) {
             return out;
         }
-        for (int i = 0; i < lines.length; i++) {
-            SceneAction action = HomeWire.decodeSceneAction(lines[i]);
+        for (String line : lines) {
+            SceneAction action = HomeWire.decodeSceneAction(line);
             if (action != null) {
                 out.add(action);
             }
@@ -1606,8 +1606,8 @@ public final class SmartHome {
             return Collections.emptyList();
         }
         List<TraitReading> out = new ArrayList<TraitReading>(lines.length);
-        for (int i = 0; i < lines.length; i++) {
-            TraitReading reading = HomeWire.decodeReading(lines[i]);
+        for (String line : lines) {
+            TraitReading reading = HomeWire.decodeReading(line);
             if (reading != null) {
                 out.add(reading);
             }
@@ -1669,8 +1669,8 @@ public final class SmartHome {
 
     private static void dispatchStructure(HomeStructureListener[] listeners,
             HomeStructureEvent event) {
-        for (int i = 0; i < listeners.length; i++) {
-            listeners[i].structureChanged(event);
+        for (HomeStructureListener listener : listeners) {
+            listener.structureChanged(event);
         }
     }
 

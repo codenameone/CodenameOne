@@ -80,6 +80,10 @@ static NSMutableDictionary *cn1homeUndelivered = nil;
 // homeManagerDidUpdateHomes:. Zero when nothing is waiting.
 static JAVA_INT cn1homePendingStart = 0;
 
+// The request id of a requestAuthorization() that is waiting for the user to
+// answer the system prompt. Zero when nothing is waiting.
+static JAVA_INT cn1homePendingAuth = 0;
+
 static BOOL cn1homeHomesLoaded = NO;
 
 // ---------------------------------------------------------------------
@@ -1113,6 +1117,55 @@ static void cn1homeNotifyStructure(int kind, NSString *structureId,
                            : fromNSString(getThreadLocalData(), accessoryId));
 }
 
+/// The authorization status as the Java side names it.
+///
+/// Split out of the native accessor so the delegate can reach it: the delegate
+/// is what turns an asynchronous prompt into an answer, and it is defined
+/// above the accessor.
+static JAVA_INT cn1homeAuthStatus(void) {
+    if (cn1homeManager == nil) {
+        return CN1_HOME_AUTH_UNKNOWN;
+    }
+    HMHomeManagerAuthorizationStatus status =
+            [cn1homeManager authorizationStatus];
+    if ((status & HMHomeManagerAuthorizationStatusRestricted) != 0) {
+        return CN1_HOME_AUTH_RESTRICTED;
+    }
+    if ((status & HMHomeManagerAuthorizationStatusAuthorized) != 0) {
+        return CN1_HOME_AUTH_AUTHORIZED;
+    }
+    if ((status & HMHomeManagerAuthorizationStatusDetermined) != 0) {
+        return CN1_HOME_AUTH_DENIED;
+    }
+    return CN1_HOME_AUTH_NOT_DETERMINED;
+}
+
+/// Answers a waiting requestAuthorization(), if the answer is in.
+///
+/// HomeKit has no request-and-callback API: creating the manager is what
+/// prompts, and the prompt is answered by the user at their leisure. Reading
+/// authorizationStatus straight after creating the manager therefore reports
+/// NOT_DETERMINED while the sheet is still on screen -- which is not what the
+/// caller was promised.
+///
+/// So the answer comes from the delegate instead. Determined is the bit that
+/// says the user has decided; homeManagerDidUpdateHomes: passes `force`
+/// because the database only finishes loading once that decision is made, and
+/// on a build too old for the status bits it is the only signal there is.
+static void cn1homeResolvePendingAuth(BOOL force) {
+    JAVA_INT pending = cn1homePendingAuth;
+    if (pending == 0) {
+        return;
+    }
+    JAVA_INT status = cn1homeAuthStatus();
+    if (!force && status == CN1_HOME_AUTH_NOT_DETERMINED) {
+        return;
+    }
+    cn1homePendingAuth = 0;
+    com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
+        getThreadLocalData(), pending, status, JAVA_NULL);
+}
+
 /// Re-attaches this bridge as the delegate of every accessory in every home.
 ///
 /// Has to run after every graph change, not just at start: an accessory added
@@ -1134,6 +1187,9 @@ static void cn1homeAttachDelegates(void) {
     cn1homeHomesLoaded = YES;
     cn1homeRebuildSnapshot();
     cn1homeAttachDelegates();
+    // The database has loaded, which HomeKit does not do until the user has
+    // answered the prompt -- so whatever the status says now is final.
+    cn1homeResolvePendingAuth(YES);
     JAVA_INT pending = cn1homePendingStart;
     if (pending != 0) {
         cn1homePendingStart = 0;
@@ -1144,6 +1200,13 @@ static void cn1homeAttachDelegates(void) {
         return;
     }
     cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil, nil);
+}
+
+- (void)homeManager:(HMHomeManager *)manager
+        didUpdateAuthorizationStatus:(HMHomeManagerAuthorizationStatus)status {
+    // Usually the first of the two to fire, and the one that carries a denial:
+    // a user who refuses gets no database load worth waiting for.
+    cn1homeResolvePendingAuth(NO);
 }
 
 - (void)homeManager:(HMHomeManager *)manager didAddHome:(HMHome *)home {
@@ -1318,20 +1381,7 @@ com_codename1_impl_ios_IOSNative_homeAuthorizationStatus___R_int(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     cn1homeInit();
-    JAVA_INT result = CN1_HOME_AUTH_UNKNOWN;
-    if (cn1homeManager != nil) {
-        HMHomeManagerAuthorizationStatus status =
-                [cn1homeManager authorizationStatus];
-        if ((status & HMHomeManagerAuthorizationStatusRestricted) != 0) {
-            result = CN1_HOME_AUTH_RESTRICTED;
-        } else if ((status & HMHomeManagerAuthorizationStatusAuthorized) != 0) {
-            result = CN1_HOME_AUTH_AUTHORIZED;
-        } else if ((status & HMHomeManagerAuthorizationStatusDetermined) != 0) {
-            result = CN1_HOME_AUTH_DENIED;
-        } else {
-            result = CN1_HOME_AUTH_NOT_DETERMINED;
-        }
-    }
+    JAVA_INT result = cn1homeAuthStatus();
     POOL_END();
     return result;
 }
@@ -1398,6 +1448,7 @@ void com_codename1_impl_ios_IOSNative_homeStop__(
         }
         cn1homeHomesLoaded = NO;
         cn1homePendingStart = 0;
+        cn1homePendingAuth = 0;
         [cn1homeWatches removeAllObjects];
         [cn1homeUndelivered removeAllObjects];
     });
@@ -1408,20 +1459,38 @@ void com_codename1_impl_ios_IOSNative_homeRequestAuthorization___int(
     cn1homeInit();
     JAVA_INT rid = requestId;
     cn1homeOnMain(^{
-        // HomeKit has no explicit request call: creating the manager and
-        // touching homes is what prompts, and the answer arrives through the
-        // authorization status afterwards. So this is start() with a
-        // different callback, which is honest rather than convenient -- there
-        // is nothing else to do.
+        // HomeKit has no explicit request call: creating the manager is what
+        // prompts. The prompt is asynchronous, so the status read straight
+        // afterwards is still NOT_DETERMINED with the sheet on screen -- the
+        // answer has to come from the delegate.
+        if (cn1homeManager != nil) {
+            JAVA_INT status = cn1homeAuthStatus();
+            if (status != CN1_HOME_AUTH_NOT_DETERMINED) {
+                // Already answered once. No second prompt is coming, so
+                // waiting for a delegate callback would wait forever.
+                com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
+                    getThreadLocalData(), rid, status, JAVA_NULL);
+                return;
+            }
+        }
+        if (cn1homePendingAuth != 0) {
+            // A second request while the first is still on screen. Answered
+            // as UNKNOWN rather than left hanging: only one of the two can be
+            // held, and a caller waiting forever is the worse failure.
+            com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
+                getThreadLocalData(), rid, CN1_HOME_AUTH_UNKNOWN, JAVA_NULL);
+            return;
+        }
+        cn1homePendingAuth = rid;
         if (cn1homeManager == nil) {
             cn1homeManager = [[HMHomeManager alloc] init];
             [cn1homeManager setDelegate:cn1homeDelegate];
+        } else {
+            // The manager exists but nobody has decided yet, which means the
+            // prompt is either open or never appeared. Re-check now in case
+            // the delegate callback landed before this request did.
+            cn1homeResolvePendingAuth(NO);
         }
-        JAVA_INT status =
-                com_codename1_impl_ios_IOSNative_homeAuthorizationStatus___R_int(
-                    getThreadLocalData(), JAVA_NULL);
-        com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
-            getThreadLocalData(), rid, status, JAVA_NULL);
     });
 }
 
@@ -1666,6 +1735,10 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
         JAVA_OBJECT accessoryIds, JAVA_OBJECT serviceIds, JAVA_OBJECT traitIds,
         JAVA_OBJECT kinds, JAVA_OBJECT numericValues, JAVA_OBJECT stringValues,
         JAVA_OBJECT unitWireIds, JAVA_OBJECT authorizationData) {
+    // authorizationData is deliberately unread. It carries one door-lock
+    // credential per write for the Matter backends; HomeKit has no per-write
+    // credential at all -- iOS asks the user itself when a lock wants one --
+    // so there is nowhere here to put it.
     cn1homeInit();
     JAVA_INT rid = requestId;
     NSArray *accessories = [cn1homeSplit(

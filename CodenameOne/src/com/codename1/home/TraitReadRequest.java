@@ -50,10 +50,6 @@ public final class TraitReadRequest {
     private final List<Trait> traits = new ArrayList<Trait>();
     private boolean allowCached = true;
 
-    /// Creates an empty request.
-    public TraitReadRequest() {
-    }
-
     /// Adds one trait on one service.
     ///
     /// #### Parameters
@@ -146,10 +142,9 @@ public final class TraitReadRequest {
         if (service == null) {
             throw new IllegalArgumentException("service is required");
         }
-        List<TraitConstraint> cs = service.getConstraints();
-        for (int i = 0; i < cs.size(); i++) {
-            if (cs.get(i).isReadable()) {
-                add(accessory.getId(), service.getId(), cs.get(i).getTrait());
+        for (TraitConstraint c : service.getConstraints()) {
+            if (c.isReadable()) {
+                add(accessory.getId(), service.getId(), c.getTrait());
             }
         }
         return this;

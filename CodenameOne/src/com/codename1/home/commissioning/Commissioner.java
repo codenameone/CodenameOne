@@ -24,6 +24,7 @@ package com.codename1.home.commissioning;
 
 import com.codename1.home.HomeError;
 import com.codename1.home.HomeException;
+import com.codename1.impl.async.EdtResult;
 import com.codename1.impl.home.CommissioningGateway;
 import com.codename1.util.AsyncResource;
 
@@ -151,10 +152,16 @@ public final class Commissioner {
         return gateway != null && gateway.openEcosystemApp();
     }
 
-    private static AsyncResource<CommissioningResult> failed(HomeError error,
+    /// An `EdtResult` rather than a plain `AsyncResource`, because this
+    /// method's contract is that the answer arrives on the EDT and a plain
+    /// already-failed resource calls back inline on whichever thread attached
+    /// the listener. The unsupported path is exactly the one a caller is most
+    /// likely to hit from a worker thread, and handing it a callback off the
+    /// EDT would let ordinary error handling mutate components off it.
+    private static EdtResult<CommissioningResult> failed(HomeError error,
             String message) {
-        AsyncResource<CommissioningResult> r =
-                new AsyncResource<CommissioningResult>();
+        EdtResult<CommissioningResult> r =
+                new EdtResult<CommissioningResult>();
         r.error(new HomeException(error, message));
         return r;
     }

@@ -1284,8 +1284,9 @@ public final class IOSNative {
 
     /**
      * Writes characteristics. All eight lists are newline-joined and positionally aligned;
-     * {@code authorizationData} is a door-lock credential HomeKit ignores, carried because the SPI
-     * is shared with Matter. Answers via IOSHomeCallbacks.writeResults.
+     * {@code authorizationData} carries a door-lock credential per write, which HomeKit ignores and
+     * which is carried because the SPI is shared with Matter. Answers via
+     * IOSHomeCallbacks.writeResults.
      */
     native void homeWriteTraits(int requestId, String accessoryIds, String serviceIds,
             String traitIds, String kinds, String numericValues, String stringValues,

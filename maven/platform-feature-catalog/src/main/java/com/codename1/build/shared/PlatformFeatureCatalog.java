@@ -416,12 +416,19 @@ public final class PlatformFeatureCatalog {
         //    it instead, gated on the scanner having seen health classes
         //    OUTSIDE the sensors subpackage.
         //
-        // The HealthKit framework linkage and the CN1_INCLUDE_HEALTH define
-        // flip likewise happen in IPhoneBuilder, gated the same way;
-        // iosFrameworks here is documentation-only, matching the bluetooth
-        // entry above.
+        //  - and NO iosFrameworks, for the same startsWith reason. The
+        //    frameworks named here are linked for real -- IPhoneBuilder
+        //    appends every matched entry's list to ios.add_libs -- so
+        //    naming HealthKit would link it into an app that only reads a
+        //    heart-rate strap, and Apple rejects a binary that links
+        //    HealthKit without the health purpose strings a sensor-only app
+        //    has no reason to declare. IPhoneBuilder links it under the
+        //    usesHealthStore gate instead, which is the one that knows the
+        //    difference.
+        //
+        // The CN1_INCLUDE_HEALTH define flip likewise happens in
+        // IPhoneBuilder, gated the same way.
         e.add(new Entry("com/codename1/health/")
-                .iosFrameworks("HealthKit")
                 .description("Cross-platform health data (samples, aggregates, background observers, workouts)"));
 
         // The health sensor layer talks to standard GATT devices over
@@ -469,8 +476,12 @@ public final class PlatformFeatureCatalog {
         //    accessories from one that only asks whether HomeKit exists.
         //    iosFrameworks here is documentation, matching the bluetooth and
         //    health entries above.
+        // No iosFrameworks: IPhoneBuilder links HomeKit itself, under the
+        // same scan, and MatterSupport under a gate this table cannot
+        // express -- the ios.home.commissioning=false opt-out. A framework
+        // named here is linked for real, so a second copy of the decision
+        // here would link MatterSupport into a build that opted out.
         e.add(new Entry("com/codename1/home/")
-                .iosFrameworks("HomeKit")
                 .androidGradle("com.google.android.gms:play-services-home:"
                         + "16.0.0-beta1")
                 .androidMinimumSdk(21)
@@ -489,7 +500,6 @@ public final class PlatformFeatureCatalog {
         // The deployment floor is real: MatterSupport arrived in iOS 16.1 and
         // linking it below that fails at launch rather than at build time.
         e.add(new Entry("com/codename1/home/commissioning/")
-                .iosFrameworks("MatterSupport")
                 .iosMinimumDeploymentTarget("16.1")
                 .description("Matter accessory commissioning"));
 

@@ -203,12 +203,11 @@ final class IOSHomeBridge implements HomeBridge {
     public void writeTraits(int requestId, String[] accessoryIds,
             String[] serviceIds, String[] traitIds, int[] kinds,
             double[] numericValues, String[] stringValues, int[] unitWireIds,
-            String authorizationData) {
+            String[] authorizationData) {
         nativeInstance.homeWriteTraits(requestId, join(accessoryIds),
                 join(serviceIds), join(traitIds), joinInts(kinds),
                 joinDoubles(numericValues), join(stringValues),
-                joinInts(unitWireIds),
-                authorizationData == null ? "" : authorizationData);
+                joinInts(unitWireIds), join(authorizationData));
     }
 
     // ------------------------------------------------------------------

@@ -114,7 +114,7 @@ Two things about this flow.
 
 === Build hints
 
-[source,properties]
+[source]
 ----
 # iOS: required as soon as your app touches accessories. The build FAILS
 # without it, deliberately -- iOS terminates an app that reaches HomeKit with

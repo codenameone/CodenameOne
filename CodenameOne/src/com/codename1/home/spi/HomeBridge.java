@@ -364,14 +364,15 @@ public interface HomeBridge {
     /// - `unitWireIds`: `com.codename1.home.TraitUnit#getWireId()` for each
     ///   value
     ///
-    /// - `authorizationData`: a credential the accessory needs -- a door-lock
-    ///   PIN -- or `null`. Applies to the whole batch, because the one
-    ///   platform that takes it takes it per operation and a batch is one
-    ///   operation. Must not be logged.
+    /// - `authorizationData`: the credential each write needs -- a door-lock
+    ///   PIN -- empty where none. Positionally aligned like every other array
+    ///   rather than one value for the batch: a batch can hold two locks with
+    ///   different PINs, and a single slot would silently send one lock the
+    ///   other's credential. Must not be logged.
     void writeTraits(int requestId, String[] accessoryIds, String[] serviceIds,
             String[] traitIds, int[] kinds, double[] numericValues,
             String[] stringValues, int[] unitWireIds,
-            String authorizationData);
+            String[] authorizationData);
 
     // ------------------------------------------------------------------
     // subscriptions

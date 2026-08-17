@@ -251,7 +251,7 @@ final class AndroidHomeBridge implements HomeBridge {
     public void writeTraits(int requestId, String[] accessoryIds,
             String[] serviceIds, String[] traitIds, int[] kinds,
             double[] numericValues, String[] stringValues, int[] unitWireIds,
-            String authorizationData) {
+            String[] authorizationData) {
         SmartHomeDelegate d = delegate();
         if (d == null) {
             SmartHome.deliverWriteResults(requestId, NOTHING, unsupported());

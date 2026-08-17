@@ -283,8 +283,8 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
     @Override
     public void writeTraits(String[] accessoryIds, String[] serviceIds,
             String[] traitIds, int[] kinds, double[] numericValues,
-            String[] stringValues, int[] unitWireIds, String authorizationData,
-            Callback callback) {
+            String[] stringValues, int[] unitWireIds,
+            String[] authorizationData, Callback callback) {
         callback.onError("NOT_SUPPORTED", graphUnavailable());
     }
 

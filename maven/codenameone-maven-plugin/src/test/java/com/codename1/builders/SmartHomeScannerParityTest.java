@@ -148,27 +148,56 @@ public class SmartHomeScannerParityTest {
     }
 
     /**
-     * And an app that does mention it gets HomeKit, while one that only reads
-     * its lights does not get MatterSupport.
+     * The catalog names no iOS framework for smart home, deliberately.
+     *
+     * <p>A framework named there is linked for real -- IPhoneBuilder appends
+     * every matched entry's list to ios.add_libs -- and the catalog matches
+     * on a prefix, which cannot see the one thing that decides whether
+     * MatterSupport belongs in a build: the ios.home.commissioning=false
+     * opt-out. The builder links both frameworks under gates that can, so a
+     * second copy of the decision here could only ever disagree with it.</p>
      */
     @Test
-    public void theCatalogSeparatesHomeKitFromMatterSupport() {
+    public void theCatalogLeavesIosFrameworkLinkageToTheBuilder() {
         PlatformFeatureCatalog.Accumulator reader =
                 new PlatformFeatureCatalog.Accumulator();
         reader.consume("com/codename1/home/SmartHome");
-        assertTrue(reader.iosFrameworks().contains("HomeKit"),
+        assertTrue(reader.iosFrameworks().isEmpty(),
                 reader.iosFrameworks().toString());
-        assertFalse(reader.iosFrameworks().contains("MatterSupport"),
-                "an app that never commissions must not link MatterSupport,"
-                        + " which drags an entire extension target with it: "
-                        + reader.iosFrameworks());
 
         PlatformFeatureCatalog.Accumulator commissioner =
                 new PlatformFeatureCatalog.Accumulator();
         commissioner.consume("com/codename1/home/commissioning/Commissioner");
-        assertTrue(commissioner.iosFrameworks().contains("MatterSupport"),
+        assertTrue(commissioner.iosFrameworks().isEmpty(),
                 commissioner.iosFrameworks().toString());
+        assertFalse(commissioner.hits().isEmpty(),
+                "the entry itself must still match, so the deployment-target"
+                        + " floor survives: " + commissioner.hits());
     }
+
+    /**
+     * The gate that does the linking, checked where it lives. HomeKit hangs
+     * off the plain smart-home scan; MatterSupport hangs off
+     * matterExtensionEnabled, which is what honours the opt-out.
+     */
+    @Test
+    public void theBuilderLinksEachFrameworkUnderItsOwnGate()
+            throws Exception {
+        String src = source("IPhoneBuilder");
+        assertGatedBy(src, "String hk = \"HomeKit.framework\"",
+                "if (usesSmartHome)");
+        assertGatedBy(src, "String ms = \"MatterSupport.framework\"",
+                "if (matterExtensionEnabled)");
+    }
+
+    private static void assertGatedBy(String src, String needle, String gate) {
+        int at = src.indexOf(needle);
+        assertTrue(at > 0, "expected the linkage " + needle);
+        String before = src.substring(Math.max(0, at - 400), at);
+        assertTrue(before.contains(gate),
+                needle + " must be linked under " + gate + ", got: " + before);
+    }
+
 
     /**
      * Play services home needs API 21, and letting Gradle's manifest merger

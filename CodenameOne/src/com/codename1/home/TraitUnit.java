@@ -205,10 +205,9 @@ public enum TraitUnit {
     ///
     /// the matching unit, or `null`
     public static TraitUnit forWireId(int wireId) {
-        TraitUnit[] all = values();
-        for (int i = 0; i < all.length; i++) {
-            if (all[i].wireId == wireId) {
-                return all[i];
+        for (TraitUnit candidate : values()) {
+            if (candidate.wireId == wireId) {
+                return candidate;
             }
         }
         return null;

@@ -50,10 +50,6 @@ public final class SubscriptionRequest {
     private int minIntervalMillis = DEFAULT_MIN_INTERVAL_MILLIS;
     private boolean deliverInitialValues;
 
-    /// Creates an empty request.
-    public SubscriptionRequest() {
-    }
-
     /// Watches one trait on one service.
     ///
     /// #### Parameters

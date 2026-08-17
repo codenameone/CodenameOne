@@ -176,8 +176,8 @@ public final class TraitConstraint {
             ordinals = Collections.<Integer>emptyList();
         } else {
             List<Integer> copy = new ArrayList<Integer>(validOrdinals.length);
-            for (int i = 0; i < validOrdinals.length; i++) {
-                copy.add(Integer.valueOf(validOrdinals[i]));
+            for (int ordinal : validOrdinals) {
+                copy.add(Integer.valueOf(ordinal));
             }
             ordinals = Collections.unmodifiableList(copy);
         }

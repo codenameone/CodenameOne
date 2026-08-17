@@ -53,10 +53,6 @@ public final class CommissioningRequest {
     private String suggestedName;
     private int timeoutMillis;
 
-    /// Creates an empty request.
-    public CommissioningRequest() {
-    }
-
     /// The accessory's onboarding payload, from a scanned QR code or a typed
     /// manual code.
     ///

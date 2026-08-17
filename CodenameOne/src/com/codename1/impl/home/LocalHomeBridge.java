@@ -83,6 +83,11 @@ import java.util.Map;
 /// an app's `PERMISSION_REQUIRED` and `COMMISSIONING_ONLY` branches are
 /// reachable on a desktop, which is the only place most people will ever
 /// exercise them.
+///
+/// A new instance is empty. Furnish it with
+/// [#addStructure(java.lang.String, java.lang.String, boolean)] and its
+/// friends, or with [SyntheticHome#populate(LocalHomeBridge)] for the
+/// deliberately awkward house the simulator uses.
 public class LocalHomeBridge implements HomeBridge {
 
     /// How long an operation takes to answer, in milliseconds.
@@ -105,12 +110,6 @@ public class LocalHomeBridge implements HomeBridge {
     private HomeAuthorizationStatus authorization =
             HomeAuthorizationStatus.AUTHORIZED;
     private int nextCommissionedIndex = 1;
-
-    /// Creates an empty home. Call [#addStructure(java.lang.String,
-    /// java.lang.String, boolean)] and its friends, or use
-    /// [SyntheticHome#populate(LocalHomeBridge)] for a furnished one.
-    public LocalHomeBridge() {
-    }
 
     // ------------------------------------------------------------------
     // model building, for the simulator and for tests
@@ -483,8 +482,8 @@ public class LocalHomeBridge implements HomeBridge {
         List<String> out = new ArrayList<String>();
         for (Structure s : structures.values()) {
             out.add(HomeWire.join(new String[] {s.id, s.name,
-                HomeWire.flag(s.primary), HomeWire.flag(true),
-                HomeWire.flag(true)}));
+                    HomeWire.flag(s.primary), HomeWire.flag(true),
+                    HomeWire.flag(true)}));
         }
         return toArray(out);
     }
@@ -496,7 +495,7 @@ public class LocalHomeBridge implements HomeBridge {
         if (s != null) {
             for (Map.Entry<String, String> e : s.rooms.entrySet()) {
                 out.add(HomeWire.join(new String[] {e.getKey(),
-                    e.getValue()}));
+                        e.getValue()}));
             }
         }
         return toArray(out);
@@ -523,10 +522,10 @@ public class LocalHomeBridge implements HomeBridge {
                 continue;
             }
             out.add(HomeWire.join(new String[] {a.id, a.name,
-                a.roomId == null ? "" : a.roomId,
-                Integer.toString(a.categoryOrdinal), "Codename One",
-                "Simulated", "1.0", HomeWire.flag(a.reachable),
-                a.bridgeAccessoryId == null ? "" : a.bridgeAccessoryId}));
+                    a.roomId == null ? "" : a.roomId,
+                    Integer.toString(a.categoryOrdinal), "Codename One",
+                    "Simulated", "1.0", HomeWire.flag(a.reachable),
+                    a.bridgeAccessoryId == null ? "" : a.bridgeAccessoryId}));
         }
         return toArray(out);
     }
@@ -538,8 +537,8 @@ public class LocalHomeBridge implements HomeBridge {
         if (a != null) {
             for (Service s : a.services.values()) {
                 out.add(HomeWire.join(new String[] {s.id, s.name,
-                    Integer.toString(s.typeOrdinal),
-                    HomeWire.flag(s.primary)}));
+                        Integer.toString(s.typeOrdinal),
+                        HomeWire.flag(s.primary)}));
             }
         }
         return toArray(out);
@@ -556,11 +555,13 @@ public class LocalHomeBridge implements HomeBridge {
         for (int i = 0; i < s.constraints.size(); i++) {
             TraitConstraint c = s.constraints.get(i);
             out.add(HomeWire.join(new String[] {c.getTrait().getId(),
-                HomeWire.flag(c.isReadable()), HomeWire.flag(c.isWritable()),
-                HomeWire.flag(c.notifiesOnChange()),
-                HomeWire.flag(c.hasRange()), Double.toString(c.getMinimum()),
-                Double.toString(c.getMaximum()),
-                Double.toString(c.getStep()), ""}));
+                    HomeWire.flag(c.isReadable()),
+                    HomeWire.flag(c.isWritable()),
+                    HomeWire.flag(c.notifiesOnChange()),
+                    HomeWire.flag(c.hasRange()),
+                    Double.toString(c.getMinimum()),
+                    Double.toString(c.getMaximum()),
+                    Double.toString(c.getStep()), ""}));
         }
         return toArray(out);
     }
@@ -637,7 +638,7 @@ public class LocalHomeBridge implements HomeBridge {
     public void writeTraits(int requestId, String[] accessoryIds,
             String[] serviceIds, String[] traitIds, int[] kinds,
             double[] numericValues, String[] stringValues, int[] unitWireIds,
-            String authorizationData) {
+            String[] authorizationData) {
         String[] lines = new String[traitIds.length];
         List<TraitReading> changed = new ArrayList<TraitReading>();
         synchronized (this) {
@@ -772,8 +773,8 @@ public class LocalHomeBridge implements HomeBridge {
         if (s != null) {
             for (SceneRecord scene : s.scenes.values()) {
                 out.add(HomeWire.join(new String[] {scene.id, scene.name,
-                    Integer.toString(scene.typeOrdinal),
-                    HomeWire.flag(true)}));
+                        Integer.toString(scene.typeOrdinal),
+                        HomeWire.flag(true)}));
             }
         }
         return toArray(out);
@@ -791,12 +792,12 @@ public class LocalHomeBridge implements HomeBridge {
         for (int i = 0; i < scene.actions.size(); i++) {
             ActionRecord a = scene.actions.get(i);
             out.add(HomeWire.join(new String[] {a.accessoryId, a.serviceId,
-                a.trait.getId(),
-                Integer.toString(a.value.getKind().ordinal()),
-                Double.toString(HomeWire.numericOf(a.value)),
-                a.value.getKind() == TraitValueKind.STRING
-                        ? a.value.getString() : "",
-                Integer.toString(a.value.getUnit().getWireId())}));
+                    a.trait.getId(),
+                    Integer.toString(a.value.getKind().ordinal()),
+                    Double.toString(HomeWire.numericOf(a.value)),
+                    a.value.getKind() == TraitValueKind.STRING
+                            ? a.value.getString() : "",
+                    Integer.toString(a.value.getUnit().getWireId())}));
         }
         return toArray(out);
     }
@@ -964,8 +965,7 @@ public class LocalHomeBridge implements HomeBridge {
         synchronized (this) {
             for (Map.Entry<String, Watch> e : watches.entrySet()) {
                 List<TraitReading> forThisWatch = null;
-                for (int i = 0; i < changed.size(); i++) {
-                    TraitReading r = changed.get(i);
+                for (TraitReading r : changed) {
                     if (!e.getValue().keys.contains(key(r.getAccessoryId(),
                             r.getServiceId(), r.getTrait().getId()))) {
                         continue;
@@ -990,7 +990,10 @@ public class LocalHomeBridge implements HomeBridge {
 
     private static String key(String accessoryId, String serviceId,
             String traitId) {
-        return accessoryId + " " + serviceId + " " + traitId;
+        // "\0" rather than a literal NUL byte: the character is the right
+        // separator -- it cannot occur in a platform identifier -- but written
+        // raw it makes this file binary to grep and diff.
+        return accessoryId + "\0" + serviceId + "\0" + traitId;
     }
 
     private static String[] toArray(List<String> list) {
@@ -1076,9 +1079,13 @@ public class LocalHomeBridge implements HomeBridge {
         }
 
         TraitConstraint constraintFor(Trait trait) {
-            for (int i = 0; i < constraints.size(); i++) {
-                if (constraints.get(i).getTrait() == trait) {
-                    return constraints.get(i);
+            for (TraitConstraint c : constraints) {
+                // Reference equality on purpose: Trait instances are
+                // interned constants, so == is the identity test the class
+                // documents. Trait does not override equals, so .equals()
+                // would be the same comparison spelled longer.
+                if (c.getTrait() == trait) { //NOPMD CompareObjectsWithEquals
+                    return c;
                 }
             }
             return null;

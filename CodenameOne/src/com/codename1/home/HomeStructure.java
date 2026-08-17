@@ -237,9 +237,9 @@ public final class HomeStructure {
         if (roomId == null) {
             return null;
         }
-        for (int i = 0; i < rooms.size(); i++) {
-            if (roomId.equals(rooms.get(i).getId())) {
-                return rooms.get(i);
+        for (HomeRoom room : rooms) {
+            if (roomId.equals(room.getId())) {
+                return room;
             }
         }
         return null;
@@ -258,9 +258,9 @@ public final class HomeStructure {
         if (accessoryId == null) {
             return null;
         }
-        for (int i = 0; i < accessories.size(); i++) {
-            if (accessoryId.equals(accessories.get(i).getId())) {
-                return accessories.get(i);
+        for (Accessory a : accessories) {
+            if (accessoryId.equals(a.getId())) {
+                return a;
             }
         }
         return null;
@@ -279,8 +279,7 @@ public final class HomeStructure {
     /// an immutable list, possibly empty
     public List<Accessory> getAccessoriesInRoom(String roomId) {
         List<Accessory> out = new ArrayList<Accessory>();
-        for (int i = 0; i < accessories.size(); i++) {
-            Accessory a = accessories.get(i);
+        for (Accessory a : accessories) {
             if (roomId == null ? a.getRoomId() == null
                     : roomId.equals(a.getRoomId())) {
                 out.add(a);
@@ -303,9 +302,9 @@ public final class HomeStructure {
             return Collections.<Accessory>emptyList();
         }
         List<Accessory> out = new ArrayList<Accessory>();
-        for (int i = 0; i < accessories.size(); i++) {
-            if (accessories.get(i).supports(trait)) {
-                out.add(accessories.get(i));
+        for (Accessory a : accessories) {
+            if (a.supports(trait)) {
+                out.add(a);
             }
         }
         return Collections.unmodifiableList(out);

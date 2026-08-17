@@ -145,6 +145,16 @@ public final class SubscriptionState {
             // Not coalesced and not delayed. The point of the initial
             // delivery is to fill a screen, and holding it for the window
             // would leave that screen blank for no reason.
+            //
+            // The disposed check matters most here: the read that produces
+            // the initial values is in flight while the caller is free to
+            // stop(), and a form torn down in between would otherwise still
+            // be handed a batch after the subscription said it had stopped.
+            synchronized (this) {
+                if (disposed) {
+                    return;
+                }
+            }
             dispatch(new TraitChangeBatch(id, readings, true, false));
             return;
         }
@@ -153,8 +163,7 @@ public final class SubscriptionState {
             if (disposed) {
                 return;
             }
-            for (int i = 0; i < readings.size(); i++) {
-                TraitReading r = readings.get(i);
+            for (TraitReading r : readings) {
                 pending.put(keyOf(r), r);
             }
             if (windowMillis <= 0) {
@@ -229,10 +238,17 @@ public final class SubscriptionState {
 
     private void dispatch(final TraitChangeBatch batch) {
         if (Display.isInitialized() && !Display.getInstance().isEdt()) {
-            Display.getInstance().callSerially(new Deliver(listener, batch));
+            Display.getInstance().callSerially(new Deliver(this, batch));
+            return;
+        }
+        if (isDisposed()) {
             return;
         }
         listener.traitsChanged(batch);
+    }
+
+    private synchronized boolean isDisposed() {
+        return disposed;
     }
 
     /// Stops delivering and releases this subscription's share of the timer.
@@ -275,19 +291,27 @@ public final class SubscriptionState {
     }
 
     /// The EDT hop for one batch.
+    ///
+    /// It re-checks `disposed` when it runs rather than trusting the check
+    /// made when it was queued: the queue is where a `stop()` on the EDT most
+    /// easily overtakes a batch produced on a platform thread, and delivering
+    /// to a form that has already been torn down is what stopping is for.
     private static final class Deliver implements Runnable {
 
-        private final HomeChangeListener listener;
+        private final SubscriptionState state;
         private final TraitChangeBatch batch;
 
-        Deliver(HomeChangeListener listener, TraitChangeBatch batch) {
-            this.listener = listener;
+        Deliver(SubscriptionState state, TraitChangeBatch batch) {
+            this.state = state;
             this.batch = batch;
         }
 
         @Override
         public void run() {
-            listener.traitsChanged(batch);
+            if (state.isDisposed()) {
+                return;
+            }
+            state.listener.traitsChanged(batch);
         }
     }
 }

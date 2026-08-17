@@ -30,16 +30,30 @@
 //  Objective-C interface to it -- so the rest of the smart-home bridge, which
 //  is Objective-C, cannot reach it directly.
 //
-//  The builder adds this source, the MatterSupport framework, the
+//  It is NOT in the port's nativeSources, and that is deliberate. Every file
+//  there is unpacked into every iOS build; a .m can be compiled away with an
+//  #ifdef, but a .swift cannot, and its mere presence is what makes the
+//  builder turn Swift compilation on for the whole project. Shipping it that
+//  way put a Swift file -- and this framework -- into every Codename One app
+//  ever built, including the watchOS and tvOS slices where
+//  MatterAddDeviceRequest does not exist at all.
+//
+//  So the builder copies it in, alongside the MatterSupport framework, the
 //  com.apple.developer.matter.allow-setup-payload entitlement, an app group
-//  and a generated app-extension target only for apps that reference
+//  and the generated app-extension target, only for apps that reference
 //  com.codename1.home.commissioning. An app that only reads its lights carries
-//  none of it.
+//  none of it. The same arrangement the surfaces Swift glue uses.
 //
 
 import Foundation
 
-#if canImport(MatterSupport)
+// os(iOS) as well as canImport, because canImport alone is not enough:
+// MatterSupport IS present in the watchOS and tvOS SDKs and imports cleanly
+// there, and only MatterAddDeviceRequest itself is marked unavailable. A
+// watch build therefore compiled this file and failed on the type rather than
+// skipping the file -- and it reaches those slices even when correctly
+// injected, because the watch target restages the app's own sources.
+#if canImport(MatterSupport) && os(iOS)
 import Matter
 import MatterSupport
 

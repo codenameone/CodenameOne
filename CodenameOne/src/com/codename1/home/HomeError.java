@@ -182,10 +182,9 @@ public enum HomeError {
         if (name == null) {
             return UNKNOWN;
         }
-        HomeError[] all = values();
-        for (int i = 0; i < all.length; i++) {
-            if (all[i].name().equals(name)) {
-                return all[i];
+        for (HomeError candidate : values()) {
+            if (candidate.name().equals(name)) {
+                return candidate;
             }
         }
         return UNKNOWN;
