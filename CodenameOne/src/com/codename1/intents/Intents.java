@@ -98,6 +98,11 @@ public final class Intents {
     /// common case, since a tap is often what launched the process.
     private static final List<AppEntity> pendingSelections = new ArrayList<AppEntity>();
 
+    /// Platform activities that arrived before the declarations did. Drained once the generated
+    /// dispatcher installs itself, and dropped if it turns out nothing declares them.
+    private static final List<PendingActivity> pendingActivities =
+            new ArrayList<PendingActivity>();
+
     private Intents() {
     }
 
@@ -387,6 +392,13 @@ public final class Intents {
         if (b == null || !b.areIntentsSupported()) {
             return;
         }
+        // exposure is a restriction, and donation is a platform surface: publishing a
+        // MODEL-only capability as a launcher shortcut or a predictable activity would expose
+        // exactly what it opted out of. The static builders filter this; so must the runtime.
+        IntentDeclaration decl = getDeclaration(intentId);
+        if (decl != null && !decl.isExposedTo(Exposure.ASSISTANT)) {
+            return;
+        }
         try {
             b.donate(intentId, IntentSerializer.serializeParams(params));
         } catch (Throwable t) {
@@ -586,10 +598,54 @@ public final class Intents {
     /// - `activityType`: the platform activity type
     /// - `params`: the activity payload, may be null
     public static boolean dispatchUserActivity(String activityType, Map<String, Object> params) {
-        if (activityType == null || getDeclaration(activityType) == null) {
+        if (activityType == null) {
             return false;
         }
-        dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
+        if (getDeclaration(activityType) != null) {
+            dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
+            return true;
+        }
+        boolean ready;
+        synchronized (pending) {
+            ready = dispatcher != null;
+        }
+        if (ready) {
+            // The table exists and does not contain this type, so it belongs to somebody else.
+            return false;
+        }
+        // Cold start: the platform can deliver a donated activity before the generated
+        // dispatcher installs itself, so an unrecognised type is not yet evidence of anything.
+        // Dropping it here is what made a shortcut tap on a dead process launch the app and
+        // then do nothing.
+        //
+        // Only ids shaped like ours are held. A third-party or handoff activity type is
+        // reverse-DNS and cannot match, so claiming this one does not swallow theirs.
+        if (!looksLikeIntentId(activityType)) {
+            return false;
+        }
+        synchronized (pendingActivities) {
+            pendingActivities.add(new PendingActivity(activityType, params));
+        }
+        return true;
+    }
+
+    /// True when a string has the shape the build enforces for an intent id: lower case, digits
+    /// and underscores only, so it can never be confused with a platform activity type.
+    private static boolean looksLikeIntentId(String s) {
+        if (s.length() < 3 || s.length() > 64) {
+            return false;
+        }
+        char first = s.charAt(0);
+        if (first < 'a' || first > 'z') {
+            return false;
+        }
+        for (int i = 1; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+            if (!ok) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -631,6 +687,7 @@ public final class Intents {
         }
         if (d != null) {
             publishDeclarations(d);
+            drainPendingActivities();
         }
         if (queued != null) {
             for (PendingInvocation q : queued) {
@@ -682,6 +739,9 @@ public final class Intents {
             selectionHandler = null;
             pendingSelections.clear();
         }
+        synchronized (pendingActivities) {
+            pendingActivities.clear();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -711,6 +771,24 @@ public final class Intents {
                 base.isHeadless(), base.isDiscoverable(), base.isDestructive(),
                 base.getOpensRoute(), base.getTimeoutSeconds(),
                 Collections.<String>emptyList(), remaining, base.getExposure());
+    }
+
+    /// Runs the activities that arrived before the declarations did, dropping any the
+    /// application turns out not to declare.
+    private static void drainPendingActivities() {
+        List<PendingActivity> queued;
+        synchronized (pendingActivities) {
+            if (pendingActivities.isEmpty()) {
+                return;
+            }
+            queued = new ArrayList<PendingActivity>(pendingActivities);
+            pendingActivities.clear();
+        }
+        for (PendingActivity a : queued) {
+            if (getDeclaration(a.activityType) != null) {
+                dispatchInvocation(a.activityType, a.params, IntentSource.SHORTCUT, false, null);
+            }
+        }
     }
 
     /// Navigates when a result names a route.
@@ -901,6 +979,16 @@ public final class Intents {
                     logError(t);
                 }
             }
+        }
+    }
+
+    private static final class PendingActivity {
+        private final String activityType;
+        private final Map<String, Object> params;
+
+        PendingActivity(String activityType, Map<String, Object> params) {
+            this.activityType = activityType;
+            this.params = params;
         }
     }
 

@@ -63,8 +63,11 @@ public final class DynamicIntent {
     /// - `baseIntentId`: the declared intent that actually runs
     /// - `title`: the name shown to the user
     public DynamicIntent(String id, String baseIntentId, String title) {
-        if (id == null || id.length() == 0) {
-            throw new IllegalArgumentException("id is required");
+        if (id == null || !isValidId(id)) {
+            throw new IllegalArgumentException("id must match [a-z][a-z0-9_]{2,63}: \"" + id
+                    + "\". The same shape the build enforces for a declared intent -- in "
+                    + "particular no colon, which the platforms use to separate an indexed "
+                    + "entity's type from its id.");
         }
         if (baseIntentId == null || baseIntentId.length() == 0) {
             throw new IllegalArgumentException("baseIntentId is required: a parameterization "
@@ -107,6 +110,29 @@ public final class DynamicIntent {
             bound.put(name, value);
         }
         return this;
+    }
+
+    /// The id shape the build enforces for a declared intent, applied here too.
+    ///
+    /// A colon is the specific character that matters: an indexed entity is published under
+    /// `type:id`, and Android identifies those entries by exactly that separator. A dynamic id
+    /// containing one would be swept up by `clearIndex` and disabled along with real content.
+    private static boolean isValidId(String s) {
+        if (s.length() < 3 || s.length() > 64) {
+            return false;
+        }
+        char first = s.charAt(0);
+        if (first < 'a' || first > 'z') {
+            return false;
+        }
+        for (int i = 1; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public String getId() {

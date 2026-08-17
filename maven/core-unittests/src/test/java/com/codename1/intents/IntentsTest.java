@@ -507,6 +507,68 @@ class IntentsTest {
                 "a model must not reach an intent that never opted in");
     }
 
+    @Test
+    void anActivityArrivingBeforeTheDeclarationsIsRunOnceTheyExist() {
+        // A donated shortcut tapped on a dead process delivers the activity before the
+        // generated dispatcher installs itself. Rejecting it there made the app launch and do
+        // nothing.
+        assertTrue(Intents.dispatchUserActivity("known", null),
+                "an id shaped like ours is claimed while the table is still empty");
+
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        assertEquals(Arrays.asList("known"), d.invoked);
+    }
+
+    @Test
+    void aThirdPartyActivityIsNeverClaimed() {
+        // Handoff and third-party types are reverse-DNS, so claiming everything while the table
+        // is empty would swallow activities belonging to somebody else.
+        assertFalse(Intents.dispatchUserActivity("com.example.SomeOtherActivity", null));
+        assertFalse(Intents.dispatchUserActivity("NSUserActivityTypeBrowsingWeb", null));
+    }
+
+    @Test
+    void aQueuedActivityNothingDeclaresIsDropped() {
+        Intents.dispatchUserActivity("never_declared", null);
+
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        assertTrue(d.invoked.isEmpty());
+    }
+
+    @Test
+    void aModelOnlyIntentIsNotDonatedToThePlatform() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("model_only", "Model", "", true, true, false,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(), Arrays.asList(Exposure.MODEL)));
+        Intents.setDispatcher(d);
+
+        Intents.donate("model_only", null);
+
+        assertNull(b.donatedId,
+                "donation is a platform surface, so exposure has to gate it too");
+    }
+
+    @Test
+    void aDynamicIdCannotContainAColon() {
+        // Indexed entities are published as type:id, and Android identifies them by that
+        // separator -- a dynamic id containing one would be swept up by clearIndex.
+        try {
+            new DynamicIntent("call:mum", "known", "Call Mum");
+            org.junit.jupiter.api.Assertions.fail("a colon must be rejected");
+        } catch (IllegalArgumentException expected) {
+            assertTrue(expected.getMessage().contains("colon"), expected.getMessage());
+        }
+    }
+
     // ------------------------------------------------------------------
     // AppEntity queries
     // ------------------------------------------------------------------

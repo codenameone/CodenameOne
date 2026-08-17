@@ -164,6 +164,18 @@ public struct CN1IntentOutcome {
         self.dialog = doc["dialog"] as? String
         self.openUrl = doc["openUrl"] as? String
         self.error = doc["error"] as? String
+        // Reduced to text on purpose, and it is a real limitation rather than an oversight.
+        //
+        // ReturnsValue<T> fixes T in the struct's signature at build time, but a handler's value
+        // is IntentResult.value(Object) -- there is nothing in the declaration that says what
+        // type it will be, and it can legitimately differ between two invocations of the same
+        // intent. Declaring ReturnsValue<String> and stringifying is the only choice that is
+        // type-stable for every handler; the alternative is refusing to return a value at all,
+        // which is strictly worse for the following Shortcuts action.
+        //
+        // The wire document keeps the JSON type, so a consumer that cares can read it there.
+        // Typing this properly needs the declaration to state a return type, which is a
+        // deliberate future addition rather than something derivable from what exists today.
         if let v = doc["value"] {
             self.value = String(describing: v)
         } else {
