@@ -41,41 +41,41 @@ public class PaginatedDataTable extends StatelessWidget {
         this.columns = v;
     }
 
-    public void sortColumnIndex(long v) {
+    public void sortColumnIndex(Long v) {
     }
 
-    public void sortAscending(boolean v) {
+    public void sortAscending(Boolean v) {
     }
 
     public void onSelectAll(Funcs.VoidFunc1<Boolean> v) {
     }
 
-    public void dataRowHeight(double v) {
+    public void dataRowHeight(Double v) {
     }
 
-    public void headingRowHeight(double v) {
+    public void headingRowHeight(Double v) {
     }
 
-    public void horizontalMargin(double v) {
+    public void horizontalMargin(Double v) {
     }
 
-    public void columnSpacing(double v) {
+    public void columnSpacing(Double v) {
     }
 
-    public void showCheckboxColumn(boolean v) {
+    public void showCheckboxColumn(Boolean v) {
     }
 
-    public void showFirstLastButtons(boolean v) {
+    public void showFirstLastButtons(Boolean v) {
     }
 
-    public void initialFirstRowIndex(long v) {
+    public void initialFirstRowIndex(Long v) {
         this.initialFirstRowIndex = v;
     }
 
     public void onPageChanged(Funcs.VoidFunc1<Long> v) {
     }
 
-    public void rowsPerPage(long v) {
+    public void rowsPerPage(Long v) {
         this.rowsPerPage = v;
     }
 
@@ -95,7 +95,7 @@ public class PaginatedDataTable extends StatelessWidget {
     public void controller(Object v) {
     }
 
-    public void primary(boolean v) {
+    public void primary(Boolean v) {
     }
 
     private static Row rowOf(DartList<Widget> cells) {
