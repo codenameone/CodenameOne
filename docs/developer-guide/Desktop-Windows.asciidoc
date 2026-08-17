@@ -13,13 +13,7 @@ its own animations and its own repaint region. The application's main surface st
 
 [source,java]
 ----
-if (Desktop.isSupported()) {
-    Window inspector = new Window("Inspector", new BorderLayout());
-    inspector.add(BorderLayout.CENTER, new Label("Hello from a second window"));
-    inspector.setWindowSize(420, 320);
-    inspector.centerOnDesktop();
-    inspector.show();
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava001Snippet.java[tag=desktop-windows-java-001,indent=0]
 ----
 
 === Where windows exist
@@ -61,7 +55,7 @@ Constructing a `Window` where windows are unsupported throws
 
 [source,java]
 ----
-Window w = new Window("Tools");   // throws on a phone
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava002Snippet.java[tag=desktop-windows-java-002,indent=0]
 ----
 
 There's no fallback to showing a `Form` instead. A pretend window produces layout and
@@ -82,10 +76,7 @@ the root of a component hierarchy:
 
 [source,java]
 ----
-TopLevelContainer top = someComponent.getTopLevelContainer();
-top.getContentPane().add(new Label("works in either"));
-top.registerAnimated(myAnimation);
-Component focused = top.getFocused();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava003Snippet.java[tag=desktop-windows-java-003,indent=0]
 ----
 
 `TopLevelContainer` carries only what genuinely applies to both. It has the
@@ -102,11 +93,7 @@ This is the one behavioral sharp edge, and it's worth stating plainly:
 
 [source,java]
 ----
-Label l = new Label("hi");
-window.add(BorderLayout.CENTER, l);
-
-l.getTopLevelContainer();   // the Window
-l.getComponentForm();       // null -- a Window is not a Form
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava004Snippet.java[tag=desktop-windows-java-004,indent=0]
 ----
 
 `getComponentForm()` keeps its original meaning: it names the enclosing `Form`, and
@@ -123,18 +110,7 @@ take focus, or doesn't animate - that's almost always the cause.
 
 [source,java]
 ----
-Window w = new Window("Preferences", new BorderLayout());
-w.add(BorderLayout.CENTER, buildPreferencesUi());
-w.setWindowSize(500, 400);
-
-w.addCloseListener(evt -> {
-    if (hasUnsavedChanges()) {
-        evt.consume();          // veto the close
-        promptToSave();
-    }
-});
-
-w.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava005Snippet.java[tag=desktop-windows-java-005,indent=0]
 ----
 
 `show()` creates the native window the first time it's called and maps it on screen.
@@ -160,11 +136,7 @@ the event dispatch thread that paints it.
 
 [source,java]
 ----
-w.setResizable(false);
-w.setDecorated(false);      // no native title bar; draw your own with a Toolbar
-w.setAlwaysOnTop(true);     // a floating palette
-w.setUtilityWindow(true);   // keep it out of the task bar where the platform allows
-w.setMinimumWindowSize(new Dimension(320, 240));
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava006Snippet.java[tag=desktop-windows-java-006,indent=0]
 ----
 
 Geometry has two coordinate systems and two sets of names, which is deliberate:
@@ -179,15 +151,26 @@ doesn't land under the task bar or the dock. `centerOn(other)` centers it over a
 top level. `minimize()`, `restore()` and `toggleMaximize()` do what they say, where the
 platform allows a program to ask.
 
+=== Styling
+
+A window is a top level surface, so it starts out with the styles a theme already
+defines for one: `Form` for the window itself, `ContentPane` for its content pane,
+`TitleArea` and `Title` for its title. That means every existing theme styles a window
+correctly without being updated, which is the point -- a top level with no style entry
+paints nothing at all and comes up as an unpainted rectangle.
+
+To make windows look different from forms, give them a UIID of your own and style that:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava007Snippet.java[tag=desktop-windows-java-007,indent=0]
+----
+
 === Modal windows
 
 [source,java]
 ----
-Window dialog = new Window("Confirm", new BorderLayout());
-dialog.add(BorderLayout.CENTER, new Label("Really delete everything?"));
-dialog.setOwnerWindow(mainWindow);
-dialog.setModalityType(Window.MODALITY_WINDOW);
-dialog.showModal();          // blocks here until the window is disposed
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava008Snippet.java[tag=desktop-windows-java-008,indent=0]
 ----
 
 `showModal()` parks the calling code until the window is disposed, exactly as a modal
@@ -216,17 +199,7 @@ phone has. `Desktop` answers which screens exist and which windows are open.
 
 [source,java]
 ----
-for (Monitor m : Desktop.getInstance().getMonitors()) {
-    System.out.println(m.getName()
-            + " bounds=" + m.getBounds()
-            + " workArea=" + m.getWorkArea()
-            + " scale=" + m.getScale()
-            + " dpi=" + m.getDotsPerInch()
-            + (m.isPrimary() ? " (primary)" : ""));
-}
-
-Monitor under = Desktop.getInstance().getMonitorAt(x, y);
-Rectangle whole = Desktop.getInstance().getDesktopBounds();   // union of every monitor
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava009Snippet.java[tag=desktop-windows-java-009,indent=0]
 ----
 
 Prefer `getWorkArea()` over `getBounds()` when placing or maximizing a window: the work
@@ -243,15 +216,13 @@ render at different scales:
 
 [source,java]
 ----
-w.getMonitor();     // the Monitor this window currently sits on
-w.getScale();       // that monitor's backing scale, e.g. 1.0 or 2.0
-w.getDensity();     // that monitor's density bucket
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava010Snippet.java[tag=desktop-windows-java-010,indent=0]
 ----
 
 These answer for the window's own monitor, not for the global display. When the user
 drags a window onto a display with a different scale, Codename One re-reads the scale,
 marks the hierarchy's preferred sizes stale and lays it out again. Skipping that step is
-what produces a window that is blurry or the wrong physical size after a move.
+what leaves a window blurry or the wrong physical size after a move.
 
 `Display.convertToPixels()` keeps its existing global meaning, the main window's monitor,
 so no existing application changes behavior.
@@ -260,21 +231,14 @@ To react to displays being attached, removed or reconfigured:
 
 [source,java]
 ----
-Desktop.getInstance().addMonitorListener(evt -> refreshWindowPlacement());
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava011Snippet.java[tag=desktop-windows-java-011,indent=0]
 ----
 
 === Window events
 
 [source,java]
 ----
-w.addWindowListener(evt -> {
-    WindowEvent we = (WindowEvent) evt;
-    switch (we.getType()) {
-        case Shown: case Hidden: case Resized: case Moved: ...
-    }
-});
-
-Desktop.getInstance().addWindowListener(evt -> ...);   // any window
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava012Snippet.java[tag=desktop-windows-java-012,indent=0]
 ----
 
 `Display.addWindowListener()` is unchanged and still reports only the application's main
