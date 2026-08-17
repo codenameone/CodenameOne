@@ -226,4 +226,136 @@ class WindowTest extends UITestBase {
         a.dispose();
         b.dispose();
     }
+
+    @FormTest
+    void showInitializesTheHierarchy() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("Preferences", new BorderLayout());
+        Label added = new Label("before show");
+        w.add(BorderLayout.CENTER, added);
+        assertFalse(added.isInitialized(),
+                "nothing should be initialized before the window is shown");
+
+        w.show();
+
+        // Without this a Window is the one top level whose children never receive
+        // initComponent(), so look and feel binding and peer attachment never happen.
+        assertTrue(added.isInitialized(),
+                "show() must initialize the hierarchy the way setCurrent() does for a Form");
+        assertTrue(w.isInitialized());
+        w.dispose();
+        assertFalse(added.isInitialized(), "dispose() must deinitialize it again");
+    }
+
+    @FormTest
+    void aFailedNativeWindowIsReportedRatherThanShown() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        wm.setCreateFails(true);
+        final Window w = new Window("too many");
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                w.show();
+            }
+        }, "A window the platform could not create must not become a phantom window");
+        assertEquals(0, Desktop.getInstance().getWindows().length,
+                "a window that failed to open must not be registered");
+    }
+
+    @FormTest
+    void modalityIsAcquiredByShowAndReleasedByDispose() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertTrue(peer.isModal(),
+                "a window shown with a modality type blocks, whether or not showModal was used");
+        assertEquals(1, peer.getModalCalls());
+
+        w.dispose();
+        assertFalse(peer.isModal(),
+                "the native modal flag must be dropped: on Windows it disables the main "
+                        + "window, and leaving it set makes the application unusable");
+        assertEquals(2, peer.getModalCalls(),
+                "the flag has to be set and cleared exactly once each");
+    }
+
+    @FormTest
+    void closeListenersFireOnceForOneClose() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("closes");
+        final AtomicInteger closes = new AtomicInteger();
+        w.addCloseListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                closes.incrementAndGet();
+            }
+        });
+        w.show();
+        w.closeRequested();
+
+        // dispose() used to fire them a second time, so one user close ran a
+        // listener's save or cleanup work twice.
+        assertEquals(1, closes.get(), "one close must notify a close listener once");
+        assertTrue(w.isWindowDisposed());
+    }
+
+    @FormTest
+    void anOwnedWindowIsDisposedWithItsOwner() {
+        implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.show();
+        assertEquals(2, Desktop.getInstance().getWindows().length);
+
+        owner.dispose();
+
+        assertTrue(child.isWindowDisposed(),
+                "an owned window cannot outlive its owner: the platform would leave it "
+                        + "open with nothing behind it");
+        assertEquals(0, Desktop.getInstance().getWindows().length);
+    }
+
+    @FormTest
+    void theMinimumSizeReachesThePortAndClampsAResize() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("clamped", new BorderLayout());
+        w.setWindowSize(800, 600);
+        w.setMinimumWindowSize(new com.codename1.ui.geom.Dimension(320, 240));
+        w.show();
+
+        assertEquals(320, wm.getLastWindow().getMinimumWidth(),
+                "the constraint has to reach the port, which is where it can be enforced");
+        assertEquals(240, wm.getLastWindow().getMinimumHeight());
+
+        // A port that cannot express a minimum, or that delivers a smaller resize
+        // before the constraint takes effect, must not lay the window out below it.
+        w.sizeChangedInternal(100, 80);
+        assertEquals(320, w.getWidth());
+        assertEquals(240, w.getHeight());
+        w.dispose();
+    }
+
+    @FormTest
+    void hidingAWindowStopsItPinningPaintWork() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("hides", new BorderLayout());
+        Label l = new Label("content");
+        w.add(BorderLayout.CENTER, l);
+        w.show();
+        w.hide();
+
+        // A hidden window is never painted, so anything queued on its surface would
+        // never drain -- and an undrained queue keeps the event dispatch thread awake.
+        assertFalse(w.isVisible(),
+                "hiding must mark the hierarchy invisible so its components stop enqueuing");
+        l.repaint();
+        assertFalse(Display.impl.hasPendingPaints(),
+                "a hidden window must not leave paint work that nothing will ever drain");
+        w.dispose();
+    }
 }

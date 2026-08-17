@@ -59,6 +59,9 @@ public class TestWindowManager extends WindowManager {
         private boolean focusRequested;
         private int monitor;
         private int paintCount;
+        private int modalCalls;
+        private int minimumWidth;
+        private int minimumHeight;
 
         public int getWindowId() {
             return windowId;
@@ -90,6 +93,24 @@ public class TestWindowManager extends WindowManager {
 
         public boolean isDisposed() {
             return disposed;
+        }
+
+        /**
+         * How many times setModal() was called on this window. An unbalanced count is
+         * exactly the bug that left a native modal blocking after its window closed,
+         * so the tests assert on the number of calls rather than only the final state.
+         */
+        public int getModalCalls() {
+            return modalCalls;
+        }
+
+        /** The minimum size the framework forwarded, or zero when none was set. */
+        public int getMinimumWidth() {
+            return minimumWidth;
+        }
+
+        public int getMinimumHeight() {
+            return minimumHeight;
         }
 
         public boolean isModal() {
@@ -194,7 +215,18 @@ public class TestWindowManager extends WindowManager {
         return null;
     }
 
+    /**
+     * Makes createWindow() answer null, which is what every port does once its fixed
+     * native window table is exhausted or the platform refuses.
+     */
+    public void setCreateFails(boolean createFails) {
+        this.createFails = createFails;
+    }
+
+    private boolean createFails;
+
     public void reset() {
+        createFails = false;
         windows.clear();
         monitors.clear();
         monitors.add(new FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
@@ -210,6 +242,9 @@ public class TestWindowManager extends WindowManager {
     @Override
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, Object parentPeer) {
+        if (createFails) {
+            return null;
+        }
         FakeWindow w = new FakeWindow();
         w.windowId = windowId;
         w.title = title;
@@ -322,6 +357,16 @@ public class TestWindowManager extends WindowManager {
         FakeWindow w = win(peer);
         if (w != null) {
             w.modal = modal;
+            w.modalCalls++;
+        }
+    }
+
+    @Override
+    public void setMinimumSize(Object peer, int width, int height) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.minimumWidth = width;
+            w.minimumHeight = height;
         }
     }
 
