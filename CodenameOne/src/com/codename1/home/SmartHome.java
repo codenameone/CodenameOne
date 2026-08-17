@@ -39,6 +39,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /// Entry point for the Codename One smart-home API -- reading the accessories
 /// in a user's home, reading and writing what they can do, watching them for
@@ -141,6 +143,19 @@ public final class SmartHome {
     private HomeBridge bridge;
     private boolean bridgeResolved;
     private boolean started;
+    /// True between calling the bridge's start() and its answer.
+    ///
+    /// Separate from `started` because the window between the two is real and
+    /// a caller can land in it: startup code and a foreground handler both
+    /// refreshing is the ordinary case, not a contrived one. Treating the
+    /// second call as "already started" sends it to the bridge's refresh(),
+    /// which on iOS rebuilds a snapshot of an HMHomeManager that has not
+    /// loaded yet and resolves with no homes at all.
+    private boolean starting;
+    /// The refreshes that arrived during that window, answered together with
+    /// the start rather than sent to a backend that is not up.
+    private final List<Integer> deferredGraphRequests =
+            new ArrayList<Integer>();
     private int nextRequestId = 1;
     private int nextSubscriptionId = 1;
 
@@ -504,14 +519,20 @@ public final class SmartHome {
         }
         int id = nextRequestId();
         EdtResult<List<HomeStructure>> result = pendingGraph.open(id);
-        boolean needsStart;
+        boolean needsStart = false;
+        boolean deferred = false;
         synchronized (this) {
-            needsStart = !started;
-            started = true;
+            if (starting) {
+                deferredGraphRequests.add(Integer.valueOf(id));
+                deferred = true;
+            } else if (!started) {
+                starting = true;
+                needsStart = true;
+            }
         }
         if (needsStart) {
             b.start(id);
-        } else {
+        } else if (!deferred) {
             b.refresh(id);
         }
         return result;
@@ -788,9 +809,16 @@ public final class SmartHome {
             serviceIds[i] = w.getServiceId();
             traitIds[i] = w.getTrait().getId();
             kinds[i] = v.getKind().ordinal();
-            numeric[i] = HomeWire.numericOf(v);
+            // Converted to the trait's own unit here, once, rather than in
+            // each bridge. A caller is free to say
+            // TraitValue.of(68, TraitUnit.FAHRENHEIT) for a Celsius trait,
+            // and a backend that reads the number and ignores the unit --
+            // which is what HomeKit's write path does -- would then set 68
+            // degrees Celsius. The unit still travels alongside for a bridge
+            // that wants it; it is now always the canonical one.
+            numeric[i] = canonicalNumeric(w.getTrait(), v);
             text[i] = v.getKind() == TraitValueKind.STRING ? v.getString() : "";
-            units[i] = v.getUnit().getWireId();
+            units[i] = canonicalUnitWireId(w.getTrait(), v);
             authorization[i] = w.getAuthorizationData() == null ? ""
                     : w.getAuthorizationData();
         }
@@ -1095,9 +1123,12 @@ public final class SmartHome {
             serviceIds[i] = a.getServiceId();
             traitIds[i] = a.getTrait().getId();
             kinds[i] = v.getKind().ordinal();
-            numeric[i] = HomeWire.numericOf(v);
+            // Same normalization as write(): a scene action is a write that
+            // happens later, and a backend that ignores the unit would apply
+            // the wrong number every time the scene runs.
+            numeric[i] = canonicalNumeric(a.getTrait(), v);
             text[i] = v.getKind() == TraitValueKind.STRING ? v.getString() : "";
-            units[i] = v.getUnit().getWireId();
+            units[i] = canonicalUnitWireId(a.getTrait(), v);
         }
         int id = nextRequestId();
         EdtResult<Scene> result = pendingScenes.open(id);
@@ -1428,25 +1459,64 @@ public final class SmartHome {
     private void onGraphAnswer(int requestId, String error) {
         EdtResult<List<HomeStructure>> result = pendingGraph.take(requestId);
         HomeException failure = HomeWire.decodeError(error);
+        List<Integer> waiting;
         if (failure != null) {
             synchronized (this) {
                 // A failed start must not leave the flag set, or the retry
                 // would call refresh() on a bridge that never connected and
                 // fail in a way that no longer names the real problem.
                 started = false;
+                starting = false;
+                waiting = drainDeferred();
             }
             if (result != null) {
                 result.error(failure);
+            }
+            for (Integer deferred : waiting) {
+                EdtResult<List<HomeStructure>> r =
+                        pendingGraph.take(deferred.intValue());
+                if (r != null) {
+                    r.error(failure);
+                }
             }
             return;
         }
         List<HomeStructure> rebuilt = buildGraph();
         synchronized (this) {
             structures = rebuilt;
+            if (starting) {
+                starting = false;
+                started = true;
+            }
+            waiting = drainDeferred();
         }
         if (result != null) {
             result.complete(rebuilt);
         }
+        // The refreshes that arrived while the start was in flight. They get
+        // the start's own answer, which is the graph they asked for -- issuing
+        // a second round trip per caller would be slower and could still race.
+        for (Integer deferred : waiting) {
+            EdtResult<List<HomeStructure>> r =
+                    pendingGraph.take(deferred.intValue());
+            if (r != null) {
+                r.complete(rebuilt);
+            }
+        }
+    }
+
+    /// Takes the deferred request ids. Callers hold this instance's monitor.
+    ///
+    /// #### Returns
+    ///
+    /// the ids, possibly empty
+    private List<Integer> drainDeferred() {
+        if (deferredGraphRequests.isEmpty()) {
+            return Collections.<Integer>emptyList();
+        }
+        List<Integer> copy = new ArrayList<Integer>(deferredGraphRequests);
+        deferredGraphRequests.clear();
+        return copy;
     }
 
     private List<HomeStructure> buildGraph() {
@@ -1682,6 +1752,113 @@ public final class SmartHome {
         return out;
     }
 
+    /// A written value's numeric component, in the trait's own unit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait being written
+    ///
+    /// - `value`: the value the caller supplied
+    ///
+    /// #### Returns
+    ///
+    /// the numeric component, converted when the value is a quantity
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value's unit measures a
+    ///   different dimension than the trait's
+    private static double canonicalNumeric(Trait trait, TraitValue value) {
+        if (value.getKind() != TraitValueKind.DOUBLE) {
+            return HomeWire.numericOf(value);
+        }
+        TraitUnit target = trait.getUnit();
+        if (target == value.getUnit()) {
+            return value.getRawDouble();
+        }
+        // Throws when the dimensions differ, which is the right answer: a
+        // brightness given in degrees Celsius is a bug in the caller, and
+        // applying the number regardless would move a real light.
+        return value.getDouble(target);
+    }
+
+    /// The unit the numeric component is now in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait being written
+    ///
+    /// - `value`: the value the caller supplied
+    ///
+    /// #### Returns
+    ///
+    /// the wire id of the trait's unit for a quantity, of the value's own
+    /// unit otherwise
+    private static int canonicalUnitWireId(Trait trait, TraitValue value) {
+        return value.getKind() == TraitValueKind.DOUBLE
+                ? trait.getUnit().getWireId()
+                : value.getUnit().getWireId();
+    }
+
+    /// Fails a commissioning request the platform never answered.
+    ///
+    /// The timeout is honoured here rather than in each bridge because not one
+    /// of the platform flows takes one: Play services owns its sheet until the
+    /// user leaves it, and MatterSupport owns its own. A caller who asked for
+    /// a limit and got none would wait forever on a flow that cannot come
+    /// back -- an activity that never returns a result, a sheet dismissed by
+    /// the system.
+    ///
+    /// A late answer is not a problem: the request id is gone from the pending
+    /// map by then, so it is ignored the same way a duplicate would be.
+    ///
+    /// #### Parameters
+    ///
+    /// - `requestId`: the request to fail
+    ///
+    /// - `timeoutMillis`: the limit; zero leaves the platform's own
+    private void armCommissioningTimeout(int requestId, int timeoutMillis) {
+        if (timeoutMillis <= 0) {
+            return;
+        }
+        Timer timer = new Timer();
+        timer.schedule(
+                new CommissioningTimeout(this, timer, requestId, timeoutMillis),
+                timeoutMillis);
+    }
+
+    /// Named rather than anonymous so the scheduled task carries no synthetic
+    /// reference to the enclosing instance (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class CommissioningTimeout extends TimerTask {
+
+        private final SmartHome home;
+        private final Timer timer;
+        private final int requestId;
+        private final int limit;
+
+        CommissioningTimeout(SmartHome home, Timer timer, int requestId,
+                int limit) {
+            this.home = home;
+            this.timer = timer;
+            this.requestId = requestId;
+            this.limit = limit;
+        }
+
+        @Override
+        public void run() {
+            timer.cancel();
+            EdtResult<CommissioningResult> waiting =
+                    home.pendingCommissioning.take(requestId);
+            if (waiting == null) {
+                return;
+            }
+            waiting.error(new HomeException(HomeError.TIMEOUT,
+                    "the add-accessory flow did not finish within " + limit
+                            + "ms"));
+        }
+    }
+
     private static <T> EdtResult<T> failed(HomeError error, String message) {
         EdtResult<T> result = new EdtResult<T>();
         result.error(error == HomeError.NOT_CONFIGURED
@@ -1835,6 +2012,7 @@ public final class SmartHome {
                     orEmpty(request.getRoomId()),
                     orEmpty(request.getSuggestedName()),
                     request.getTimeoutMillis());
+            armCommissioningTimeout(id, request.getTimeoutMillis());
             return result;
         }
 

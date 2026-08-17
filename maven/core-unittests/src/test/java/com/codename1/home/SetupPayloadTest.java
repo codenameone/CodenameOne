@@ -93,6 +93,49 @@ class SetupPayloadTest {
         assertTrue(e.getMessage().indexOf("11 or 21") >= 0, e.getMessage());
     }
 
+    /**
+     * A checksum can only catch a mistyped digit, not a digit run that is
+     * larger than the field it fills.
+     *
+     * <p>Each decimal chunk of a manual code stands for a fixed number of
+     * bits and a decimal run holds more than a binary field does. Masking the
+     * excess away silently turns a malformed code into a different, valid
+     * looking one -- which is the failure this parser exists to catch before
+     * the platform sheet opens.</p>
+     */
+    @Test
+    void aManualCodeChunkTooLargeForItsFieldIsRejected() {
+        // First digit 8: the format gives it three bits and 8 sets a fourth.
+        assertThrows(IllegalArgumentException.class,
+                () -> SetupPayload.parse(manualCode("8700000000")));
+        // Digits 2 to 6 stand for 16 bits, so 99999 does not fit.
+        assertThrows(IllegalArgumentException.class,
+                () -> SetupPayload.parse(manualCode("3999990112")));
+        // Digits 7 to 10 stand for 13 bits, so 9999 does not fit.
+        assertThrows(IllegalArgumentException.class,
+                () -> SetupPayload.parse(manualCode("3497019999")));
+    }
+
+    /**
+     * And a base-38 group that overflows the bytes it stands for. Five
+     * characters can express 38^5, which is more than three bytes hold.
+     */
+    @Test
+    void aBase38GroupTooLargeForItsBytesIsRejected() {
+        StringBuilder tooBig = new StringBuilder("MT:");
+        for (int i = 0; i < 19; i++) {
+            // '.' is the last base-38 symbol, so every group is at its
+            // maximum and every one of them overflows.
+            tooBig.append('.');
+        }
+        IllegalArgumentException e =
+                assertThrows(IllegalArgumentException.class,
+                        () -> SetupPayload.parse(tooBig.toString()));
+        assertTrue(e.getMessage().indexOf("too") >= 0,
+                "it must fail on the overflow rather than incidentally on the"
+                        + " decoded length: " + e.getMessage());
+    }
+
     @Test
     void nonDigitsAreRejected() {
         assertThrows(IllegalArgumentException.class,
@@ -220,6 +263,11 @@ class SetupPayloadTest {
     };
 
     private static final int[] INV = {0, 4, 3, 2, 1, 5, 6, 7, 8, 9};
+
+    /** The 11-digit code whose first ten digits are given, checksum appended. */
+    private static String manualCode(String firstTen) {
+        return firstTen + verhoeffCheckDigit(firstTen);
+    }
 
     private static int verhoeffCheckDigit(String digits) {
         int c = 0;

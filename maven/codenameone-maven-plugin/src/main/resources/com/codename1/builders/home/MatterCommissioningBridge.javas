@@ -372,6 +372,13 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             // Play services shows one add-device UI at a time, and a second
             // request would replace the parked callback so the first caller
             // never heard anything. Refused, which is a failure they can see.
+            //
+            // This is cleared when the sheet returns, whatever it returns.
+            // A CommissioningRequest timeout fails the waiting caller in the
+            // framework rather than here, because nothing in this API can
+            // close a sheet Play services owns -- so a limit that expires
+            // frees the caller, and this stays refused until the user is
+            // actually done with the screen in front of them.
             callback.onError("BUSY",
                     "an add-device flow is already running");
             return;
@@ -400,6 +407,8 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(Exception failure) {
+                        // Nothing was launched, so no listener was registered
+                        // and there is nothing to restore here.
                         Callback waiting = pendingCommission;
                         pendingCommission = null;
                         if (waiting != null) {
@@ -410,8 +419,8 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                 });
     }
 
-    private void launch(Activity activity, IntentSender sender) {
-        CodenameOneActivity cn1 = (CodenameOneActivity) activity;
+    private void launch(final Activity activity, IntentSender sender) {
+        final CodenameOneActivity cn1 = (CodenameOneActivity) activity;
         cn1.setIntentResultListener(new IntentResultListener() {
             @Override
             public void onActivityResult(int requestCode, int resultCode,
@@ -419,6 +428,13 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                 if (requestCode != REQUEST_COMMISSION) {
                     return;
                 }
+                // Before anything else, and on every path out of here. The
+                // activity latches waitingForResult when a listener is
+                // registered and ignores every later registration until this
+                // clears it -- so skipping it does not just leak this
+                // listener, it silently breaks the camera, the scanner and
+                // the file picker for the rest of the process.
+                cn1.restoreIntentResultListener();
                 Callback waiting = pendingCommission;
                 pendingCommission = null;
                 if (waiting == null) {
@@ -454,6 +470,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             activity.startIntentSenderForResult(sender, REQUEST_COMMISSION,
                     null, 0, 0, 0);
         } catch (IntentSender.SendIntentException cannotStart) {
+            cn1.restoreIntentResultListener();
             Callback waiting = pendingCommission;
             pendingCommission = null;
             if (waiting != null) {

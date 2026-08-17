@@ -4268,7 +4268,8 @@ public class IPhoneBuilder extends Executor {
             // Wallet/widget extensions and .ios.appext archives mutate the Xcode project through
             // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
             boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
-                    || surfacesExtensionEnabled || hasAppExtensionArchives(resDir);
+                    || surfacesExtensionEnabled || matterExtensionEnabled
+                    || hasAppExtensionArchives(resDir);
             if (needsXcodeProjectMutation) {
                 try {
                     List<File> podSpecFileList = new ArrayList<File>();
@@ -4790,14 +4791,6 @@ public class IPhoneBuilder extends Executor {
             // pbxproj and create the bridging header.  This avoids adding
             // Swift-specific settings to pure Objective-C projects.
             File distDir = new File(tmpFile, "dist");
-            if (matterExtensionEnabled) {
-                // Into <MainClass>-src so the schemes script compiles it into
-                // the APP target, the same arrangement the surfaces Swift glue
-                // uses -- and before hasSwiftFiles, which this file is what
-                // makes true for an app whose own natives are pure Objective-C.
-                SmartHomeInjector.injectIosCommissioningShim(this,
-                        new File(distDir, request.getMainClass() + "-src"));
-            }
             if (hasSwiftFiles(distDir)) {
                 File bridgingHeader = new File(distDir, "cn1-Bridging-Header.h");
                 if (!bridgingHeader.exists()) {
@@ -5394,6 +5387,15 @@ public class IPhoneBuilder extends Executor {
                 MatterExtensionBuilder.buildFileMap(request.getPackageName(),
                         matterAppGroup, displayName),
                 new File(distDir, name));
+        // The app-side Swift shim, into <MainClass>-src, exactly where the
+        // surfaces glue goes and for the same reason: this method runs while
+        // the schemes ruby is still being assembled, and that script is what
+        // sweeps *.swift there into the APP target's source phase. Staged any
+        // later -- after the script has run, or after its post-dependency
+        // re-run -- the file is on disk and in no target, and
+        // NSClassFromString finds nothing at runtime.
+        SmartHomeInjector.injectIosCommissioningShim(this,
+                new File(distDir, request.getMainClass() + "-src"));
         log("Adding Matter add-device extension target " + name
                 + " (app group " + matterAppGroup + ")");
 

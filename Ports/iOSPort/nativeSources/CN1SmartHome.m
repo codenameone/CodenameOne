@@ -2041,6 +2041,16 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
     NSArray *numbers = [cn1homeSplit(
         toNSString(CN1_THREAD_STATE_PASS_ARG numericValues)) retain];
     cn1homeOnMain(^{
+        // One place to hand back the retained arguments, so every exit --
+        // and there are six -- releases exactly once.
+        void (^releaseArgs)(void) = ^{
+            [homeId release];
+            [sceneName release];
+            [accessories release];
+            [services release];
+            [traits release];
+            [numbers release];
+        };
         HMHome *home = cn1homeFindHome(homeId);
         if (home == nil) {
             com_codename1_impl_ios_IOSHomeCallbacks_sceneResult___int_java_lang_String_java_lang_String_java_lang_String(
@@ -2048,6 +2058,7 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                 fromNSString(getThreadLocalData(), homeId),
                 fromNSString(getThreadLocalData(),
                              cn1homeError(@"INVALID_ARGUMENT", nil)));
+            releaseArgs();
             return;
         }
         [home addActionSetWithName:sceneName
@@ -2059,25 +2070,49 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                     fromNSString(getThreadLocalData(),
                                  cn1homeError(cn1homeErrorName(error),
                                               error)));
+                releaseArgs();
                 return;
             }
             __block NSUInteger remaining = [traits count];
-            void (^done)(void) = ^{
-                NSString *line = cn1homeJoinFields(
-                    [NSArray arrayWithObjects:
-                     cn1homeUuid([actionSet uniqueIdentifier]), sceneName,
-                     @"4", @"1", nil]);
+            // A scene is all-or-nothing on purpose. A half-built "Good night"
+            // that silently drops the lock is worse than one that failed:
+            // the user is told it exists and runs it every night. So a failed
+            // action fails the whole request, and the action set HomeKit has
+            // already created is removed rather than left in their home.
+            __block NSUInteger failedActions = 0;
+            __block NSString *firstFailure = nil;
+            void (^answer)(NSString *) = ^(NSString *encodedError) {
                 cn1homeRebuildSnapshot();
+                NSString *line = encodedError != nil ? nil
+                        : cn1homeJoinFields(
+                            [NSArray arrayWithObjects:
+                             cn1homeUuid([actionSet uniqueIdentifier]),
+                             sceneName, @"4", @"1", nil]);
                 com_codename1_impl_ios_IOSHomeCallbacks_sceneResult___int_java_lang_String_java_lang_String_java_lang_String(
                     getThreadLocalData(), rid,
-                    fromNSString(getThreadLocalData(), line),
-                    fromNSString(getThreadLocalData(), homeId), JAVA_NULL);
-                [homeId release];
-                [sceneName release];
-                [accessories release];
-                [services release];
-                [traits release];
-                [numbers release];
+                    line == nil ? JAVA_NULL
+                                : fromNSString(getThreadLocalData(), line),
+                    fromNSString(getThreadLocalData(), homeId),
+                    encodedError == nil
+                        ? JAVA_NULL
+                        : fromNSString(getThreadLocalData(), encodedError));
+                [firstFailure release];
+                firstFailure = nil;
+                releaseArgs();
+            };
+            void (^done)(void) = ^{
+                if (failedActions == 0) {
+                    answer(nil);
+                    return;
+                }
+                NSString *encoded = [[firstFailure retain] autorelease];
+                [home removeActionSet:actionSet
+                    completionHandler:^(NSError *ignored) {
+                    // The removal's own outcome is not reported: the caller
+                    // asked to create a scene and the answer is that it was
+                    // not created. A failure to clean up is ours, not theirs.
+                    answer(encoded);
+                }];
             };
             if (remaining == 0) {
                 done();
@@ -2097,6 +2132,12 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                             ? [[numbers objectAtIndex:i] doubleValue] : 0);
                 }
                 if (target == nil) {
+                    failedActions++;
+                    if (firstFailure == nil) {
+                        firstFailure = [cn1homeError(
+                            c == nil ? @"TRAIT_NOT_SUPPORTED"
+                                     : @"INVALID_ARGUMENT", nil) retain];
+                    }
                     remaining--;
                     if (remaining == 0) {
                         done();
@@ -2107,7 +2148,15 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                         [[HMCharacteristicWriteAction alloc]
                          initWithCharacteristic:c targetValue:target];
                 [actionSet addAction:action
-                   completionHandler:^(NSError *ignored) {
+                   completionHandler:^(NSError *actionError) {
+                    if (actionError != nil) {
+                        failedActions++;
+                        if (firstFailure == nil) {
+                            firstFailure = [cn1homeError(
+                                cn1homeErrorName(actionError),
+                                actionError) retain];
+                        }
+                    }
                     remaining--;
                     if (remaining == 0) {
                         done();

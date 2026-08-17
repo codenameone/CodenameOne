@@ -271,6 +271,20 @@ public final class SetupPayload {
                 value += index * multiplier;
                 multiplier *= 38;
             }
+            // A five-character group can hold 38^5, which is more than the
+            // three bytes it stands for; the four- and two-character groups
+            // overflow the same way. Without this, the high bits are dropped
+            // and several different malformed codes decode to one payload --
+            // so a mis-scanned sticker would be accepted here and rejected by
+            // the platform, which is the whole thing this parser exists to
+            // prevent.
+            if (value >= (1L << (8 * bytesOut))) {
+                throw new IllegalArgumentException(
+                        "this setup code is not valid base-38: a group of "
+                                + chars + " characters encodes a value too"
+                                + " large for the " + bytesOut
+                                + " bytes it stands for");
+            }
             for (int i = 0; i < bytesOut; i++) {
                 if (outPos >= out.length) {
                     throw new IllegalArgumentException(
@@ -332,7 +346,14 @@ public final class SetupPayload {
                     "this setup code's check digit does not match, so a digit"
                             + " was mistyped or misread");
         }
+        // Each decimal chunk of a manual code stands for a fixed number of
+        // bits, and a decimal digit run can hold more than its field does.
+        // Masking the excess away silently accepts a mistyped code as a
+        // different, valid-looking one -- checksum-valid 87000000002 would
+        // read as passcode 4464 -- which is exactly the failure this parser
+        // is here to catch, so each chunk is checked against its own width.
         int first = digits.charAt(0) - '0';
+        requireWidth(first, 3, "the first digit");
         int vidPidPresent = (first >> 2) & 0x01;
         if ((vidPidPresent == 1) != hasVendorProduct) {
             throw new IllegalArgumentException(
@@ -342,7 +363,9 @@ public final class SetupPayload {
         }
         int discriminatorHigh = first & 0x03;
         int group2 = parseDigits(digits, 1, 5);
+        requireWidth(group2, 16, "digits 2 to 6");
         int group3 = parseDigits(digits, 6, 4);
+        requireWidth(group3, 13, "digits 7 to 10");
         int discriminatorMid = (group2 >> 14) & 0x03;
         int passcode = (group2 & 0x3FFF) | (group3 << 14);
         validatePasscode(passcode);
@@ -356,11 +379,35 @@ public final class SetupPayload {
         int productId = 0;
         if (hasVendorProduct) {
             vendorId = parseDigits(digits, 10, 5);
+            requireWidth(vendorId, 16, "the vendor id digits");
             productId = parseDigits(digits, 15, 5);
+            requireWidth(productId, 16, "the product id digits");
         }
         return new SetupPayload(text, 0, vendorId, productId, 0,
                 DISCOVERY_BLE | DISCOVERY_ON_NETWORK, discriminator, passcode,
                 false, true);
+    }
+
+    /// Refuses a decimal chunk too large for the field it fills.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the chunk
+    ///
+    /// - `bits`: how many bits the format gives it
+    ///
+    /// - `what`: the chunk's name, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when it does not fit
+    private static void requireWidth(int value, int bits, String what) {
+        if (value >= (1 << bits)) {
+            throw new IllegalArgumentException(
+                    "this setup code is malformed: " + what + " read "
+                            + value + ", which does not fit the " + bits
+                            + " bits the Matter manual format gives them");
+        }
     }
 
     private static int parseDigits(String digits, int from, int count) {

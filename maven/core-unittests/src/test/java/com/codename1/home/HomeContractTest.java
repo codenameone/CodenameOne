@@ -26,7 +26,10 @@ import com.codename1.impl.home.LocalHomeBridge;
 import com.codename1.impl.home.SubscriptionState;
 import com.codename1.impl.home.SyntheticHome;
 
+import com.codename1.util.AsyncResource;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +37,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * The parts of the contract that are invisible from the happy path: what
@@ -81,6 +86,92 @@ class HomeContractTest {
         assertArrayEquals(new String[] {"1234", "", "9999"},
                 bridge.authorization,
                 "each write's credential must arrive in its own slot");
+    }
+
+    /**
+     * A quantity reaches the bridge in the trait's own unit.
+     *
+     * <p>The wire carries a number and a unit id, and the one backend that
+     * ignores the unit is HomeKit -- so 68 Fahrenheit handed straight through
+     * sets a thermostat to 68 Celsius. Converting once here means no bridge
+     * has to remember to.</p>
+     */
+    @Test
+    void aWriteReachesTheBridgeInTheTraitsOwnUnit() {
+        CapturingBridge bridge = new CapturingBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory thermostat = home.findAccessory("thermostat");
+        AccessoryService svc = thermostat.getPrimaryService();
+        HomeAwait.settled(home.write(new TraitWrite(thermostat, svc,
+                Trait.TARGET_HEATING_TEMPERATURE,
+                TraitValue.of(68, TraitUnit.FAHRENHEIT))));
+
+        assertEquals(20.0, bridge.numeric[0], 0.0001,
+                "68F must reach the bridge as 20C, not as 68");
+        assertEquals(TraitUnit.CELSIUS.getWireId(), bridge.units[0],
+                "and the unit slot must say so");
+    }
+
+    /**
+     * A value whose unit measures something else entirely is a caller bug,
+     * and applying the number regardless would move a real accessory.
+     */
+    @Test
+    void aWriteInAUnitOfTheWrongDimensionIsRefused() {
+        CapturingBridge bridge = new CapturingBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory thermostat = home.findAccessory("thermostat");
+        final AccessoryService svc = thermostat.getPrimaryService();
+        final TraitWrite bad = new TraitWrite(thermostat, svc,
+                Trait.TARGET_HEATING_TEMPERATURE,
+                TraitValue.of(50, TraitUnit.PERCENT));
+        assertThrows(IllegalArgumentException.class, new Executable() {
+            @Override
+            public void execute() {
+                SmartHome.getInstance().write(bad);
+            }
+        });
+    }
+
+    /**
+     * Two refreshes before the first one has connected.
+     *
+     * <p>Ordinary rather than contrived: startup code and a foreground
+     * handler both call it. The second used to be sent to the bridge's
+     * refresh() against a backend that had not loaded, and on iOS that
+     * resolves with an empty house.</p>
+     */
+    @Test
+    void aRefreshDuringStartupGetsTheStartsAnswer() {
+        CapturingBridge bridge = new CapturingBridge();
+        bridge.holdStart = true;
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+
+        AsyncResource<List<HomeStructure>> first = home.refresh();
+        AsyncResource<List<HomeStructure>> second = home.refresh();
+        assertEquals(0, bridge.refreshCalls,
+                "the second refresh must not reach a backend that is still"
+                        + " starting");
+
+        bridge.releaseStart();
+        HomeAwait.settled(first);
+        HomeAwait.settled(second);
+        assertEquals(0, bridge.refreshCalls,
+                "and it must still not have gone to the backend afterwards");
+        assertEquals(first.get().size(), second.get().size(),
+                "it is answered with the start's own graph");
+        assertFalse(second.get().isEmpty(),
+                "an empty answer is the bug this guards");
     }
 
     /**
@@ -147,6 +238,34 @@ class HomeContractTest {
     private static final class CapturingBridge extends LocalHomeBridge {
 
         private String[] authorization;
+        private double[] numeric;
+        private int[] units;
+        private int refreshCalls;
+        /// Holds start() open, so a test can stand inside the window between
+        /// asking a backend to connect and it having connected. The local
+        /// bridge is otherwise far too quick to be in it.
+        private boolean holdStart;
+        private int heldStartId;
+
+        @Override
+        public void start(int requestId) {
+            if (holdStart) {
+                heldStartId = requestId;
+                return;
+            }
+            super.start(requestId);
+        }
+
+        void releaseStart() {
+            holdStart = false;
+            super.start(heldStartId);
+        }
+
+        @Override
+        public void refresh(int requestId) {
+            refreshCalls++;
+            super.refresh(requestId);
+        }
 
         @Override
         public void writeTraits(int requestId, String[] accessoryIds,
@@ -154,6 +273,8 @@ class HomeContractTest {
                 double[] numericValues, String[] stringValues,
                 int[] unitWireIds, String[] authorizationData) {
             authorization = authorizationData;
+            numeric = numericValues;
+            units = unitWireIds;
             super.writeTraits(requestId, accessoryIds, serviceIds, traitIds,
                     kinds, numericValues, stringValues, unitWireIds,
                     authorizationData);
