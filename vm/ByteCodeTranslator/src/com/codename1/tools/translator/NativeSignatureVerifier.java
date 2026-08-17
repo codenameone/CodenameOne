@@ -244,13 +244,17 @@ public class NativeSignatureVerifier {
         public final int line;
         public final String returnType;
         public final List<String> paramTypes;
+        /** Declared {@code static}: internal linkage, so no other TU can call it. */
+        public final boolean internalLinkage;
 
-        Definition(String symbol, File file, int line, String returnType, List<String> paramTypes) {
+        Definition(String symbol, File file, int line, String returnType,
+                   List<String> paramTypes, boolean internalLinkage) {
             this.symbol = symbol;
             this.file = file;
             this.line = line;
             this.returnType = returnType;
             this.paramTypes = Collections.unmodifiableList(paramTypes);
+            this.internalLinkage = internalLinkage;
         }
 
         public String where() {
@@ -507,13 +511,13 @@ public class NativeSignatureVerifier {
             if (brace >= length || code.charAt(brace) != '{') {
                 continue; // a declaration, or a call -- not a definition
             }
-            String returnType = returnTypeBefore(code, nameStart);
-            if (returnType == null) {
+            Declaration declared = returnTypeBefore(code, nameStart);
+            if (declared == null) {
                 continue;
             }
             List<String> params = parseParameters(code.substring(open + 1, close));
             Definition definition = new Definition(name, file, lineOf(raw, nameStart),
-                    returnType, params);
+                    declared.returnType, params, declared.internalLinkage);
             List<Definition> list = into.get(name);
             if (list == null) {
                 list = new ArrayList<Definition>();
@@ -684,9 +688,10 @@ public class NativeSignatureVerifier {
      * they do not change the machine type -- while {@code long}/{@code short}/
      * {@code unsigned}/{@code signed} are kept, because they are the type.</p>
      */
-    private static String returnTypeBefore(String code, int nameStart) {
+    private static Declaration returnTypeBefore(String code, int nameStart) {
         int cursor = nameStart - 1;
         boolean pointer = false;
+        boolean internalLinkage = false;
         List<String> tokens = new ArrayList<String>();
         while (cursor >= 0) {
             char c = code.charAt(cursor);
@@ -712,6 +717,7 @@ public class NativeSignatureVerifier {
                 return null;
             }
             if (DECLARATION_QUALIFIERS.contains(token)) {
+                internalLinkage |= "static".equals(token);
                 continue;
             }
             // Keep reading left only while the tokens can still be part of ONE type.
@@ -736,7 +742,18 @@ public class NativeSignatureVerifier {
         if (pointer) {
             type.append('*');
         }
-        return type.toString();
+        return new Declaration(type.toString(), internalLinkage);
+    }
+
+    /** What precedes a function name: its return type, and whether it is static. */
+    private static final class Declaration {
+        final String returnType;
+        final boolean internalLinkage;
+
+        Declaration(String returnType, boolean internalLinkage) {
+            this.returnType = returnType;
+            this.internalLinkage = internalLinkage;
+        }
     }
 
     /** Keywords that can precede a '(' without the match being a definition. */
@@ -848,6 +865,15 @@ public class NativeSignatureVerifier {
      * or a human-readable reason when they do not.
      */
     static String mismatch(Signature expected, Definition actual) {
+        if (actual.internalLinkage) {
+            // The call ParparVM emits lives in the generated .c for the declaring
+            // class, never in the hand-written .m, so a static definition is not a
+            // definition as far as that reference is concerned -- the name resolves
+            // to nothing and the link fails. Reporting it here beats an "undefined
+            // symbol" at the end of an Xcode build that names no Java method.
+            return "is declared static: internal linkage cannot satisfy the call"
+                    + " ParparVM emits from another translation unit";
+        }
         if (!sameType(expected.returnType, actual.returnType)) {
             return "returns " + actual.returnType + " where " + expected.returnType + " is required";
         }

@@ -204,6 +204,28 @@ public class HeavyLoadBenchmarkTest {
     }
 
     private void runTranslator(String classpath, Path outputDir) throws Exception {
+        // This benchmark deliberately translates the PUBLISHED codenameone-ios
+        // 7.0.214 jar and its bundled nativeios sources, because it wants a large
+        // workload that does not move when the repo does. That artifact predates the
+        // native-signature fixes, so with the check on (CI sets CN1_NATIVE_VERIFY)
+        // it reports natives this repo has already corrected and cannot correct in a
+        // shipped jar -- and, being an in-process call to main(), it would take the
+        // surefire JVM down with it. The check belongs on sources we control.
+        String previousVerify = System.getProperty(
+                NativeSignatureVerifier.MODE_PROPERTY);
+        System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, "off");
+        try {
+            translate(classpath, outputDir);
+        } finally {
+            if (previousVerify == null) {
+                System.clearProperty(NativeSignatureVerifier.MODE_PROPERTY);
+            } else {
+                System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, previousVerify);
+            }
+        }
+    }
+
+    private void translate(String classpath, Path outputDir) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         if (!Files.exists(translatorResources)) {
              translatorResources = Paths.get("vm", "ByteCodeTranslator", "src").normalize().toAbsolutePath();

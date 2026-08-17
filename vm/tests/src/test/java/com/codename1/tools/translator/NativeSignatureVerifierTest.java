@@ -367,8 +367,27 @@ class NativeSignatureVerifierTest {
                 + " JAVA_OBJECT me) {\n    return JAVA_TRUE;\n}\n"));
         assertEquals(Collections.emptyList(), verify(signature("noop", "()V", false),
                 "static NSString* CN1_TAG = @\"x\";\n"
-                + "static void com_example_Natives_noop__(CN1_THREAD_STATE_MULTI_ARG"
+                + "void com_example_Natives_noop__(CN1_THREAD_STATE_MULTI_ARG"
                 + " JAVA_OBJECT me) {\n}\n"));
+    }
+
+    /**
+     * A qualifier that changes linkage is not cosmetic. ParparVM emits the call from
+     * the generated .c for the declaring class, so a static definition in the
+     * hand-written .m cannot satisfy it and the link fails -- late, and naming a
+     * mangled symbol rather than a Java method.
+     */
+    @Test
+    void aStaticImplementationCannotSatisfyTheCallAndIsFatal() throws IOException {
+        List<Problem> problems = verify(signature("noop", "()V", false),
+                "static void com_example_Natives_noop__(CN1_THREAD_STATE_MULTI_ARG"
+                + " JAVA_OBJECT me) {\n}\n");
+
+        assertEquals(1, problems.size());
+        assertEquals(Kind.SIGNATURE, problems.get(0).kind);
+        assertTrue(problems.get(0).fatal);
+        assertTrue(problems.get(0).message.contains("declared static"),
+                problems.get(0).message);
     }
 
     // --------------------------------------------------------- near-miss policy
