@@ -94,7 +94,6 @@ public final class JavaScriptTextLayer {
         private int coverY;
         private int coverW;
         private int coverH;
-        private int promotedAt;
 
         Run(HTMLElement clip, HTMLElement text) {
             this.clip = clip;
@@ -143,12 +142,7 @@ public final class JavaScriptTextLayer {
      * component's text on the canvas from then on.
      */
     private final Set<Component> canvasOnly = new HashSet<Component>();
-    /**
-     * The first draw order belonging to the frame being painted. Only a run promoted during this
-     * frame can be covered by something drawn later in it; a run from an earlier frame sits
-     * under nothing, because the frame that drew over it repainted the run as well.
-     */
-    private int frameFirstSequence;
+
     private boolean reattachedThisFrame;
 
     /**
@@ -424,7 +418,6 @@ public final class JavaScriptTextLayer {
         run.coverY = coverTop;
         run.coverW = Math.max(0, coverRight - coverLeft);
         run.coverH = Math.max(0, coverBottom - coverTop);
-        run.promotedAt = drawSequence;
         if (!run.attached) {
             container.appendChild(run.clip);
             run.attached = true;
@@ -449,8 +442,6 @@ public final class JavaScriptTextLayer {
      * @param form the form currently displayed, may be null
      */
     public void syncToForm(Form form) {
-        // Called once per flush, so this marks where the next frame's draws begin.
-        frameFirstSequence = drawSequence + 1;
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
             Map.Entry<Component, ComponentRuns> entry = it.next();
@@ -497,6 +488,13 @@ public final class JavaScriptTextLayer {
         if (suspended || w <= 0 || h <= 0 || byComponent.isEmpty()) {
             return;
         }
+        // Who is drawing decides what the draw means for text already in the DOM. A component
+        // painting its own background covers the text it is about to promote again a moment
+        // later, and so does a container painting behind the children it is about to paint --
+        // neither is hiding anything. A component painting over text that belongs somewhere else
+        // on the form is, and that text has to go back to the canvas where it can be covered.
+        Component painter = depth == 0 ? null : stack.get(depth - 1).component;
+        int painterPass = depth == 0 ? -1 : stack.get(depth - 1).paintPass;
         List<Component> covered = null;
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
@@ -504,9 +502,15 @@ public final class JavaScriptTextLayer {
             ComponentRuns runs = entry.getValue();
             for (int i = 0; i < runs.runs.size(); i++) {
                 Run run = runs.runs.get(i);
-                if (!run.attached || run.promotedAt < frameFirstSequence) {
-                    // Not promoted during this frame, so whatever is being drawn now belongs to
-                    // a frame that painted this run as well -- it is not covering anything.
+                if (!run.attached) {
+                    continue;
+                }
+                // Promoted by the paint that is drawing right now, so this draw really does come
+                // after it -- a component covering its own text, which the canvas would have
+                // shown and the DOM cannot.
+                boolean drawnThisPaint = painterPass >= 0 && run.claimedPass == painterPass;
+                if (!drawnThisPaint && painter != null
+                        && isSelfOrDescendant(entry.getKey(), painter)) {
                     continue;
                 }
                 if (run.coverW <= 0 || run.coverH <= 0
@@ -536,6 +540,25 @@ public final class JavaScriptTextLayer {
         // asked for rather than the dirty region: the flush already carries the reattach flag
         // to the same place.
         reattachedThisFrame = true;
+    }
+
+    /**
+     * True when a component is the one painting, or somewhere inside it -- in which case the
+     * paint in progress is about to draw it again.
+     *
+     * @param component the component owning a promoted run
+     * @param painter the component whose paint is drawing
+     * @return true when the run will be repainted by this paint
+     */
+    private boolean isSelfOrDescendant(Component component, Component painter) {
+        Component walk = component;
+        while (walk != null) {
+            if (walk == painter) {
+                return true;
+            }
+            walk = walk.getParent();
+        }
+        return false;
     }
 
     /**
