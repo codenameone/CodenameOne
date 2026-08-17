@@ -206,6 +206,10 @@ public class Window extends Container implements TopLevelContainer {
         }
         setWidth(pendingWidth);
         setHeight(pendingHeight);
+        // Hardcoded for the same reason Form hardcodes it: a top level surface has
+        // nothing behind it, so a translucent one shows whatever the raster happened
+        // to contain.
+        getStyle().setBgTransparency(0xFF);
     }
 
     // ---- identity -------------------------------------------------------------
@@ -1128,7 +1132,14 @@ public class Window extends Container implements TopLevelContainer {
         }
         Desktop.getInstance().registerWindow(this);
         setVisible(true);
-        sizeChangedInternal(wm.getWidth(nativePeer), wm.getHeight(nativePeer));
+        // A port that creates its native window asynchronously reports zero until it
+        // exists. Keep the requested size until a real one is delivered, rather than
+        // collapsing the window to nothing and laying out against that.
+        int nativeWidth = wm.getWidth(nativePeer);
+        int nativeHeight = wm.getHeight(nativePeer);
+        if (nativeWidth > 0 && nativeHeight > 0) {
+            sizeChangedInternal(nativeWidth, nativeHeight);
+        }
         initFocused();
         nativeVisible = true;
         wm.show(nativePeer);

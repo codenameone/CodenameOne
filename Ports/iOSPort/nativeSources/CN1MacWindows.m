@@ -212,6 +212,26 @@ static void dropPendingSlot(int slot) {
     g_pendingCount = write;
 }
 
+/*
+ * Scenes that a closed window gave back, kept alive for the next one.
+ *
+ * A scene session is not a cheap object and the system does not hand them out on
+ * demand: asking for one while a previous destruction is still in flight fails with
+ * "scene invalidated before create completion", and the window that asked is then
+ * left with no scene at all. Closing one window and opening another is completely
+ * ordinary, so recycling is the only way that sequence can be reliable. Only touched
+ * on the main thread.
+ */
+static UIWindowScene* g_freeScenes[CN1_MAC_MAX_WINDOWS];
+static int g_freeSceneCount;
+
+static UIWindowScene* takeFreeScene(void) {
+    if (g_freeSceneCount <= 0) {
+        return NULL;
+    }
+    return g_freeScenes[--g_freeSceneCount];
+}
+
 int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, int height,
         BOOL decorated, BOOL resizable) {
     int slot = -1;
@@ -233,6 +253,15 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     g_macWindows[slot].pendingTitle = [title retain];
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindowScene* recycled = takeFreeScene();
+        if (recycled != nil) {
+            /* Adopt it straight away rather than going through the pending queue:
+             * there is no asynchronous delivery to wait for. */
+            pushPendingSlot(slot);
+            CN1MacWindowSceneConnected(recycled);
+            [recycled release];
+            return;
+        }
         // Enqueue and request on the same main-thread turn, so the queue order is
         // exactly the request order the system will deliver scenes in.
         pushPendingSlot(slot);
@@ -332,20 +361,26 @@ void CN1MacWindowDestroy(int slot) {
             window.hidden = YES;
             window.rootViewController = nil;
         }
-        if (scene != nil) {
+        if (scene != nil && g_freeSceneCount < CN1_MAC_MAX_WINDOWS) {
+            /* Park the scene instead of destroying it -- see g_freeScenes. Its
+             * ownership moves from the slot to the pool, so it is deliberately not
+             * released here. */
+            scene.title = @"";
+            g_freeScenes[g_freeSceneCount++] = scene;
+        } else if (scene != nil) {
             UISceneDestructionRequestOptions* opts =
                     [[UISceneDestructionRequestOptions alloc] init];
             [[UIApplication sharedApplication] requestSceneSessionDestruction:scene.session
                                                                       options:opts
                                                                  errorHandler:nil];
             [opts release];
+            [scene release];
         }
         /* No ARC in this port: everything retained above is released here, after
          * UIKit has finished with it on the main thread. */
         [content release];
         [controller release];
         [window release];
-        [scene release];
         [title release];
     });
 }
@@ -422,28 +457,31 @@ void CN1MacWindowGetBounds(int slot, int* out) {
     }
 }
 
+/*
+ * Zero until the scene really exists, rather than the requested size.
+ *
+ * The scene arrives asynchronously and may not be granted the size that was asked
+ * for. Answering with the request would mean the window looks correctly sized during
+ * exactly the window of time when nothing is known about it yet, which is how a
+ * capture taken too early ends up in the wrong geometry. Zero says "not yet", and the
+ * framework keeps the requested size until a real one is delivered.
+ */
 int CN1MacWindowGetWidth(int slot) {
     CN1MacWindow* w = slotAt(slot);
-    if (w == NULL) {
+    if (w == NULL || w->content == nil) {
         return 0;
     }
-    if (w->content != nil) {
-        CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
-        return (int) (w->content.bounds.size.width * scale);
-    }
-    return w->pendingWidth;
+    CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
+    return (int) (w->content.bounds.size.width * scale);
 }
 
 int CN1MacWindowGetHeight(int slot) {
     CN1MacWindow* w = slotAt(slot);
-    if (w == NULL) {
+    if (w == NULL || w->content == nil) {
         return 0;
     }
-    if (w->content != nil) {
-        CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
-        return (int) (w->content.bounds.size.height * scale);
-    }
-    return w->pendingHeight;
+    CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
+    return (int) (w->content.bounds.size.height * scale);
 }
 
 void CN1MacWindowFocus(int slot) {
