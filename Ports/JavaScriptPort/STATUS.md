@@ -50,7 +50,14 @@ Text that stays on the canvas, by design:
   the form beneath it as its own backdrop);
 - decorated runs -- underline, strike-through, overline -- whose lines are drawn
   after the glyphs and over them, which a promoted glyph would cover;
-- shape clips and non-identity transforms.
+- shape clips and non-identity transforms;
+- anything a later canvas draw covers. The layer is above the canvas as a whole,
+  so an image, fill or shape drawn over a promoted run cannot hide it the way it
+  would have hidden canvas text. Such a run is put back on the canvas and its
+  component stays there -- a sheet's scrim, a tab bar's composited lens, a
+  clipped rotation over a title. Who is drawing decides: a component painting its
+  own background, or a container painting behind children it is about to paint,
+  covers text it draws again a moment later and hides nothing.
 
 Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`
 itself and never reaches the implementation.
