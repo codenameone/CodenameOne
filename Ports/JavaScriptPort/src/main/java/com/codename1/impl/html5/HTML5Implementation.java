@@ -10757,6 +10757,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
             historySuppressPop = false;
             return;
         }
+        if (restored == previous) {
+            // Neither direction, as far as this port can tell: the entry carries no id of ours
+            // and the application is on its root, which reads the same way. It belongs to
+            // whatever hosts this page -- a site that navigates around the canvas -- and the
+            // user asked for it. Stepping anywhere from here would take the page off the entry
+            // they chose.
+            return;
+        }
         if (!backward) {
             // Forward traversal. The port cannot replay it -- it has no way to know which form
             // an entry stood for, and re-showing one would need the application's own
