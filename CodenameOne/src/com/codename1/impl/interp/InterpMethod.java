@@ -118,6 +118,7 @@ public final class InterpMethod {
         return line;
     }
 
+    @Override
     public String toString() {
         return owner.name + "." + name + desc;
     }

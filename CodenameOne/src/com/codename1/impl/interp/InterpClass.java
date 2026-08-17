@@ -162,9 +162,9 @@ public final class InterpClass {
 
     /// Finds a method declared directly on this class.
     InterpMethod declaredMethod(String methodName, String desc) {
-        for (int i = 0; i < methods.length; i++) {
-            if (methods[i].name.equals(methodName) && methods[i].desc.equals(desc)) {
-                return methods[i];
+        for (InterpMethod m : methods) {
+            if (m.name.equals(methodName) && m.desc.equals(desc)) {
+                return m;
             }
         }
         return null;
@@ -182,7 +182,7 @@ public final class InterpClass {
         if (vtable == null) {
             buildVtable();
         }
-        return (InterpMethod)vtable.get(methodName + desc);
+        return (InterpMethod) vtable.get(methodName + desc);
     }
 
     private void buildVtable() {
@@ -191,14 +191,13 @@ public final class InterpClass {
         // Interfaces before the superclass: a default method is only reached
         // when no class in the chain provides an implementation, and the
         // superclass pass below overwrites anything it does declare.
-        for (int i = 0; i < interpInterfaces.length; i++) {
-            copyInto(t, interpInterfaces[i]);
+        for (InterpClass iface : interpInterfaces) {
+            copyInto(t, iface);
         }
         if (superInterp != null) {
             copyInto(t, superInterp);
         }
-        for (int i = 0; i < methods.length; i++) {
-            InterpMethod m = methods[i];
+        for (InterpMethod m : methods) {
             if (!m.isStatic()) {
                 t.put(m.name + m.desc, m);
             }

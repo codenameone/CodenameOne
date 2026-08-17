@@ -99,7 +99,7 @@ public final class InterpBundle {
     /// The interpreted class with this JVM internal name, or null if the class
     /// is not part of this bundle (i.e. it belongs to the host app).
     public InterpClass findClass(String internalName) {
-        return (InterpClass)classesByName.get(internalName);
+        return (InterpClass) classesByName.get(internalName);
     }
 
     /// The interpreted classes in this bundle.
@@ -115,7 +115,7 @@ public final class InterpBundle {
 
     /// The source text for a file name, or null. Used by the on-device viewer.
     public String getSource(String fileName) {
-        return (String)sources.get(fileName);
+        return (String) sources.get(fileName);
     }
 
     /// The names of every source file carried by this bundle.

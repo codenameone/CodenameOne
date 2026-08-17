@@ -31,7 +31,7 @@ package com.codename1.impl.interp;
 /// Stop button apparently doing nothing.
 ///
 /// @author Shai Almog
-public final class InterpCancelled extends Error {
+public final class InterpCancelled extends Error {  //NOPMD DoNotExtendJavaLangError - see above: Exception would be swallowed
     InterpCancelled(String message) {
         super(message);
     }

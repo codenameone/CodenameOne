@@ -88,7 +88,7 @@ final class InterpFrame {
     }
 
     int popInt() {
-        return (int)stackPrim[--sp];
+        return (int) stackPrim[--sp];
     }
 
     long popLong() {
@@ -122,7 +122,7 @@ final class InterpFrame {
                 pushRef(ref);
                 break;
             default:
-                pushInt((int)raw);
+                pushInt((int) raw);
                 break;
         }
     }

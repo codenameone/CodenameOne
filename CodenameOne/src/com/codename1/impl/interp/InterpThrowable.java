@@ -43,12 +43,12 @@ public final class InterpThrowable extends RuntimeException {
 
     private static String describe(Object thrown) {
         if (thrown instanceof Throwable) {
-            Throwable t = (Throwable)thrown;
+            Throwable t = (Throwable) thrown;
             String msg = t.getMessage();
             return t.getClass().getName() + (msg == null ? "" : ": " + msg);
         }
         if (thrown instanceof InterpObject) {
-            return ((InterpObject)thrown).getType().getName().replace('/', '.');
+            return ((InterpObject) thrown).getType().getName().replace('/', '.');
         }
         return String.valueOf(thrown);
     }
@@ -69,8 +69,8 @@ public final class InterpThrowable extends RuntimeException {
     /// can be shown on device or sent to the desktop for the IDE to linkify.
     public String getInterpretedStackTrace() {
         StringBuffer sb = new StringBuffer(getMessage());
-        for (int i = 0; i < interpretedStack.length; i++) {
-            sb.append("\n\tat ").append(interpretedStack[i]);
+        for (String frame : interpretedStack) {
+            sb.append("\n\tat ").append(frame);
         }
         return sb.toString();
     }

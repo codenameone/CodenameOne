@@ -136,13 +136,13 @@ public final class InterpPairingSecret {
     public static byte[] unhex(String s) {
         byte[] out = new byte[s.length() / 2];
         for (int i = 0; i < out.length; i++) {
-            out[i] = (byte)((digit(s.charAt(i * 2)) << 4) | digit(s.charAt(i * 2 + 1)));
+            out[i] = (byte) ((digit(s.charAt(i * 2)) << 4) | digit(s.charAt(i * 2 + 1)));
         }
         return out;
     }
 
     private static char hexDigit(int nibble) {
-        return (char)(nibble < 10 ? '0' + nibble : 'a' + nibble - 10);
+        return (char) (nibble < 10 ? '0' + nibble : 'a' + nibble - 10);
     }
 
     private static int digit(char c) {
@@ -165,7 +165,8 @@ public final class InterpPairingSecret {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 is always available");
+            //NOPMD PreserveStackTrace - the device's IllegalStateException has no cause constructor
+            throw new IllegalStateException("UTF-8 is always available: " + e);  //NOPMD PreserveStackTrace
         }
     }
 }

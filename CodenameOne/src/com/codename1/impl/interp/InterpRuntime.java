@@ -58,7 +58,7 @@ public final class InterpRuntime {
     private int fuelPerCheck = 20000;
     private long edtBudgetMs = 2000;
 
-    private volatile boolean cancelRequested;
+    private volatile boolean cancelRequested;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
 
     /// The last exception interpreted code threw, and the interpreted frames it
     /// was thrown from.
@@ -68,12 +68,12 @@ public final class InterpRuntime {
     /// main runs on the event thread and the socket thread is what answers the
     /// push. The pair is only ever read through an identity check, so the worst
     /// a race can do is decline to produce a stack.
-    private volatile Object lastThrown;
-    private volatile String[] lastThrownStack;
+    private volatile Object lastThrown;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
+    private volatile String[] lastThrownStack;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
 
     /// The host method being called when [#lastThrown] was thrown, if it was
     /// thrown by one rather than by interpreted code.
-    private volatile String lastHostCall;
+    private volatile String lastHostCall;  //NOPMD AvoidUsingVolatile - written from another thread on purpose
 
     /// Execution state that belongs to one thread, not to the runtime.
     ///
@@ -94,7 +94,7 @@ public final class InterpRuntime {
     private final ThreadLocal threadState = new ThreadLocal();
 
     private ThreadState state() {
-        ThreadState s = (ThreadState)threadState.get();
+        ThreadState s = (ThreadState) threadState.get();
         if (s == null) {
             s = new ThreadState();
             s.fuel = fuelPerCheck;
@@ -172,7 +172,7 @@ public final class InterpRuntime {
         Vector hostSupertypes = new Vector();
         c.collectHostSupertypes(hostSupertypes);
         for (int i = 0; i < hostSupertypes.size(); i++) {
-            int ext = ((Integer)hostSupertypes.elementAt(i)).intValue();
+            int ext = ((Integer) hostSupertypes.elementAt(i)).intValue();
             if (hostName.equals(externOwnerName(ext))) {
                 return true;
             }
@@ -262,7 +262,7 @@ public final class InterpRuntime {
     public Object invoke(InterpMethod m, Object receiver, Object[] args) throws Throwable {
         Object result = invokeInterpreted(m, receiver, args);
         if (result instanceof InterpObject) {
-            InterpObject io = (InterpObject)result;
+            InterpObject io = (InterpObject) result;
             return io.hostPeer != null ? io.hostPeer : io;
         }
         return result;
@@ -286,7 +286,7 @@ public final class InterpRuntime {
                 f.setLocalLong(slot, InterpValues.unbox(kind, a));
                 slot += 2;
             } else {
-                f.setLocalInt(slot++, (int)InterpValues.unbox(kind, a));
+                f.setLocalInt(slot++, (int) InterpValues.unbox(kind, a));
             }
         }
         if (!m.isSynchronized()) {
@@ -300,8 +300,8 @@ public final class InterpRuntime {
         if (m.isStatic()) {
             lock = m.getOwner();
         } else if (receiver instanceof InterpObject
-                && ((InterpObject)receiver).hostPeer != null) {
-            lock = ((InterpObject)receiver).hostPeer;
+                && ((InterpObject) receiver).hostPeer != null) {
+            lock = ((InterpObject) receiver).hostPeer;
         } else {
             lock = receiver;
         }
@@ -328,7 +328,8 @@ public final class InterpRuntime {
             st.runStartMs = System.currentTimeMillis();
             st.fuel = fuelPerCheck;
         }
-        if (++st.depth > maxDepth) {
+        st.depth++;
+        if (st.depth > maxDepth) {
             st.depth--;
             throw new InterpThrowable(new StackOverflowError(
                     "interpreted call depth exceeded " + maxDepth), snapshotStack());
@@ -393,7 +394,7 @@ public final class InterpRuntime {
 
                     case InterpOpcodes.ILOAD:
                     case InterpOpcodes.FLOAD:
-                        f.pushInt((int)f.prim[code[pc + 1]]);
+                        f.pushInt((int) f.prim[code[pc + 1]]);
                         break;
                     case InterpOpcodes.LLOAD:
                     case InterpOpcodes.DLOAD:
@@ -465,10 +466,26 @@ public final class InterpRuntime {
                     case InterpOpcodes.LADD: f.pushLong(f.popLong() + f.popLong()); break;
                     case InterpOpcodes.FADD: f.pushFloat(f.popFloat() + f.popFloat()); break;
                     case InterpOpcodes.DADD: f.pushDouble(f.popDouble() + f.popDouble()); break;
-                    case InterpOpcodes.ISUB: { int b = f.popInt(); f.pushInt(f.popInt() - b); break; }
-                    case InterpOpcodes.LSUB: { long b = f.popLong(); f.pushLong(f.popLong() - b); break; }
-                    case InterpOpcodes.FSUB: { float b = f.popFloat(); f.pushFloat(f.popFloat() - b); break; }
-                    case InterpOpcodes.DSUB: { double b = f.popDouble(); f.pushDouble(f.popDouble() - b); break; }
+                    case InterpOpcodes.ISUB: {
+                        int b = f.popInt();
+                        f.pushInt(f.popInt() - b);
+                        break;
+                    }
+                    case InterpOpcodes.LSUB: {
+                        long b = f.popLong();
+                        f.pushLong(f.popLong() - b);
+                        break;
+                    }
+                    case InterpOpcodes.FSUB: {
+                        float b = f.popFloat();
+                        f.pushFloat(f.popFloat() - b);
+                        break;
+                    }
+                    case InterpOpcodes.DSUB: {
+                        double b = f.popDouble();
+                        f.pushDouble(f.popDouble() - b);
+                        break;
+                    }
                     case InterpOpcodes.IMUL: f.pushInt(f.popInt() * f.popInt()); break;
                     case InterpOpcodes.LMUL: f.pushLong(f.popLong() * f.popLong()); break;
                     case InterpOpcodes.FMUL: f.pushFloat(f.popFloat() * f.popFloat()); break;
@@ -489,8 +506,16 @@ public final class InterpRuntime {
                         f.pushLong(f.popLong() / b);
                         break;
                     }
-                    case InterpOpcodes.FDIV: { float b = f.popFloat(); f.pushFloat(f.popFloat() / b); break; }
-                    case InterpOpcodes.DDIV: { double b = f.popDouble(); f.pushDouble(f.popDouble() / b); break; }
+                    case InterpOpcodes.FDIV: {
+                        float b = f.popFloat();
+                        f.pushFloat(f.popFloat() / b);
+                        break;
+                    }
+                    case InterpOpcodes.DDIV: {
+                        double b = f.popDouble();
+                        f.pushDouble(f.popDouble() / b);
+                        break;
+                    }
                     case InterpOpcodes.IREM: {
                         int b = f.popInt();
                         if (b == 0) {
@@ -507,18 +532,50 @@ public final class InterpRuntime {
                         f.pushLong(f.popLong() % b);
                         break;
                     }
-                    case InterpOpcodes.FREM: { float b = f.popFloat(); f.pushFloat(f.popFloat() % b); break; }
-                    case InterpOpcodes.DREM: { double b = f.popDouble(); f.pushDouble(f.popDouble() % b); break; }
+                    case InterpOpcodes.FREM: {
+                        float b = f.popFloat();
+                        f.pushFloat(f.popFloat() % b);
+                        break;
+                    }
+                    case InterpOpcodes.DREM: {
+                        double b = f.popDouble();
+                        f.pushDouble(f.popDouble() % b);
+                        break;
+                    }
                     case InterpOpcodes.INEG: f.pushInt(-f.popInt()); break;
                     case InterpOpcodes.LNEG: f.pushLong(-f.popLong()); break;
                     case InterpOpcodes.FNEG: f.pushFloat(-f.popFloat()); break;
                     case InterpOpcodes.DNEG: f.pushDouble(-f.popDouble()); break;
-                    case InterpOpcodes.ISHL: { int b = f.popInt(); f.pushInt(f.popInt() << b); break; }
-                    case InterpOpcodes.LSHL: { int b = f.popInt(); f.pushLong(f.popLong() << b); break; }
-                    case InterpOpcodes.ISHR: { int b = f.popInt(); f.pushInt(f.popInt() >> b); break; }
-                    case InterpOpcodes.LSHR: { int b = f.popInt(); f.pushLong(f.popLong() >> b); break; }
-                    case InterpOpcodes.IUSHR: { int b = f.popInt(); f.pushInt(f.popInt() >>> b); break; }
-                    case InterpOpcodes.LUSHR: { int b = f.popInt(); f.pushLong(f.popLong() >>> b); break; }
+                    case InterpOpcodes.ISHL: {
+                        int b = f.popInt();
+                        f.pushInt(f.popInt() << b);
+                        break;
+                    }
+                    case InterpOpcodes.LSHL: {
+                        int b = f.popInt();
+                        f.pushLong(f.popLong() << b);
+                        break;
+                    }
+                    case InterpOpcodes.ISHR: {
+                        int b = f.popInt();
+                        f.pushInt(f.popInt() >> b);
+                        break;
+                    }
+                    case InterpOpcodes.LSHR: {
+                        int b = f.popInt();
+                        f.pushLong(f.popLong() >> b);
+                        break;
+                    }
+                    case InterpOpcodes.IUSHR: {
+                        int b = f.popInt();
+                        f.pushInt(f.popInt() >>> b);
+                        break;
+                    }
+                    case InterpOpcodes.LUSHR: {
+                        int b = f.popInt();
+                        f.pushLong(f.popLong() >>> b);
+                        break;
+                    }
                     case InterpOpcodes.IAND: f.pushInt(f.popInt() & f.popInt()); break;
                     case InterpOpcodes.LAND: f.pushLong(f.popLong() & f.popLong()); break;
                     case InterpOpcodes.IOR: f.pushInt(f.popInt() | f.popInt()); break;
@@ -526,24 +583,24 @@ public final class InterpRuntime {
                     case InterpOpcodes.IXOR: f.pushInt(f.popInt() ^ f.popInt()); break;
                     case InterpOpcodes.LXOR: f.pushLong(f.popLong() ^ f.popLong()); break;
                     case InterpOpcodes.IINC:
-                        f.prim[code[pc + 1]] = (int)f.prim[code[pc + 1]] + code[pc + 2];
+                        f.prim[code[pc + 1]] = (int) f.prim[code[pc + 1]] + code[pc + 2];
                         break;
 
                     case InterpOpcodes.I2L: f.pushLong(f.popInt()); break;
                     case InterpOpcodes.I2F: f.pushFloat(f.popInt()); break;
                     case InterpOpcodes.I2D: f.pushDouble(f.popInt()); break;
-                    case InterpOpcodes.L2I: f.pushInt((int)f.popLong()); break;
+                    case InterpOpcodes.L2I: f.pushInt((int) f.popLong()); break;
                     case InterpOpcodes.L2F: f.pushFloat(f.popLong()); break;
                     case InterpOpcodes.L2D: f.pushDouble(f.popLong()); break;
-                    case InterpOpcodes.F2I: f.pushInt((int)f.popFloat()); break;
-                    case InterpOpcodes.F2L: f.pushLong((long)f.popFloat()); break;
+                    case InterpOpcodes.F2I: f.pushInt((int) f.popFloat()); break;
+                    case InterpOpcodes.F2L: f.pushLong((long) f.popFloat()); break;
                     case InterpOpcodes.F2D: f.pushDouble(f.popFloat()); break;
-                    case InterpOpcodes.D2I: f.pushInt((int)f.popDouble()); break;
-                    case InterpOpcodes.D2L: f.pushLong((long)f.popDouble()); break;
-                    case InterpOpcodes.D2F: f.pushFloat((float)f.popDouble()); break;
-                    case InterpOpcodes.I2B: f.pushInt((byte)f.popInt()); break;
-                    case InterpOpcodes.I2C: f.pushInt((char)f.popInt()); break;
-                    case InterpOpcodes.I2S: f.pushInt((short)f.popInt()); break;
+                    case InterpOpcodes.D2I: f.pushInt((int) f.popDouble()); break;
+                    case InterpOpcodes.D2L: f.pushLong((long) f.popDouble()); break;
+                    case InterpOpcodes.D2F: f.pushFloat((float) f.popDouble()); break;
+                    case InterpOpcodes.I2B: f.pushInt((byte) f.popInt()); break;
+                    case InterpOpcodes.I2C: f.pushInt((char) f.popInt()); break;
+                    case InterpOpcodes.I2S: f.pushInt((short) f.popInt()); break;
 
                     case InterpOpcodes.LCMP: {
                         long b = f.popLong();
@@ -576,22 +633,102 @@ public final class InterpRuntime {
                         break;
                     }
 
-                    case InterpOpcodes.IFEQ: if (f.popInt() == 0) next = code[pc + 1]; break;
-                    case InterpOpcodes.IFNE: if (f.popInt() != 0) next = code[pc + 1]; break;
-                    case InterpOpcodes.IFLT: if (f.popInt() < 0) next = code[pc + 1]; break;
-                    case InterpOpcodes.IFGE: if (f.popInt() >= 0) next = code[pc + 1]; break;
-                    case InterpOpcodes.IFGT: if (f.popInt() > 0) next = code[pc + 1]; break;
-                    case InterpOpcodes.IFLE: if (f.popInt() <= 0) next = code[pc + 1]; break;
-                    case InterpOpcodes.IF_ICMPEQ: { int b = f.popInt(); if (f.popInt() == b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ICMPNE: { int b = f.popInt(); if (f.popInt() != b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ICMPLT: { int b = f.popInt(); if (f.popInt() < b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ICMPGE: { int b = f.popInt(); if (f.popInt() >= b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ICMPGT: { int b = f.popInt(); if (f.popInt() > b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ICMPLE: { int b = f.popInt(); if (f.popInt() <= b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ACMPEQ: { Object b = f.popRef(); if (f.popRef() == b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IF_ACMPNE: { Object b = f.popRef(); if (f.popRef() != b) next = code[pc + 1]; break; }
-                    case InterpOpcodes.IFNULL: if (f.popRef() == null) next = code[pc + 1]; break;
-                    case InterpOpcodes.IFNONNULL: if (f.popRef() != null) next = code[pc + 1]; break;
+                    case InterpOpcodes.IFEQ:
+                        if (f.popInt() == 0) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IFNE:
+                        if (f.popInt() != 0) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IFLT:
+                        if (f.popInt() < 0) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IFGE:
+                        if (f.popInt() >= 0) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IFGT:
+                        if (f.popInt() > 0) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IFLE:
+                        if (f.popInt() <= 0) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IF_ICMPEQ: {
+                        int b = f.popInt();
+                        if (f.popInt() == b) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ICMPNE: {
+                        int b = f.popInt();
+                        if (f.popInt() != b) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ICMPLT: {
+                        int b = f.popInt();
+                        if (f.popInt() < b) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ICMPGE: {
+                        int b = f.popInt();
+                        if (f.popInt() >= b) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ICMPGT: {
+                        int b = f.popInt();
+                        if (f.popInt() > b) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ICMPLE: {
+                        int b = f.popInt();
+                        if (f.popInt() <= b) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ACMPEQ: {
+                        Object b = f.popRef();
+                        if (f.popRef() == b) {  //NOPMD CompareObjectsWithEquals - IF_ACMP compares references, by definition
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IF_ACMPNE: {
+                        Object b = f.popRef();
+                        if (f.popRef() != b) {  //NOPMD CompareObjectsWithEquals - IF_ACMP compares references, by definition
+                            next = code[pc + 1];
+                        }
+                        break;
+                    }
+                    case InterpOpcodes.IFNULL:
+                        if (f.popRef() == null) {
+                            next = code[pc + 1];
+                        }
+                        break;
+                    case InterpOpcodes.IFNONNULL:
+                        if (f.popRef() != null) {
+                            next = code[pc + 1];
+                        }
+                        break;
                     case InterpOpcodes.GOTO: next = code[pc + 1]; break;
 
                     case InterpOpcodes.OP_TABLESWITCH: {
@@ -792,7 +929,8 @@ public final class InterpRuntime {
                 // Back edge: the only place a loop can spin, so the only place
                 // that needs a fuel check.
                 ThreadState st = state();
-                if (--st.fuel <= 0) {
+                st.fuel--;
+                if (st.fuel <= 0) {
                     checkpoint(st);
                 }
             }
@@ -844,7 +982,7 @@ public final class InterpRuntime {
                 // Enum.valueOf is the one javac generates -- checks for it.
                 InterpClass local = bundle.findClass(externOwnerName(operand));
                 f.pushRef(local != null
-                        ? (Object)local
+                        ? (Object) local
                         : linker.classObject(resolveExternClass(operand)));
                 break;
             }
@@ -879,7 +1017,7 @@ public final class InterpRuntime {
                         + c.getName().replace('/', '.'));
             }
             if (c.initState == InterpClass.INIT_RUNNING) {
-                if (c.initThread == Thread.currentThread()) {
+                if (c.initThread == Thread.currentThread()) {  //NOPMD CompareObjectsWithEquals - the initializing thread, not an equal one
                     // Recursive entry from the initializer itself: legal, and
                     // the one case where a partly-built class must be visible.
                     return;
@@ -1045,7 +1183,7 @@ public final class InterpRuntime {
             throw new InterpThrowable(new NullPointerException(owner + "." + name), snapshotStack());
         }
         if (target instanceof InterpObject) {
-            InterpObject io = (InterpObject)target;
+            InterpObject io = (InterpObject) target;
             int idx = fieldIndex(io, owner, name);
             if (idx >= 0) {
                 pushBoxed(f, InterpValues.kindOf(desc), io.fields[idx]);
@@ -1070,7 +1208,7 @@ public final class InterpRuntime {
             throw new InterpThrowable(new NullPointerException(owner + "." + name), snapshotStack());
         }
         if (target instanceof InterpObject) {
-            InterpObject io = (InterpObject)target;
+            InterpObject io = (InterpObject) target;
             int idx = fieldIndex(io, owner, name);
             if (idx >= 0) {
                 io.fields[idx] = value;
@@ -1116,7 +1254,7 @@ public final class InterpRuntime {
             // interpreted, so the lookup runs against the bundle instead.
             if ("java/lang/Enum".equals(owner) && "valueOf".equals(name)
                     && args.length == 2 && args[0] instanceof InterpClass) {
-                pushBoxed(f, returnKind, enumValueOf((InterpClass)args[0], (String)args[1]));
+                pushBoxed(f, returnKind, enumValueOf((InterpClass) args[0], (String) args[1]));
                 return;
             }
             // A native interface declared by the pushed code itself. Its native
@@ -1128,7 +1266,7 @@ public final class InterpRuntime {
             // compile and still run here.
             if ("com/codename1/system/NativeLookup".equals(owner) && "create".equals(name)
                     && args.length == 1 && args[0] instanceof InterpClass) {
-                pushBoxed(f, returnKind, new NativeStub((InterpClass)args[0]));
+                pushBoxed(f, returnKind, new NativeStub((InterpClass) args[0]));
                 return;
             }
             pushBoxed(f, returnKind, hostCall(owner, name, desc, null, args, false));
@@ -1144,7 +1282,7 @@ public final class InterpRuntime {
         // the invokespecial that turns it into a real object. The placeholder
         // may have been duplicated by DUP, so every copy has to be replaced.
         if (target instanceof PendingHostNew) {
-            PendingHostNew pending = (PendingHostNew)target;
+            PendingHostNew pending = (PendingHostNew) target;
             Object created = linker.construct(resolveExternClass(pending.externIndex), desc, args);
             replaceOnStack(f, pending, created);
             return;
@@ -1178,19 +1316,19 @@ public final class InterpRuntime {
         // receiver and a native one has no clazz pointer for it -- so the small
         // part of Class that means anything here is answered here.
         if (target instanceof InterpClass) {
-            Object r = classCall((InterpClass)target, name, args);
+            Object r = classCall((InterpClass) target, name, args);
             if (r != NOT_CLASS_METHOD) {
                 pushBoxed(f, returnKind, r);
                 return;
             }
             throw new InterpThrowable(new UnsupportedOperationException(
                     "Class." + name + desc + " is not available for "
-                    + ((InterpClass)target).getName().replace('/', '.')
+                    + ((InterpClass) target).getName().replace('/', '.')
                     + ", which exists only in this bundle"), snapshotStack());
         }
 
         if (target instanceof InterpObject) {
-            InterpObject io = (InterpObject)target;
+            InterpObject io = (InterpObject) target;
 
             // `super(...)` reaching a host class is the moment the peer can be
             // built: it is the first point at which the superclass constructor
@@ -1255,7 +1393,7 @@ public final class InterpRuntime {
             // is java.lang.Enum's own behaviour, which is small enough to
             // answer here and has no peer to answer it.
             if (io.enumOrdinal >= 0) {
-                Object r = enumCall(io, name, desc, args);
+                Object r = enumCall(io, name, args);
                 if (r != NOT_ENUM_METHOD) {
                     pushBoxed(f, returnKind, r);
                     return;
@@ -1302,9 +1440,9 @@ public final class InterpRuntime {
         // the interpreter answers itself. The constant is still free to
         // implement host interfaces, and those are collected below as usual.
         if ("java/lang/Enum".equals(superOwner)) {
-            io.enumName = superArgs.length > 0 ? (String)superArgs[0] : null;
+            io.enumName = superArgs.length > 0 ? (String) superArgs[0] : null;
             io.enumOrdinal = superArgs.length > 1 && superArgs[1] instanceof Number
-                    ? ((Number)superArgs[1]).intValue() : -1;
+                    ? ((Number) superArgs[1]).intValue() : -1;
             superOwner = "java/lang/Object";
         }
 
@@ -1318,7 +1456,7 @@ public final class InterpRuntime {
             hostSuperclassName = superOwner;
         }
         for (int i = 0; i < hostSupertypes.size(); i++) {
-            int ext = ((Integer)hostSupertypes.elementAt(i)).intValue();
+            int ext = ((Integer) hostSupertypes.elementAt(i)).intValue();
             String n = externOwnerName(ext);
             // Enum is skipped for the same reason it is skipped as a
             // superclass: it has no shim and needs none. It reaches here as
@@ -1368,7 +1506,7 @@ public final class InterpRuntime {
             // interpreter's own stack and no message -- "java.lang.
             // UnsupportedOperationException" and nothing else -- which says
             // neither what was called nor from where.
-            if (lastThrown != t) {
+            if (lastThrown != t) {  //NOPMD CompareObjectsWithEquals - the same throwable instance, not an equal one
                 lastThrownStack = snapshotStack();
                 lastHostCall = owner.replace('/', '.') + "." + name + desc;
                 lastThrown = t;
@@ -1381,12 +1519,12 @@ public final class InterpRuntime {
 
     private void replaceOnStack(InterpFrame f, Object placeholder, Object created) {
         for (int i = 0; i < f.sp; i++) {
-            if (f.stackRefs[i] == placeholder) {
+            if (f.stackRefs[i] == placeholder) {  //NOPMD CompareObjectsWithEquals - a placeholder sentinel
                 f.stackRefs[i] = created;
             }
         }
         for (int i = 0; i < f.refs.length; i++) {
-            if (f.refs[i] == placeholder) {
+            if (f.refs[i] == placeholder) {  //NOPMD CompareObjectsWithEquals - a placeholder sentinel
                 f.refs[i] = created;
             }
         }
@@ -1450,7 +1588,7 @@ public final class InterpRuntime {
             return Integer.valueOf(System.identityHashCode(c));
         }
         if ("equals".equals(name) && args.length == 1) {
-            return args[0] == c ? Boolean.TRUE : Boolean.FALSE;
+            return args[0] == c ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Class identity is reference identity
         }
         if ("isInterface".equals(name) && args.length == 0) {
             return c.isInterface() ? Boolean.TRUE : Boolean.FALSE;
@@ -1474,7 +1612,7 @@ public final class InterpRuntime {
             return Integer.valueOf(System.identityHashCode(io));
         }
         if ("equals".equals(name) && args.length == 1) {
-            return args[0] == io ? Boolean.TRUE : Boolean.FALSE;
+            return args[0] == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
         }
         if ("toString".equals(name) && args.length == 0) {
             return io.toString();
@@ -1494,6 +1632,7 @@ public final class InterpRuntime {
             this.iface = iface;
         }
 
+        @Override
         public String toString() {
             return iface.getName().replace('/', '.') + "(unsupported on this runtime)";
         }
@@ -1503,7 +1642,7 @@ public final class InterpRuntime {
     ///
     /// Only the methods a constant inherits without overriding reach here;
     /// anything the enum declares itself was already resolved and run.
-    private Object enumCall(InterpObject io, String name, String desc, Object[] args) {
+    private Object enumCall(InterpObject io, String name, Object[] args) {
         if ("name".equals(name) || "toString".equals(name)) {
             return io.enumName;
         }
@@ -1512,13 +1651,13 @@ public final class InterpRuntime {
         }
         if ("equals".equals(name) && args.length == 1) {
             // Enum identity is object identity: constants are singletons.
-            return args[0] == io ? Boolean.TRUE : Boolean.FALSE;
+            return args[0] == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
         }
         if ("hashCode".equals(name)) {
             return Integer.valueOf(System.identityHashCode(io));
         }
         if ("compareTo".equals(name) && args.length == 1 && args[0] instanceof InterpObject) {
-            return Integer.valueOf(io.enumOrdinal - ((InterpObject)args[0]).enumOrdinal);
+            return Integer.valueOf(io.enumOrdinal - ((InterpObject) args[0]).enumOrdinal);
         }
         return NOT_ENUM_METHOD;
     }
@@ -1529,11 +1668,11 @@ public final class InterpRuntime {
         ensureInitialized(c);
         Object values = c.staticValue("$VALUES");
         if (values instanceof Object[]) {
-            Object[] a = (Object[])values;
-            for (int i = 0; i < a.length; i++) {
-                if (a[i] instanceof InterpObject
-                        && name.equals(((InterpObject)a[i]).enumName)) {
-                    return a[i];
+            Object[] a = (Object[]) values;
+            for (Object constant : a) {
+                if (constant instanceof InterpObject
+                        && name.equals(((InterpObject) constant).enumName)) {
+                    return constant;
                 }
             }
         }
@@ -1555,54 +1694,54 @@ public final class InterpRuntime {
     /// whole method on iOS.
     private static Object copyArray(Object a) {
         if (a instanceof Object[]) {
-            Object[] s = (Object[])a;
+            Object[] s = (Object[]) a;
             Object[] d = new Object[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof int[]) {
-            int[] s = (int[])a;
+            int[] s = (int[]) a;
             int[] d = new int[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof byte[]) {
-            byte[] s = (byte[])a;
+            byte[] s = (byte[]) a;
             byte[] d = new byte[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof char[]) {
-            char[] s = (char[])a;
+            char[] s = (char[]) a;
             char[] d = new char[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof short[]) {
-            short[] s = (short[])a;
+            short[] s = (short[]) a;
             short[] d = new short[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof long[]) {
-            long[] s = (long[])a;
+            long[] s = (long[]) a;
             long[] d = new long[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof float[]) {
-            float[] s = (float[])a;
+            float[] s = (float[]) a;
             float[] d = new float[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
         if (a instanceof double[]) {
-            double[] s = (double[])a;
+            double[] s = (double[]) a;
             double[] d = new double[s.length];
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
-        boolean[] s = (boolean[])a;
+        boolean[] s = (boolean[]) a;
         boolean[] d = new boolean[s.length];
         System.arraycopy(s, 0, d, 0, s.length);
         return d;
@@ -1643,18 +1782,18 @@ public final class InterpRuntime {
             return isArrayInstanceOf(v, name);
         }
         if (v instanceof InterpBacked) {
-            v = ((InterpBacked)v).getInterpObject();
+            v = ((InterpBacked) v).getInterpObject();
         }
         if (v instanceof NativeStub) {
             // The cast the NativeLookup idiom always performs. The stub stands
             // in for the interface it was asked for, and for NativeInterface
             // above it.
-            InterpClass iface = ((NativeStub)v).iface;
+            InterpClass iface = ((NativeStub) v).iface;
             return iface.isSubclassOfInterp(name)
                     || "com/codename1/system/NativeInterface".equals(name);
         }
         if (v instanceof InterpObject) {
-            InterpObject io = (InterpObject)v;
+            InterpObject io = (InterpObject) v;
             if (io.type.isSubclassOfInterp(name)) {
                 return true;
             }
@@ -1701,9 +1840,9 @@ public final class InterpRuntime {
             return false;
         }
         if (component.charAt(0) == '[') {
-            Object[] a = (Object[])v;
-            for (int i = 0; i < a.length; i++) {
-                if (a[i] != null && !isArrayInstanceOf(a[i], component)) {
+            Object[] a = (Object[]) v;
+            for (Object element : a) {
+                if (element != null && !isArrayInstanceOf(element, component)) {
                     return false;
                 }
             }
@@ -1715,12 +1854,12 @@ public final class InterpRuntime {
         if ("java/lang/Object".equals(element)) {
             return true;
         }
-        Object[] a = (Object[])v;
-        for (int i = 0; i < a.length; i++) {
-            if (a[i] == null) {
+        Object[] a = (Object[]) v;
+        for (Object item : a) {
+            if (item == null) {
                 continue;
             }
-            if (!isElementOf(a[i], element)) {
+            if (!isElementOf(item, element)) {
                 return false;
             }
         }
@@ -1729,7 +1868,7 @@ public final class InterpRuntime {
 
     private boolean isElementOf(Object v, String element) throws Throwable {
         if (v instanceof InterpObject) {
-            InterpObject io = (InterpObject)v;
+            InterpObject io = (InterpObject) v;
             if (io.type.isSubclassOfInterp(element)) {
                 return true;
             }
@@ -1772,22 +1911,22 @@ public final class InterpRuntime {
         Object array = f.popRef();
         checkArray(array, index);
         switch (op) {
-            case InterpOpcodes.IALOAD: f.pushInt(((int[])array)[index]); break;
-            case InterpOpcodes.LALOAD: f.pushLong(((long[])array)[index]); break;
-            case InterpOpcodes.FALOAD: f.pushFloat(((float[])array)[index]); break;
-            case InterpOpcodes.DALOAD: f.pushDouble(((double[])array)[index]); break;
+            case InterpOpcodes.IALOAD: f.pushInt(((int[]) array)[index]); break;
+            case InterpOpcodes.LALOAD: f.pushLong(((long[]) array)[index]); break;
+            case InterpOpcodes.FALOAD: f.pushFloat(((float[]) array)[index]); break;
+            case InterpOpcodes.DALOAD: f.pushDouble(((double[]) array)[index]); break;
             case InterpOpcodes.BALOAD:
                 // byte[] and boolean[] share the opcode; they are distinct
                 // array types and only the runtime type says which.
                 if (array instanceof boolean[]) {
-                    f.pushInt(((boolean[])array)[index] ? 1 : 0);
+                    f.pushInt(((boolean[]) array)[index] ? 1 : 0);
                 } else {
-                    f.pushInt(((byte[])array)[index]);
+                    f.pushInt(((byte[]) array)[index]);
                 }
                 break;
-            case InterpOpcodes.CALOAD: f.pushInt(((char[])array)[index]); break;
-            case InterpOpcodes.SALOAD: f.pushInt(((short[])array)[index]); break;
-            default: f.pushRef(((Object[])array)[index]); break;
+            case InterpOpcodes.CALOAD: f.pushInt(((char[]) array)[index]); break;
+            case InterpOpcodes.SALOAD: f.pushInt(((short[]) array)[index]); break;
+            default: f.pushRef(((Object[]) array)[index]); break;
         }
     }
 
@@ -1798,7 +1937,7 @@ public final class InterpRuntime {
                 int i = f.popInt();
                 Object a = f.popRef();
                 checkArray(a, i);
-                ((long[])a)[i] = v;
+                ((long[]) a)[i] = v;
                 return;
             }
             case InterpOpcodes.DASTORE: {
@@ -1806,7 +1945,7 @@ public final class InterpRuntime {
                 int i = f.popInt();
                 Object a = f.popRef();
                 checkArray(a, i);
-                ((double[])a)[i] = v;
+                ((double[]) a)[i] = v;
                 return;
             }
             case InterpOpcodes.AASTORE: {
@@ -1814,7 +1953,7 @@ public final class InterpRuntime {
                 int i = f.popInt();
                 Object a = f.popRef();
                 checkArray(a, i);
-                ((Object[])a)[i] = v;
+                ((Object[]) a)[i] = v;
                 return;
             }
             default: break;
@@ -1824,17 +1963,17 @@ public final class InterpRuntime {
         Object a = f.popRef();
         checkArray(a, i);
         switch (op) {
-            case InterpOpcodes.IASTORE: ((int[])a)[i] = v; break;
-            case InterpOpcodes.FASTORE: ((float[])a)[i] = Float.intBitsToFloat(v); break;
+            case InterpOpcodes.IASTORE: ((int[]) a)[i] = v; break;
+            case InterpOpcodes.FASTORE: ((float[]) a)[i] = Float.intBitsToFloat(v); break;
             case InterpOpcodes.BASTORE:
                 if (a instanceof boolean[]) {
-                    ((boolean[])a)[i] = v != 0;
+                    ((boolean[]) a)[i] = v != 0;
                 } else {
-                    ((byte[])a)[i] = (byte)v;
+                    ((byte[]) a)[i] = (byte) v;
                 }
                 break;
-            case InterpOpcodes.CASTORE: ((char[])a)[i] = (char)v; break;
-            case InterpOpcodes.SASTORE: ((short[])a)[i] = (short)v; break;
+            case InterpOpcodes.CASTORE: ((char[]) a)[i] = (char) v; break;
+            case InterpOpcodes.SASTORE: ((short[]) a)[i] = (short) v; break;
             default: throw new IllegalStateException("bad array store " + op);
         }
     }
@@ -1865,15 +2004,33 @@ public final class InterpRuntime {
     /// requires anyway -- ParparVM's CHECKCAST is unchecked, so a cast whose
     /// failure you intend to handle does not throw there.
     private static int arrayLength(Object array) {
-        if (array instanceof Object[]) return ((Object[])array).length;
-        if (array instanceof int[]) return ((int[])array).length;
-        if (array instanceof byte[]) return ((byte[])array).length;
-        if (array instanceof char[]) return ((char[])array).length;
-        if (array instanceof long[]) return ((long[])array).length;
-        if (array instanceof double[]) return ((double[])array).length;
-        if (array instanceof float[]) return ((float[])array).length;
-        if (array instanceof short[]) return ((short[])array).length;
-        if (array instanceof boolean[]) return ((boolean[])array).length;
+        if (array instanceof Object[]) {
+            return ((Object[]) array).length;
+        }
+        if (array instanceof int[]) {
+            return ((int[]) array).length;
+        }
+        if (array instanceof byte[]) {
+            return ((byte[]) array).length;
+        }
+        if (array instanceof char[]) {
+            return ((char[]) array).length;
+        }
+        if (array instanceof long[]) {
+            return ((long[]) array).length;
+        }
+        if (array instanceof double[]) {
+            return ((double[]) array).length;
+        }
+        if (array instanceof float[]) {
+            return ((float[]) array).length;
+        }
+        if (array instanceof short[]) {
+            return ((short[]) array).length;
+        }
+        if (array instanceof boolean[]) {
+            return ((boolean[]) array).length;
+        }
         throw new IllegalArgumentException("not an array: " + array.getClass().getName());
     }
 
@@ -1919,7 +2076,7 @@ public final class InterpRuntime {
         if (InterpOpcodes.isCategory2(kind)) {
             f.pushLong(raw);
         } else {
-            f.pushInt((int)raw);
+            f.pushInt((int) raw);
         }
     }
 
@@ -1933,7 +2090,7 @@ public final class InterpRuntime {
     /// instance of anything the bundle declares.
     private static Object fromHost(Object value) {
         return value instanceof InterpBacked
-                ? ((InterpBacked)value).getInterpObject()
+                ? ((InterpBacked) value).getInterpObject()
                 : value;
     }
 
@@ -1943,7 +2100,7 @@ public final class InterpRuntime {
             // An interpreted object crossing into host code has to go as its
             // peer; the host cannot do anything with an InterpObject.
             if (v instanceof InterpObject) {
-                InterpObject io = (InterpObject)v;
+                InterpObject io = (InterpObject) v;
                 return io.hostPeer != null ? io.hostPeer : io;
             }
             return v;
@@ -1969,7 +2126,7 @@ public final class InterpRuntime {
             lastThrownStack = snapshotStack();
             lastHostCall = null;
             lastThrown = t;
-            return (Throwable)t;
+            return (Throwable) t;
         }
         return new InterpThrowable(t, snapshotStack());
     }
@@ -1980,12 +2137,12 @@ public final class InterpRuntime {
     /// trace, which names the interpreter's frames rather than the program's.
     /// This is the program's, recorded when it was thrown.
     public String[] interpretedStackFor(Throwable t) {
-        return lastThrown == t ? lastThrownStack : null;
+        return lastThrown == t ? lastThrownStack : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
     }
 
     /// The framework method that threw this, or null if interpreted code did.
     public String hostCallFor(Throwable t) {
-        return lastThrown == t ? lastHostCall : null;
+        return lastThrown == t ? lastHostCall : null;  //NOPMD CompareObjectsWithEquals - the same throwable instance
     }
 
     private int findHandler(InterpMethod m, int insn, Object thrown) throws Throwable {
@@ -2014,7 +2171,7 @@ public final class InterpRuntime {
         String[] out = new String[callStack.size()];
         int j = 0;
         for (int i = callStack.size() - 1; i >= 0; i--) {
-            InterpFrame f = (InterpFrame)callStack.elementAt(i);
+            InterpFrame f = (InterpFrame) callStack.elementAt(i);
             int line = f.method.lineFor(f.insn);
             String file = f.method.owner.sourceFile == null ? "Unknown" : f.method.owner.sourceFile;
             out[j++] = f.method.owner.name.replace('/', '.') + "." + f.method.name

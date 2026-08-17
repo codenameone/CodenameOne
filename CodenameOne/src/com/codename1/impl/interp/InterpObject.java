@@ -124,6 +124,7 @@ public final class InterpObject {
     ///
     /// An object that *does* have a peer never reaches this: the framework sees
     /// the peer, whose generated override routes to the interpreter already.
+    @Override
     public String toString() {
         if (enumName != null) {
             return enumName;
@@ -131,8 +132,8 @@ public final class InterpObject {
         if (runtime != null) {
             Object r = runtime.dispatch(this, "toString", "()Ljava/lang/String;",
                     new Object[0]);
-            if (r != InterpRuntime.NOT_OVERRIDDEN) {
-                return (String)r;
+            if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
+                return (String) r;
             }
         }
         return type.name.replace('/', '.') + "@interp";

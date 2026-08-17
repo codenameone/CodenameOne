@@ -83,7 +83,7 @@ final class InterpValues {
         }
         int[] result = new int[kinds.size()];
         for (int j = 0; j < result.length; j++) {
-            result[j] = ((Integer)kinds.elementAt(j)).intValue();
+            result[j] = ((Integer) kinds.elementAt(j)).intValue();
         }
         return result;
     }
@@ -115,9 +115,9 @@ final class InterpValues {
     static Object defaultValue(String desc) {
         switch (kindOf(desc)) {
             case InterpOpcodes.RET_BOOLEAN: return Boolean.FALSE;
-            case InterpOpcodes.RET_BYTE:    return Byte.valueOf((byte)0);
-            case InterpOpcodes.RET_CHAR:    return Character.valueOf((char)0);
-            case InterpOpcodes.RET_SHORT:   return Short.valueOf((short)0);
+            case InterpOpcodes.RET_BYTE:    return Byte.valueOf((byte) 0);
+            case InterpOpcodes.RET_CHAR:    return Character.valueOf((char) 0);
+            case InterpOpcodes.RET_SHORT:   return Short.valueOf((short) 0);
             case InterpOpcodes.RET_INT:     return Integer.valueOf(0);
             case InterpOpcodes.RET_LONG:    return Long.valueOf(0L);
             case InterpOpcodes.RET_FLOAT:   return Float.valueOf(0f);
@@ -131,9 +131,9 @@ final class InterpValues {
     static Object defaultForKind(int kind) {
         switch (kind) {
             case InterpOpcodes.RET_BOOLEAN: return Boolean.FALSE;
-            case InterpOpcodes.RET_BYTE:    return Byte.valueOf((byte)0);
-            case InterpOpcodes.RET_CHAR:    return Character.valueOf((char)0);
-            case InterpOpcodes.RET_SHORT:   return Short.valueOf((short)0);
+            case InterpOpcodes.RET_BYTE:    return Byte.valueOf((byte) 0);
+            case InterpOpcodes.RET_CHAR:    return Character.valueOf((char) 0);
+            case InterpOpcodes.RET_SHORT:   return Short.valueOf((short) 0);
             case InterpOpcodes.RET_INT:     return Integer.valueOf(0);
             case InterpOpcodes.RET_LONG:    return Long.valueOf(0L);
             case InterpOpcodes.RET_FLOAT:   return Float.valueOf(0f);
@@ -149,12 +149,12 @@ final class InterpValues {
     static Object box(int kind, long raw, Object ref) {
         switch (kind) {
             case InterpOpcodes.RET_BOOLEAN: return raw != 0 ? Boolean.TRUE : Boolean.FALSE;
-            case InterpOpcodes.RET_BYTE:    return Byte.valueOf((byte)raw);
-            case InterpOpcodes.RET_CHAR:    return Character.valueOf((char)raw);
-            case InterpOpcodes.RET_SHORT:   return Short.valueOf((short)raw);
-            case InterpOpcodes.RET_INT:     return Integer.valueOf((int)raw);
+            case InterpOpcodes.RET_BYTE:    return Byte.valueOf((byte) raw);
+            case InterpOpcodes.RET_CHAR:    return Character.valueOf((char) raw);
+            case InterpOpcodes.RET_SHORT:   return Short.valueOf((short) raw);
+            case InterpOpcodes.RET_INT:     return Integer.valueOf((int) raw);
             case InterpOpcodes.RET_LONG:    return Long.valueOf(raw);
-            case InterpOpcodes.RET_FLOAT:   return Float.valueOf(Float.intBitsToFloat((int)raw));
+            case InterpOpcodes.RET_FLOAT:   return Float.valueOf(Float.intBitsToFloat((int) raw));
             case InterpOpcodes.RET_DOUBLE:  return Double.valueOf(Double.longBitsToDouble(raw));
             default: return ref;
         }
@@ -168,21 +168,21 @@ final class InterpValues {
         }
         switch (kind) {
             case InterpOpcodes.RET_BOOLEAN:
-                return ((Boolean)value).booleanValue() ? 1 : 0;
+                return ((Boolean) value).booleanValue() ? 1 : 0;
             case InterpOpcodes.RET_BYTE:
-                return ((Byte)value).byteValue();
+                return ((Byte) value).byteValue();
             case InterpOpcodes.RET_CHAR:
-                return ((Character)value).charValue();
+                return ((Character) value).charValue();
             case InterpOpcodes.RET_SHORT:
-                return ((Short)value).shortValue();
+                return ((Short) value).shortValue();
             case InterpOpcodes.RET_INT:
-                return ((Integer)value).intValue();
+                return ((Integer) value).intValue();
             case InterpOpcodes.RET_LONG:
-                return ((Long)value).longValue();
+                return ((Long) value).longValue();
             case InterpOpcodes.RET_FLOAT:
-                return Float.floatToIntBits(((Float)value).floatValue()) & 0xffffffffL;
+                return Float.floatToIntBits(((Float) value).floatValue()) & 0xffffffffL;
             case InterpOpcodes.RET_DOUBLE:
-                return Double.doubleToLongBits(((Double)value).doubleValue());
+                return Double.doubleToLongBits(((Double) value).doubleValue());
             default:
                 return 0;
         }

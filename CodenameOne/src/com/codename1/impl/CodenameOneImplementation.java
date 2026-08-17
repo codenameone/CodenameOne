@@ -4567,7 +4567,7 @@ public abstract class CodenameOneImplementation {
     /// already touches the file system. Allocated eagerly rather than lazily:
     /// a push arrives on a socket thread while the event thread may be reading,
     /// and lazily creating a shared static under that is how entries go missing.
-    private static final java.util.Hashtable localResources = new java.util.Hashtable();
+    private static final Hashtable localResources = new Hashtable();
 
     /// Publishes a resource under the path an application would load it by,
     /// e.g. `/theme.res`. A null value removes it.
@@ -4591,9 +4591,9 @@ public abstract class CodenameOneImplementation {
         if (resource == null || localResources.isEmpty()) {
             return null;
         }
-        byte[] data = (byte[])localResources.get(resource);
+        byte[] data = (byte[]) localResources.get(resource);
         if (data == null && !resource.startsWith("/")) {
-            data = (byte[])localResources.get("/" + resource);
+            data = (byte[]) localResources.get("/" + resource);
         }
         return data == null ? null : new java.io.ByteArrayInputStream(data);
     }
