@@ -22,14 +22,15 @@
  */
 package com.codenameone.devruntime;
 
-import com.codename1.interp.InterpBundle;
-import com.codename1.interp.InterpBundleReader;
-import com.codename1.interp.InterpPlatform;
-import com.codename1.interp.InterpRuntime;
+import com.codename1.impl.interp.InterpBundle;
+import com.codename1.impl.interp.InterpBundleReader;
+import com.codename1.impl.interp.InterpPairingSecret;
+import com.codename1.impl.interp.InterpPlatform;
+import com.codename1.impl.interp.InterpRuntime;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
-import com.codename1.interp.InterpThrowable;
+import com.codename1.impl.interp.InterpThrowable;
 import com.codename1.io.Preferences;
 import com.codename1.io.Socket;
 import com.codename1.io.SocketConnection;
@@ -39,6 +40,7 @@ import com.codename1.ui.Form;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Enumeration;
@@ -67,8 +69,15 @@ public class DeviceRuntimeService {
     /** Unauthenticated push. Only meaningful over a loopback-bound listener. */
     static final int PROTOCOL_V1 = 1;
 
-    /** Push preceded by a peer id, subject to pairing and per-connection approval. */
-    static final int PROTOCOL_V2 = 2;
+    /**
+     * Challenge-response push, subject to pairing and per-connection approval.
+     *
+     * <p>There was a v2 in which the peer id alone authorised a push. It was a
+     * bearer token in plaintext on a LAN -- capture one frame, push forever --
+     * and it is gone rather than deprecated. Nothing has shipped that speaks
+     * it, and leaving it in would have made the fix optional for an attacker.</p>
+     */
+    static final int PROTOCOL_V3 = 3;
 
     static final int FRAME_PAIR = 1;
     static final int FRAME_PUSH = 2;
@@ -364,13 +373,69 @@ public class DeviceRuntimeService {
     }
 
     /**
+     * Runs the pairing handshake on an open connection.
+     *
+     * <p>Two round trips, because the device cannot issue a challenge until a
+     * human has typed the code the challenge will be answered with. The secret
+     * derived here is never sent -- both ends compute it from the code, the peer
+     * id and the device id -- so what an eavesdropper sees is a nonce and an
+     * HMAC over it.</p>
+     */
+    private void handlePairing(DataInputStream in, DataOutputStream out) throws IOException {
+        String peerId = in.readUTF();
+        String peerName = in.readUTF();
+        String code = DeviceRuntimePairing.promptForCode(peerId, peerName);
+        if (code == null) {
+            out.writeByte(0);
+            out.writeUTF(DeviceRuntimePairing.lastFailure());
+            out.flush();
+            return;
+        }
+        String deviceId = DeviceRuntimePairing.deviceId();
+        String challenge = InterpPairingSecret.challenge();
+        out.writeByte(1);
+        out.writeUTF(deviceId);
+        out.writeUTF(challenge);
+        out.flush();
+
+        // Deliberately slow, and deliberately off the event thread: the whole
+        // point of the iteration count is that grinding the six-digit code costs
+        // an attacker real time.
+        byte[] secret = InterpPairingSecret.derive(code, peerId, deviceId);
+        String response = in.readUTF();
+        if (!InterpPairingSecret.matches(response,
+                InterpPairingSecret.respond(secret, challenge))) {
+            DeviceRuntimePairing.reportCodeMismatch();
+            out.writeByte(0);
+            out.writeUTF(DeviceRuntimePairing.lastFailure());
+            out.flush();
+            return;
+        }
+        DeviceRuntimePairing.completePairing(peerId, peerName, secret);
+        status = "paired with " + peerName;
+        out.writeByte(1);
+        out.writeUTF("paired with this device as \"" + peerName + "\"");
+        out.flush();
+    }
+
+    /**
      * Reads one frame and replies.
      *
-     * <p>Wire format: magic, protocol version, then a version-specific body.
-     * v1 is {@code length, bundle}; v2 is {@code frameType} followed by either a
-     * pairing request or {@code peerId, length, bundle}. The reply is a status
-     * byte and a UTF message either way, so the desktop learns whether the
-     * program actually started rather than only that the bytes arrived.</p>
+     * <p>Wire format: magic, protocol version, then a version-specific body.</p>
+     *
+     * <p>v1 is {@code length, bundle} and is accepted only over loopback.</p>
+     *
+     * <p>v3 opens with a frame type. {@code FRAME_PAIR} sends
+     * {@code peerId, peerName}; the device prompts for the code, replies
+     * {@code 1, deviceId, challenge}, reads the computer's response and replies
+     * again with the verdict. {@code FRAME_PUSH} sends {@code peerId}; the
+     * device replies {@code 1, deviceId, challenge}, then reads
+     * {@code response, length, bundle} and checks the response against the
+     * challenge <em>and the bundle</em> before anything is run.</p>
+     *
+     * <p>The reply is a status byte and a UTF message either way, so the desktop
+     * learns whether the program actually started rather than only that the
+     * bytes arrived.</p>
      */
     void handle(InputStream is, OutputStream os) {
         handle(is, os, true);
@@ -409,41 +474,49 @@ public class DeviceRuntimeService {
                             in.readFully(payload);
                         }
                     }
-                } else if (version == PROTOCOL_V2) {
+                } else if (version == PROTOCOL_V3) {
                     int frame = in.readInt();
                     if (frame == FRAME_PAIR) {
-                        String peerId = in.readUTF();
-                        String peerName = in.readUTF();
-                        String digest = in.readUTF();
-                        String paired = DeviceRuntimePairing.pair(peerId, peerName, digest);
-                        if (paired == null) {
-                            out.writeByte(0);
-                            out.writeUTF(DeviceRuntimePairing.lastFailure());
-                        } else {
-                            DeviceRuntimePairing.remember(peerId);
-                            status = "paired with " + paired;
-                            out.writeByte(1);
-                            out.writeUTF("paired with this device as \"" + paired + "\"");
-                        }
-                        out.flush();
+                        handlePairing(in, out);
                         return;
                     } else if (frame == FRAME_PUSH) {
                         String peerId = in.readUTF();
-                        if (!DeviceRuntimePairing.isPaired(peerId)) {
+                        byte[] secret = DeviceRuntimePairing.secretFor(peerId);
+                        if (secret == null) {
                             // Said precisely, so the push tool can offer to pair
                             // rather than leaving the user to guess. A device
                             // that was reinstalled has forgotten pairings the
                             // desktop still believes in.
                             reject = "this computer is not paired with this device";
-                        } else if (!DeviceRuntimePairing.approve(peerId)) {
-                            reject = "this device did not approve the connection";
                         } else {
+                            String challenge = InterpPairingSecret.challenge();
+                            out.writeByte(1);
+                            out.writeUTF(DeviceRuntimePairing.deviceId());
+                            out.writeUTF(challenge);
+                            out.flush();
+
+                            String response = in.readUTF();
                             int length = in.readInt();
                             if (length <= 0 || length > MAX_BUNDLE) {
                                 reject = "implausible bundle length " + length;
                             } else {
-                                payload = new byte[length];
-                                in.readFully(payload);
+                                byte[] body = new byte[length];
+                                in.readFully(body);
+                                if (!InterpPairingSecret.matches(response,
+                                        InterpPairingSecret.respond(secret, challenge, body))) {
+                                    // Covers the bundle as well as the
+                                    // challenge, so this also rejects a program
+                                    // altered in flight behind a valid answer.
+                                    reject = "this connection did not authenticate";
+                                } else if (!DeviceRuntimePairing.approve(peerId)) {
+                                    // Only now: prompting before authentication
+                                    // would let anyone on the network raise
+                                    // dialogs on this phone until somebody
+                                    // tapped Approve to make them stop.
+                                    reject = "this device did not approve the connection";
+                                } else {
+                                    payload = body;
+                                }
                             }
                         }
                     } else {
@@ -451,7 +524,7 @@ public class DeviceRuntimeService {
                     }
                 } else {
                     reject = "push protocol version " + version + ", this app speaks "
-                            + PROTOCOL_V1 + " and " + PROTOCOL_V2;
+                            + PROTOCOL_V1 + " and " + PROTOCOL_V3;
                 }
             }
             if (reject != null) {

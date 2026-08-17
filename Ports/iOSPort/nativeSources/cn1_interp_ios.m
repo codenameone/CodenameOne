@@ -62,7 +62,7 @@ extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
 #include <string.h>
 #include <stdlib.h>
 
-/* Kind codes, matching com.codename1.interp.InterpOpcodes. */
+/* Kind codes, matching com.codename1.impl.interp.InterpOpcodes. */
 #define K_VOID    0
 #define K_INT     1
 #define K_LONG    2

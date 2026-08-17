@@ -13,9 +13,35 @@
 
     <!-- Add your cn1lib dependencies to this section -->
     <dependencies>
+        <!-- Build-time only: it writes the shims, it is not part of the app. -->
+        <dependency>
+            <groupId>com.codenameone.devruntime</groupId>
+            <artifactId>cn1-device-runtime-tools</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>java-runtime</artifactId>
+            <version>${cn1.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- The generator reads the device's method tables with ASM. -->
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>9.8</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm-tree</artifactId>
+            <version>9.8</version>
             <scope>provided</scope>
         </dependency>
 
@@ -343,6 +369,16 @@
                 <version>3.4.0</version>
                 <executions>
                     <execution>
+                        <id>add-generated-shim-source</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>add-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.build.directory}/generated-sources/shims</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>add-parparvm-common-benchmark-source</id>
                         <phase>generate-sources</phase>
                         <goals><goal>add-source</goal></goals>
@@ -355,6 +391,61 @@
                 </executions>
             </plugin>
 
+            <!--
+              The shims are generated code, so the build generates them. They are
+              a mechanical function of the framework jar on the classpath (one
+              subclass per public non-final type, ~1000 files), and checking a
+              thousand derived files into git only invites them to drift from the
+              framework they were derived from.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <id>resolve-jar-paths</id>
+                        <phase>initialize</phase>
+                        <goals><goal>properties</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>generate-interp-shims</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <!--
+                              The running JVM, not whatever java is on PATH: the
+                              java.* shims are derived by reflecting over the JDK
+                              that compiles them, and the JDKs disagree about
+                              what is final.
+                            -->
+                            <executable>${java.home}/bin/java</executable>
+                            <!--
+                              The generator is a provided-scope dependency, and
+                              the default runtime classpath omits those.
+                            -->
+                            <classpathScope>compile</classpathScope>
+                            <arguments>
+                                <argument>-cp</argument>
+                                <classpath/>
+                                <argument>com.codenameone.devruntime.tools.GenerateInterpShims</argument>
+                                <argument>${project.build.directory}/generated-sources/shims</argument>
+                                <argument>${com.codenameone:codenameone-core:jar}</argument>
+                                <argument>--java-runtime</argument>
+                                <argument>${com.codenameone:java-runtime:jar}</argument>
+                                <argument>--exclude</argument>
+                                <argument>${project.basedir}/../tools/unshimmable-by-contract.txt</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>com.codenameone</groupId>
                 <artifactId>codenameone-maven-plugin</artifactId>

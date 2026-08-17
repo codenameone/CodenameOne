@@ -262,7 +262,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         // the linker needs; on an ordinary build this leaves the registry empty
         // and the device runtime reports itself unavailable.
         if(InterpIOSLinker.isAvailable()) {
-            com.codename1.interp.InterpPlatform.register(new InterpIOSLinker());
+            com.codename1.impl.interp.InterpPlatform.register(new InterpIOSLinker());
         }
     }
     

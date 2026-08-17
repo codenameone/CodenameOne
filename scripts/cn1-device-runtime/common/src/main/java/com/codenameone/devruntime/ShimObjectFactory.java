@@ -22,9 +22,9 @@
  */
 package com.codenameone.devruntime;
 
-import com.codename1.interp.InterpObject;
-import com.codename1.interp.InterpObjectFactory;
-import com.codename1.interp.InterpRuntime;
+import com.codename1.impl.interp.InterpObject;
+import com.codename1.impl.interp.InterpObjectFactory;
+import com.codename1.impl.interp.InterpRuntime;
 import com.codenameone.devruntime.gen.InterpShimRegistry;
 
 /**

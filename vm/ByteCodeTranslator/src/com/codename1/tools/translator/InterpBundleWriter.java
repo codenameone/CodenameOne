@@ -166,7 +166,16 @@ public class InterpBundleWriter {
         }
     }
 
-    /** Adds every {@code .java} under a directory, recursively. */
+    /**
+     * Adds every {@code .java} under a directory, recursively.
+     *
+     * <p>Keyed by package rather than by file name. A bare name collides the
+     * moment a project has two {@code Util.java} in different packages, and the
+     * loser is simply absent -- which the runtime reports as "bundle is missing
+     * the source file Util.java" for a file that was right there. Since the
+     * source requirement is what lets the app run pushed code at all, losing one
+     * silently is not an option.</p>
+     */
     public void addSourceTree(File dir) throws IOException {
         File[] kids = dir.listFiles();
         if (kids == null) {
@@ -176,10 +185,44 @@ public class InterpBundleWriter {
             if (f.isDirectory()) {
                 addSourceTree(f);
             } else if (f.getName().endsWith(".java")) {
-                addSource(f.getName(),
-                        new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
+                String text = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
+                addSource(sourceKey(packageOf(text), f.getName()), text);
             }
         }
+    }
+
+    /**
+     * The bundle key for a source file: {@code com/foo/Util.java}, or the bare
+     * name in the default package. Matches how a class's own internal name and
+     * its {@code SourceFile} attribute combine, which is how the reader looks
+     * one up.
+     */
+    static String sourceKey(String packageName, String fileName) {
+        if (packageName == null || packageName.length() == 0) {
+            return fileName;
+        }
+        return packageName.replace('.', '/') + "/" + fileName;
+    }
+
+    /**
+     * The declared package of a source file, read from the file rather than
+     * inferred from its path -- a source root is not always the package root.
+     */
+    static String packageOf(String text) {
+        for (String raw : text.split("\n")) {
+            String line = raw.trim();
+            if (line.startsWith("package ")) {
+                int end = line.indexOf(';');
+                if (end > 0) {
+                    return line.substring("package ".length(), end).trim();
+                }
+            } else if (line.startsWith("import ") || line.startsWith("class ")
+                    || line.startsWith("public ")) {
+                // Past anything a package declaration may follow.
+                break;
+            }
+        }
+        return "";
     }
 
     /** The class whose {@code main} the runtime should enter. */

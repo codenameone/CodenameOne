@@ -16,8 +16,9 @@
     </license>
   </licenses>
   <modules>
-<module>common</module>
-</modules>
+    <module>tools</module>
+    <module>common</module>
+  </modules>
   <properties>
     <cn1.plugin.version>8.0-SNAPSHOT</cn1.plugin.version>
     <cn1.version>8.0-SNAPSHOT</cn1.version>

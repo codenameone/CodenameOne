@@ -22,11 +22,10 @@
  */
 package com.codenameone.devruntime;
 
-import com.codename1.interp.InterpPairingDigest;
+import com.codename1.impl.interp.InterpPairingSecret;
 import com.codename1.io.Preferences;
 import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
-import com.codename1.ui.Command;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -42,29 +41,26 @@ import com.codename1.ui.Label;
  *
  * <h2>Pairing</h2>
  *
- * <p>The IDE prints a six-digit code and sends the device a peer id plus a
- * digest binding that id to the code. The device asks the user to type the
- * code, recomputes the digest, and pairs only if it matches. A computer that
+ * <p>The IDE prints a six-digit code; the device asks the user to type it. Both
+ * ends then derive the same 256-bit secret from that code, the peer id and the
+ * device id -- the secret itself never crosses the wire -- and the device
+ * challenges the computer to prove it holds the same one. A computer that
  * cannot see the IDE's terminal therefore cannot pair, which is the property
  * worth having: the code proves a human is at both ends.</p>
  *
  * <h2>Every connection after that</h2>
  *
- * <p>A paired computer still does not get to push silently. Each connection
- * raises "Approve connection from &lt;name&gt;?" with <em>Once</em>,
- * <em>Always</em> and <em>Deny</em>. Only <em>Always</em> is remembered, and it
- * is remembered per peer, so revoking one computer does not disturb another.
- * "Forget all paired computers" clears the lot.</p>
+ * <p>Each connection begins with a fresh challenge, so a captured frame
+ * authenticates nothing the second time. Only after the computer answers it
+ * does the device raise "Approve connection from &lt;name&gt;?" with
+ * <em>Once</em>, <em>Always</em> and <em>Deny</em>. Only <em>Always</em> is
+ * remembered, and it is remembered per peer, so revoking one computer does not
+ * disturb another. "Forget all paired computers" clears the lot -- secrets
+ * included, so a forgotten computer has to be let back in by a human.</p>
  *
- * <h2>What the digest is and is not</h2>
- *
- * <p>The digest is a plain string hash, not a MAC, and the channel is not
- * encrypted. That is honest for what this is: a loopback link reachable only
- * over USB debugging or the simulator's own loopback, where an attacker who
- * could observe the exchange already has code execution on the machine at one
- * end. It is not adequate for a listener exposed to a network, and the
- * transport must not be moved onto one without replacing this with a real key
- * exchange.</p>
+ * <p>The order matters: authenticate, then ask. Prompting first would let
+ * anyone on the network raise a dialog on somebody's phone until they tapped
+ * Approve to make it stop.</p>
  *
  * @author Shai Almog
  */
@@ -72,19 +68,46 @@ public final class DeviceRuntimePairing {
     /** Peer id -> friendly name, for every computer that has ever paired. */
     private static final String PREF_PAIRED = "cn1devruntime.paired.";
 
+    /** Peer id -> hex shared secret established at pairing. */
+    private static final String PREF_SECRET = "cn1devruntime.secret.";
+
     /** Peer ids the user chose to stop being asked about. */
     private static final String PREF_ALWAYS = "cn1devruntime.always.";
+
+    /** This device's own public identifier, bound into every secret. */
+    private static final String PREF_DEVICE_ID = "cn1devruntime.deviceId";
+
+    /// Why the last pairing attempt failed, for the desktop to report.
+    private static volatile String lastFailure = "pairing declined on the device";
 
     private DeviceRuntimePairing() {
     }
 
     /**
-     * Completes a pairing request.
+     * This device's identifier: public, stable, and bound into every derived
+     * secret so a code typed on one phone cannot pair another.
      *
-     * @return the friendly name if the user typed the right code, else null
+     * <p>Random rather than a hardware id on purpose. A device id that followed
+     * the hardware would be a tracking identifier handed to every computer that
+     * ever pushed, and nothing here needs one -- reinstalling the app is
+     * supposed to invalidate the pairings it forgot anyway.</p>
      */
-    static String pair(final String peerId, final String peerName, final String digest) {
-        if (peerId == null || peerId.length() == 0 || peerName == null || digest == null) {
+    static synchronized String deviceId() {
+        String id = Preferences.get(PREF_DEVICE_ID, null);
+        if (id == null || id.length() == 0) {
+            id = InterpPairingSecret.hex(com.codename1.security.SecureRandom.bytes(16));
+            Preferences.set(PREF_DEVICE_ID, id);
+        }
+        return id;
+    }
+
+    /**
+     * Asks the user for the code the IDE printed.
+     *
+     * @return what they typed, or null if they declined or typed nothing
+     */
+    static String promptForCode(final String peerId, final String peerName) {
+        if (peerId == null || peerId.length() == 0 || peerName == null) {
             return null;
         }
         final String[] result = new String[1];
@@ -136,46 +159,67 @@ public final class DeviceRuntimePairing {
                             "OK", null);
                     return;
                 }
-                if (!digest.equals(InterpPairingDigest.of(typed, peerId))) {
-                    // Said differently from a denial: a wrong code is a typo to
-                    // retry, and a denial is a decision. Reporting both the same
-                    // way sends people looking for the wrong problem.
-                    lastFailure = "the code typed on the device did not match";
-                    Dialog.show("Device runtime", "That code did not match. "
-                            + "Push again to get a new one.", "OK", null);
-                    return;
-                }
-                Preferences.set(PREF_PAIRED + peerId, peerName);
-                result[0] = peerName;
+                result[0] = typed;
             }
         });
         return result[0];
     }
 
+    /** Records a computer as paired, with the secret both ends derived. */
+    static void completePairing(String peerId, String peerName, byte[] secret) {
+        Preferences.set(PREF_PAIRED + peerId, peerName);
+        Preferences.set(PREF_SECRET + peerId, InterpPairingSecret.hex(secret));
+        remember(peerId);
+    }
+
     /**
-     * Whether an already-paired computer may push right now.
-     *
-     * <p>Returns false for an unknown peer without prompting: an unpaired
-     * computer asking for approval would train the user to approve dialogs they
-     * have no way to attribute.</p>
+     * Tells the user their code was wrong, and says so differently from a
+     * denial: a wrong code is a typo to retry, a denial is a decision, and
+     * reporting both the same way sends people looking for the wrong problem.
      */
+    static void reportCodeMismatch() {
+        lastFailure = "the code typed on the device did not match";
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                Dialog.show("Device runtime", "That code did not match. "
+                        + "Push again to get a new one.", "OK", null);
+            }
+        });
+    }
+
+    static String lastFailure() {
+        return lastFailure;
+    }
+
     /// Whether this computer has ever paired with this device.
     ///
     /// Distinct from approval: the desktop needs to tell "you have never paired
     /// with me" apart from "the person said no", because the first is
     /// recoverable by pairing again -- which is exactly what happens after the
     /// runtime is reinstalled and the device forgets while the desktop does not.
-    /// Why the last pairing attempt failed, for the desktop to report.
-    private static volatile String lastFailure = "pairing declined on the device";
-
-    static String lastFailure() {
-        return lastFailure;
-    }
-
     static boolean isPaired(String peerId) {
-        return peerId != null && Preferences.get(PREF_PAIRED + peerId, null) != null;
+        return secretFor(peerId) != null;
     }
 
+    /// The secret established with a peer, or null if it has never paired.
+    static byte[] secretFor(String peerId) {
+        if (peerId == null) {
+            return null;
+        }
+        String hex = Preferences.get(PREF_SECRET + peerId, null);
+        if (hex == null || hex.length() == 0) {
+            return null;
+        }
+        return InterpPairingSecret.unhex(hex);
+    }
+
+    /**
+     * Whether an already-authenticated computer may push right now.
+     *
+     * <p>Returns false for an unknown peer without prompting: an unpaired
+     * computer asking for approval would train the user to approve dialogs they
+     * have no way to attribute.</p>
+     */
     static boolean approve(final String peerId) {
         final String name = peerId == null ? null : Preferences.get(PREF_PAIRED + peerId, null);
         if (name == null) {
@@ -231,7 +275,7 @@ public final class DeviceRuntimePairing {
         return allowed[0];
     }
 
-    /** Drops every pairing, so the next push has to go through pair() again. */
+    /** Drops every pairing, so the next push has to go through pairing again. */
     public static void forgetAll() {
         // Preferences has no key enumeration, so the peer ids have to be
         // recorded to be removable. The index is a single key holding a
@@ -247,6 +291,10 @@ public final class DeviceRuntimePairing {
             if (peerId.length() > 0) {
                 Preferences.delete(PREF_PAIRED + peerId);
                 Preferences.delete(PREF_ALWAYS + peerId);
+                // The secret above all: leaving it behind would let a forgotten
+                // computer authenticate, and only the approval prompt would
+                // stand between it and running code here.
+                Preferences.delete(PREF_SECRET + peerId);
             }
             from = tab + 1;
         }

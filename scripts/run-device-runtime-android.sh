@@ -40,7 +40,7 @@ MVN_ARGS=()
 
 if [ "$SKIP_BUILD" = 0 ]; then
     # Same trap the iOS script guards: the app resolves the framework from the
-    # local repository, so an edit to com.codename1.interp is invisible here
+    # local repository, so an edit to com.codename1.impl.interp is invisible here
     # until core is installed, and the Android port jar carries its own copy of
     # those classes on top of that. Rebuilding both costs a minute and removes
     # a failure that reads as "my change did nothing".

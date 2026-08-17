@@ -32,6 +32,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
@@ -41,10 +43,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.Random;
+import java.util.Properties;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Sends a compiled project to a device runtime and waits for the result.
@@ -66,19 +74,31 @@ import java.util.Random;
  * <p>Over USB the transport is loopback and possession of the cable is the
  * authentication. Over Wi-Fi it is not: any machine on the network could answer
  * a device's dial, and the bundle carries the program's whole source. So a
- * network session pairs first -- this prints a six-digit code, the code is
- * typed on the device, and the device stores this computer only if the digest
- * of (code, peer id) matches. Every later connection is still approved on the
- * device unless the user chose "Always".</p>
+ * network session pairs first. This prints a six-digit code; the code is typed
+ * on the device; both ends then derive the same secret from it without ever
+ * sending it, and the device challenges this computer to prove it holds the
+ * same one. Every connection afterwards answers a fresh challenge that also
+ * covers the bundle, so a captured frame authenticates nothing the second time
+ * and a program cannot be swapped in behind a valid answer. The device still
+ * asks its user to approve, unless they chose "Always".</p>
  *
  * @author Shai Almog
  */
 public final class DevicePush {
     private static final int MAGIC = 0x434E3150;   // "CN1P"
     private static final int V1 = 1;
-    private static final int V2 = 2;
+
+    /**
+     * Challenge-response push. There was a v2 in which the peer id alone
+     * authorised a push -- a plaintext bearer token on a LAN -- and it is gone
+     * rather than deprecated.
+     */
+    private static final int V3 = 3;
     private static final int FRAME_PAIR = 1;
     private static final int FRAME_PUSH = 2;
+
+    /** Must equal InterpPairingSecret.ITERATIONS, or nothing pairs. */
+    private static final int PAIRING_ITERATIONS = 20000;
 
     private DevicePush() {
     }
@@ -233,14 +253,18 @@ public final class DevicePush {
             // Loopback: the only thing that can answer is a USB-authorised
             // device or a simulator on this machine, so there is nothing for a
             // pairing step to establish that possession has not already.
-            send(payload, port, V1, null, true);
+            send(payload, port, null, true);
             return;
         }
         String peerId = peerId();
         String peerName = System.getProperty("user.name") + "@"
                 + InetAddress.getLocalHost().getHostName();
-        if (!Files.exists(pairedMarker())) {
-            String code = String.format("%06d", new Random().nextInt(1000000));
+        if (!send(payload, port, peerId, false) && rejectedAsUnpaired()) {
+            // Either this computer has never paired, or the device has
+            // forgotten it -- reinstalled, or "forget paired computers". Both
+            // recover the same way, and doing it automatically beats making the
+            // user work out why a push that worked yesterday does not today.
+            String code = String.format("%06d", new SecureRandom().nextInt(1000000));
             System.out.println();
             System.out.println("    ==============================");
             System.out.println("      Pairing code:  " + code);
@@ -251,69 +275,112 @@ public final class DevicePush {
             if (!pair(port, peerId, peerName, code)) {
                 System.exit(1);
             }
-            Files.createDirectories(pairedMarker().getParent());
-            Files.write(pairedMarker(), peerId.getBytes(StandardCharsets.UTF_8));
             System.out.println("paired; pushing");
-        }
-        if (!send(payload, port, V2, peerId, false) && rejectedAsUnpaired()) {
-            // The device has forgotten us -- reinstalled, or "forget paired
-            // computers" -- while this machine still had a marker saying
-            // otherwise. Pair again rather than making the user work out why a
-            // push that worked yesterday does not today.
-            System.out.println("this device no longer knows this computer; pairing again");
-            Files.deleteIfExists(pairedMarker());
-            String again = String.format("%06d", new Random().nextInt(1000000));
-            System.out.println("    Pairing code: " + again);
-            System.out.println("    Type it on the device to allow pushes from this computer.");
-            System.out.println();
-            if (!pair(port, peerId, peerName, again)) {
+            if (!send(payload, port, peerId, false)) {
                 System.exit(1);
             }
-            Files.write(pairedMarker(), peerId.getBytes(StandardCharsets.UTF_8));
-            send(payload, port, V2, peerId, false);
         }
     }
 
+    /**
+     * Pairs with a device: two round trips, since the device cannot challenge
+     * until a human has typed the code the challenge is answered with.
+     *
+     * <p>The secret is derived here and on the device from the same three
+     * inputs and is never transmitted. What this sends is an HMAC over the
+     * device's nonce, which authenticates this exchange and no other.</p>
+     */
     private static boolean pair(int port, String peerId, String peerName, String code)
             throws Exception {
         Socket s = accept(port, false, 180000);
         try {
             s.setSoTimeout(180000);   // the user has to read the code and type it
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
+            DataInputStream in = new DataInputStream(s.getInputStream());
             out.writeInt(MAGIC);
-            out.writeInt(V2);
+            out.writeInt(V3);
             out.writeInt(FRAME_PAIR);
             out.writeUTF(peerId);
             out.writeUTF(peerName);
-            out.writeUTF(digestOf(code, peerId));
             out.flush();
-            return report(s);
+
+            if (in.readByte() != 1) {
+                String message = in.readUTF();
+                lastRejection = message;
+                System.out.println("FAILED: " + message);
+                return false;
+            }
+            String deviceId = in.readUTF();
+            String challenge = in.readUTF();
+            byte[] secret = deriveSecret(code, peerId, deviceId);
+            out.writeUTF(respond(secret, challenge, null));
+            out.flush();
+            boolean ok = report(s);
+            if (ok) {
+                rememberSecret(deviceId, secret);
+            }
+            return ok;
         } finally {
             s.close();
         }
     }
 
-    private static boolean send(byte[] payload, int port, int version, String peerId,
+    /**
+     * Sends a bundle.
+     *
+     * <p>Over loopback this is v1 and unauthenticated, because possession of
+     * the USB cable or of this machine already is the authentication. Over a
+     * network it is v3: the device names itself and issues a nonce, and the
+     * answer covers the bundle as well as the nonce, so what runs on the phone
+     * is what left this process.</p>
+     */
+    private static boolean send(byte[] payload, int port, String peerId,
                                 boolean loopbackOnly) throws Exception {
         System.out.println("awaiting the device on port " + port);
         Socket s = accept(port, loopbackOnly, 120000);
         try {
             s.setSoTimeout(120000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
+            DataInputStream in = new DataInputStream(s.getInputStream());
             out.writeInt(MAGIC);
-            out.writeInt(version);
-            if (version >= V2) {
-                out.writeInt(FRAME_PUSH);
-                out.writeUTF(peerId);
+            if (loopbackOnly) {
+                out.writeInt(V1);
+                out.writeInt(payload.length);
+                out.write(payload);
+                out.flush();
+                boolean ok = report(s);
+                if (!ok) {
+                    System.exit(1);
+                }
+                return ok;
             }
+            out.writeInt(V3);
+            out.writeInt(FRAME_PUSH);
+            out.writeUTF(peerId);
+            out.flush();
+
+            if (in.readByte() != 1) {
+                String message = in.readUTF();
+                lastRejection = message;
+                System.out.println("FAILED: " + message);
+                return false;
+            }
+            String deviceId = in.readUTF();
+            String challenge = in.readUTF();
+            // Which device answered decides which secret applies: one computer
+            // may be paired with several phones, and the dial-in gives no
+            // advance notice of which one this is.
+            byte[] secret = secretFor(deviceId);
+            if (secret == null) {
+                lastRejection = "this computer is not paired with this device";
+                System.out.println("FAILED: " + lastRejection);
+                return false;
+            }
+            out.writeUTF(respond(secret, challenge, payload));
             out.writeInt(payload.length);
             out.write(payload);
             out.flush();
-            boolean ok = report(s);
-            if (!ok && version < V2) {
-                System.exit(1);
-            }
-            return ok;
+            return report(s);
         } finally {
             s.close();
         }
@@ -463,40 +530,128 @@ public final class DevicePush {
         if (Files.exists(f)) {
             return new String(Files.readAllBytes(f), StandardCharsets.UTF_8).trim();
         }
-        String id = Long.toHexString(new Random().nextLong())
-                + Long.toHexString(System.currentTimeMillis());
+        String id = hex(randomBytes(16));
         Files.createDirectories(f.getParent());
         Files.write(f, id.getBytes(StandardCharsets.UTF_8));
         return id;
     }
 
-    private static Path pairedMarker() {
-        return Paths.get(System.getProperty("user.home"), ".codenameone", "devruntime-paired");
+    /** Where the secrets established with each device are kept. */
+    private static Path secretsFile() {
+        return Paths.get(System.getProperty("user.home"), ".codenameone",
+                "devruntime-secrets.properties");
+    }
+
+    private static byte[] secretFor(String deviceId) throws IOException {
+        Path f = secretsFile();
+        if (!Files.exists(f)) {
+            return null;
+        }
+        Properties p = new Properties();
+        InputStream in = Files.newInputStream(f);
+        try {
+            p.load(in);
+        } finally {
+            in.close();
+        }
+        String hex = p.getProperty(deviceId);
+        return hex == null ? null : unhex(hex);
+    }
+
+    private static void rememberSecret(String deviceId, byte[] secret) throws IOException {
+        Path f = secretsFile();
+        Properties p = new Properties();
+        if (Files.exists(f)) {
+            InputStream in = Files.newInputStream(f);
+            try {
+                p.load(in);
+            } finally {
+                in.close();
+            }
+        }
+        p.setProperty(deviceId, hex(secret));
+        Files.createDirectories(f.getParent());
+        OutputStream out = Files.newOutputStream(f);
+        try {
+            p.store(out, "Codename One device runtime -- shared secrets, one per paired device");
+        } finally {
+            out.close();
+        }
+        // It authorises running code on somebody's phone; nobody else on this
+        // machine needs to read it.
+        try {
+            Files.setPosixFilePermissions(f,
+                    PosixFilePermissions.fromString("rw-------"));
+        } catch (UnsupportedOperationException notPosix) {
+            // Windows: the default ACL is the user's own, which is the intent.
+        }
     }
 
     /**
-     * Must stay identical to {@code InterpPairingDigest} in the runtime.
+     * Must stay identical to {@code InterpPairingSecret} in the runtime.
      *
-     * <p>Hand-rolled rather than {@code MessageDigest}: the device half of this
-     * runs on ParparVM, which has neither {@code java.security} nor
-     * {@code Long.toHexString}, and the two halves have to agree exactly. It
-     * establishes that the pairing code came from whoever can see this
-     * terminal, which is all it is for -- the session is not encrypted, and the
-     * transport is a local network.</p>
+     * <p>Written against the JDK's own HMAC while the device half is written
+     * against Codename One's, because ParparVM has no {@code javax.crypto} --
+     * two implementations of one standard, which is exactly what
+     * {@code InterpPairingSecretTest} exists to keep honest.</p>
      */
-    private static String digestOf(String code, String peerId) {
-        String material = "cn1-device-runtime " + code.trim() + " " + peerId;
-        long h = 1125899906842597L;
-        for (int i = 0; i < material.length(); i++) {
-            h = 31 * h + material.charAt(i);
+    private static byte[] deriveSecret(String code, String peerId, String deviceId) {
+        byte[] key = code.trim().getBytes(StandardCharsets.UTF_8);
+        byte[] block = hmac(key,
+                ("cn1-device-runtime|" + peerId + "|" + deviceId).getBytes(StandardCharsets.UTF_8));
+        for (int i = 1; i < PAIRING_ITERATIONS; i++) {
+            block = hmac(key, block);
         }
-        char[] hex = new char[16];
-        for (int i = 15; i >= 0; i--) {
-            int nibble = (int) (h & 0xf);
-            hex[i] = (char) (nibble < 10 ? '0' + nibble : 'a' + nibble - 10);
-            h >>>= 4;
+        return block;
+    }
+
+    /** The answer to a device's challenge, optionally covering a bundle. */
+    private static String respond(byte[] secret, String challenge, byte[] payload) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+            mac.update(challenge.getBytes(StandardCharsets.UTF_8));
+            if (payload != null) {
+                mac.update(payload);
+            }
+            return hex(mac.doFinal());
+        } catch (GeneralSecurityException impossible) {
+            throw new IllegalStateException("HmacSHA256 is required of every JRE", impossible);
         }
-        return new String(hex);
+    }
+
+    private static byte[] hmac(byte[] key, byte[] data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(key, "HmacSHA256"));
+            return mac.doFinal(data);
+        } catch (GeneralSecurityException impossible) {
+            throw new IllegalStateException("HmacSHA256 is required of every JRE", impossible);
+        }
+    }
+
+    private static byte[] randomBytes(int count) {
+        byte[] out = new byte[count];
+        new SecureRandom().nextBytes(out);
+        return out;
+    }
+
+    private static String hex(byte[] data) {
+        StringBuilder sb = new StringBuilder(data.length * 2);
+        for (byte b : data) {
+            sb.append(Character.forDigit((b >> 4) & 0xf, 16));
+            sb.append(Character.forDigit(b & 0xf, 16));
+        }
+        return sb.toString();
+    }
+
+    private static byte[] unhex(String s) {
+        byte[] out = new byte[s.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte)((Character.digit(s.charAt(i * 2), 16) << 4)
+                    | Character.digit(s.charAt(i * 2 + 1), 16));
+        }
+        return out;
     }
 
     /** Every address of this machine a device could reasonably dial. */

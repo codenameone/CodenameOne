@@ -149,7 +149,7 @@ They would not be extensible on Android, which can neither patch a vtable nor lo
 
 The test stays, because the day Android grows an equivalent is the day this becomes worth doing.
 
-Regenerate that list with `scripts/generate-interp-shims.sh` after editing `GenerateInterpShims`. The shims are checked in on purpose: they are the app's compiled contract with pushed code, and generating them during the build would let that contract drift silently between the machine that pushes and the app that was installed from a store.
+The shims are generated during the app build -- an `exec-maven-plugin` execution in `common/pom.xml` writes them to `target/generated-sources/shims` and `build-helper` adds that as a source root -- so nothing derived is committed. Generation is required to be reproducible for exactly the reason it might look safer to check the output in: two builds of the same commit must ship the same contract, and `scripts/generate-interp-shims.sh` asserts that alongside "every shim compiles" and "the load-bearing shims exist" after you edit `GenerateInterpShims`.
 
 Two limits follow from the shim approach, and both are recorded rather than remembered.
 
@@ -171,7 +171,7 @@ The generator names the blocking method in all three cases, and a shim that fail
 
 [IMPORTANT]
 ====
-There is deliberately no drop-what-fails fallback. **A shim that will not compile is a bug in the generator, not a property of the framework**, and `generate-interp-shims.sh` fails the build so it gets fixed.
+There is deliberately no drop-what-fails fallback. **A shim that will not compile is a bug in the generator, not a property of the framework**, and both the app build and `generate-interp-shims.sh` fail so it gets fixed.
 
 That distinction is not academic. An earlier version compiled the generated set, dropped whatever `javac` rejected, and repeated until clean -- and it silently ate `Interp_ui_Form`, because `Form` re-declares `getComponentForm()` final where `Component` does not. A device runtime that cannot subclass `Form` is useless, and the mechanism designed to make the build robust was what hid it. Twenty-two types were on that dropped list; every one turned out to be a generator defect -- missing constructor `throws` clauses, unresolved type variables, interface abstracts shadowing concrete implementations -- and fixing them took the list to zero.
 
@@ -216,7 +216,7 @@ A pruned method returning null is the right answer for `Kotlin`'s `BigDecimal` h
 
 `InterpRuntime.run` -- the main dispatch loop -- called `java.lang.reflect.Array.getLength`. ParparVM's `Array` has only `newInstance`, so the pass pruned the loop to an empty function. The iOS build then linked, launched, accepted a push, and replied `OK: ran YourProgram` for every program including one whose `main` was nothing but `throw`. It executed no bytecode at all and said so nowhere.
 
-`Parser.failIfLoadBearing` now makes pruning anything in `com.codename1.interp` or the iOS linker a hard build failure naming the method and the missing member. If you hit it, add the member to `vm/JavaAPI` or rewrite the method to avoid it -- `arrayLength` in `InterpRuntime` is the pattern, an `instanceof` chain that needs no reflection and behaves identically everywhere.
+`Parser.failIfLoadBearing` now makes pruning anything in `com.codename1.impl.interp` or the iOS linker a hard build failure naming the method and the missing member. If you hit it, add the member to `vm/JavaAPI` or rewrite the method to avoid it -- `arrayLength` in `InterpRuntime` is the pattern, an `instanceof` chain that needs no reflection and behaves identically everywhere.
 
 The general lesson: a silent fallback is only safe where "did nothing" and "was never needed" are the same outcome.
 ====
@@ -352,7 +352,7 @@ scripts/run-device-runtime-android.sh PushedDemo.java   # build, install, adb fo
 Two artifacts repackage code from elsewhere, and each has cost a full build cycle to a change that appeared to do nothing:
 
 * **`maven/parparvm`** carries the translator the build actually executes. Installing `vm/ByteCodeTranslator` alone leaves the previous translator in place, and the failure is an error message identical to the one you just fixed.
-* **`maven/ios`** bundles `iOSPort.jar`, which embeds a copy of the core classes. A change to `com.codename1.interp` is invisible to an iOS build until this is rebuilt -- installing `maven/core` is not enough.
+* **`maven/ios`** bundles `iOSPort.jar`, which embeds a copy of the core classes. A change to `com.codename1.impl.interp` is invisible to an iOS build until this is rebuilt -- installing `maven/core` is not enough.
 
 Both symptoms look like your edit was wrong rather than absent, which is what makes them expensive. `run-device-runtime-ios.sh` now rebuilds `core`, `parparvm` and `ios` before translating, which costs about a minute and removes the category.
 ====
@@ -389,18 +389,27 @@ Both device scripts delete the generated native project before rebuilding. That 
 
 The listener speaks two protocol versions and they exist for different situations.
 
-*v1* is an unauthenticated push. It is what `cn1-push.sh` sends by default and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorised device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog.
+*v1* is an unauthenticated push. It is what `cn1-push.sh` sends by default and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorised device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog. It is refused on any connection that did not arrive over loopback, and that is a property of the connection rather than a mode -- treating it as a mode once meant a device that had seen a network address refused USB pushes for the rest of its life.
 
-*v2* pairs first. The IDE prints a six-digit code and sends a peer id with a digest binding that id to the code; the device asks the user to type the code and pairs only on a match. A computer that cannot see the IDE's terminal cannot pair, which is the property worth having -- the code proves a human is at both ends.
+*v3* pairs first, then authenticates every connection.
 
-Pairing does not buy silent access. Every later connection raises "Approve connection from &lt;name&gt;?" with *Once*, *Always* and *Deny*, and only *Always* is remembered, per peer. `DeviceRuntimePairing.forgetAll()` drops the lot.
+Pairing is two round trips. The IDE prints a six-digit code and sends its peer id and a friendly name; the device asks a human to type the code, replies with its own device id and a fresh 32-byte challenge, and both ends then derive the same 256-bit secret from `(code, peerId, deviceId)` -- 20,000 iterations of HMAC-SHA-256, which is what makes grinding the six digits cost something. The computer answers the challenge under that secret and the device stores it only on a match. The secret is never transmitted, in either direction, at any point.
 
-Call `setRequirePairing(true)` to refuse v1. A build that ships to a store must do that before its transport reaches anything wider than loopback.
+Every push afterwards answers a fresh challenge, and the answer covers the bundle as well as the challenge. So a captured frame authenticates exactly one connection, and a program cannot be substituted behind a valid answer.
+
+Pairing does not buy silent access. Once a connection has authenticated, it still raises "Approve connection from &lt;name&gt;?" with *Once*, *Always* and *Deny*, and only *Always* is remembered, per peer. `DeviceRuntimePairing.forgetAll()` drops the lot, secrets included. The order is deliberate: authenticate, then ask. Prompting first would let anyone on the network raise dialogs on somebody's phone until they tapped Approve to make them stop.
+
+[NOTE]
+====
+There was a v2, in which a peer id sent in the clear authorised every later push. That is a bearer token on a LAN -- capture one frame and push forever, and what you push is arbitrary code. It is gone rather than deprecated: nothing had shipped that spoke it, and leaving it in would have made the fix optional for an attacker.
+====
 
 [WARNING]
 ====
-The v2 digest is a string hash, not a MAC, and the channel is not encrypted. That is honest for a loopback link where an attacker who could observe the exchange already has code execution on one of the two machines. It is *not* adequate for a listener on a network. Moving the transport off loopback means replacing this with a real key exchange, not turning `setRequirePairing` on and calling it done.
+What this still does not defeat is a passive observer of the *pairing* exchange itself. Six digits is 10^6 candidates, and an attacker holding the nonce and the answer can grind them offline; the iteration count sets the price but does not remove the attack. Observing any number of *pushes* -- the exposure that actually persists, since pairing happens once -- tells them nothing. Closing the pairing gap properly means a PAKE, not a longer code, and it is the next thing to do if this transport is ever exposed beyond a local network.
 ====
+
+The two implementations of the derivation -- Codename One's HMAC on the device, the JDK's in the push tool, since ParparVM has no `javax.crypto` -- are held together by `InterpPairingSecretTest`, which runs both and compares. They have to agree to the byte, and the symptom of disagreement is "that code did not match", which reads exactly like a typo.
 
 == Store considerations
 

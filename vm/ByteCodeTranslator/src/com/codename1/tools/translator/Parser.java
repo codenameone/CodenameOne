@@ -1336,7 +1336,7 @@ public class Parser extends ClassVisitor {
      * nothing.</p>
      */
     private static boolean isLoadBearingForInterp(String clsName) {
-        return clsName.startsWith("com_codename1_interp_")
+        return clsName.startsWith("com_codename1_impl_interp_")
                 || clsName.startsWith("com_codename1_impl_ios_InterpIOS");
     }
 

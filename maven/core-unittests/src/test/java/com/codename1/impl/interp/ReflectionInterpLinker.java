@@ -20,10 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.android;
+package com.codename1.impl.interp;
 
-import com.codename1.impl.interp.InterpLinker;
-import com.codename1.impl.interp.InterpValuesAccess;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -50,7 +48,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
-public class InterpAndroidLinker implements InterpLinker {
+public class ReflectionInterpLinker implements InterpLinker {
     private final ClassLoader loader;
     // Concurrent, not plain HashMap: the interpreter is entered from every thread
     // the pushed program touches, and a resolution cache is exactly the shared
@@ -67,11 +65,11 @@ public class InterpAndroidLinker implements InterpLinker {
     private final Map<String, Field> fieldCache =
             java.util.Collections.synchronizedMap(new HashMap<String, Field>());
 
-    public InterpAndroidLinker() {
-        this(InterpAndroidLinker.class.getClassLoader());
+    public ReflectionInterpLinker() {
+        this(ReflectionInterpLinker.class.getClassLoader());
     }
 
-    public InterpAndroidLinker(ClassLoader loader) {
+    public ReflectionInterpLinker(ClassLoader loader) {
         this.loader = loader;
     }
 
@@ -116,7 +114,7 @@ public class InterpAndroidLinker implements InterpLinker {
     }
 
     private Class[] paramTypes(String descriptor) throws ClassNotFoundException {
-        String[] descs = InterpValuesAccess.argumentTypes(descriptor);
+        String[] descs = InterpValues.argumentTypes(descriptor);
         Class[] types = new Class[descs.length];
         for (int i = 0; i < descs.length; i++) {
             types[i] = resolve(descs[i]);

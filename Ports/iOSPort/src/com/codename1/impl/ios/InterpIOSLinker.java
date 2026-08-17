@@ -22,8 +22,8 @@
  */
 package com.codename1.impl.ios;
 
-import com.codename1.interp.InterpLinker;
-import com.codename1.interp.InterpValuesAccess;
+import com.codename1.impl.interp.InterpLinker;
+import com.codename1.impl.interp.InterpValuesAccess;
 
 /**
  * Binds interpreted code to the app on iOS.
@@ -48,7 +48,7 @@ import com.codename1.interp.InterpValuesAccess;
  * @author Shai Almog
  */
 public class InterpIOSLinker implements InterpLinker {
-    // Kind codes, matching com.codename1.interp.InterpOpcodes.
+    // Kind codes, matching com.codename1.impl.interp.InterpOpcodes.
     private static final int K_VOID = 0;
     private static final int K_INT = 1;
     private static final int K_LONG = 2;

@@ -84,7 +84,7 @@ if [ "$SKIP_BUILD" = 0 ]; then
     #   parparvm  carries the translator the build actually runs, so installing
     #             vm/ByteCodeTranslator alone leaves the old one in place.
     #   ios       bundles iOSPort.jar, which embeds a copy of the core classes,
-    #             so a change to com.codename1.interp is invisible until this is
+    #             so a change to com.codename1.impl.interp is invisible until this is
     #             rebuilt -- core alone is not enough.
     #
     # Rebuilding all three here costs a minute and removes the whole category.

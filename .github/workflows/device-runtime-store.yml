@@ -78,10 +78,11 @@ jobs:
           mvn -B -q -DskipTests install -pl core,parparvm -am
           mvn -B -q -DskipTests -Pcompile-android install -pl android
 
-      - name: Regenerate and verify the shims
-        # The shims are the app's compiled contract with pushed code. The script
-        # fails if one will not compile, if a load-bearing shim is missing, or if
-        # generation is not reproducible -- all of which are release blockers.
+      - name: Verify the shim generator
+        # The app build generates the shims; this asserts the properties that
+        # build takes on faith. It fails if a shim will not compile, if a
+        # load-bearing shim is missing, or if generating twice differs -- all of
+        # which are release blockers.
         run: scripts/generate-interp-shims.sh
 
       - name: Build the app bundle
@@ -144,7 +145,7 @@ jobs:
           cd maven
           mvn -B -q -DskipTests install -pl core,parparvm,ios -am
 
-      - name: Regenerate and verify the shims
+      - name: Verify the shim generator
         run: scripts/generate-interp-shims.sh
 
       - name: Translate to Xcode
@@ -183,6 +184,9 @@ jobs:
           src="$(find scripts/cn1-device-runtime/ios/target -maxdepth 1 \
             -name '*-ios-source' -type d | head -1)"
           [ -n "$src" ] || { echo "no Xcode project was generated" >&2; exit 1; }
+          # Resolved before the cd: the export options live at a fixed place in
+          # the repo, and the generated project's depth is not ours to predict.
+          export_options="$PWD/scripts/cn1-device-runtime/store/ExportOptions.plist"
           cd "$src"
           xcodebuild -workspace CN1DeviceRuntime.xcworkspace \
             -scheme CN1DeviceRuntime -configuration Release \
@@ -190,7 +194,7 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath build/CN1DeviceRuntime.xcarchive \
             -exportPath build/ipa \
-            -exportOptionsPlist ../../store/ExportOptions.plist
+            -exportOptionsPlist "$export_options"
 
       - name: Upload to TestFlight
         if: ${{ !inputs.dry_run }}
