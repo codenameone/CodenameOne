@@ -282,8 +282,13 @@ class GcHeapIntegrityIntegrationTest {
         if (System.getProperty("os.name").toLowerCase().contains("win")) {
             javaExe += ".exe";
         }
+        // "reference" tells the app it is the JVM run: the collector handshake it uses to place
+        // its hazards inside a mark is a ParparVM symbol, and this run has neither that collector
+        // nor any reason to synchronize with one -- it exists only to say what the program
+        // computes. The translated run below gets no argument and uses the handshake.
         ProcessBuilder pb = new ProcessBuilder(javaExe, "-cp",
-                classesDir + System.getProperty("path.separator") + javaApiDir, "GcVerifyApp");
+                classesDir + System.getProperty("path.separator") + javaApiDir, "GcVerifyApp",
+                "reference");
         pb.redirectErrorStream(true);
         Process process = pb.start();
         String output;
