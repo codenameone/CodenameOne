@@ -32,7 +32,6 @@ import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
 
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,7 +131,13 @@ final class IOSIntentCallbacks {
         }
         try {
             List<AppEntity> found = Intents.queryEntities(entityType, kind, argument);
-            return IntentSerializer.serializeEntities(found, new HashMap<String, byte[]>());
+            // Thumbnails travel inside the document here rather than through the staging area
+            // the index and result paths use. This reply is synchronous -- the platform is
+            // building a picker and blocking on it -- so there is no second call to hand the
+            // blobs to, and staging them would leave them for whatever native call happened
+            // next to consume. An entity thumbnail is a picker-row image, so inlining a few of
+            // them is the whole transaction.
+            return IntentSerializer.serializeEntities(found, null, true);
         } catch (Throwable t) {
             Log.e(t);
             return null;

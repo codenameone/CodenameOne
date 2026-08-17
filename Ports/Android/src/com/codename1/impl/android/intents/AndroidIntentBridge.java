@@ -153,12 +153,20 @@ public class AndroidIntentBridge implements IntentBridge {
                     .getDynamicIntent(intentId);
             String targetId = intentId;
             String effectiveParams = paramsJson;
-            String label = intentId;
+            String label = null;
             if (dyn != null) {
                 targetId = dyn.getBaseIntentId();
                 label = dyn.getTitle();
                 effectiveParams = com.codename1.intents.IntentSerializer.mergeParams(
                         dyn.getBoundParameters(), paramsJson);
+            }
+            if (label == null || label.length() == 0) {
+                // An ordinary declared intent has a title, and that title is what the static
+                // catalogue already shows for it. Falling through to the id here would put
+                // "log_workout" on the launcher beside a "Log a workout" the build wrote.
+                com.codename1.intents.IntentDeclaration decl =
+                        com.codename1.intents.Intents.getDeclaration(targetId);
+                label = decl == null ? intentId : decl.getTitle();
             }
             pushShortcut(ctx, intentId, label, label,
                     uriFor(targetId, effectiveParams, ctx), null);

@@ -663,6 +663,27 @@ class IntentsTest {
         assertEquals(1, ((List) schema.get("required")).size());
     }
 
+    /// A schema that says "string" and nothing else lets a model send an ISO date, a weekday
+    /// name or a sentence, all schema-valid and all of which the dispatcher reads as null. The
+    /// description is the only place the accepted forms can be stated, so it has to state them.
+    @Test
+    void aDateParameterTellsTheModelWhichFormsAreAccepted() {
+        IntentParameterInfo when = new IntentParameterInfo("when", "When?",
+                IntentParameterType.DATE, true, null, null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("log_workout", "Log", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(when),
+                Arrays.asList(Exposure.MODEL)));
+        Intents.setDispatcher(d);
+
+        Map props = (Map) parse(Intents.asTools().get(0).getParametersJsonSchema())
+                .get("properties");
+        String description = (String) ((Map) props.get("when")).get("description");
+
+        assertTrue(description.contains("ISO-8601"), description);
+        assertTrue(description.contains("epoch milliseconds"), description);
+    }
+
     @Test
     void aToolRunsTheIntentAndReturnsItsSerializedResult() throws Exception {
         FakeDispatcher d = new FakeDispatcher();

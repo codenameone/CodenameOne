@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -165,6 +166,24 @@ class IOSAppIntentsBuilderTest {
         assertTrue(swift.contains("var playlist: CN1Entity_playlist"));
         assertTrue(swift.contains("playlist.id"),
                 "the app's own object never crosses; only its id does");
+    }
+
+    /// An @EntityImage that never reaches a DisplayRepresentation is an annotation the
+    /// application wrote and the platform ignores, which is indistinguishable from a bug in
+    /// their code. Every construction site has to carry it, not just the by-id one.
+    @Test
+    void anEntityCarriesItsThumbnailIntoEveryPicker() {
+        String swift = new IOSAppIntentsBuilder(
+                Arrays.asList(intent("play_list", "Play")),
+                Arrays.asList(entity("playlist", "Playlist", "BY_ID", "SUGGESTED", "SEARCH")))
+                .buildAppTargetFileMap().get("CN1AppEntities.swift");
+
+        assertTrue(swift.contains("let thumbnail: Data?"));
+        assertTrue(swift.contains("image: thumbnail.map { DisplayRepresentation.Image(data: $0) }"),
+                "the thumbnail has to reach the display representation to be shown at all");
+        int constructed = swift.split("thumbnail: \\$0\\.image", -1).length - 1;
+        assertEquals(3, constructed,
+                "by-id, suggested and search all build entities and all three must carry it");
     }
 
     @Test

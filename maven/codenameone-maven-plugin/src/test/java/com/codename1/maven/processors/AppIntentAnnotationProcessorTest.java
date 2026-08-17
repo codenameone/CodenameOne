@@ -43,6 +43,7 @@ import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -185,6 +186,71 @@ public class AppIntentAnnotationProcessorTest {
         } finally {
             loader.close();
         }
+    }
+
+    /// A date arrives as epoch millis from the platforms and as text from a language model
+    /// invoking the intent through Intents.asTools(). Both are advertised in the tool schema,
+    /// so both have to resolve; anything else silently becomes a null argument.
+    @Test
+    public void aDateParameterAcceptsBothEpochMillisAndIso8601() throws Exception {
+        File classes = compile(source(
+                "public static java.util.Date seen;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log a workout\")\n"
+                        + "public static IntentResult logWorkout(\n"
+                        + "        @IntentParam(value = \"when\", required = false)\n"
+                        + "        java.util.Date when) {\n"
+                        + "    seen = when;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            // 2026-03-14T00:00:00Z
+            long midnightUtc = 1773446400000L;
+
+            assertEquals(new java.util.Date(midnightUtc),
+                    read(invoke, registry, seen, Long.valueOf(midnightUtc)));
+            assertEquals(new java.util.Date(midnightUtc),
+                    read(invoke, registry, seen, String.valueOf(midnightUtc)));
+            assertEquals("a bare date is midnight UTC", new java.util.Date(midnightUtc),
+                    read(invoke, registry, seen, "2026-03-14"));
+            assertEquals(new java.util.Date(midnightUtc),
+                    read(invoke, registry, seen, "2026-03-14T00:00:00Z"));
+            assertEquals("fractional seconds are accepted and kept",
+                    new java.util.Date(midnightUtc + 250),
+                    read(invoke, registry, seen, "2026-03-14T00:00:00.250Z"));
+            assertEquals("an offset is applied rather than ignored",
+                    new java.util.Date(midnightUtc + 3600000L),
+                    read(invoke, registry, seen, "2026-03-14T00:00:00-01:00"));
+            // Optional on purpose: an unparseable value has to become "absent" rather than
+            // "some date", and only an optional parameter can show that. A required one fails
+            // the invocation instead, which is the other half of the same rule.
+            assertNull("text that is not a date must not become some date",
+                    read(invoke, registry, seen, "next tuesday"));
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// Invokes the fixture with one parameter value and reports what the handler received.
+    private static Object read(java.lang.reflect.Method invoke, Object registry,
+                               java.lang.reflect.Field seen, Object value) throws Exception {
+        seen.set(null, null);
+        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        params.put("when", value);
+        invoke.invoke(registry, "log_workout", params, null);
+        return seen.get(null);
     }
 
     /// A nested handler and a nested entity are the ordinary case, not an edge one -- an

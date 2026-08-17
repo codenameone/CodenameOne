@@ -26,6 +26,7 @@ import com.codename1.io.JSONWriter;
 import com.codename1.io.Log;
 import com.codename1.surfaces.SurfaceSerializer;
 import com.codename1.ui.EncodedImage;
+import com.codename1.util.Base64;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -164,12 +165,34 @@ public final class IntentSerializer {
     /// - `entities`: the entities to serialize
     /// - `images`: receives PNG blobs keyed by the name used in the JSON
     public static String serializeEntities(List<AppEntity> entities, Map<String, byte[]> images) {
+        return serializeEntities(entities, images, false);
+    }
+
+    /// Serializes entities, optionally carrying their thumbnails inside the document.
+    ///
+    /// Indexing wants the second form: the blobs go out separately, keyed by the name embedded
+    /// in the JSON, because a search index takes them one at a time and a base64 copy of every
+    /// thumbnail in one string would be wasteful.
+    ///
+    /// A query answering a platform picker wants the first. The reply is synchronous and the
+    /// caller is a native picker being built right now, so there is nowhere to put a side
+    /// channel of bytes that the reply is guaranteed to be matched with. Inlining a handful of
+    /// small thumbnails is the whole transaction.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entities`: the entities to serialize
+    /// - `images`: receives PNG blobs keyed by the name used in the JSON; may be null when
+    ///   inlining
+    /// - `inlineImages`: true to also write each thumbnail as base64 under `imageData`
+    public static String serializeEntities(List<AppEntity> entities, Map<String, byte[]> images,
+                                           boolean inlineImages) {
         Map<String, Object> doc = new LinkedHashMap<String, Object>();
         doc.put("v", Integer.valueOf(VERSION));
         List<Object> out = new ArrayList<Object>();
         if (entities != null) {
             for (AppEntity e : entities) {
-                out.add(entityToMap(e, images));
+                out.add(entityToMap(e, images, inlineImages));
             }
         }
         doc.put("entities", out);
@@ -239,6 +262,16 @@ public final class IntentSerializer {
     }
 
     private static Map<String, Object> entityToMap(AppEntity e, Map<String, byte[]> images) {
+        return entityToMap(e, images, false);
+    }
+
+    /// A thumbnail large enough to matter here is a mistake rather than a picture: a picker row
+    /// renders it at a few dozen points. Inlining is capped so one oversized image cannot turn
+    /// a synchronous query reply into a payload the picker waits on.
+    private static final int MAX_INLINE_IMAGE_BYTES = 128 * 1024;
+
+    private static Map<String, Object> entityToMap(AppEntity e, Map<String, byte[]> images,
+                                                   boolean inlineImages) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("type", e.getType());
         m.put("id", e.getId());
@@ -257,12 +290,17 @@ public final class IntentSerializer {
             m.put("keywords", new ArrayList<Object>(e.getKeywords()));
         }
         EncodedImage img = e.getImage();
-        if (img != null && images != null) {
+        if (img != null && (images != null || inlineImages)) {
             byte[] bytes = img.getImageData();
             if (bytes != null && bytes.length > 0) {
                 String name = "e" + Integer.toHexString(contentHash(bytes));
-                images.put(name, bytes);
+                if (images != null) {
+                    images.put(name, bytes);
+                }
                 m.put("image", name);
+                if (inlineImages && bytes.length <= MAX_INLINE_IMAGE_BYTES) {
+                    m.put("imageData", Base64.encodeNoNewline(bytes));
+                }
             }
         }
         return m;

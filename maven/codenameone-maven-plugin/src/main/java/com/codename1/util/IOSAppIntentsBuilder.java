@@ -298,13 +298,18 @@ public final class IOSAppIntentsBuilder {
             sb.append("struct ").append(struct).append(": AppEntity {\n");
             sb.append("    let id: String\n");
             sb.append("    let name: String\n");
-            sb.append("    let detail: String?\n\n");
+            sb.append("    let detail: String?\n");
+            // The @EntityImage thumbnail, carried so a picker row shows the entity the way the
+            // application declared it rather than as a bare line of text.
+            sb.append("    let thumbnail: Data?\n\n");
             sb.append("    static var typeDisplayRepresentation: TypeDisplayRepresentation =\n");
             sb.append("        TypeDisplayRepresentation(name: \"")
                     .append(swift(str(entity, "title"))).append("\")\n\n");
             sb.append("    var displayRepresentation: DisplayRepresentation {\n");
             sb.append("        DisplayRepresentation(title: \"\\(name)\", subtitle: "
-                    + "detail.map { \"\\($0)\" })\n");
+                    + "detail.map { \"\\($0)\" },\n");
+            sb.append("                              image: thumbnail.map "
+                    + "{ DisplayRepresentation.Image(data: $0) })\n");
             sb.append("    }\n\n");
             sb.append("    static var defaultQuery = ").append(struct).append("Query()\n");
             sb.append("}\n\n");
@@ -322,7 +327,7 @@ public final class IOSAppIntentsBuilder {
             sb.append("            CN1IntentBridge.entities(type: \"").append(swift(type))
                     .append("\", kind: \"byId\", argument: id)\n");
             sb.append("        }.map { ").append(struct)
-                    .append("(id: $0.id, name: $0.title, detail: $0.subtitle) }\n");
+                    .append("(id: $0.id, name: $0.title, detail: $0.subtitle, thumbnail: $0.image) }\n");
             sb.append("    }\n\n");
             if (queries.contains("SUGGESTED")) {
                 sb.append("    func suggestedEntities() async throws -> [").append(struct)
@@ -330,7 +335,7 @@ public final class IOSAppIntentsBuilder {
                 sb.append("        CN1IntentBridge.entities(type: \"").append(swift(type))
                         .append("\", kind: \"suggested\", argument: nil)\n");
                 sb.append("            .map { ").append(struct)
-                        .append("(id: $0.id, name: $0.title, detail: $0.subtitle) }\n");
+                        .append("(id: $0.id, name: $0.title, detail: $0.subtitle, thumbnail: $0.image) }\n");
                 sb.append("    }\n\n");
             }
             if (search) {
@@ -339,7 +344,7 @@ public final class IOSAppIntentsBuilder {
                 sb.append("        CN1IntentBridge.entities(type: \"").append(swift(type))
                         .append("\", kind: \"search\", argument: string)\n");
                 sb.append("            .map { ").append(struct)
-                        .append("(id: $0.id, name: $0.title, detail: $0.subtitle) }\n");
+                        .append("(id: $0.id, name: $0.title, detail: $0.subtitle, thumbnail: $0.image) }\n");
                 sb.append("    }\n");
             }
             sb.append("}\n\n");

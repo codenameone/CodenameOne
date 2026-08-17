@@ -294,7 +294,16 @@ public final class Intents {
     /// code rather than a platform service.
     ///
     /// Platform-initiated invocations do not come through here; they arrive at
-    /// [#dispatchInvocation], which adds thread marshalling and a deadline.
+    /// [#dispatchInvocation], which adds thread marshalling and an enforced
+    /// deadline.
+    ///
+    /// The deadline on this path is a **budget the handler may consult**, not a
+    /// cutoff: your own thread is blocked in this call, nothing else is waiting
+    /// to report an outcome, and a handler that overruns has still done the work
+    /// and produced the answer you asked for. So a late result is returned
+    /// rather than discarded. Discarding is the right behaviour under
+    /// [#dispatchInvocation], where the framework has already told the platform
+    /// the invocation failed and a second answer would be a protocol violation.
     ///
     /// #### Parameters
     ///
@@ -307,6 +316,11 @@ public final class Intents {
     public static IntentResult invoke(String intentId, Map<String, Object> params) {
         IntentDeclaration decl = getDeclaration(intentId);
         int timeout = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
+        // The deadline is carried so a handler can size its work the same way it would under a
+        // platform invocation, and deliberately not enforced afterwards: the caller is blocked
+        // in this method waiting for exactly this result, so turning a late success into a
+        // failure would discard completed work with nobody left to report it to. Enforcement
+        // belongs to dispatchInvocation, which has already answered the platform by then.
         IntentContext ctx = new IntentContext(IntentSource.IN_APP, false,
                 System.currentTimeMillis() + timeout * 1000L);
         return invokeInternal(intentId, params, ctx);
@@ -584,6 +598,13 @@ public final class Intents {
                 prop.put("description", p.getTitle() + " (the id of a "
                         + p.getEntityType() + ")");
             }
+            if (p.getType() == IntentParameterType.DATE) {
+                // A bare "string" would let a model send anything and call it schema-valid,
+                // which is how a well-formed request turns into a null argument. Name both
+                // forms the dispatcher actually parses.
+                prop.put("description", p.getTitle()
+                        + " (an ISO-8601 date such as 2026-03-14, or epoch milliseconds)");
+            }
             properties.put(p.getName(), prop);
             if (p.isRequired()) {
                 required.add(p.getName());
@@ -608,7 +629,10 @@ public final class Intents {
         if (type == IntentParameterType.BOOLEAN) {
             return "boolean";
         }
-        // Dates cross as epoch millis but read better to a model as text it can produce.
+        // A date stays a string, which is the form a model writes dates in without being
+        // coerced into arithmetic on epoch millis. The generated dispatcher accepts both that
+        // and a numeric string, and the property description says so -- the two have to agree
+        // or a schema-valid request becomes a null argument.
         return "string";
     }
 

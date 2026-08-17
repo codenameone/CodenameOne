@@ -34,6 +34,12 @@ import java.lang.annotation.Target;
 /// as they are. Returning something that still needs rasterizing would move
 /// that work here, which is the kind of cost that looks free in the simulator
 /// and stalls on a device.
+///
+/// It reaches two places: the search index entry, and the row the platform
+/// draws when it asks the user to pick between entities. Both render it small,
+/// so a thumbnail is what this wants -- a full-size picture is dropped from the
+/// picker rather than carried, since a synchronous query reply is what the
+/// platform is waiting on while it builds that list.
 @Retention(RetentionPolicy.CLASS)
 @Target({ElementType.METHOD, ElementType.FIELD})
 public @interface EntityImage {

@@ -1016,11 +1016,78 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        if (o == null) { o = def; }\n");
         sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
         sb.append("        if (o instanceof Number) { return new java.util.Date(((Number) o).longValue()); }\n");
+        // A string may be epoch millis or ISO-8601. Both arrive in practice: the platforms send
+        // millis, and a language model handed this parameter through asTools() writes a date the
+        // way it writes dates. Rejecting the second form would fail the invocation over
+        // formatting, which is not a failure worth having.
         sb.append("        if (o instanceof String) {\n");
-        sb.append("            try { return new java.util.Date(Long.parseLong(((String) o).trim())); }\n");
-        sb.append("            catch (NumberFormatException e) { return null; }\n");
+        sb.append("            String s = ((String) o).trim();\n");
+        sb.append("            if (s.length() == 0) { return null; }\n");
+        sb.append("            try { return new java.util.Date(Long.parseLong(s)); }\n");
+        sb.append("            catch (NumberFormatException e) { return parseIso8601(s); }\n");
         sb.append("        }\n");
         sb.append("        return null;\n");
+        sb.append("    }\n\n");
+
+        // Hand-rolled rather than SimpleDateFormat: this has to be exact about what it accepts
+        // and null about everything else, and a lenient formatter reading "not a date" as some
+        // date is the failure mode that would be hardest to see.
+        sb.append("    /// Parses yyyy-MM-dd, optionally followed by THH:mm(:ss)(.SSS) and a\n");
+        sb.append("    /// Z / +hh:mm / -hh:mm offset. Anything else is null.\n");
+        sb.append("    private static java.util.Date parseIso8601(String s) {\n");
+        sb.append("        if (s.length() < 10 || s.charAt(4) != '-' || s.charAt(7) != '-') {\n");
+        sb.append("            return null;\n");
+        sb.append("        }\n");
+        sb.append("        java.util.Calendar c = java.util.Calendar.getInstance(\n");
+        sb.append("                java.util.TimeZone.getTimeZone(\"GMT\"));\n");
+        sb.append("        c.clear();\n");
+        sb.append("        int offsetMinutes = 0;\n");
+        sb.append("        try {\n");
+        sb.append("            int year = Integer.parseInt(s.substring(0, 4));\n");
+        sb.append("            int month = Integer.parseInt(s.substring(5, 7));\n");
+        sb.append("            int day = Integer.parseInt(s.substring(8, 10));\n");
+        sb.append("            int hour = 0, minute = 0, second = 0, millis = 0;\n");
+        sb.append("            String rest = s.substring(10);\n");
+        sb.append("            if (rest.length() > 0) {\n");
+        sb.append("                char sep = rest.charAt(0);\n");
+        sb.append("                if (sep != 'T' && sep != 't' && sep != ' ') { return null; }\n");
+        sb.append("                rest = rest.substring(1);\n");
+        sb.append("                int zone = -1;\n");
+        sb.append("                for (int i = 0; i < rest.length(); i++) {\n");
+        sb.append("                    char ch = rest.charAt(i);\n");
+        sb.append("                    if (ch == 'Z' || ch == 'z' || ch == '+'\n");
+        sb.append("                            || (ch == '-' && i > 0)) { zone = i; break; }\n");
+        sb.append("                }\n");
+        sb.append("                String time = zone < 0 ? rest : rest.substring(0, zone);\n");
+        sb.append("                if (zone >= 0) {\n");
+        sb.append("                    String z = rest.substring(zone);\n");
+        sb.append("                    if (!\"Z\".equals(z) && !\"z\".equals(z)) {\n");
+        sb.append("                        String digits = z.substring(1).replace(\":\", \"\");\n");
+        sb.append("                        if (digits.length() != 4) { return null; }\n");
+        sb.append("                        offsetMinutes = Integer.parseInt(digits.substring(0, 2)) * 60\n");
+        sb.append("                                + Integer.parseInt(digits.substring(2));\n");
+        sb.append("                        if (z.charAt(0) == '-') { offsetMinutes = -offsetMinutes; }\n");
+        sb.append("                    }\n");
+        sb.append("                }\n");
+        sb.append("                if (time.length() < 5 || time.charAt(2) != ':') { return null; }\n");
+        sb.append("                hour = Integer.parseInt(time.substring(0, 2));\n");
+        sb.append("                minute = Integer.parseInt(time.substring(3, 5));\n");
+        sb.append("                if (time.length() >= 8 && time.charAt(5) == ':') {\n");
+        sb.append("                    second = Integer.parseInt(time.substring(6, 8));\n");
+        sb.append("                    if (time.length() > 9 && time.charAt(8) == '.') {\n");
+        sb.append("                        String frac = (time.substring(9) + \"000\").substring(0, 3);\n");
+        sb.append("                        millis = Integer.parseInt(frac);\n");
+        sb.append("                    }\n");
+        sb.append("                }\n");
+        sb.append("            }\n");
+        sb.append("            c.set(year, month - 1, day, hour, minute, second);\n");
+        sb.append("            c.set(java.util.Calendar.MILLISECOND, millis);\n");
+        sb.append("        } catch (NumberFormatException e) {\n");
+        sb.append("            return null;\n");
+        sb.append("        } catch (IndexOutOfBoundsException e) {\n");
+        sb.append("            return null;\n");
+        sb.append("        }\n");
+        sb.append("        return new java.util.Date(c.getTime().getTime() - offsetMinutes * 60000L);\n");
         sb.append("    }\n");
     }
 

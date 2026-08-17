@@ -118,6 +118,9 @@ public struct CN1EntityValue {
     public let id: String
     public let title: String
     public let subtitle: String?
+    /// The declared @EntityImage thumbnail, inlined in the query reply. Nil when the entity
+    /// declared none, or when its image was too large for a picker row to be worth carrying.
+    public let image: Data?
 
     init?(dictionary: [String: Any]) {
         guard let type = dictionary["type"] as? String,
@@ -128,6 +131,11 @@ public struct CN1EntityValue {
         self.id = id
         self.title = (dictionary["title"] as? String) ?? id
         self.subtitle = dictionary["subtitle"] as? String
+        if let encoded = dictionary["imageData"] as? String {
+            self.image = Data(base64Encoded: encoded)
+        } else {
+            self.image = nil
+        }
     }
 }
 
