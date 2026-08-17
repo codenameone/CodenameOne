@@ -163,6 +163,14 @@ public final class HomeStructure {
     /// worth surfacing mainly so an app can explain why a control it offered
     /// did not work.
     ///
+    /// **Always `false` on iOS.** HomeKit has no notion of ownership -- it
+    /// reports whether the user is an administrator of the home, which an
+    /// invited resident can also be -- so there is nothing to answer this
+    /// with. That capability is reported by
+    /// [#isSceneAuthoringSupported()] instead, which is what it actually
+    /// governs. Do not use this to decide whether to offer a control; use it
+    /// only to phrase an explanation after one has failed.
+    ///
     /// #### Returns
     ///
     /// `true` when the user is the owner

@@ -1078,13 +1078,20 @@ static void cn1homeRebuildSnapshot(void) {
         // getPrimaryStructure() fall back to the first, which is documented
         // and is at least not a claim about what the user prefers.
         BOOL isPrimary = NO;
-        BOOL owner = [home homeAccessControlForUser:[home currentUser]] != nil
-                ? [[home homeAccessControlForUser:[home currentUser]]
-                   isAdministrator] : NO;
+        // Administrator, which is NOT ownership: HomeKit has no owner concept
+        // at all -- HMHomeAccessControl offers isAdministrator and nothing
+        // else -- and an invited resident can be made an administrator. It is
+        // exactly the right answer for whether this user may author scenes,
+        // and the wrong one for isOwner(), which is reported false on iOS the
+        // same way isPrimary is, and for the same reason: the platform cannot
+        // say, and a guess is worse than an honest no.
+        HMHomeAccessControl *access =
+                [home homeAccessControlForUser:[home currentUser]];
+        BOOL administrator = access != nil ? [access isAdministrator] : NO;
         [structures addObject:cn1homeJoinFields(
             [NSArray arrayWithObjects:homeId, [home name],
-             cn1homeFlag(isPrimary), cn1homeFlag(owner),
-             cn1homeFlag(owner), nil])];
+             cn1homeFlag(isPrimary), cn1homeFlag(NO),
+             cn1homeFlag(administrator), nil])];
 
         NSMutableArray *roomRecords = [NSMutableArray array];
         for (HMRoom *room in [home rooms]) {

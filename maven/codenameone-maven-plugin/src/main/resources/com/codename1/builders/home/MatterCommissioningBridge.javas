@@ -110,6 +110,15 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             "com.google.android.apps.chromecast.app";
 
     private Callback pendingCommission;
+    /// Which request the parked callback belongs to.
+    ///
+    /// Play services prepares the IntentSender asynchronously, so a stop()
+    /// or a timeout can clear the callback while that task is still running.
+    /// Without an identity the task's listener would then find whatever
+    /// callback happened to be parked next and report ITS request's outcome
+    /// to a caller that asked for something else -- and on success open the
+    /// old request's sheet.
+    private int commissionGeneration;
 
     private MatterCommissioningBridge() {
     }
@@ -176,6 +185,8 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
     @Override
     public void stop() {
         pendingCommission = null;
+        // Anything still in flight now belongs to nobody.
+        commissionGeneration++;
     }
 
     @Override
@@ -406,6 +417,7 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             request.setDeviceNameHint(suggestedName);
         }
         pendingCommission = callback;
+        final int generation = ++commissionGeneration;
         // The caller's own limit, kept so a sender that arrives after it has
         // expired is dropped rather than opening a sheet for a request the
         // framework has already failed with TIMEOUT. Zero means no limit,
@@ -419,6 +431,13 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                 .addOnSuccessListener(new OnSuccessListener<IntentSender>() {
                     @Override
                     public void onSuccess(IntentSender sender) {
+                        if (generation != commissionGeneration) {
+                            // Stopped, timed out or superseded while this was
+                            // being prepared. Dropped rather than answered:
+                            // the caller it belonged to is gone, and whoever
+                            // is parked now asked for something else.
+                            return;
+                        }
                         if (deadline > 0
                                 && System.currentTimeMillis() > deadline) {
                             Callback waiting = pendingCommission;
@@ -437,6 +456,9 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                 .addOnFailureListener(new OnFailureListener() {
                     @Override
                     public void onFailure(Exception failure) {
+                        if (generation != commissionGeneration) {
+                            return;
+                        }
                         // Nothing was launched, so no listener was registered
                         // and there is nothing to restore here.
                         Callback waiting = pendingCommission;
