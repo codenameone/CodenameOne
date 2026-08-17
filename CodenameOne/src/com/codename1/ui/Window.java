@@ -1203,7 +1203,21 @@ public class Window extends Container implements TopLevelContainer {
         }
         // show() registers the blocker, since a window shown any other way with a
         // modality type set has to block too.
-        show();
+        //
+        // From a background thread show() only queues its work and returns, so the
+        // wait below would find the window not visible yet, decide the modal was
+        // already over and return before it ever appeared. Wait for the show to
+        // actually happen first.
+        if (Display.getInstance().isEdt()) {
+            show();
+        } else {
+            Display.getInstance().callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    show();
+                }
+            });
+        }
         try {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 @Override
@@ -1514,6 +1528,16 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `owner`: the owning top level
     public void setOwnerWindow(TopLevelContainer owner) {
+        if (nativePeer != null) {
+            // The native ownership relation is established when the window is created
+            // -- the owner HWND on Windows, the transient parent on GTK, the owner
+            // passed to the JDialog on Java SE -- and none of those can be re-pointed
+            // afterwards. Silently keeping the old one while this field claimed
+            // otherwise would also strand a modal blocker on the previous owner, since
+            // that is the window the port was told to disable.
+            throw new IllegalStateException(
+                    "the owner has to be set before the window is shown");
+        }
         this.ownerWindow = owner;
     }
 
@@ -1825,14 +1849,11 @@ public class Window extends Container implements TopLevelContainer {
         Component cmp = resolveComponentAt(x[0], y[0]);
         if (cmp != null) {
             LeadUtil.pointerHover(cmp, x, y);
-            if (TooltipManager.getInstance() != null) {
-                String tip = cmp.getTooltip();
-                if (tip != null && tip.length() > 0) {
-                    TooltipManager.getInstance().prepareTooltip(tip, cmp);
-                } else {
-                    TooltipManager.getInstance().clearTooltip();
-                }
-            }
+            // Deliberately no TooltipManager call. It schedules only when
+            // getComponentForm() is non-null and displays through InteractionDialog on
+            // the current form, so from a window it would either do nothing or put the
+            // tooltip on the main window. It is listed with the other form-coupled
+            // overlays in the developer guide rather than half-wired here.
         }
     }
 

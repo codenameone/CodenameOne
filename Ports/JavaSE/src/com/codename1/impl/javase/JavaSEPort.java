@@ -3974,7 +3974,12 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int y = scaleCoordinateY(e.getY());
                 if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        JavaSEPort.this.pointerDragged(new int[]{Math.min(surfaceWidth(), Math.max(0,x)), 0}, new int[]{Math.min(surfaceHeight(), Math.max(0, y)), 0});
+                        // Tagged with the window id like the press that started the
+                        // gesture; otherwise the second pointer of a simulated pinch
+                        // lands on the main form and drags unrelated content.
+                        JavaSEPort.this.windowPointerDragged(windowId,
+                                new int[]{Math.min(surfaceWidth(), Math.max(0, x)), 0},
+                                new int[]{Math.min(surfaceHeight(), Math.max(0, y)), 0});
                     }
                 } 
                 return;

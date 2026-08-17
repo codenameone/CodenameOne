@@ -3311,6 +3311,26 @@ public abstract class CodenameOneImplementation {
     /// - `x`: the position of the event
     ///
     /// - `y`: the position of the event
+    /// Multi pointer drag over a specific native window, which is how the desktop
+    /// simulator plays a pinch gesture. Without the id the second pointer would land
+    /// on the main form while the press that started the gesture went to the window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the x positions of the pointers
+    ///
+    /// - `y`: the y positions of the pointers
+    protected void windowPointerDragged(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0) {
+            Display.getInstance().windowPointerDragged(windowId, x, y);
+        } else {
+            pointerDragged(x, y);
+        }
+    }
+
     protected void windowPointerDragged(int windowId, int x, int y) {
         if (windowId == 0) {
             pointerDragged(x, y);

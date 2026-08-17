@@ -447,6 +447,30 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void theOwnerCannotBeChangedOnceTheWindowExists() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a");
+        a.show();
+        final Window b = new Window("b");
+        b.show();
+        final Window child = new Window("child");
+        child.setOwnerWindow(a);
+        child.show();
+
+        // Native ownership is fixed when the window is created, and the port was told
+        // to block a specific owner. Repointing the field would strand the modal
+        // blocker on the previous owner and leave the platform relation on it too.
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            @Override
+            public void execute() {
+                child.setOwnerWindow(b);
+            }
+        });
+        a.dispose();
+        b.dispose();
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
