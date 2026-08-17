@@ -123,6 +123,12 @@ public abstract class Element implements BuildContext {
         Element a = ancestorOf(this);
         while (a != null) {
             if (isInstanceOf(type, a.widget)) {
+                // REGISTER, do not merely read: the name is depend-on. Flutter records this
+                // element as a dependent so a later change to the widget rebuilds it, and
+                // without that every consumer is a one-shot read.
+                if (a instanceof com.codename1.flutter.widgets.InheritedElement) {
+                    ((com.codename1.flutter.widgets.InheritedElement) a).addDependent(this);
+                }
                 return type.cast(a.widget);
             }
             a = ancestorOf(a);
