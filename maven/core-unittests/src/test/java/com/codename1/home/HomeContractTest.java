@@ -409,6 +409,65 @@ class HomeContractTest {
     }
 
     /**
+     * A constraint's enum choices survive the trip through the graph.
+     *
+     * <p>Dropped, a thermostat the simulator restricts to HEAT and COOL came
+     * back saying it accepts anything, so a UI built from the graph offered
+     * modes the very same bridge then refused.</p>
+     */
+    @Test
+    void enumChoicesSurviveTheGraph() {
+        LocalHomeBridge bridge = new LocalHomeBridge();
+        SyntheticHome.populate(bridge);
+        bridge.addAccessory(SyntheticHome.STRUCTURE_ID, "stat-2", "Hall Stat",
+                "room-hall", AccessoryCategory.THERMOSTAT.ordinal());
+        bridge.addService("stat-2", "1", "Hall Stat",
+                ServiceType.THERMOSTAT.ordinal(), true);
+        bridge.addTrait("stat-2", "1",
+                TraitConstraint.choices(Trait.TARGET_HEATING_COOLING, true,
+                        true, true, new int[] {
+                            HeatingCoolingMode.HEAT.ordinal(),
+                            HeatingCoolingMode.COOL.ordinal()}),
+                TraitValue.ofEnum(HeatingCoolingMode.HEAT));
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory stat = home.findAccessory("stat-2");
+        TraitConstraint c = stat.getPrimaryService()
+                .getConstraint(Trait.TARGET_HEATING_COOLING);
+        assertEquals(2, c.getValidOrdinals().size(),
+                "the two choices must come back: " + c.getValidOrdinals());
+        assertTrue(c.getValidOrdinals().contains(
+                Integer.valueOf(HeatingCoolingMode.HEAT.ordinal())));
+        assertFalse(c.getValidOrdinals().contains(
+                Integer.valueOf(HeatingCoolingMode.AUTO.ordinal())),
+                "and a mode it does not offer must not appear");
+    }
+
+    /**
+     * identify() on an unreachable accessory fails, as it does on iOS. The
+     * local model's promise is that an unreachable accessory fails
+     * operations, and the synthetic outlet exists to be unreachable.
+     */
+    @Test
+    void identifyingAnUnreachableAccessoryFails() {
+        LocalHomeBridge bridge = new LocalHomeBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory dead = home.findAccessory("outlet-garage");
+        AsyncResource<?> r = HomeAwait.settled(home.identify(dead));
+        assertFalse(r.isReady(), "an unreachable accessory cannot identify");
+
+        Accessory lamp = home.findAccessory("lamp-living");
+        assertTrue(HomeAwait.settled(home.identify(lamp)).isReady(),
+                "a reachable one still can");
+    }
+
+    /**
      * A change that lands while the up-front read is in flight arrives
      * after it, not before.
      *

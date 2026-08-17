@@ -3258,9 +3258,22 @@ public class IPhoneBuilder extends Executor {
                 // has not declared -- so without this the fallback every
                 // unsupported platform points at reports Home missing on a
                 // device that has it.
+                // Entry by entry, not as a substring: a project that already
+                // queries com.apple.HomePreview contains "com.apple.Home",
+                // and skipping on that basis leaves the exact scheme
+                // openEcosystemApp() asks about undeclared -- so canOpenURL:
+                // reports Apple Home missing on a device that has it, which
+                // is the failure this block exists to prevent.
                 String queries = request.getArg(
                         "ios.applicationQueriesSchemes", "");
-                if (queries.indexOf("com.apple.Home") < 0) {
+                boolean homeSchemeDeclared = false;
+                for (String scheme : queries.split(",")) {
+                    if ("com.apple.Home".equals(scheme.trim())) {
+                        homeSchemeDeclared = true;
+                        break;
+                    }
+                }
+                if (!homeSchemeDeclared) {
                     request.putArgument("ios.applicationQueriesSchemes",
                             queries.trim().length() == 0 ? "com.apple.Home"
                                     : queries.trim() + ",com.apple.Home");

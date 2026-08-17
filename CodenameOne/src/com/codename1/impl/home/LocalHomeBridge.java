@@ -577,7 +577,13 @@ public class LocalHomeBridge implements HomeBridge {
                     HomeWire.flag(c.hasRange()),
                     Double.toString(c.getMinimum()),
                     Double.toString(c.getMaximum()),
-                    Double.toString(c.getStep()), ""}));
+                    Double.toString(c.getStep()),
+                    // The enum choices, which used to be a hard-coded empty
+                    // field. Dropped, a thermostat the simulator constrains
+                    // to HEAT and COOL came back saying it accepts anything,
+                    // so a UI built from the graph offered modes the very
+                    // same bridge then refused.
+                    joinOrdinals(c.getValidOrdinals())}));
         }
         return toArray(out);
     }
@@ -998,7 +1004,23 @@ public class LocalHomeBridge implements HomeBridge {
 
     @Override
     public void identify(int requestId, String accessoryId) {
-        answer(new Identified(requestId));
+        // Checked, because the local model's promise is that an unreachable
+        // accessory fails operations -- and the iOS bridge answers
+        // ACCESSORY_NOT_FOUND or the platform's own identify error. Always
+        // succeeding here let a simulator test pass against the synthetic
+        // outlet that exists precisely to be unreachable.
+        String failure = null;
+        synchronized (this) {
+            Accessory a = accessories.get(accessoryId);
+            if (a == null) {
+                failure = HomeError.ACCESSORY_NOT_FOUND.name()
+                        + "\tno such accessory in the simulated home";
+            } else if (!a.reachable) {
+                failure = HomeError.ACCESSORY_UNREACHABLE.name()
+                        + "\tthis accessory is simulated as unreachable";
+            }
+        }
+        answer(new Identified(requestId, failure));
     }
 
     // ------------------------------------------------------------------
@@ -1120,6 +1142,30 @@ public class LocalHomeBridge implements HomeBridge {
         // separator -- it cannot occur in a platform identifier -- but written
         // raw it makes this file binary to grep and diff.
         return accessoryId + "\0" + serviceId + "\0" + traitId;
+    }
+
+    /// The comma-separated ordinal list a constraint record carries, empty
+    /// when the constraint names no specific choices.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ordinals`: the valid ordinals, possibly empty
+    ///
+    /// #### Returns
+    ///
+    /// the encoded field, never null
+    private static String joinOrdinals(List<Integer> ordinals) {
+        if (ordinals == null || ordinals.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Integer ordinal : ordinals) {
+            if (sb.length() > 0) {
+                sb.append(',');
+            }
+            sb.append(ordinal.intValue());
+        }
+        return sb.toString();
     }
 
     private static String[] toArray(List<String> list) {
@@ -1391,14 +1437,16 @@ public class LocalHomeBridge implements HomeBridge {
 
     private static final class Identified implements Runnable {
         private final int requestId;
+        private final String error;
 
-        Identified(int requestId) {
+        Identified(int requestId, String error) {
             this.requestId = requestId;
+            this.error = error;
         }
 
         @Override
         public void run() {
-            SmartHome.deliverIdentifyResult(requestId, null);
+            SmartHome.deliverIdentifyResult(requestId, error);
         }
     }
 }

@@ -911,10 +911,33 @@ static BOOL cn1homeHasNoValueNow(HMService *service, NSString *traitId) {
             && [value intValue] == 3;
 }
 
+/// Encodes a reading, with an explicit "when was this true" stamp.
+///
+/// Zero means "the backend cannot say", which TraitReading.getTimestampMillis
+/// documents and which is the honest answer for a value HomeKit had lying
+/// around: stamping a cached value with the current time tells every
+/// freshness check that a reading of unknown age was observed just now.
+static NSString *cn1homeEncodeReadingAt(NSString *accessoryId,
+                                        NSString *serviceId,
+                                        NSString *traitId, id value,
+                                        NSString *errorName,
+                                        NSString *errorMessage,
+                                        BOOL known);
+
 static NSString *cn1homeEncodeReading(NSString *accessoryId,
                                       NSString *serviceId, NSString *traitId,
                                       id value, NSString *errorName,
                                       NSString *errorMessage) {
+    return cn1homeEncodeReadingAt(accessoryId, serviceId, traitId, value,
+                                  errorName, errorMessage, YES);
+}
+
+static NSString *cn1homeEncodeReadingAt(NSString *accessoryId,
+                                        NSString *serviceId,
+                                        NSString *traitId, id value,
+                                        NSString *errorName,
+                                        NSString *errorMessage,
+                                        BOOL known) {
     NSArray *entry = cn1homeEntryFor(traitId);
     int kind = entry == nil ? CN1_HOME_KIND_DOUBLE
             : [[entry objectAtIndex:1] intValue];
@@ -942,9 +965,10 @@ static NSString *cn1homeEncodeReading(NSString *accessoryId,
                               hasRaw ? [NSString stringWithFormat:@"%d", raw]
                                      : @"",
                               cn1homeFlag(hasValue),
-                              [NSString stringWithFormat:@"%lld",
-                               (long long) ([[NSDate date]
-                                             timeIntervalSince1970] * 1000)],
+                              known ? [NSString stringWithFormat:@"%lld",
+                                       (long long) ([[NSDate date]
+                                            timeIntervalSince1970] * 1000)]
+                                    : @"0",
                               @"", @"", nil]);
 }
 
@@ -1376,6 +1400,70 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
     cn1homeNotifyStructure(CN1_HOME_CHANGE_ACCESSORY_MOVED,
                            cn1homeUuid([home uniqueIdentifier]),
                            cn1homeUuid([accessory uniqueIdentifier]));
+}
+
+// The rest of the topology. Renaming a home, adding or renaming a room,
+// creating a zone or moving a room into one are ordinary things to do in the
+// Apple Home app, and each of them changes what getStructures() should
+// return. Without these the snapshot kept whatever it was built with and a
+// HomeStructureListener heard nothing, so a room list stayed wrong until
+// something unrelated forced a refresh.
+//
+// All of them report STRUCTURES: the listener's contract is "re-read the
+// graph", not "here is what changed", and the graph is a snapshot.
+- (void)homeDidUpdateName:(HMHome *)home {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didAddRoom:(HMRoom *)room {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didRemoveRoom:(HMRoom *)room {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didUpdateNameForRoom:(HMRoom *)room {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didAddZone:(HMZone *)zone {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didRemoveZone:(HMZone *)zone {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didUpdateNameForZone:(HMZone *)zone {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home didAddRoom:(HMRoom *)room toZone:(HMZone *)zone {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home
+        didRemoveRoom:(HMRoom *)room fromZone:(HMZone *)zone {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
 }
 
 - (void)home:(HMHome *)home didAddActionSet:(HMActionSet *)actionSet {
@@ -1867,15 +1955,30 @@ com_codename1_impl_ios_IOSNative_homeReadTraits___int_java_lang_String_java_lang
                                          @"no such accessory in this home")];
                 continue;
             }
+            HMService *service = cn1homeFindService(accessoryId, serviceId);
+            HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
             if (![accessory isReachable]) {
+                // Unreachable, but a cached read is exactly the request that
+                // tolerates that -- setAllowCached documents riding out a
+                // brief outage with the last value HomeKit saw. Refused
+                // before consulting the cache, the option did nothing in the
+                // one case it exists for.
+                if (cached && c != nil
+                        && [[c properties] containsObject:
+                            HMCharacteristicPropertyReadable]
+                        && [c value] != nil
+                        && !cn1homeHasNoValueNow(service, traitId)) {
+                    [records replaceObjectAtIndex:i withObject:
+                        cn1homeEncodeReadingAt(accessoryId, serviceId, traitId,
+                                               [c value], nil, nil, NO)];
+                    continue;
+                }
                 [records replaceObjectAtIndex:i withObject:
                     cn1homeEncodeReading(accessoryId, serviceId, traitId, nil,
                                          @"ACCESSORY_UNREACHABLE",
                                          @"the accessory is not responding")];
                 continue;
             }
-            HMService *service = cn1homeFindService(accessoryId, serviceId);
-            HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
             if (c == nil) {
                 [records replaceObjectAtIndex:i withObject:
                     cn1homeEncodeReading(accessoryId, serviceId, traitId, nil,
@@ -1908,9 +2011,13 @@ com_codename1_impl_ios_IOSNative_homeReadTraits___int_java_lang_String_java_lang
                 // HomeKit keeps the last value it saw, and answering from it
                 // is instant and costs a battery-powered accessory nothing.
                 // TraitReadRequest.setAllowCached documents the trade.
+                //
+                // Stamped unknown rather than now: this value is of whatever
+                // age HomeKit's cache is, and calling it fresh is the one
+                // thing that would make a freshness check useless.
                 [records replaceObjectAtIndex:i withObject:
-                    cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                         [c value], nil, nil)];
+                    cn1homeEncodeReadingAt(accessoryId, serviceId, traitId,
+                                           [c value], nil, nil, NO)];
                 continue;
             }
             [live addObject:[NSNumber numberWithUnsignedInteger:i]];
