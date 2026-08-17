@@ -28,6 +28,8 @@ public class AppBar extends Widget {
     private Widget bottom;
     private Double elevation;
     private SystemUiOverlayStyle systemOverlayStyle;
+    private Double titleSpacing;
+    private Double toolbarHeight;
 
     public void title(Widget v) {
         this.title = v;
@@ -62,9 +64,21 @@ public class AppBar extends Widget {
     }
 
     public void titleSpacing(double v) {
+        this.titleSpacing = Double.valueOf(v);
     }
 
     public void toolbarHeight(double v) {
+        this.toolbarHeight = Double.valueOf(v);
+    }
+
+    /** The gap either side of the title, or null for NavigationToolbar's 16lp default. */
+    public Double getTitleSpacing() {
+        return titleSpacing;
+    }
+
+    /** The bar's height, or null for the 56lp Material default. */
+    public Double getToolbarHeight() {
+        return toolbarHeight;
     }
 
     public void iconTheme(IconThemeData v) {

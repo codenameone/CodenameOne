@@ -1,5 +1,6 @@
 package com.codename1.flutter.animation;
 
+import com.codename1.flutter.Element;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.foundation.Listenable;
 
@@ -23,5 +24,15 @@ public abstract class AnimatedWidget extends StatelessWidget {
     /** Getter for the driving {@link Listenable}. */
     public Listenable listenable() {
         return listenable;
+    }
+
+    /**
+     * An element that LISTENS. The whole point of the type is that a notification rebuilds
+     * the widget, so the plain {@code StatelessElement} a StatelessWidget would otherwise
+     * get leaves every subclass frozen on its first frame.
+     */
+    @Override
+    public Element createElement() {
+        return new AnimatedWidgetElement(this);
     }
 }

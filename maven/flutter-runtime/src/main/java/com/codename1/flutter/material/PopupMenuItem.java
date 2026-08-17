@@ -60,6 +60,14 @@ public class PopupMenuItem<T> extends PopupMenuEntry<T> implements HasChild {
         return value;
     }
 
+    public Funcs.VoidFunc0 getOnTap() {
+        return onTap;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     @Override
     public Widget getChild() {
         return child;

@@ -1,7 +1,7 @@
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.Element;
 import com.codename1.flutter.RenderElement;
-import com.codename1.flutter.SingleChildRenderElement;
 import com.codename1.flutter.Widget;
 import com.codename1.flutter.rendering.BoxConstraints;
 import com.codename1.flutter.rendering.Dp;
@@ -9,23 +9,44 @@ import com.codename1.flutter.rendering.Size;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 
+import dart.runtime.Funcs;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Render element for {@link AppBar} with two modes:
+ * Render element for {@link AppBar}: Flutter's {@code NavigationToolbar} arrangement of
+ * <b>leading, title and actions</b> across the bar, in two modes:
  * <ul>
  *   <li><b>Toolbar mode</b> (host is a root Scaffold's toolbar title host):
- *       owns no strip component; sizes to the title subtree and applies the
- *       backgroundColor to the CN1 Toolbar's style. The Form's Toolbar does
- *       the actual bar chrome.</li>
+ *       owns no strip component and applies the backgroundColor to the CN1 Toolbar's
+ *       style. The Form's Toolbar draws the bar chrome; the row is laid out inside the
+ *       Toolbar's title component, which spans its full width.</li>
  *   <li><b>Strip mode</b> (embedded/non-root): owns a background Container
- *       (UIID "FlutterAppBar") covering a 56lp-high strip, with the title
- *       laid out inside (16lp leading inset, or centered when centerTitle).</li>
+ *       (UIID "FlutterAppBar") covering a 56lp-high strip.</li>
  * </ul>
+ *
+ * <p><b>Only the title used to be laid out.</b> {@code leading} and {@code actions} were
+ * read into the widget and then dropped on the floor, which is a quiet way to lose a lot
+ * of an app: every gallery demo page carries its <i>back button</i> as
+ * {@code AppBar.leading} and its options/info/code/documentation buttons as
+ * {@code actions}, so each one rendered as a bare title with no way out and no controls —
+ * a page that looked like a stub of itself.</p>
  */
-public class AppBarRenderElement extends SingleChildRenderElement {
+public class AppBarRenderElement extends RenderElement {
 
     /** Material toolbar height in logical pixels. */
     public static final double TOOLBAR_HEIGHT_LP = 56;
-    private static final double TITLE_INSET_LP = 16;
+    /** NavigationToolbar.kMiddleSpacing — the gap either side of the title. */
+    private static final double TITLE_SPACING_LP = 16;
+    /** Flutter's _kLeadingWidth: the leading slot is a square the height of the bar. */
+    private static final double LEADING_WIDTH_LP = 56;
+
+    private List<Element> children = new ArrayList<Element>();
+    /** Index into {@link #children} of each slot, or -1 when absent. */
+    private int leadingIndex = -1;
+    private int titleIndex = -1;
+    private int firstActionIndex = -1;
 
     public AppBarRenderElement(AppBar widget) {
         super(widget);
@@ -39,15 +60,95 @@ public class AppBarRenderElement extends SingleChildRenderElement {
         return host() != null && host().isToolbarTitleHost();
     }
 
+    // ------------------------------------------------------------------
+    // Children: leading, title, actions - in that order
+    // ------------------------------------------------------------------
+
     @Override
-    protected Widget childWidget() {
-        return appBar().getTitle();
+    protected void syncChildren() {
+        List<Widget> slots = new ArrayList<Widget>();
+        leadingIndex = -1;
+        titleIndex = -1;
+        firstActionIndex = -1;
+
+        Widget leading = effectiveLeading();
+        if (leading != null) {
+            leadingIndex = slots.size();
+            slots.add(leading);
+        }
+        if (appBar().getTitle() != null) {
+            titleIndex = slots.size();
+            slots.add(appBar().getTitle());
+        }
+        if (appBar().getActions() != null) {
+            for (Widget a : appBar().getActions()) {
+                if (a == null) {
+                    continue;
+                }
+                if (firstActionIndex < 0) {
+                    firstActionIndex = slots.size();
+                }
+                slots.add(a);
+            }
+        }
+        children = updateChildren(children, slots);
     }
+
+    /**
+     * The leading widget, or the back button Flutter would imply in its place.
+     *
+     * <p>{@code automaticallyImplyLeading} defaults to true, and a route that can be popped
+     * gets a back button for free — which is how most Flutter pages get theirs. Without it
+     * a Scaffold that never names a leading is a page with no way back.</p>
+     */
+    private Widget effectiveLeading() {
+        if (appBar().getLeading() != null) {
+            return appBar().getLeading();
+        }
+        if (!appBar().getAutomaticallyImplyLeading()) {
+            return null;
+        }
+        return canPop() ? new BackButton() : null;
+    }
+
+    private boolean canPop() {
+        try {
+            com.codename1.flutter.navigation.NavigatorState nav =
+                    com.codename1.flutter.navigation.Navigator.of(this, Boolean.FALSE);
+            return nav != null && nav.canPop();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public void visitChildren(Funcs.VoidFunc1<Element> visitor) {
+        for (Element c : children) {
+            if (c != null) {
+                visitor.call(c);
+            }
+        }
+    }
+
+    private RenderElement renderAt(int index) {
+        if (index < 0 || index >= children.size()) {
+            return null;
+        }
+        return findRenderElement(children.get(index));
+    }
+
+    // ------------------------------------------------------------------
+    // Component and styling
+    // ------------------------------------------------------------------
 
     @Override
     protected Component createComponent() {
         if (toolbarMode()) {
             applyToolbarStyle();
+            return null;
+        }
+        if (!com.codename1.ui.Display.isInitialized()) {
+            // headless unit tests: the layout is exercised without any CN1 components
             return null;
         }
         Container strip = new Container();
@@ -128,37 +229,120 @@ public class AppBarRenderElement extends SingleChildRenderElement {
         super.themeChanged();
     }
 
+    // ------------------------------------------------------------------
+    // Layout - Flutter's NavigationToolbar
+    // ------------------------------------------------------------------
+
     @Override
     protected Size performLayout(BoxConstraints constraints) {
-        RenderElement title = renderChild();
-        if (toolbarMode()) {
-            // Size to the title; the Toolbar provides the bar itself.
-            if (title == null) {
-                return constraints.smallest();
-            }
-            Size ts = title.layout(constraints.loosen());
-            setChildOffset(title, 0, 0);
-            return constraints.constrain(ts);
+        double barHeight = barHeight(constraints);
+        double spacing = Dp.px(titleSpacing());
+
+        // Leading first: it fixes where the title may start.
+        RenderElement leading = renderAt(leadingIndex);
+        double leadingWidth = 0;
+        Size leadingSize = null;
+        if (leading != null) {
+            leadingSize = leading.layout(BoxConstraints.loose(
+                    Math.min(Dp.px(LEADING_WIDTH_LP), maxWidthFor(constraints)), barHeight));
+            leadingWidth = leadingSize.width();
         }
-        double height = constraints.constrainHeight(Dp.px(TOOLBAR_HEIGHT_LP));
-        double inset = Dp.px(TITLE_INSET_LP);
+
+        // Actions next, packed at the end. Each is laid out against what is still free, so
+        // a long row degrades by shrinking rather than by overflowing the bar.
+        List<RenderElement> actions = new ArrayList<RenderElement>();
+        List<Size> actionSizes = new ArrayList<Size>();
+        double actionsWidth = 0;
+        if (firstActionIndex >= 0) {
+            for (int i = firstActionIndex; i < children.size(); i++) {
+                RenderElement a = renderAt(i);
+                if (a == null) {
+                    continue;
+                }
+                double free = Math.max(0, maxWidthFor(constraints) - leadingWidth - actionsWidth);
+                Size as = a.layout(BoxConstraints.loose(free, barHeight));
+                actions.add(a);
+                actionSizes.add(as);
+                actionsWidth += as.width();
+            }
+        }
+
+        RenderElement title = renderAt(titleIndex);
+        Size titleSize = null;
+
         double width;
         if (constraints.hasBoundedWidth()) {
             width = constraints.maxWidth();
+            if (title != null) {
+                double avail = Math.max(0,
+                        width - leadingWidth - actionsWidth - spacing * 2);
+                titleSize = title.layout(BoxConstraints.loose(avail, barHeight));
+            }
         } else {
-            width = inset * 2;
+            // Unbounded (the dry pass that yields a preferred size): the bar is as wide as
+            // its contents, so the title is measured free and everything is summed.
+            if (title != null) {
+                titleSize = title.layout(BoxConstraints.loose(Double.POSITIVE_INFINITY, barHeight));
+            }
+            width = leadingWidth + actionsWidth
+                    + (titleSize == null ? 0 : titleSize.width() + spacing * 2);
+        }
+
+        // Place: leading at the start, actions flush to the end, title between.
+        if (leading != null) {
+            setChildOffset(leading, 0, centreY(leadingSize, barHeight));
+        }
+        double actionX = width - actionsWidth;
+        for (int i = 0; i < actions.size(); i++) {
+            Size as = actionSizes.get(i);
+            setChildOffset(actions.get(i), actionX, centreY(as, barHeight));
+            actionX += as.width();
         }
         if (title != null) {
-            double avail = Math.max(0, width - inset * 2);
-            Size ts = title.layout(BoxConstraints.loose(avail, height));
-            if (!constraints.hasBoundedWidth()) {
-                width = ts.width() + inset * 2;
+            double tx;
+            if (appBar().getCenterTitle()) {
+                tx = (width - titleSize.width()) / 2;
+                // A centred title still may not slide under the leading or the actions.
+                tx = Math.max(leadingWidth + spacing,
+                        Math.min(tx, width - actionsWidth - spacing - titleSize.width()));
+                tx = Math.max(0, tx);
+            } else {
+                tx = leadingWidth + spacing;
             }
-            double tx = appBar().getCenterTitle()
-                    ? (width - ts.width()) / 2
-                    : inset;
-            setChildOffset(title, tx, (height - ts.height()) / 2);
+            setChildOffset(title, tx, centreY(titleSize, barHeight));
         }
-        return constraints.constrain(new Size(width, height));
+
+        return constraints.constrain(new Size(width, barHeight));
+    }
+
+    /** Vertical centring of one slot within the bar. */
+    private static double centreY(Size child, double barHeight) {
+        if (child == null) {
+            return 0;
+        }
+        return Math.max(0, (barHeight - child.height()) / 2);
+    }
+
+    private static double maxWidthFor(BoxConstraints constraints) {
+        return constraints.hasBoundedWidth() ? constraints.maxWidth() : Double.POSITIVE_INFINITY;
+    }
+
+    /**
+     * The bar's height. In toolbar mode the CN1 Toolbar owns the chrome and has already
+     * been given a height, so the row fills whatever box it was handed rather than forcing
+     * a second 56lp on top of it.
+     */
+    private double barHeight(BoxConstraints constraints) {
+        double preferred = Dp.px(appBar().getToolbarHeight() == null
+                ? TOOLBAR_HEIGHT_LP : appBar().getToolbarHeight().doubleValue());
+        if (toolbarMode() && constraints.hasBoundedHeight() && constraints.maxHeight() > 0) {
+            return constraints.maxHeight();
+        }
+        return constraints.constrainHeight(preferred);
+    }
+
+    private double titleSpacing() {
+        Double s = appBar().getTitleSpacing();
+        return s == null ? TITLE_SPACING_LP : s.doubleValue();
     }
 }

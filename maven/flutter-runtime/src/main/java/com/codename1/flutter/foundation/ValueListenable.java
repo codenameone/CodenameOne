@@ -7,9 +7,14 @@ import dart.runtime.Funcs;
  * ({@code ValueListenable<T>} in Flutter). {@code ValueListenableBuilder}
  * rebuilds whenever the value changes. Implemented by {@link ValueNotifier}.
  *
+ * <p>It IS a {@link Listenable}, as in Flutter, so a notifier can drive anything that takes
+ * one — {@code AnimatedWidget(listenable: notifier)}, {@code AnimatedBuilder(animation:
+ * notifier)}. Leaving the two hierarchies unrelated made those a compile error in transpiled
+ * code for no reason the Dart could explain.</p>
+ *
  * @param <T> the value type
  */
-public abstract class ValueListenable<T> {
+public abstract class ValueListenable<T> implements Listenable {
 
     public abstract T value();
 

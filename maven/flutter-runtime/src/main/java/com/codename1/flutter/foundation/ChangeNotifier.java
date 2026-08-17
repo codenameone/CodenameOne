@@ -13,8 +13,11 @@ import dart.runtime.Funcs;
  * mixin to an implemented Java interface, so the notifier state (the listener
  * list) lives in an identity-keyed side table rather than in an instance field.
  * Listeners are {@code VoidCallback}s ({@link Funcs.VoidFunc0}).
+ *
+ * <p>A ChangeNotifier IS a {@link Listenable}, as in Flutter — so a model mixing it in can
+ * drive an {@code AnimatedBuilder} or an {@code AnimatedWidget} directly.</p>
  */
-public interface ChangeNotifier {
+public interface ChangeNotifier extends Listenable {
 
     /** Identity-keyed listener lists for every ChangeNotifier instance. */
     Map<ChangeNotifier, List<Funcs.VoidFunc0>> LISTENERS =

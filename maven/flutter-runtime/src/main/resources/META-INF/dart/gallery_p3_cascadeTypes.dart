@@ -120,7 +120,7 @@ class Vector3 {
 
 // An object exposing a value that changes over time and can be listened to.
 @JavaName('com.codename1.flutter.foundation.ValueListenable')
-abstract class ValueListenable<T> {
+abstract class ValueListenable<T> extends Listenable {
   external T get value;
   external void addListener(VoidCallback listener);
   external void removeListener(VoidCallback listener);

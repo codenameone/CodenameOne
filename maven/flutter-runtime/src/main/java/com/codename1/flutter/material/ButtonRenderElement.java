@@ -47,7 +47,13 @@ public class ButtonRenderElement extends RenderElement {
     // Configuration accessors (per widget kind)
     // ------------------------------------------------------------------
 
-    private dart.runtime.Funcs.VoidFunc0 onPressed() {
+    /** Test hook: the handler a press would run, or null when the button is disabled. */
+    public dart.runtime.Funcs.VoidFunc0 pressHandler() {
+        return onPressed();
+    }
+
+    /** What a press does. Overridden by buttons that act rather than call back. */
+    protected dart.runtime.Funcs.VoidFunc0 onPressed() {
         Widget w = widget();
         if (w instanceof ButtonBase) {
             return ((ButtonBase) w).getOnPressed();
@@ -55,16 +61,58 @@ public class ButtonRenderElement extends RenderElement {
         return ((IconButton) w).getOnPressed();
     }
 
-    private Widget contentWidget() {
+    /** The widget the button draws. Overridden by buttons with their own trigger. */
+    protected Widget contentWidget() {
         Widget w = widget();
-        if (w instanceof ButtonBase) {
-            return ((ButtonBase) w).getChild();
-        }
-        return ((IconButton) w).getIcon();
+        Widget content = w instanceof ButtonBase
+                ? ((ButtonBase) w).getChild()
+                : ((IconButton) w).getIcon();
+        return unwrapToLeaf(content);
     }
 
-    private boolean isIconButton() {
-        return widget() instanceof IconButton;
+    /**
+     * Looks THROUGH wrapper and composed widgets for the Text or Icon a button can actually
+     * render.
+     *
+     * <p>A button consumes its content rather than mounting it, so anything that is not
+     * literally a Text or an Icon used to fall through to {@code toString()} and be drawn as
+     * a label — the gallery's back button ({@code IconButton(icon: BackButtonIcon())})
+     * rendered the string "com.codename1.flutter.material.BackButtonIcon@1a2b3c", clipped by
+     * the bar to a baffling "com.c". The same applied to the demo pages' options button,
+     * whose icon is wrapped in a FeatureDiscovery.</p>
+     *
+     * <p>Composed widgets are built here to see what they produce. That is safe for the
+     * icon-shaped widgets this reaches — they are pure {@code build} methods returning a
+     * glyph — and it is bounded: the walk gives up after a few levels and any failure
+     * returns the original widget, restoring the previous behaviour.</p>
+     */
+    private Widget unwrapToLeaf(Widget content) {
+        Widget cur = content;
+        for (int depth = 0; depth < 4 && cur != null; depth++) {
+            if (cur instanceof Text || cur instanceof Icon) {
+                return cur;
+            }
+            try {
+                if (cur instanceof com.codename1.flutter.widgets.HasChild) {
+                    cur = ((com.codename1.flutter.widgets.HasChild) cur).getChild();
+                } else if (cur instanceof com.codename1.flutter.StatelessWidget) {
+                    cur = ((com.codename1.flutter.StatelessWidget) cur).build(this);
+                } else {
+                    return content;
+                }
+            } catch (Throwable t) {
+                return content;
+            }
+        }
+        return cur == null ? content : cur;
+    }
+
+    /**
+     * Whether this renders as a bare glyph rather than a capsule with a label — true for
+     * IconButton and for anything else whose trigger is an icon (a popup menu button).
+     */
+    protected boolean isIconButton() {
+        return !(widget() instanceof ButtonBase);
     }
 
     /**
@@ -107,7 +155,7 @@ public class ButtonRenderElement extends RenderElement {
         if (c instanceof Icon && ((Icon) c).getSize() != null) {
             return ((Icon) c).getSize();
         }
-        if (isIconButton() && ((IconButton) widget()).getIconSize() != null) {
+        if (widget() instanceof IconButton && ((IconButton) widget()).getIconSize() != null) {
             return ((IconButton) widget()).getIconSize();
         }
         return DEFAULT_ICON_SIZE_LP;
@@ -212,10 +260,11 @@ public class ButtonRenderElement extends RenderElement {
                 all.setBorder(Border.createEmpty());
                 all.setBgTransparency(0);
             } else {
-                // IconButton: bare glyph
+                // IconButton (and other glyph triggers): bare glyph
                 int pad = (int) Math.round(Dp.px(8));
                 all.setPadding(pad, pad, pad, pad);
-                com.codename1.flutter.Color tint = ((IconButton) w).getColor();
+                com.codename1.flutter.Color tint = w instanceof IconButton
+                        ? ((IconButton) w).getColor() : null;
                 all.setFgColor(tint != null ? tint.rgb() : cs.onSurface().rgb());
                 all.setBorder(Border.createEmpty());
                 all.setBgTransparency(0);

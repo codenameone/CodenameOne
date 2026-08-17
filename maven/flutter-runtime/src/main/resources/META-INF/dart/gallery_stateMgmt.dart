@@ -32,7 +32,7 @@ abstract class Listenable {
 }
 
 @JavaName('com.codename1.flutter.foundation.ChangeNotifier')
-class ChangeNotifier {
+class ChangeNotifier extends Listenable {
   external ChangeNotifier();
   external void addListener(VoidCallback listener);
   external void removeListener(VoidCallback listener);

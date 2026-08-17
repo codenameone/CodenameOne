@@ -104,6 +104,38 @@ public class PopupMenuButton<T> extends Widget {
         return icon;
     }
 
+    public Funcs.Func1<BuildContext, Object> getItemBuilder() {
+        return itemBuilder;
+    }
+
+    public Funcs.VoidFunc1<T> getOnSelected() {
+        return onSelected;
+    }
+
+    public Funcs.VoidFunc0 getOnCanceled() {
+        return onCanceled;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    /**
+     * The widget the button shows: the explicit {@code child} or {@code icon}, else the
+     * overflow glyph Flutter falls back to. Without that default a menu button written the
+     * usual way — neither child nor icon, as the gallery's app bar demo writes it — laid out
+     * as a zero-sized nothing, so the menu was not merely inert but invisible.
+     */
+    public Widget effectiveTrigger() {
+        if (child != null) {
+            return child;
+        }
+        if (icon != null) {
+            return icon;
+        }
+        return new com.codename1.flutter.widgets.Icon(com.codename1.flutter.Icons.more_vert);
+    }
+
     @Override
     public Element createElement() {
         return new PopupMenuButtonRenderElement(this);

@@ -32,6 +32,10 @@ public class IconRenderElement extends RenderElement {
 
     @Override
     protected Component createComponent() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            // headless unit tests: no CN1 components can exist
+            return null;
+        }
         Label l = new Label("", "FlutterIcon");
         l.getAllStyles().setPadding(0, 0, 0, 0);
         l.getAllStyles().setMargin(0, 0, 0, 0);
