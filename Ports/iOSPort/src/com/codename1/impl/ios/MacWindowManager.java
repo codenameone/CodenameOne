@@ -57,14 +57,12 @@ public class MacWindowManager extends WindowManager {
     /** One native window: its slot, and the raster it is rendered through. */
     static final class Peer {
         final int slot;
-        final int windowId;
         Object mutableImage;
         int rasterWidth;
         int rasterHeight;
 
-        Peer(int slot, int windowId) {
+        Peer(int slot) {
             this.slot = slot;
-            this.windowId = windowId;
         }
     }
 
@@ -87,7 +85,7 @@ public class MacWindowManager extends WindowManager {
         if (s < 0) {
             return null;
         }
-        return new Peer(s, windowId);
+        return new Peer(s);
     }
 
     @Override

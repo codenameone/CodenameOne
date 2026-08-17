@@ -2149,13 +2149,50 @@ public final class Display extends CN1Constants {
     ///
     /// true if a listener consumed the wheel event
     public boolean fireMouseWheelEvent(int x, int y, int scrollX, int scrollY, boolean precise, int modifiers) {
-        Form f = getCurrent();
-        if (f == null) {
+        return windowMouseWheelEvent(0, x, y, scrollX, scrollY, precise, modifiers);
+    }
+
+    /// Same as `#fireMouseWheelEvent(int, int, int, int, boolean, int)`, for a wheel
+    /// event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to route the wheel explicitly: the main form
+    /// version resolves the component from `#getCurrent()`, so a wheel over a second
+    /// window would either do nothing or scroll the main form's content instead.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device such as a trackpad
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    ///
+    /// #### Returns
+    ///
+    /// true if a listener consumed the wheel event
+    public boolean windowMouseWheelEvent(int windowId, int x, int y, int scrollX, int scrollY,
+            boolean precise, int modifiers) {
+        if (isBlockedByModal(windowId)) {
+            return true;
+        }
+        Container root = windowId > 0
+                ? Desktop.getInstance().windowById(windowId)
+                : getCurrent();
+        if (root == null) {
             return false;
         }
         Component cmp;
         try {
-            cmp = f.getComponentAt(x, y);
+            cmp = root.getComponentAt(x, y);
         } catch (Throwable t) {
             cmp = null;
         }

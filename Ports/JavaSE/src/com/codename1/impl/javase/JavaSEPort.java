@@ -4286,13 +4286,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 return;
             }
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
-                Form f = getCurrentForm();
+                // Resolve against the canvas's own top level rather than the current
+                // form: this handler is installed on every canvas, and a wheel over a
+                // desktop window has to scroll that window's content.
+                com.codename1.ui.Container f = windowId > 0
+                        ? (com.codename1.ui.Container) com.codename1.ui.Desktop.getInstance().windowById(windowId)
+                        : (com.codename1.ui.Container) getCurrentForm();
                 if(f != null){
-                    Component cmp;
+                    com.codename1.ui.Component cmp;
                     try {
                         cmp = f.getComponentAt(x, y);
                     } catch (Throwable t) {
-                        // Since this is called off the edt, we sometimes hit 
+                        // Since this is called off the edt, we sometimes hit
                         // NPEs and Array Index out of bounds errors here
                         cmp = null;
                     }
@@ -4327,9 +4332,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 boolean precise = e.getPreciseWheelRotation() != e.getWheelRotation();
                 int modifiers = modifierMask(e);
                 if (e.isShiftDown()) {
-                    pointerWheelMoved(x, y, units, 0, precise, modifiers);
+                    windowPointerWheelMoved(windowId, x, y, units, 0, precise, modifiers);
                 } else {
-                    pointerWheelMoved(x, y, 0, units, precise, modifiers);
+                    windowPointerWheelMoved(windowId, x, y, 0, units, precise, modifiers);
                 }
             }
         }
@@ -19260,13 +19265,31 @@ public class JavaSEPort extends CodenameOneImplementation {
         private JFrame resolveOwningFrame() {
             Object peer = Display.getInstance().getWindowPeerForComponent(this);
             if (peer instanceof JavaSEWindowManager.Peer) {
-                JFrame owner = ((JavaSEWindowManager.Peer) peer).frame;
-                if (owner != null) {
-                    return owner;
+                JavaSEWindowManager.Peer owner = (JavaSEWindowManager.Peer) peer;
+                if (owner.frame != null) {
+                    // Remembered rather than re-resolved: removeNativeCnt() runs after
+                    // the component has left the hierarchy, so the owning window is no
+                    // longer discoverable from it, and removing from the wrong frame
+                    // leaves the Swing panel attached to the window that is going away.
+                    owningFrame = owner.frame;
+                    owningCanvas = owner.canvas;
+                    return owner.frame;
                 }
             }
             return frm;
         }
+
+        /**
+         * The canvas this peer's coordinates are relative to. A peer inside a desktop
+         * Window is positioned against that window's canvas; using the main one offsets
+         * it by the two frames' on-screen distance.
+         */
+        private C owningCanvas() {
+            return owningCanvas != null ? owningCanvas : instance.canvas;
+        }
+
+        private JFrame owningFrame;
+        private C owningCanvas;
 
         /**
          * Removes the native container from the Swing component hierarchy.
@@ -19286,9 +19309,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 peerImage = generatePeerImage();
             }
             init = false;
-            frm.remove(cnt);
-            frm.repaint();
-            
+            JFrame target = owningFrame != null ? owningFrame : frm;
+            target.remove(cnt);
+            target.repaint();
+
         }
 
         @Override
@@ -19447,21 +19471,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                 @Override
                 public void run() {
                     if (cnt.getParent() == null) return;
-                    Point absCanvasLocation = SwingUtilities.convertPoint(instance.canvas, new Point(0, 0), cnt.getParent());
+                    Point absCanvasLocation = SwingUtilities.convertPoint(owningCanvas(), new Point(0, 0), cnt.getParent());
                     if (peerBuffer == null) {
                         double scale = zoom/retinaScale;
 
                         setCntBounds(
-                                (int) ((x + screenX + instance.canvas.x) * scale) + absCanvasLocation.x,
-                                (int) ((y + screenY + instance.canvas.y) * scale) + absCanvasLocation.y,
+                                (int) ((x + screenX + owningCanvas().x) * scale) + absCanvasLocation.x,
+                                (int) ((y + screenY + owningCanvas().y) * scale) + absCanvasLocation.y,
                                 (int) (w * scale),
                                 (int) (h * scale)
                         );
                     } else {
                         double scale = zoom/retinaScale;
                         setCntBounds(
-                                (int) ((x + screenX + instance.canvas.x) * scale) + absCanvasLocation.x,
-                                (int) ((y + screenY + instance.canvas.y) * scale) + absCanvasLocation.y,
+                                (int) ((x + screenX + owningCanvas().x) * scale) + absCanvasLocation.x,
+                                (int) ((y + screenY + owningCanvas().y) * scale) + absCanvasLocation.y,
                                 (int) (w * scale),
                                 (int) (h * scale)
                         );
@@ -19489,6 +19513,13 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (_inHierarchyChanged) return;
             _inHierarchyChanged = true;
             try {
+                // A peer inside a desktop window is already parented to that window's
+                // frame; re-homing it to the main canvas's ancestor would move it to
+                // the wrong window on every hierarchy change.
+                if (owningFrame != null) {
+                    onPositionSizeChange();
+                    return;
+                }
                 java.awt.Container win = instance.canvas.getTopLevelAncestor();
                 if (win != frm) {
                     removeNativeCnt();

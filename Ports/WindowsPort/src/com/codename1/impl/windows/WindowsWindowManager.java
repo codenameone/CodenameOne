@@ -157,8 +157,27 @@ public class WindowsWindowManager extends WindowManager {
         // correctness. Disabling the main window on top of that gives the platform's
         // own modal feel -- the title bar flashes rather than the click being
         // silently swallowed.
-        WindowsNative.mainWindowSetEnabled(!modal);
+        //
+        // Counted rather than a flag: nesting one modal window inside another is
+        // ordinary, and re-enabling the main window when the inner one closes would
+        // leave the outer modal not blocking. A leaked disable is much worse than a
+        // leaked enable -- it makes the application unusable -- so the count never
+        // goes below zero.
+        if (modal) {
+            modalDepth++;
+            if (modalDepth == 1) {
+                WindowsNative.mainWindowSetEnabled(false);
+            }
+        } else if (modalDepth > 0) {
+            modalDepth--;
+            if (modalDepth == 0) {
+                WindowsNative.mainWindowSetEnabled(true);
+            }
+        }
     }
+
+    /// How many modal windows are currently up. See `#setModal(Object, boolean)`.
+    private int modalDepth;
 
     @Override
     public void setIcon(Object peerObj, Image icon) {

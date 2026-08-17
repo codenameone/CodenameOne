@@ -287,6 +287,23 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     @Override
+    public void setMinimumSize(Object peerObj, final int width, final int height) {
+        final Peer p = peer(peerObj);
+        if (p != null) {
+            runOnAwt(new Runnable() {
+                @Override
+                public void run() {
+                    if (width > 0 && height > 0) {
+                        p.frame.setMinimumSize(new Dimension(width, height));
+                    } else {
+                        p.frame.setMinimumSize(null);
+                    }
+                }
+            });
+        }
+    }
+
+    @Override
     public void setDecorated(Object peerObj, final boolean decorated) {
         final Peer p = peer(peerObj);
         if (p == null) {

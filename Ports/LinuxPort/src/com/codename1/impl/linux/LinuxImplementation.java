@@ -770,12 +770,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
                     // A forward (positive) notch reveals content above, i.e. drags
                     // the finger down -> positive scrollY. Map through the shared
                     // CodenameOneImplementation.pointerWheelMoved scroll gesture.
-                    pointerWheelMoved(x, y, 0, wheelUnits(key));
+                    windowPointerWheelMoved(windowId, x, y, 0, wheelUnits(key), false, 0);
                     break;
                 case EVENT_MOUSE_HWHEEL:
                     // A positive horizontal notch tilts right (scrolls content
                     // left), i.e. drags the finger left -> negative scrollX.
-                    pointerWheelMoved(x, y, -wheelUnits(key), 0);
+                    windowPointerWheelMoved(windowId, x, y, -wheelUnits(key), 0, false, 0);
                     break;
                 case EVENT_PINCH:
                     // key is the incremental scale multiplier in 1/10000 units.

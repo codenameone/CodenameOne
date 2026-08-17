@@ -808,6 +808,26 @@ public abstract class CodenameOneImplementation {
         return surface;
     }
 
+    /// Drops everything queued on a window's paint surface, keeping the surface
+    /// itself. A hidden window is not painted, so work queued on it would never
+    /// drain -- and an undrained queue keeps `#hasPendingPaints()` true, which keeps
+    /// the event dispatch thread awake spinning on it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surface`: the surface handle to clear
+    public final void clearPaintSurface(Object surface) {
+        PaintSurface s = asPaintSurface(surface);
+        if (s == null) {
+            return;
+        }
+        synchronized (displayLock) {
+            s.paintQueueFill = 0;
+            java.util.Arrays.fill(s.paintQueue, null);
+            java.util.Arrays.fill(s.paintQueueTemp, null);
+        }
+    }
+
     /// Releases a window's paint surface, dropping anything still queued on it so a
     /// disposed window cannot pin its component tree.
     ///
@@ -9130,6 +9150,35 @@ public abstract class CodenameOneImplementation {
     /// - `modifiers`: bitmask of the held keyboard modifiers (the `PointerEvent` `MODIFIER_*` constants)
     public void pointerWheelMoved(final int x, final int y, final int scrollX, final int scrollY,
             final boolean precise, final int modifiers) {
+        windowPointerWheelMoved(0, x, y, scrollX, scrollY, precise, modifiers);
+    }
+
+    /// Same as `#pointerWheelMoved(int, int, int, int, boolean, int)`, for a wheel
+    /// event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to say which window the wheel was over: the
+    /// main form version resolves everything -- the listeners and the synthesized
+    /// scroll gesture -- from the current form, so a wheel over a second window
+    /// would scroll the main form's content instead of the window's.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the pointer x position in window pixels
+    ///
+    /// - `y`: the pointer y position in window pixels
+    ///
+    /// - `scrollX`: the horizontal scroll amount in display pixels
+    ///
+    /// - `scrollY`: the vertical scroll amount in display pixels
+    ///
+    /// - `precise`: true if the deltas come from a high resolution device
+    ///
+    /// - `modifiers`: bitmask of the held keyboard modifiers
+    public void windowPointerWheelMoved(final int windowId, final int x, final int y,
+            final int scrollX, final int scrollY, final boolean precise, final int modifiers) {
         if (scrollX == 0 && scrollY == 0) {
             return;
         }
@@ -9139,23 +9188,33 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                if (d.fireMouseWheelEvent(x, y, scrollX, scrollY, precise, modifiers)) {
+                if (d.windowMouseWheelEvent(windowId, x, y, scrollX, scrollY, precise, modifiers)) {
                     return;
                 }
-                playWheelScrollGesture(d, x, y, scrollX, scrollY);
+                playWheelScrollGesture(d, windowId, x, y, scrollX, scrollY);
             }
         });
+    }
+
+    /// Resolves the top level a wheel gesture should play into: the window with the
+    /// given id, or the current form for the main surface.
+    private Container wheelRoot(Display d, int windowId) {
+        if (windowId > 0) {
+            return com.codename1.ui.Desktop.getInstance().windowById(windowId);
+        }
+        return d.getCurrent();
     }
 
     /// Plays the default scroll gesture for a wheel movement. Quarter the gesture across four EDT
     /// cycles: a single press->drag(full)->release would read as a fling and overshoot, whereas
     /// stepped drags let the scroll container settle the way a finger drag does. While it runs
     /// `#isScrollWheeling` reports `true`.
-    private void playWheelScrollGesture(final Display d, final int x, final int y, final int scrollX, final int scrollY) {
+    private void playWheelScrollGesture(final Display d, final int windowId, final int x,
+            final int y, final int scrollX, final int scrollY) {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = wheelRoot(d, windowId);
                 if (f != null) {
                     scrollWheeling = true;
                     dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
@@ -9165,7 +9224,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = wheelRoot(d, windowId);
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
                 }
@@ -9174,7 +9233,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = wheelRoot(d, windowId);
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
                 }
@@ -9183,7 +9242,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Form f = d.getCurrent();
+                Container f = wheelRoot(d, windowId);
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX, scrollY, false, true);
                 }
@@ -9196,7 +9255,7 @@ public abstract class CodenameOneImplementation {
     /// presses, drags to the accumulated `(dx, dy)` offset, and optionally
     /// releases. The component under the cursor is made non-focusable around the
     /// step so the synthetic press is not turned into a selection/click.
-    private void dragWheelStep(Form f, int x, int y, int dx, int dy, boolean press, boolean release) {
+    private void dragWheelStep(Container f, int x, int y, int dx, int dy, boolean press, boolean release) {
         Component cmp;
         try {
             cmp = f.getComponentAt(x, y);

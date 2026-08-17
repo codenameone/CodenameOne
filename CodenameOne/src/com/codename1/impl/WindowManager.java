@@ -173,6 +173,22 @@ public abstract class WindowManager {
     public void setResizable(Object peer, boolean resizable) {
     }
 
+    /// Sets the smallest size the user may resize the window to, or clears the
+    /// constraint when either dimension is zero or less.
+    ///
+    /// A port that cannot express this leaves the default in place; the framework
+    /// additionally clamps a delivered resize, so the constraint holds either way.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window peer
+    ///
+    /// - `width`: the minimum width in Codename One pixels
+    ///
+    /// - `height`: the minimum height in Codename One pixels
+    public void setMinimumSize(Object peer, int width, int height) {
+    }
+
     /// Sets whether the platform draws the title bar and border.
     ///
     /// #### Parameters

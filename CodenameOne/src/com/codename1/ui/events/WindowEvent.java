@@ -99,6 +99,9 @@ public class WindowEvent extends ActionEvent {
         /// The window was resized.
         Resized,
         /// The window was moved.
-        Moved
+        Moved,
+        /// The window was destroyed and its native window released. Unlike a close
+        /// request, this cannot be vetoed -- it reports what already happened.
+        Disposed
     }
 }

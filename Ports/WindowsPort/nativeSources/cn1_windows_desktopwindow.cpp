@@ -263,6 +263,22 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
                 cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_DRAGGED, lParam, mask);
             }
             return 0;
+        case WM_MOUSEWHEEL:
+        case WM_MOUSEHWHEEL: {
+            /* Same shape as the main window's handler: the wheel message reports the
+             * cursor in SCREEN coordinates while the input ring works in client
+             * coordinates, and the delta is a signed multiple of WHEEL_DELTA (120).
+             * The windowId is what makes the EDT scroll this window's content rather
+             * than the main form's. */
+            POINT pt;
+            pt.x = GET_X_LPARAM(lParam);
+            pt.y = GET_Y_LPARAM(lParam);
+            ScreenToClient(hwnd, &pt);
+            cn1WinPushWindowEvent(w->windowId,
+                    msg == WM_MOUSEHWHEEL ? CN1_EVENT_MOUSE_HWHEEL : CN1_EVENT_MOUSE_WHEEL,
+                    pt.x, pt.y, GET_WHEEL_DELTA_WPARAM(wParam));
+            return 0;
+        }
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_PRESSED, 0, 0, (int) wParam);

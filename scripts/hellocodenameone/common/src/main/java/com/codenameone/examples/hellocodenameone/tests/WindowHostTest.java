@@ -63,6 +63,10 @@ public abstract class WindowHostTest extends BaseTest {
     private static final int WINDOW_READY_TIMEOUT_MS = 10000;
 
     private Window window;
+    /// Previous poll's window size, so readiness can tell a settled window from one
+    /// that is still being resized by the platform.
+    private int lastWidth = -1;
+    private int lastHeight = -1;
 
     /**
      * The content to host in the window. Invoked once per size, so an implementation
@@ -120,6 +124,8 @@ public abstract class WindowHostTest extends BaseTest {
         final int height = all[index][1];
 
         closeWindow();
+        lastWidth = -1;
+        lastHeight = -1;
         window = new Window(baseImageName(), new BorderLayout());
         window.setResizable(true);
         window.add(BorderLayout.CENTER, createWindowContent(width, height));
@@ -144,23 +150,41 @@ public abstract class WindowHostTest extends BaseTest {
      */
     private void awaitRenderable(final int index, final int width, final int height,
                                  final long deadline) {
-        // Readiness has three parts, and dropping any one of them produces a golden
-        // that silently lies:
+        // Readiness has four parts, and dropping any one of them produces a golden
+        // that silently lies.
         //
-        //   the window has laid out at the size that was asked for -- some platforms
-        //     create the native window asynchronously and only then report its real
-        //     size back (Mac Catalyst has to ask the system to activate a scene), so
-        //     until then the window is still sized to whatever it was handed;
-        //   it has painted at least once -- the raster exists from the moment the
-        //     window is shown, so a capture before the first paint is a blank frame
-        //     of exactly the right dimensions;
-        //   the captured image is that size -- which is what proves the two agree.
+        // The window has painted at least once: its raster exists from the moment it
+        // is shown, so a capture before the first paint is a blank frame of exactly
+        // the right dimensions.
+        //
+        // Its size has settled: some platforms create the native window
+        // asynchronously and only then report a real size back -- Mac Catalyst has to
+        // ask the system to activate a scene -- so a capture taken between the request
+        // and the answer catches the window mid-resize.
+        //
+        // The capture is the size the window laid out at. This is the real invariant,
+        // and the one that caught a window laying out at 400x300 inside a raster the
+        // size of the main display.
+        //
+        // The window is no larger than what was asked for. setWindowSize() is native
+        // geometry and includes the platform's chrome, so the content is legitimately
+        // smaller wherever a title bar and border exist -- but it can never be bigger,
+        // and a platform that ignored the request and handed back its own size is what
+        // that would mean.
         Image probe = window == null ? null : window.capture();
+        int windowWidth = window == null ? 0 : window.getWidth();
+        int windowHeight = window == null ? 0 : window.getHeight();
+        boolean settled = windowWidth == lastWidth && windowHeight == lastHeight;
+        lastWidth = windowWidth;
+        lastHeight = windowHeight;
         boolean ready = window != null
-                && window.getWidth() == width && window.getHeight() == height
                 && window.hasPaintedOnce()
+                && settled
+                && windowWidth > 0 && windowHeight > 0
+                && windowWidth <= width && windowHeight <= height
                 && probe != null
-                && probe.getWidth() == width && probe.getHeight() == height;
+                && probe.getWidth() == windowWidth
+                && probe.getHeight() == windowHeight;
         if (ready || System.currentTimeMillis() >= deadline) {
             captureAndAdvance(index, width, height, ready);
             return;

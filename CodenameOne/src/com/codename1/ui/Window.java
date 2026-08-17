@@ -98,6 +98,8 @@ public class Window extends Container implements TopLevelContainer {
     /// Published under Display.lock once teardown is complete; showModal waits on it.
     private volatile boolean disposed;
     private boolean nativeVisible;
+    /// Set while this window holds a modal blocker, so it is pushed and popped once.
+    private boolean modalRegistered;
 
     private final Container contentPane;
     private final Container titleArea = new Container(new BorderLayout());
@@ -330,7 +332,17 @@ public class Window extends Container implements TopLevelContainer {
             windowLayeredPane.setWidth(getWidth());
             windowLayeredPane.setHeight(getHeight());
         }
-        return TopLevelSupport.layeredPane(windowLayeredPane, c, top);
+        // The whole window overlay has its layout disabled, exactly as Form's does, so
+        // nothing sizes the layers inside it. Form assigns each one the top level's
+        // size at creation; without the same here every layer stays at zero and the
+        // overlays that attach through this method -- Sheet, InteractionDialog,
+        // ToastBar -- have no area to render into. Applied on every call rather than
+        // only at creation, so a layer created before a resize is corrected too.
+        Container layer = TopLevelSupport.layeredPane(windowLayeredPane, c, top);
+        layer.setShouldLayout(false);
+        layer.setWidth(getWidth());
+        layer.setHeight(getHeight());
+        return layer;
     }
 
     Container getWindowLayeredPaneIfExists() {
@@ -981,6 +993,10 @@ public class Window extends Container implements TopLevelContainer {
     /// - `d`: the minimum size
     public void setMinimumWindowSize(Dimension d) {
         minimumWindowSize = d;
+        if (nativePeer != null) {
+            manager().setMinimumSize(nativePeer,
+                    d == null ? 0 : d.getWidth(), d == null ? 0 : d.getHeight());
+        }
     }
 
     /// Returns the smallest size the user may resize this window to.
@@ -1116,8 +1132,16 @@ public class Window extends Container implements TopLevelContainer {
         if (nativePeer == null) {
             Object parentPeer = ownerWindow instanceof Window
                     ? ((Window) ownerWindow).nativePeer : null;
-            nativePeer = wm.createWindow(windowId, pendingTitle, pendingX, pendingY,
+            Object peer = wm.createWindow(windowId, pendingTitle, pendingX, pendingY,
                     pendingWidth, pendingHeight, decorated, resizable, parentPeer);
+            if (peer == null) {
+                // Every port has a bounded native window table. Continuing here would
+                // register a window that paints through null graphics forever, which
+                // surfaces far away from the call that asked for one window too many.
+                throw new IllegalStateException(
+                        "the platform could not create a native window for " + getTitle());
+            }
+            nativePeer = peer;
             paintSurface = Display.impl.createPaintSurface(nativePeer);
             windowGraphics = Display.getInstance().createWindowGraphics(this);
             if (windowIcon != null) {
@@ -1126,8 +1150,9 @@ public class Window extends Container implements TopLevelContainer {
             if (alwaysOnTop) {
                 wm.setAlwaysOnTop(nativePeer, true);
             }
-            if (modalityType != MODALITY_NONE) {
-                wm.setModal(nativePeer, true);
+            if (minimumWindowSize != null) {
+                wm.setMinimumSize(nativePeer, minimumWindowSize.getWidth(),
+                        minimumWindowSize.getHeight());
             }
         }
         Desktop.getInstance().registerWindow(this);
@@ -1140,8 +1165,18 @@ public class Window extends Container implements TopLevelContainer {
         if (nativeWidth > 0 && nativeHeight > 0) {
             sizeChangedInternal(nativeWidth, nativeHeight);
         }
+        // Same hierarchy initialization Display.setCurrent() performs for a Form.
+        // Without it every component added before show() stays uninitialized, so
+        // initComponent() never runs, the look and feel is never bound and native
+        // peers are never attached. It has to happen before layout, since a peer
+        // reports a preferred size only once it exists.
+        if (!isInitialized()) {
+            initComponentImpl();
+        }
+        revalidateWithAnimationSafety();
         initFocused();
         nativeVisible = true;
+        acquireModal();
         wm.show(nativePeer);
         showListeners.fireActionEvent(new ActionEvent(this));
         fireWindowEvent(WindowEvent.Type.Shown);
@@ -1160,8 +1195,9 @@ public class Window extends Container implements TopLevelContainer {
         if (modalityType == MODALITY_NONE) {
             modalityType = MODALITY_APPLICATION;
         }
+        // show() registers the blocker, since a window shown any other way with a
+        // modality type set has to block too.
         show();
-        Display.getInstance().pushModalWindow(this);
         try {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 @Override
@@ -1182,7 +1218,41 @@ public class Window extends Container implements TopLevelContainer {
                 }
             });
         } finally {
-            Display.getInstance().popModalWindow(this);
+            releaseModal();
+        }
+    }
+
+    /// Takes this window's modal blocker, both the framework one and the native flag.
+    ///
+    /// A window shown with a modality type set blocks exactly as one shown through
+    /// `#showModal()` does; the only difference between them is that showModal() also
+    /// parks the caller. Acquiring here rather than only there is what makes the
+    /// framework's input blocking agree with the platform's own modal state.
+    ///
+    /// The two always move together and exactly once, because a port may implement
+    /// the native flag by disabling another window -- Win32 does -- and an unbalanced
+    /// pair leaves that window disabled for good.
+    private void acquireModal() {
+        if (modalRegistered || modalityType == MODALITY_NONE || nativePeer == null) {
+            return;
+        }
+        modalRegistered = true;
+        Display.getInstance().pushModalWindow(this);
+        manager().setModal(nativePeer, true);
+    }
+
+    /// Drops this window's modal blocker, both the framework one and the native flag.
+    /// Called from `#showModal()` and from `#dispose()`, so a modal window released
+    /// either way stops blocking -- a native modal on Windows disables the owner's
+    /// HWND, and leaving that in place makes the application unusable.
+    private void releaseModal() {
+        if (!modalRegistered) {
+            return;
+        }
+        modalRegistered = false;
+        Display.getInstance().popModalWindow(this);
+        if (nativePeer != null) {
+            manager().setModal(nativePeer, false);
         }
     }
 
@@ -1193,8 +1263,10 @@ public class Window extends Container implements TopLevelContainer {
     /// - `type`: one of `#MODALITY_NONE`, `#MODALITY_WINDOW` or `#MODALITY_APPLICATION`
     public void setModalityType(int type) {
         modalityType = type;
-        if (nativePeer != null) {
-            manager().setModal(nativePeer, type != MODALITY_NONE);
+        if (type == MODALITY_NONE) {
+            releaseModal();
+        } else if (nativeVisible) {
+            acquireModal();
         }
     }
 
@@ -1211,6 +1283,13 @@ public class Window extends Container implements TopLevelContainer {
     public void hide() {
         if (nativePeer != null && nativeVisible) {
             nativeVisible = false;
+            // A hidden window is not painted, so anything its components queue would
+            // sit on its surface forever -- and hasPendingPaints() seeing that queue
+            // keeps the event dispatch thread awake spinning on work it will never
+            // drain. Marking the hierarchy invisible stops components enqueuing, and
+            // clearing the surface drops whatever was queued before this call.
+            setVisible(false);
+            Display.impl.clearPaintSurface(paintSurface);
             manager().hide(nativePeer);
             fireWindowEvent(WindowEvent.Type.Hidden);
         }
@@ -1233,6 +1312,14 @@ public class Window extends Container implements TopLevelContainer {
         }
         disposing = true;
         nativeVisible = false;
+        // An owned window cannot outlive its owner: the platform would leave it open
+        // with no owner behind it, and it would keep painting. Snapshot first -- each
+        // dispose deregisters, which mutates the registry being walked.
+        Window[] owned = Desktop.getInstance().windowsOwnedBy(this);
+        for (int iter = 0; iter < owned.length; iter++) {
+            owned[iter].dispose();
+        }
+        releaseModal();
         Desktop.getInstance().deregisterWindow(this);
         Display.getInstance().windowDisposed(this);
         deinitializeImpl();
@@ -1261,8 +1348,13 @@ public class Window extends Container implements TopLevelContainer {
             disposed = true;
             Display.lock.notifyAll();
         }
-        closeListeners.fireActionEvent(new ActionEvent(this));
+        // Deliberately NOT closeListeners: those are the vetoable close *request*, and
+        // a native close with DISPOSE_ON_CLOSE has already fired them once. Firing
+        // them again would run a listener's save or cleanup work twice for one user
+        // close, and a listener consuming the second event could not veto anything
+        // because the window is already gone.
         fireWindowEvent(WindowEvent.Type.Hidden);
+        fireWindowEvent(WindowEvent.Type.Disposed);
     }
 
     /// Indicates whether this window has been disposed.
@@ -1310,10 +1402,22 @@ public class Window extends Container implements TopLevelContainer {
             return null;
         }
         Object nativeImage = manager().capture(nativePeer);
-        if (nativeImage == null) {
+        if (nativeImage != null) {
+            return Image.createImage(nativeImage);
+        }
+        // A port that cannot read its own window back still owes a capture, so render
+        // the hierarchy again at the window's current size. This is the same content
+        // the window is showing rather than a readback of the pixels on screen, so a
+        // port that can read back should -- that is the version that would also catch
+        // the window and its raster disagreeing.
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0) {
             return null;
         }
-        return Image.createImage(nativeImage);
+        Image img = Image.createImage(w, h);
+        paintComponent(img.getGraphics(), true);
+        return img;
     }
 
     /// Sets what happens when the user closes this window through the platform's own
@@ -1497,6 +1601,14 @@ public class Window extends Container implements TopLevelContainer {
     /// {@inheritDoc}
     @Override
     void sizeChangedInternal(int w, int h) {
+        // Clamp here as well as asking the port. Not every platform can express a
+        // minimum size, and a port that can may still deliver a smaller resize before
+        // the constraint takes effect; laying out below the minimum the application
+        // asked for is the thing this is meant to prevent.
+        if (minimumWindowSize != null) {
+            w = Math.max(w, minimumWindowSize.getWidth());
+            h = Math.max(h, minimumWindowSize.getHeight());
+        }
         int oldWidth = getWidth();
         int oldHeight = getHeight();
         setSize(new Dimension(w, h));
@@ -1504,6 +1616,14 @@ public class Window extends Container implements TopLevelContainer {
         if (windowLayeredPane != null) {
             windowLayeredPane.setWidth(w);
             windowLayeredPane.setHeight(h);
+            // Its layout is disabled, so its layers do not follow it by themselves.
+            java.util.List<Component> layers = windowLayeredPane.getChildrenAsList(true);
+            int layerCount = layers.size();
+            for (int iter = 0; iter < layerCount; iter++) {
+                Component layer = layers.get(iter);
+                layer.setWidth(w);
+                layer.setHeight(h);
+            }
         }
         doLayout();
         if (oldWidth != w || oldHeight != h) {
@@ -1514,12 +1634,31 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     /// {@inheritDoc}
+    ///
+    /// Matches `Form`: once the content pane has been wrapped in a layered pane the
+    /// wrapper is the pane, since the content is no longer a direct child. The whole
+    /// window overlay is deliberately not returned here -- see
+    /// `#getActualPane(int, int)`.
     @Override
     Container getActualPane() {
-        if (windowLayeredPane != null) {
-            return windowLayeredPane;
+        if (layeredPane != null) {
+            return layeredPane.getParent();
         }
         return contentPane;
+    }
+
+    /// The pane a pointer at the given point should be dispatched into.
+    ///
+    /// The whole window overlay covers the window, so making it the hit testing root
+    /// whenever it exists would swallow every click -- including over empty parts of
+    /// it -- and leave the content and the title unresponsive for as long as anything
+    /// had ever installed a layer. `Form` solves this by consulting the overlay only
+    /// where it has something interactive, and this does the same.
+    private Container getActualPane(int x, int y) {
+        if (windowLayeredPane != null && windowLayeredPane.getResponderAt(x, y) != null) {
+            return windowLayeredPane;
+        }
+        return getActualPane();
     }
 
     // ---- pointer dispatch ---------------------------------------------------------
@@ -1568,7 +1707,7 @@ public class Window extends Container implements TopLevelContainer {
     }
 
     private Component resolveComponentAt(int x, int y) {
-        Component cmp = getActualPane().getComponentAt(x, y);
+        Component cmp = getActualPane(x, y).getComponentAt(x, y);
         while (cmp != null && cmp.isIgnorePointerEvents()) {
             cmp = cmp.getParent();
         }

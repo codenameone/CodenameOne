@@ -294,6 +294,23 @@ public final class Desktop {
         }
     }
 
+    /// Returns the open windows owned by the given top level. Used by
+    /// `Window#dispose()`, which cannot outlive its children -- the platform would
+    /// leave them open with nothing behind them.
+    Window[] windowsOwnedBy(TopLevelContainer owner) {
+        ArrayList<Window> owned = new ArrayList<Window>();
+        synchronized (windows) {
+            int len = windows.size();
+            for (int iter = 0; iter < len; iter++) {
+                Window w = windows.get(iter);
+                if (w.getOwnerWindow() == owner) { //NOPMD CompareObjectsWithEquals
+                    owned.add(w);
+                }
+            }
+        }
+        return owned.toArray(new Window[owned.size()]);
+    }
+
     void deregisterWindow(Window w) {
         synchronized (windows) {
             windows.remove(w);

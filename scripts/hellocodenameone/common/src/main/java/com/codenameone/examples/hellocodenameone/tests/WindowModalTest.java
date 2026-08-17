@@ -54,6 +54,10 @@ public class WindowModalTest extends BaseTest {
 
     private Window background;
     private Window modal;
+    /// Previous poll's background window size, so readiness can tell a settled window
+    /// from one the platform is still resizing.
+    private int lastWidth = -1;
+    private int lastHeight = -1;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -101,18 +105,23 @@ public class WindowModalTest extends BaseTest {
      * makes the windows renderable happens on this thread.
      */
     private void awaitRenderable(final long deadline) {
-        // Readiness is "the background window has laid out at the size it asked for
-        // and painted at least once". Neither half is redundant: a window is sized to
-        // whatever the platform handed it until the native window really exists, and
-        // its raster exists from the moment it is shown, so a capture before the first
-        // paint returns a blank frame of exactly the right dimensions.
+        // Same readiness contract as WindowHostTest: painted at least once, size
+        // settled, no larger than the native geometry that was asked for (chrome makes
+        // the content legitimately smaller), and a capture that matches the size the
+        // window actually laid out at.
         Image probe = background.capture();
-        boolean ready = background.getWidth() == BACKGROUND_WIDTH
-                && background.getHeight() == BACKGROUND_HEIGHT
-                && background.hasPaintedOnce()
+        int windowWidth = background.getWidth();
+        int windowHeight = background.getHeight();
+        boolean settled = windowWidth == lastWidth && windowHeight == lastHeight;
+        lastWidth = windowWidth;
+        lastHeight = windowHeight;
+        boolean ready = background.hasPaintedOnce()
+                && settled
+                && windowWidth > 0 && windowHeight > 0
+                && windowWidth <= BACKGROUND_WIDTH && windowHeight <= BACKGROUND_HEIGHT
                 && probe != null
-                && probe.getWidth() == BACKGROUND_WIDTH
-                && probe.getHeight() == BACKGROUND_HEIGHT
+                && probe.getWidth() == windowWidth
+                && probe.getHeight() == windowHeight
                 && modal.isWindowShowing();
         if (ready) {
             capture();
@@ -121,9 +130,10 @@ public class WindowModalTest extends BaseTest {
         if (System.currentTimeMillis() >= deadline) {
             fail("Windows never became renderable (background showing="
                     + background.isWindowShowing() + " painted="
-                    + background.hasPaintedOnce() + " size=" + background.getWidth()
-                    + "x" + background.getHeight() + " modal showing="
-                    + modal.isWindowShowing() + ")");
+                    + background.hasPaintedOnce() + " size=" + windowWidth
+                    + "x" + windowHeight + " capture="
+                    + (probe == null ? "none" : probe.getWidth() + "x" + probe.getHeight())
+                    + " modal showing=" + modal.isWindowShowing() + ")");
             return;
         }
         CN.callSerially(new Runnable() {

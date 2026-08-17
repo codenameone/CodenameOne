@@ -216,6 +216,27 @@ static gboolean cn1DesktopOnMotion(GtkWidget* widget, GdkEventMotion* e, gpointe
     return FALSE;
 }
 
+/* Same shape as the main window's cn1OnScroll, with the window id attached so the
+ * event dispatch thread scrolls this window's content rather than the main form's.
+ * One notch == 120 units, the WHEEL_DELTA the implementation converts to pixels. */
+static gboolean cn1DesktopOnScroll(GtkWidget* widget, GdkEventScroll* e, gpointer data) {
+    CN1LinuxWindow* w = (CN1LinuxWindow*) data;
+    (void) widget;
+    if (w == 0) {
+        return FALSE;
+    }
+    if (e->direction == GDK_SCROLL_UP) {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_WHEEL, (int) e->x, (int) e->y, 120);
+    } else if (e->direction == GDK_SCROLL_DOWN) {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_WHEEL, (int) e->x, (int) e->y, -120);
+    } else if (e->direction == GDK_SCROLL_LEFT) {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, -120);
+    } else if (e->direction == GDK_SCROLL_RIGHT) {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_MOUSE_HWHEEL, (int) e->x, (int) e->y, 120);
+    }
+    return TRUE;
+}
+
 static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     (void) widget;
@@ -306,6 +327,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "button-press-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "button-release-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "motion-notify-event", G_CALLBACK(cn1DesktopOnMotion), w);
+    g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
     g_signal_connect(w->window, "key-press-event", G_CALLBACK(cn1DesktopOnKey), w);
     g_signal_connect(w->window, "key-release-event", G_CALLBACK(cn1DesktopOnKey), w);
     g_signal_connect(w->window, "delete-event", G_CALLBACK(cn1DesktopOnDelete), w);
