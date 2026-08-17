@@ -286,6 +286,9 @@ public class IPhoneBuilder extends Executor {
     // True when intents.json declares at least one @AppIntent, as opposed to an app that only
     // indexes content. The distinction is what keeps an indexing-only app off the newer floor.
     private boolean declaresAppIntents;
+    /// True when the app declares intents but ios.intents.appIntents=false asked for the App
+    /// Intents declarations to be left out. Donation still needs its Swift bridge.
+    private boolean appIntentsSuppressed;
     private java.util.List<Map<String, Object>> intentsManifest = new ArrayList<Map<String, Object>>();
     private java.util.List<Map<String, Object>> entitiesManifest = new ArrayList<Map<String, Object>>();
     // usesSurfaces && ios.surfaces.extension != false. When the developer opts out with
@@ -5270,12 +5273,25 @@ public class IPhoneBuilder extends Executor {
 
         // A declared intent is what needs App Intents; an empty list means the project only
         // declared entity types, or only indexes content at runtime.
-        declaresAppIntents = !intentsManifest.isEmpty();
+        // Only intents that actually reach the platform can justify the floor. One declared
+        // solely for a language model produces no App Intent at all, so raising the app's
+        // minimum for it would drop older devices for nothing.
+        declaresAppIntents = false;
+        for (Map<String, Object> intent : intentsManifest) {
+            if (com.codename1.util.IOSAppIntentsBuilder.isExposedToAssistant(intent)) {
+                declaresAppIntents = true;
+                break;
+            }
+        }
         if (!declaresAppIntents) {
             return;
         }
         if ("false".equals(request.getArg("ios.intents.appIntents", "true"))) {
             // The explicit way to keep indexing and donation while staying off the newer floor.
+            // Recorded separately from declaresAppIntents so the donation bridge is still
+            // generated -- suppressing the declarations must not remove the implementation the
+            // native donation path trampolines through.
+            appIntentsSuppressed = true;
             declaresAppIntents = false;
             return;
         }
@@ -5321,7 +5337,7 @@ public class IPhoneBuilder extends Executor {
     /// Spotlight and no Swift at all, which is also why an empty `AppShortcutsProvider` is never
     /// emitted -- Apple rejects one.
     private void generateAppIntentSources(File distDir, BuildRequest request) throws IOException {
-        if (!declaresAppIntents) {
+        if (!declaresAppIntents && !appIntentsSuppressed) {
             return;
         }
         File srcDir = new File(distDir, request.getMainClass() + "-src");
@@ -5336,6 +5352,14 @@ public class IPhoneBuilder extends Executor {
                     new File(srcDir, name));
         }
 
+        if (appIntentsSuppressed) {
+            // The declarations were opted out of, but the bridge and the donation shim are what
+            // the native donation path reaches through NSClassFromString. Leaving them out would
+            // make donation silently do nothing, which is the opposite of what the opt-out
+            // promises.
+            log("Generating the app intents donation bridge only (ios.intents.appIntents=false)");
+            return;
+        }
         IOSAppIntentsBuilder gen = new IOSAppIntentsBuilder(intentsManifest, entitiesManifest);
         for (Map.Entry<String, String> e : gen.buildAppTargetFileMap().entrySet()) {
             try (FileOutputStream out = new FileOutputStream(new File(srcDir, e.getKey()))) {

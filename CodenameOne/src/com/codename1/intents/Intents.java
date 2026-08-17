@@ -224,6 +224,25 @@ public final class Intents {
         }
     }
 
+    /// The parameterization registered under this id, or null when the id is a build-time
+    /// declaration or nothing at all.
+    ///
+    /// Ports need this to resolve a donation: a shortcut outlives the process while a
+    /// parameterization does not, so the shortcut has to record the base intent and the bound
+    /// values rather than a runtime id nothing will recognise later.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the id to look up
+    public static DynamicIntent getDynamicIntent(String intentId) {
+        if (intentId == null) {
+            return null;
+        }
+        synchronized (dynamic) {
+            return dynamic.get(intentId);
+        }
+    }
+
     /// The declaration for a build-time intent id, or null. Deliberately does not consult the
     /// dynamic table, so registration can check for collisions against the real catalogue.
     private static IntentDeclaration declaredById(String intentId) {

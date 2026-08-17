@@ -311,6 +311,36 @@ class IOSAppIntentsBuilderTest {
     }
 
     @Test
+    void aPhraseParameterBindsToTheGeneratedProperty() {
+        // Left as literal text the phrase reads the placeholder back to the user and never
+        // supplies the argument, so the documented parameterized phrases could not invoke.
+        Map<String, Object> withParams = intent("log_workout", "Log",
+                "phrases", Arrays.asList("Log a ${minutes} minute ${kind} in ${applicationName}"),
+                "params", Arrays.asList(param("minutes", "int"), param("kind", "string")));
+
+        String swift = intentsSwift(Arrays.asList(withParams),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("\\(.$minutes)"), swift);
+        assertTrue(swift.contains("\\(.$kind)"), swift);
+        assertTrue(swift.contains("\\(.applicationName)"), swift);
+        assertFalse(swift.contains("${"), swift);
+    }
+
+    @Test
+    void aPlaceholderThatNamesNoParameterIsLeftAlone() {
+        // Emitting an interpolation of a property that does not exist would not compile, which
+        // is a worse outcome than a phrase reading slightly oddly.
+        Map<String, Object> odd = intent("log_workout", "Log",
+                "phrases", Arrays.asList("Log ${nonsense} in ${applicationName}"));
+
+        String swift = intentsSwift(Arrays.asList(odd), new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("${nonsense}"), swift);
+        assertFalse(swift.contains(".$nonsense"), swift);
+    }
+
+    @Test
     void aSwiftKeywordParameterIsEscaped() {
         // Parameter names come from application code, so a Swift keyword is reachable rather
         // than theoretical, and an unescaped one is a compile error on a Mac only.

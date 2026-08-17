@@ -515,6 +515,10 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return;
         }
         if (intents.isEmpty() && entities.isEmpty()) {
+            // Nothing declared any more. On an incremental build the previous run's output is
+            // still sitting in target/classes and would be packaged again -- publishing removed
+            // shortcuts and calling handlers that no longer exist -- so it has to go.
+            deleteGenerated(ctx);
             return;
         }
 
@@ -544,6 +548,27 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
         ctx.getLog().info("cn1: generated " + REGISTRY_PACKAGE + "." + REGISTRY_SIMPLE
                 + " with " + defs.size() + " intent(s) and " + ents.size() + " entity type(s)");
+    }
+
+    /// Removes a previous run's output. Deleting is the only correct answer for the empty case:
+    /// emitting nothing leaves the stale files in place, and they ship.
+    private void deleteGenerated(ProcessorContext ctx) {
+        File outDir = ctx.getOutputClassDir();
+        if (outDir == null) {
+            return;
+        }
+        String[] paths = {
+                MANIFEST_RESOURCE,
+                REGISTRY_PACKAGE.replace('.', '/') + "/" + REGISTRY_SIMPLE + ".class",
+                BOOTSTRAP_PACKAGE.replace('.', '/') + "/" + BOOTSTRAP_SIMPLE + ".class"
+        };
+        for (String path : paths) {
+            File f = new File(outDir, path);
+            if (f.isFile() && !f.delete()) {
+                ctx.getLog().warn("cn1: could not remove the stale " + f
+                        + "; it would be packaged even though nothing declares an intent");
+            }
+        }
     }
 
     /// Binds every entity-typed parameter to a declared entity. Deferred to
@@ -688,6 +713,11 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
     private String argumentExpression(ParamDef p) {
         String key = quote(p.name);
+        if (p.required && p.defaultValue.length() == 0) {
+            // A required value that never arrived must stop the invocation, not be silently
+            // turned into null, 0 or false and handed to the handler, which would act on it.
+            return "required(params, " + key + ", " + requiredReader(p) + ")";
+        }
         if (!p.options.isEmpty() && "string".equals(p.kind)) {
             // The declaration promises a closed vocabulary, so the framework has to enforce it
             // rather than trusting whatever the platform or an in-app caller supplied.
@@ -719,6 +749,36 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "(float) asDouble(params, " + key + ", " + numeric(fallback, "0") + "d)";
         }
         return "asDouble(params, " + key + ", " + numeric(fallback, "0") + "d)";
+    }
+
+    /// The reader used once a required value is known to be present.
+    private String requiredReader(ParamDef p) {
+        String key = quote(p.name);
+        if ("entity".equals(p.kind)) {
+            return "entity_" + p.entityType + "(params, " + key + ")";
+        }
+        if ("date".equals(p.kind)) {
+            return "asDate(params, " + key + ")";
+        }
+        if ("boolean".equals(p.kind)) {
+            return "asBoolean(params, " + key + ", false)";
+        }
+        if (!p.options.isEmpty() && "string".equals(p.kind)) {
+            return "oneOf(params, " + key + ", null, " + stringArrayExpr(p.options) + ")";
+        }
+        if ("string".equals(p.kind)) {
+            return "asString(params, " + key + ", null)";
+        }
+        if ("int".equals(p.kind)) {
+            return "asInt(params, " + key + ", 0)";
+        }
+        if ("long".equals(p.kind)) {
+            return "asLong(params, " + key + ", 0L)";
+        }
+        if ("float".equals(p.kind)) {
+            return "(float) asDouble(params, " + key + ", 0d)";
+        }
+        return "asDouble(params, " + key + ", 0d)";
     }
 
     private void generateQueryEntities(StringBuilder sb, List<EntityDef> ents) {
@@ -872,6 +932,18 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         // the handler with something the caller did not ask for.
         sb.append("        throw new IllegalArgumentException(\"\\\"\" + v\n");
         sb.append("                + \"\\\" is not an accepted value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static <T> T required(Map<String, Object> p, String k, T value) {\n");
+        sb.append("        if (p == null || !p.containsKey(k) || p.get(k) == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("        }\n");
+        // An entity id that resolves to nothing is just as missing as an absent one: the handler
+        // would otherwise receive null for a parameter it declared as required.
+        sb.append("        if (value == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Could not resolve \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return value;\n");
         sb.append("    }\n\n");
 
         sb.append("    private static java.util.Date asDate(Map<String, Object> p, String k) {\n");

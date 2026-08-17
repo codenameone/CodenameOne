@@ -48,6 +48,11 @@ import java.util.Map;
 /// public API no-ops.
 final class IOSIntentBridge implements IntentBridge {
     private final IOSNative nativeInstance;
+    /// Images are staged into one native dictionary and consumed by the call that follows, so
+    /// staging and consuming have to be one transaction. Two threads indexing at once would
+    /// otherwise interleave: the second clears the staging area while the first is still between
+    /// its own stage and index, and the first publishes without its thumbnails.
+    private final Object stagingLock = new Object();
 
     IOSIntentBridge(IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
@@ -84,15 +89,10 @@ final class IOSIntentBridge implements IntentBridge {
         // Thumbnails travel as their own call so the JSON stays a plain string
         // across the boundary; the native side matches them by the name the
         // serializer embedded in the document.
-        if (images != null) {
-            for (Map.Entry<String, byte[]> e : images.entrySet()) {
-                byte[] data = e.getValue();
-                if (data != null && data.length > 0) {
-                    nativeInstance.intentsStageImage(e.getKey(), data, data.length);
-                }
-            }
+        synchronized (stagingLock) {
+            stage(images);
+            nativeInstance.intentsIndex(entitiesJson);
         }
-        nativeInstance.intentsIndex(entitiesJson);
     }
 
     public void removeFromIndex(String idsJson) {
@@ -104,14 +104,22 @@ final class IOSIntentBridge implements IntentBridge {
     }
 
     public void completeInvocation(String token, String resultJson, Map<String, byte[]> images) {
-        if (images != null) {
-            for (Map.Entry<String, byte[]> e : images.entrySet()) {
-                byte[] data = e.getValue();
-                if (data != null && data.length > 0) {
-                    nativeInstance.intentsStageImage(e.getKey(), data, data.length);
-                }
+        synchronized (stagingLock) {
+            stage(images);
+            nativeInstance.intentsCompleteInvocation(token, resultJson);
+        }
+    }
+
+    /// Stages this request's blobs. Always called while holding the staging lock.
+    private void stage(Map<String, byte[]> images) {
+        if (images == null) {
+            return;
+        }
+        for (Map.Entry<String, byte[]> e : images.entrySet()) {
+            byte[] data = e.getValue();
+            if (data != null && data.length > 0) {
+                nativeInstance.intentsStageImage(e.getKey(), data, data.length);
             }
         }
-        nativeInstance.intentsCompleteInvocation(token, resultJson);
     }
 }

@@ -23,6 +23,7 @@
 package com.codename1.intents;
 
 import com.codename1.io.JSONWriter;
+import com.codename1.io.Log;
 import com.codename1.surfaces.SurfaceSerializer;
 import com.codename1.ui.EncodedImage;
 
@@ -118,6 +119,39 @@ public final class IntentSerializer {
                 if (wire != null) {
                     out.put(e.getKey(), wire);
                 }
+            }
+        }
+        return JSONWriter.toJson(out);
+    }
+
+    /// Merges bound values under a serialized parameter document, returning a fresh document.
+    ///
+    /// Used when a parameterization is donated: the shortcut has to carry the values the
+    /// parameterization bound, with anything supplied at donation time still winning, because a
+    /// binding is a default rather than a lock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bound`: the parameterization's values
+    /// - `paramsJson`: values supplied at donation time, may be null
+    public static String mergeParams(Map<String, Object> bound, String paramsJson) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (bound != null) {
+            for (Map.Entry<String, Object> e : bound.entrySet()) {
+                Object wire = toWire(e.getValue());
+                if (wire != null) {
+                    out.put(e.getKey(), wire);
+                }
+            }
+        }
+        if (paramsJson != null && paramsJson.length() > 0) {
+            try {
+                Map<String, Object> supplied = com.codename1.io.JSONParser.parseJSON(paramsJson);
+                if (supplied != null) {
+                    out.putAll(supplied);
+                }
+            } catch (Throwable t) {
+                Log.e(t);
             }
         }
         return JSONWriter.toJson(out);

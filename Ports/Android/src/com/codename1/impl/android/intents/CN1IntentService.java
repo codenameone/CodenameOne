@@ -57,7 +57,11 @@ public class CN1IntentService extends IntentService {
 
     private static final String TAG = "CN1Intents";
     private static final String SCHEME = "cn1intentsvc";
-    private static final int BUDGET_SECONDS = 25;
+    /// Added to the intent's own budget. The framework enforces the real deadline and answers
+    /// on expiry; this is only the backstop for a completion that never arrives at all, so it
+    /// has to outlast the deadline rather than pre-empt it.
+    private static final int BACKSTOP_MARGIN_SECONDS = 5;
+    private static final int DEFAULT_BUDGET_SECONDS = 25;
 
     private boolean shouldStopContext;
 
@@ -106,7 +110,7 @@ public class CN1IntentService extends IntentService {
             // The service must outlive the handler, so this waits -- but never forever. The
             // framework enforces its own per-intent deadline; this is the backstop for the case
             // where the completion itself never arrives.
-            if (!latch.await(BUDGET_SECONDS, TimeUnit.SECONDS)) {
+            if (!latch.await(backstopSeconds(id), TimeUnit.SECONDS)) {
                 Log.w(TAG, "Intent " + id + " did not complete within its budget");
             }
             report(latch.result());
@@ -119,6 +123,20 @@ public class CN1IntentService extends IntentService {
                 AndroidImplementation.stopContext(this);
             }
         }
+    }
+
+    /// How long to wait before giving up on a completion that never came.
+    ///
+    /// Derived from what the intent declared rather than fixed: an intent allowed more than the
+    /// default would otherwise have its runtime torn down while its handler was still running,
+    /// and the caller told nothing.
+    private static int backstopSeconds(String intentId) {
+        com.codename1.intents.IntentDeclaration decl = Intents.getDeclaration(intentId);
+        int declared = decl == null ? Intents.getDefaultTimeout() : decl.getTimeoutSeconds();
+        if (declared < 1) {
+            declared = DEFAULT_BUDGET_SECONDS;
+        }
+        return declared + BACKSTOP_MARGIN_SECONDS;
     }
 
     /// Shows what the handler wanted said.

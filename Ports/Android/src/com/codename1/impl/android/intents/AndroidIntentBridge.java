@@ -106,7 +106,23 @@ public class AndroidIntentBridge implements IntentBridge {
             return;
         }
         try {
-            pushShortcut(ctx, intentId, intentId, intentId, uriFor(intentId, paramsJson));
+            // A shortcut outlives the process, but a parameterization lives only in memory. So
+            // the shortcut has to carry what the build-time registry can actually run: the base
+            // intent, with the bound values merged in. Donating the runtime id would produce a
+            // shortcut that works until the app is killed and reports an unknown intent after.
+            com.codename1.intents.DynamicIntent dyn = com.codename1.intents.Intents
+                    .getDynamicIntent(intentId);
+            String targetId = intentId;
+            String effectiveParams = paramsJson;
+            String label = intentId;
+            if (dyn != null) {
+                targetId = dyn.getBaseIntentId();
+                label = dyn.getTitle();
+                effectiveParams = com.codename1.intents.IntentSerializer.mergeParams(
+                        dyn.getBoundParameters(), paramsJson);
+            }
+            pushShortcut(ctx, intentId, label, label,
+                    uriFor(targetId, effectiveParams, ctx));
         } catch (Throwable t) {
             Log.w(TAG, "Could not donate " + intentId, t);
         }
@@ -136,8 +152,12 @@ public class AndroidIntentBridge implements IntentBridge {
             String title = entry[1];
             String subtitle = entry[2];
             try {
-                pushShortcut(ctx, uid, title, subtitle,
-                        Uri.parse(SCHEME + "://open?uid=" + Uri.encode(uid)));
+                String openUri = SCHEME + "://open?uid=" + Uri.encode(uid);
+                String nonce = CN1IntentNonce.get(ctx);
+                if (nonce != null) {
+                    openUri += "&n=" + Uri.encode(nonce);
+                }
+                pushShortcut(ctx, uid, title, subtitle, Uri.parse(openUri));
                 synchronized (indexed) {
                     if (!indexed.contains(uid)) {
                         indexed.add(uid);
@@ -334,7 +354,7 @@ public class AndroidIntentBridge implements IntentBridge {
 
     /// Builds the shortcut URI. The headless flag rides along so the trampoline can route a
     /// cold-start tap without the declaration table, which does not exist yet at that point.
-    private static Uri uriFor(String intentId, String paramsJson) {
+    private static Uri uriFor(String intentId, String paramsJson, Context ctx) {
         String uri = SCHEME + "://run?id=" + Uri.encode(intentId);
         if (paramsJson != null && paramsJson.length() > 0) {
             uri += "&p=" + Uri.encode(paramsJson);
@@ -343,6 +363,12 @@ public class AndroidIntentBridge implements IntentBridge {
                 com.codename1.intents.Intents.getDeclaration(intentId);
         if (decl != null && decl.isHeadless()) {
             uri += "&h=1";
+        }
+        // Marks the URI as one this application published, which is what lets the trampoline
+        // run it without the restrictions an unauthenticated caller is held to.
+        String nonce = CN1IntentNonce.get(ctx);
+        if (nonce != null) {
+            uri += "&n=" + Uri.encode(nonce);
         }
         return Uri.parse(uri);
     }

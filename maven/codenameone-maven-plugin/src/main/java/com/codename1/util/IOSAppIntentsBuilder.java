@@ -211,11 +211,8 @@ public final class IOSAppIntentsBuilder {
             sb.append("            phrases: [\n");
             List<String> ph = phrases(intent);
             for (int i = 0; i < ph.size(); i++) {
-                // ${applicationName} is Apple's own token; it becomes \(.applicationName) in a
-                // Swift phrase literal.
-                String phrase = swift(ph.get(i)).replace("${applicationName}",
-                        "\\(.applicationName)");
-                sb.append("                \"").append(phrase).append("\"");
+                sb.append("                \"").append(phraseLiteral(ph.get(i), intent))
+                        .append("\"");
                 sb.append(i == ph.size() - 1 ? "\n" : ",\n");
             }
             sb.append("            ],\n");
@@ -226,6 +223,52 @@ public final class IOSAppIntentsBuilder {
         }
         sb.append("    }\n");
         sb.append("}\n\n");
+    }
+
+    /// Turns a declared phrase into a Swift phrase literal.
+    ///
+    /// Two different interpolations live in the same string. `${applicationName}` is Apple's own
+    /// token and becomes `\(.applicationName)`. A `${name}` naming one of the intent's own
+    /// parameters has to become `\(.$name)`, which is what binds the spoken value to the
+    /// generated property -- left as literal text, the phrase reads back to the user as the
+    /// placeholder and never supplies the argument.
+    private String phraseLiteral(String phrase, Map<String, Object> intent) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < phrase.length()) {
+            int open = phrase.indexOf("${", i);
+            if (open < 0) {
+                out.append(swift(phrase.substring(i)));
+                break;
+            }
+            int close = phrase.indexOf('}', open);
+            if (close < 0) {
+                out.append(swift(phrase.substring(i)));
+                break;
+            }
+            out.append(swift(phrase.substring(i, open)));
+            String name = phrase.substring(open + 2, close);
+            if ("applicationName".equals(name)) {
+                out.append("\\(.applicationName)");
+            } else if (declaresParameter(intent, name)) {
+                out.append("\\(.$").append(sanitize(name)).append(")");
+            } else {
+                // Not a parameter and not Apple's token: leave it alone rather than emitting an
+                // interpolation of something that does not exist, which would not compile.
+                out.append(swift(phrase.substring(open, close + 1)));
+            }
+            i = close + 1;
+        }
+        return out.toString();
+    }
+
+    private boolean declaresParameter(Map<String, Object> intent, String name) {
+        for (Map<String, Object> p : params(intent)) {
+            if (name.equals(str(p, "name"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String buildEntities() {
@@ -388,7 +431,7 @@ public final class IOSAppIntentsBuilder {
     /// True when the intent offered itself to the platform. An absent list means the default,
     /// which is platform exposure.
     @SuppressWarnings("unchecked")
-    static boolean isExposedToAssistant(Map<String, Object> intent) {
+    public static boolean isExposedToAssistant(Map<String, Object> intent) {
         Object exposure = intent.get("exposure");
         if (!(exposure instanceof List)) {
             return true;

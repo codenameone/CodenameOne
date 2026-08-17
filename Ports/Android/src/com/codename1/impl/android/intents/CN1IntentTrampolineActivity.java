@@ -24,14 +24,10 @@ package com.codename1.impl.android.intents;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.ResolveInfo;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 
-import java.util.ArrayList;
-import java.util.List;
 
 /// Invisible trampoline for a tapped shortcut or an indexed item.
 ///
@@ -44,17 +40,26 @@ import java.util.List;
 /// - `cn1intent://open?uid=type:id` is a tap on indexed content, delivered to the application's
 ///   selection handler after the app is brought forward.
 ///
-/// #### Why the caller is checked
+/// #### Why an untrusted caller is limited rather than identified
 ///
 /// This activity has to be exported, because the launcher is what starts a shortcut. Exported
-/// means *any* installed application can send it an `ACTION_VIEW` intent, and an unrestricted
-/// trampoline would therefore let any app on the device invoke any declared capability with
-/// parameters of its choosing -- including one marked destructive or deliberately not
-/// discoverable. Keeping `CN1IntentService` unexported does nothing about that, since this
+/// means *any* installed application can send it an `ACTION_VIEW` intent, so an unrestricted
+/// trampoline would let any app on the device invoke any declared capability with parameters of
+/// its choosing. Keeping `CN1IntentService` unexported does nothing about that, since this
 /// activity would be a proxy straight to it.
 ///
-/// So a caller that is neither this application nor a home-screen launcher gets nothing. A
-/// launcher is the only external party with a legitimate reason to start a shortcut.
+/// Identifying the caller is not available to us. `getReferrer()` looks like the answer and is
+/// not: it returns the caller-supplied `Intent.EXTRA_REFERRER` in preference to anything the
+/// platform attributes, so an attacker simply claims to be the launcher. `getCallingPackage()`
+/// is null unless the caller used `startActivityForResult`, which a launcher does not.
+///
+/// So the trust comes from the URI instead of the caller. Shortcuts this application publishes
+/// at runtime carry a nonce minted on first use and never leaves the app's private storage;
+/// a URI presenting it can do anything. A URI without it -- a build-time static shortcut, or an
+/// arbitrary app's fabrication -- is held to exactly what the launcher already offers: an
+/// intent that is discoverable, not destructive, and needs no parameters. Its parameters are
+/// dropped, so nothing can be injected. That bounds an attacker to what the user could already
+/// do by tapping the app's own launcher shortcut.
 ///
 /// Either way this finishes immediately: it exists to route, never to be seen.
 public class CN1IntentTrampolineActivity extends Activity {
@@ -69,14 +74,7 @@ public class CN1IntentTrampolineActivity extends Activity {
             Intent intent = getIntent();
             Uri data = intent == null ? null : intent.getData();
             if (data != null) {
-                if (isTrustedCaller()) {
-                    foreground = route(data);
-                } else {
-                    // Deliberately silent to the caller: an app probing for which capabilities
-                    // exist should not learn anything from the difference between a refused
-                    // known id and a refused unknown one.
-                    Log.w(TAG, "Refusing an intent tap from an untrusted caller");
-                }
+                foreground = route(data, CN1IntentNonce.matches(this, data.getQueryParameter("n")));
             }
         } catch (Throwable t) {
             Log.w(TAG, "Could not route an intent tap", t);
@@ -87,8 +85,9 @@ public class CN1IntentTrampolineActivity extends Activity {
         finish();
     }
 
-    /// Returns true when the app should be brought forward.
-    private boolean route(Uri data) {
+    /// Returns true when the app should be brought forward. `trusted` is set when the URI
+    /// presented this application's own nonce.
+    private boolean route(Uri data, boolean trusted) {
         String host = data.getHost();
         if ("open".equals(host)) {
             String uid = data.getQueryParameter("uid");
@@ -105,6 +104,17 @@ public class CN1IntentTrampolineActivity extends Activity {
                 return true;
             }
             String params = data.getQueryParameter("p");
+            if (!trusted) {
+                // Held to what the launcher already offers, and stripped of parameters so a
+                // fabricated URI cannot choose the values a capability acts on. Deliberately
+                // silent: an app probing for capabilities should learn nothing from the
+                // difference between a refused known id and a refused unknown one.
+                if (!isSafeForUntrustedCallers(id)) {
+                    Log.w(TAG, "Refusing an unauthenticated request for \"" + id + "\"");
+                    return true;
+                }
+                params = null;
+            }
             // The headless flag travels in the URI rather than being looked up. At a cold start
             // -- a tapped shortcut on a dead process, which is the common case -- the generated
             // dispatcher has not installed itself yet, so the declaration table is empty and a
@@ -125,53 +135,30 @@ public class CN1IntentTrampolineActivity extends Activity {
         return true;
     }
 
-    /// True when the caller is this application or a home-screen launcher.
+    /// True when an unauthenticated caller may run this intent: exactly the set the build
+    /// already published as launcher shortcuts.
     ///
-    /// `getReferrer()` reports the package that started this activity. A null referrer is
-    /// treated as untrusted: it is what an explicit intent from an arbitrary app looks like on
-    /// the versions where the platform cannot attribute the caller.
-    private boolean isTrustedCaller() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
-            // No way to attribute the caller at all, so the only safe answer is to accept
-            // nothing from outside; a shortcut on these versions still works because the
-            // launcher path below is unavailable to attackers too.
+    /// An intent the application declared as not discoverable, or as destructive, or that needs
+    /// a value nobody supplied, is never in that set -- so an arbitrary app cannot reach the
+    /// capabilities most worth protecting.
+    private boolean isSafeForUntrustedCallers(String id) {
+        com.codename1.intents.IntentDeclaration decl =
+                com.codename1.intents.Intents.getDeclaration(id);
+        if (decl == null) {
+            // Either it does not exist, or the runtime is not up yet at a cold start. Neither is
+            // a basis for running something on an unauthenticated request.
             return false;
         }
-        Uri referrer = getReferrer();
-        String caller = referrer == null ? null : referrer.getHost();
-        if (caller == null) {
+        if (!decl.isDiscoverable() || decl.isDestructive()) {
             return false;
         }
-        if (caller.equals(getApplicationInfo().packageName)) {
-            return true;
-        }
-        return launcherPackages().contains(caller);
-    }
-
-    /// The packages that can act as a home screen. Resolved rather than hard-coded, since the
-    /// user's launcher is their choice.
-    private List<String> launcherPackages() {
-        List<String> out = new ArrayList<String>();
-        // Only the query is guarded; the loop's implicit cast stays outside the catch, which
-        // the repo's cast-semantics gate requires wherever the shape appears.
-        List<ResolveInfo> found;
-        try {
-            Intent home = new Intent(Intent.ACTION_MAIN);
-            home.addCategory(Intent.CATEGORY_HOME);
-            found = getPackageManager().queryIntentActivities(home, 0);
-        } catch (Throwable t) {
-            Log.w(TAG, "Could not resolve the launcher packages", t);
-            return out;
-        }
-        if (found == null) {
-            return out;
-        }
-        for (ResolveInfo info : found) {
-            if (info.activityInfo != null && info.activityInfo.packageName != null) {
-                out.add(info.activityInfo.packageName);
+        for (com.codename1.intents.IntentParameterInfo p : decl.getParameters()) {
+            if (p.isRequired() && (p.getDefaultValue() == null
+                    || p.getDefaultValue().length() == 0)) {
+                return false;
             }
         }
-        return out;
+        return true;
     }
 
     private void launchMainActivity() {
