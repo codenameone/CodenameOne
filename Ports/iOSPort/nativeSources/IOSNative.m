@@ -15214,6 +15214,41 @@ static void cn1IntentsRetainActivity(NSUserActivity *activity) {
     }
 }
 
+/// Writes the staged blobs into a per-invocation directory and returns its path, or nil when
+/// there was nothing to write. The directory is under the caches folder, so the OS can reclaim
+/// it -- a snippet is transient and there is nothing to keep once it has been shown.
+static NSString *cn1IntentsWriteStagedImages(NSString *token) {
+    cn1IntentsEnsureStaging();
+    NSDictionary *snapshot;
+    @synchronized (cn1IntentImagesLock) {
+        if ([cn1IntentImages count] == 0) {
+            return nil;
+        }
+        snapshot = [cn1IntentImages copy];
+    }
+    NSArray *caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory,
+            NSUserDomainMask, YES);
+    if ([caches count] == 0) {
+        return nil;
+    }
+    NSString *dir = [[caches objectAtIndex:0]
+            stringByAppendingPathComponent:[@"cn1intents/" stringByAppendingString:token]];
+    NSError *err = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:&err];
+    if (err != nil) {
+        NSLog(@"CN1 intents: could not create the snippet image directory: %@", err);
+        return nil;
+    }
+    for (NSString *name in snapshot) {
+        NSData *data = [snapshot objectForKey:name];
+        [data writeToFile:[dir stringByAppendingPathComponent:name] atomically:YES];
+    }
+    return dir;
+}
+
 static NSDictionary *cn1IntentsParseJson(NSString *json) {
     if (json == nil) {
         return nil;
@@ -15422,10 +15457,15 @@ void com_codename1_impl_ios_IOSNative_intentsCompleteInvocation___java_lang_Stri
             NSString *t = toNSString(CN1_THREAD_STATE_PASS_ARG token);
             NSString *json = (resultJson == JAVA_NULL) ? @"{}"
                     : toNSString(CN1_THREAD_STATE_PASS_ARG resultJson);
+            // A snippet's images reach the renderer as files, not bytes: it resolves them from
+            // a directory, the same way the widget extension does, so the two render paths stay
+            // identical rather than growing a second image pipeline.
+            NSString *imagesDir = cn1IntentsWriteStagedImages(t);
             // The Swift side owns the one-shot guarantee for its continuation; the Java side
             // has already guaranteed this fires once per token.
-            ((void (*)(id, SEL, NSString *, NSString *))objc_msgSend)((id)bridge,
-                    NSSelectorFromString(@"completeInvocation:resultJson:"), t, json);
+            ((void (*)(id, SEL, NSString *, NSString *, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"completeInvocation:resultJson:imagesDir:"),
+                    t, json, imagesDir);
         }
         POOL_END();
     }

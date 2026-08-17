@@ -65,8 +65,9 @@ public class CN1IntentBridge: NSObject {
     }
 
     /// Called from Java with the outcome of an invocation the system started.
-    @objc public static func completeInvocation(_ token: String, resultJson: String) {
-        CN1IntentHost.completeToken(token, resultJson: resultJson)
+    @objc public static func completeInvocation(_ token: String, resultJson: String,
+                                                imagesDir: String?) {
+        CN1IntentHost.completeToken(token, resultJson: resultJson, imagesDir: imagesDir)
     }
 
     // MARK: - Helpers shared by the generated declarations
@@ -78,12 +79,16 @@ public class CN1IntentBridge: NSObject {
     /// crash rather than a recoverable error.
     static func run(id: String, params: [String: Any], headless: Bool) async -> CN1IntentOutcome {
         let json = encode(params)
-        let raw: String = await withCheckedContinuation { continuation in
-            CN1IntentHost.performIntent(id, paramsJson: json, headless: headless) { result in
-                continuation.resume(returning: result ?? "{}")
+        let answer: (String, String?) = await withCheckedContinuation { continuation in
+            CN1IntentHost.performIntent(id, paramsJson: json, headless: headless) { result, dir in
+                continuation.resume(returning: (result ?? "{}", dir))
             }
         }
-        return CN1IntentOutcome(json: raw)
+        // The snippet's images are files rather than bytes by the time they reach here: the
+        // renderer reads them from a directory, which is also how the widget extension gets
+        // them, so the two paths stay identical.
+        let dir = answer.1.map { URL(fileURLWithPath: $0) }
+        return CN1IntentOutcome(json: answer.0, imagesDir: dir)
     }
 
     static func entities(type: String, kind: String, argument: String?) -> [CN1EntityValue] {
@@ -154,8 +159,13 @@ public struct CN1IntentOutcome {
     public let dialog: String?
     public let openUrl: String?
     public let error: String?
+    /// The snippet's node tree, in the surfaces schema, or nil.
+    public let snippet: [String: Any]?
+    /// Where the snippet's images were written, or nil.
+    public let imagesDir: URL?
 
-    init(json: String) {
+    init(json: String, imagesDir: URL? = nil) {
+        self.imagesDir = imagesDir
         let doc = (try? JSONSerialization.jsonObject(
             with: Data(json.utf8))) as? [String: Any] ?? [:]
         // A result with no "ok" key at all is treated as success: the framework always writes
@@ -176,6 +186,7 @@ public struct CN1IntentOutcome {
         // The wire document keeps the JSON type, so a consumer that cares can read it there.
         // Typing this properly needs the declaration to state a return type, which is a
         // deliberate future addition rather than something derivable from what exists today.
+        self.snippet = doc["snippet"] as? [String: Any]
         if let v = doc["value"] {
             self.value = String(describing: v)
         } else {

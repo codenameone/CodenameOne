@@ -354,6 +354,63 @@ class IntentsTest {
     }
 
     @Test
+    void aDeclaredRouteTemplateIsExpandedFromTheBoundValues() {
+        // opensRoute exists so a handler can return ok() and still be an "open the app here"
+        // intent; without expansion the app foregrounded onto whatever screen it was showing.
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", false, true, false,
+                    "/orders/{orderId}", 5, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Map<String, Object> params = new HashMap<String, Object>();
+            params.put("orderId", "42");
+            Intents.invoke("known", params);
+
+            assertEquals(Arrays.asList("/orders/42"), navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
+    @Test
+    void aTemplateWithNoValueForAPlaceholderDoesNotNavigate() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", false, true, false,
+                    "/orders/{orderId}", 5, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertTrue(navigated.isEmpty(),
+                    "a half-expanded URL would route somewhere unintended");
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
+    @Test
     void aFailedResultDoesNotNavigate() {
         final List<String> navigated = new ArrayList<String>();
         com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {

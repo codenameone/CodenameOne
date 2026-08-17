@@ -44,7 +44,7 @@ static void cn1IntentsEnsureState(void) {
 + (void)performIntent:(NSString *)intentId
            paramsJson:(NSString *)paramsJson
              headless:(BOOL)headless
-           completion:(void (^)(NSString *))completion {
+           completion:(void (^)(NSString *, NSString *))completion {
     cn1IntentsEnsureState();
     NSString *token;
     @synchronized (cn1PendingLock) {
@@ -66,12 +66,14 @@ static void cn1IntentsEnsureState(void) {
             CN1_THREAD_GET_STATE_PASS_ARG jtoken, jid, jparams, headless ? JAVA_TRUE : JAVA_FALSE);
 }
 
-+ (void)completeToken:(NSString *)token resultJson:(NSString *)resultJson {
++ (void)completeToken:(NSString *)token
+           resultJson:(NSString *)resultJson
+            imagesDir:(NSString *)imagesDir {
     if (token == nil) {
         return;
     }
     cn1IntentsEnsureState();
-    void (^completion)(NSString *) = nil;
+    void (^completion)(NSString *, NSString *) = nil;
     @synchronized (cn1PendingLock) {
         completion = [cn1PendingIntents objectForKey:token];
         // Removed before firing, so a late handler result racing the deadline cannot resume
@@ -79,7 +81,7 @@ static void cn1IntentsEnsureState(void) {
         [cn1PendingIntents removeObjectForKey:token];
     }
     if (completion != nil) {
-        completion(resultJson == nil ? @"{}" : resultJson);
+        completion(resultJson == nil ? @"{}" : resultJson, imagesDir);
     }
 }
 

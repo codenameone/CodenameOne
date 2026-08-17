@@ -82,7 +82,18 @@ final class IOSIntentBridge implements IntentBridge {
     }
 
     public void donate(String intentId, String paramsJson) {
-        nativeInstance.intentsDonate(intentId, paramsJson);
+        // A suggestion outlives the process while a parameterization does not, so the donation
+        // has to record the base intent and the bound values. Donating the runtime id would
+        // produce a suggestion that works until the app is killed and then fails as unknown.
+        com.codename1.intents.DynamicIntent dyn =
+                com.codename1.intents.Intents.getDynamicIntent(intentId);
+        if (dyn == null) {
+            nativeInstance.intentsDonate(intentId, paramsJson);
+            return;
+        }
+        nativeInstance.intentsDonate(dyn.getBaseIntentId(),
+                com.codename1.intents.IntentSerializer.mergeParams(
+                        dyn.getBoundParameters(), paramsJson));
     }
 
     public void index(String entitiesJson, Map<String, byte[]> images) {

@@ -139,8 +139,11 @@ public final class IOSAppIntentsBuilder {
         // ReturnsValue is declared unconditionally so the signature does not vary with the
         // declaration: the wire value is a string, absent becomes empty, and Shortcuts can pipe
         // it into a following action either way.
+        // ShowsSnippetView is declared unconditionally so the signature does not vary with the
+        // declaration: a result with no snippet renders an empty view, which costs nothing and
+        // keeps every generated struct the same shape.
         sb.append("    func perform() async throws -> some IntentResult & ProvidesDialog"
-                + " & ReturnsValue<String> {\n");
+                + " & ReturnsValue<String> & ShowsSnippetView {\n");
         if (bool(intent, "destructive")) {
             // Declared destructive, so the platform confirms before anything happens.
             sb.append("        try await requestConfirmation()\n");
@@ -183,7 +186,9 @@ public final class IOSAppIntentsBuilder {
         // A result carrying a route is navigated by the framework once the app is up; this only
         // has to make sure the app is up, which openAppWhenRun already did.
         sb.append("        return .result(value: outcome.value ?? \"\",\n");
-        sb.append("                       dialog: IntentDialog(stringLiteral: outcome.spoken))\n");
+        sb.append("                       dialog: IntentDialog(stringLiteral: outcome.spoken),\n");
+        sb.append("                       view: CN1IntentSnippetView(node: outcome.snippet,\n");
+        sb.append("                                                  imagesDir: outcome.imagesDir))\n");
         sb.append("    }\n");
         sb.append("}\n\n");
     }

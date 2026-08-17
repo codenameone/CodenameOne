@@ -5345,9 +5345,19 @@ public class IPhoneBuilder extends Executor {
 
         // The static half: the Java-to-Swift bridge, the donation shim, and the Objective-C
         // host that is the only legal way for Swift to reach the translated Java.
-        String[] staticFiles = {"CN1IntentBridge.swift", "CN1IntentHost.h", "CN1IntentHost.m"};
+        String[] staticFiles = {"CN1IntentBridge.swift", "CN1IntentSnippetView.swift",
+                "CN1IntentHost.h", "CN1IntentHost.m"};
         for (String name : staticFiles) {
             copyResourceTo("/com/codename1/builders/intents/ios/" + name,
+                    new File(srcDir, name));
+        }
+        // A snippet is a small layout rendered while the app may be off screen, which is what a
+        // widget is, so it reuses the surfaces node renderer rather than growing a second
+        // layout vocabulary. Written under the same filenames the surfaces builder uses, so an
+        // app that has both features gets one copy rather than two conflicting declarations.
+        String[] sharedRenderer = {"CN1SurfaceModel.swift", "CN1SurfaceRenderer.swift"};
+        for (String name : sharedRenderer) {
+            copyResourceTo("/com/codename1/builders/surfaces/ios/" + name,
                     new File(srcDir, name));
         }
 
@@ -6069,7 +6079,11 @@ public class IPhoneBuilder extends Executor {
         // Emitted for any app that declares an intent. It has nothing to do with the widget
         // extension, and nesting it in that branch made it depend on an unrelated feature being
         // switched on.
-        if (declaresAppIntents && !inject.contains("NSUserActivityTypes")) {
+        // Emitted whenever the app declares intents, including the appIntents=false opt-out:
+        // donation still runs there, and iOS only offers an activity whose type is declared
+        // here, so omitting it would make the opt-out donate into a void.
+        if ((declaresAppIntents || appIntentsSuppressed)
+                && !inject.contains("NSUserActivityTypes")) {
             StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
             for (Map<String, Object> intent : intentsManifest) {
                 Object id = intent.get("id");

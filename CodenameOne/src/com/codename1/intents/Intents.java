@@ -797,11 +797,19 @@ public final class Intents {
     /// platforms only know how to bring the app forward -- iOS through `openAppWhenRun`, Android
     /// through the trampoline. Without this the app would foreground and then sit on whatever
     /// screen it happened to be showing, which is the failure an `opens` result exists to avoid.
-    private static void navigateIfRequested(IntentResult r) {
+    private static void navigateIfRequested(IntentResult r, IntentDeclaration decl,
+                                             Map<String, Object> params) {
         if (r == null || r.isFailed()) {
             return;
         }
         String url = r.getOpenUrl();
+        if (url == null || url.length() == 0) {
+            // The handler named no route, but the declaration may have. That is the whole point
+            // of opensRoute: a handler can return ok() and still be an "open the app here"
+            // intent, and without expanding the template the app foregrounds onto whatever
+            // screen it happened to be showing.
+            url = expandRoute(decl, params);
+        }
         if (url == null || url.length() == 0) {
             return;
         }
@@ -811,6 +819,43 @@ public final class Intents {
         } catch (Throwable t) {
             logError(t);
         }
+    }
+
+    /// Fills a declared route template from the values the intent ran with, or returns null
+    /// when there is no template or a placeholder has no value.
+    private static String expandRoute(IntentDeclaration decl, Map<String, Object> params) {
+        if (decl == null) {
+            return null;
+        }
+        String template = decl.getOpensRoute();
+        if (template == null || template.length() == 0) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < template.length()) {
+            int open = template.indexOf('{', i);
+            if (open < 0) {
+                out.append(template.substring(i));
+                break;
+            }
+            int close = template.indexOf('}', open);
+            if (close < 0) {
+                out.append(template.substring(i));
+                break;
+            }
+            out.append(template, i, open);
+            String name = template.substring(open + 1, close);
+            Object value = params == null ? null : params.get(name);
+            if (value == null) {
+                // A half-expanded URL would route somewhere unintended, which is worse than not
+                // navigating at all.
+                return null;
+            }
+            out.append(value);
+            i = close + 1;
+        }
+        return out.toString();
     }
 
     /// Logs a swallowed failure without ever being able to become one.
@@ -872,7 +917,7 @@ public final class Intents {
             if (r == null) {
                 return IntentResult.failed("Unknown intent \"" + intentId + "\"");
             }
-            navigateIfRequested(r);
+            navigateIfRequested(r, getDeclaration(targetId), safe);
             return r;
         } catch (Throwable t) {
             logError(t);

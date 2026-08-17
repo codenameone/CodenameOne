@@ -41,11 +41,13 @@
 + (void)performIntent:(NSString *)intentId
            paramsJson:(NSString *)paramsJson
              headless:(BOOL)headless
-           completion:(void (^)(NSString *resultJson))completion;
+           completion:(void (^)(NSString *resultJson, NSString *imagesDir))completion;
 
 /// Delivers the result for a token and forgets it. A second call for the same token is ignored,
 /// because the Swift continuation waiting on the other side crashes the process if resumed twice.
-+ (void)completeToken:(NSString *)token resultJson:(NSString *)resultJson;
++ (void)completeToken:(NSString *)token
+           resultJson:(NSString *)resultJson
+            imagesDir:(NSString *)imagesDir;
 
 /// Runs one of an entity type's queries and returns the serialized entities, or nil.
 /// Synchronous: the platform calls this while building a picker and expects an answer.
