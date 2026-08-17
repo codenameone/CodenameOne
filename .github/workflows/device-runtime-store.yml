@@ -1,0 +1,208 @@
+# Weekly build of the device runtime for testers.
+#
+# Uploads to Google Play internal testing and to TestFlight. It does not promote
+# to production and does not submit for App Store review -- see
+# scripts/cn1-device-runtime/store/README.md for why that is deliberate.
+#
+# Without credentials the job reports what is missing and stops. It never
+# publishes half of a release.
+name: Device runtime store build
+
+on:
+  schedule:
+    # Monday morning, so a failure has a working week in front of it.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and check credentials without uploading'
+        type: boolean
+        default: false
+
+concurrency:
+  group: device-runtime-store
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.check.outputs.android }}
+      ios: ${{ steps.check.outputs.ios }}
+    steps:
+      - id: check
+        name: Which stores are configured
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ASC_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          IOS_CERT: ${{ secrets.IOS_DIST_CERT_P12 }}
+        run: |
+          android=false
+          ios=false
+          if [ -n "$PLAY_JSON" ] && [ -n "$KEYSTORE" ]; then android=true; fi
+          if [ -n "$ASC_KEY" ] && [ -n "$IOS_CERT" ]; then ios=true; fi
+          echo "android=$android" >> "$GITHUB_OUTPUT"
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
+          echo "### Device runtime store build" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Store | Configured |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Google Play | $android |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| App Store | $ios |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$android" = false ] && [ "$ios" = false ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No publishing credentials are present, so nothing was uploaded." >> "$GITHUB_STEP_SUMMARY"
+            echo "The secrets each store needs are listed in" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`scripts/cn1-device-runtime/store/README.md\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  android:
+    needs: preflight
+    if: needs.preflight.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 8 for the framework, JDK 17 for the Android port
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            17
+
+      - name: Build the framework and the Android port
+        run: |
+          cd maven
+          mvn -B -q -DskipTests install -pl core,parparvm -am
+          mvn -B -q -DskipTests -Pcompile-android install -pl android
+
+      - name: Regenerate and verify the shims
+        # The shims are the app's compiled contract with pushed code. The script
+        # fails if one will not compile, if a load-bearing shim is missing, or if
+        # generation is not reproducible -- all of which are release blockers.
+        run: scripts/generate-interp-shims.sh
+
+      - name: Build the app bundle
+        env:
+          JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          cd scripts/cn1-device-runtime
+          mvn -B -q package -DskipTests \
+            -Dcodename1.platform=android \
+            -Dcodename1.buildTarget=android-source \
+            -Dopen=false
+
+      - name: Sign and assemble
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          gradle_dir="$(find scripts/cn1-device-runtime/android/target -maxdepth 1 \
+            -name '*-android-source' -type d | head -1)"
+          [ -n "$gradle_dir" ] || { echo "no gradle project was generated" >&2; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$gradle_dir/upload.keystore"
+          cd "$gradle_dir"
+          ./gradlew --no-daemon bundleRelease \
+            -Pandroid.injected.signing.store.file=upload.keystore \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+
+      - name: Upload to internal testing
+        if: ${{ !inputs.dry_run }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.codenameone.devruntime
+          releaseFiles: scripts/cn1-device-runtime/android/target/*-android-source/app/build/outputs/bundle/release/*.aab
+          track: internal
+          status: completed
+          whatsNewDirectory: scripts/cn1-device-runtime/fastlane/metadata/android/en-US/changelogs
+
+  ios:
+    needs: preflight
+    if: needs.preflight.outputs.ios == 'true'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 8 for the framework, JDK 17 for the translator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            17
+
+      - name: Build the framework, translator and iOS port
+        run: |
+          cd maven
+          mvn -B -q -DskipTests install -pl core,parparvm,ios -am
+
+      - name: Regenerate and verify the shims
+        run: scripts/generate-interp-shims.sh
+
+      - name: Translate to Xcode
+        env:
+          JAVA17_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        run: |
+          cd scripts/cn1-device-runtime
+          mvn -B -q package -DskipTests \
+            -Dcodename1.platform=ios \
+            -Dcodename1.buildTarget=ios-source \
+            -Dcodename1.arg.ios.interpHost=true \
+            -Dopen=false
+
+      - name: Import signing material
+        env:
+          CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          set -euo pipefail
+          keychain=build.keychain
+          security create-keychain -p actions "$keychain"
+          security default-keychain -s "$keychain"
+          security unlock-keychain -p actions "$keychain"
+          echo "$CERT_P12" | base64 -d > cert.p12
+          security import cert.p12 -k "$keychain" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions "$keychain"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE" | base64 -d > \
+            ~/Library/MobileDevice/Provisioning\ Profiles/devruntime.mobileprovision
+
+      - name: Archive and export
+        run: |
+          set -euo pipefail
+          src="$(find scripts/cn1-device-runtime/ios/target -maxdepth 1 \
+            -name '*-ios-source' -type d | head -1)"
+          [ -n "$src" ] || { echo "no Xcode project was generated" >&2; exit 1; }
+          cd "$src"
+          xcodebuild -workspace CN1DeviceRuntime.xcworkspace \
+            -scheme CN1DeviceRuntime -configuration Release \
+            -archivePath build/CN1DeviceRuntime.xcarchive archive
+          xcodebuild -exportArchive \
+            -archivePath build/CN1DeviceRuntime.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist ../../store/ExportOptions.plist
+
+      - name: Upload to TestFlight
+        if: ${{ !inputs.dry_run }}
+        env:
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/private_keys
+          echo "$ASC_PRIVATE_KEY" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
+          src="$(find scripts/cn1-device-runtime/ios/target -maxdepth 1 \
+            -name '*-ios-source' -type d | head -1)"
+          xcrun altool --upload-app -f "$src"/build/ipa/*.ipa -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"

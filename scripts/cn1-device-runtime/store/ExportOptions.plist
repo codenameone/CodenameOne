@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- app-store, not ad-hoc: the weekly job feeds TestFlight. -->
+    <key>method</key>
+    <string>app-store</string>
+    <key>teamID</key>
+    <string>$(APPLE_TEAM_ID)</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <!-- The build is submitted by altool in a later step, so the archive export
+         itself does not upload. -->
+    <key>destination</key>
+    <string>export</string>
+</dict>
+</plist>
