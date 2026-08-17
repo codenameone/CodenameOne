@@ -61,9 +61,9 @@ class AndroidIntentShortcutsTest {
         }
         AndroidGradleBuilder b = new AndroidGradleBuilder();
         Method m = AndroidGradleBuilder.class.getDeclaredMethod("buildIntentsManifestEntries",
-                File.class, File.class);
+                File.class, File.class, String.class);
         m.setAccessible(true);
-        return (String) m.invoke(b, assets, res);
+        return (String) m.invoke(b, assets, res, "com.example.app");
     }
 
     private static String shortcutsXml(Path dir) throws IOException {
@@ -76,12 +76,31 @@ class AndroidIntentShortcutsTest {
         entriesFor(dir, manifestJson);
         AndroidGradleBuilder b = new AndroidGradleBuilder();
         Method m = AndroidGradleBuilder.class.getDeclaredMethod("buildIntentsManifestEntries",
-                File.class, File.class);
+                File.class, File.class, String.class);
         m.setAccessible(true);
-        m.invoke(b, new File(dir.toFile(), "assets"), new File(dir.toFile(), "res"));
+        m.invoke(b, new File(dir.toFile(), "assets"), new File(dir.toFile(), "res"),
+                "com.example.app");
         Field f = AndroidGradleBuilder.class.getDeclaredField("intentsShortcutsMetaData");
         f.setAccessible(true);
         return (String) f.get(b);
+    }
+
+    /// res/xml is not processed for manifest placeholders, so ${applicationId} written there
+    /// reaches the launcher literally and the explicit component cannot resolve -- every
+    /// generated static shortcut would open nothing at all.
+    @Test
+    void aShortcutNamesTheRealPackage(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\","
+                + " \"title\": \"Log a workout\", \"headless\": true,"
+                + " \"discoverable\": true, \"destructive\": false,"
+                + " \"opensRoute\": \"\", \"params\": [],"
+                + " \"exposure\": [\"ASSISTANT\"]}]}");
+
+        String xml = shortcutsXml(dir);
+
+        assertTrue(xml.contains("android:targetPackage=\"com.example.app\""), xml);
+        assertFalse(xml.contains("${applicationId}"),
+                "a manifest placeholder is not substituted in res/xml: " + xml);
     }
 
     /// A declared route needs a window to land in, so the URI must not claim headless however

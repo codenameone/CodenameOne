@@ -234,6 +234,24 @@ static void installSignalHandlers() {
     }
 }
 
+/// An activity that cold-launched the app, held until the VM callback has run the
+/// application's init/start. Nil at every other moment.
+static NSUserActivity *cn1PendingLaunchActivity = nil;
+
+/// Delivers the held launch activity, if there is one. Safe to call when there is not.
+- (void)cn1DeliverPendingLaunchActivity
+{
+    NSUserActivity *pending = cn1PendingLaunchActivity;
+    if (pending == nil) {
+        return;
+    }
+    // Cleared before delivery so a second call cannot deliver it twice, and released after,
+    // since this holds the only reference in the app target's manual-reference-counted build.
+    cn1PendingLaunchActivity = nil;
+    [self cn1ContinueUserActivity:pending];
+    [pending release];
+}
+
 - (BOOL)cn1ContinueUserActivity:(NSUserActivity *)userActivity
 {
     if (userActivity != nil && [NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType] && userActivity.webpageURL != nil) {
@@ -489,7 +507,21 @@ static void installSignalHandlers() {
         if (activityDictionary) {
             NSUserActivity *userActivity = [activityDictionary valueForKey:@"UIApplicationLaunchOptionsUserActivityKey"];
             if (userActivity != nil) {
+#ifdef CN1_USE_INTENTS
+                // A donated activity cold-launching the app arrives here, before the VM
+                // callback below has run the application's init/start -- so the framework's
+                // dispatcher exists (the generated bootstrap installed it from main) while
+                // Display does not, and the handler would run inline with no event thread and
+                // no window. Held until initialization instead; browsing-web keeps its existing
+                // path, which only stores AppArg and is safe this early.
+                if (![NSUserActivityTypeBrowsingWeb isEqualToString:userActivity.activityType]) {
+                    cn1PendingLaunchActivity = [userActivity retain];
+                } else {
+                    [self cn1ContinueUserActivity:userActivity];
+                }
+#else
                 [self cn1ContinueUserActivity:userActivity];
+#endif
             }
         }
     }
@@ -504,6 +536,7 @@ static void installSignalHandlers() {
         if (locationValueDeferred) {
             com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
         }
+        [self cn1DeliverPendingLaunchActivity];
     });
 #else
     com_codename1_impl_ios_IOSImplementation_callback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
@@ -512,6 +545,7 @@ static void installSignalHandlers() {
     if (locationValue) {
         com_codename1_impl_ios_IOSImplementation_appDidLaunchWithLocation__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     }
+    [self cn1DeliverPendingLaunchActivity];
 #endif
     
 #ifdef INCLUDE_CN1_BACKGROUND_FETCH

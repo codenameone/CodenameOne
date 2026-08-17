@@ -368,7 +368,7 @@ jobs:
               # core + Linux port (musl JDK8); the default cc on Alpine already links musl.
               cd /cn1/maven && mvn -B -pl linux -am -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
               cd /cn1/vm && mvn -B clean package -pl JavaAPI -am -DskipTests
-              $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B test -pl tests -am \
+              /cn1/scripts/ci-mvn-retry.sh -B test -pl tests -am \
                 -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
                 -Dsurefire.failIfNoSpecifiedTests=false
             '

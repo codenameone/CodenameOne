@@ -3280,7 +3280,7 @@ public class AndroidGradleBuilder extends Executor {
         // activity are assembled here and injected into the manifest further below. No gradle
         // dependencies are involved -- the runtime lowering is plain RemoteViews in the port.
         String intentsManifestEntries = usesIntents
-                ? buildIntentsManifestEntries(assetsDir, resDir)
+                ? buildIntentsManifestEntries(assetsDir, resDir, request.getPackageName())
                 : "";
         // The launcher only reads a shortcut list through meta-data on the activity carrying the
         // LAUNCHER intent filter, so this half is spliced into the main activity rather than
@@ -7393,7 +7393,14 @@ public class AndroidGradleBuilder extends Executor {
     /// A missing manifest is not an error, mirroring iOS: an app may reference the package purely
     /// to index content or donate shortcuts at runtime, in which case the processor emitted
     /// nothing to compile in.
-    private String buildIntentsManifestEntries(File assetsDir, File resDir) throws BuildException {
+    /// Builds the intents manifest fragments and the shortcuts resource.
+    ///
+    /// `packageName` is passed rather than read from a placeholder because res/xml is not
+    /// processed for manifest placeholders: `${applicationId}` written there reaches the
+    /// launcher literally, so the explicit component cannot resolve and every generated static
+    /// shortcut silently fails to launch anything.
+    private String buildIntentsManifestEntries(File assetsDir, File resDir, String packageName)
+            throws BuildException {
         StringBuilder entries = new StringBuilder();
 
         // The trampoline is the only exported door. Everything else -- notably the service that
@@ -7508,7 +7515,8 @@ public class AndroidGradleBuilder extends Executor {
                     .append("              android:shortcutShortLabel=\"@string/")
                     .append(labelRes).append("\">\n")
                     .append("        <intent android:action=\"android.intent.action.VIEW\"\n")
-                    .append("                android:targetPackage=\"${applicationId}\"\n")
+                    .append("                android:targetPackage=\"")
+                    .append(xmlEscape(packageName == null ? "" : packageName)).append("\"\n")
                     .append("                android:targetClass=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
                     .append("                android:data=\"cn1intent://run?id=")
                     .append(xmlEscape((String) id)).append(headlessFlag).append("\" />\n")
