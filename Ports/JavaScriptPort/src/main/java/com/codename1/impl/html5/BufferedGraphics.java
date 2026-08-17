@@ -136,13 +136,32 @@ public class BufferedGraphics extends HTML5Graphics {
         // An empty clip must cull every draw; a degenerate empty-clip path on
         // the host leaks image blits, so cull here. Issue #5263.
         if (clipEmpty) { return; }
-        imageTransformRenderAdapter.drawImage((NativeImage)img, x, y);
+        NativeImage image = (NativeImage) img;
+        noteCanvasCover(x, y, image == null ? 0 : image.getWidth(), image == null ? 0 : image.getHeight());
+        imageTransformRenderAdapter.drawImage(image, x, y);
     }
 
     @Override
     public void drawImage(Object img, int x, int y, int w, int h) {
         if (clipEmpty) { return; }
+        noteCanvasCover(x, y, w, h);
         imageTransformRenderAdapter.drawImage((NativeImage)img, x, y, w, h);
+    }
+
+    /**
+     * Tells the text layer that an image landed on the canvas, so it can put back any text it
+     * promoted this frame that the image would have covered.
+     *
+     * <p>Text promoted into the DOM sits above the whole canvas. An image drawn over it in the
+     * original renderer would have hidden it; here it cannot, so the promotion has to be given
+     * up rather than leave the frame showing something the application did not draw.</p>
+     */
+    private void noteCanvasCover(int x, int y, int w, int h) {
+        JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
+        if (layer == null || w <= 0 || h <= 0) {
+            return;
+        }
+        layer.noteCanvasCover(x, y, w, h);
     }
 
     /// Buffers a blit of a raw canvas (an offscreen WebGL render target) into the

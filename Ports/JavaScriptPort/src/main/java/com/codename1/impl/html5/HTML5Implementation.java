@@ -86,6 +86,7 @@ import com.codename1.ui.CN;
 import static com.codename1.ui.CN.invokeAndBlock;
 import com.codename1.ui.Component;
 import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.AnimationManager;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
@@ -1300,6 +1301,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * True while the form is running an animation the framework schedules -- a layout
+     * animation, a component morph, a transition between two states of the same form.
+     *
+     * @param f the form to look at, may be null
+     * @return true while an animation is in flight
+     */
+    private boolean isAnimationRunning(Form f) {
+        if (f == null) {
+            return false;
+        }
+        AnimationManager animations = f.getAnimationManager();
+        return animations != null && animations.isAnimating();
+    }
+
+    /**
      * Decides whether text promotion is suspended, before any component of the frame paints.
      *
      * <p>The decision cannot wait until the frame is flushed. By then the components have
@@ -1310,7 +1326,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private void updateTextLayerSuspension() {
         Form currentForm = Display.getInstance().getCurrent();
         boolean overlayBlocked = com.codename1.ui.Accessor.paintsOverChildren(currentForm);
-        boolean shouldSuspend = Display.getInstance().isInTransition() || overlayBlocked;
+        // While an animation is running the layout moves every frame, and every frame would
+        // rewrite the style of every run through the bridge -- which slows the animation down
+        // enough to be seen. The canvas carries the text for the duration, and it comes back to
+        // the DOM the moment the form is still again.
+        boolean shouldSuspend = Display.getInstance().isInTransition() || overlayBlocked
+                || isAnimationRunning(currentForm);
         if (textLayerDisabledByReadback) {
             // A pixel read has already claimed the canvas as the source of truth.
             return;
@@ -3899,8 +3920,56 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // no other reliable route to an ordinary label, since the visible text layer is
         // aria-hidden and a role-less div's aria-label is not dependably announced.
         semanticOverlay.setTextContentEnabled(true);
+        if (deferSemanticsWhileAnimating()) {
+            return;
+        }
         semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
     }
+
+    /**
+     * Holds the semantic tree still while an animation runs.
+     *
+     * <p>Every frame of an animation moves components, and every move invalidates the tree --
+     * so the overlay would diff and rewrite geometry across the bridge on every frame of it.
+     * Assistive technology has nothing to gain from following an animation frame by frame, and
+     * the cost is paid by the animation itself, which runs visibly slower for it. The tree is
+     * brought up to date once, when the form is still again.</p>
+     *
+     * @return true when the update was put off
+     */
+    private boolean deferSemanticsWhileAnimating() {
+        if (!isAnimationRunning(Display.getInstance().getCurrent())) {
+            return false;
+        }
+        if (!semanticRefreshPending) {
+            semanticRefreshPending = true;
+            awaitStillForSemantics(0);
+        }
+        return true;
+    }
+
+    private void awaitStillForSemantics(final int attempt) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                // Bounded, so an animation that never ends -- a progress indicator, a ticker --
+                // still gets the tree updated rather than leaving a screen reader on a stale one.
+                if (attempt < 120 && isAnimationRunning(Display.getInstance().getCurrent())) {
+                    awaitStillForSemantics(attempt + 1);
+                    return;
+                }
+                semanticRefreshPending = false;
+                if (semanticOverlay != null && accessibilityContainer != null) {
+                    semanticOverlay.update(getAccessibilityTreeSnapshot(), getDevicePixelRatio());
+                }
+            }
+        });
+    }
+
+    /**
+     * True while an update is waiting for the form to stop animating.
+     */
+    private boolean semanticRefreshPending;
 
     @Override
     public boolean isAccessibilityTreeSupported() {
@@ -10795,7 +10864,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // navigation -- so rather than leave the browser sitting on an entry the app is not
             // on, step back to the entry that does match. Forward is inert, which is the honest
             // degradation.
-            requestSuppressedTraversal(-1);
+            //
+            // The whole way back, not one step: the Forward menu can jump several entries at
+            // once, and returning only one would leave the browser somewhere in between, out
+            // of step with the form on screen for every Back after it.
+            requestSuppressedTraversal(previous - restored);
             return;
         }
         // A traversal can cross more than one entry at once -- the Back button's history menu,

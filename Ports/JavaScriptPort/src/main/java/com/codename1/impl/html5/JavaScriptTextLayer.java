@@ -31,9 +31,11 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Renders Codename One text as real DOM text above the canvas.
@@ -84,6 +86,14 @@ public final class JavaScriptTextLayer {
         private boolean attached;
         private boolean everAttached;
         private int lastY = Integer.MIN_VALUE;
+        private int claimedPass;
+        // Where the run landed, in Codename One pixels, and the draw order it was promoted at.
+        // Both are needed to tell whether something drawn on the canvas afterwards covers it.
+        private int coverX;
+        private int coverY;
+        private int coverW;
+        private int coverH;
+        private int promotedAt;
 
         Run(HTMLElement clip, HTMLElement text) {
             this.clip = clip;
@@ -109,6 +119,7 @@ public final class JavaScriptTextLayer {
         private Component component;
         private ComponentRuns runs;
         private int sequence;
+        private int paintPass;
         private boolean cellRenderer;
         private boolean promotable;
         private boolean covering;
@@ -123,6 +134,20 @@ public final class JavaScriptTextLayer {
     private int cellRendererDepth;
     private boolean suspended;
     private int drawSequence;
+    private int paintPass;
+    /**
+     * Components whose text has been found underneath something drawn on the canvas. The layer
+     * is above the canvas as a whole, so a promoted run cannot be covered by a later canvas draw
+     * the way canvas text would have been -- the only faithful answer is to leave that
+     * component's text on the canvas from then on.
+     */
+    private final Set<Component> canvasOnly = new HashSet<Component>();
+    /**
+     * The first draw order belonging to the frame being painted. Only a run promoted during this
+     * frame can be covered by something drawn later in it; a run from an earlier frame sits
+     * under nothing, because the frame that drew over it repainted the run as well.
+     */
+    private int frameFirstSequence;
     private boolean reattachedThisFrame;
 
     /**
@@ -204,6 +229,9 @@ public final class JavaScriptTextLayer {
         Frame frame = stack.get(depth);
         frame.component = component;
         frame.sequence = 0;
+        // Identifies this paint, so a run matched by one line of it cannot be matched again by
+        // the next line of the same paint.
+        frame.paintPass = ++paintPass;
         frame.runs = component == null ? null : byComponent.get(component);
         frame.cellRenderer = component != null && component.isCellRenderer();
         // Resolved here rather than at flush time: painting happens before the frame is
@@ -300,6 +328,9 @@ public final class JavaScriptTextLayer {
         if (clipW <= 0 || clipH <= 0) {
             return false;
         }
+        if (canvasOnly.contains(frame.component)) {
+            return false;
+        }
         if (frame.runs == null) {
             frame.runs = new ComponentRuns();
             byComponent.put(frame.component, frame.runs);
@@ -312,7 +343,8 @@ public final class JavaScriptTextLayer {
         // updated so a component scrolling across the viewport edge keeps up rather than
         // freezing at its last fully visible position.
         Run run = frame.covering ? obtain(frame.runs, frame.sequence)
-                : obtainClipped(frame.runs, str, y);
+                : obtainClipped(frame.runs, str, y, frame.paintPass);
+        run.claimedPass = frame.paintPass;
         frame.sequence++;
 
         double scale = ratio <= 0 ? 1 : ratio;
@@ -376,6 +408,11 @@ public final class JavaScriptTextLayer {
             run.content = str;
         }
         run.lastY = y;
+        run.coverX = clipX;
+        run.coverY = clipY;
+        run.coverW = clipW;
+        run.coverH = clipH;
+        run.promotedAt = drawSequence;
         if (!run.attached) {
             container.appendChild(run.clip);
             run.attached = true;
@@ -400,6 +437,8 @@ public final class JavaScriptTextLayer {
      * @param form the form currently displayed, may be null
      */
     public void syncToForm(Form form) {
+        // Called once per flush, so this marks where the next frame's draws begin.
+        frameFirstSequence = drawSequence + 1;
         for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
                 it.hasNext();) {
             Map.Entry<Component, ComponentRuns> entry = it.next();
@@ -418,11 +457,71 @@ public final class JavaScriptTextLayer {
     }
 
     /**
+     * Records that something opaque was drawn straight onto the canvas.
+     *
+     * <p>The canvas cannot cover this layer. Where the original renderer would have drawn an
+     * image over a label and hidden it, a promoted run would keep showing through -- as it did
+     * for a tab bar that draws its selected tab through a composited lens, leaving the plain
+     * text of the pass before it floating over the finished result. A run caught underneath goes
+     * back to the canvas, and its component stays there: the alternative is a frame that
+     * disagrees with itself, or one that oscillates between the two.</p>
+     *
+     * @param x left edge of what was drawn, in Codename One pixels
+     * @param y top edge
+     * @param w width
+     * @param h height
+     */
+    public void noteCanvasCover(int x, int y, int w, int h) {
+        if (suspended || w <= 0 || h <= 0 || byComponent.isEmpty()) {
+            return;
+        }
+        List<Component> covered = null;
+        for (Iterator<Map.Entry<Component, ComponentRuns>> it = byComponent.entrySet().iterator();
+                it.hasNext();) {
+            Map.Entry<Component, ComponentRuns> entry = it.next();
+            ComponentRuns runs = entry.getValue();
+            for (int i = 0; i < runs.runs.size(); i++) {
+                Run run = runs.runs.get(i);
+                if (!run.attached || run.promotedAt < frameFirstSequence) {
+                    // Not promoted during this frame, so whatever is being drawn now belongs to
+                    // a frame that painted this run as well -- it is not covering anything.
+                    continue;
+                }
+                if (run.coverX + run.coverW <= x || x + w <= run.coverX
+                        || run.coverY + run.coverH <= y || y + h <= run.coverY) {
+                    continue;
+                }
+                if (covered == null) {
+                    covered = new ArrayList<Component>();
+                }
+                covered.add(entry.getKey());
+                break;
+            }
+        }
+        if (covered == null) {
+            return;
+        }
+        for (int i = 0; i < covered.size(); i++) {
+            Component component = covered.get(i);
+            canvasOnly.add(component);
+            ComponentRuns runs = byComponent.remove(component);
+            if (runs != null) {
+                releaseFrom(runs, 0);
+            }
+        }
+        // The text has to be drawn again, and this time on the canvas, so the whole form is
+        // asked for rather than the dirty region: the flush already carries the reattach flag
+        // to the same place.
+        reattachedThisFrame = true;
+    }
+
+    /**
      * Detaches every run and drops the pool.
      */
     public void clear() {
         container.setInnerHTML("");
         byComponent.clear();
+        canvasOnly.clear();
         stack.clear();
         depth = 0;
         cellRendererDepth = 0;
@@ -435,19 +534,24 @@ public final class JavaScriptTextLayer {
      *
      * <p>Used when the paint is clipped and ordering cannot be trusted.</p>
      */
-    private Run obtainClipped(ComponentRuns runs, String content, int y) {
-        // Position first: a line keeps its baseline when its text changes, so this is what
-        // matches a clipped repaint of new content to the run showing the old.
+    private Run obtainClipped(ComponentRuns runs, String content, int y, int pass) {
+        // A run already matched by an earlier line of this same paint is off limits. Lines move
+        // as a block when a multiline component scrolls, so the new position of one line is
+        // routinely the old position of the line before it: without this the second line would
+        // match -- and overwrite -- the run the first line had just taken, leaving the displaced
+        // run attached with stale text and duplicating a line on screen.
         for (int i = 0; i < runs.runs.size(); i++) {
             Run candidate = runs.runs.get(i);
-            if (candidate.lastY == y) {
+            // Position first: a line keeps its baseline when its text changes, so this is what
+            // matches a clipped repaint of new content to the run showing the old.
+            if (candidate.lastY == y && candidate.claimedPass != pass) {
                 return candidate;
             }
         }
         // Then content: a line keeps its text when it scrolls, which is what moves the baseline.
         for (int i = 0; i < runs.runs.size(); i++) {
             Run candidate = runs.runs.get(i);
-            if (content.equals(candidate.content)) {
+            if (content.equals(candidate.content) && candidate.claimedPass != pass) {
                 return candidate;
             }
         }
