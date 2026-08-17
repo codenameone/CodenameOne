@@ -10804,7 +10804,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // Every entry this port pushed has to go, not just one: a form reached through
             // several others still has theirs above the document, and stepping over a single
             // one would leave the browser inside a history the application has no forms for.
-            int remaining = Math.max(1, historyEntriesPushed);
+            //
+            // The document's own entry counts too. The gesture that got here has already spent
+            // the entry belonging to the form being left, so what remains above the document is
+            // the rest of the pushed entries -- traversing only those would land on the
+            // document with the same form still showing, and the user would have to press Back
+            // again to actually leave.
+            int remaining = historyEntriesPushed + 1;
+            int available = 0;
+            try {
+                available = window.getHistory().getLength() - 1;
+            } catch (Throwable ignored) {
+                // No length to go by; ask for the full distance and let the browser stop where
+                // its history does.
+            }
+            if (available > 0 && remaining > available) {
+                remaining = available;
+            }
             historySuppressPop = true;
             try {
                 window.getHistory().go(-remaining);
