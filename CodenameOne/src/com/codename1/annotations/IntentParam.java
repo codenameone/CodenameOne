@@ -52,9 +52,21 @@ public @interface IntentParam {
     boolean required() default true;
 
     /// The value substituted when an optional parameter is absent.
+    ///
+    /// Only meaningful alongside `required = false`, and the build says so rather than letting
+    /// the two contradict each other: the platforms resolve that contradiction differently, one
+    /// treating the parameter as satisfied by the default and another still prompting for it.
+    ///
+    /// It must also be a value the parameter's type can actually hold, which the build checks
+    /// too -- a default it cannot parse would otherwise become 0, false or null at runtime.
     String defaultValue() default "";
 
-    /// A closed vocabulary of accepted values.
+    /// A closed vocabulary of accepted values. **`String` parameters only.**
+    ///
+    /// That restriction is enforced at build time because it is the only place it can be:
+    /// the framework validates a vocabulary for strings and projects it to an iOS choice list,
+    /// and nothing does either for other types -- so options elsewhere would advertise a
+    /// restriction that nothing applies.
     ///
     /// The platform offers these as choices rather than asking for free text,
     /// and the framework rejects anything else before your handler runs. Use it

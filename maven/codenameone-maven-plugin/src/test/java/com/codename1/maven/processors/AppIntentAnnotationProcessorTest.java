@@ -741,6 +741,30 @@ public class AppIntentAnnotationProcessorTest {
     /// numeric() emits 0 for an int it cannot parse, an unparseable boolean becomes false, and
     /// an unparseable date becomes null. An omitted value then reached the handler as a value
     /// the declaration never named.
+    /// The two halves contradict each other, and the platforms resolved the contradiction
+    /// differently: Android published a parameterless static shortcut and ran it with the
+    /// default, while the generated Swift kept the parameter non-optional and prompted.
+    @Test
+    public void aRequiredParameterWithADefaultIsRejected() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"minutes\",\n"
+                        + "        defaultValue = \"20\") int m) { }\n")),
+                "is required and also declares defaultValue");
+    }
+
+    /// A closed vocabulary is only enforced for strings -- oneOf() on the Java side, an AppEnum
+    /// on the iOS side -- so publishing one on any other type advertises a restriction nothing
+    /// applies, and a caller passing 999 to options={"1","2"} runs the handler.
+    @Test
+    public void optionsOnATypeThatCannotEnforceThemIsRejected() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"level\",\n"
+                        + "        options = {\"1\", \"2\"}) int level) { }\n")),
+                "declares options on a int");
+    }
+
     /// Callers disagreed about what a non-positive budget meant -- platform dispatch
     /// substituted the default, Intents.invoke built an already-expired context, and a model
     /// waited on the raw number -- so the same handler got contradictory deadlines depending on

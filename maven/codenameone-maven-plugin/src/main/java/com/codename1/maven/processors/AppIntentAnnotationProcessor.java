@@ -463,6 +463,30 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 pd.kind = "entity";
                 pd.entityBinary = args[i].getClassName();
             }
+            if (pd.required && pd.defaultValue.length() > 0) {
+                // The two halves contradict each other and the platforms resolve the
+                // contradiction differently: the generated coercion treats a defaulted
+                // parameter as optional, so Android publishes a parameterless static shortcut
+                // and runs it with the default, while the generated Swift keeps the parameter
+                // non-optional and prompts for it. @IntentParam defines a default as what an
+                // *omitted optional* value becomes; there is no such thing for a required one.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " is required and also declares defaultValue \"" + pd.defaultValue
+                        + "\". A default is what an omitted optional value becomes, so set "
+                        + "required = false, or drop the default.");
+                continue;
+            }
+            if (!pd.options.isEmpty() && !"string".equals(pd.kind)) {
+                // The manifest would advertise a closed vocabulary that nothing enforces: the
+                // generated coercion only routes strings through oneOf(), and the iOS builder
+                // only generates an AppEnum for them. A caller could pass 999 to
+                // options={"1","2"} and the handler would run.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " declares options on a " + pd.kind + ". A closed vocabulary is only "
+                        + "enforced for String parameters; declare it as a String, or drop the "
+                        + "options rather than publishing a restriction nothing applies.");
+                continue;
+            }
             if (pd.defaultValue.length() > 0 && !defaultFitsType(pd)) {
                 // numeric() emits 0 for a default it cannot parse, an unparseable boolean
                 // becomes false and an unparseable date becomes null -- so an omitted value
