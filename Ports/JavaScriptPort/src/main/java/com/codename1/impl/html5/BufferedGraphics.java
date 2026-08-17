@@ -161,7 +161,38 @@ public class BufferedGraphics extends HTML5Graphics {
         if (layer == null || w <= 0 || h <= 0) {
             return;
         }
-        layer.noteCanvasCover(x, y, w, h);
+        if (transform == null || transform.isIdentity()) {
+            layer.noteCanvasCover(x, y, w, h);
+            return;
+        }
+        // Where the image lands, not where it was asked for: text is only promoted under an
+        // identity transform, but a transform set afterwards moves everything drawn through it.
+        // Comparing the untransformed rectangle would miss an image that ends up over the text
+        // and leave the glyphs floating above it.
+        float minX = Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE;
+        float maxY = -Float.MAX_VALUE;
+        float[] corner = new float[2];
+        float[] out = new float[2];
+        for (int i = 0; i < 4; i++) {
+            corner[0] = (i == 0 || i == 3) ? x : x + w;
+            corner[1] = (i < 2) ? y : y + h;
+            try {
+                transform.transformPoint(corner, out);
+            } catch (Throwable ignored) {
+                // A transform the platform will not project -- treat the draw as covering what
+                // it was asked to cover, which is what the untransformed rectangle says.
+                layer.noteCanvasCover(x, y, w, h);
+                return;
+            }
+            minX = Math.min(minX, out[0]);
+            minY = Math.min(minY, out[1]);
+            maxX = Math.max(maxX, out[0]);
+            maxY = Math.max(maxY, out[1]);
+        }
+        layer.noteCanvasCover((int) Math.floor(minX), (int) Math.floor(minY),
+                (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY));
     }
 
     /// Buffers a blit of a raw canvas (an offscreen WebGL render target) into the

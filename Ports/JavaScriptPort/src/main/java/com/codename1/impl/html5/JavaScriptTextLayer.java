@@ -86,6 +86,7 @@ public final class JavaScriptTextLayer {
         private boolean attached;
         private boolean everAttached;
         private int lastY = Integer.MIN_VALUE;
+        private int lastX = Integer.MIN_VALUE;
         private int claimedPass;
         // Where the run landed, in Codename One pixels, and the draw order it was promoted at.
         // Both are needed to tell whether something drawn on the canvas afterwards covers it.
@@ -343,7 +344,7 @@ public final class JavaScriptTextLayer {
         // updated so a component scrolling across the viewport edge keeps up rather than
         // freezing at its last fully visible position.
         Run run = frame.covering ? obtain(frame.runs, frame.sequence)
-                : obtainClipped(frame.runs, str, y, frame.paintPass);
+                : obtainClipped(frame.runs, str, x, y, frame.paintPass);
         run.claimedPass = frame.paintPass;
         frame.sequence++;
 
@@ -408,6 +409,7 @@ public final class JavaScriptTextLayer {
             run.content = str;
         }
         run.lastY = y;
+        run.lastX = x;
         // The glyphs, not the clip: a component that draws text and then an image somewhere
         // else inside the same clip would otherwise look like it had covered its own text, and
         // the text would be dropped for nothing. The font measures worker-side from a cache, so
@@ -555,7 +557,7 @@ public final class JavaScriptTextLayer {
      *
      * <p>Used when the paint is clipped and ordering cannot be trusted.</p>
      */
-    private Run obtainClipped(ComponentRuns runs, String content, int y, int pass) {
+    private Run obtainClipped(ComponentRuns runs, String content, int x, int y, int pass) {
         // A run already matched by an earlier line of this same paint is off limits. Lines move
         // as a block when a multiline component scrolls, so the new position of one line is
         // routinely the old position of the line before it: without this the second line would
@@ -564,10 +566,30 @@ public final class JavaScriptTextLayer {
         for (int i = 0; i < runs.runs.size(); i++) {
             Run candidate = runs.runs.get(i);
             // Position first: a line keeps its baseline when its text changes, so this is what
-            // matches a clipped repaint of new content to the run showing the old.
-            if (candidate.lastY == y && candidate.claimedPass != pass) {
+            // matches a clipped repaint of new content to the run showing the old. Both
+            // coordinates, not just the baseline: a component can draw two strings side by side
+            // on one line, and matching by baseline alone would move the first one's element
+            // onto the second -- leaving the first nowhere and the second twice over.
+            if (candidate.lastY == y && candidate.lastX == x && candidate.claimedPass != pass) {
                 return candidate;
             }
+        }
+        // Then the baseline alone, for a run whose text has moved horizontally -- a label that
+        // re-centres when its text changes -- but only where nothing else on that line is in
+        // doubt, so a side-by-side pair is never confused for one another.
+        Run onBaseline = null;
+        for (int i = 0; i < runs.runs.size(); i++) {
+            Run candidate = runs.runs.get(i);
+            if (candidate.lastY == y && candidate.claimedPass != pass) {
+                if (onBaseline != null) {
+                    onBaseline = null;
+                    break;
+                }
+                onBaseline = candidate;
+            }
+        }
+        if (onBaseline != null) {
+            return onBaseline;
         }
         // Then content: a line keeps its text when it scrolls, which is what moves the baseline.
         for (int i = 0; i < runs.runs.size(); i++) {
