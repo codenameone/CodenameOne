@@ -341,6 +341,12 @@ SQLite lets you attach one file under several schema names at once. The file sta
 the last of them is detached, so a `DETACH` of one name doesn't release a database the connection
 still holds under another.
 
+Write the filename as a single quoted literal, or bind it as a parameter. SQLite also accepts an
+expression there -- `ATTACH '/data/' || name AS aux` -- but nothing can tell which file that names
+until the engine evaluates it, which is after the database is already attached and too late to
+refuse. Those
+are rejected, and the message says so; build the name in your own code and pass it as a parameter.
+
 Run `ATTACH` and `DETACH` through `execute()`. `executeQuery()` refuses them, because a cursor runs
 its statement when it's stepped -- so the attachment would happen after the bookkeeping, and the
 file could then be deleted while SQLite still holds it.
@@ -454,6 +460,7 @@ The hint works in the simulator too, so you can test either mode without a devic
 | `getColumnName` reports the table column rather than the result set label | Simulator
 | `executeQuery` accepts a transaction control statement such as `BEGIN` | all
 | `executeQuery` accepts `ATTACH` and `DETACH` | all
+| `ATTACH` accepts an expression for the filename rather than a literal or a parameter | all
 |====
 
 The flag doesn't cover defects, nor capabilities that used to throw and now work:

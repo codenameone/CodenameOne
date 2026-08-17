@@ -1439,6 +1439,24 @@ public final class DatabaseConformanceSuite {
                 // The expected outcome: the ATTACH was refused, so there is nothing to detach.
             }
 
+            // ---- and an ATTACH whose filename is an expression is refused before it runs
+            // SQLite evaluates an expression where the filename goes, so which file is about to
+            // be attached is not known until it has been. Nothing can be reserved against that,
+            // and nothing can refuse it afterwards: the engine holds the file, and a detach is
+            // itself rejected inside a transaction that has written through the attachment.
+            boolean expressionRefused = false;
+            try {
+                db.execute("ATTACH ':mem' || 'ory:' AS cn1expression");
+            } catch (IOException expected) {
+                expressionRefused = true;
+            }
+            r.check(expressionRefused, "an ATTACH whose filename is an expression is refused");
+            try {
+                db.execute("DETACH DATABASE cn1expression");
+            } catch (IOException neverAttached) {
+                // Expected, and here for the same reason as the detach above.
+            }
+
             // ---- a cursor over a writing statement never runs it twice
             // executeQuery prepares and steps, so an INSERT ... RETURNING does its insert while
             // the cursor is walked. Anything that rewinds -- getCount(), last(), going backwards

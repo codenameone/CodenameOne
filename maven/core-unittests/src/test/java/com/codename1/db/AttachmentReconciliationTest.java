@@ -315,6 +315,61 @@ class AttachmentReconciliationTest extends UITestBase {
     }
 
     @FormTest
+    void anAttachNamedByAnExpressionIsRefusedBeforeItRuns() throws Exception {
+        // SQLite evaluates an expression where the filename goes, and both of these attach a real
+        // file: "'/tmp/' || 'b.db'" and "replace('/tmp/XXX.db','XXX','b')". Reading the first
+        // token called the first one "/tmp/" -- a reservation on the wrong file, which reads as
+        // protection and is not -- and the second one nothing at all. There is no moment after
+        // this to refuse: the engine holds the file, and inside a transaction that has written
+        // through the attachment even the detach is rejected.
+        String[] expressions = {
+            "ATTACH '/data/' || 'b.db' AS aux",
+            "ATTACH DATABASE replace('/data/XXX.db','XXX','b') AS aux",
+            "ATTACH some_column AS aux",
+            // A double quoted name is an identifier to SQLite, read as a filename only when no
+            // column answers to it -- which cannot be known from here either.
+            "ATTACH \"/data/b.db\" AS aux",
+            // No whitespace anywhere, which SQLite attaches perfectly well.
+            "ATTACH('/data/' || 'b.db')AS aux",
+            // The reviewer's script, where the attach sits between other statements.
+            "BEGIN; ATTACH '/data/' || 'b.db' AS aux; CREATE TABLE aux.t(x);",
+        };
+        for (String expression : expressions) {
+            final ReconcilingDatabase db = new ReconcilingDatabase();
+            final String sql = expression;
+            IOException refused = assertThrows(IOException.class, () -> db.about(sql),
+                    "an ATTACH this cannot resolve has to be refused: " + expression);
+            assertTrue(refused.getMessage().indexOf("literal") > 0,
+                    "and say what to write instead: " + refused.getMessage());
+        }
+
+        // The forms that can be accounted for still run. A literal is resolved outright, a
+        // placeholder is covered by the parameterized overload, and :memory: has no file at all.
+        String[] allowed = {
+            "ATTACH '/data/plain.db' AS aux",
+            "ATTACH DATABASE ? AS aux",
+            "ATTACH :name AS aux",
+            "ATTACH '/data/it''s.db' AS aux",
+            "ATTACH ':memory:' AS aux",
+        };
+        for (String statement : allowed) {
+            new ReconcilingDatabase().about(statement);
+        }
+    }
+
+    @FormTest
+    void theLegacyHintKeepsAnExpressionAttachWorking() throws Exception {
+        // The refusal is new, and the hint restores what used to work: before the registry
+        // existed an expression attached like any other statement.
+        Database.setLegacyBehavior(true);
+        try {
+            new ReconcilingDatabase().about("ATTACH '/data/' || 'b.db' AS aux");
+        } finally {
+            Database.setLegacyBehavior(false);
+        }
+    }
+
+    @FormTest
     void attachmentControlCannotBeRunThroughExecuteQuery() throws Exception {
         ReconcilingDatabase db = new ReconcilingDatabase();
 

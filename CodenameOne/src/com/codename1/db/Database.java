@@ -1055,6 +1055,24 @@ public abstract class Database {
             if (!"ATTACH".equals(leadingKeyword(statement))) {
                 continue;
             }
+            if (!isLegacyBehavior() && !isResolvableAttachment(statement)) {
+                // SQLite evaluates an expression here and this cannot. Reserving the first token
+                // of "'/tmp/' || 'b.db'" reserved "/tmp/" -- a claim on the wrong file, which
+                // reads as protection and is not -- and a function call reserved nothing at all.
+                // Refused before it runs, because that is the last moment anything can refuse:
+                // afterwards the engine holds the file, and the detach that would undo it is
+                // itself rejected inside a transaction that has written through the attachment.
+                //
+                // Not gated on the file being claimed, because that cannot be known either. The
+                // statement is one this API cannot account for, whoever else is holding the file.
+                throw new IOException("The file an ATTACH names has to be a single quoted "
+                        + "literal ('name.db') or a bound parameter, so that a database being "
+                        + "deleted or re-keyed can be recognized before the attach happens: "
+                        + statement.trim() + ". An expression is evaluated by the engine, and a "
+                        + "double quoted name is an identifier that SQLite reads as a filename "
+                        + "only when no column answers to it -- neither can be resolved here. "
+                        + "Build the name in the application and bind it as a parameter.");
+            }
             String file = attachmentFileOf(statement);
             if (file == null || file.length() == 0 || ":memory:".equals(file)) {
                 continue;
@@ -1369,16 +1387,13 @@ public abstract class Database {
     ///
     /// the file it names, or null
     private static String attachmentFileOf(String statement) {
-        String[] words = splitWords(statement);
-        String found = null;
-        for (int iter = 1; iter < words.length && found == null; iter++) {
-            String word = words[iter];
-            String upper = word.toUpperCase();
-            if (!"DATABASE".equals(upper)) {
-                found = "AS".equals(upper) ? "" : word;
-            }
+        String[] target = attachmentTargetTokens(statement);
+        if (target.length != 1) {
+            // Nothing, or an expression: neither names one file this can read.
+            return null;
         }
-        if (found == null || found.length() == 0) {
+        String found = target[0];
+        if (found.length() == 0) {
             return null;
         }
         // Quoted, and single-quoted at that: a double-quoted word is an identifier to SQLite, and
@@ -1394,6 +1409,90 @@ public abstract class Database {
             return null;
         }
         return asDatabaseArgument(file);
+    }
+
+    /// The tokens an ATTACH gives as its filename, between the keyword and `AS`.
+    ///
+    /// SQLite takes an expression there, not just a string: `ATTACH '/tmp/' || 'b.db' AS aux`
+    /// and `ATTACH replace('/tmp/XXX.db','XXX','b') AS aux` both attach `/tmp/b.db`. Reading only
+    /// the first token called the first one `/tmp/` -- a reservation on the wrong file, which
+    /// reads as protection and is not -- and the second one nothing at all. Keeping every token
+    /// is what lets the caller tell one literal apart from an expression it cannot evaluate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: one ATTACH statement
+    ///
+    /// #### Returns
+    ///
+    /// the tokens of the filename, empty when the statement names none
+    private static String[] attachmentTargetTokens(String statement) {
+        // Split from the end of the keyword rather than from the second word, because a word is
+        // whitespace delimited and SQL is not: "ATTACH('x.db')AS aux" attaches a database with no
+        // space anywhere in it, and reading words would have kept "ATTACH('x.db')AS" together and
+        // found no target at all.
+        String[] words = splitWords(statement.substring(leadingKeywordEnd(statement)));
+        java.util.Vector target = new java.util.Vector();
+        for (String word : words) {
+            String upper = word.toUpperCase();
+            if (target.isEmpty() && "DATABASE".equals(upper)) {
+                // The optional keyword, which is not part of the filename.
+                continue;
+            }
+            if ("AS".equals(upper)) {
+                break;
+            }
+            target.addElement(word);
+        }
+        String[] out = new String[target.size()];
+        target.copyInto(out);
+        return out;
+    }
+
+    /// Whether the filename an ATTACH gives is one this can account for before it runs.
+    ///
+    /// A single quoted literal names its file outright. A single placeholder names it in the
+    /// parameters, which the parameterized overload reserves. Anything else is an expression the
+    /// engine evaluates and this cannot -- a concatenation, a function call, a column -- and the
+    /// file it produces would be attached with nothing holding it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `statement`: one ATTACH statement
+    ///
+    /// #### Returns
+    ///
+    /// whether the target can be resolved or reserved before the statement runs
+    private static boolean isResolvableAttachment(String statement) {
+        String[] target = attachmentTargetTokens(statement);
+        if (target.length == 0) {
+            // Not an attach of anything -- malformed, and the engine says so better than this can.
+            return true;
+        }
+        if (target.length > 1) {
+            return false;
+        }
+        String only = target[0];
+        if (only.length() > 1 && only.charAt(0) == '\''
+                && only.charAt(only.length() - 1) == '\'') {
+            return true;
+        }
+        return isParameterPlaceholder(only);
+    }
+
+    /// Whether a token is a bound parameter in any of the spellings SQLite accepts.
+    private static boolean isParameterPlaceholder(String token) {
+        if (token.length() == 0) {
+            return false;
+        }
+        char first = token.charAt(0);
+        if (first == '?') {
+            // ? and ?NNN. The digits are not checked: a malformed one is the engine's to reject,
+            // and either way it is a parameter rather than a name this could have resolved.
+            return true;
+        }
+        // :name, @name and $name, the named forms.
+        return (first == ':' || first == '@' || first == '$') && token.length() > 1;
     }
 
     /// The form of a file name a port resolves, for a name an ATTACH names either way.
@@ -1832,13 +1931,18 @@ public abstract class Database {
     }
 
     private static String leadingKeyword(String statement) {
-        int start = skipLeadingTrivia(statement, 0);
+        return upperAscii(statement.substring(
+                skipLeadingTrivia(statement, 0), leadingKeywordEnd(statement)));
+    }
+
+    /// Where the leading keyword ends, which is where the rest of the statement starts.
+    private static int leadingKeywordEnd(String statement) {
         int length = statement.length();
-        int end = start;
+        int end = skipLeadingTrivia(statement, 0);
         while (end < length && isKeywordChar(statement.charAt(end))) {
             end++;
         }
-        return upperAscii(statement.substring(start, end));
+        return end;
     }
 
     /// Upper cases the ASCII letters and leaves everything else alone.
