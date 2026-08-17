@@ -1283,6 +1283,27 @@ static void cn1homeAttachDelegates(void) {
     }
 }
 
+/// Sends one reading to every subscription watching it.
+static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
+                                 NSString *traitId, id value) {
+    NSString *key = cn1homeReadingKey(accessoryId, serviceId, traitId);
+    NSString *record = cn1homeEncodeReading(accessoryId, serviceId, traitId,
+                                            value, nil, nil);
+    for (NSString *subscriptionId in cn1homeWatches) {
+        NSSet *keys = [cn1homeWatches objectForKey:subscriptionId];
+        if (![keys containsObject:key]) {
+            continue;
+        }
+        // Delivered straight away: HomeKit is the one backend that pushes,
+        // and the framework does the coalescing, so holding it here would
+        // only add latency without reducing the number of EDT hops.
+        com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
+            getThreadLocalData(),
+            fromNSString(getThreadLocalData(), subscriptionId),
+            fromNSString(getThreadLocalData(), record));
+    }
+}
+
 @implementation CN1HomeDelegate
 
 - (void)homeManagerDidUpdateHomes:(HMHomeManager *)manager {
@@ -1389,23 +1410,24 @@ static void cn1homeAttachDelegates(void) {
     }
     NSString *accessoryId = cn1homeUuid([accessory uniqueIdentifier]);
     NSString *serviceId = cn1homeUuid([service uniqueIdentifier]);
-    NSString *key = cn1homeReadingKey(accessoryId, serviceId, traitId);
-    NSString *record = cn1homeEncodeReading(accessoryId, serviceId, traitId,
+    cn1homeDeliverChange(accessoryId, serviceId, traitId,
         cn1homeHasNoValueNow(service, traitId) ? nil
-                                               : [characteristic value],
-        nil, nil);
-    for (NSString *subscriptionId in cn1homeWatches) {
-        NSSet *keys = [cn1homeWatches objectForKey:subscriptionId];
-        if (![keys containsObject:key]) {
-            continue;
+                                               : [characteristic value]);
+    // A thermostat crossing into or out of AUTO changes what
+    // TARGET_TEMPERATURE means without touching the TargetTemperature
+    // characteristic, and HomeKit notifies per characteristic -- so a
+    // listener watching the setpoint hears nothing and keeps showing a
+    // number the accessory is no longer aiming for. The mode's own
+    // notification is the only signal there is, so the setpoint's update is
+    // sent from here too.
+    if ([traitId isEqualToString:@"target_heating_cooling"]) {
+        HMCharacteristic *setpoint = cn1homeFindCharacteristic(
+            service, @"target_temperature");
+        if (setpoint != nil) {
+            cn1homeDeliverChange(accessoryId, serviceId, @"target_temperature",
+                cn1homeHasNoValueNow(service, @"target_temperature")
+                    ? nil : [setpoint value]);
         }
-        // Delivered straight away: HomeKit is the one backend that pushes,
-        // and the framework does the coalescing, so holding it here would
-        // only add latency without reducing the number of EDT hops.
-        com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
-            getThreadLocalData(),
-            fromNSString(getThreadLocalData(), subscriptionId),
-            fromNSString(getThreadLocalData(), record));
     }
 }
 

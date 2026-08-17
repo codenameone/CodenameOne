@@ -3382,11 +3382,24 @@ public class IPhoneBuilder extends Executor {
                 String matterGroup = request.getArg("ios.home.appGroup",
                         MatterExtensionBuilder.defaultAppGroup(
                                 request.getPackageName()));
+                // Compared entry by entry, not as a substring: an app group
+                // named group.com.acme.shared contains group.com.acme, and
+                // deciding the group is already there on that basis entitles
+                // the extension for one group and the host for another --
+                // which fails signing, or launches an extension that cannot
+                // reach its host.
                 String appGroups = request.getArg("ios.app_groups", "");
-                if (!appGroups.contains(matterGroup)) {
+                boolean present = false;
+                for (String group : appGroups.split(",")) {
+                    if (group.trim().equals(matterGroup)) {
+                        present = true;
+                        break;
+                    }
+                }
+                if (!present) {
                     request.putArgument("ios.app_groups",
-                            appGroups.length() == 0 ? matterGroup
-                                    : appGroups + "," + matterGroup);
+                            appGroups.trim().length() == 0 ? matterGroup
+                                    : appGroups.trim() + "," + matterGroup);
                 }
                 matterAppGroup = matterGroup;
                 // Commissioning talks to the accessory over BLE before it has

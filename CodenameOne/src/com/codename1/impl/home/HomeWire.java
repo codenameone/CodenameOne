@@ -487,8 +487,17 @@ public final class HomeWire {
                 || trait == null) {
             return null;
         }
+        // No fallback for the number, as in decodeReading and for the same
+        // reason: zero is SECURED for a lock and false for a flag, so a
+        // truncated record would describe a persisted scene as doing
+        // something it does not do. A record that will not read is skipped,
+        // which is what this method promises.
+        double numeric = real(f, 4, Double.NaN);
+        if (Double.isNaN(numeric) || Double.isInfinite(numeric)) {
+            return null;
+        }
         TraitValue value = decodeValue(trait, integer(f, 3, -1),
-                real(f, 4, 0), field(f, 5), integer(f, 6, -1), 0, false);
+                numeric, field(f, 5), integer(f, 6, -1), 0, false);
         if (value == null) {
             return null;
         }
