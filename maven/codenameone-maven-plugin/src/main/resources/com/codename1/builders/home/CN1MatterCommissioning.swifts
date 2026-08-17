@@ -94,7 +94,13 @@ public final class CN1MatterCommissioning: NSObject {
             return
         }
 
-        Task {
+        // @MainActor, because delivering the answer re-enters the
+        // Objective-C bridge and the first thing that does is rebuild the
+        // snapshot -- which walks HMHomeManager, its homes and their
+        // accessories, all of which HomeKit requires be touched on the main
+        // queue. An unstructured Task runs on a generic executor, so without
+        // this the successful path races HomeKit's own delegates.
+        Task { @MainActor in
             do {
                 let request = MatterAddDeviceRequest(
                     topology: topology(),

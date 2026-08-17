@@ -84,6 +84,14 @@ public final class SubscriptionState {
     /// keep the screen true.
     private boolean awaitingInitial;
 
+    /// Live readings held for the initial delivery when the window is zero.
+    ///
+    /// A list rather than the keyed map, because a zero window promises every
+    /// step and the map keeps only the newest per trait. Empty whenever the
+    /// window is non-zero: there, coalescing is what was asked for.
+    private final List<TraitReading> heldSteps =
+            new ArrayList<TraitReading>();
+
     /// Creates a subscription's state and claims a share of the timer.
     ///
     /// #### Parameters
@@ -178,20 +186,28 @@ public final class SubscriptionState {
             // stop(), and a form torn down in between would otherwise still
             // be handed a batch after the subscription said it had stopped.
             boolean held;
+            List<TraitReading> steps = null;
             synchronized (this) {
                 if (disposed) {
                     return;
                 }
                 awaitingInitial = false;
                 held = !pending.isEmpty();
+                if (!heldSteps.isEmpty()) {
+                    steps = new ArrayList<TraitReading>(heldSteps);
+                    heldSteps.clear();
+                }
             }
             dispatch(new TraitChangeBatch(id, readings, true, false));
+            // Changes that arrived while the read was in flight. They are
+            // newer than what it snapshotted, so they go out immediately
+            // after it rather than waiting for the window -- otherwise the
+            // older values are the last thing the screen sees.
             if (held) {
-                // Changes that arrived while the read was in flight. They are
-                // newer than what it snapshotted, so they go out immediately
-                // after it rather than waiting for the window -- otherwise
-                // the older values are the last thing the screen sees.
                 flush();
+            }
+            if (steps != null) {
+                dispatch(new TraitChangeBatch(id, steps, false, false));
             }
             return;
         }
@@ -202,13 +218,17 @@ public final class SubscriptionState {
                 return;
             }
             hold = awaitingInitial;
-            if (windowMillis <= 0 && !hold) {
+            if (windowMillis <= 0) {
                 // A window of zero means every step, and this delivery can
                 // carry several for one trait -- a drain of writes that
                 // accumulated while nobody was looking. Keyed into `pending`
                 // they collapse to the last one, which is the one thing a
-                // zero window promises not to do.
+                // zero window promises not to do. Held for the initial read
+                // in a list for the same reason.
                 arm = false;
+                if (hold) {
+                    heldSteps.addAll(readings);
+                }
             } else {
                 for (TraitReading r : readings) {
                     pending.put(keyOf(r), r);
@@ -259,15 +279,23 @@ public final class SubscriptionState {
     /// is a far worse outcome than the missing initial values.
     public void initialDeliveryUnavailable() {
         boolean release;
+        List<TraitReading> steps = null;
         synchronized (this) {
             if (disposed || !awaitingInitial) {
                 return;
             }
             awaitingInitial = false;
             release = !pending.isEmpty() || resyncRequired;
+            if (!heldSteps.isEmpty()) {
+                steps = new ArrayList<TraitReading>(heldSteps);
+                heldSteps.clear();
+            }
         }
         if (release) {
             flush();
+        }
+        if (steps != null) {
+            dispatch(new TraitChangeBatch(id, steps, false, false));
         }
     }
 
@@ -336,6 +364,7 @@ public final class SubscriptionState {
             }
             disposed = true;
             pending.clear();
+            heldSteps.clear();
             wasUsingTimer = windowMillis > 0;
         }
         if (wasUsingTimer) {

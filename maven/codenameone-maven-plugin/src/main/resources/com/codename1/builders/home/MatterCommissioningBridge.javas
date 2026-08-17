@@ -406,12 +406,31 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             request.setDeviceNameHint(suggestedName);
         }
         pendingCommission = callback;
+        // The caller's own limit, kept so a sender that arrives after it has
+        // expired is dropped rather than opening a sheet for a request the
+        // framework has already failed with TIMEOUT. Zero means no limit,
+        // which is the default and the usual case -- somebody adding an
+        // accessory may be up a ladder.
+        final long deadline = timeoutMillis > 0
+                ? System.currentTimeMillis() + timeoutMillis : 0;
         final CommissioningRequest built = request.build();
         Matter.getCommissioningClient(activity)
                 .commissionDevice(built)
                 .addOnSuccessListener(new OnSuccessListener<IntentSender>() {
                     @Override
                     public void onSuccess(IntentSender sender) {
+                        if (deadline > 0
+                                && System.currentTimeMillis() > deadline) {
+                            Callback waiting = pendingCommission;
+                            pendingCommission = null;
+                            if (waiting != null) {
+                                waiting.onError("TIMEOUT",
+                                        "the add-device screen took longer to"
+                                                + " prepare than the requested"
+                                                + " limit");
+                            }
+                            return;
+                        }
                         launch(activity, sender);
                     }
                 })

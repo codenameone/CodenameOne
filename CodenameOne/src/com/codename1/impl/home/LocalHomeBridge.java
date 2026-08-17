@@ -851,6 +851,23 @@ public class LocalHomeBridge implements HomeBridge {
                         HomeError.INVALID_ARGUMENT.name() + "\tno such scene"));
                 return;
             }
+            // Reachability is checked here rather than at creation: a scene
+            // is made once and run later, and an accessory that happens to be
+            // offline while it is being made is no reason to refuse it. At
+            // run time it is every reason -- a scene that quietly "succeeds"
+            // against an unplugged lamp is a simulator approving what a real
+            // backend fails.
+            for (int i = 0; i < scene.actions.size(); i++) {
+                ActionRecord a = scene.actions.get(i);
+                Accessory target = accessories.get(a.accessoryId);
+                if (target == null || !target.reachable) {
+                    answer(new SceneResult(requestId, null, structureId,
+                            HomeError.ACCESSORY_UNREACHABLE.name()
+                            + "\tthis scene acts on an accessory that is not"
+                            + " responding"));
+                    return;
+                }
+            }
             for (int i = 0; i < scene.actions.size(); i++) {
                 ActionRecord a = scene.actions.get(i);
                 values.put(key(a.accessoryId, a.serviceId, a.trait.getId()),
