@@ -25,6 +25,7 @@ package com.codename1.impl.android.ai;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import com.codename1.ai.vision.TextScript;
 import com.codename1.ai.vision.VisionException;
 import com.codename1.ai.vision.VisionFeature;
 import com.codename1.ai.vision.VisionImage;
@@ -43,7 +44,7 @@ import com.google.mlkit.vision.common.InputImage;
 public final class AndroidVisionImpl extends VisionImpl {
     private volatile boolean closed;
     private AndroidVisionAdapter adapter;
-    private VisionFeature adapterFeature;
+    private String adapterClassName;
 
     @Override
     public boolean isSupported(VisionFeature feature, String backendId) {
@@ -63,10 +64,22 @@ public final class AndroidVisionImpl extends VisionImpl {
         final VisionOptions optionSnapshot = new VisionOptions()
                 .backend(options.getBackend())
                 .minimumConfidence(options.getMinimumConfidence())
-                .maximumResults(options.getMaximumResults());
+                .maximumResults(options.getMaximumResults())
+                .textScript(options.getTextScript());
         if (!isSupported(feature, backendId)) {
             out.error(new VisionException(VisionException.UNSUPPORTED,
                     feature + " is not included in this Android build"));
+            return out;
+        }
+        final String adapterType = adapterClass(feature,
+                optionSnapshot.getTextScript());
+        if (!isClassPresent(adapterType)) {
+            // The script model is a separate ML Kit artifact selected at build
+            // time. Name the selector rather than the feature: the recognizer
+            // itself is present, it is this script that was never asked for.
+            out.error(new VisionException(VisionException.UNSUPPORTED,
+                    "TextScript." + optionSnapshot.getTextScript()
+                            + "() is not included in this Android build"));
             return out;
         }
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
@@ -80,8 +93,8 @@ public final class AndroidVisionImpl extends VisionImpl {
                                         + "or RGBA8888 data"));
                         return;
                     }
-                    adapter(feature).analyze(decoded.input, decoded.width,
-                            decoded.height, optionSnapshot,
+                    adapter(adapterType).analyze(decoded.input,
+                            decoded.width, decoded.height, optionSnapshot,
                             (AsyncResource) out);
                 } catch (Throwable cause) {
                     error(out, new VisionException(
@@ -94,18 +107,18 @@ public final class AndroidVisionImpl extends VisionImpl {
         return out;
     }
 
-    private synchronized AndroidVisionAdapter adapter(VisionFeature feature)
+    private synchronized AndroidVisionAdapter adapter(String className)
             throws Exception {
         if (closed) {
             throw new IllegalStateException("Vision backend is closed");
         }
         if (adapter == null) {
             adapter = (AndroidVisionAdapter) Class.forName(
-                    adapterClass(feature)).newInstance();
-            adapterFeature = feature;
-        } else if (adapterFeature != feature) {
-            throw new IllegalStateException(
-                    "A vision backend instance cannot analyze multiple features");
+                    className).newInstance();
+            adapterClassName = className;
+        } else if (!adapterClassName.equals(className)) {
+            throw new IllegalStateException("A vision backend instance cannot "
+                    + "analyze multiple features or writing systems");
         }
         return adapter;
     }
@@ -198,6 +211,35 @@ public final class AndroidVisionImpl extends VisionImpl {
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    /**
+     * Resolves the adapter for a feature, honouring the writing system when the
+     * feature is text recognition. ML Kit ships one recognizer artifact per
+     * script, so each script maps to its own adapter class; a script the build
+     * never packaged simply has no class, which the caller reports as
+     * unsupported.
+     */
+    private static String adapterClass(VisionFeature feature,
+                                       TextScript script) {
+        if (feature != VisionFeature.TEXT_RECOGNITION || script == null) {
+            return adapterClass(feature);
+        }
+        String prefix = "com.codename1.impl.android.ai.AndroidTextRecognition";
+        String id = script.getId();
+        if ("chinese".equals(id)) {
+            return prefix + "ChineseAdapter";
+        }
+        if ("devanagari".equals(id)) {
+            return prefix + "DevanagariAdapter";
+        }
+        if ("japanese".equals(id)) {
+            return prefix + "JapaneseAdapter";
+        }
+        if ("korean".equals(id)) {
+            return prefix + "KoreanAdapter";
+        }
+        return adapterClass(feature);
     }
 
     private static String adapterClass(VisionFeature feature) {

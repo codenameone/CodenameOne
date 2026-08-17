@@ -20,26 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.ai.vision;
+package com.codename1.impl.android.ai;
 
-/// Creates reusable on-device OCR analyzers. The default recognizes the Latin
-/// script; select {@link VisionOptions#textScript(TextScript)} to read Chinese,
-/// Devanagari, Japanese or Korean text.
-public final class TextRecognizer extends AbstractVisionAnalyzer<TextRecognitionResult> {
-    /// Creates an analyzer using the platform default backend and options,
-    /// reading the Latin script.
-    /// @see VisionOptions
-    public TextRecognizer() {
-        this(null);
-    }
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions;
 
-    /// Creates a reusable analyzer with explicit backend and result options.
-    /// The writing system comes from
-    /// {@link VisionOptions#textScript(TextScript)}.
-    ///
-    /// @param options configuration captured by this analyzer; {@code null}
-    ///        uses defaults
-    public TextRecognizer(VisionOptions options) {
-        super(VisionFeature.TEXT_RECOGNITION, options);
+/**
+ * ML Kit Devanagari text recognition, covering Hindi, Marathi, Nepali and
+ * Sanskrit. Kept in its own source file so the text-recognition-devanagari
+ * ML Kit dependency is packaged only for an application that selects
+ * {@code TextScript.devanagari()}.
+ */
+final class AndroidTextRecognitionDevanagariAdapter
+        extends AndroidTextRecognitionAdapter {
+    AndroidTextRecognitionDevanagariAdapter() {
+        super(new DevanagariTextRecognizerOptions.Builder().build());
     }
 }

@@ -29,6 +29,7 @@ import com.codename1.ai.vision.ImageLabel;
 import com.codename1.ai.vision.Pose;
 import com.codename1.ai.vision.SegmentationMask;
 import com.codename1.ai.vision.TextRecognitionResult;
+import com.codename1.ai.vision.TextScript;
 import com.codename1.ai.vision.VisionException;
 import com.codename1.ai.vision.VisionFeature;
 import com.codename1.ai.vision.VisionImage;
@@ -88,9 +89,11 @@ public final class IOSVisionImpl extends VisionImpl {
                     "Apple Vision requires encoded, NV21, or RGBA8888 input"));
             return out;
         }
+        TextScript script = options.getTextScript();
         analyzeInBackground(out, feature, mlKit, input,
                 image.getRotationDegrees(), width, height, frameFormat,
-                options.getMinimumConfidence(), options.getMaximumResults());
+                options.getMinimumConfidence(), options.getMaximumResults(),
+                script == null ? null : script.getId());
         return out;
     }
 
@@ -103,13 +106,14 @@ public final class IOSVisionImpl extends VisionImpl {
                                                  final int height,
                                                  final int frameFormat,
                                                  final float minimumConfidence,
-                                                 final int maximumResults) {
+                                                 final int maximumResults,
+                                                 final String textScript) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
                     String json = IOSImplementation.nativeInstance.cn1VisionAnalyze(
                             input, nativeFeatureId(feature), mlKit,
-                            rotation, width, height, frameFormat);
+                            rotation, width, height, frameFormat, textScript);
                     if (json == null || json.length() == 0) {
                         throw new VisionException(VisionException.BACKEND_ERROR,
                                 "Apple Vision returned no result");

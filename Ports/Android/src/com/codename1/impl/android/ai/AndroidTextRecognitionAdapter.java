@@ -30,14 +30,32 @@ import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
 import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.TextRecognizerOptionsInterface;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
 import java.util.List;
 
-/** ML Kit text recognition; retained only for {@code TextRecognizer} users. */
-final class AndroidTextRecognitionAdapter extends AndroidVisionAdapter {
-    private final TextRecognizer client = TextRecognition.getClient(
-            TextRecognizerOptions.DEFAULT_OPTIONS);
+/**
+ * ML Kit text recognition; retained only for {@code TextRecognizer} users.
+ *
+ * <p>This class holds the Latin recognizer and the result mapping shared by
+ * every script. The other scripts live in their own subclasses because ML Kit
+ * ships one artifact per script model: keeping each {@code import} in a
+ * separate source file lets the builder delete the sources -- and therefore
+ * skip the Gradle dependencies -- for the models the application never asks
+ * for.</p>
+ */
+class AndroidTextRecognitionAdapter extends AndroidVisionAdapter {
+    private final TextRecognizer client;
+
+    AndroidTextRecognitionAdapter() {
+        this(TextRecognizerOptions.DEFAULT_OPTIONS);
+    }
+
+    AndroidTextRecognitionAdapter(TextRecognizerOptionsInterface options) {
+        client = TextRecognition.getClient(options);
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     void analyze(InputImage input, final int imageWidth,

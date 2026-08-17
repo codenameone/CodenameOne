@@ -56,6 +56,8 @@ public final class PlatformFeatureCatalog {
             "com.google.mlkit:smart-reply:17.0.4";
     private static final String MLKIT_SELFIE_SEGMENTATION =
             "com.google.mlkit:segmentation-selfie:16.0.0-beta5";
+    /** Shared version of the per-script ML Kit text recognition bundles. */
+    private static final String MLKIT_TEXT_SCRIPT_VERSION = "16.0.1";
     private static final List<Entry> ENTRIES;
     private static final List<String> CLASS_PREFIXES;
     private static final Set<String> METHOD_KEYS;
@@ -210,6 +212,37 @@ public final class PlatformFeatureCatalog {
                 .iosDependenciesUnsupportedOnMacCatalyst()
                 .iosDependenciesUnsupportedOnArm64Simulator()
                 .description("ML Kit iOS text-recognition backend"));
+
+        // Non-Latin OCR. ML Kit ships one recognizer artifact per script, so a
+        // script is a dependency of its own rather than a runtime flag; Latin
+        // needs no entry because it is what the base recognizer already reads.
+        // On iOS the script model is only fetched for a build that also
+        // selected the ML Kit backend -- Apple Vision reads these scripts
+        // itself through its recognition languages.
+        for (String[] script : new String[][] {
+                {"chinese", "Chinese"},
+                {"devanagari", "Devanagari"},
+                {"japanese", "Japanese"},
+                {"korean", "Korean"}}) {
+            e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
+                    .requiresMethod("com/codename1/ai/vision/TextScript",
+                            script[0])
+                    .androidGradle("com.google.mlkit:text-recognition-"
+                            + script[0] + ":" + MLKIT_TEXT_SCRIPT_VERSION)
+                    .androidMinimumSdk(21)
+                    .description(script[1] + " text recognition"));
+            e.add(new Entry("com/codename1/ai/vision/TextRecognizer")
+                    .requiresMethod("com/codename1/ai/vision/VisionBackends",
+                            "mlKitTextRecognition")
+                    .requiresMethod("com/codename1/ai/vision/TextScript",
+                            script[0])
+                    .iosPod("GoogleMLKit/TextRecognition" + script[1])
+                    .iosMinimumDeploymentTarget("15.5")
+                    .iosDependenciesUnsupportedOnMacCatalyst()
+                    .iosDependenciesUnsupportedOnArm64Simulator()
+                    .description("ML Kit iOS " + script[1]
+                            + " text-recognition model"));
+        }
 
         e.add(new Entry("com/codename1/ai/vision/BarcodeScanner")
                 .iosFrameworks("Vision", "CoreImage")
@@ -477,9 +510,7 @@ public final class PlatformFeatureCatalog {
         Set<String> methodKeys = new LinkedHashSet<String>();
         for (Entry entry : e) {
             classPrefixes.add(entry.classPrefix);
-            if (entry.hasMethodRequirement()) {
-                methodKeys.add(entry.methodOwner + "#" + entry.methodName);
-            }
+            methodKeys.addAll(entry.methodRequirements());
         }
         CLASS_PREFIXES = Collections.unmodifiableList(
                 new ArrayList<String>(classPrefixes));
@@ -662,8 +693,13 @@ public final class PlatformFeatureCatalog {
      */
     public static final class Entry {
         private final String classPrefix;
-        private String methodOwner;
-        private String methodName;
+        /**
+         * Method requirements as {@code owner#name} keys. Every key must be
+         * observed for the entry to fire, so an entry can name a combination
+         * such as "the ML Kit text backend <em>and</em> the Japanese script"
+         * without also firing for either one alone.
+         */
+        private final List<String> methodKeys = new ArrayList<String>();
         private final List<String> iosPods = new ArrayList<String>();
         private final List<IosSpm> iosSpm = new ArrayList<IosSpm>();
         private final List<String> iosFrameworks = new ArrayList<String>();
@@ -691,7 +727,11 @@ public final class PlatformFeatureCatalog {
         }
 
         boolean hasMethodRequirement() {
-            return methodOwner != null;
+            return !methodKeys.isEmpty();
+        }
+
+        List<String> methodRequirements() {
+            return Collections.unmodifiableList(methodKeys);
         }
 
         boolean requirementsMet(Set<String> classes, Set<String> methods) {
@@ -705,20 +745,24 @@ public final class PlatformFeatureCatalog {
             if (!classSeen) {
                 return false;
             }
-            if (!hasMethodRequirement()) {
-                return true;
-            }
-            for (String method : methods) {
-                if (method.equals(methodOwner + "#" + methodName)) {
-                    return true;
+            for (String key : methodKeys) {
+                if (!methods.contains(key)) {
+                    return false;
                 }
             }
-            return false;
+            return true;
         }
 
+        /**
+         * Adds a required method reference. Calling this more than once makes
+         * every named method required, not any of them.
+         *
+         * @param owner internal-form declaring class of the method
+         * @param methodName referenced method name
+         * @return this entry
+         */
         Entry requiresMethod(String owner, String methodName) {
-            this.methodOwner = owner;
-            this.methodName = methodName;
+            methodKeys.add(owner + "#" + methodName);
             return this;
         }
 
