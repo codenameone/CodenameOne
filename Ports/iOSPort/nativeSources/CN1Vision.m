@@ -46,6 +46,32 @@
 #import <MLKitTextRecognitionCommon/MLKitTextRecognitionCommon.h>
 #define CN1_HAS_MLKIT_TEXT 1
 #endif
+/*
+ * One pod per writing system, each imported only when the build linked it.
+ *
+ * These must be real symbol references rather than an NSClassFromString
+ * lookup. The pods link as static frameworks -- the builder passes -ObjC only
+ * for ads builds or the ios.objC hint -- so an options class that nothing
+ * references is dropped by the linker, and the lookup would then return nil on
+ * a build whose Podfile did include the model. Naming the class here also gets
+ * it spell-checked by the compiler instead of at runtime.
+ */
+#if __has_include(<MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>)
+#import <MLKitTextRecognitionChinese/MLKitTextRecognitionChinese.h>
+#define CN1_HAS_MLKIT_TEXT_CHINESE 1
+#endif
+#if __has_include(<MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>)
+#import <MLKitTextRecognitionDevanagari/MLKitTextRecognitionDevanagari.h>
+#define CN1_HAS_MLKIT_TEXT_DEVANAGARI 1
+#endif
+#if __has_include(<MLKitTextRecognitionJapanese/MLKitTextRecognitionJapanese.h>)
+#import <MLKitTextRecognitionJapanese/MLKitTextRecognitionJapanese.h>
+#define CN1_HAS_MLKIT_TEXT_JAPANESE 1
+#endif
+#if __has_include(<MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>)
+#import <MLKitTextRecognitionKorean/MLKitTextRecognitionKorean.h>
+#define CN1_HAS_MLKIT_TEXT_KOREAN 1
+#endif
 #if __has_include(<MLKitBarcodeScanning/MLKitBarcodeScanning.h>)
 #import <MLKitBarcodeScanning/MLKitBarcodeScanning.h>
 #define CN1_HAS_MLKIT_BARCODE 1
@@ -223,6 +249,13 @@ static NSString *cn1VisionUnsupported(NSString *message) {
     });
 }
 
+/*
+ * Defined further down with the Apple Vision helpers; both backends use a
+ * non-nil result as "a writing system other than the Latin default was
+ * selected", so the set of recognized script ids stays in one place.
+ */
+static NSArray<NSString *> *cn1VisionScriptSubtags(NSString *script);
+
 #if defined(CN1_HAS_MLKIT_VISION)
 static UIImageOrientation cn1UIImageOrientation(int rotation) {
     switch (rotation) {
@@ -263,24 +296,32 @@ static NSString *cn1MLKitBarcodeFormat(MLKBarcodeFormat format) {
 
 #if defined(CN1_HAS_MLKIT_TEXT)
 /*
- * ML Kit ships one recognizer model per writing system, each in its own pod.
- * The class is looked up by name rather than imported so this file keeps
- * compiling for a build that linked only some of them -- a missing model is a
- * nil Class, which the caller reports as unsupported.
+ * The recognizer options for a writing system, or nil when this build did not
+ * link that model. Latin needs no entry: it is the base recognizer's own
+ * options, which the caller supplies.
  */
-static NSString *cn1MLKitTextOptionsClassName(NSString *script) {
+static MLKCommonTextRecognizerOptions *cn1MLKitTextScriptOptions(
+        NSString *script) {
+#if defined(CN1_HAS_MLKIT_TEXT_CHINESE)
     if ([script isEqualToString:@"chinese"]) {
-        return @"MLKChineseTextRecognizerOptions";
+        return [[MLKChineseTextRecognizerOptions alloc] init];
     }
+#endif
+#if defined(CN1_HAS_MLKIT_TEXT_DEVANAGARI)
     if ([script isEqualToString:@"devanagari"]) {
-        return @"MLKDevanagariTextRecognizerOptions";
+        return [[MLKDevanagariTextRecognizerOptions alloc] init];
     }
+#endif
+#if defined(CN1_HAS_MLKIT_TEXT_JAPANESE)
     if ([script isEqualToString:@"japanese"]) {
-        return @"MLKJapaneseTextRecognizerOptions";
+        return [[MLKJapaneseTextRecognizerOptions alloc] init];
     }
+#endif
+#if defined(CN1_HAS_MLKIT_TEXT_KOREAN)
     if ([script isEqualToString:@"korean"]) {
-        return @"MLKKoreanTextRecognizerOptions";
+        return [[MLKKoreanTextRecognizerOptions alloc] init];
     }
+#endif
     return nil;
 }
 #endif
@@ -302,16 +343,15 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
 
     if (feature == 0) {
 #if defined(CN1_HAS_MLKIT_TEXT)
-        id textOptions = [[MLKTextRecognizerOptions alloc] init];
-        NSString *scriptClassName = cn1MLKitTextOptionsClassName(textScript);
-        if (scriptClassName != nil) {
-            Class scriptClass = NSClassFromString(scriptClassName);
-            if (scriptClass == nil) {
+        MLKCommonTextRecognizerOptions *textOptions =
+                [[MLKTextRecognizerOptions alloc] init];
+        if (cn1VisionScriptSubtags(textScript) != nil) {
+            textOptions = cn1MLKitTextScriptOptions(textScript);
+            if (textOptions == nil) {
                 return cn1VisionUnsupported([NSString stringWithFormat:
                         @"The ML Kit %@ text model is not linked into this "
                          "build", textScript]);
             }
-            textOptions = [[scriptClass alloc] init];
         }
         MLKTextRecognizer *recognizer =
                 [MLKTextRecognizer textRecognizerWithOptions:textOptions];
