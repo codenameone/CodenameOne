@@ -252,6 +252,17 @@ class InterpHostVtableSynthesisIntegrationTest {
 
         String previousInterp = System.getProperty("cn1.interpHost");
         System.setProperty("cn1.interpHost", "true");
+        // The spike's three natives are implemented in cn1_interp_spike.c, which
+        // is copied into the generated source root *after* translation -- the
+        // root does not exist until then, and cmake globs the directory at
+        // configure time. So the native-signature check has nothing to find and
+        // would abort a translation whose natives are in fact implemented. CI
+        // sets CN1_NATIVE_VERIFY=strict for every forked translation, and the
+        // property wins over the environment, which is what makes this local
+        // opt-out possible.
+        String previousVerify = System.getProperty(
+                NativeSignatureVerifier.MODE_PROPERTY);
+        System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, "off");
         try {
             CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "InterpVtApp");
         } finally {
@@ -259,6 +270,11 @@ class InterpHostVtableSynthesisIntegrationTest {
                 System.clearProperty("cn1.interpHost");
             } else {
                 System.setProperty("cn1.interpHost", previousInterp);
+            }
+            if (previousVerify == null) {
+                System.clearProperty(NativeSignatureVerifier.MODE_PROPERTY);
+            } else {
+                System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, previousVerify);
             }
         }
         return outputDir;
