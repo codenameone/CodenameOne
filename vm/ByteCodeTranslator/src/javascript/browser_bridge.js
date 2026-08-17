@@ -5061,7 +5061,11 @@
             seen = seq;
           }
           frames++;
-          if (quiet >= 2 || frames >= 30) {
+          // Several quiet frames, not one or two: a screen is often painted over a handful of
+          // frames with short pauses between them -- a grid of gradients drawn cell by cell --
+          // and a capture taken in one of those pauses records a half-finished screen. Still
+          // bounded, so a screen that never stops drawing is captured as it was before.
+          if (quiet >= 6 || frames >= 60) {
             resolve();
             return;
           }
