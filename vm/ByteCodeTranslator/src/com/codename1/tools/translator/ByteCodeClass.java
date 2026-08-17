@@ -297,34 +297,55 @@ public class ByteCodeClass {
             }
         }
         
-        // mark all non-final classes that aren't inherited as final for use in 
-        // additional optimizations
-        for(ByteCodeClass bc : lst) {
-            if(bc.isFinalClass() || bc.isInterface || bc.isIsAbstract()) {
-                continue;
-            }
-            boolean found = false;
-            for(ByteCodeClass bk : lst) {
-                if(bk.baseClassObject == bc) {
-                    found = true;
-                    break;
+        // Both passes below reason from "this is the whole program": a class
+        // nothing extends can be treated as final, and a final class's methods
+        // need no virtual dispatch. An interp-host build breaks that premise by
+        // construction -- interpreted subclasses are synthesized at runtime, so
+        // any class may be extended by code the translator never saw.
+        //
+        // The consequences are not subtle. setVirtualOverriden suppresses the
+        // virtual_ wrapper AND stops __INIT_VTABLE_ from filling the method's
+        // slot, while call sites become direct calls. A synthesized subclass
+        // would then patch a slot nothing dispatches through, and every call
+        // would silently reach the parent implementation.
+        {
+            // mark all non-final classes that aren't inherited as final for use in
+            // additional optimizations
+            for(ByteCodeClass bc : lst) {
+                if(BytecodeMethod.isInterpHost()
+                        && !BytecodeMethod.isInterpOpaqueClass(bc.getClsName())) {
+                    continue;
+                }
+                if(bc.isFinalClass() || bc.isInterface || bc.isIsAbstract()) {
+                    continue;
+                }
+                boolean found = false;
+                for(ByteCodeClass bk : lst) {
+                    if(bk.baseClassObject == bc) {
+                        found = true;
+                        break;
+                    }
+                }
+                if(!found) {
+                    bc.setFinalClass(true);
                 }
             }
-            if(!found) {
-                bc.setFinalClass(true);
+
+            // we try to disable the "virtual" aspect of methods where possible
+            for(ByteCodeClass bc : lst) {
+                if(BytecodeMethod.isInterpHost()
+                        && !BytecodeMethod.isInterpOpaqueClass(bc.getClsName())) {
+                    continue;
+                }
+                if(bc.isFinalClass()) {
+                    for(BytecodeMethod meth : bc.methods) {
+                        if(meth.canBeVirtual() && !bc.isMethodFromBaseOrInterface(meth)) {
+                            meth.setVirtualOverriden(true);
+                        }
+                    }
+                }
             }
         }
-        
-        // we try to disable the "virtual" aspect of methods where possible
-        for(ByteCodeClass bc : lst) {
-            if(bc.isFinalClass()) {
-                for(BytecodeMethod meth : bc.methods) {
-                    if(meth.canBeVirtual() && !bc.isMethodFromBaseOrInterface(meth)) {
-                        meth.setVirtualOverriden(true);
-                    }
-                } 
-            } 
-        }        
     }
     
     
@@ -366,7 +387,7 @@ public class ByteCodeClass {
         return null;
     }
 
-    private BytecodeMethod findDeclaredMethod(String name, String desc) {
+    BytecodeMethod findDeclaredMethod(String name, String desc) {
         for (BytecodeMethod meth : methods) {
             if (meth.getMethodName().equals(name) && desc.equals(meth.getSignature())) {
                 return meth;
@@ -416,6 +437,32 @@ public class ByteCodeClass {
         }
     }
     
+    /**
+     * Marks every class in the list, reachable or not. Used only by an
+     * interp-host build, which retains the whole API because pushed code may
+     * call any part of it.
+     *
+     * <p>Marking is not just bookkeeping for the cull: {@link #markDependent}
+     * is also what puts a class's name, its method names and its string
+     * literals into the constant pool. The pool's size is baked into
+     * cn1_class_method_index.h, which is written before any class is emitted,
+     * so a class that is emitted without having been marked appends its
+     * literals to the pool afterwards and its LDCs index past the declared
+     * size — reading whatever follows the array. That shows up as a string
+     * literal arriving as null, then a segfault, with nothing to connect it
+     * back to reachability.</p>
+     */
+    public static void markAll(List<ByteCodeClass> lst, String[] nativeSources) {
+        // Seed from the real roots first so anything genuinely reachable is
+        // marked through the normal path, then sweep up the remainder.
+        markDependencies(lst, nativeSources);
+        for (ByteCodeClass bc : lst) {
+            if (!bc.marked) {
+                bc.markDependent(lst);
+            }
+        }
+    }
+
     public static List<ByteCodeClass> clearUnmarked(List<ByteCodeClass> lst) {
         List<ByteCodeClass> response = new ArrayList<ByteCodeClass>();
         for(ByteCodeClass bc : lst) {
@@ -595,6 +642,9 @@ public class ByteCodeClass {
         
         for(String s : dependsClassesInterfaces) {
             if (exportsClassesInterfaces.contains(s)) {
+                continue;
+            }
+            if (skipAbsentInclude(s)) {
                 continue;
             }
             b.append("#include \"");
@@ -1401,18 +1451,43 @@ public class ByteCodeClass {
         // where this is known to bite. java.lang / java.util etc. are
         // fine and worth keeping (jdb leans on Object.toString for
         // "print" output, and we want lists/strings to round-trip too).
-        if (clsName.startsWith("java_io_") || clsName.startsWith("java_net_")
-                || clsName.startsWith("java_nio_")
-                || clsName.startsWith("com_codename1_impl_")) {
+        //
+        // The java.* half of that list comes off under interp-host, where it is
+        // actively harmful: a pushed program calling File.getPath() or
+        // URL.getHost() would be told the method is "not present in the
+        // installed app" when it plainly is. Dropping it is safe there because
+        // interp-host disables dead-code elimination, so those wrappers are
+        // already forced live by markAll whether or not a thunk points at them.
+        //
+        // com.codename1.impl stays out in every mode. It is the port's own
+        // native surface, where the drift is real -- IOSNative declares natives
+        // (createVideoComponentNSData, fillRadialGradientMutable) that no
+        // hand-written implementation defines, and a thunk turns that into an
+        // undefined symbol at link time. Interpreted code has no business
+        // calling the implementation layer directly in any case; it calls the
+        // framework, and the framework calls the port.
+        boolean portInternal = clsName.startsWith("com_codename1_impl_");
+        boolean nativeSidecar = clsName.startsWith("java_io_") || clsName.startsWith("java_net_")
+                || clsName.startsWith("java_nio_");
+        if (portInternal || (nativeSidecar && !BytecodeMethod.isInterpHost())) {
             return;
         }
         // We emit a constructor PER class that registers all of that
         // class's invoke thunks in one go. The thunks themselves are
         // file-static so they don't leak symbols.
+        // Constructor thunks exist only for the device runtime host build,
+        // where the interpreter has to be able to evaluate `new Foo(args)` for
+        // an arbitrary framework class. A plain on-device-debug build has no
+        // use for them (jdb never constructs), so it keeps the smaller output.
+        //
+        // __NEW_<cls> -- which the ctor thunk calls -- is only emitted for
+        // concrete classes, so asking for one on an interface or abstract class
+        // would not compile.
+        boolean ctorThunks = BytecodeMethod.isInterpHost() && !isInterface && !isAbstract;
         List<BytecodeMethod> eligible = new ArrayList<>();
         for (BytecodeMethod m : methods) {
             if (m.isEliminated()) continue;
-            if (m.isConstructor()) continue;
+            if (m.isConstructor() && !ctorThunks) continue;
             String name = m.getMethodName();
             if ("__CLINIT__".equals(name) || "<clinit>".equals(name)) continue;
             // Abstract methods have no body to call. Native methods are
@@ -1452,7 +1527,10 @@ public class ByteCodeClass {
         // we don't have, but this should never happen — translator pulls in
         // parents transitively.
         b.append("\n#ifdef CN1_ON_DEVICE_DEBUG\n");
-        b.append("#import \"cn1_debugger.h\"\n");
+        // cn1_reflect.h, not cn1_debugger.h: the metadata ABI is translator-owned
+        // and every target has to be able to compile what it generates. The iOS
+        // port's debugger header includes this one, so an iOS build is unchanged.
+        b.append("#include \"cn1_reflect.h\"\n");
         b.append("static const cn1_field_entry __cn1_dbg_fields_").append(clsName).append("[] = {\n");
         for (ByteCodeField bf : instance) {
             String declCls = bf.getClsName().replace('/', '_').replace('$', '_');
@@ -1465,6 +1543,7 @@ public class ByteCodeClass {
               .append(bf.getFieldName()).append("\" },\n");
         }
         b.append("};\n");
+        appendInterpStaticAccessors(b);
         b.append("__attribute__((constructor)) static void __cn1_dbg_register_").append(clsName).append("(void) {\n");
         b.append("    cn1_debugger_register_fields(cn1_class_id_").append(clsName).append(",\n");
         b.append("            __cn1_dbg_fields_").append(clsName).append(",\n");
@@ -1475,8 +1554,116 @@ public class ByteCodeClass {
         // this constructor, so the registry is complete before main().
         b.append("    cn1_debugger_register_class(cn1_class_id_").append(clsName)
           .append(", &class__").append(clsName).append(");\n");
+        appendInterpStaticAccessorRegistrations(b);
         b.append("}\n");
         b.append("#endif // CN1_ON_DEVICE_DEBUG\n");
+    }
+
+    /**
+     * Emits an accessor per static field, and registers each by fieldId.
+     *
+     * <p>Only under interp-host. The debugger reads statics through its own
+     * command path; the interpreter cannot, because a pushed program's
+     * {@code GETSTATIC java/lang/System.out} arrives as a name and there is
+     * nothing to resolve it against. Without this, every host static read
+     * failed -- which is most programs, since {@code System.out.println} is
+     * one.</p>
+     *
+     * <p>An instance field needs no accessor: it is an offset from a receiver
+     * and the table above covers it. A static field has no receiver, and the
+     * translator gives it a named C global plus typed
+     * {@code get_static_}/{@code set_static_} functions rather than a table.
+     * Going through those functions rather than the global matters: the getter
+     * runs {@code __STATIC_INITIALIZER_} first, so reading a static from
+     * interpreted code initialises the class exactly as compiled code would.</p>
+     */
+    private void appendInterpStaticAccessorRegistrations(StringBuilder b) {
+        if (!BytecodeMethod.isInterpHost() || staticFieldList == null) {
+            return;
+        }
+        for (ByteCodeField bf : staticFieldList) {
+            if (!isOwnStatic(bf)) {
+                continue;
+            }
+            int fid = Parser.getOrAssignFieldId(clsName, bf.getFieldName());
+            b.append("    cn1_debugger_register_static_accessor(").append(fid)
+             .append(", &__cn1_sacc_").append(fid).append(");\n");
+        }
+    }
+
+    /**
+     * Whether this class physically stores the static field.
+     *
+     * <p>{@code staticFieldList} walks the hierarchy, but only the declaring
+     * class emits storage and accessors for a static -- so registering from any
+     * other class would name a C symbol that translation unit does not have.</p>
+     */
+    private boolean isOwnStatic(ByteCodeField bf) {
+        return bf.isStaticField() && bf.getClsName().equals(clsName);
+    }
+
+    /**
+     * Whether this static is emitted as an inlined constant getter rather than
+     * as storage. Mirrors the condition in the emission loop above; a constant
+     * has a getter and no setter, so its accessor must be read-only.
+     */
+    private static boolean isInlinedConstant(ByteCodeField bf) {
+        return bf.isFinal() && bf.getValue() != null
+                && !writableFields.contains(bf.getFieldName());
+    }
+
+    /**
+     * Emits the accessor bodies. Separate from the registration above only
+     * because C wants them defined before the constructor that takes their
+     * address.
+     */
+    private void appendInterpStaticAccessors(StringBuilder b) {
+        if (!BytecodeMethod.isInterpHost() || staticFieldList == null) {
+            return;
+        }
+        for (ByteCodeField bf : staticFieldList) {
+            if (!isOwnStatic(bf)) {
+                continue;
+            }
+            int fid = Parser.getOrAssignFieldId(clsName, bf.getFieldName());
+            char tc = onDeviceDebugTypeCharFor(bf);
+            String slot = interpArgSlotFor(tc);
+            String suffix = clsName + "_" + bf.getFieldName().replace('$', '_');
+            b.append("static void __cn1_sacc_").append(fid)
+             .append("(CODENAME_ONE_THREAD_STATE, int write, cn1_invoke_arg* value, char* type) {\n");
+            b.append("    *type = '").append(tc).append("';\n");
+            if (isInlinedConstant(bf)) {
+                // Emitted as a constant getter with no storage and no setter,
+                // so a write has nowhere to go. Java would not compile one
+                // either -- the field is final.
+                b.append("    if (write) { return; }\n");
+            } else {
+                // The generated setter takes thread state only for object
+                // fields -- those touch the write barrier and the heap
+                // collection, primitives do not. Passing it unconditionally
+                // fails to compile on every primitive static in the app.
+                b.append("    if (write) {\n");
+                b.append("        set_static_").append(suffix).append("(")
+                 .append(bf.isObjectType() ? "threadStateData, (" : "(")
+                 .append(bf.getCDefinition()).append(")value->").append(slot).append(");\n");
+                b.append("        return;\n");
+                b.append("    }\n");
+            }
+            b.append("    value->").append(slot).append(" = get_static_")
+             .append(suffix).append("();\n");
+            b.append("}\n");
+        }
+    }
+
+    /** The {@code cn1_invoke_arg} member a JVM type-char travels in. */
+    private static String interpArgSlotFor(char typeChar) {
+        switch (typeChar) {
+            case 'J': return "j";
+            case 'F': return "f";
+            case 'D': return "d";
+            case 'L': return "o";
+            default:  return "i";   // I, Z, B, S, C all ride in the int slot
+        }
     }
 
     private static char onDeviceDebugTypeCharFor(ByteCodeField bf) {
@@ -1660,6 +1847,29 @@ public class ByteCodeClass {
         return fieldList;
     } 
     
+    /**
+     * Whether an {@code #include} of the given class should be dropped because
+     * no such class was translated. Only ever true for an interp-host build.
+     *
+     * <p>A dependency is recorded for a field's declared type as well as for
+     * anything the code calls, and ParparVM's JavaAPI simply does not contain
+     * some types the wider ecosystem references -- Kotlin's stdlib has fields
+     * typed {@code java.io.BufferedReader} and {@code java.nio.ByteBuffer},
+     * neither of which exists here. Reachability normally removes the whole
+     * class before this matters; an interp-host build keeps it, and the include
+     * then names a header that was never generated.</p>
+     *
+     * <p>Dropping the include is safe: every object field is a
+     * {@code JAVA_OBJECT} in the emitted struct regardless of its Java type, so
+     * the header is only needed by code that calls into the class -- and any
+     * method that did was already eliminated for referencing an absent
+     * class.</p>
+     */
+    private static boolean skipAbsentInclude(String mangledClassName) {
+        return BytecodeMethod.isInterpHost()
+                && Parser.getClassObject(mangledClassName) == null;
+    }
+
     private void addFields(StringBuilder b) {
         if(baseClassObject != null) {
             baseClassObject.addFields(b);
@@ -1698,6 +1908,9 @@ public class ByteCodeClass {
             //if (isAnnotation) {
             //    continue;
             //}
+            if (skipAbsentInclude(s)) {
+                continue;
+            }
             b.append("#include \"");
             b.append(s);
             b.append(".h\"\n");
@@ -2096,7 +2309,20 @@ public class ByteCodeClass {
             }
         }
         for(BytecodeMethod bm : methods) {
-            if (bm.isEliminated()) continue;
+            // An eliminated method still gets a stub body emitted ("return 0;"),
+            // and callers that survived still reference it. Dropping it from the
+            // table removes its virtual_ wrapper and its header declaration
+            // while those call sites remain -- an undeclared-function error in
+            // the class's own generated C.
+            //
+            // A normal build never hits this because elimination is driven by
+            // reachability, so nothing that survived can call what was removed.
+            // An interp-host build eliminates on a different axis entirely --
+            // the member the method references does not exist on this platform
+            // -- which says nothing about whether anything calls it. Keep the
+            // slot; calling it reaches the stub, which is the honest answer for
+            // an API the platform does not have.
+            if (bm.isEliminated() && !BytecodeMethod.isInterpHost()) continue;
             if(bm.canBeVirtual()) {
                 int offset = virtualMethods.indexOf(bm);
                 if(offset < 0) {
@@ -2257,7 +2483,7 @@ public class ByteCodeClass {
     public void setIsAbstract(boolean isAbstract) {
         this.isAbstract = isAbstract;
     }
-    
+
     private void appendClassVFunctions(StringBuilder b) {
         // special case, class has no Class object within it so no real virtual functions
         b.append("JAVA_BOOLEAN virtual_java_lang_Class_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1) {\n" +

@@ -257,11 +257,28 @@ public class ByteCodeTranslator {
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        if ("true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"))) {
+        // Ask BytecodeMethod rather than re-reading the property: an interp-host
+        // build turns on-device-debug emission on implicitly, and re-reading
+        // cn1.onDeviceDebug here would leave the macro commented out while the
+        // thunks and field tables were still emitted behind #ifdef
+        // CN1_ON_DEVICE_DEBUG -- i.e. the whole mechanism would silently
+        // compile to nothing.
+        if (BytecodeMethod.isOnDeviceDebug()) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
+        if (BytecodeMethod.isInterpHost()) {
+            replaceInFile(cn1Globals, "//#define CN1_INTERP_HOST", "#define CN1_INTERP_HOST");
+        }
+        // The ABI for the metadata the generated code emits under
+        // CN1_ON_DEVICE_DEBUG. Always copied, so include order never depends on
+        // which target is building; the weak sinks in cn1_reflect let a target
+        // without a debugger runtime link what it generated.
+        File cn1Reflect = new File(srcRoot, "cn1_reflect.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_reflect.h"), Files.newOutputStream(cn1Reflect.toPath()));
         File cn1GlobalsC = new File(srcRoot, "cn1_globals.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), Files.newOutputStream(cn1GlobalsC.toPath()));
+        File cn1ReflectC = new File(srcRoot, "cn1_reflect.c");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_reflect.m"), Files.newOutputStream(cn1ReflectC.toPath()));
         File nativeMethodsC = new File(srcRoot, "nativeMethods.c");
         copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), Files.newOutputStream(nativeMethodsC.toPath()));
         if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
@@ -581,16 +598,30 @@ public class ByteCodeTranslator {
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
-        if ("true".equalsIgnoreCase(System.getProperty("cn1.onDeviceDebug", "false"))) {
+        // Ask BytecodeMethod rather than re-reading the property: an interp-host
+        // build turns on-device-debug emission on implicitly, and re-reading
+        // cn1.onDeviceDebug here would leave the macro commented out while the
+        // thunks and field tables were still emitted behind #ifdef
+        // CN1_ON_DEVICE_DEBUG -- i.e. the whole mechanism would silently
+        // compile to nothing.
+        if (BytecodeMethod.isOnDeviceDebug()) {
             replaceInFile(cn1Globals, "//#define CN1_ON_DEVICE_DEBUG", "#define CN1_ON_DEVICE_DEBUG");
         }
+        if (BytecodeMethod.isInterpHost()) {
+            replaceInFile(cn1Globals, "//#define CN1_INTERP_HOST", "#define CN1_INTERP_HOST");
+        }
+        // The ABI for the metadata the generated code emits under
+        // CN1_ON_DEVICE_DEBUG. Always copied, so include order never depends on
+        // which target is building; the weak sinks in cn1_reflect let a target
+        // without a debugger runtime link what it generated.
+        File cn1Reflect = new File(srcRoot, "cn1_reflect.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_reflect.h"), Files.newOutputStream(cn1Reflect.toPath()));
         File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), Files.newOutputStream(cn1GlobalsM.toPath()));
+        File cn1ReflectM = new File(srcRoot, "cn1_reflect.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_reflect.m"), Files.newOutputStream(cn1ReflectM.toPath()));
         File nativeMethods = new File(srcRoot, "nativeMethods.m");
         copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), Files.newOutputStream(nativeMethods.toPath()));
-        File javaIoFileM = new File(srcRoot, "java_io_File.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), Files.newOutputStream(javaIoFileM.toPath()));
-
         if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
             File malloc = new File(srcRoot, "malloc.c");
             copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), Files.newOutputStream(malloc.toPath()));
@@ -601,6 +632,20 @@ public class ByteCodeTranslator {
         }
 
         Parser.writeOutput(srcRoot);
+
+        // java.io.File's native bodies. The file has to be named something the
+        // translator will not also emit, and has to be written after
+        // writeOutput: it used to be copied to "java_io_File.m" beforehand, so
+        // the generated class of the same name overwrote it and every
+        // java_io_File_*Impl symbol went missing. Nothing noticed because
+        // java.io.File is unreachable in a normal CN1 app -- CN1 code uses
+        // FileSystemStorage -- so reachability removed the callers before the
+        // link. An interp-host build keeps them and the link fails.
+        //
+        // This mirrors what the clean target has always done correctly
+        // ("java_io_File_runtime.c", copied after writeOutput).
+        File javaIoFileM = new File(srcRoot, "java_io_File_runtime.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), Files.newOutputStream(javaIoFileM.toPath()));
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
         copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), Files.newOutputStream(templateInfoPlist.toPath()));

@@ -2294,6 +2294,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
+        // A resource pushed by the device runtime wins over the app's own,
+        // so a pushed program shows its own theme rather than the host's.
+        InputStream local = localResource(resource);
+        if (local != null) {
+            return local;
+        }
         try {
             if (resource.startsWith("/")) {
                 resource = resource.substring(1);
@@ -12212,20 +12218,40 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public String getHostOrIP() {
         try {
             InetAddress i = java.net.InetAddress.getLocalHost();
-            if(i.isLoopbackAddress()) {
-                Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
-                while(nie.hasMoreElements()) {
-                    NetworkInterface current = nie.nextElement();
-                    if(!current.isLoopback()) {
-                        Enumeration<InetAddress> iae = current.getInetAddresses();
-                        while(iae.hasMoreElements()) {
-                            InetAddress currentI = iae.nextElement();
-                            if(!currentI.isLoopbackAddress()) {
-                                return currentI.getHostAddress();
-                            }
-                        }
-                    }
+            if(!i.isLoopbackAddress()) {
+                return i.getHostAddress();
+            }
+            // Walking the interfaces and taking the first non-loopback address
+            // is not good enough on Android: the first one up is routinely
+            // dummy0, whose only address is an IPv6 link-local, and callers get
+            // "fe80::...%dummy0" -- which is not an address anything can be
+            // reached on and cannot even say which network this device is on.
+            // Prefer a real IPv4 on a live interface, and take a routable one
+            // over a link-local.
+            String linkLocal = null;
+            Enumeration<NetworkInterface> nie = NetworkInterface.getNetworkInterfaces();
+            while(nie.hasMoreElements()) {
+                NetworkInterface current = nie.nextElement();
+                if(current.isLoopback() || !current.isUp()) {
+                    continue;
                 }
+                Enumeration<InetAddress> iae = current.getInetAddresses();
+                while(iae.hasMoreElements()) {
+                    InetAddress currentI = iae.nextElement();
+                    if(currentI.isLoopbackAddress() || !(currentI instanceof java.net.Inet4Address)) {
+                        continue;
+                    }
+                    if(currentI.isLinkLocalAddress()) {
+                        if(linkLocal == null) {
+                            linkLocal = currentI.getHostAddress();
+                        }
+                        continue;
+                    }
+                    return currentI.getHostAddress();
+                }
+            }
+            if(linkLocal != null) {
+                return linkLocal;
             }
             return i.getHostAddress();
         } catch(Throwable t) {

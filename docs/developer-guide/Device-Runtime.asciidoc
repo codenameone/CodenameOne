@@ -1,0 +1,415 @@
+= Device Runtime
+
+The device runtime is a third way to run Codename One code, alongside the simulator and a full device build. You install one app on a phone, and from then on push compiled classes to it from your machine and see them run natively -- no rebuild, no signing, no round trip to a build server.
+
+It is a development tool, not a shipping mechanism. Applications you ship are still compiled ahead of time: ParparVM translates them to C for iOS and the Android build produces real dex. Nothing about the device runtime changes how a released app is built or how fast it runs.
+
+== What it is for, and what it is not
+
+The device runtime gives you the iteration speed of the simulator with the fidelity of a real device for everything that does not depend on native code or on the optimizer. Layout on a real screen, real fonts, real input, real density, real network conditions.
+
+It is the wrong tool for three things:
+
+Performance measurement. Your code is interpreted and the host app is built with the optimizer off. Numbers taken here mean nothing about a released build.
+
+Native integration. Native code cannot be pushed. A `cn1lib`'s Java half runs; its native half is only available if it was compiled into the runtime app.
+
+Anything that depends on app identity. Bundle id, icons, splash screens, URL schemes, push certificates, background modes and app extensions all belong to the runtime app, not to your program.
+
+== How it works
+
+Three pieces, in the order they run.
+
+*The bundle writer* runs on your machine. It reads your compiled classes with ASM, resolves the constant pool into flat tables, converts branch targets from labels to instruction indices, and writes a `.cn1ip` file containing the code, the symbols it references in the host app, and your source.
+
+The instruction set is the JVM's own. Only the operands change. Keeping the opcodes means every semantic question -- what `dup2` does to a `long`, when `athrow` unwinds, how `invokespecial` differs from `invokevirtual` -- has one authoritative answer that can be checked against a real JVM, rather than a reinterpretation that has to be rediscovered by testing.
+
+*The bundle* carries your source, and this is not optional. `InterpBundleReader` refuses to load a bundle whose interpreted classes are not all covered by source files. Apple permits an app to download and run code only where the user can see and edit it (App Store Review Guideline 2.5.2), so the runtime enforces that rather than trusting the tool chain to have included it.
+
+*The interpreter* runs on the device. It walks the int array, and reaches the host app through two interfaces:
+
+`InterpLinker` is how interpreted code calls into the app. On Android and in the simulator that is `java.lang.reflect`. On iOS there is no reflection at all -- `Method.invoke` does not exist and ParparVM's `struct clazz` has no name-to-method table -- so the iOS backend binds through the per-method invoke thunks and symbol table that the interp-host build emits.
+
+The linker is supplied by the port, not by the app: `AndroidImplementation` and `IOSImplementation` each register one with `InterpPlatform` during startup. That is a registry rather than a lookup by class name because a name lookup is precisely what ParparVM cannot do. A build with no device runtime registers nothing and the whole feature reduces to one null field.
+
+`InterpObjectFactory` is how the app calls back into interpreted code. See <<Extending framework classes>>.
+
+== Building the runtime app
+
+The runtime app is not built like a normal Codename One app. Set the build hint:
+
+[source]
+----
+codename1.arg.ios.interpHost=true
+----
+
+That switches the translator into `CN1_INTERP_HOST` mode, which changes four things at once:
+
+*Invoke thunks, field tables and the symbol table are emitted.* These are the same structures on-device debugging uses. They are what gives the interpreter a way to call a method it only knows by name.
+
+*The optimizer is off.* Not for speed -- for correctness. The optimizer devirtualizes calls, and a devirtualized call is a direct branch that no runtime-installed override can intercept.
+
+*Dead code elimination is off.* Pushed code may call any part of the API, including classes the runtime app itself never mentions.
+
+*Vtable layout is published.* The symbol table gains `vtsize` and `vtable` rows so the runtime can find the slot to patch for a given method.
+
+*Static fields become reachable.* Instance fields are covered by a per-class offset table, because an instance field is an offset from a receiver. A static has no receiver: the translator gives it a named C global and typed `get_static_`/`set_static_` functions, with no table to index. Interp-host adds one uniform accessor per static, registered by field id, plus `sfield` rows in the symbol table. Without it every host static read failed -- which is most programs, since `System.out.println` compiles to a `GETSTATIC` of `System.out`. Reads go through the generated getter rather than the global, so the declaring class's static initializer runs exactly as it would for compiled code.
+
+An ordinary on-device-debug build skips thunk generation for `java.io`, `java.net` and `java.nio`, because those packages have hand-written native sidecars and a thunk forces a C wrapper live whose implementation may be missing. Interp-host lifts that: it has already disabled dead code elimination, so those wrappers are live either way, and a program calling `File.getPath()` should not be told the method is "not present in the installed app". `com.codename1.impl` stays excluded in every mode -- that is where the drift is real, and interpreted code reaches the port through the framework rather than directly.
+
+=== What this costs
+
+Measured on `hellocodenameone`, a real application with native interfaces, camera, health and NFC:
+
+[options="header"]
+|===
+|                          | Normal build | Interp host
+| Translate + project generation | 64 s    | 195 s
+| Generated `.m` files      | 2,696       | 5,547
+| Generated sources         | 249 MB      | 623 MB
+| Classes retained          | culled      | 5,449 (all)
+| Simulator `.app` (Debug)  | --          | 192 MB
+| Symbol table in the binary| --          | 2.5 MB gzipped
+|===
+
+The binary is large because nothing is culled and nothing is optimized. That is the trade the whole design rests on: this app is a development tool, so it can afford to be big and slow in exchange for being able to run anything.
+
+Budget for the wall clock rather than being surprised by it. On an M-series laptop a full interp-host cycle -- translate, generate the Xcode project, compile, link, install -- runs to roughly an hour. The translator itself is only a few minutes of that. Most of the rest splits between clang (5,500 files, ~340 MB of build log) and the Ruby project-generation hooks, which walk every source file and scale with the file count that interp-host doubles. Static-field accessors added to it again.
+
+That cost is why the emission gate matters: `mvn -f vm/tests/pom.xml test -Dtest='InterpHost*'` compiles generated C with cmake in about a minute and catches anything that would fail the real compile. Run it before every device build, not after.
+
+== Performance
+
+Only your code is interpreted. The framework is compiled ahead of time, so a `Form` constructor that adds thirty components spends almost all of its time in AOT code and a few thousand interpreted operations on the glue. That is the case the runtime is designed for, and it is comfortably fast enough to be invisible.
+
+Expect roughly two orders of magnitude slower than compiled code for the interpreted portion. Where that shows up:
+
+*`paint(Graphics)` on a custom component.* Called per component per frame. A handful of drawing calls is fine; per-pixel work in an interpreted `paint` is not.
+
+*`Animation.animate()`.* Same shape, same limit.
+
+*Game loops.* Push them and they will run, but the frame rate will tell you nothing. Build a real device build for anything frame-rate sensitive.
+
+*Hot algorithms in your own code.* Sorting a large list with an interpreted `Comparator`, hand-rolled parsing, string building in a tight loop. Note that `java.util`, `String` and `StringBuilder` are *not* interpreted -- only classes from your own source roots are -- so the collection itself is at full speed and only your comparator is not.
+
+=== The fuel counter
+
+Every back edge and method entry decrements a counter. When it reaches zero the interpreter checks whether it has been asked to stop and whether it has held the event thread too long. Back-edge-only accounting costs under 2%.
+
+The budget covers *one entry into the interpreter*, not the age of the session. Every callback the framework makes -- a button press, a `paint`, a serial call -- is a fresh entry with a fresh budget. Measuring from the start of the run instead is a mistake worth naming: it makes the budget expire once and stay expired, so every callback arriving later than `edtBudgetMs` after the program started fails instantly with "ran without yielding" having executed nothing at all. In an application whose whole life is callbacks, that is every button press.
+
+This is what makes a runaway program recoverable. `while (true) {}` in a pushed program raises `InterpCancelledException` instead of freezing the app. It extends `Error`, not `Exception`, deliberately: pushed code routinely wraps loops in `catch (Exception e)`, and a cancellation user code can swallow is not a cancellation.
+
+Accounting pauses while inside a host call. A legitimate `invokeAndBlock` waiting on the network can take thirty seconds and must not look like a spin loop.
+
+[source,java]
+----
+runtime.setEdtBudgetMs(2000);   // 0 disables the check
+runtime.setMaxDepth(512);
+runtime.requestCancel();        // safe from another thread
+----
+
+== Frames, threads and blocking
+
+One interpreted frame is one real Java frame -- the interpreter recurses rather than driving heap-allocated frames from a trampoline.
+
+That is a deliberate cost. `Display.invokeAndBlock` runs a nested event loop on the caller's native stack, and every blocking Codename One idiom is built on it: `Dialog.show()`, a synchronous `NetworkManager` call, `Display.invokeAndBlock` itself. Interpreted code has to be able to sit in the middle of one, which it can only do if its frames are real.
+
+The consequence is that interpreted depth is bounded by the real stack. `setMaxDepth` caps it well short and raises an interpreted `StackOverflowError`, because overflowing the real stack on a device is a process death with no diagnosis.
+
+== Extending framework classes
+
+An interpreted `class MyForm extends Form` has to be an object the framework accepts as a `Form` and whose overrides the framework calls. The framework was compiled before your class existed, and neither platform lets you define a class at run time.
+
+*iOS* uses runtime clazz synthesis. ParparVM allocates each class's vtable on the heap and fills it slot by slot, so a subclass can be built by copying the parent's `struct clazz`, copying its vtable, and repointing the overridden slots at a trampoline into the interpreter. Nothing is generated and nothing is written to executable memory, which is what makes it acceptable on iOS.
+
+Three details matter. The synthetic class reuses the *parent's* classId, because `instanceofFunction` indexes a static table that a fresh id would have no row in -- so `instanceof Form` answers true, which is what you want, at the cost of `getClass().getName()` reporting the parent. The synthetic clazz must register with the conservative collector's clazz registry or its instances look like false positives. And the parent's static initializer has to have run before its vtable exists at all.
+
+*Android* cannot patch a vtable and cannot load dex at run time, so the guard is compiled ahead of time: a generated subclass per extensible framework class, each overridable method either delegating to the interpreter or calling `super`.
+
+What actually ships uses the generated-subclass approach on *both* platforms. Android could have covered interfaces with `java.lang.reflect.Proxy` and generated only classes; iOS has no `Proxy`, because `Proxy` is `defineClass` in a trenchcoat. Two factories that fail in different places is worse than one that fails in the same place twice, so `ShimObjectFactory` generates shims for classes and for interfaces alike and both platforms run identical code.
+
+*Nothing about the set is curated.* It is every public, non-final, constructible class and every public interface the device exposes -- both the framework under `com.codename1` and the device's own `java.*`, taken from the `codenameone-java-runtime` artifact that applications actually compile against. That is 851 classes and 269 interfaces, and roughly 111,000 methods once the `super_` bridges are counted.
+
+The `java.*` half is not optional. `implements Runnable` appears in a large share of applications, and an early version of this generator scanned only `com.codename1` -- which silently dropped `Runnable` and would have failed those applications at push time.
+
+Deriving it needs the device's own class files rather than reflection over the running JDK, because the two disagree in four separate ways: which methods exist (`InputStream.readAllBytes` is JDK-only), which are `final` (`Calendar.add` is final on the device and abstract in the JDK), which interfaces a class implements (the JDK's `Writer` is `Appendable`, `Closeable` and `Flushable`; the device's is only `AutoCloseable`), and which constructors exist (`Timer(String, boolean)` is JDK-only). The generator reads them out of the runtime jar with ASM.
+
+A difference is not by itself a reason to give up on a class, and treating it as one was a real bug rather than a hypothetical: because the JDK's `Throwable` implements `Serializable` and the device's does not, every exception type in the framework was refused, which made `class MyException extends RuntimeException` -- table stakes for an application -- impossible to push. `Serializable` and `Cloneable` declare no methods at all, so the difference is invisible to a subclass. Where the extra interface does declare methods the shim implements them, because javac here demands it and there they override nothing and cost a method each. Generating on a different JDK from the one the application compiles with produces shims that cannot exist -- `LambdaMetafactory` is non-final on 8 and final on 17 -- so the script pins `JAVA17_HOME`. A hand-maintained list would be a promise that applications only subclass what somebody anticipated, and the failure when that is wrong is not an error message but an override that is silently never called.
+
+The cost lands on Android, which carries it with multidex the way large applications routinely do, and which this app can afford because it is a development tool built with the optimizer off and nothing culled. On iOS a full interp-host cycle -- translate, `xcodebuild`, install -- measures under sixteen minutes, so the generated set is not the bottleneck it was assumed to be when the design was written.
+
+=== Why iOS still uses shims
+
+The plan called for replacing them on iOS with runtime vtable synthesis, and the mechanism works: `InterpHostVtableSynthesisIntegrationTest` compiles the generated C and runs it. It is deliberately not wired into the port, for a reason that only became visible once the generic generator existed.
+
+Synthesis was meant to solve two problems. The first -- that a shim approach could never reach `java.*` without marking up every non-final class in the tree -- turned out not to be a problem at all: the generator derives that set from `codenameone-java-runtime` automatically. The second is real but unusable. Synthesis patches vtable slots and so ignores Java's access rules, which would make the fourteen types blocked by a package-private abstract method -- `CodeEditor`, `RichTextArea`, `SurfaceText`, `SurfaceVector` among them -- extensible on iOS.
+
+They would not be extensible on Android, which can neither patch a vtable nor load dex. A program that runs on one platform and fails on the other is worse than one that fails on both, so the runtime's real capability is the intersection, and against that intersection synthesis buys nothing a developer can use. What it costs is one to two thousand lines of C in the collector's and `instanceof`'s path, a second object model to reason about, and per-signature trampolines for roughly 27,000 distinct signatures.
+
+The test stays, because the day Android grows an equivalent is the day this becomes worth doing.
+
+Regenerate that list with `scripts/generate-interp-shims.sh` after editing `GenerateInterpShims`. The shims are checked in on purpose: they are the app's compiled contract with pushed code, and generating them during the build would let that contract drift silently between the machine that pushes and the app that was installed from a store.
+
+Two limits follow from the shim approach, and both are recorded rather than remembered.
+
+A class implementing several host interfaces at once has no shim, because a shim covers one supertype.
+
+A method whose signature names a type the device does not have is not shimmed. The framework compiles against a full JDK and the device does not: `Reader.read(java.nio.CharBuffer)` is a real method of a real framework class, and referencing it from a shim fails the bytecode compliance gate because ParparVM has no `CharBuffer`. The generator asks `vm/JavaAPI/src` directly rather than discovering each absent type one build at a time.
+
+Generic supertypes are resolved rather than erased. `CaseInsensitiveOrder implements Comparator<String>`, so `compare(T,T)` is written `compare(String,String)` -- the erasure `compare(Object,Object)` is a different method and clashes with the real one. The substitution composes through the hierarchy, which matters: `ComponentSelector implements Set<Component>` but `add` is declared on `Collection<E>` one level further up, and carrying the binding down is what turns it into `add(Component)`. Where the target is itself generic -- `BooleanProperty<K>` -- the shim extends it raw, so every inherited signature erases and no substitution applies. That is Java's rule, not a shortcut.
+
+Thirty-two types have no shim, and every one of them names the reason. They fall into three groups.
+
+Java forbids subclassing them from another package at all: a package-private abstract method leaves no legal subclass outside its own package. `SurfaceNode.serializeContent` and `AbstractEditorComponent.getEditorType` are the two in the current API, which between them account for `SurfaceText`, `SurfaceVector`, `CodeEditor` and `RichTextArea`.
+
+An abstract method's signature names a type the device does not have, so the shim could be written here and could not be referenced there -- `Format.parseObject` needs `ParsePosition`, `Charset.newDecoder` needs `CharsetDecoder`.
+
+The two tool chains contradict each other outright. `Calendar.add` is abstract in the JDK and `final` on the device, so a concrete subclass must declare it to compile here and must not declare it to compile there. No shim can satisfy both, and `java.util.Calendar` therefore has none. This is the one group worth watching: it is the shape of skew that produces a class nobody can extend.
+
+The generator names the blocking method in all three cases, and a shim that fails to compile is treated as a generator bug that fails the build -- never pruned. That rule exists because a compile-and-drop loop once silently ate `Interp_ui_Form`, and a device runtime that cannot subclass `Form` is useless.
+
+[IMPORTANT]
+====
+There is deliberately no drop-what-fails fallback. **A shim that will not compile is a bug in the generator, not a property of the framework**, and `generate-interp-shims.sh` fails the build so it gets fixed.
+
+That distinction is not academic. An earlier version compiled the generated set, dropped whatever `javac` rejected, and repeated until clean -- and it silently ate `Interp_ui_Form`, because `Form` re-declares `getComponentForm()` final where `Component` does not. A device runtime that cannot subclass `Form` is useless, and the mechanism designed to make the build robust was what hid it. Twenty-two types were on that dropped list; every one turned out to be a generator defect -- missing constructor `throws` clauses, unresolved type variables, interface abstracts shadowing concrete implementations -- and fixing them took the list to zero.
+
+One hand-written exception remains, in `tools/unshimmable-by-contract.txt`: `Simd`, whose `alloca` intrinsics must not escape the frame that allocated them. That is a semantic contract no compiler reports, which is the only kind of entry that belongs there.
+====
+
+The generator also asserts that `Component`, `Container`, `Form`, `Label`, `Button`, `Dialog` and `ActionListener` were produced. With pruning gone this is belt and braces, but it costs nothing and it is the check that would have caught the `Form` regression the moment it happened rather than a build cycle later.
+
+If a platform cannot produce a peer for a type, `InterpObjectFactory.canExtend` returns false and the runtime raises an error naming the type. That is deliberate: a peer that exists but is never dispatched to produces a program that runs and quietly does the wrong thing.
+
+== Edge cases
+
+These are the ones that will actually bite you.
+
+=== String concatenation must be compiled inline
+
+From JDK 9 onwards `javac` compiles `"a" + b` into an `invokedynamic` against `StringConcatFactory`. ParparVM has no runtime `invokedynamic` -- the translator desugars it at build time, and a pushed bundle gets no such pass.
+
+Compile pushed code with `-XDstringConcat=inline`; `cn1-push.sh` already does. The bundle writer rejects any `invokedynamic` it does not recognise, naming the bootstrap method, rather than producing something that fails obscurely on the device.
+
+Lambdas and method references are handled without a flag. `InterpLambdaDesugar` rewrites each site into the class `LambdaMetafactory` would have spun -- captures in fields, the single abstract method forwarding to the lambda body, the call site becoming a plain static call -- so lambdas, method references, constructor references and bound receivers all work. The generated class inherits the source file of the class that contained the lambda, which is both true and required, since the runtime will not execute a class whose source it cannot show.
+
+=== The API on the device is not the API on your machine
+
+The runtime app ships on a store cadence; your SDK does not. A program compiled against a newer framework than the installed app will reference symbols that are not there.
+
+The device is the source of truth. Resolution of host symbols is lazy, so a program that never touches a missing symbol never fails because of it; one that does gets a `NoClassDefFoundError` naming the class and saying it is not present in the installed app.
+
+The bundle format is versioned and a mismatch is refused outright, with a message telling you to rebuild.
+
+=== The JavaAPI is a subset, at member granularity
+
+ParparVM's `java.*` is smaller than the JDK's, and not only class by class. `java.util.Locale` exists but has no `ROOT`. `java.lang.String` exists but has no `toLowerCase(Locale)`. `java.io.PrintWriter`, `java.math.BigInteger` and `java.math.BigDecimal` do not exist at all -- which the Kotlin standard library reaches for.
+
+In a normal build you never notice, because the code that references them is unreachable and gets culled. An interp-host build keeps everything, so the translator prunes method bodies whose references cannot be resolved and logs each one. A pruned method returns zero or null rather than failing to link -- the honest answer for an API the platform does not have.
+
+`java.util.regex.Matcher.quoteReplacement` is worth naming separately: it is declared as an instance method here where the JDK specifies it static, so any `INVOKESTATIC` against it cannot be translated.
+
+[WARNING]
+====
+A pruned method returning null is the right answer for `Kotlin`'s `BigDecimal` helpers. It is a catastrophe inside the interpreter, and this is not hypothetical.
+
+`InterpRuntime.run` -- the main dispatch loop -- called `java.lang.reflect.Array.getLength`. ParparVM's `Array` has only `newInstance`, so the pass pruned the loop to an empty function. The iOS build then linked, launched, accepted a push, and replied `OK: ran YourProgram` for every program including one whose `main` was nothing but `throw`. It executed no bytecode at all and said so nowhere.
+
+`Parser.failIfLoadBearing` now makes pruning anything in `com.codename1.interp` or the iOS linker a hard build failure naming the method and the missing member. If you hit it, add the member to `vm/JavaAPI` or rewrite the method to avoid it -- `arrayLength` in `InterpRuntime` is the pattern, an `instanceof` chain that needs no reflection and behaves identically everywhere.
+
+The general lesson: a silent fallback is only safe where "did nothing" and "was never needed" are the same outcome.
+====
+
+=== Field access is not virtual
+
+If `Base` declares `v` and `Mid extends Base` shadows it, code compiled inside `Base` reads `Base.v` even for a `Mid` instance. The interpreter resolves from the owner named in the field reference, not from the object's runtime type. Worth knowing because getting it wrong produces a wrong number rather than an error.
+
+=== Monitors are the real thing
+
+`synchronized` means what it says, against host code locking the same object included. Interpreted frames run on real threads and everything they can lock is a real object, so the host monitor is not an obstacle -- it is the mechanism.
+
+The awkwardness is only that Java offers a block and not an explicit monitor-enter. A synchronized *method* has no monitor instruction at all -- `ACC_SYNCHRONIZED` is the only record of it -- so the invocation is wrapped in a real `synchronized` block, on the peer where there is one, because the peer is the object host code holds. A synchronized *block* runs its guarded region nested inside a real `synchronized` block; the matching `monitorexit` hands control back to the enclosing level, and leaving that block is what releases the lock. An exception thrown out of the region unlocks on the way past, and javac's synthetic handler releasing the monitor a second time is a no-op.
+
+Because it is the genuine monitor, `wait` and `notify` work. A private lock table keyed by identity would have been simpler and could not have offered either.
+
+=== A program brings its own resources
+
+The bundle carries every file in the pushed tree that is not a `.java` -- `theme.res`, CSS, images -- keyed by the path an application loads it with. Without them a pushed program wears the runtime host's theme, which is the wrong application's design and reads as a bug in yours.
+
+They are published to `CodenameOneImplementation`, not to `Display`. That is not a detail: `Resources.openLayered("/theme")` and `UIManager.initFirstTheme` resolve inside the framework, which asks the implementation directly, and a hook on `Display` would never see them. Each port checks the published set before the classpath, and the set is cleared on every push so a program that ships no theme does not inherit the previous one's.
+
+=== A linker dispatches on the receiver, not the call site
+
+`list.add(x)` where `list` is declared `java.util.List` compiles to a call naming `java.util.List`. Resolving the method from that name finds `AbstractList.add`, whose body is `throw new UnsupportedOperationException()`. A linker has to start from the receiver's actual class and walk up from there; that walk *is* the virtual dispatch, because there is no vtable to consult from Java.
+
+Android gets this free -- `Method.invoke` dispatches virtually. iOS does not, and the symptom is worth recognising: every collection call from pushed code fails with a bare `UnsupportedOperationException` and no message, while `Form.show()` works, because that call site happens to name the receiver's own class.
+
+=== Enums are interpreted, not shimmed
+
+`java.lang.Enum` cannot be named as a superclass in Java source, so no generated shim for it exists or can. It needs none: an enum constant is a name, an ordinal and the handful of methods that read them, and the interpreter answers those itself. The constant gets no peer, and what the framework sees of it is whatever interfaces the enum declares.
+
+`values()` and `valueOf(String)` are compiled by `javac` into code that clones a `$VALUES` array and calls `Enum.valueOf(Class, String)` reflectively. Neither works as written here -- the class is not on the device and there is no reflection -- so the runtime resolves `valueOf` against the bundle and implements array `clone` directly.
+
+=== A network error must not phone home
+
+Codename One's default `Lifecycle.handleNetworkError` calls `Log.sendLogAsync()`, which makes another blocking request on the event thread. When the network is what is broken, that request fails too and re-enters the handler: the event thread ends up parked in nested `invokeAndBlock` calls with no way out, and the app is wedged. It also shows a modal dialog, which nobody is present to dismiss on a device being driven from a desktop.
+
+A runtime host must override that handler to report the error and stop. This is not specific to the interpreter -- any Codename One app can hit it -- but a pushed program pointed at a wrong URL hits it immediately.
+
+=== Native interfaces degrade rather than fail
+
+A `cn1lib` is Java plus native code. The Java half is interpreted like the rest of your program. For the native half, `NativeLookup.create` returns the real implementation if it was compiled into the runtime app, and otherwise a stub whose `isSupported()` returns false. Your program compiles and runs; the feature reports itself unavailable.
+
+=== `super.` needs the generated bridge, not the peer's method
+
+A generated shim overrides the framework method and asks the interpreter for it. When the interpreted override then calls `super.paint(g)`, routing that to the peer's `paint` lands back on the override -- unbounded recursion, once per frame, on the event thread. It reads as a frozen app rather than as a stack overflow.
+
+That is what the `super_` bridges on every shim are for: `super.paint(g)` from interpreted code is dispatched to `super_paint`, which is the only path to the framework implementation. The same applies to any `super.` call on a host superclass.
+
+=== Pushing an application, not a file
+
+`cn1-push.sh` takes a source tree as readily as a single file, compiles all of
+it, and carries every source -- the runtime will not run a class whose source it
+cannot show, and an application is many files.
+
+The entry point is discovered rather than named: a `main(String[])` if the
+bundle has one, otherwise a `Lifecycle` subclass, which is what a real Codename
+One application has. A `Lifecycle` is entered the way the platform enters one --
+constructed through the ordinary interpreted path so it gets its generated peer,
+then `init(null)` and `start()`, falling through to the `super_` bridge for
+whichever of those the application does not override. Pass `--main` to override
+the choice.
+
+[source,bash]
+----
+scripts/cn1-push.sh src/main/java 18234
+scripts/cn1-push.sh src/main/java 18234 --main com.example.Other
+----
+
+=== A pushed `main` runs on the event thread
+
+Exactly as an application's `start()` does, and for the same reason: it builds UI, and Codename One requires that on the EDT.
+
+The consequence is that `Display.callSeriallyAndWait` fails from a pushed `main` with "This method MUST NOT be invoked on the EDT" -- you are already on the thread you would be waiting for. `callSerially` is fine, and so is `invokeAndBlock`, which exists precisely to block on the EDT without wedging it.
+
+=== The runtime is entered from several threads at once
+
+This is the normal case, not an edge one. The thread running a pushed `main` and the event thread calling an interpreted `paint` through a shim are both inside the interpreter, continuously. Execution state -- depth, fuel, the interpreted call stack -- therefore belongs to the thread, not to the runtime. Sharing it makes the depth cap trip on the wrong thread and stack traces name another thread's frames.
+
+The caches are the other half of that, and they are where this actually went wrong twice. Both bugs presented identically and neither pointed at concurrency:
+
+* The extern-class cache is two arrays, a result and an "attempted" flag, which are one logical entry. Setting the flag before storing the result leaves a window where another thread reads "attempted, and null" and reports `NoClassDefFoundError: java/lang/StringBuilder` -- for a class that resolved perfectly well microseconds earlier. Store the result first, and take a lock over the pair.
+* The reflection linker memoises resolved classes and methods in a `HashMap`. Concurrent `put` on an unsynchronised `HashMap` does not merely lose an entry: it can return null for a key that is present, producing the same impossible `NoClassDefFoundError`.
+
+If you add a cache to this code path, assume every thread in the program will hit it at once, because they will.
+
+=== A shim's fields are null while `super()` runs
+
+Java assigns a subclass's fields only after `super()` returns, and framework constructors call overridable methods -- `Form`'s does. So a shim's `$runtime` is null for part of its own construction. The generated guard defers to `super` in that window, which is correct rather than defensive: the interpreted object genuinely has no state yet.
+
+=== `show()` does not take effect in the same event-thread pass
+
+`Form.show()` queues the switch. Reading `Display.getCurrent()` immediately after it returns reports the *previous* screen, which makes a working push look like it did nothing. Read it on a later pass.
+
+=== Failures name your source, not the interpreter's
+
+An uncaught throwable carries an interpreted stack built from the bundle's line table:
+
+[source]
+----
+java.lang.ArithmeticException: / by zero
+	at Boom.div(Boom.java:3)
+	at Boom.main(Boom.java:6)
+----
+
+A real stack trace here would name the interpreter's own frames, which tells you nothing about your bug.
+
+== Testing
+
+The interpreter is verified by differential testing: each case is compiled once and run twice, on a real JVM and through the interpreter, and the two must agree -- including how the program fails.
+
+Nothing asserts an expected string. The JVM is the oracle, so a case cannot encode a mistaken idea of what Java does. The corpus targets where interpreters actually go wrong: value widths and overflow, NaN's asymmetric comparisons, shift-count masking, the stack-shuffling opcodes whose meaning is in slots rather than values, which exception handler wins and whether `finally` still runs, and dispatch through an inheritance chain.
+
+[source]
+----
+mvn -Punittests -pl core-unittests \
+    -Dtest='InterpConformanceTest,InterpRuntimeContractTest' test
+----
+
+The runtime's own guarantees -- cancellation, the EDT budget, the depth cap, source-line traces, refusing a source-less bundle -- are covered separately in `InterpRuntimeContractTest`. `InterpHostSubclassTest` pins the parts that only bite once a peer exists: `super.` reaching the framework rather than recursing, constructor arguments surviving the chain, and the runtime being entered from several threads at once.
+
+Unit tests cannot tell you whether an interp-host build actually links, which is where this feature fails. Two scripts run the whole loop against a real device:
+
+[source]
+----
+scripts/run-device-runtime-ios.sh     PushedDemo.java   # translate, xcodebuild, install, push
+scripts/run-device-runtime-android.sh PushedDemo.java   # build, install, adb forward, push
+----
+
+[IMPORTANT]
+====
+Two artifacts repackage code from elsewhere, and each has cost a full build cycle to a change that appeared to do nothing:
+
+* **`maven/parparvm`** carries the translator the build actually executes. Installing `vm/ByteCodeTranslator` alone leaves the previous translator in place, and the failure is an error message identical to the one you just fixed.
+* **`maven/ios`** bundles `iOSPort.jar`, which embeds a copy of the core classes. A change to `com.codename1.interp` is invisible to an iOS build until this is rebuilt -- installing `maven/core` is not enough.
+
+Both symptoms look like your edit was wrong rather than absent, which is what makes them expensive. `run-device-runtime-ios.sh` now rebuilds `core`, `parparvm` and `ios` before translating, which costs about a minute and removes the category.
+====
+
+Do not reach for the iOS script first when you have changed what the translator *emits*. A full interp-host cycle is around forty-five minutes, and `InterpHostVtableSynthesisIntegrationTest` compiles generated C with cmake and runs it in about a minute:
+
+[source]
+----
+mvn -f vm/tests/pom.xml test -Dtest='InterpHost*'
+----
+
+That is not a substitute for the device -- it cannot tell you whether the interpreter actually executed anything -- but it catches every emission bug that would fail the C compile. It found the static-accessor signature bug (the generated setter takes thread state only for object fields, not primitives) at the same moment the iOS build did, for one seventieth of the wait.
+
+[IMPORTANT]
+====
+Both devices listen on the same port, and a pushed program prints the same thing on either. So a push can land on the wrong device and report success, and nothing in the output says which one answered.
+
+That is not hypothetical: a leftover `adb forward tcp:18234` sent several "iOS" pushes to the Android emulator, and the results were indistinguishable from the real thing until Android's own logcat showed the `PUSHED:` lines. The iOS script now clears the mapping, but any push you run by hand can hit it.
+
+Make a probe answer the question rather than trusting the message. Reading a host static whose implementation differs is enough:
+
+[source,java]
+----
+Object o = System.out;
+throw new IllegalStateException("read as " + o.getClass().getName());
+----
+
+`java.io.PrintStream` is iOS. `com.android.internal.os.AndroidPrintStream` is Android. Anything that could have come from either device has told you nothing.
+====
+
+Both device scripts delete the generated native project before rebuilding. That is not tidiness. Neither the Xcode project nor the Gradle project is regenerated in place -- the build copies into whatever is already there -- so a changed framework jar or native source keeps its old copy and the app runs the previous version. It presents as something else entirely: a protocol error from the device rejecting a bundle the current writer plainly produced.
+
+== Pairing and approval
+
+The listener speaks two protocol versions and they exist for different situations.
+
+*v1* is an unauthenticated push. It is what `cn1-push.sh` sends by default and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorised device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog.
+
+*v2* pairs first. The IDE prints a six-digit code and sends a peer id with a digest binding that id to the code; the device asks the user to type the code and pairs only on a match. A computer that cannot see the IDE's terminal cannot pair, which is the property worth having -- the code proves a human is at both ends.
+
+Pairing does not buy silent access. Every later connection raises "Approve connection from &lt;name&gt;?" with *Once*, *Always* and *Deny*, and only *Always* is remembered, per peer. `DeviceRuntimePairing.forgetAll()` drops the lot.
+
+Call `setRequirePairing(true)` to refuse v1. A build that ships to a store must do that before its transport reaches anything wider than loopback.
+
+[WARNING]
+====
+The v2 digest is a string hash, not a MAC, and the channel is not encrypted. That is honest for a loopback link where an attacker who could observe the exchange already has code execution on one of the two machines. It is *not* adequate for a listener on a network. Moving the transport off loopback means replacing this with a real key exchange, not turning `setRequirePairing` on and calling it done.
+====
+
+== Store considerations
+
+Running downloaded code is allowed on both stores, conditionally, and the conditions shape the design.
+
+Apple's guideline 2.5.2 permits an app that teaches or tests code to download it, provided the source is completely viewable and editable by the user. That is why the bundle carries source and the runtime refuses one that does not. There is precedent: thebaselab's Code App ships OpenJDK's Zero interpreter on the App Store, and the same property holds here -- an interpreter with no JIT writes no executable memory.
+
+The sharper risk is guideline 4.7.2, which forbids exposing native platform APIs to software that is not embedded in the binary. Exposing the Codename One API to pushed code is the product, so that argument has to be made explicitly rather than assumed.
+
+Google Play's Device and Network Abuse policy bans downloading dex, JAR or `.so` files, but exempts "code that runs in a virtual machine or an interpreter". The `.cn1ip` format is none of those, and the interpreter never touches Android APIs directly -- the AOT-compiled framework does.
+
+Two practical consequences: the runtime app must declare the union of permissions pushed code might use, and that union has to be justifiable to App Review and truthfully declared on Play's Data Safety form. And the transport must be point-to-point and consented to, not an anonymous push endpoint.

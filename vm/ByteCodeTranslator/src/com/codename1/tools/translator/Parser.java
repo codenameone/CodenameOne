@@ -46,6 +46,7 @@ import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
 import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.Invoke;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
 
@@ -106,6 +107,24 @@ public class Parser extends ClassVisitor {
      */
     public static synchronized String resolveDevirtualizedOwner(ByteCodeClass owner, String name, String desc) {
         if (owner == null) {
+            return null;
+        }
+        if (BytecodeMethod.isInterpHost() && !owner.isFinalClass()
+                && !BytecodeMethod.isInterpOpaqueClass(owner.getClsName())) {
+            // "No reachable override" is a statement about the closed world,
+            // and an interp-host build does not have one: interpreted
+            // subclasses are synthesized at runtime and patch their overrides
+            // into a copy of the parent's vtable. Devirtualizing here would
+            // compile the call as a direct branch to the parent, so the
+            // override would never be reached however correctly it was
+            // installed.
+            //
+            // A class that is genuinely final in its class file is exempt --
+            // nothing can subclass it, interpreted or not. That exemption is
+            // load-bearing rather than an optimization: java.lang.Class is
+            // final and is the one class ParparVM gives no vtable at all (see
+            // ByteCodeClass's appendClassVFunctions), so a virtual call on it
+            // has no symbol to link against.
             return null;
         }
         cn1EnsureSubclassIndex();
@@ -301,6 +320,57 @@ public class Parser extends ClassVisitor {
                             + "\t" + bf.getFieldName()
                             + "\t" + desc
                             + "\t" + access + "\n");
+                }
+            }
+            // Static fields, for the device runtime only. The debugger reads
+            // statics over its own command path and does not need these; the
+            // interpreter does, because a pushed GETSTATIC arrives as a name
+            // with nothing to resolve it against. Rows are separate from
+            // "field" because a static has no offset -- it is reached through
+            // the generated accessor registered under the same id.
+            if (BytecodeMethod.isInterpHost()) {
+                for (ByteCodeClass bc : classes) {
+                    int classId = bc.getClassOffset();
+                    for (ByteCodeField bf : bc.getFields()) {
+                        if (!bf.isStaticField()) continue;
+                        int fid = getOrAssignFieldId(bc.getClsName(), bf.getFieldName());
+                        w.write("sfield\t" + classId + "\t" + fid
+                                + "\t" + bf.getFieldName()
+                                + "\t" + jvmDescriptorOf(bf)
+                                + "\t" + jdwpAccessFlagsOf(bf) + "\n");
+                    }
+                }
+            }
+            // Device runtime host build only: publish the vtable layout so the
+            // on-device interpreter can synthesise a subclass at runtime --
+            // malloc a clazz, memcpy the parent's vtable, then patch the slots
+            // the interpreted class overrides. Without this the runtime has no
+            // way to know which slot corresponds to, say, Component.paint.
+            //
+            // Rows are emitted only for methods this class DECLARES or
+            // overrides, mirroring exactly what __INIT_VTABLE_<cls> patches.
+            // Emitting inherited slots too would be O(classes x hierarchy
+            // depth) -- Component alone has hundreds of virtual methods
+            // inherited by every widget. The runtime resolves an inherited
+            // method's slot by walking up the superclass chain, which it has to
+            // be able to do regardless.
+            if (BytecodeMethod.isInterpHost()) {
+                for (ByteCodeClass bc : classes) {
+                    if (bc.isIsInterface() || bc.virtualMethodList == null) {
+                        continue;
+                    }
+                    int classId = bc.getClassOffset();
+                    // Slot count is the full inherited-through table size --
+                    // that is the allocation size a synthetic vtable needs.
+                    w.write("vtsize\t" + classId + "\t" + bc.virtualMethodList.size() + "\n");
+                    for (int slot = 0; slot < bc.virtualMethodList.size(); slot++) {
+                        BytecodeMethod bm = bc.virtualMethodList.get(slot);
+                        if (!bm.getClsName().equals(bc.getClsName())) {
+                            continue;
+                        }
+                        w.write("vtable\t" + classId + "\t" + slot
+                                + "\t" + bm.getMethodOffset() + "\n");
+                    }
                 }
             }
             for (ByteCodeClass bc : classes) {
@@ -787,14 +857,44 @@ public class Parser extends ClassVisitor {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
             }
-            ByteCodeClass.markDependencies(classes, nativeSources);
-            Set<ByteCodeClass> unmarked = new HashSet<>(classes);
-            classes = ByteCodeClass.clearUnmarked(classes);
-            classes.forEach(unmarked::remove);
             int neliminated = 0;
-            for (ByteCodeClass removedClass : unmarked) {
-                removedClass.setEliminated(true);
-                neliminated++;
+            if (BytecodeMethod.isInterpHost()) {
+                // Device runtime host build: keep every class. The reachability
+                // graph is rooted in the host app's own code, but the code that
+                // actually matters hasn't been written yet -- it gets pushed
+                // from a developer's machine at runtime and may call any part
+                // of the API. Culling here would produce an app that works
+                // until someone's pushed program touches a class the host
+                // itself never mentions.
+                //
+                // The method-level cull below is already disabled, because
+                // interpHost forces optimizerOn off (see BytecodeMethod).
+                neliminated += eliminateMethodsReferencingAbsentClasses();
+                // Recompute after the pass: a class's #include list is derived
+                // from its surviving methods' dependencies, so without this the
+                // class would still include the header of the absent class
+                // whose only reference we just removed.
+                for (ByteCodeClass bc : classes) {
+                    file = bc.getClsName();
+                    bc.updateAllDependencies();
+                }
+                // Mark everything without culling anything. Marking is what
+                // populates the constant pool, whose size is fixed in the index
+                // header before any class is emitted -- see markAll.
+                ByteCodeClass.markAll(classes, nativeSources);
+                if (ByteCodeTranslator.verbose) {
+                    System.out.println("Interp host build: retaining all "
+                            + classes.size() + " classes (dead code elimination disabled)");
+                }
+            } else {
+                ByteCodeClass.markDependencies(classes, nativeSources);
+                Set<ByteCodeClass> unmarked = new HashSet<>(classes);
+                classes = ByteCodeClass.clearUnmarked(classes);
+                classes.forEach(unmarked::remove);
+                for (ByteCodeClass removedClass : unmarked) {
+                    removedClass.setEliminated(true);
+                    neliminated++;
+                }
             }
 
             // loop over methods and start eliminating the body of unused methods
@@ -1170,6 +1270,215 @@ public class Parser extends ClassVisitor {
         }
     }
     
+    /**
+     * Eliminates method bodies that reference a class the translation set does
+     * not contain. Only used by an interp-host build.
+     *
+     * <p>"Keep everything" cannot be taken literally, because the runtime
+     * itself does not compile under it. {@code java.lang.Throwable} declares
+     * {@code printStackTrace(PrintWriter)}, and ParparVM's JavaAPI has no
+     * {@code java.io.PrintWriter} at all — the reference has always dangled and
+     * ordinary builds never notice because the method is unreachable and the
+     * unused-method cull removes it first. With that cull off, the method
+     * survives, its class emits {@code #include "java_io_PrintWriter.h"}, and
+     * the build fails on a header that was never generated.</p>
+     *
+     * <p>So the real invariant is "keep everything that is actually
+     * translatable". A method whose operands name an absent class could never
+     * have been called anyway: there is no such class on the device, so no
+     * pushed program can reach it either.</p>
+     *
+     * @return the number of methods eliminated
+     */
+    private static int eliminateMethodsReferencingAbsentClasses() {
+        Set<String> present = new HashSet<>();
+        for (ByteCodeClass bc : classes) {
+            present.add(bc.getClsName());
+        }
+        int eliminated = 0;
+        for (ByteCodeClass bc : classes) {
+            for (BytecodeMethod m : bc.getMethods()) {
+                if (m.isEliminated()) {
+                    continue;
+                }
+                String reason = null;
+                for (String dep : m.getDependentClasses()) {
+                    if (!present.contains(dep)) {
+                        reason = "absent class " + dep;
+                        break;
+                    }
+                }
+                if (reason == null) {
+                    reason = unresolvableMemberOf(m);
+                }
+                if (reason != null) {
+                    failIfLoadBearing(bc, m, reason);
+                    m.setEliminated(true);
+                    eliminated++;
+                    if (ByteCodeTranslator.verbose) {
+                        System.out.println("Interp host build: eliminating "
+                                + bc.getClsName() + "." + m.getMethodName()
+                                + " -- references " + reason);
+                    }
+                }
+            }
+        }
+        return eliminated;
+    }
+
+    /**
+     * Classes whose methods must never be stubbed out.
+     *
+     * <p>Everything else in an interp-host build can lose a method safely: it
+     * was unreachable, or it belongs to a corner of the JDK the device does not
+     * have. These are different. They are the device runtime itself, and a
+     * stubbed method here does not fail -- it succeeds, quietly, doing
+     * nothing.</p>
+     */
+    private static boolean isLoadBearingForInterp(String clsName) {
+        return clsName.startsWith("com_codename1_interp_")
+                || clsName.startsWith("com_codename1_impl_ios_InterpIOS");
+    }
+
+    /**
+     * Refuses to eliminate a method the device runtime is built on.
+     *
+     * <p>This exists because of a specific failure that cost real time and gave
+     * no signal at all. A single call to {@code java.lang.reflect.Array
+     * .getLength} -- a method ParparVM's {@code Array} does not have -- made
+     * {@code InterpRuntime.run} unresolvable, so the pass eliminated it. The
+     * interpreter's main loop became an empty function. Every pushed program
+     * then "ran" instantly and reported success while executing none of its
+     * bytecode, and nothing anywhere said otherwise.</p>
+     *
+     * <p>A build failure naming the method and the missing member is worth far
+     * more than a working build that does nothing, so this throws.</p>
+     */
+    private static void failIfLoadBearing(ByteCodeClass bc, BytecodeMethod m, String reason) {
+        if (!isLoadBearingForInterp(bc.getClsName())) {
+            return;
+        }
+        throw new IllegalStateException(
+                "interp-host build cannot stub " + bc.getClsName() + "." + m.getMethodName()
+                + ": it references " + reason + ", and this class is the device runtime itself. "
+                + "Eliminating it would produce an app that reports every pushed program as "
+                + "successful while running none of it. Either add the missing member to "
+                + "vm/JavaAPI, or rewrite the method to avoid it.");
+    }
+
+    /**
+     * Describes the first member this method references that does not exist in
+     * the translation set, or null if every reference resolves.
+     *
+     * <p>The class-level check above is not enough. ParparVM's JavaAPI is a
+     * subset at <em>member</em> granularity too: {@code java.util.Locale} is
+     * present but has no {@code ROOT}, {@code java.lang.String} is present but
+     * has no {@code toLowerCase(Locale)}. Kotlin's stdlib calls both. An
+     * ordinary build never notices because the calling method is unreachable
+     * and the unused-method cull drops it; with that cull off the method is
+     * emitted and the C references a function no header ever declares.</p>
+     *
+     * <p>Resolution walks the superclass chain and interfaces, so an inherited
+     * member counts as present. When the owner cannot be resolved at all the
+     * reference is left alone: that is either a class the class-level check
+     * already caught, or an array/primitive pseudo-owner this does not model.</p>
+     */
+    private static String unresolvableMemberOf(BytecodeMethod m) {
+        for (Instruction ins : m.getInstructions()) {
+            if (ins instanceof Invoke) {
+                Invoke inv = (Invoke) ins;
+                ByteCodeClass owner = getClassObject(mangle(inv.getOwner()));
+                if (owner == null || inv.getOwner().startsWith("[")) {
+                    continue;
+                }
+                // The parser rewrites <init>/<clinit> to __INIT__/__CLINIT__ on
+                // the method it stores, while the invoke instruction keeps the
+                // JVM spelling. Comparing the two directly makes every
+                // constructor call look unresolvable, which would stub out
+                // every method that does `new X()`.
+                String name = inv.getName();
+                if ("<init>".equals(name)) {
+                    name = "__INIT__";
+                } else if ("<clinit>".equals(name)) {
+                    name = "__CLINIT__";
+                }
+                BytecodeMethod target = findMethodInHierarchy(owner, name, inv.getDesc(),
+                        new HashSet<String>());
+                if (target == null) {
+                    return "absent method " + mangle(inv.getOwner()) + "."
+                            + inv.getName() + inv.getDesc();
+                }
+                // A static/instance disagreement is as fatal as an absent
+                // method: the emitted call passes the wrong number of
+                // arguments, which the C compiler rejects. ParparVM's JavaAPI
+                // has real cases -- java.util.regex.Matcher.quoteReplacement is
+                // declared as an instance method where the JDK specifies it
+                // static, so any javac/kotlinc-compiled INVOKESTATIC against it
+                // cannot be translated.
+                boolean callIsStatic = inv.getOpcode() == org.objectweb.asm.Opcodes.INVOKESTATIC;
+                if (callIsStatic != target.isStatic()) {
+                    return (callIsStatic ? "static call to instance method "
+                                         : "instance call to static method ")
+                            + mangle(inv.getOwner()) + "." + inv.getName() + inv.getDesc();
+                }
+            } else if (ins instanceof com.codename1.tools.translator.bytecodes.Field) {
+                com.codename1.tools.translator.bytecodes.Field f =
+                        (com.codename1.tools.translator.bytecodes.Field) ins;
+                ByteCodeClass owner = getClassObject(mangle(f.getOwner()));
+                if (owner == null || f.getOwner().startsWith("[")) {
+                    continue;
+                }
+                if (!declaresFieldInHierarchy(owner, f.getFieldName(), new HashSet<String>())) {
+                    return "absent field " + mangle(f.getOwner()) + "." + f.getFieldName();
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String mangle(String internalName) {
+        return internalName.replace('/', '_').replace('$', '_');
+    }
+
+    private static BytecodeMethod findMethodInHierarchy(ByteCodeClass bc, String name, String desc,
+                                                        Set<String> seen) {
+        while (bc != null && seen.add(bc.getClsName())) {
+            BytecodeMethod declared = bc.findDeclaredMethod(name, desc);
+            if (declared != null) {
+                return declared;
+            }
+            for (String iface : bc.getBaseInterfaces()) {
+                ByteCodeClass ic = getClassObject(mangle(iface));
+                if (ic != null) {
+                    BytecodeMethod m = findMethodInHierarchy(ic, name, desc, seen);
+                    if (m != null) {
+                        return m;
+                    }
+                }
+            }
+            bc = bc.getBaseClassObject();
+        }
+        return null;
+    }
+
+    private static boolean declaresFieldInHierarchy(ByteCodeClass bc, String name, Set<String> seen) {
+        while (bc != null && seen.add(bc.getClsName())) {
+            for (ByteCodeField bf : bc.getFields()) {
+                if (bf.getFieldName().equals(name)) {
+                    return true;
+                }
+            }
+            for (String iface : bc.getBaseInterfaces()) {
+                ByteCodeClass ic = getClassObject(mangle(iface));
+                if (ic != null && declaresFieldInHierarchy(ic, name, seen)) {
+                    return true;
+                }
+            }
+            bc = bc.getBaseClassObject();
+        }
+        return false;
+    }
+
     public Parser() {
         super(Opcodes.ASM9);
     }

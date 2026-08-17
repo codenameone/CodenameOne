@@ -132,3 +132,6 @@ scripts/fidelity-app/common/src/main/resources/*ThemeDev.res
 # build time (common/pom.xml copy-native-themes); never commit the duplicate.
 scripts/fidelity-app/common/src/main/resources/iOSModernTheme.res
 scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res
+
+# Local Maven repository used for isolated local builds (see .m2-local)
+.m2-local/

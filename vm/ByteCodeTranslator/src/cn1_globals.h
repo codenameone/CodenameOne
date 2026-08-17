@@ -96,6 +96,16 @@
 // this off and pay no overhead.
 //#define CN1_ON_DEVICE_DEBUG
 
+// Uncommented by the translator (driven by the cn1.interpHost system property)
+// when building the CN1 device runtime host app -- the app that loads and
+// interprets bytecode bundles pushed from a developer's machine. Implies
+// CN1_ON_DEVICE_DEBUG, whose invoke thunks, field tables and symbol table the
+// interpreter binds against; adds constructor thunks and the vtable layout rows
+// that runtime clazz synthesis needs. An interp-host build is also translated
+// with the optimizer off and dead code elimination disabled, so it is much
+// larger and slower than a normal app build. Never set for a shipping app.
+//#define CN1_INTERP_HOST
+
 #ifdef DEBUG_GC_ALLOCATIONS
 #define DEBUG_GC_VARIABLES int line; int className;
 #define DEBUG_GC_INIT 0, 0,
@@ -532,6 +542,18 @@ typedef struct clazz*       JAVA_CLASS;
 #define PUSH_FLOAT(value) { JAVA_FLOAT pFlo = value; (*SP).type = CN1_TYPE_FLOAT; \
     (*SP).data.f = pFlo; \
     SP++; }
+
+// The POP_MANY_AND_PUSH_* macros below use MAX. On iOS/macOS it arrives via
+// Foundation (NSObjCRuntime.h); a plain C target has no such definition, and
+// the omission went unnoticed for years because the only callers are bytecode
+// shapes that dead code elimination removed before they reached the compiler.
+// An interp-host build keeps everything, so they now get emitted for real.
+#ifndef MAX
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
 #define POP_MANY_AND_PUSH_OBJ(value, offset) {  \
     JAVA_OBJECT pObj = value; SP[-offset].type = CN1_TYPE_INVALID; \

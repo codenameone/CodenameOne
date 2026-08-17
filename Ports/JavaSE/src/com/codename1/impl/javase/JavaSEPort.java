@@ -16433,6 +16433,12 @@ public class JavaSEPort extends CodenameOneImplementation {
    
 
     public InputStream getResourceAsStream(Class cls, String resource) {
+        // A resource pushed by the device runtime wins over the app's own,
+        // so a pushed program shows its own theme rather than the host's.
+        InputStream local = localResource(resource);
+        if (local != null) {
+            return local;
+        }
         if (!resource.startsWith("/")) {
             System.out.println("ERROR: resources must reside in the root directory thus must start with a '/' character in Codename One! Invalid resource: " + resource);
             return null;

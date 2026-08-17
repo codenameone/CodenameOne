@@ -70,6 +70,22 @@ void cn1_debugger_register_class(int classId, struct clazz* cls) {
 }
 
 /**
+ * The clazz registered under a classId, or null.
+ *
+ * Exported because the on-device interpreter needs it from another translation
+ * unit and with no debugger session attached -- it is how a pushed program's
+ * `ldc SomeClass.class` and `instanceof` reach a real clazz. Overrides the weak
+ * definition in cn1_reflect.
+ */
+struct clazz* cn1_reflect_clazz_for(int classId) {
+    if (classId < 0) return NULL;
+    pthread_mutex_lock(&g_classRegMutex);
+    struct clazz* result = classId < g_classByIdCap ? g_classById[classId] : NULL;
+    pthread_mutex_unlock(&g_classRegMutex);
+    return result;
+}
+
+/**
  * Copies len bytes from a possibly-invalid address, returning 0 instead of
  * faulting when the address is not mapped.
  *

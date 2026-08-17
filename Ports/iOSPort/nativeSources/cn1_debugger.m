@@ -402,6 +402,61 @@ static cn1_invoke_thunk_t invoke_thunk_for(int methodId) {
 }
 
 /**
+ * The invoke thunk for a methodId, or null.
+ *
+ * Exported for the on-device interpreter, which dispatches through the same
+ * thunks with no debugger session attached -- they are the only way to call a
+ * method by name on a runtime with no reflection. Overrides the weak
+ * definition in cn1_reflect.
+ */
+cn1_invoke_thunk_t cn1_reflect_thunk_for_method(int methodId) {
+    return invoke_thunk_for(methodId);
+}
+
+/** The field entry for (classId, fieldId), or null. Exported for the same reason. */
+const cn1_field_entry* cn1_reflect_field_for(int classId, int fieldId) {
+    return field_lookup_by_class_and_id(classId, fieldId, NULL);
+}
+
+/*
+ * Static field accessors, indexed by fieldId exactly like the invoke thunks.
+ *
+ * Instance fields are reachable through a class's offset table, because an
+ * instance field is an offset from a receiver. A static field is a named C
+ * global with no receiver and no table, so the translator emits a typed
+ * accessor pair per field and one uniform wrapper that this indexes. Same
+ * shape, same growth policy, same lock as the thunk registry above -- the two
+ * are registered from the same generated constructors.
+ */
+static cn1_static_accessor_t* g_staticAccessors = NULL;
+static int g_staticAccessorCap = 0;
+
+void cn1_debugger_register_static_accessor(int fieldId, cn1_static_accessor_t accessor) {
+    if (fieldId < 0) return;
+    pthread_mutex_lock(&g_invokeRegMutex);
+    if (fieldId >= g_staticAccessorCap) {
+        int newCap = g_staticAccessorCap == 0 ? CN1_INVOKE_REG_INITIAL_CAP
+                                              : g_staticAccessorCap * 2;
+        while (fieldId >= newCap) newCap *= 2;
+        cn1_static_accessor_t* n = (cn1_static_accessor_t*)realloc(g_staticAccessors,
+                newCap * sizeof(cn1_static_accessor_t));
+        if (!n) { pthread_mutex_unlock(&g_invokeRegMutex); return; }
+        memset(n + g_staticAccessorCap, 0,
+               (newCap - g_staticAccessorCap) * sizeof(cn1_static_accessor_t));
+        g_staticAccessors = n;
+        g_staticAccessorCap = newCap;
+    }
+    g_staticAccessors[fieldId] = accessor;
+    pthread_mutex_unlock(&g_invokeRegMutex);
+}
+
+/** The accessor for a static fieldId, or null. Overrides the weak definition. */
+cn1_static_accessor_t cn1_reflect_static_accessor_for(int fieldId) {
+    if (fieldId < 0 || fieldId >= g_staticAccessorCap) return NULL;
+    return g_staticAccessors[fieldId];
+}
+
+/**
  * Read a field value into 8 host-endian bytes plus a JVM type-char.
  * Object refs become the JAVA_OBJECT pointer reinterpreted as uint64 so
  * the proxy can pass them straight to JDWP as objectIDs.
