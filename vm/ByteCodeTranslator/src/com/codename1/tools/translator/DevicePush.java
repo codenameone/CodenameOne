@@ -94,6 +94,7 @@ public final class DevicePush {
      * rather than deprecated.
      */
     private static final int V3 = 3;
+    private static final int FRAME_PING = 0;
     private static final int FRAME_PAIR = 1;
     private static final int FRAME_PUSH = 2;
 
@@ -217,7 +218,8 @@ public final class DevicePush {
      * has.
      */
     private static String findEntryPoint(List<File> classes) throws IOException {
-        String lifecycle = null;
+        java.util.Map<String, String> supers = new java.util.HashMap<String, String>();
+        java.util.Set<String> abstractClasses = new java.util.HashSet<String>();
         for (File f : classes) {
             ClassNode cn = new ClassNode();
             new ClassReader(Files.readAllBytes(f.toPath())).accept(cn, ClassReader.SKIP_CODE);
@@ -228,8 +230,33 @@ public final class DevicePush {
                     return cn.name;
                 }
             }
-            if ("com/codename1/system/Lifecycle".equals(cn.superName)) {
-                lifecycle = cn.name;
+            supers.put(cn.name, cn.superName);
+            if ((cn.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE)) != 0) {
+                abstractClasses.add(cn.name);
+            }
+        }
+        // Transitively, and skipping the abstract ones. A project whose app
+        // extends its own BaseApp extends Lifecycle has two Lifecycle
+        // descendants, and entering the wrong one runs a class that was never
+        // meant to be instantiated.
+        String lifecycle = null;
+        for (java.util.Map.Entry<String, String> e : supers.entrySet()) {
+            if (abstractClasses.contains(e.getKey())) {
+                continue;
+            }
+            String parent = e.getValue();
+            int guard = 0;
+            while (parent != null && guard++ < 64) {
+                if ("com/codename1/system/Lifecycle".equals(parent)) {
+                    // Deepest wins: with BaseApp and MyApp both descending from
+                    // Lifecycle, MyApp is the application.
+                    if (lifecycle == null || depthOf(e.getKey(), supers)
+                            > depthOf(lifecycle, supers)) {
+                        lifecycle = e.getKey();
+                    }
+                    break;
+                }
+                parent = supers.get(parent);
             }
         }
         if (lifecycle != null) {
@@ -237,6 +264,17 @@ public final class DevicePush {
         }
         throw new IllegalStateException(
                 "no entry point: expected a main(String[]) or a Lifecycle subclass");
+    }
+
+    /** How far a class sits below the deepest ancestor the bundle knows. */
+    private static int depthOf(String name, java.util.Map<String, String> supers) {
+        int depth = 0;
+        String at = supers.get(name);
+        while (at != null && depth < 64) {
+            depth++;
+            at = supers.get(at);
+        }
+        return depth;
     }
 
     private static void collect(File dir, List<File> out) {
@@ -402,7 +440,7 @@ public final class DevicePush {
      * from a phone takes long enough to look broken. iOS has no server socket,
      * so nothing answers there and the wait below is what finds it.</p>
      */
-    private static Socket scanForDevice(int port) {
+    private static String scanForDevice(int port) {
         final List<String> candidates = new ArrayList<String>();
         try {
             Enumeration<NetworkInterface> nics = NetworkInterface.getNetworkInterfaces();
@@ -433,8 +471,8 @@ public final class DevicePush {
             return null;
         }
         System.out.println("looking for a device on " + candidates.size() + " addresses");
-        final java.util.concurrent.atomic.AtomicReference<Socket> found =
-                new java.util.concurrent.atomic.AtomicReference<Socket>();
+        final java.util.concurrent.atomic.AtomicReference<String> found =
+                new java.util.concurrent.atomic.AtomicReference<String>();
         java.util.concurrent.ExecutorService pool =
                 java.util.concurrent.Executors.newFixedThreadPool(64);
         try {
@@ -444,18 +482,8 @@ public final class DevicePush {
                         if (found.get() != null) {
                             return;
                         }
-                        Socket s = new Socket();
-                        try {
-                            s.connect(new InetSocketAddress(candidate, port), 300);
-                            if (!found.compareAndSet(null, s)) {
-                                s.close();
-                            }
-                        } catch (IOException nothingThere) {
-                            try {
-                                s.close();
-                            } catch (IOException ignored) {
-                                // Nothing to do; the address had nobody on it.
-                            }
+                        if (isDeviceRuntime(candidate, port)) {
+                            found.compareAndSet(null, candidate);
                         }
                     }
                 });
@@ -467,11 +495,46 @@ public final class DevicePush {
         } finally {
             pool.shutdownNow();
         }
-        Socket s = found.get();
-        if (s != null) {
-            System.out.println("found a device at " + s.getInetAddress().getHostAddress());
+        String address = found.get();
+        if (address != null) {
+            System.out.println("found a device at " + address);
         }
-        return s;
+        return address;
+    }
+
+    /**
+     * Asks an address whether it is a device runtime, and believes only an
+     * answer in our own protocol.
+     *
+     * <p>A separate connection from the one the push will use, because the
+     * question consumes a connection: the desktop speaks first in this
+     * protocol, so there is no way to probe without committing the frame.</p>
+     */
+    private static boolean isDeviceRuntime(String candidate, int port) {
+        Socket s = new Socket();
+        try {
+            s.connect(new InetSocketAddress(candidate, port), 300);
+            s.setSoTimeout(1500);
+            DataOutputStream out = new DataOutputStream(s.getOutputStream());
+            out.writeInt(MAGIC);
+            out.writeInt(V3);
+            out.writeInt(FRAME_PING);
+            out.flush();
+            DataInputStream in = new DataInputStream(s.getInputStream());
+            if (in.readByte() != 1) {
+                return false;
+            }
+            return in.readUTF().length() > 0;
+        } catch (IOException notTheRuntime) {
+            // Nobody there, or something there that does not speak this.
+            return false;
+        } finally {
+            try {
+                s.close();
+            } catch (IOException ignored) {
+                // Nothing useful to do.
+            }
+        }
     }
 
     /** Waits for the device to dial in. */
@@ -483,9 +546,13 @@ public final class DevicePush {
             return direct;
         }
         if (!loopbackOnly) {
-            Socket scanned = scanForDevice(port);
+            String scanned = scanForDevice(port);
             if (scanned != null) {
-                return scanned;
+                // A fresh connection to the address that answered: the probe
+                // consumed the one it asked on.
+                Socket direct = new Socket();
+                direct.connect(new InetSocketAddress(scanned, port), 4000);
+                return direct;
             }
             System.out.println("no device answered; waiting for one to call in");
         }

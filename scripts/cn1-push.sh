@@ -172,71 +172,27 @@ import java.net.*;
 import java.nio.file.*;
 
 /**
- * Sends a bundle to a device runtime, pairing first if this computer has not
- * paired with it before.
+ * Sends a bundle to a device runtime over loopback.
  *
- * The identity is a random id stored in ~/.codenameone/devruntime-peer. Pairing
- * prints a six-digit code that the user types on the device; the device pairs
- * only if the digest of (code, peer id) matches, so a program that cannot see
- * this terminal cannot pair. After that every connection still has to be
- * approved on the device unless the user chose "Always".
+ * Unauthenticated on purpose, and only over loopback: reaching this listener
+ * means `adb reverse` on a USB-authorised device or the iOS simulator's own
+ * loopback, so possession of the device is the authentication, and going
+ * through a pairing dialog for every push during framework work would be pure
+ * friction. The device refuses this protocol on any connection that did not
+ * arrive over loopback.
+ *
+ * A push to a phone over Wi-Fi is a different thing and belongs to a different
+ * tool: DevicePush pairs, derives a shared secret and answers a challenge on
+ * every connection. This helper deliberately does not, rather than carrying a
+ * third copy of the crypto that would drift from the other two.
  */
 public final class Push {
     private static final int MAGIC = 0x434E3150;   // "CN1P"
     private static final int V1 = 1;
-    private static final int V2 = 2;
-    private static final int FRAME_PAIR = 1;
-    private static final int FRAME_PUSH = 2;
 
     public static void main(String[] a) throws Exception {
         byte[] payload = Files.readAllBytes(Paths.get(a[0]));
-        int port = Integer.parseInt(a[1]);
-        boolean paired = a.length > 2 && "paired".equals(a[2]);
-
-        if (!paired) {
-            // The loopback listener of a development build accepts v1, and
-            // going through pairing for every push during framework work would
-            // be pure friction. A store build refuses v1 and the caller passes
-            // "paired" instead.
-            send(port, V1, null, payload);
-            return;
-        }
-
-        String peerId = peerId();
-        String peerName = System.getProperty("user.name") + "@"
-                + InetAddress.getLocalHost().getHostName();
-        if (!Files.exists(pairedMarker(port))) {
-            String code = String.format("%06d", new java.util.Random().nextInt(1000000));
-            System.out.println();
-            System.out.println("    Pairing code: " + code);
-            System.out.println("    Type it on the device to allow pushes from this computer.");
-            System.out.println();
-            ServerSocket pairServer = new ServerSocket();
-            pairServer.setReuseAddress(true);
-            pairServer.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port));
-            pairServer.setSoTimeout(180000);
-            Socket s = pairServer.accept();
-            pairServer.close();
-            try {
-                s.setSoTimeout(180000);   // the user has to read and type
-                DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                out.writeInt(MAGIC);
-                out.writeInt(V2);
-                out.writeInt(FRAME_PAIR);
-                out.writeUTF(peerId);
-                out.writeUTF(peerName);
-                out.writeUTF(digestOf(code, peerId));
-                out.flush();
-                if (!report(s)) {
-                    System.exit(1);
-                }
-            } finally {
-                s.close();
-            }
-            Files.createDirectories(pairedMarker(port).getParent());
-            Files.write(pairedMarker(port), peerId.getBytes("UTF-8"));
-        }
-        send(port, V2, peerId, payload);
+        send(Integer.parseInt(a[1]), payload);
     }
 
     /**
@@ -249,8 +205,7 @@ public final class Push {
      * accept inbound connections at all. The device retries every couple of
      * seconds, so starting this first is all the synchronisation needed.
      */
-    private static void send(int port, int version, String peerId, byte[] payload)
-            throws Exception {
+    private static void send(int port, byte[] payload) throws Exception {
         ServerSocket server = new ServerSocket();
         server.setReuseAddress(true);
         server.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port));
@@ -268,14 +223,10 @@ public final class Push {
             server.close();
         }
         try {
-            s.setSoTimeout(120000);   // approval on the device is a human step
+            s.setSoTimeout(120000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
             out.writeInt(MAGIC);
-            out.writeInt(version);
-            if (version == V2) {
-                out.writeInt(FRAME_PUSH);
-                out.writeUTF(peerId);
-            }
+            out.writeInt(V1);
             out.writeInt(payload.length);
             out.write(payload);
             out.flush();
@@ -294,44 +245,7 @@ public final class Push {
         System.out.println((ok == 1 ? "OK: " : "FAILED: ") + message);
         return ok == 1;
     }
-
-    private static Path pairedMarker(int port) {
-        return Paths.get(System.getProperty("user.home"), ".codenameone",
-                "devruntime-paired-" + port);
-    }
-
-    private static String peerId() throws IOException {
-        Path p = Paths.get(System.getProperty("user.home"), ".codenameone", "devruntime-peer");
-        if (Files.exists(p)) {
-            return new String(Files.readAllBytes(p), "UTF-8").trim();
-        }
-        byte[] raw = new byte[16];
-        new java.security.SecureRandom().nextBytes(raw);
-        StringBuilder sb = new StringBuilder();
-        for (byte b : raw) {
-            sb.append(Integer.toHexString((b & 0xff) | 0x100).substring(1));
-        }
-        Files.createDirectories(p.getParent());
-        Files.write(p, sb.toString().getBytes("UTF-8"));
-        return sb.toString();
-    }
-
-    /** Must stay identical to DeviceRuntimePairing.digestOf. */
-    private static String digestOf(String code, String peerId) {
-        String material = "cn1-device-runtime " + code.trim() + " " + peerId;
-        long h = 1125899906842597L;
-        for (int i = 0; i < material.length(); i++) {
-            h = 31 * h + material.charAt(i);
-        }
-        char[] hex = new char[16];
-        for (int i = 15; i >= 0; i--) {
-            int nibble = (int)(h & 0xf);
-            hex[i] = (char)(nibble < 10 ? '0' + nibble : 'a' + nibble - 10);
-            h >>>= 4;
-        }
-        return new String(hex);
-    }
 }
 JAVA
 "$JDK/bin/javac" -nowarn -d "$WORK" "$WORK/Push.java"
-"$JDK/bin/java" -cp "$WORK" Push "$WORK/program.cn1ip" "$PORT" "${CN1_PUSH_PAIRED:-unpaired}"
+"$JDK/bin/java" -cp "$WORK" Push "$WORK/program.cn1ip" "$PORT"

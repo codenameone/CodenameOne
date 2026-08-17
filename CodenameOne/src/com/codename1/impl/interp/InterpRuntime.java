@@ -669,10 +669,12 @@ public final class InterpRuntime {
                         int count = f.popInt();
                         checkNegativeSize(count);
                         String comp = externOwnerName(code[pc + 1]);
-                        InterpClass ic = bundle.findClass(comp);
                         // An array of an interpreted type is an Object[]: the
-                        // element type only exists in the interpreter.
-                        f.pushRef(ic != null
+                        // element type only exists in the interpreter. This has
+                        // to look through the brackets -- `new Entry[1][]` names
+                        // the component `[LEntry;`, and asking the host to load
+                        // Entry is asking for a class only the bundle has.
+                        f.pushRef(isInterpretedLeaf(comp)
                                 ? new Object[count]
                                 : linker.newArray(comp.startsWith("[") ? comp : "L" + comp + ";", count));
                         break;
@@ -684,7 +686,10 @@ public final class InterpRuntime {
                             sizes[i] = f.popInt();
                             checkNegativeSize(sizes[i]);
                         }
-                        f.pushRef(linker.newMultiArray(externOwnerName(code[pc + 1]), sizes));
+                        String arrayType = externOwnerName(code[pc + 1]);
+                        f.pushRef(isInterpretedLeaf(arrayType)
+                                ? nestedObjectArray(sizes, 0)
+                                : linker.newMultiArray(arrayType, sizes));
                         break;
                     }
                     case InterpOpcodes.ARRAYLENGTH: {
@@ -897,6 +902,18 @@ public final class InterpRuntime {
             if (c.superInterp != null) {
                 ensureInitialized(c.superInterp);
             }
+            // JLS 12.4.1: initializing a class initializes the superinterfaces
+            // that declare a default method, and only those. An interface
+            // without one is initialized when a field of it is read, not when
+            // an implementor is -- so initializing them all would run
+            // initializers Java never runs, which is as wrong as running them
+            // late.
+            for (int i = 0; i < c.interpInterfaces.length; i++) {
+                InterpClass iface = c.interpInterfaces[i];
+                if (iface != null && declaresDefaultMethod(iface)) {
+                    ensureInitialized(iface);
+                }
+            }
             InterpMethod clinit = c.declaredMethod("<clinit>", "()V");
             if (clinit != null) {
                 invokeInterpreted(clinit, null, null);
@@ -909,6 +926,56 @@ public final class InterpRuntime {
                 c.notifyAll();
             }
         }
+    }
+
+    /// Whether a type descriptor bottoms out in a class this bundle carries.
+    ///
+    /// The brackets have to be looked through, and so does the `L...;` wrapper,
+    /// because the same leaf reaches here spelled three ways: `Entry` from a
+    /// one-dimensional `anewarray`, `[LEntry;` from `new Entry[1][]`, and
+    /// `[[LEntry;` from a `multianewarray`. Only the leaf says whether the host
+    /// has ever heard of the type.
+    private boolean isInterpretedLeaf(String descriptor) {
+        String at = descriptor;
+        while (at.length() > 0 && at.charAt(0) == '[') {
+            at = at.substring(1);
+        }
+        if (at.length() > 2 && at.charAt(0) == 'L' && at.endsWith(";")) {
+            at = at.substring(1, at.length() - 1);
+        }
+        return bundle.findClass(at) != null;
+    }
+
+    /// The interpreter's representation of a multi-dimensional array of an
+    /// interpreted type: nested `Object[]`, allocated for every dimension the
+    /// bytecode gave a size for.
+    private static Object[] nestedObjectArray(int[] sizes, int depth) {
+        Object[] out = new Object[sizes[depth]];
+        if (depth + 1 < sizes.length) {
+            for (int i = 0; i < out.length; i++) {
+                out[i] = nestedObjectArray(sizes, depth + 1);
+            }
+        }
+        return out;
+    }
+
+    /// Whether an interpreted interface declares a default method, directly or
+    /// through a superinterface -- the condition JLS 12.4.1 attaches to
+    /// initializing an interface on behalf of an implementor.
+    private boolean declaresDefaultMethod(InterpClass iface) {
+        for (int i = 0; i < iface.methods.length; i++) {
+            InterpMethod m = iface.methods[i];
+            if (!m.isStatic() && !m.isAbstract() && !"<clinit>".equals(m.name)) {
+                return true;
+            }
+        }
+        for (int i = 0; i < iface.interpInterfaces.length; i++) {
+            InterpClass parent = iface.interpInterfaces[i];
+            if (parent != null && declaresDefaultMethod(parent)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ---------------------------------------------------------------- fields
@@ -1102,6 +1169,24 @@ public final class InterpRuntime {
                 pushBoxed(f, returnKind, InterpValues.defaultForKind(returnKind));
             }
             return;
+        }
+
+        // A class literal or getClass() for a type only the bundle has: the
+        // token on the stack is the InterpClass itself, because there is no host
+        // class object to hand back. The bytecode still calls java.lang.Class
+        // methods on it, and the linkers cannot -- a reflective one rejects the
+        // receiver and a native one has no clazz pointer for it -- so the small
+        // part of Class that means anything here is answered here.
+        if (target instanceof InterpClass) {
+            Object r = classCall((InterpClass)target, name, args);
+            if (r != NOT_CLASS_METHOD) {
+                pushBoxed(f, returnKind, r);
+                return;
+            }
+            throw new InterpThrowable(new UnsupportedOperationException(
+                    "Class." + name + desc + " is not available for "
+                    + ((InterpClass)target).getName().replace('/', '.')
+                    + ", which exists only in this bundle"), snapshotStack());
         }
 
         if (target instanceof InterpObject) {
@@ -1332,6 +1417,48 @@ public final class InterpRuntime {
     ///
     /// Only reached when nothing interpreted implements the method and there is
     /// no host object to inherit it from.
+    /// Sentinel for "java.lang.Class does not answer this here".
+    private static final Object NOT_CLASS_METHOD = new Object();
+
+    /// java.lang.Class, for a type that exists only in the bundle.
+    ///
+    /// The set is what an application can reasonably ask of a class literal
+    /// without reflection, which the runtime does not have and the device could
+    /// not provide: naming, identity, and the two type tests. Anything beyond
+    /// that is refused by name rather than answered wrongly.
+    private Object classCall(InterpClass c, String name, Object[] args) throws Throwable {
+        if ("getName".equals(name) && args.length == 0) {
+            return c.getName().replace('/', '.');
+        }
+        if ("getSimpleName".equals(name) && args.length == 0) {
+            String n = c.getName();
+            int slash = n.lastIndexOf('/');
+            String simple = slash < 0 ? n : n.substring(slash + 1);
+            int dollar = simple.lastIndexOf('$');
+            return dollar < 0 ? simple : simple.substring(dollar + 1);
+        }
+        if ("toString".equals(name) && args.length == 0) {
+            return (c.isInterface() ? "interface " : "class ")
+                    + c.getName().replace('/', '.');
+        }
+        if ("hashCode".equals(name) && args.length == 0) {
+            return Integer.valueOf(System.identityHashCode(c));
+        }
+        if ("equals".equals(name) && args.length == 1) {
+            return args[0] == c ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("isInterface".equals(name) && args.length == 0) {
+            return c.isInterface() ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("isInstance".equals(name) && args.length == 1) {
+            return isInstanceOf(args[0], c.getName()) ? Boolean.TRUE : Boolean.FALSE;
+        }
+        if ("getSuperclass".equals(name) && args.length == 0) {
+            return c.superInterp;
+        }
+        return NOT_CLASS_METHOD;
+    }
+
     private Object objectCall(InterpObject io, String name, Object[] args) {
         if ("getClass".equals(name) && args.length == 0) {
             // The interpreted class is its own class object: there is no host
@@ -1501,7 +1628,12 @@ public final class InterpRuntime {
     }
 
     private boolean isInstanceOf(Object v, int ext) throws Throwable {
-        String name = externOwnerName(ext);
+        return isInstanceOf(v, externOwnerName(ext));
+    }
+
+    /// The same test against a type named directly, which is what
+    /// `Class.isInstance` has and an extern index is not.
+    private boolean isInstanceOf(Object v, String name) throws Throwable {
         if (name.length() > 0 && name.charAt(0) == '[') {
             return isArrayInstanceOf(v, name);
         }

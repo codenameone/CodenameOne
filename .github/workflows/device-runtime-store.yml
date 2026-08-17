@@ -35,13 +35,32 @@ jobs:
         env:
           PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ASC_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           IOS_CERT: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          ASC_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
         run: |
-          android=false
-          ios=false
-          if [ -n "$PLAY_JSON" ] && [ -n "$KEYSTORE" ]; then android=true; fi
-          if [ -n "$ASC_KEY" ] && [ -n "$IOS_CERT" ]; then ios=true; fi
+          # Every secret the job will actually consume, not just the two that
+          # name the store. A partial configuration used to pass here, spend
+          # half an hour building, and then fail in the signing step -- which is
+          # the opposite of what a preflight is for.
+          android=true
+          ios=true
+          missing=""
+          for name in PLAY_JSON KEYSTORE KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then android=false; missing="$missing android:$name"; fi
+          done
+          for name in IOS_CERT IOS_CERT_PASSWORD IOS_PROFILE ASC_KEY ASC_KEY_ID ASC_ISSUER_ID; do
+            if [ -z "${!name}" ]; then ios=false; missing="$missing ios:$name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "missing secrets:$missing"
+          fi
           echo "android=$android" >> "$GITHUB_OUTPUT"
           echo "ios=$ios" >> "$GITHUB_OUTPUT"
           echo "### Device runtime store build" >> "$GITHUB_STEP_SUMMARY"
@@ -50,6 +69,10 @@ jobs:
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           echo "| Google Play | $android |" >> "$GITHUB_STEP_SUMMARY"
           echo "| App Store | $ios |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$missing" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Secrets that are absent:\`$missing\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ "$android" = false ] && [ "$ios" = false ]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "No publishing credentials are present, so nothing was uploaded." >> "$GITHUB_STEP_SUMMARY"

@@ -442,6 +442,78 @@ class InterpRuntimeContractTest {
         assertTrue(bundle.getSource("b/Util.java").contains("package b;"));
     }
 
+    /// A class literal for a pushed type has no host class object behind it, so
+    /// the token on the stack is the interpreter's own. The bytecode does not
+    /// know that and goes on calling `java.lang.Class` methods on it, which no
+    /// linker can serve -- a reflective one rejects the receiver and a native
+    /// one has no clazz pointer for a class the device was never built with.
+    @Test
+    @DisplayName("Class methods work on a class literal for a pushed type")
+    void classLiteralsAnswerTheUsualQuestions() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("ClassOps",
+                "public class ClassOps {"
+                + " interface Marker {}"
+                + " static class Thing implements Marker {}"
+                + " public static void main(String[] a) {"
+                + "  System.out.println(Thing.class.getName());"
+                + "  System.out.println(Thing.class.getSimpleName());"
+                + "  System.out.println(Marker.class.isInterface());"
+                + "  System.out.println(Thing.class.isInstance(new Thing()));"
+                + "  System.out.println(new Thing().getClass().getSimpleName());"
+                + "  System.out.println(Thing.class.equals(Thing.class));"
+                + "}}");
+        assertEquals(r[0].output, r[1].output,
+                "the interpreter should answer Class the way the JVM does");
+    }
+
+    /// `new Entry[1][]` names its component `[LEntry;`, not `Entry`, so a
+    /// bundle-membership test that did not look through the brackets asked the
+    /// host to load a class only the bundle has.
+    @Test
+    @DisplayName("arrays of a pushed type allocate in the interpreter at every rank")
+    void arraysOfInterpretedTypesAllocate() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("ArrayRanks",
+                "public class ArrayRanks {"
+                + " static class Entry { int v; Entry(int v) { this.v = v; } }"
+                + " public static void main(String[] a) {"
+                + "  Entry[] one = new Entry[2];"
+                + "  one[0] = new Entry(7);"
+                + "  System.out.println(one.length + \":\" + one[0].v + \":\" + one[1]);"
+                + "  Entry[][] partial = new Entry[2][];"
+                + "  partial[0] = one;"
+                + "  System.out.println(partial.length + \":\" + partial[0][0].v + \":\" + partial[1]);"
+                + "  Entry[][] full = new Entry[2][3];"
+                + "  full[1][2] = new Entry(9);"
+                + "  System.out.println(full.length + \":\" + full[1].length + \":\" + full[1][2].v);"
+                + "}}");
+        assertEquals(r[0].output, r[1].output,
+                "allocating an array of a pushed type should not reach the host loader");
+    }
+
+    /// JLS 12.4.1: initializing a class initializes the superinterfaces that
+    /// declare a default method -- and only those. Initializing all of them
+    /// would run initializers Java never runs, which is as wrong as running
+    /// them late.
+    @Test
+    @DisplayName("an interface with a default method is initialized with its implementor")
+    void defaultBearingInterfacesInitializeWithTheClass() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("IfaceInit",
+                "public class IfaceInit {"
+                + " static String log = \"\";"
+                + " static String note(String s) { log = log + s; return s; }"
+                + " interface WithDefault { String V = note(\"D\"); default int x() { return 1; } }"
+                + " interface Plain { String V = note(\"P\"); }"
+                + " static class C implements WithDefault, Plain {}"
+                + " public static void main(String[] a) {"
+                + "  new C();"
+                + "  System.out.println(\"after new C: \" + log);"
+                + "  System.out.println(Plain.V);"
+                + "  System.out.println(\"after reading Plain.V: \" + log);"
+                + "}}");
+        assertEquals(r[0].output, r[1].output,
+                "interface initialization order should match the JVM's");
+    }
+
     private static Throwable unwrap(Throwable t) {
         if (t instanceof InterpThrowable) {
             Object thrown = ((InterpThrowable) t).getThrown();

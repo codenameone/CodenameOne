@@ -389,9 +389,9 @@ Both device scripts delete the generated native project before rebuilding. That 
 
 The listener speaks two protocol versions and they exist for different situations.
 
-*v1* is an unauthenticated push. It is what `cn1-push.sh` sends by default and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorised device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog. It is refused on any connection that did not arrive over loopback, and that is a property of the connection rather than a mode -- treating it as a mode once meant a device that had seen a network address refused USB pushes for the rest of its life.
+*v1* is an unauthenticated push. It is the only thing `cn1-push.sh` sends, and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorised device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog. It is refused on any connection that did not arrive over loopback, and that is a property of the connection rather than a mode -- treating it as a mode once meant a device that had seen a network address refused USB pushes for the rest of its life.
 
-*v3* pairs first, then authenticates every connection.
+*v3* pairs first, then authenticates every connection. It is what `DevicePush` speaks, and pushing to a phone over Wi-Fi is its job rather than the shell helper's: a third copy of the derivation in a script would only drift from the two that have to agree.
 
 Pairing is two round trips. The IDE prints a six-digit code and sends its peer id and a friendly name; the device asks a human to type the code, replies with its own device id and a fresh 32-byte challenge, and both ends then derive the same 256-bit secret from `(code, peerId, deviceId)` -- 20,000 iterations of HMAC-SHA-256, which is what makes grinding the six digits cost something. The computer answers the challenge under that secret and the device stores it only on a match. The secret is never transmitted, in either direction, at any point.
 

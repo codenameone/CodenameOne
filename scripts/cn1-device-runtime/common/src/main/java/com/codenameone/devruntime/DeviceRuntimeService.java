@@ -79,6 +79,18 @@ public class DeviceRuntimeService {
      */
     static final int PROTOCOL_V3 = 3;
 
+    /**
+     * "Are you a device runtime?" -- answered with this device's id, and
+     * nothing else happens on the connection.
+     *
+     * <p>The desktop finds a device by connecting to every address on the
+     * subnet, and a bare successful connect proves only that something on that
+     * address accepts TCP on this port. Without a frame to ask, the first
+     * unrelated service to answer won the race and the push then failed against
+     * it while the real device sat unqueried.</p>
+     */
+    static final int FRAME_PING = 0;
+
     static final int FRAME_PAIR = 1;
     static final int FRAME_PUSH = 2;
 
@@ -476,7 +488,12 @@ public class DeviceRuntimeService {
                     }
                 } else if (version == PROTOCOL_V3) {
                     int frame = in.readInt();
-                    if (frame == FRAME_PAIR) {
+                    if (frame == FRAME_PING) {
+                        out.writeByte(1);
+                        out.writeUTF(DeviceRuntimePairing.deviceId());
+                        out.flush();
+                        return;
+                    } else if (frame == FRAME_PAIR) {
                         handlePairing(in, out);
                         return;
                     } else if (frame == FRAME_PUSH) {
