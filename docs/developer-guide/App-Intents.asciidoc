@@ -19,7 +19,7 @@ The method is `static` for a reason that matters on a device rather than as a st
 
 At build time the Codename One Maven plugin scans your compiled bytecode, validates every declaration, and generates both the reflection-free dispatch table and the native declarations each platform compiles into the app. A malformed declaration fails the build rather than going quiet on a device.
 
-Spoken phrases carry three rules, all of which Apple treats as halting errors that produce no App Intents metadata at all. The build checks them for you, so the message names your declaration instead of arriving as an opaque failure from the metadata processor:
+Spoken phrases carry three rules, which Apple treats as halting errors that produce no App Intents metadata at all. The build checks them for you, so the message names your declaration instead of arriving as an opaque failure from the metadata processor:
 
 * Every phrase must contain `${applicationName}`.
 * A phrase may reference *at most one* parameter. Write one phrase per parameter rather than combining them.
@@ -76,11 +76,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 A `headless` intent can run in a process the system started only to answer it, with nothing on screen. That's what lets an assistant answer without your app appearing, and it's a real constraint rather than a flag.
 
+The default is `false`, and that costs something worth knowing: an intent that doesn't declare `headless` brings the app to the foreground when it runs, because a handler outside the contract below is allowed to touch a `Form` and there has to be somewhere to put it. Declaring `headless = true` is what buys the answer-in-place behaviour -- and what obliges you to earn it.
+
 A headless handler *may* use `Storage`, `Preferences`, `Database`, `NetworkManager`, `Log`, surfaces publishing and `Intents.index`. It *must not* touch `Form`, `Dialog`, `Component`, `Display.getCurrent()`, the camera, capture, or anything else that needs a window: there is no window. It must also not call `Display.callSeriallyAndWait`, which can deadlock against a foregrounded event dispatch thread.
 
 Handlers never run on the event dispatch thread, on any platform and from any source. An invocation can arrive while your app is visible -- a widget button, a search result tapped on a running app -- and a handler blocking the event thread there is a visible freeze.
 
-Every invocation carries a deadline, and `IntentContext.isCancelled()` flips when it passes. Cancellation is cooperative: nothing interrupts a running handler, and anything it returns afterward is discarded, so commit durable work to storage as you go rather than only at the end.
+Every invocation carries a deadline, and `IntentContext.isCancelled()` flips when it passes. Cancellation is cooperative: nothing interrupts a running handler, and anything a platform invocation returns afterward is discarded, so commit durable work to storage as you go rather than only at the end. `Intents.invoke` is the one exception, by design: you are blocked in that call waiting for the result and nothing else will report it, so a late one is still returned to you rather than thrown away.
 
 [TIP]
 ====
