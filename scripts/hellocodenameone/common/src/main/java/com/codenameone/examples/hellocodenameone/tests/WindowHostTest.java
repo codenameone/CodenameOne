@@ -182,6 +182,10 @@ public abstract class WindowHostTest extends BaseTest {
                 && settled
                 && windowWidth > 0 && windowHeight > 0
                 && windowWidth <= width && windowHeight <= height
+                // ...and not implausibly smaller either. Chrome costs tens of pixels,
+                // never half the window: a much smaller size means the platform is
+                // still reporting a previous window's geometry.
+                && windowWidth * 4 >= width * 3 && windowHeight * 4 >= height * 3
                 && probe != null
                 && probe.getWidth() == windowWidth
                 && probe.getHeight() == windowHeight;

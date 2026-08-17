@@ -144,6 +144,10 @@ public class WindowModalTest extends BaseTest {
                 && settled
                 && windowWidth > 0 && windowHeight > 0
                 && windowWidth <= requestedWidth && windowHeight <= requestedHeight
+                // ...and not implausibly smaller either. Chrome costs tens of pixels,
+                // never half the window: a much smaller size means the platform is
+                // still reporting a previous window's geometry.
+                && windowWidth * 4 >= requestedWidth * 3 && windowHeight * 4 >= requestedHeight * 3
                 && probe != null
                 && probe.getWidth() == windowWidth
                 && probe.getHeight() == windowHeight;

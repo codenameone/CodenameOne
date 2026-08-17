@@ -106,6 +106,8 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
 
 @end
 
+static void CN1MacWindowReportLayout(int windowId, int width, int height);
+
 /* The view controller a Codename One window scene is rooted at. */
 @interface CN1MacWindowController : UIViewController
 @property (nonatomic, assign) int windowId;
@@ -168,7 +170,7 @@ extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
     }
     CGSize size = self.view.bounds.size;
     CGFloat scale = self.view.window != nil ? self.view.window.screen.scale : 1.0;
-    CN1MacWindowDeliverResize(self.windowId,
+    CN1MacWindowReportLayout(self.windowId,
             (int) (size.width * scale), (int) (size.height * scale));
 }
 
@@ -188,6 +190,13 @@ typedef struct {
      * without recording it the hide is dropped and adoption shows the window
      * anyway, leaving a native window on screen the framework no longer paints. */
     int pendingVisible;
+    /* The geometry asked for but not yet granted, in pixels, or 0 when nothing is
+     * outstanding. A recycled scene reports the *previous* window's size the moment
+     * it is adopted, before the new geometry request lands, and delivering that would
+     * lay the window out at the wrong size -- which a capture then records. Layout
+     * sizes are suppressed until one matches what was asked for. */
+    int awaitingWidth;
+    int awaitingHeight;
     NSString* pendingTitle;
 } CN1MacWindow;
 
@@ -201,6 +210,35 @@ static CN1MacWindow* slotAt(int slot) {
         return NULL;
     }
     return &g_macWindows[slot];
+}
+
+/*
+ * A layout size from UIKit, filtered against any geometry still being asked for.
+ *
+ * A recycled scene reports the previous window's size the instant it is adopted --
+ * before the new geometry request has landed -- and delivering that lays the window
+ * out at the wrong size, which a capture then records. While a request is
+ * outstanding only the size that was asked for is delivered; anything else is the
+ * old geometry on its way out. Once it matches, the window is free again and every
+ * later layout (a user resize) passes straight through.
+ */
+static void CN1MacWindowReportLayout(int windowId, int width, int height) {
+    int iter;
+    for (iter = 0; iter < CN1_MAC_MAX_WINDOWS; iter++) {
+        CN1MacWindow* w = &g_macWindows[iter];
+        if (!w->inUse || w->windowId != windowId) {
+            continue;
+        }
+        if (w->awaitingWidth > 0 && w->awaitingHeight > 0) {
+            if (width != w->awaitingWidth || height != w->awaitingHeight) {
+                return;
+            }
+            w->awaitingWidth = 0;
+            w->awaitingHeight = 0;
+        }
+        break;
+    }
+    CN1MacWindowDeliverResize(windowId, width, height);
 }
 
 static int slotForScene(UIWindowScene* scene) {
@@ -405,6 +443,10 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
         CGFloat scale = w->window.screen != nil ? w->window.screen.scale : 1.0;
         CGFloat pointWidth = w->pendingWidth / scale;
         CGFloat pointHeight = w->pendingHeight / scale;
+        /* Until this lands, a layout report is the old geometry -- see
+         * CN1MacWindowReportLayout. */
+        w->awaitingWidth = w->pendingWidth;
+        w->awaitingHeight = w->pendingHeight;
         if (scene.sizeRestrictions != nil) {
             scene.sizeRestrictions.minimumSize =
                     CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
@@ -498,6 +540,8 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     }
     w->pendingWidth = width;
     w->pendingHeight = height;
+    w->awaitingWidth = width;
+    w->awaitingHeight = height;
     UIWindowScene* scene = w->scene;
     UIWindow* window = w->window;
     dispatch_async(dispatch_get_main_queue(), ^{
