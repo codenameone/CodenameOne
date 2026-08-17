@@ -187,9 +187,9 @@ class InterpIOSSymbols {
     }
 
     /** A comma-separated id list, as an int[]. */
-    private static int[] parseIds(Stringlist) {
+    private static int[] parseIds(String list) {
         int count = 1;
-        for (int i = 0; i <list.length(); i++) {
+        for (int i = 0; i < list.length(); i++) {
             if (list.charAt(i) == ',') {
                 count++;
             }
@@ -197,7 +197,7 @@ class InterpIOSSymbols {
         int[] out = new int[count];
         int idx = 0;
         int from = 0;
-        for (int i = 0; i <list.length(); i++) {
+        for (int i = 0; i < list.length(); i++) {
             if (list.charAt(i) == ',') {
                 out[idx++] = Integer.parseInt(list.substring(from, i));
                 from = i + 1;
