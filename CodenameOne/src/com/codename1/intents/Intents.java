@@ -1037,6 +1037,17 @@ public final class Intents {
             String name = template.substring(open + 1, close);
             Object value = params == null ? null : params.get(name);
             if (value == null) {
+                // The platform omits an optional parameter it was not given, and the generated
+                // dispatcher fills in the declared default before calling the handler. Reading
+                // only the supplied map made the route unexpandable for exactly those intents,
+                // so a valid invocation left the app sitting on whatever screen it was showing.
+                IntentParameterInfo p = decl.getParameter(name);
+                if (p != null && p.getDefaultValue() != null
+                        && p.getDefaultValue().length() > 0) {
+                    value = p.getDefaultValue();
+                }
+            }
+            if (value == null) {
                 // A half-expanded URL would route somewhere unintended, which is worse than not
                 // navigating at all.
                 return null;
@@ -1094,12 +1105,28 @@ public final class Intents {
 
     private static IntentResult invokeInternal(String intentId, Map<String, Object> params,
                                                IntentContext ctx) {
+        Outcome o = dispatchOnce(intentId, params, ctx);
+        // The in-app path navigates unconditionally: the caller is blocked in this method and
+        // there is no competing timeout to lose to.
+        navigateIfRequested(o.result, o.declaration, o.params);
+        return o.result;
+    }
+
+    /// Runs the handler and reports what came back, **without navigating**.
+    ///
+    /// Navigation is separated because it is a side effect on the user's screen, and whether it
+    /// is allowed depends on something this cannot know: whether the invocation won its race
+    /// against the deadline. A platform invocation that timed out has already been reported as
+    /// failed, so bringing the app forward afterwards contradicts what the platform was told.
+    private static Outcome dispatchOnce(String intentId, Map<String, Object> params,
+                                        IntentContext ctx) {
         IntentDispatcher d;
         synchronized (pending) {
             d = dispatcher;
         }
         if (d == null) {
-            return IntentResult.failed("No intents are declared in this application");
+            return new Outcome(IntentResult.failed(
+                    "No intents are declared in this application"), null, null);
         }
         String targetId = intentId;
         Map<String, Object> safe = new HashMap<String, Object>();
@@ -1116,16 +1143,31 @@ public final class Intents {
         if (params != null) {
             safe.putAll(params);
         }
+        IntentDeclaration decl = getDeclaration(targetId);
         try {
             IntentResult r = d.invoke(targetId, safe, ctx);
             if (r == null) {
-                return IntentResult.failed("Unknown intent \"" + intentId + "\"");
+                return new Outcome(IntentResult.failed(
+                        "Unknown intent \"" + intentId + "\""), decl, safe);
             }
-            navigateIfRequested(r, getDeclaration(targetId), safe);
-            return r;
+            return new Outcome(r, decl, safe);
         } catch (Throwable t) {
             logError(t);
-            return IntentResult.failed("The action could not be completed");
+            return new Outcome(IntentResult.failed(
+                    "The action could not be completed"), decl, safe);
+        }
+    }
+
+    /// One handler's result together with what navigating from it would need.
+    private static final class Outcome {
+        private final IntentResult result;
+        private final IntentDeclaration declaration;
+        private final Map<String, Object> params;
+
+        Outcome(IntentResult result, IntentDeclaration declaration, Map<String, Object> params) {
+            this.result = result;
+            this.declaration = declaration;
+            this.params = params;
         }
     }
 
@@ -1150,8 +1192,14 @@ public final class Intents {
         Runnable body = new Runnable() {
             @Override
             public void run() {
-                IntentResult r = invokeInternal(inv.intentId, inv.params, ctx);
-                guard.complete(r);
+                Outcome o = dispatchOnce(inv.intentId, inv.params, ctx);
+                // Only the winner navigates. A handler that overran its deadline has already
+                // had the platform told it failed, and moving the user's screen afterwards
+                // contradicts that -- the app foregrounding itself onto a new form for an
+                // action the assistant just said did not happen.
+                if (guard.complete(o.result)) {
+                    navigateIfRequested(o.result, o.declaration, o.params);
+                }
             }
         };
 
@@ -1213,10 +1261,12 @@ public final class Intents {
             }
         }
 
-        void complete(IntentResult result) {
+        /// Reports the outcome exactly once. Returns true when this caller is the one that
+        /// did, which is also what decides whether it may act on the result.
+        boolean complete(IntentResult result) {
             synchronized (this) {
                 if (done) {
-                    return;
+                    return false;
                 }
                 done = true;
                 notifyAll();
@@ -1228,6 +1278,7 @@ public final class Intents {
                     logError(t);
                 }
             }
+            return true;
         }
     }
 

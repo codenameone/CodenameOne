@@ -97,6 +97,89 @@ class IntentEntityImageTest extends UITestBase {
     }
 
     /**
+     * The timeout path, which needs a real Display: without one the framework runs the handler
+     * inline and no timeout thread ever starts, so this is the only suite that can prove it.
+     *
+     * A handler that overruns has already had the platform told it failed. Navigating afterwards
+     * contradicts that -- the app foregrounding onto a new form for an action the assistant just
+     * reported as not having happened.
+     *
+     * The waiting goes through invokeAndBlock rather than Thread.sleep because this test body is
+     * dispatched onto the event thread. Sleeping here blocks the very thread that delivers the
+     * navigation, so the assertion would pass whether or not the fix is present -- which it did,
+     * before this was written properly.
+     */
+    @FormTest
+    void aHandlerThatOverrunsItsDeadlineDoesNotNavigate() throws Exception {
+        final java.util.List<String> navigated =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
+        final java.util.List<IntentResult> reported =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<IntentResult>());
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            Intents.setDispatcher(new SlowDispatcher());
+            Intents.dispatchInvocation("slow", null, IntentSource.SHORTCUT, true,
+                    new IntentCompletion() {
+                        public void onIntentResult(IntentResult r) {
+                            reported.add(r);
+                        }
+                    });
+
+            // Declared budget is one second, handler takes two. Waiting past both, off the
+            // event thread, so anything the framework marshals onto it can actually run.
+            com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            });
+            flushSerialCalls();
+
+            assertEquals(1, reported.size(),
+                    "the platform must be told exactly once, got " + reported.size());
+            assertTrue(reported.get(0).isFailed(), "and told that it timed out");
+            assertTrue(navigated.isEmpty(),
+                    "a late result must not move the user's screen, got " + navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+            Intents.reset();
+        }
+    }
+
+    /** Declares a one-second budget and takes two, so the timeout always wins. */
+    private static final class SlowDispatcher implements IntentDispatcher {
+        public java.util.List<IntentDeclaration> describe() {
+            return Arrays.asList(new IntentDeclaration("slow", "Slow", "", true, true, false,
+                    "", 1, java.util.Collections.<String>emptyList(),
+                    java.util.Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+        }
+
+        public IntentResult invoke(String intentId, Map<String, Object> params,
+                                   IntentContext ctx) {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return IntentResult.opens("/orders/42");
+        }
+
+        public java.util.List<AppEntity> queryEntities(String entityType, String kind,
+                                                       String argument) {
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
      * A picker row renders a thumbnail at a few dozen points, so an image big enough to matter
      * here is a mistake rather than a picture. It still indexes and still names its blob; only
      * the inline copy is dropped, so one oversized image cannot turn a synchronous reply into

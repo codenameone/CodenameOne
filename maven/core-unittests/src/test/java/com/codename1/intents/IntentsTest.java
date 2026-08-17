@@ -848,6 +848,37 @@ class IntentsTest {
         assertEquals(1, b.foregroundRequests);
     }
 
+    /// The platform omits an optional parameter it was not given, and the generated dispatcher
+    /// supplies the declared default to the handler. Route expansion reading only the supplied
+    /// map made the route unexpandable for exactly those intents, so the invocation succeeded
+    /// and the user was left on whatever screen was already showing.
+    @Test
+    void aRouteExpandsFromADeclaredDefaultWhenTheValueWasOmitted() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            IntentParameterInfo tab = new IntentParameterInfo("tab", "Which tab?",
+                    IntentParameterType.STRING, false, null, "summary", null);
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", false, true, false,
+                    "/reports/{tab}", 5, Collections.<String>emptyList(),
+                    Arrays.asList(tab), Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertEquals(Arrays.asList("/reports/summary"), navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
     /// A declared opensRoute is different: the platform already brought the app forward before
     /// the handler ran, which is what the flag is for. Asking again would be a second launch.
     @Test
