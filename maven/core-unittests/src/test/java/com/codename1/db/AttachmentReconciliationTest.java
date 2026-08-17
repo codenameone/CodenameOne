@@ -399,6 +399,20 @@ class AttachmentReconciliationTest extends UITestBase {
         // reading it as a filename would refuse a statement that is perfectly well formed.
         new ReconcilingDatabase().about("ATTACH ? AS aux KEY ?",
                 new Object[] {"/data/aux.db", "a passphrase"});
+
+        // A numbered placeholder names its own slot, whatever precedes it: "?2" is the second
+        // parameter even when the first is something else entirely. Reading the first for every
+        // form reserved a value that was never a filename and then stopped looking.
+        final ReconcilingDatabase numbered = new ReconcilingDatabase();
+        assertThrows(IOException.class,
+                () -> numbered.about("ATTACH ?2 AS aux", new Object[] {"a passphrase", "aux.db"}),
+                "the relative name in the second slot is the one ?2 attaches");
+        new ReconcilingDatabase().about("ATTACH ?2 AS aux",
+                new Object[] {"a passphrase", "/data/aux.db"});
+        // And the first slot is not read as the filename when ?2 is what stands there: a relative
+        // string sitting in slot one is not the file, so it must not be refused.
+        new ReconcilingDatabase().about("ATTACH ?2 AS aux",
+                new Object[] {"relative-but-not-the-file", "/data/aux.db"});
     }
 
     @FormTest

@@ -1145,13 +1145,29 @@ public abstract class Database {
         if (params == null || params.length == 0 || sql == null || !mentionsAttachment(sql)) {
             return;
         }
-        if ("ATTACH".equals(leadingKeyword(sql)) && params[0] instanceof String) {
-            // This statement really is an ATTACH, and a parameterized call is a single statement,
-            // so nothing can bind before the filename: the first parameter is the file. Named
-            // exactly rather than over-reserved, which also keeps a second parameter -- the key,
-            // in "ATTACH ? AS aux KEY ?" -- from being read as a path.
-            reserveAttachmentParameter((String) params[0]);
-            return;
+        if ("ATTACH".equals(leadingKeyword(sql))) {
+            // This statement really is an ATTACH, so the placeholder that stands where the
+            // filename goes names the file. Which parameter that is comes from the placeholder
+            // itself: "?" and the named forms take the first, since a parameterized call is a
+            // single statement and nothing binds before the filename, but "?2" takes the second
+            // whatever precedes it. Reading the first parameter for every form reserved the
+            // wrong value for "ATTACH ?2 AS aux" and then returned, so the file the engine
+            // opened was reserved by nobody.
+            //
+            // Named exactly rather than over-reserved, which also keeps a second parameter --
+            // the key, in "ATTACH ? AS aux KEY ?" -- from being read as a path.
+            String[] target = attachmentTargetTokens(sql);
+            if (target.length == 1 && isParameterPlaceholder(target[0])) {
+                int slot = placeholderSlot(target[0]);
+                if (slot >= 1 && slot <= params.length && params[slot - 1] instanceof String) {
+                    reserveAttachmentParameter((String) params[slot - 1]);
+                    return;
+                }
+                // The slot cannot be worked out -- an index past the parameters given, or a
+                // value that is not a name at all. The loop below then over-reserves every
+                // string, which costs a delete refused until the reconciliation gives it back
+                // and is the only direction that does not leave the real file unheld.
+            }
         }
         for (Object param : params) {
             if (!(param instanceof String)) {
@@ -1547,6 +1563,40 @@ public abstract class Database {
             return true;
         }
         return isParameterPlaceholder(only);
+    }
+
+    /// Which bound value a placeholder stands for, counting from one, or 0 when it cannot be told.
+    ///
+    /// `?NNN` names its own slot: `ATTACH ?2 AS aux` opens whatever the *second* parameter holds,
+    /// whatever the first one is for. A bare `?` and the named forms take their position in the
+    /// statement instead, and in an ATTACH the filename is the first thing that can be bound, so
+    /// they are slot one -- a `KEY ?` after it is slot two.
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the placeholder standing where the filename goes
+    ///
+    /// #### Returns
+    ///
+    /// the one-based parameter index, or 0 if the digits cannot be read
+    private static int placeholderSlot(String token) {
+        if (token.charAt(0) != '?' || token.length() == 1) {
+            return 1;
+        }
+        int slot = 0;
+        for (int iter = 1; iter < token.length(); iter++) {
+            char c = token.charAt(iter);
+            if (c < '0' || c > '9') {
+                return 0;
+            }
+            slot = slot * 10 + (c - '0');
+            if (slot > 999999) {
+                // Beyond anything a call could bind, and past this a longer run of digits would
+                // overflow into a slot that looks reasonable.
+                return 0;
+            }
+        }
+        return slot;
     }
 
     /// Whether a token is a bound parameter in any of the spellings SQLite accepts.
