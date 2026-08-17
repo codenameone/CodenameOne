@@ -62,11 +62,65 @@ class LinuxDatabase extends Database {
     /** The file this connection is open on, for the shared registry a key change consults. */
     private final String openKey;
 
+    /// The registry identity of a database file, resolved the way the engine resolves it.
+    ///
+    /// SQLite reports the file it opened with every link followed: `PRAGMA database_list` on a
+    /// database attached as `/tmp/link/../db`, where `/tmp/link` points at `/var/sub`, answers
+    /// `/var/db`. Collapsing `..` as text answers `/tmp/db` instead -- a real path, belonging to
+    /// a different file or to none -- so a connection filed under it is invisible to a delete or
+    /// a key change asked for by the name the engine uses, and the file is unlinked or rewritten
+    /// while SQLite still has it open. Resolving links first is what makes the two agree; the
+    /// lexical pass afterwards still earns its keep, because it also folds `.` and doubled
+    /// separators in the part that could not be resolved.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the resolved database file, which need not exist yet
+    ///
+    /// #### Returns
+    ///
+    /// the key this file is registered under
+    static String registryKeyFor(String path) {
+        return normalizeDatabasePathKey(resolveLinks(path));
+    }
+
+    /// The path with its links followed, as far as the filesystem can answer.
+    ///
+    /// A database being created for the first time has no file to resolve, and a path that cannot
+    /// be resolved at all must not change its identity later -- so the directory is resolved
+    /// instead and the name put back on the end. The directory is what carries the links; the
+    /// last component is the one SQLite is about to create.
+    private static String resolveLinks(String path) {
+        if (path == null || path.length() == 0) {
+            return path;
+        }
+        java.io.File file = new java.io.File(path);
+        if (file.exists()) {
+            try {
+                return file.getCanonicalPath();
+            } catch (IOException cannotResolve) {
+                return path;
+            }
+        }
+        java.io.File parent = file.getParentFile();
+        if (parent == null || !parent.exists()) {
+            return path;
+        }
+        try {
+            String directory = parent.getCanonicalPath();
+            return directory.endsWith("/") ? directory + file.getName()
+                    : directory + "/" + file.getName();
+        } catch (IOException cannotResolve) {
+            return path;
+        }
+    }
+
     LinuxDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
-        // Normalized, so two spellings of one path are one registry entry: the claim a key
-        // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.openKey = normalizeDatabasePathKey(path);
+        // Resolved and then normalized, so two spellings of one path are one registry entry: the
+        // claim a key change takes is worth nothing if the other connection is filed under
+        // "/a/./b" -- or under a link the engine sees through.
+        this.openKey = registryKeyFor(path);
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.

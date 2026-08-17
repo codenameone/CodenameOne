@@ -158,6 +158,15 @@ class WindowsDatabase extends Database {
         // "//server/share/db" and "/server/share/db" -- a share, and a path on the current
         // drive -- came out as one string: two unrelated databases sharing one implicit key, and
         // forgetting either one would leave both unreadable.
+        // Lexical on purpose, and unlike the Linux and iOS ports, which resolve links before
+        // they normalize. The engine decides what these keys have to match, and it resolves
+        // differently per platform: the unix VFS follows symbolic links when it reports the file
+        // it opened, while the Windows VFS calls GetFullPathNameW, which collapses "." and ".."
+        // as text and leaves a junction or a symbolic link exactly where it found it. The
+        // symlink-following branch in the Windows VFS is inside "#ifdef __CYGWIN__" and no build
+        // shipped here is a Cygwin build. Resolving links on this port would key a database
+        // under a name the engine never reports -- the very mismatch this normalization exists
+        // to avoid.
         String slashed = path.replace('\\', '/');
         boolean unc = slashed.startsWith("//");
         String normalized = normalizeDatabasePathKey(slashed);

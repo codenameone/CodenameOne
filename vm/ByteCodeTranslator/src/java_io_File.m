@@ -4,6 +4,10 @@
 
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <Foundation/Foundation.h>
+// realpath and PATH_MAX, named rather than left to whatever Foundation happens to pull in.
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 
 JAVA_BOOLEAN java_io_File_existsImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
@@ -261,7 +265,24 @@ JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_Str
         NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
         absPath = [cwd stringByAppendingPathComponent:p];
     }
-    NSString* canon = [absPath stringByStandardizingPath];
+    // realpath first, which is what getCanonicalPath is specified to do and what the platform
+    // itself resolves a path to. -stringByStandardizingPath is neither: it leaves a symbolic
+    // link in the middle of a path alone, and it rewrites /private/tmp and /private/var back to
+    // /tmp and /var -- the opposite direction from every other resolver on the system. SQLite
+    // reports the realpath form for an attached database, so a key built from the standardized
+    // form named a file the engine had never heard of.
+    //
+    // Falls back for a path that does not exist yet, where realpath cannot answer at all.
+    NSString* canon = nil;
+    char resolved[PATH_MAX];
+    const char* utf8 = [absPath fileSystemRepresentation];
+    if (utf8 != NULL && realpath(utf8, resolved) != NULL) {
+        canon = [[NSFileManager defaultManager] stringWithFileSystemRepresentation:resolved
+                                                                           length:strlen(resolved)];
+    }
+    if (canon == nil) {
+        canon = [absPath stringByStandardizingPath];
+    }
     JAVA_OBJECT res = fromNSString(CN1_THREAD_STATE_PASS_ARG canon);
     [pool release];
     finishedNativeAllocations();

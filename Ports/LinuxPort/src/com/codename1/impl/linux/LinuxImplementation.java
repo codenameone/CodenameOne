@@ -3261,7 +3261,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
             // alias is stored under what is passed here, so two accepted spellings of one database
             // would derive two different keys and the second open would report a wrong key against
             // intact data.
-            key = config.resolveKeyMaterial(com.codename1.db.Database.normalizeDatabaseKey(path));
+            key = config.resolveKeyMaterial(LinuxDatabase.registryKeyFor(path));
         }
         return new LinuxDatabase(databaseName, path, key);
     }
@@ -3312,7 +3312,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     /// same way so two spellings of one database derive one key.
     @Override
     public String databaseManagedKeyIdentity(String databaseName) {
-        return com.codename1.db.Database.normalizeDatabaseKey(resolveDatabasePath(databaseName));
+        return LinuxDatabase.registryKeyFor(resolveDatabasePath(databaseName));
     }
 
     @Override

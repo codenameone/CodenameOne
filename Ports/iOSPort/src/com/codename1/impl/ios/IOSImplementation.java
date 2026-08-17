@@ -11218,7 +11218,54 @@ public class IOSImplementation extends CodenameOneImplementation {
     ///
     /// the identity a managed key for that file is filed under
     static String managedKeyAliasForPath(String path) {
-        return Database.normalizeDatabaseKey(containerRelative(path));
+        return Database.normalizeDatabaseKey(containerRelative(resolveLinks(path)));
+    }
+
+    /// The path with its links followed, the way SQLite follows them.
+    ///
+    /// The engine reports the file it opened with every link resolved -- `PRAGMA database_list`
+    /// answers `/private/var/mobile/...` for a database this port names `/var/mobile/...`, since
+    /// `/var` is itself a link, and it resolves `/a/link/../db` to wherever the link really
+    /// points rather than to `/a/db`. A key built from the unresolved spelling names a file the
+    /// engine has never heard of, so a delete or a key change asked for by one form does not see
+    /// a connection registered under the other.
+    ///
+    /// Both sides of the comparison go through here, including the container prefix below, so
+    /// the two are always in the same form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a native path, which need not exist yet
+    ///
+    /// #### Returns
+    ///
+    /// the resolved path, or the path itself when the filesystem cannot resolve it
+    private static String resolveLinks(String path) {
+        if (path == null || path.length() == 0) {
+            return path;
+        }
+        java.io.File file = new java.io.File(path);
+        if (file.exists()) {
+            try {
+                return file.getCanonicalPath();
+            } catch (java.io.IOException cannotResolve) {
+                return path;
+            }
+        }
+        // A database about to be created has no file to resolve, and its identity must not change
+        // once it exists. The directory carries the links; the last component is the one SQLite is
+        // about to create, so resolving the directory answers the same either way.
+        java.io.File parent = file.getParentFile();
+        if (parent == null || !parent.exists()) {
+            return path;
+        }
+        try {
+            String directory = parent.getCanonicalPath();
+            return directory.endsWith("/") ? directory + file.getName()
+                    : directory + "/" + file.getName();
+        } catch (java.io.IOException cannotResolve) {
+            return path;
+        }
     }
 
     /// Where a database sits inside this application, rather than where the device is keeping it
@@ -11274,6 +11321,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (nativeHome == null || nativeHome.length() == 0) {
             return null;
         }
+        // Resolved like the paths it is matched against. The home directory arrives as
+        // /var/mobile/... and a resolved database path reads /private/var/mobile/..., so an
+        // unresolved prefix never matched and the alias kept the container's UUID in it -- the
+        // one thing being container relative exists to keep out, since that UUID changes when the
+        // application is restored onto another device and the managed key would be lost with it.
+        nativeHome = resolveLinks(nativeHome);
         int end = nativeHome.length();
         while (end > 0 && nativeHome.charAt(end - 1) == '/') {
             end--;
