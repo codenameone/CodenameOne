@@ -1109,6 +1109,13 @@ public class Window extends Container implements TopLevelContainer {
         return getMonitor().getScale();
     }
 
+    /// Invoked by the framework when the platform reports that the user moved this
+    /// window. Nothing needs re-laying out -- only the position changed -- so this
+    /// just reports it.
+    void moved() {
+        fireWindowEvent(WindowEvent.Type.Moved);
+    }
+
     /// Invoked by the framework when the platform reports that this window has moved
     /// to a monitor with different characteristics. Re-reads the scale and lays the
     /// hierarchy out again, since preferred sizes computed at the old scale are stale.
@@ -1794,6 +1801,21 @@ public class Window extends Container implements TopLevelContainer {
             LeadUtil.pointerDragged(target, x, y);
         }
     }
+
+    /// {@inheritDoc}
+    ///
+    /// The multi pointer form, which is how a pinch reaches the component under the
+    /// fingers. Without it `Component`'s version runs instead: it tests the pinch on
+    /// the window itself and then collapses the event to a single coordinate, so the
+    /// pressed child gets an ordinary one-finger drag and never its `pinch` callbacks.
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+        Component target = dragged != null ? dragged : pressedCmp;
+        if (target != null) {
+            LeadUtil.pointerDragged(target, x, y);
+        }
+    }
+
 
     /// {@inheritDoc}
     @Override

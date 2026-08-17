@@ -421,9 +421,13 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public Object getNativeGraphics(Object peer) {
-        // The headless implementation's graphics is a plain marker object; the tests
-        // assert that a window was flushed, not what it drew.
-        return new Object();
+        // A real TestGraphics rather than a marker object, sized to the window: the
+        // paint pass sets a clip on it, so anything else makes flushing the event
+        // dispatch thread with a window open blow up.
+        FakeWindow w = win(peer);
+        int width = w == null ? 1 : Math.max(1, w.width);
+        int height = w == null ? 1 : Math.max(1, w.height);
+        return new TestCodenameOneImplementation.TestGraphics(width, height);
     }
 
     @Override

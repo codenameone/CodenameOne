@@ -52,6 +52,8 @@ typedef struct {
     CN1Graphics g;            /* the window's cairo back buffer */
     int width;
     int height;
+    int x;
+    int y;
     int windowId;
     int monitorIndex;
     int inUse;
@@ -161,6 +163,11 @@ static gboolean cn1DesktopOnConfigure(GtkWidget* widget, GdkEventConfigure* e, g
         w->height = e->height;
         cn1DesktopResizeBuffer(w, w->width, w->height);
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
+    }
+    if (e->x != w->x || e->y != w->y) {
+        w->x = e->x;
+        w->y = e->y;
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_MOVED, 0, 0, 0);
     }
     {
         int now = cn1DesktopMonitorIndexFor(w->window);

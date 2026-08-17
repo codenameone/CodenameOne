@@ -77,7 +77,8 @@ typedef enum {
     CN1_EVENT_WINDOW_FOCUS = 14,      /* keyCode 1 == gained, 0 == lost      */
     CN1_EVENT_WINDOW_MONITOR = 15,    /* window moved to a different monitor */
     CN1_EVENT_WINDOW_SHOWN = 16,
-    CN1_EVENT_WINDOW_HIDDEN = 17
+    CN1_EVENT_WINDOW_HIDDEN = 17,
+    CN1_EVENT_WINDOW_MOVED = 18
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

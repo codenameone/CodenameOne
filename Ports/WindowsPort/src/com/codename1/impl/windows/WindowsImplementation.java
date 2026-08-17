@@ -102,6 +102,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int EVENT_WINDOW_MONITOR = 15;
     private static final int EVENT_WINDOW_SHOWN = 16;
     private static final int EVENT_WINDOW_HIDDEN = 17;
+    private static final int EVENT_WINDOW_MOVED = 18;
 
     // The native gesture events encode their float (incremental scale / radians) as
     // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_windows.h.
@@ -763,6 +764,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
                     break;
                 case EVENT_WINDOW_HIDDEN:
                     Display.getInstance().windowHideNotify(windowId);
+                    break;
+                case EVENT_WINDOW_MOVED:
+                    Display.getInstance().windowMoved(windowId);
                     break;
                 case EVENT_MOUSE_WHEEL:
                     // key carries the signed wheel delta (multiple of WHEEL_DELTA).

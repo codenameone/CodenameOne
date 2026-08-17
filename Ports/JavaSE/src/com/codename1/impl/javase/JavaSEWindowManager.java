@@ -81,6 +81,10 @@ public class JavaSEWindowManager extends WindowManager {
         JavaSEPort.C canvas;
         int windowId;
         int monitorIndex;
+        /// The application's own always-on-top setting, kept apart from the temporary
+        /// elevation a modal window gets so releasing modality cannot clear it.
+        boolean explicitAlwaysOnTop;
+        boolean modalElevated;
 
         /**
          * The frame operations that only exist on a top level window. An owned window
@@ -182,9 +186,11 @@ public class JavaSEWindowManager extends WindowManager {
 
                     @Override
                     public void componentMoved(ComponentEvent e) {
-                        // A move can carry the window onto a different display, and a
-                        // different display can mean a different backing scale, which
-                        // invalidates every preferred size computed at the old one.
+                        Display.getInstance().windowMoved(windowId);
+                        // A move can also carry the window onto a different display,
+                        // and a different display can mean a different backing scale,
+                        // which invalidates every preferred size computed at the old
+                        // one.
                         int now = monitorIndexOf(p);
                         if (now != p.monitorIndex) {
                             p.monitorIndex = now;
@@ -380,12 +386,8 @@ public class JavaSEWindowManager extends WindowManager {
     public void setAlwaysOnTop(Object peerObj, final boolean alwaysOnTop) {
         final Peer p = peer(peerObj);
         if (p != null) {
-            runOnAwt(new Runnable() {
-                @Override
-                public void run() {
-                    p.frame.setAlwaysOnTop(alwaysOnTop);
-                }
-            });
+            p.explicitAlwaysOnTop = alwaysOnTop;
+            applyAlwaysOnTop(p);
         }
     }
 
@@ -396,7 +398,26 @@ public class JavaSEWindowManager extends WindowManager {
         // correctness. Floating a modal window keeps the platform's own stacking
         // consistent with that; the scope does not change that, because the frame is
         // only being floated rather than anything being disabled.
-        setAlwaysOnTop(peerObj, modal);
+        //
+        // Releasing modality must not clear an always-on-top the application asked
+        // for: the framework does not reapply it, since the native window already
+        // exists, so the window would silently stop honouring it.
+        final Peer p = peer(peerObj);
+        if (p == null) {
+            return;
+        }
+        p.modalElevated = modal;
+        applyAlwaysOnTop(p);
+    }
+
+    /// Floats the frame when the application asked for it or while it is modal.
+    private void applyAlwaysOnTop(final Peer p) {
+        runOnAwt(new Runnable() {
+            @Override
+            public void run() {
+                p.frame.setAlwaysOnTop(p.explicitAlwaysOnTop || p.modalElevated);
+            }
+        });
     }
 
     @Override

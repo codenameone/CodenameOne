@@ -2795,6 +2795,22 @@ public final class Display extends CN1Constants {
         callSerially(new WindowCallback(windowId, WindowCallback.MONITOR_CHANGED));
     }
 
+    /// Notifies Codename One that the user moved a native window.
+    ///
+    /// Separate from `#windowMonitorChanged(int)`, which is only for a move that
+    /// carried the window onto a different display: an ordinary move within one
+    /// monitor still has to reach the listeners, or nothing can persist a window's
+    /// position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    public void windowMoved(int windowId) {
+        if (windowId > 0) {
+            callSerially(new WindowCallback(windowId, WindowCallback.MOVED));
+        }
+    }
+
     /// Notifies Codename One that the set of attached monitors changed.
     public void monitorsChanged() {
         callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
@@ -2809,6 +2825,7 @@ public final class Display extends CN1Constants {
         private static final int CLOSE_REQUESTED = 2;
         private static final int MONITOR_CHANGED = 3;
         private static final int MONITORS_CHANGED = 4;
+        private static final int MOVED = 5;
 
         private final int windowId;
         private final int kind;
@@ -2847,6 +2864,11 @@ public final class Display extends CN1Constants {
                         each.monitorChanged();
                     }
                     desktop.fireMonitorChanged();
+                    break;
+                case MOVED:
+                    if (w != null) {
+                        w.moved();
+                    }
                     break;
                 default:
                     break;

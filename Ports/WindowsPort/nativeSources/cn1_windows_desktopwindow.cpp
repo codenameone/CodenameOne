@@ -301,7 +301,9 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
             return 0;
         case WM_MOVE: {
-            int now = cn1WinMonitorIndexForHwnd(hwnd);
+            int now;
+            cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_MOVED, 0, 0, 0);
+            now = cn1WinMonitorIndexForHwnd(hwnd);
             if (now != w->monitorIndex) {
                 w->monitorIndex = now;
                 cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_MONITOR, 0, 0, now);

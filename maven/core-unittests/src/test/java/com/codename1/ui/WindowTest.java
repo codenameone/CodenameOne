@@ -492,6 +492,30 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aMoveIsReportedToWindowListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("moves");
+        w.show();
+        final AtomicInteger moves = new AtomicInteger();
+        w.addWindowListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                if (((com.codename1.ui.events.WindowEvent) evt).getType()
+                        == com.codename1.ui.events.WindowEvent.Type.Moved) {
+                    moves.incrementAndGet();
+                }
+            }
+        });
+
+        // Only a monitor change was reported before, so an ordinary move within one
+        // display never reached a listener and nothing could persist a position.
+        Display.getInstance().windowMoved(w.getWindowId());
+        flushSerialCalls();
+        assertEquals(1, moves.get());
+        w.dispose();
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
