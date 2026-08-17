@@ -285,16 +285,23 @@ the feature is inert on the device. A right name with a wrong *prototype* is wor
 C links on the name alone, so it runs and reads its arguments out of the wrong
 registers.
 
-`NativeSignatureVerifier` gates this, in two places:
+`NativeSignatureVerifier` gates this, in two places -- **both of them ours, neither
+of them on by default in a customer build**:
 
-- **Every translation** (iOS, native Windows, native Linux) verifies the generated
+- **A translation** (iOS, native Windows, native Linux) verifies the generated
   project -- app, cn1libs and the native-interface glue the builders inject -- and
-  fails before emitting any C. Per-symbol opt-out for a native that lives in a
-  prebuilt `.a`/`.framework`: list it in `cn1-native-verify-ignore.txt` beside the
-  native sources. Blunt opt-out: the `nativeVerify=warn` (or `off`) build hint,
-  or `-Dparparvm.nativeVerify=warn` directly on the translator.
+  fails before emitting any C. This is **opt-in**: it does nothing unless
+  `CN1_NATIVE_VERIFY` or `-Dparparvm.nativeVerify` says `strict` or `warn`. Making
+  the old soft failure hard would change the outcome of app builds that succeed
+  today, so our CI opts in (`CN1_NATIVE_VERIFY: strict` at workflow level in
+  `pr.yml`, `parparvm-tests.yml` and `parparvm-tests-windows.yml`, inherited by
+  every forked translation) and nobody else has to. The `nativeVerify` build hint
+  turns it on for a single build. With the check on, the per-symbol opt-out for a
+  native that lives in a prebuilt `.a`/`.framework` is
+  `cn1-native-verify-ignore.txt` beside the native sources.
 - **PR CI** runs the same verifier offline over our own ports, which needs no
-  device build:
+  device build. This half is a CI tool rather than part of any build, so it is
+  always strict:
 
 ```bash
 source tools/env.sh

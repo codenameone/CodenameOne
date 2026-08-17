@@ -27,18 +27,19 @@ import java.util.List;
 /**
  * Carries the {@code nativeVerify} build hint into the forked translator JVM.
  *
- * <p>Every ParparVM translation checks that each {@code native} method has a C
- * implementation with the name and prototype the generated code will call, and
- * fails the build when one does not (see {@code NativeSignatureVerifier}). The
- * per-symbol escape hatch is {@code cn1-native-verify-ignore.txt} beside the
- * native sources, which is where a native provided by a prebuilt {@code .a} or
- * {@code .framework} belongs. This hint is the blunt one, for a build that has to
- * go out before the real fix: {@code nativeVerify=warn} reports and continues,
- * {@code off} skips the pass entirely.</p>
+ * <p>A ParparVM translation can check that each {@code native} method has a C
+ * implementation with the name and prototype the generated code will call (see
+ * {@code NativeSignatureVerifier}). It is <b>off unless asked</b>, because making
+ * that failure hard changes the outcome of app builds that succeed today. This
+ * hint turns it on for one build: {@code nativeVerify=strict} fails on a bad
+ * native, {@code warn} reports and continues, {@code off} (the default) skips the
+ * pass entirely.</p>
  *
- * <p>It has to travel as a {@code -D} on the forked JVM's command line: the
+ * <p>The hint has to travel as a {@code -D} on the forked JVM's command line: the
  * translator runs in its own process and inherits none of the builder's system
- * properties.</p>
+ * properties. Codename One's own CI does not use the hint at all -- it sets the
+ * {@code CN1_NATIVE_VERIFY} environment variable once for the job, which every
+ * forked process inherits for free.</p>
  */
 final class NativeVerifyOption {
     /** Build hint name, accepted unprefixed and per-platform. */
@@ -46,7 +47,9 @@ final class NativeVerifyOption {
 
     /**
      * Appends {@code -Dparparvm.nativeVerify=...} to a forked translator command
-     * when the build asks for anything other than the strict default.
+     * when the build sets the hint. An unset hint adds nothing, leaving the
+     * translator on its default (and leaving {@code CN1_NATIVE_VERIFY} to speak
+     * for CI, since a {@code -D} would override it).
      *
      * @param jvmArgs the JVM argument list, before {@code -jar}
      * @param request the build request to read the hint from
@@ -61,7 +64,7 @@ final class NativeVerifyOption {
         if (value == null) {
             value = request.getArg(HINT, null);
         }
-        if (value == null || value.trim().length() == 0 || "strict".equalsIgnoreCase(value.trim())) {
+        if (value == null || value.trim().length() == 0) {
             return;
         }
         jvmArgs.add("-Dparparvm.nativeVerify=" + value.trim());

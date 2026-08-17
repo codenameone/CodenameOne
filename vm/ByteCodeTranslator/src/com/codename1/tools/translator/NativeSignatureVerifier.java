@@ -112,28 +112,49 @@ import java.util.zip.ZipFile;
  * therefore as a mismatch, so an unrecognised spelling is reported rather than
  * waved through.</p>
  *
- * <h2>Escape hatch</h2>
- * <p>A native implementation can legitimately live somewhere this scan cannot see --
- * a prebuilt {@code .a} or {@code .framework} shipped by a cn1lib. List those
- * symbols in {@code cn1-native-verify-ignore.txt} beside the native sources (one
- * symbol or {@code prefix*} glob per line, {@code #} comments allowed). As a blunt
- * instrument, {@code -Dparparvm.nativeVerify=warn} downgrades every finding to a
- * warning and {@code =off} skips the pass.</p>
+ * <h2>Opt-in: this runs in OUR CI, not in customer builds</h2>
+ * <p>A translation performs no check at all unless {@code -Dparparvm.nativeVerify}
+ * or the {@code CN1_NATIVE_VERIFY} environment variable says {@code strict} or
+ * {@code warn}; {@link Mode#OFF} is the default. That is deliberate. Turning the
+ * old soft failure into a hard one changes the outcome of builds that succeed
+ * today: an app carrying a vestigial {@code native} declaration nobody implements
+ * builds now and would stop building, and it is not Codename One's place to break
+ * a customer's release over a method their app never calls. The environment
+ * variable exists so one setting on a CI job reaches every translation that job
+ * forks -- the Maven plugin, the ParparVM integration tests, the build scripts --
+ * without each of them plumbing a {@code -D} of its own.</p>
  *
- * <p>The same check runs offline over compiled classes plus native source
- * directories, which is how CI verifies Codename One's own ports without a device
- * build:</p>
+ * <p>The offline entry point below has no such default: it is a CI tool, it is not
+ * part of anyone's build, and it is always strict. It checks compiled classes
+ * against native source directories, which is how CI verifies Codename One's own
+ * ports without a device build:</p>
  *
  * <pre>
  *   java -cp ByteCodeTranslator.jar com.codename1.tools.translator.NativeSignatureVerifier \
  *       --classes DIR_OR_JAR [--classes ...] --natives DIR [--natives ...]
  * </pre>
+ *
+ * <h2>Escape hatch</h2>
+ * <p>Even with the check on, a native implementation can legitimately live
+ * somewhere this scan cannot see -- a prebuilt {@code .a} or {@code .framework}
+ * shipped by a cn1lib. List those symbols in {@code cn1-native-verify-ignore.txt}
+ * beside the native sources (one symbol or {@code prefix*} glob per line,
+ * {@code #} comments allowed).</p>
  */
 public class NativeSignatureVerifier {
     /** File name, looked up beside the native sources, listing symbols to skip. */
     public static final String IGNORE_FILE = "cn1-native-verify-ignore.txt";
 
-    /** Value of {@code -Dparparvm.nativeVerify}: fail, warn only, or skip. */
+    /** System property selecting the mode for a translation. */
+    public static final String MODE_PROPERTY = "parparvm.nativeVerify";
+
+    /** Environment variable read when {@link #MODE_PROPERTY} is not set. */
+    public static final String MODE_ENVIRONMENT = "CN1_NATIVE_VERIFY";
+
+    /**
+     * What a translation does with the findings. {@link #OFF} is the default:
+     * see the "opt-in" note on the class.
+     */
     public enum Mode { STRICT, WARN, OFF }
 
     public enum Kind { MISSING, SIGNATURE, ORPHAN }
@@ -944,14 +965,29 @@ public class NativeSignatureVerifier {
 
     /** {@code -Dparparvm.nativeVerify}, defaulting to strict. */
     public static Mode mode() {
-        String value = System.getProperty("parparvm.nativeVerify", "strict");
-        if ("off".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
+        String value = System.getProperty(MODE_PROPERTY);
+        if (value == null) {
+            // Environment, not just the property, so one setting on a CI job reaches
+            // every translation it forks -- the Maven plugin, the integration tests
+            // and the build scripts alike -- without each having to plumb a -D.
+            value = System.getenv(MODE_ENVIRONMENT);
+        }
+        return modeOf(value);
+    }
+
+    /** {@link #mode()} without the lookup, so it can be tested. */
+    static Mode modeOf(String value) {
+        if (value == null || value.trim().length() == 0) {
             return Mode.OFF;
         }
-        if ("warn".equalsIgnoreCase(value)) {
+        String normalized = value.trim();
+        if ("strict".equalsIgnoreCase(normalized) || "true".equalsIgnoreCase(normalized)) {
+            return Mode.STRICT;
+        }
+        if ("warn".equalsIgnoreCase(normalized)) {
             return Mode.WARN;
         }
-        return Mode.STRICT;
+        return Mode.OFF;
     }
 
     /**
@@ -971,7 +1007,11 @@ public class NativeSignatureVerifier {
             if (fails) {
                 fatal++;
             }
-            if (!fails && !detailWarnings) {
+            // Only genuinely non-fatal findings collapse. A fatal one demoted by
+            // warn mode still prints in full: it is a missing implementation, and
+            // filing it under "nothing calls this" would describe it as the
+            // opposite of what it is.
+            if (!problem.fatal && !detailWarnings) {
                 quiet.add(problem.symbol);
                 continue;
             }

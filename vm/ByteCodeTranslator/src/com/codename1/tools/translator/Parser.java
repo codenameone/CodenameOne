@@ -854,7 +854,8 @@ public class Parser extends ClassVisitor {
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 JavascriptBundleWriter.write(outputDirectory, classes);
             } else {
-                // Before a single line of C is emitted: every native method that
+                // Opt-in (CN1_NATIVE_VERIFY / -Dparparvm.nativeVerify), and a no-op
+                // otherwise: before a line of C is emitted, every native method that
                 // survived into this program must have an implementation the
                 // generated code can actually call. The JavaScript target has its
                 // own registry (JavascriptNativeRegistry) and reports its own
@@ -932,12 +933,18 @@ public class Parser extends ClassVisitor {
      * no C implementation, or has one whose prototype the generated call site would
      * not match.
      *
-     * <p>Checked over EVERY native method of every surviving class, not just the ones
-     * the dead-code pass kept: a native method is kept alive precisely by its symbol
-     * appearing in the native sources (see {@link BytecodeMethod#isMethodUsedByNative}),
-     * so a misspelled implementation makes the method look unused and it is dropped.
-     * Keying the check on "survived elimination" would therefore skip exactly the
-     * methods it exists to catch.</p>
+     * <p><b>Does nothing unless asked.</b> {@code -Dparparvm.nativeVerify} or
+     * {@code CN1_NATIVE_VERIFY} has to select {@code strict} or {@code warn}; the
+     * default is off, so an app that builds today keeps building even if it carries
+     * a native declaration nobody implements. Codename One's CI sets the environment
+     * variable for the whole job, which is where the check actually runs.</p>
+     *
+     * <p>When it does run it covers EVERY native method of every surviving class,
+     * not just the ones the dead-code pass kept: a native method is kept alive
+     * precisely by its symbol appearing in the native sources (see
+     * {@link BytecodeMethod#isMethodUsedByNative}), so a misspelled implementation
+     * makes the method look unused and it is dropped. Keying the check on "survived
+     * elimination" would therefore skip exactly the methods it exists to catch.</p>
      *
      * @param handWrittenNativeSources the project's native sources as they were
      *        before the translator wrote its own C into the same directory
@@ -981,8 +988,8 @@ public class Parser extends ClassVisitor {
             throw new NativeSignatureVerifier.VerificationFailedException(
                     "Native signature check failed: " + fatal
                     + " native method(s) have no callable C implementation."
-                    + " Fix the names listed above, or pass -Dparparvm.nativeVerify=warn"
-                    + " to downgrade this to a warning.");
+                    + " Fix the names listed above, or set parparvm.nativeVerify /"
+                    + " CN1_NATIVE_VERIFY to 'warn' to downgrade this to a warning.");
         }
     }
 

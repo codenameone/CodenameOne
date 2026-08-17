@@ -355,6 +355,42 @@ class NativeSignatureVerifierTest {
         assertEquals("com_example_Natives_scale___long_R_long", problems.get(0).symbol);
     }
 
+    // -------------------------------------------------------------- opt-in mode
+
+    /**
+     * The check must stay off unless a build asks for it. Turning the old soft
+     * failure hard would change the outcome of app builds that succeed today, so
+     * it is Codename One's CI that opts in, not the customer who trips over it.
+     */
+    @Test
+    void theCheckIsOffUnlessTheBuildAsksForIt() {
+        assertEquals(NativeSignatureVerifier.Mode.OFF, NativeSignatureVerifier.modeOf(null));
+        assertEquals(NativeSignatureVerifier.Mode.OFF, NativeSignatureVerifier.modeOf(""));
+        assertEquals(NativeSignatureVerifier.Mode.OFF, NativeSignatureVerifier.modeOf("off"));
+        assertEquals(NativeSignatureVerifier.Mode.STRICT, NativeSignatureVerifier.modeOf("strict"));
+        assertEquals(NativeSignatureVerifier.Mode.STRICT, NativeSignatureVerifier.modeOf(" STRICT "));
+        assertEquals(NativeSignatureVerifier.Mode.WARN, NativeSignatureVerifier.modeOf("warn"));
+        // an unrecognised value must not silently become strict
+        assertEquals(NativeSignatureVerifier.Mode.OFF, NativeSignatureVerifier.modeOf("yes please"));
+    }
+
+    @Test
+    void thePropertyIsReadWhenSet() {
+        String previous = System.getProperty(NativeSignatureVerifier.MODE_PROPERTY);
+        try {
+            System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, "strict");
+            assertEquals(NativeSignatureVerifier.Mode.STRICT, NativeSignatureVerifier.mode());
+            System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, "off");
+            assertEquals(NativeSignatureVerifier.Mode.OFF, NativeSignatureVerifier.mode());
+        } finally {
+            if (previous == null) {
+                System.clearProperty(NativeSignatureVerifier.MODE_PROPERTY);
+            } else {
+                System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, previous);
+            }
+        }
+    }
+
     // ------------------------------------------------------------ escape hatch
 
     @Test

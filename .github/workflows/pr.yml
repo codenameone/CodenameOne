@@ -39,6 +39,15 @@ permissions:
   issues: write
   packages: read
 
+env:
+  # Turn the ParparVM native-signature check on for every translation this
+  # workflow forks -- the Maven plugin, the ParparVM integration tests, the build
+  # scripts -- since a forked process inherits the environment. Deliberately NOT
+  # the translator's default: making the old soft failure hard would change the
+  # outcome of customer builds that succeed today, so it is ours to enforce, not
+  # theirs to trip over. See NativeSignatureVerifier.
+  CN1_NATIVE_VERIFY: strict
+
 concurrency:
   # Cancel superseded runs of this workflow for the same PR branch
   # (github.head_ref is set on pull_request events). On push to master
