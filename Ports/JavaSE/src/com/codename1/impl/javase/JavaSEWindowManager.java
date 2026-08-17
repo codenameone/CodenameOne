@@ -400,7 +400,7 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     @Override
-    public void setModal(Object peerObj, final boolean modal, boolean applicationWide,
+    public void setModal(Object peerObj, final boolean modal, final boolean applicationWide,
             Object ownerPeer) {
         // Codename One blocks the input itself, so nothing is required here for
         // correctness. Floating a modal window keeps the platform's own stacking
