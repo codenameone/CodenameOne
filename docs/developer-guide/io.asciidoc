@@ -359,10 +359,12 @@ rather than through it, so the unresolved name is what identifies the file there
 
 Name the file with an absolute path from `Database.getDatabasePath()`. A relative name is resolved
 by SQLite against the process working directory, which is a different place on every platform and
-isn't something a Codename One application controls -- so a relative name may reach a file that
-isn't the database you meant, and can't be accounted for exactly beforehand. If an attachment turns
-out to name a database that something else is deleting or converting, it's detached again and the
-next call on that connection throws to tell you.
+isn't something a Codename One application controls, while Codename One would look for it in the
+database directory -- so the database protected wouldn't be the database attached. Those are
+rejected on every port whose engine has a working directory to resolve against; in the browser,
+where a name is an entry in a storage pool and means the same thing either way, they're accepted.
+If an attachment turns out to name a database that something else is deleting or converting, it's
+detached again and the next call on that connection throws to tell you.
 
 ==== Threading
 
@@ -461,6 +463,7 @@ The hint works in the simulator too, so you can test either mode without a devic
 | `executeQuery` accepts a transaction control statement such as `BEGIN` | all
 | `executeQuery` accepts `ATTACH` and `DETACH` | all
 | `ATTACH` accepts an expression for the filename rather than a literal or a parameter | all
+| `ATTACH` accepts a relative filename | all but the browser
 |====
 
 The flag doesn't cover defects, nor capabilities that used to throw and now work:

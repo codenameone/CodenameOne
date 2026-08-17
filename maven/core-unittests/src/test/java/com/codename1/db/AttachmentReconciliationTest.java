@@ -116,6 +116,11 @@ class AttachmentReconciliationTest extends UITestBase {
             reserveAttachments(sql);
         }
 
+        /** The parameterized counterpart, which every port calls with its bound values. */
+        void about(String sql, Object[] params) throws IOException {
+            reserveAttachments(sql, params);
+        }
+
         List<String> detaches() {
             List<String> found = new ArrayList<String>();
             for (String sql : statements) {
@@ -355,6 +360,45 @@ class AttachmentReconciliationTest extends UITestBase {
         for (String statement : allowed) {
             new ReconcilingDatabase().about(statement);
         }
+    }
+
+    @FormTest
+    void aRelativeAttachIsRefusedWhereTheEngineResolvesItDifferently() throws Exception {
+        // A relative name is a literal this can read and still cannot resolve: SQLite opens it
+        // against the process working directory, this port opens it in the database directory,
+        // and the reservation would name a different file from the one attached. The engine holds
+        // it by the time that is discoverable, and the detach that would undo it is refused
+        // inside a transaction that has written through the attachment -- the same corner an
+        // expression leaves this in.
+        String[] relative = {
+            "ATTACH 'aux.db' AS aux",
+            "ATTACH DATABASE './aux.db' AS aux",
+            "BEGIN; ATTACH 'aux.db' AS aux; CREATE TABLE aux.t(x);",
+        };
+        for (String script : relative) {
+            final ReconcilingDatabase db = new ReconcilingDatabase();
+            final String sql = script;
+            IOException refused = assertThrows(IOException.class, () -> db.about(sql),
+                    "a relative ATTACH has to be refused: " + script);
+            assertTrue(refused.getMessage().indexOf("absolute path") > 0, refused.getMessage());
+        }
+
+        // Bound as a parameter, which is the same file by another road. The first parameter is
+        // the filename because a parameterized call is a single statement and nothing binds
+        // before it.
+        final ReconcilingDatabase bound = new ReconcilingDatabase();
+        assertThrows(IOException.class,
+                () -> bound.about("ATTACH ? AS aux", new Object[] {"aux.db"}),
+                "and so does a relative name bound to the placeholder");
+
+        // An absolute one is what the message asks for, and it goes through.
+        new ReconcilingDatabase().about("ATTACH '/data/aux.db' AS aux");
+        new ReconcilingDatabase().about("ATTACH ? AS aux", new Object[] {"/data/aux.db"});
+
+        // A second parameter is not a path. "ATTACH ? AS aux KEY ?" binds a key there, and
+        // reading it as a filename would refuse a statement that is perfectly well formed.
+        new ReconcilingDatabase().about("ATTACH ? AS aux KEY ?",
+                new Object[] {"/data/aux.db", "a passphrase"});
     }
 
     @FormTest

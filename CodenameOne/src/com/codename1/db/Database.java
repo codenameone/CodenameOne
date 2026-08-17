@@ -1077,6 +1077,25 @@ public abstract class Database {
             if (file == null || file.length() == 0 || ":memory:".equals(file)) {
                 continue;
             }
+            // A relative name is a literal this can read and still cannot resolve: SQLite opens it
+            // against the process working directory and this resolves it in the port's database
+            // directory, so the reservation would be taken on one file while the engine attached
+            // another. That is the same position an expression leaves this in, and it fails the
+            // same way -- the file the engine really opened goes unregistered, and the detach that
+            // would undo it is refused inside a transaction that has written through the
+            // attachment. Refused here, where a refusal still stops it.
+            //
+            // Ports whose engine has no working directory to resolve against say so, and there a
+            // bare name means exactly the database this would have reserved.
+            if (!isLegacyBehavior() && !file.startsWith("file://")
+                    && !Display.getInstance().isRelativeAttachmentNameResolvable()) {
+                throw new IOException("The file an ATTACH names has to be an absolute path on "
+                        + "this platform, because SQLite resolves a relative name against the "
+                        + "process directory and Codename One resolves it in the database "
+                        + "directory -- so the database protected would not be the database "
+                        + "attached: " + statement.trim() + ". Pass Database.getDatabasePath(name)"
+                        + " as the filename.");
+            }
             String key;
             try {
                 key = Display.getInstance().databaseManagedKeyIdentity(file);
@@ -1126,6 +1145,14 @@ public abstract class Database {
         if (params == null || params.length == 0 || sql == null || !mentionsAttachment(sql)) {
             return;
         }
+        if ("ATTACH".equals(leadingKeyword(sql)) && params[0] instanceof String) {
+            // This statement really is an ATTACH, and a parameterized call is a single statement,
+            // so nothing can bind before the filename: the first parameter is the file. Named
+            // exactly rather than over-reserved, which also keeps a second parameter -- the key,
+            // in "ATTACH ? AS aux KEY ?" -- from being read as a path.
+            reserveAttachmentParameter((String) params[0]);
+            return;
+        }
         for (Object param : params) {
             if (!(param instanceof String)) {
                 continue;
@@ -1149,6 +1176,48 @@ public abstract class Database {
             }
             attachments.put(key, key);
         }
+    }
+
+    /// Reserves the file an `ATTACH ?` is about to open, bound as a parameter.
+    ///
+    /// Held to the same rule as a literal: a relative name is resolved against the process
+    /// directory by SQLite and in this port's database directory here, so what would be reserved
+    /// is not what would be attached. The refusal has to happen now, before the engine opens it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the bound filename
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if the file is claimed, or if it is a name this cannot resolve
+    private void reserveAttachmentParameter(String value) throws IOException {
+        if (value.length() == 0 || ":memory:".equals(value)) {
+            return;
+        }
+        String file = asDatabaseArgument(value);
+        if (!isLegacyBehavior() && !file.startsWith("file://")
+                && !Display.getInstance().isRelativeAttachmentNameResolvable()) {
+            throw new IOException("The file an ATTACH names has to be an absolute path on this "
+                    + "platform, because SQLite resolves a relative name against the process "
+                    + "directory and Codename One resolves it in the database directory -- so "
+                    + "the database protected would not be the database attached: " + value
+                    + ". Pass Database.getDatabasePath(name) as the parameter.");
+        }
+        String key;
+        try {
+            key = Display.getInstance().databaseManagedKeyIdentity(file);
+        } catch (RuntimeException cannotResolve) {
+            return;
+        }
+        if (key == null || (attachments != null && attachments.containsKey(key))) {
+            return;
+        }
+        registerOpenDatabase(key);
+        if (attachments == null) {
+            attachments = new java.util.Hashtable();
+        }
+        attachments.put(key, key);
     }
 
     /// Brings the reservations into line with what the engine actually has attached.

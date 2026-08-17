@@ -135,8 +135,15 @@ public class LinuxSecureStorage extends SecureStorage {
             }
             // 0 means nothing was there, which is what a second forget sees; the token still goes.
         }
-        Storage.getInstance().deleteStorageFile(key(account));
-        return true;
+        // Checked for the same reason the keyring result is: deleteStorageFile returns void, so
+        // a token that could not be deleted would report a clean removal. The token is not the
+        // secret here -- that is out of the keyring already -- but entryState() reads exactly
+        // this file, so a surviving token answers ENTRY_PRESENT for a key that is gone, and
+        // ManagedKeys then refuses to generate a replacement because it believes one exists.
+        // The database that key belonged to would never open again.
+        Storage storage = Storage.getInstance();
+        storage.deleteStorageFile(key(account));
+        return !storage.exists(key(account));
     }
 
     /* ----------------------------------------- prompting (AsyncResource) API

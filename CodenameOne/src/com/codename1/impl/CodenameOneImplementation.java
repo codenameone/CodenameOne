@@ -9691,6 +9691,23 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// the key connections on that file are registered under, or null if it cannot be worked out
+    /// Whether a relative name in an ATTACH means the same database to this port and its engine.
+    ///
+    /// It does not on a port backed by a filesystem. SQLite resolves a relative name against the
+    /// process working directory, which differs per platform and which no application controls
+    /// through this API, while a name here means a database in the port's own directory -- so a
+    /// reservation taken on one names a different file from the one the engine opens, and the
+    /// database that really was attached goes unprotected. A port whose engine has no filesystem
+    /// -- the browser, where a name is an entry in a storage pool -- resolves it exactly as this
+    /// does, and says so by answering true.
+    ///
+    /// #### Returns
+    ///
+    /// whether a relative attachment name resolves to the database this port would open
+    public boolean isRelativeAttachmentNameResolvable() {
+        return false;
+    }
+
     public String databaseIdentityForEngineFile(String engineFile) {
         if (engineFile == null || engineFile.length() == 0) {
             return null;

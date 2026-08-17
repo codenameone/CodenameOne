@@ -11521,6 +11521,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean isRelativeAttachmentNameResolvable() {
+        // No filesystem and no working directory: the engine is SQLite compiled to wasm over a
+        // storage pool, so a bare name in an ATTACH is a pool entry -- the same entry this port
+        // would open under that name. There is nothing here for a relative name to resolve
+        // against differently, so the reservation names the database that really gets attached.
+        return true;
+    }
+
+    @Override
     public String databaseIdentityForEngineFile(String engineFile) {
         // The engine here is SQLite compiled to wasm over a storage pool, so what it reports is a
         // pool entry rather than a path. Dressing it as a file URL, which is right on every port

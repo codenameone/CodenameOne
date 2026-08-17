@@ -106,8 +106,15 @@ public class WindowsSecureStorage extends SecureStorage {
         if (account == null) {
             return false;
         }
-        Storage.getInstance().deleteStorageFile(key(account));
-        return true;
+        // Checked, because deleteStorageFile cannot report anything: it returns void and the
+        // DeleteFileW under it has its result dropped. The file is the DPAPI ciphertext itself,
+        // so a delete that quietly failed -- the file open without delete sharing, or carrying
+        // the read-only attribute -- left a secret on disk that the same Windows user can still
+        // decrypt, while forgetManagedKey() reported the key forgotten. Reading the entry back
+        // is the only answer available here, and an entry that is still there is a failure.
+        Storage storage = Storage.getInstance();
+        storage.deleteStorageFile(key(account));
+        return !storage.exists(key(account));
     }
 
     /* ----------------------------------------- prompting (AsyncResource) API

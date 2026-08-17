@@ -6132,6 +6132,15 @@ public final class Display extends CN1Constants {
         return impl.databaseManagedKeyIdentity(databaseName);
     }
 
+    /// See `com.codename1.impl.CodenameOneImplementation#isRelativeAttachmentNameResolvable()`.
+    ///
+    /// #### Returns
+    ///
+    /// whether a relative attachment name resolves to the database this port would open
+    public boolean isRelativeAttachmentNameResolvable() {
+        return impl.isRelativeAttachmentNameResolvable();
+    }
+
     /// See `com.codename1.impl.CodenameOneImplementation#databaseIdentityForEngineFile(String)`.
     ///
     /// #### Parameters
