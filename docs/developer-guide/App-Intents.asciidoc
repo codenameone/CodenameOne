@@ -17,7 +17,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The method is `static` for a reason that matters on a device rather than as a style preference: the build generates a direct static call to it, and a direct call is the only form that survives the iOS translator's dead-code elimination and Android's obfuscation. It also makes the contract visible -- a handler can be asked to run in a process that exists only to answer it, where no instance of your class has been constructed and there is no user interface.
 
-At build time the Codename One Maven plugin scans your compiled bytecode, validates every declaration, and generates both the reflection-free dispatch table and the native declarations each platform compiles into the app. A malformed declaration fails the build rather than going quiet on a device. That includes a check worth more than most of the code behind this feature: every phrase must contain `${applicationName}`, because Apple rejects App Shortcut phrases that omit the app name, and finding that out from App Review is an expensive way to learn it.
+At build time the Codename One Maven plugin scans your compiled bytecode, validates every declaration, and generates both the reflection-free dispatch table and the native declarations each platform compiles into the app. A malformed declaration fails the build rather than going quiet on a device.
+
+Spoken phrases carry three rules, all of which Apple treats as halting errors that produce no App Intents metadata at all. The build checks them for you, so the message names your declaration instead of arriving as an opaque failure from the metadata processor:
+
+* Every phrase must contain `${applicationName}`.
+* A phrase may reference *at most one* parameter. Write one phrase per parameter rather than combining them.
+* A phrase parameter must be an entity. A primitive can't appear in a phrase -- which costs little, because leaving it out still has the platform ask for it, using the title you gave its `@IntentParam`.
 
 === Intents and routes are different questions
 

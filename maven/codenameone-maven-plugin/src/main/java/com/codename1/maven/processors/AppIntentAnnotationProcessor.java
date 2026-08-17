@@ -375,6 +375,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         + " -- Apple rejects App Shortcut phrases that omit the app name");
             }
             checkPlaceholders(cls, ctx, where, PLACEHOLDER, phrase, def, "phrase");
+            checkPhraseParameters(cls, ctx, where, phrase, def);
+        }
+        if (!def.phrases.isEmpty() && !def.discoverable) {
+            // Apple: "App Intent 'X' must be visible for App Shortcuts use". A phrase on a
+            // non-discoverable intent is a build failure rather than an inert declaration.
+            ctx.error(cls, "@AppIntent " + where + " declares phrases but discoverable=false. "
+                    + "A spoken phrase is only reachable through an App Shortcut, and Apple "
+                    + "rejects a shortcut whose intent is not discoverable. Drop the phrases, "
+                    + "or make it discoverable.");
         }
         if (def.opensRoute.length() > 0) {
             checkPlaceholders(cls, ctx, where, ROUTE_PLACEHOLDER, def.opensRoute, def,
@@ -441,6 +450,57 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             }
             def.params.add(pd);
         }
+    }
+
+    /// Enforces the two rules Apple's metadata extractor applies to a spoken phrase, both of
+    /// which it reports as halting errors that produce no metadata at all -- so catching them
+    /// here turns a failed iOS build into a message naming the offending declaration.
+    ///
+    /// A phrase may reference at most one parameter, and that parameter has to be an entity.
+    /// Apple accepts `AppEntity` or `AppEnum`; this framework generates entities and expresses
+    /// closed vocabularies as validated strings rather than enums, so an entity is the only
+    /// kind that can appear.
+    private void checkPhraseParameters(AnnotatedClass cls, ProcessorContext ctx, String where,
+                                        String phrase, IntentDef def) {
+        List<String> referenced = new ArrayList<String>();
+        java.util.regex.Matcher matcher = PLACEHOLDER.matcher(phrase);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            if ("applicationName".equals(name)) {
+                continue;
+            }
+            if (!referenced.contains(name)) {
+                referenced.add(name);
+            }
+        }
+        if (referenced.size() > 1) {
+            ctx.error(cls, "@AppIntent " + where + " phrase \"" + phrase + "\" references "
+                    + referenced.size() + " parameters (" + join(referenced) + "). Apple allows "
+                    + "at most one parameter per phrase; write one phrase per parameter, or "
+                    + "leave the others out of the spoken form.");
+            return;
+        }
+        for (String name : referenced) {
+            ParamDef p = def.param(name);
+            if (p != null && !"entity".equals(p.kind)) {
+                ctx.error(cls, "@AppIntent " + where + " phrase \"" + phrase + "\" references "
+                        + "${" + name + "}, which is a " + p.kind + ". Apple only accepts an "
+                        + "entity as a spoken phrase parameter, so declare " + name + " with an "
+                        + "@IntentEntity type, or drop it from the phrase -- the platform still "
+                        + "asks for it, using the title on its @IntentParam.");
+            }
+        }
+    }
+
+    private static String join(List<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(values.get(i));
+        }
+        return sb.toString();
     }
 
     private void checkPlaceholders(AnnotatedClass cls, ProcessorContext ctx, String where,

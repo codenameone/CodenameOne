@@ -85,7 +85,11 @@ public final class IOSAppIntentsBuilder {
         header(sb);
         sb.append("#if canImport(AppIntents)\n");
         sb.append("import AppIntents\n");
-        sb.append("import Foundation\n\n");
+        sb.append("import Foundation\n");
+        // SwiftUI is not decoration here: the result overload that carries a snippet view lives
+        // in the _AppIntents_SwiftUI cross-import overlay, which only activates when both
+        // modules are imported. Without it .result(value:dialog:view:) does not exist.
+        sb.append("import SwiftUI\n\n");
 
         for (Map<String, Object> intent : intents) {
             // An intent that only offered itself to a language model must not become an App
@@ -234,9 +238,11 @@ public final class IOSAppIntentsBuilder {
     ///
     /// Two different interpolations live in the same string. `${applicationName}` is Apple's own
     /// token and becomes `\(.applicationName)`. A `${name}` naming one of the intent's own
-    /// parameters has to become `\(.$name)`, which is what binds the spoken value to the
-    /// generated property -- left as literal text, the phrase reads back to the user as the
-    /// placeholder and never supplies the argument.
+    /// parameters becomes `\(\.$name)` -- a key path, because that is what
+    /// `AppShortcutPhraseToken` accepts for a parameter: the enum itself only carries
+    /// `applicationName`, and the interpolation that takes a parameter is declared over
+    /// `KeyPath<Intent, IntentParameter<Value>>`. Left as literal text the phrase reads the
+    /// placeholder back to the user and never supplies the argument.
     private String phraseLiteral(String phrase, Map<String, Object> intent) {
         StringBuilder out = new StringBuilder();
         int i = 0;
@@ -256,7 +262,7 @@ public final class IOSAppIntentsBuilder {
             if ("applicationName".equals(name)) {
                 out.append("\\(.applicationName)");
             } else if (declaresParameter(intent, name)) {
-                out.append("\\(.$").append(sanitize(name)).append(")");
+                out.append("\\(\\.$").append(sanitize(name)).append(")");
             } else {
                 // Not a parameter and not Apple's token: leave it alone rather than emitting an
                 // interpolation of something that does not exist, which would not compile.

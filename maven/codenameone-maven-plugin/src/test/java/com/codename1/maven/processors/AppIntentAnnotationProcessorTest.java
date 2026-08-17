@@ -274,6 +274,73 @@ public class AppIntentAnnotationProcessorTest {
         assertError(classes, "declares no parameter with that name");
     }
 
+    /// Apple's metadata processor stops on "Multiple parameters detected in phrase" and emits no
+    /// App Intents metadata at all -- the app builds, ships, and simply has no intents. Catching
+    /// it here is the difference between a named declaration and an opaque toolchain failure.
+    @Test
+    public void aPhraseMayReferenceAtMostOneParameter() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\",\n"
+                        + "        phrases = {\"Log a ${minutes} minute ${kind} in ${applicationName}\"})\n"
+                        + "public static void log(@IntentParam(\"kind\") String kind,\n"
+                        + "        @IntentParam(\"minutes\") int minutes) { }\n"));
+
+        assertError(classes, "at most one parameter per phrase");
+    }
+
+    /// Same shape of failure, different Apple message: "AppEntity and AppEnum are the only
+    /// allowed types for App Shortcut parameters".
+    @Test
+    public void aPhraseParameterMustBeAnEntity() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\",\n"
+                        + "        phrases = {\"Log a ${kind} in ${applicationName}\"})\n"
+                        + "public static void log(@IntentParam(\"kind\") String kind) { }\n"));
+
+        assertError(classes, "only accepts an entity as a spoken phrase parameter");
+    }
+
+    /// "App Intent 'X' must be visible for App Shortcuts use."
+    @Test
+    public void aPhraseOnANonDiscoverableIntentIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\", discoverable = false,\n"
+                        + "        phrases = {\"Log a workout in ${applicationName}\"})\n"
+                        + "public static void log() { }\n"));
+
+        assertError(classes, "declares phrases but discoverable=false");
+    }
+
+    /// The counterpart to the two rejections above: an entity in a phrase, on its own, is the
+    /// form Apple actually accepts, so it has to keep compiling.
+    @Test
+    public void oneEntityInAPhraseIsAccepted() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.App",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.intents.IntentResult;\n"
+                                + "public class App {\n"
+                                + "  @IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "  public static class Playlist {\n"
+                                + "    @EntityId public String getId() { return \"1\"; }\n"
+                                + "    @EntityTitle public String getName() { return \"Focus\"; }\n"
+                                + "    @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "    public static Playlist byId(String id) { return null; }\n"
+                                + "  }\n"
+                                + "  @AppIntent(value = \"play_list\", title = \"Play\",\n"
+                                + "          phrases = {\"Play ${playlist} in ${applicationName}\"})\n"
+                                + "  public static IntentResult play(\n"
+                                + "      @IntentParam(\"playlist\") Playlist p) { return IntentResult.ok(); }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        run(classes, true);
+
+        assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
     @Test
     public void anUnknownReturnTypeIsRejected() throws Exception {
         File classes = compile(source(

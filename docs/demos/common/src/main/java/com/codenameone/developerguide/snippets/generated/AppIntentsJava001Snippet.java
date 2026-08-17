@@ -67,8 +67,7 @@ class AppIntentsJava001Snippet {
     // tag::app-intents-java-001[]
     @AppIntent(value = "log_workout", title = "Log a workout",
             description = "Records a completed workout",
-            phrases = {"Log a workout in ${applicationName}",
-                       "Log a ${minutes} minute ${kind} in ${applicationName}"},
+            phrases = {"Log a workout in ${applicationName}"},
             headless = true, timeoutSeconds = 5)
     public static IntentResult logWorkout(
             @IntentParam(value = "kind", title = "What kind of workout?",

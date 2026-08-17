@@ -36,8 +36,7 @@ import java.lang.annotation.Target;
 /// ```java
 /// @AppIntent(value = "log_workout", title = "Log a workout",
 ///         description = "Records a completed workout",
-///         phrases = {"Log a workout in ${applicationName}",
-///                    "Log a ${minutes} minute ${kind} in ${applicationName}"},
+///         phrases = {"Log a workout in ${applicationName}"},
 ///         headless = true, timeoutSeconds = 5)
 /// public static IntentResult logWorkout(
 ///         @IntentParam(value = "kind", title = "What kind of workout?",
@@ -72,11 +71,23 @@ import java.lang.annotation.Target;
 ///
 /// #### Phrases
 ///
-/// Every phrase must contain `${applicationName}` -- Apple rejects App Shortcut
-/// phrases that omit it, so the build checks this rather than letting the
-/// rejection arrive from App Review. A `${name}` placeholder naming one of your
-/// parameters lets the user say the value as part of the phrase. Phrases are
-/// ignored on platforms with no voice invocation, which today means Android.
+/// Apple enforces three rules on a spoken phrase, all of them as build failures
+/// that produce no App Intents metadata at all. The build checks them here
+/// instead, so the message names your declaration rather than arriving as an
+/// opaque failure from `appintentsmetadataprocessor`:
+///
+/// - Every phrase must contain `${applicationName}`.
+/// - A phrase may reference **at most one** parameter. Write one phrase per
+///   parameter rather than combining them.
+/// - A phrase parameter must be an [IntentEntity] type. A primitive cannot
+///   appear in a phrase, which is not much of a loss: leave it out and the
+///   platform still asks for it, using the title on its [IntentParam].
+///
+/// An intent that declares phrases must also be `discoverable`, since a phrase
+/// is only reachable through an App Shortcut.
+///
+/// Phrases are ignored on platforms with no voice invocation, which today means
+/// Android.
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.METHOD)
 public @interface AppIntent {

@@ -5223,32 +5223,31 @@ public class IPhoneBuilder extends Executor {
     /** Xcode target / folder name of the generated WidgetKit extension. */
     static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
 
-    /**
-     * Parses the surfaces.json build-time manifest ({appGroup?, liveActivities?, kinds:[{id,
-     * name, description, iosFamilies?, preview?}]}) and resolves the app group. Fails the
-     * build loudly when the app uses com.codename1.surfaces without a manifest -- the widget
-     * gallery is compiled into the native app, so kinds cannot be registered at runtime only.
-     */
-    @SuppressWarnings("unchecked")
-    /// The iOS release App Intents first shipped in. Only ever contributed as a
-    /// deployment floor for an app that actually declares an intent.
+    /// The iOS release App Intents first shipped in.
+    ///
+    /// **Not contributed as a deployment floor**, and that is a measured result rather than an
+    /// assumption: a target building at `IPHONEOS_DEPLOYMENT_TARGET = 13.0` with
+    /// availability-fenced App Intents declarations emits a complete `Metadata.appintents`
+    /// carrying every intent and entity. Xcode does not gate metadata extraction on the
+    /// deployment target. So the declarations ship, the app's minimum is untouched, and the
+    /// intents are simply not offered on devices too old to run them.
+    ///
+    /// It survives as the number quoted in diagnostics, and as the value a project can opt into
+    /// through `ios.intents.minDeploymentTarget`.
     static final String APP_INTENTS_MIN_IOS = "16.0";
 
     /// Reads the `intents.json` the annotation processor emitted into the project jar and
     /// decides what this app has to pay for it.
     ///
-    /// The deployment target is the interesting part. App Intents needs a newer iOS than this
-    /// port's floor, and raising every app to that for a feature most never touch would be
-    /// unacceptable, so the cost is tiered:
+    /// The deployment target is the interesting part, and the answer is that nothing here
+    /// moves it. That was measured rather than assumed: Xcode emits a complete
+    /// `Metadata.appintents` for a target deploying to 13.0, so availability-fenced
+    /// declarations ship and are simply not offered on devices too old for them. Indexing and
+    /// donation cost nothing either, being Objective-C APIs that predate the current floor.
     ///
-    /// - no `com.codename1.intents` usage: nothing at all, the build is unchanged
-    /// - indexing and donation only: nothing, because Core Spotlight and NSUserActivity are
-    ///   Objective-C and long predate the current floor
-    /// - at least one declared `@AppIntent`: the App Intents floor, and only then
-    ///
-    /// Even the third tier is a fallback rather than the default: every generated Swift type is
-    /// availability-guarded, so where the toolchain accepts that, `ios.intents.minDeploymentTarget`
-    /// can be set to an empty value and the intents simply go missing on older devices instead.
+    /// A project that would rather not ship a build whose intents are inert for part of its
+    /// audience can still contribute a floor with `ios.intents.minDeploymentTarget`, which is
+    /// the only path below that reaches `addMinDeploymentTarget`.
     private void parseIntentsManifest(File resDir, BuildRequest request) throws BuildException {
         if (!usesIntents) {
             return;
@@ -5296,7 +5295,8 @@ public class IPhoneBuilder extends Executor {
             return;
         }
 
-        String floor = request.getArg("ios.intents.minDeploymentTarget", APP_INTENTS_MIN_IOS);
+        // Defaults to contributing nothing; see the note on APP_INTENTS_MIN_IOS.
+        String floor = request.getArg("ios.intents.minDeploymentTarget", "");
         if (floor == null || floor.trim().length() == 0) {
             return;
         }
@@ -5307,11 +5307,13 @@ public class IPhoneBuilder extends Executor {
             // capabilities never appear, which is worse than not offering the feature. So say
             // what happened and name both ways out. This can only fire on newly written
             // opt-in code, never on an upgrade of an existing project.
-            throw new BuildException("This app declares an @AppIntent, which needs iOS " + floor
+            throw new BuildException("ios.intents.minDeploymentTarget asks for iOS " + floor
                     + ", but ios.deployment_target is pinned to " + pinned + ".\n"
-                    + "Either raise ios.deployment_target to " + floor + ", or set "
-                    + "ios.intents.appIntents=false to keep Spotlight indexing and shortcut "
-                    + "donation while dropping App Intents generation.");
+                    + "Raise ios.deployment_target to " + floor + ", or drop "
+                    + "ios.intents.minDeploymentTarget -- it is not required. App Intents "
+                    + "declarations are availability-fenced and their metadata is emitted for a "
+                    + "lower target, so intents simply do not appear on devices below iOS "
+                    + APP_INTENTS_MIN_IOS + ".");
         }
         addMinDeploymentTarget(floor);
     }
@@ -5360,6 +5362,22 @@ public class IPhoneBuilder extends Executor {
             copyResourceTo("/com/codename1/builders/surfaces/ios/" + name,
                     new File(srcDir, name));
         }
+        // The model resolves the surfaces App Group through a constant the surfaces builder
+        // generates. An app that declares an intent but publishes no widgets never gets that
+        // file, so the renderer would not compile -- written here only when it is absent, so a
+        // project using both features keeps the real app group the surfaces build wrote.
+        File config = new File(srcDir, "CN1SurfaceConfig.swift");
+        if (!config.exists()) {
+            String body = "// Auto-generated by Codename One. This application declares app\n"
+                    + "// intents but publishes no external surfaces, so there is no App Group\n"
+                    + "// to resolve: an intent snippet reads its images from a per-invocation\n"
+                    + "// directory rather than the shared container.\n"
+                    + "import Foundation\n\n"
+                    + "let cn1SurfacesAppGroup = \"\"\n";
+            try (FileOutputStream out = new FileOutputStream(config)) {
+                out.write(body.getBytes(StandardCharsets.UTF_8));
+            }
+        }
 
         if (appIntentsSuppressed) {
             // Nothing more to emit. Donation is Objective-C and needs no Swift at all, which is
@@ -5396,6 +5414,13 @@ public class IPhoneBuilder extends Executor {
         }
     }
 
+    /**
+     * Parses the surfaces.json build-time manifest ({appGroup?, liveActivities?, kinds:[{id,
+     * name, description, iosFamilies?, preview?}]}) and resolves the app group. Fails the
+     * build loudly when the app uses com.codename1.surfaces without a manifest -- the widget
+     * gallery is compiled into the native app, so kinds cannot be registered at runtime only.
+     */
+    @SuppressWarnings("unchecked")
     private void parseSurfacesManifest(File resDir, BuildRequest request) throws BuildException {
         surfacesExtensionEnabled = usesSurfaces
                 && !"false".equals(request.getArg("ios.surfaces.extension", "true"));

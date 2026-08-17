@@ -37,10 +37,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * App Intents needs a newer iOS than this port's floor, so the cost has to land only on apps
- * that actually declare an intent. These pin the tiering: no usage pays nothing, indexing-only
- * pays nothing, and a declared intent raises the floor -- while an explicit pin below it is
- * reported rather than silently overridden.
+ * Nothing here raises an app's deployment target, and that is a measured result: a target built
+ * at IPHONEOS_DEPLOYMENT_TARGET=13.0 with availability-fenced App Intents declarations emits a
+ * complete Metadata.appintents containing every intent and entity. Xcode does not gate metadata
+ * extraction on the deployment target.
+ *
+ * These pin that no configuration silently costs an app its older devices, and that the opt-in
+ * floor still behaves when a project asks for one.
  */
 class IPhoneBuilderIntentsDeploymentTargetTest {
 
@@ -113,10 +116,24 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
     }
 
     @Test
-    void aDeclaredIntentRaisesTheFloor(@TempDir Path dir) throws Exception {
+    void aDeclaredIntentDoesNotRaiseTheFloor(@TempDir Path dir) throws Exception {
+        // The interesting case, and the one that would quietly drop iOS 13-15 users if it were
+        // wrong. Verified against Xcode: the metadata is emitted at 13.0 regardless.
         File res = manifest(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\"}]}");
 
         String floor = floorFor(res, request(), true);
+
+        assertTrue(compare(floor, "16.0") < 0,
+                "declaring an intent must not cost an app its older devices; got " + floor);
+    }
+
+    @Test
+    void aProjectMayAskForTheFloorAnyway(@TempDir Path dir) throws Exception {
+        // For a project that would rather not ship a build whose intents are inert on part of
+        // its audience.
+        File res = manifest(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\"}]}");
+
+        String floor = floorFor(res, request("ios.intents.minDeploymentTarget", "16.0"), true);
 
         assertEquals("16.0", floor);
     }
@@ -132,7 +149,7 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
     }
 
     @Test
-    void theFloorIsConfigurable(@TempDir Path dir) throws Exception {
+    void theOptInFloorIsConfigurable(@TempDir Path dir) throws Exception {
         File res = manifest(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\"}]}");
 
         String floor = floorFor(res, request("ios.intents.minDeploymentTarget", "17.0"), true);
@@ -142,8 +159,7 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
 
     @Test
     void anEmptyFloorLeavesTheTargetAloneEntirely(@TempDir Path dir) throws Exception {
-        // For the case where the toolchain accepts availability-guarded iOS 16 types in a
-        // lower target: the intents are simply absent on older devices.
+        // The default, stated explicitly.
         File res = manifest(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\"}]}");
 
         String floor = floorFor(res, request("ios.intents.minDeploymentTarget", ""), true);
@@ -152,21 +168,30 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
     }
 
     @Test
-    void anExplicitPinBelowTheFloorIsReportedRatherThanOverridden(@TempDir Path dir)
-            throws Exception {
+    void anExplicitPinIsFineByDefault(@TempDir Path dir) throws Exception {
+        // Nothing contributes a floor, so a pinned target is simply honoured. This used to be
+        // a build failure, which was a cost invented for no benefit.
+        File res = manifest(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\"}]}");
+
+        assertEquals("13.0", floorFor(res, request("ios.deployment_target", "13.0"), true));
+    }
+
+    @Test
+    void askingForAFloorBelowAnExplicitPinIsReported(@TempDir Path dir) throws Exception {
+        // Only reachable when a project explicitly asks for the floor and also pins lower --
+        // two deliberate settings that contradict each other.
         File res = manifest(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\"}]}");
 
         BuildException e = assertThrows(BuildException.class, new org.junit.jupiter.api.function.Executable() {
             public void execute() throws Throwable {
-                floorFor(res, request("ios.deployment_target", "13.0"), true);
+                floorFor(res, request("ios.deployment_target", "13.0",
+                        "ios.intents.minDeploymentTarget", "16.0"), true);
             }
         });
 
         String msg = e.getMessage();
         assertTrue(msg.contains("13.0"), msg);
-        // Both escape hatches must be named, or the message sends the developer hunting.
-        assertTrue(msg.contains("ios.deployment_target"), msg);
-        assertTrue(msg.contains("ios.intents.appIntents=false"), msg);
+        assertTrue(msg.contains("ios.intents.minDeploymentTarget"), msg);
     }
 
     @Test

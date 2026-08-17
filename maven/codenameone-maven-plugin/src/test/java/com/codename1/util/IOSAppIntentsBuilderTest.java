@@ -314,15 +314,17 @@ class IOSAppIntentsBuilderTest {
     void aPhraseParameterBindsToTheGeneratedProperty() {
         // Left as literal text the phrase reads the placeholder back to the user and never
         // supplies the argument, so the documented parameterized phrases could not invoke.
-        Map<String, Object> withParams = intent("log_workout", "Log",
-                "phrases", Arrays.asList("Log a ${minutes} minute ${kind} in ${applicationName}"),
-                "params", Arrays.asList(param("minutes", "int"), param("kind", "string")));
+        // A key path, not a plain member: AppShortcutPhraseToken only carries applicationName,
+        // and the interpolation that takes a parameter is declared over
+        // KeyPath<Intent, IntentParameter<Value>>. Verified by building against the iOS SDK.
+        Map<String, Object> withParams = intent("play_list", "Play",
+                "phrases", Arrays.asList("Play ${playlist} in ${applicationName}"),
+                "params", Arrays.asList(param("playlist", "entity", "entityType", "playlist")));
 
         String swift = intentsSwift(Arrays.asList(withParams),
-                new ArrayList<Map<String, Object>>());
+                Arrays.asList(entity("playlist", "Playlist", "BY_ID")));
 
-        assertTrue(swift.contains("\\(.$minutes)"), swift);
-        assertTrue(swift.contains("\\(.$kind)"), swift);
+        assertTrue(swift.contains("\\(\\.$playlist)"), swift);
         assertTrue(swift.contains("\\(.applicationName)"), swift);
         assertFalse(swift.contains("${"), swift);
     }
