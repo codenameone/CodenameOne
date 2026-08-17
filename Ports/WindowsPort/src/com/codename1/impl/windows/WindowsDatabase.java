@@ -77,16 +77,53 @@ class WindowsDatabase extends Database {
      */
     private final String aliasKey;
 
+    /// What the filesystem says this open file IS, as opposed to what it was called.
+    ///
+    /// Two names can reach one file on Windows -- an 8.3 short name, a junction, a hard link --
+    /// and the path key cannot tell: it folds case and separators, which leaves two spellings of
+    /// one file as two registry entries. Each connection then looks like the only one, and a key
+    /// change through either rewrites the file under the other's feet, whose next read fails on
+    /// a page it cannot decrypt.
+    ///
+    /// Registered alongside the path key rather than instead of it. The identity is a volume
+    /// serial and file index, which Windows reuses after a delete, so it can say two open handles
+    /// are the same file but cannot name a database that is not open -- which is what delete and
+    /// the persistent managed key alias need. Null when there is no file to ask about, and then
+    /// only the path key is in play, exactly as before.
+    private final String identityKey;
+
     WindowsDatabase(String databaseName, String path, String key) throws IOException {
         this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
         this.openKey = windowsPathKey(path);
         this.aliasKey = openKey;
+        String identity = null;
+        try {
+            identity = WindowsNative.fileIdentity(path);
+        } catch (RuntimeException cannotAsk) {
+            // No identity, so the path key carries the registration on its own.
+        }
+        this.identityKey = identity != null && identity.length() > 0 && !identity.equals(openKey)
+                ? "winfile:" + identity : null;
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
         registerOpenDatabase(openKey);
+        boolean identityRegistered = false;
+        try {
+            if (identityKey != null) {
+                registerOpenDatabase(identityKey);
+                identityRegistered = true;
+            }
+        } finally {
+            if (identityKey != null && !identityRegistered) {
+                // The identity is claimed by a delete or a key change already. The path key was
+                // taken a line ago and has to go back, or this file is unopenable until the
+                // process ends.
+                releaseOpenDatabase(openKey);
+            }
+        }
         boolean opened = false;
         try {
             peer = WindowsNative.sqlDbOpen(path);
@@ -118,10 +155,12 @@ class WindowsDatabase extends Database {
                     WindowsNative.sqlDbClose(peer);
                     peer = 0;
                 }
-                // Anything this connection attached goes with it: SQLite drops attachments when the
-            // connection closes, so the registrations taken for them have to go at the same moment.
-            noteConnectionClosed();
-            releaseOpenDatabase(openKey);
+                // Anything this connection attached goes with it: SQLite drops attachments
+                // when the connection closes, so the registrations taken for them have to go
+                // at the same moment.
+                noteConnectionClosed();
+                releaseOpenDatabase(openKey);
+                releaseOpenDatabase(identityKey);
             }
         }
     }
@@ -292,6 +331,7 @@ class WindowsDatabase extends Database {
             // connection closes, so the registrations taken for them have to go at the same moment.
             noteConnectionClosed();
             releaseOpenDatabase(openKey);
+            releaseOpenDatabase(identityKey);
         }
     }
 
@@ -302,7 +342,15 @@ class WindowsDatabase extends Database {
         // Rotating a key rewrites the file under the new one for this connection only; another
         // connection keeps the old key and fails at the first rewritten page it reads.
         requireSoleConnectionForKeyChange(openKey);
+        boolean identityClaimed = false;
         try {
+            if (identityKey != null) {
+                // The one that catches a second connection opened under another name for this
+                // same file: that connection registered the identity too, so the count here is
+                // two and the rewrite is refused before it starts.
+                requireSoleConnectionForKeyChange(identityKey);
+                identityClaimed = true;
+            }
             String key = null;
             if (config != null && config.isEncrypted()) {
                 // The resolved file, as the open path does: an implicit managed key is stored
@@ -312,6 +360,9 @@ class WindowsDatabase extends Database {
             }
             WindowsNative.sqlDbRekey(peer, key);
         } finally {
+            if (identityClaimed) {
+                releaseKeyChangeClaim(identityKey);
+            }
             releaseKeyChangeClaim(openKey);
         }
     }

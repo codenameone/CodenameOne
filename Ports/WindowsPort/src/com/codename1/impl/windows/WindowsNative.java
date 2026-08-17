@@ -443,6 +443,24 @@ public final class WindowsNative {
     public static native boolean fileExists(String path);
 
     /**
+     * The operating system's own answer to "which file is this", as a string.
+     *
+     * <p>Two names can reach one file: an 8.3 short name, a junction, a hard link. Comparing the
+     * names says they are different; the volume serial number and file index say they are not.
+     * Returns null when there is no file to ask about, which the caller reads as "no identity" and
+     * falls back to the name.
+     *
+     * <p>Not stable across a delete and recreate -- the index is reused for whatever is created
+     * next -- so it identifies an OPEN file, never a database by name. The persistent managed key
+     * alias stays name-based for exactly that reason.
+     *
+     * @param path the file to identify
+     * @return the identity, or null when the file cannot be opened
+     */
+    public static native String fileIdentity(String path);
+
+
+    /**
      * The operating system's own upper-casing of a string, which is the rule the filesystem
      * compares names by.
      *

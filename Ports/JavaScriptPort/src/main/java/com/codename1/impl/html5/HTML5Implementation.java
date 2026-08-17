@@ -11520,6 +11520,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 && com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
     }
 
+    /// The browser's non-prompting secure store.
+    ///
+    /// Without one the base class answers "unknown" to every question, and ManagedKeys refuses to
+    /// generate a key it cannot prove is absent -- so DatabaseConfig.managed() failed at every
+    /// open on a port that reports encryption as supported. See HTML5SecureStorage for what this
+    /// does and does not protect: it is persistence in origin storage, not a key store.
+    @Override
+    public com.codename1.security.SecureStorage getSecureStorage() {
+        if (secureStorage == null) {
+            secureStorage = new HTML5SecureStorage();
+        }
+        return secureStorage;
+    }
+
+    private com.codename1.security.SecureStorage secureStorage;
+
     @Override
     public boolean isRelativeAttachmentNameResolvable() {
         // No filesystem and no working directory: the engine is SQLite compiled to wasm over a

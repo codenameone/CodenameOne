@@ -11233,6 +11233,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     /// Both sides of the comparison go through here, including the container prefix below, so
     /// the two are always in the same form.
     ///
+    /// Through a native rather than `java.io.File`. That class's `exists` and `getCanonicalPath`
+    /// natives are not linked into the watch and tv targets, so naming them here broke those
+    /// builds at the link step -- with the app itself compiling perfectly well, since the Java
+    /// side is identical for every target.
+    ///
     /// #### Parameters
     ///
     /// - `path`: a native path, which need not exist yet
@@ -11244,28 +11249,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         if (path == null || path.length() == 0) {
             return path;
         }
-        java.io.File file = new java.io.File(path);
-        if (file.exists()) {
-            try {
-                return file.getCanonicalPath();
-            } catch (java.io.IOException cannotResolve) {
-                return path;
-            }
-        }
-        // A database about to be created has no file to resolve, and its identity must not change
-        // once it exists. The directory carries the links; the last component is the one SQLite is
-        // about to create, so resolving the directory answers the same either way.
-        java.io.File parent = file.getParentFile();
-        if (parent == null || !parent.exists()) {
-            return path;
-        }
-        try {
-            String directory = parent.getCanonicalPath();
-            return directory.endsWith("/") ? directory + file.getName()
-                    : directory + "/" + file.getName();
-        } catch (java.io.IOException cannotResolve) {
-            return path;
-        }
+        String resolved = nativeInstance.realPath(path);
+        return resolved == null || resolved.length() == 0 ? path : resolved;
     }
 
     /// Where a database sits inside this application, rather than where the device is keeping it

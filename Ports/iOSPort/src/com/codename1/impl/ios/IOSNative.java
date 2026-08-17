@@ -313,6 +313,24 @@ public final class IOSNative {
     native void releasePeer(long peer);
     native void retainPeer(long peer);
 
+    /// The path with every symbolic link followed, as the platform resolves it.
+    ///
+    /// realpath, which is what SQLite's unix layer does to the filename it reports, and what
+    /// java.io.File.getCanonicalPath is specified to do -- but that class's natives are not
+    /// linked into the watch and tv targets, so calling it from the port breaks those builds.
+    ///
+    /// A file that does not exist yet has its directory resolved instead and its name put back,
+    /// so a database keeps one identity before and after it is created.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: a native path
+    ///
+    /// #### Returns
+    ///
+    /// the resolved path, or the path itself when nothing can be resolved
+    native String realPath(String path);
+
     native void setClipboardString(String s);
     native String getClipboardString();
     native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc, byte[] image, String fileUris);

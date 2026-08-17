@@ -28,6 +28,9 @@
 #include "xmlvm.h"
 #include "java_lang_String.h"
 #include <pthread.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 #import "CN1ES2compat.h"
 #import "CN1JailbreakDetector.h"
 #if TARGET_OS_WATCH
@@ -841,6 +844,37 @@ static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
     if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
     if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
     return mimeType;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_realPath___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    POOL_BEGIN();
+    NSString* input = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    JAVA_OBJECT result = path;
+    char resolved[PATH_MAX];
+    const char* utf8 = [input fileSystemRepresentation];
+    if(utf8 != NULL && realpath(utf8, resolved) != NULL) {
+        result = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                [[NSFileManager defaultManager] stringWithFileSystemRepresentation:resolved
+                                                                           length:strlen(resolved)]);
+    } else {
+        // Nothing there yet, which is the ordinary case for a database about to be created.
+        // The directory carries the links; the last component is the name the engine is about
+        // to make, so resolving the directory answers the same before and after creation.
+        NSString* directory = [input stringByDeletingLastPathComponent];
+        const char* directoryUtf8 = [directory fileSystemRepresentation];
+        if([directory length] > 0 && directoryUtf8 != NULL
+                && realpath(directoryUtf8, resolved) != NULL) {
+            NSString* real = [[NSFileManager defaultManager]
+                    stringWithFileSystemRepresentation:resolved length:strlen(resolved)];
+            result = fromNSString(CN1_THREAD_STATE_PASS_ARG
+                    [real stringByAppendingPathComponent:[input lastPathComponent]]);
+        }
+    }
+    POOL_END();
+    return result;
 }
 
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
