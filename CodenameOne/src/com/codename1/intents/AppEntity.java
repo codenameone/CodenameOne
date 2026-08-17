@@ -62,11 +62,25 @@ public final class AppEntity {
     ///
     /// #### Parameters
     ///
-    /// - `type`: the entity type id, matching an `IntentEntity` declaration
-    /// - `id`: the stable identifier of this instance
+    /// - `type`: the entity type id, matching an `IntentEntity` declaration. It may not contain
+    ///   `:`, which separates the type from the id in the identifier the platforms store.
+    /// - `id`: the stable identifier of this instance. Colons are fine here: the uid splits at
+    ///   the first one, so everything after it is the id.
     public AppEntity(String type, String id) {
         if (type == null || type.length() == 0) {
             throw new IllegalArgumentException("type is required");
+        }
+        if (type.indexOf(':') >= 0) {
+            // A platform index stores one opaque identifier per entry and hands that same
+            // string back on a tap, so the type travels inside it as "type:id" and is split at
+            // the first colon. A colon in the type moves that boundary: new AppEntity(
+            // "shop:order", "42") comes back as type "shop", id "order:42", and the application
+            // cannot recognise the entity it published. The build enforces the same shape on a
+            // declared @IntentEntity; this is the path that skips the build.
+            throw new IllegalArgumentException("type may not contain ':': \"" + type
+                    + "\". The character separates the type from the id in the identifier the "
+                    + "platforms store, so an entity declaring one cannot be resolved when the "
+                    + "user taps it.");
         }
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("id is required");

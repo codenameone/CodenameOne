@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Platform-independent coverage for the portable com.codename1.intents runtime:
@@ -960,6 +961,26 @@ class IntentsTest {
     /// Both sides of an index removal are addressed by `uid`, which is `type:id`. The ports
     /// match on it -- the JavaSE bridge keys its whole index by it -- so this pins the contract
     /// they rely on. Matching a bare id instead made removing order:42 also hide customer:42.
+    /// A platform index stores one opaque identifier per entry and hands it back on a tap, so
+    /// the type rides inside it as "type:id" and is split at the first colon. A colon in the
+    /// type moves that boundary, and the application cannot recognise its own entity when the
+    /// user taps it -- with nothing to see at the point the mistake was made.
+    @Test
+    void anEntityTypeMayNotContainTheUidSeparator() {
+        try {
+            new AppEntity("shop:order", "42");
+            fail("a colon in the type breaks the identifier the platforms store");
+        } catch (IllegalArgumentException e) {
+            assertTrue(e.getMessage().contains("may not contain"), e.getMessage());
+        }
+
+        // The id is the other half and may contain colons: the split takes the first one, so
+        // everything after it is the id.
+        AppEntity ok = new AppEntity("order", "shop:42");
+        assertEquals("order", ok.getType());
+        assertEquals("shop:42", ok.getId());
+    }
+
     @Test
     void indexedEntitiesAndRemovalsAgreeOnACompositeUid() {
         FakeBridge b = new FakeBridge();

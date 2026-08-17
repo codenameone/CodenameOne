@@ -76,6 +76,8 @@ public class AndroidIntentBridge implements IntentBridge {
     /// there even though the runtime values are fixed and public.
     private static final int API_LONG_LIVED = 29;
     private static final int API_PUSH_DYNAMIC = 30;
+    /// ShortcutManager.getShortcuts(int) and the cached-shortcut concept both arrive here.
+    private static final int API_MATCH_FLAGS = 30;
     /// How long a parked foreground request waits for the app to actually appear.
     private static final long FOREGROUND_WAIT_MILLIS = 15000L;
     private static final long FOREGROUND_POLL_MILLIS = 50L;
@@ -541,23 +543,56 @@ public class AndroidIntentBridge implements IntentBridge {
         if (manager == null) {
             return out;
         }
-        List<ShortcutInfo> live;
-        try {
-            live = manager.getDynamicShortcuts();
-        } catch (Throwable t) {
-            Log.w(TAG, "Could not read the published shortcuts", t);
-            return out;
-        }
-        if (live == null) {
-            return out;
-        }
-        for (ShortcutInfo info : live) {
+        for (ShortcutInfo info : allPublished(manager)) {
             String id = info.getId();
-            if (id != null && matchesType(id, entityType)) {
+            if (id != null && matchesType(id, entityType) && !out.contains(id)) {
                 out.add(id);
             }
         }
         return out;
+    }
+
+    /// Every shortcut this app has published that the system still knows about.
+    ///
+    /// The dynamic set alone is not that. Indexed shortcuts are long-lived, so the system keeps
+    /// a cached copy after `pushDynamicShortcut` evicts one to stay under the limit, and the
+    /// user may have pinned others -- both remain visible and tappable. Reading only the dynamic
+    /// list therefore left deleted content on screen after a process restart, since the
+    /// in-memory list of what this instance published is gone by then too.
+    @TargetApi(Build.VERSION_CODES.N_MR1)
+    @SuppressWarnings("unchecked")
+    private static List<ShortcutInfo> allPublished(ShortcutManager manager) {
+        List<ShortcutInfo> out = new ArrayList<ShortcutInfo>();
+        if (Build.VERSION.SDK_INT >= API_MATCH_FLAGS) {
+            // getShortcuts(int) reports every kind in one call, but postdates the android.jar
+            // this port compiles against. FLAG_MATCH_DYNAMIC | FLAG_MATCH_PINNED |
+            // FLAG_MATCH_CACHED = 2 | 4 | 8; named as literals for the same reason.
+            Object all = invokeReturning(manager, "getShortcuts", new Class[]{int.class},
+                    new Object[]{Integer.valueOf(2 | 4 | 8)});
+            if (all instanceof List) {
+                for (Object o : (List<Object>) all) {
+                    if (o instanceof ShortcutInfo) {
+                        out.add((ShortcutInfo) o);
+                    }
+                }
+                return out;
+            }
+        }
+        // Older platforms: the two lists that exist there. Cached shortcuts are a concept from
+        // the same release as getShortcuts(int), so nothing is missed by their absence here.
+        try {
+            addAll(out, manager.getDynamicShortcuts());
+            addAll(out, manager.getPinnedShortcuts());
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read the published shortcuts", t);
+        }
+        return out;
+    }
+
+    private static void addAll(List<ShortcutInfo> out, List<ShortcutInfo> in) {
+        if (in != null) {
+            out.addAll(in);
+        }
     }
 
     /// An indexed id is `type:id`; an intent shortcut is a bare intent id and never matches a
@@ -665,6 +700,17 @@ public class AndroidIntentBridge implements IntentBridge {
             manager.disableShortcuts(ids);
         } catch (Throwable t) {
             Log.w(TAG, "Could not remove shortcuts", t);
+        }
+    }
+
+    /// Calls a method that may not exist on this platform version and returns its result, or
+    /// null when it was unavailable.
+    private static Object invokeReturning(Object target, String method, Class[] signature,
+                                           Object[] args) {
+        try {
+            return target.getClass().getMethod(method, signature).invoke(target, args);
+        } catch (Throwable t) {
+            return null;
         }
     }
 

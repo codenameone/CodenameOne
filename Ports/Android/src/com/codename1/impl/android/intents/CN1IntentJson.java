@@ -22,101 +22,95 @@
  */
 package com.codename1.impl.android.intents;
 
+import android.util.Log;
+
+import com.codename1.io.JSONParser;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-/// A deliberately tiny reader for the two framework-produced documents this port consumes.
+/// Reads the index documents the framework's serializer produces.
 ///
-/// Not a JSON parser and not trying to be one. The payloads come from Codename One's own
-/// serializer, so their shape is known, and the alternative -- adding a JSON dependency to the
-/// Android port -- would be paid for by every application whether or not it uses intents. Any
-/// value it cannot make sense of is skipped rather than guessed at.
+/// This used to scan the raw text for `"uid"` rather than parse it, on the reasoning that
+/// adding a JSON dependency to the Android port would be paid for by every application. That
+/// reasoning was wrong: `com.codename1.io.JSONParser` is part of core and CN1IntentService in
+/// this same package already uses it, so the dependency was always present and the scanner
+/// bought nothing.
+///
+/// It also cost something. Searching for a key by its text cannot tell a key from a string
+/// value that happens to equal it, so an entity legitimately typed `uid` -- serialized as
+/// `"type":"uid"` -- was read as the start of another entity, and Android published an extra
+/// malformed shortcut that counted against the ten-entry cap.
 final class CN1IntentJson {
+
+    private static final String TAG = "CN1Intents";
 
     private CN1IntentJson() {
     }
 
     /// Returns `{uid, title, subtitle, image}` for each entity in an index document.
+    @SuppressWarnings("unchecked")
     static List<String[]> entities(String json) {
         List<String[]> out = new ArrayList<String[]>();
-        if (json == null) {
+        Object list = field(parse(json), "entities");
+        if (!(list instanceof List)) {
             return out;
         }
-        int at = 0;
-        while (true) {
-            int uidAt = json.indexOf("\"uid\"", at);
-            if (uidAt < 0) {
-                break;
+        for (Object o : (List<Object>) list) {
+            if (!(o instanceof Map)) {
+                continue;
             }
-            String uid = valueAfter(json, uidAt);
+            Map<String, Object> entity = (Map<String, Object>) o;
+            String uid = string(entity, "uid");
             if (uid == null) {
-                break;
+                continue;
             }
-            // Bounded to this entity's object so a title belonging to the next entry cannot be
-            // picked up when this one omits it.
-            int end = json.indexOf("\"uid\"", uidAt + 5);
-            String scope = end < 0 ? json.substring(uidAt) : json.substring(uidAt, end);
-            out.add(new String[]{uid, field(scope, "title"), field(scope, "subtitle"),
-                    field(scope, "image")});
-            at = uidAt + 5;
+            out.add(new String[]{uid, string(entity, "title"), string(entity, "subtitle"),
+                    string(entity, "image")});
         }
         return out;
     }
 
     /// Returns the uids named in a removal document.
+    @SuppressWarnings("unchecked")
     static List<String> refs(String json) {
         List<String> out = new ArrayList<String>();
-        if (json == null) {
+        Object list = field(parse(json), "refs");
+        if (!(list instanceof List)) {
             return out;
         }
-        int at = 0;
-        while (true) {
-            int uidAt = json.indexOf("\"uid\"", at);
-            if (uidAt < 0) {
-                break;
+        for (Object o : (List<Object>) list) {
+            if (o instanceof Map) {
+                String uid = string((Map<String, Object>) o, "uid");
+                if (uid != null) {
+                    out.add(uid);
+                }
             }
-            String uid = valueAfter(json, uidAt);
-            if (uid != null) {
-                out.add(uid);
-            }
-            at = uidAt + 5;
         }
         return out;
     }
 
-    private static String field(String scope, String name) {
-        int at = scope.indexOf("\"" + name + "\"");
-        return at < 0 ? null : valueAfter(scope, at);
+    private static Object field(Map<String, Object> doc, String name) {
+        return doc == null ? null : doc.get(name);
     }
 
-    /// Reads the string value that follows a key, honouring backslash escapes.
-    private static String valueAfter(String json, int keyAt) {
-        int colon = json.indexOf(':', keyAt);
-        if (colon < 0) {
+    /// A string field, or null when absent or of another type. Never a coerced value: a
+    /// non-string where a string belongs means the document is not what this expects.
+    private static String string(Map<String, Object> m, String name) {
+        Object v = m.get(name);
+        return v instanceof String ? (String) v : null;
+    }
+
+    private static Map<String, Object> parse(String json) {
+        if (json == null || json.length() == 0) {
             return null;
         }
-        int open = json.indexOf('"', colon);
-        if (open < 0) {
+        try {
+            return JSONParser.parseJSON(json);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read an index document", t);
             return null;
         }
-        StringBuilder sb = new StringBuilder();
-        for (int i = open + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '\\' && i + 1 < json.length()) {
-                char next = json.charAt(++i);
-                switch (next) {
-                    case 'n': sb.append('\n'); break;
-                    case 't': sb.append('\t'); break;
-                    case 'r': sb.append('\r'); break;
-                    default: sb.append(next);
-                }
-                continue;
-            }
-            if (c == '"') {
-                return sb.toString();
-            }
-            sb.append(c);
-        }
-        return null;
     }
 }
