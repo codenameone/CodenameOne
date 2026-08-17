@@ -1844,6 +1844,8 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             // power characteristic is the write, then, not a side effect of
             // one: done the other way the fan keeps running and the caller is
             // told it stopped, which is the one outcome they cannot detect.
+            // It also drops out of the fan handling below, which is about
+            // getting a fan running rather than stopping one.
             if (conversion == CN1_HC_FAN_MODE && (int) numeric == 0) {
                 HMCharacteristic *power = cn1homeFindCharacteristic(
                     service, @"on_off");
@@ -1870,46 +1872,65 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                 outstanding--;
                 continue;
             }
-            // A fan mode that names a speed writes the speed too, because
-            // HomeKit has no mode characteristic that carries one. FanMode's
-            // javadoc says this happens and that a read never gives it back.
+            // A running fan mode is three characteristics on HomeKit, not
+            // one: the fan has to be on, at the speed the mode names, in
+            // manual rather than auto. They are independent, so writing only
+            // the mode reports success while the fan stays stopped or keeps
+            // its old speed. All of them are written, and all of them are
+            // reported -- the caller asked for LOW, and a LOW that did not
+            // take is not a success.
+            NSMutableArray *chars = [NSMutableArray arrayWithObject:c];
+            NSMutableArray *values = [NSMutableArray arrayWithObject:target];
             if (conversion == CN1_HC_FAN_MODE) {
+                HMCharacteristic *power = cn1homeFindCharacteristic(
+                    service, @"on_off");
+                if (power != nil) {
+                    [chars addObject:power];
+                    [values addObject:[NSNumber numberWithBool:YES]];
+                }
                 double speed = cn1homeFanModeSpeed((int) numeric);
-                if (speed >= 0) {
-                    HMCharacteristic *speedChar = cn1homeFindCharacteristic(
-                        service, @"fan_speed");
-                    if (speedChar != nil) {
-                        [speedChar writeValue:[NSNumber numberWithDouble:speed]
-                            completionHandler:^(NSError *ignored) {
-                            // Best effort and deliberately unreported: the
-                            // caller asked for a mode, and failing the mode
-                            // write because its implied speed did not take
-                            // would be answering a question they did not ask.
-                        }];
-                    }
+                HMCharacteristic *speedChar = speed < 0 ? nil
+                        : cn1homeFindCharacteristic(service, @"fan_speed");
+                if (speedChar != nil) {
+                    [chars addObject:speedChar];
+                    [values addObject:[NSNumber numberWithDouble:speed]];
                 }
             }
             NSUInteger index = i;
-            [c writeValue:target completionHandler:^(NSError *error) {
-                if (error != nil) {
-                    [records replaceObjectAtIndex:index
-                                       withObject:cn1homeJoinFields(
-                        [base arrayByAddingObjectsFromArray:
-                         [NSArray arrayWithObjects:@"0",
-                          cn1homeErrorName(error),
-                          cn1homeSanitize([error localizedDescription]),
-                          nil]])];
-                } else {
-                    [records replaceObjectAtIndex:index
-                                       withObject:cn1homeJoinFields(
-                        [base arrayByAddingObjectsFromArray:
-                         [NSArray arrayWithObjects:@"1", @"", @"", nil]])];
-                }
-                finished++;
-                if (finished == outstanding) {
-                    answer();
-                }
-            }];
+            __block NSUInteger partsLeft = [chars count];
+            __block BOOL reported = NO;
+            for (NSUInteger part = 0; part < [chars count]; part++) {
+                [[chars objectAtIndex:part]
+                        writeValue:[values objectAtIndex:part]
+                 completionHandler:^(NSError *error) {
+                    if (error != nil && !reported) {
+                        // The first failure is the one reported. A second
+                        // would only describe the same broken accessory.
+                        reported = YES;
+                        [records replaceObjectAtIndex:index
+                                           withObject:cn1homeJoinFields(
+                            [base arrayByAddingObjectsFromArray:
+                             [NSArray arrayWithObjects:@"0",
+                              cn1homeErrorName(error),
+                              cn1homeSanitize([error localizedDescription]),
+                              nil]])];
+                    }
+                    partsLeft--;
+                    if (partsLeft > 0) {
+                        return;
+                    }
+                    if (!reported) {
+                        [records replaceObjectAtIndex:index
+                                           withObject:cn1homeJoinFields(
+                            [base arrayByAddingObjectsFromArray:
+                             [NSArray arrayWithObjects:@"1", @"", @"", nil]])];
+                    }
+                    finished++;
+                    if (finished == outstanding) {
+                        answer();
+                    }
+                }];
+            }
         }
         if (outstanding == 0) {
             answer();
@@ -2206,17 +2227,35 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                     target = cn1homeToHomeKit(conversion, numeric);
                 }
                 if (target != nil && conversion == CN1_HC_FAN_MODE) {
+                    // A running fan mode is three characteristics, as in the
+                    // direct write path: on, at the speed the mode names, in
+                    // manual. A scene that set only the mode left the fan
+                    // stopped, or at its old speed, every time it ran.
                     double speed = cn1homeFanModeSpeed((int) numeric);
+                    NSMutableArray *extraChars = [NSMutableArray array];
+                    NSMutableArray *extraValues = [NSMutableArray array];
+                    HMCharacteristic *power = cn1homeFindCharacteristic(
+                        service, @"on_off");
+                    if (power != nil) {
+                        [extraChars addObject:power];
+                        [extraValues addObject:[NSNumber numberWithBool:YES]];
+                    }
                     HMCharacteristic *speedChar = speed < 0 ? nil
                             : cn1homeFindCharacteristic(service, @"fan_speed");
                     if (speedChar != nil) {
-                        HMCharacteristicWriteAction *speedAction =
+                        [extraChars addObject:speedChar];
+                        [extraValues addObject:
+                            [NSNumber numberWithDouble:speed]];
+                    }
+                    for (NSUInteger e = 0; e < [extraChars count]; e++) {
+                        HMCharacteristicWriteAction *extra =
                                 [[HMCharacteristicWriteAction alloc]
-                                 initWithCharacteristic:speedChar
+                                 initWithCharacteristic:
+                                     [extraChars objectAtIndex:e]
                                             targetValue:
-                                     [NSNumber numberWithDouble:speed]];
+                                     [extraValues objectAtIndex:e]];
                         remaining++;
-                        [actionSet addAction:speedAction
+                        [actionSet addAction:extra
                            completionHandler:^(NSError *actionError) {
                             if (actionError != nil) {
                                 failedActions++;
@@ -2231,7 +2270,7 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                                 done();
                             }
                         }];
-                        [speedAction release];
+                        [extra release];
                     }
                 }
                 if (target == nil) {

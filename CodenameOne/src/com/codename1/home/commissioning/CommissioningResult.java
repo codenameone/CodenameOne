@@ -32,7 +32,13 @@ package com.codename1.home.commissioning;
 /// different answer per backend:
 ///
 /// - **iOS, MatterSupport** -- the accessory joins the user's HomeKit home and
-///   appears in your graph on the next refresh. You get an id and it works.
+///   appears in your graph on the next refresh, where you can control it like
+///   any other. **This result carries no id**, and
+///   [#wasCommissionedToThisApp()] is `false`: Apple's sheet reports that the
+///   flow finished and does not say what was added or which home it went to,
+///   and the user is free to pick a different home than the one you asked
+///   for. Call `com.codename1.home.SmartHome#refresh()` and look at what is
+///   new.
 /// - **Android, Google Home APIs** -- the accessory joins the user's Google
 ///   Home and, if the user granted your app access to that structure, appears
 ///   in your graph. You get an id and it works.
@@ -42,8 +48,9 @@ package com.codename1.home.commissioning;
 ///   `com.codename1.home.HomeAvailability#COMMISSIONING_ONLY`.
 ///
 /// [#wasCommissionedToThisApp()] is that distinction, made explicit so it
-/// cannot be missed. An app that assumes the third case is the first shows a
-/// "your new device" screen with nothing on it.
+/// cannot be missed. An app that assumes it got a device shows a "your new
+/// device" screen with nothing on it -- and on two of these three backends
+/// that is what it would get.
 public final class CommissioningResult {
 
     private final String accessoryId;

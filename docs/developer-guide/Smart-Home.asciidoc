@@ -108,7 +108,7 @@ Two things about this flow.
 
 **The interaction isn't yours.** Both mobile backends hand it to an operating-system sheet, and the user may be several minutes -- they have to power the accessory on, hold a button, sometimes join it to Wi-Fi. There's no progress reporting. Don't put a short timeout or a determinate progress bar behind it.
 
-**Success doesn't always mean you got a device.** `wasCommissionedToThisApp()` is the difference between "the accessory was added to the user's home" and "your app can address it." On Android with Play services alone the answer is the former: you're told the name and nothing more. An app that assumes otherwise shows a "your new device" screen with nothing on it.
+**Success doesn't always mean you got a device.** `wasCommissionedToThisApp()` is the difference between "the accessory was added to the user's home" and "your app can address it." On Android with Play services alone the answer is the former: you're told the name and nothing more. On iOS it's the former too -- Apple's sheet reports that the flow finished without saying what was added or which home it went to -- so refresh the graph and look at what's new. An app that assumes otherwise shows a "your new device" screen with nothing on it.
 
 `SetupPayload.parse()` validates a scanned QR or typed manual code in pure Java before any of that starts, so a mis-scanned sticker gets a message in your wording rather than an opaque failure inside the OS sheet.
 
