@@ -1000,7 +1000,7 @@ public class Dialog extends Form implements AbstractDialog {
             revalidate();
             return;
         }
-        if (dialogTitle.getParent() == target) {
+        if (dialogTitle.getParent() == target) { //NOPMD CompareObjectsWithEquals
             return;
         }
         if (dialogTitle.getParent() != null) {
