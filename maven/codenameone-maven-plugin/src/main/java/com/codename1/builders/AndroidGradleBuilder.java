@@ -5910,6 +5910,11 @@ public class AndroidGradleBuilder extends Executor {
                         ? "-keep class com.codename1.impl.android.CN1Widget_* { *; }\n\n"
                         + "-keep class com.codename1.impl.android.surfaces.** { *; }\n\n"
                         : "")
+                // Intents: a headless shortcut can start CN1IntentService into a dead process,
+                // where the main Activity -- which is where the generated bootstrap is spliced
+                // -- never runs. The service loads it by name instead, so the name has to
+                // survive R8.
+                + (usesIntents ? "-keep class cn1app.IntentBootstrap { *; }\n\n" : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 // App-hardening keep rules for R8. On Android the engine does not rename (R8 is the

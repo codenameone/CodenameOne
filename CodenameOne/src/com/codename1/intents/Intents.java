@@ -924,6 +924,16 @@ public final class Intents {
     }
 
     static IntentBridge bridgeInternal() {
+        IntentBridge b = resolveBridge();
+        if (b != null) {
+            // First moment a bridge exists is the first moment declarations can be published,
+            // and on iOS that is later than the moment they are installed.
+            flushDeclarations(b);
+        }
+        return b;
+    }
+
+    private static IntentBridge resolveBridge() {
         if (bridgeOverridden) {
             return bridge;
         }
@@ -938,6 +948,34 @@ public final class Intents {
         }
     }
 
+    /// True when declarations exist but could not be published because no bridge did yet.
+    /// Guarded by `pending`.
+    private static boolean declarationsOwed;
+
+    /// Publishes declarations that were installed before the platform bridge existed.
+    ///
+    /// The generated bootstrap installs the dispatcher from the app's `main`, which on iOS runs
+    /// **before** `Display.init` -- so the first publication attempt finds no bridge and, until
+    /// this existed, gave up permanently. The native side then never learned the catalogue, and
+    /// the first App Intent ran its handler and dropped the result because the port's bridge
+    /// reference was still null.
+    private static void flushDeclarations(IntentBridge b) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            if (!declarationsOwed) {
+                return;
+            }
+            d = dispatcher;
+            // Cleared before publishing rather than after: registerIntents can re-enter this
+            // through the framework, and a second publication is not what that would mean.
+            declarationsOwed = false;
+        }
+        if (d == null) {
+            return;
+        }
+        publishTo(b, d);
+    }
+
     /// Test seam: clears the bridge override, the dispatcher, queued invocations
     /// and runtime declarations.
     static void reset() {
@@ -948,6 +986,7 @@ public final class Intents {
             dispatcher = null;
             pending.clear();
             pendingActivities.clear();
+            declarationsOwed = false;
         }
         synchronized (dynamic) {
             dynamic.clear();
@@ -1160,7 +1199,23 @@ public final class Intents {
 
     private static void publishDeclarations(IntentDispatcher d) {
         IntentBridge b = bridgeInternal();
-        if (b == null || !b.areIntentsSupported()) {
+        if (b == null) {
+            // No platform bridge yet. On iOS the generated bootstrap runs from main() before
+            // Display.init, so this is the ordinary path rather than an error -- but it has to
+            // be remembered, or the platform never learns what this app can do.
+            synchronized (pending) {
+                declarationsOwed = true;
+            }
+            return;
+        }
+        if (!b.areIntentsSupported()) {
+            return;
+        }
+        publishTo(b, d);
+    }
+
+    private static void publishTo(IntentBridge b, IntentDispatcher d) {
+        if (!b.areIntentsSupported()) {
             return;
         }
         try {

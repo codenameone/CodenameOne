@@ -846,6 +846,42 @@ public class AppIntentAnnotationProcessorTest {
                 "not a valid int");
     }
 
+    /// Shape is not enough: these all match the pattern and are all rejected by the generated
+    /// parser, so a default that looked valid became null and the handler saw no value at all.
+    @Test
+    public void aDateDefaultIsValidatedSemanticallyNotJustByShape() throws Exception {
+        String[] impossible = {"2026-13-01", "2026-02-30", "2026-01-01T25:00",
+            "2026-01-01T12:61", "2026-01-01T12:00:61", "2026-01-01T12:00+19:00",
+            "2026-01-01T12:00+01:99"};
+        for (String bad : impossible) {
+            assertError(compile(source(
+                    "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                            + "public static void log(@IntentParam(value = \"when\",\n"
+                            + "        required = false, defaultValue = \"" + bad + "\")\n"
+                            + "        java.util.Date d) { }\n")),
+                    "not a valid date");
+        }
+    }
+
+    /// The counterpart: every form the generated parser accepts has to survive validation, or
+    /// the build would reject defaults that work perfectly at runtime.
+    @Test
+    public void everyAcceptedDateFormPassesValidation() throws Exception {
+        String[] good = {"2026-03-14", "2026-03-14T12:34", "2026-03-14T12:34:56",
+            "2026-03-14T12:34:56.789", "2026-03-14T12:34:56Z", "2026-03-14T12:34:56+01:00",
+            "2028-02-29T00:00", "2026-12-31T23:59:59.999-05:00"};
+        for (String ok : good) {
+            File classes = compile(source(
+                    "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                            + "public static void log(@IntentParam(value = \"when\",\n"
+                            + "        required = false, defaultValue = \"" + ok + "\")\n"
+                            + "        java.util.Date d) { }\n"));
+            run(classes, true);
+            assertTrue(ok + " must be accepted",
+                    new File(classes, REGISTRY_PATH).exists());
+        }
+    }
+
     @Test
     public void wellFormedDefaultsAreAccepted() throws Exception {
         File classes = compile(source(

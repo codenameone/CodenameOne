@@ -573,7 +573,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             if (isLong(v)) {
                 return true;
             }
-            return DATE_DEFAULT.matcher(v).matches();
+            return parsesAsIso8601(v);
         }
         if ("int".equals(p.kind)) {
             if (!isLong(v)) {
@@ -608,6 +608,66 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private static boolean booleanDefault(String v) {
         String trimmed = v == null ? "" : v.trim();
         return "true".equalsIgnoreCase(trimmed) || "1".equals(trimmed);
+    }
+
+    /// Whether the generated ISO-8601 parser would accept this literal.
+    ///
+    /// Shape is not enough: `2026-13-01` and `2026-01-01T25:00` both match the pattern and are
+    /// both rejected at runtime, so a default that looked valid became null and the handler saw
+    /// no value at all. This applies the same bounds the generated parser applies -- a strict
+    /// Calendar for the date fields, and explicit range checks for the time and offset.
+    ///
+    /// It is a deliberate second implementation of that grammar, because the generated code
+    /// cannot be called from here. The two must move together; the tests exercise both.
+    private static boolean parsesAsIso8601(String v) {
+        if (!DATE_DEFAULT.matcher(v).matches()) {
+            return false;
+        }
+        try {
+            java.util.Calendar c = java.util.Calendar.getInstance(
+                    java.util.TimeZone.getTimeZone("GMT"));
+            c.clear();
+            c.setLenient(false);
+            c.set(Integer.parseInt(v.substring(0, 4)),
+                    Integer.parseInt(v.substring(5, 7)) - 1,
+                    Integer.parseInt(v.substring(8, 10)));
+            String rest = v.length() > 10 ? v.substring(11) : "";
+            if (rest.length() > 0) {
+                String zone = "";
+                int at = -1;
+                for (int i = 0; i < rest.length(); i++) {
+                    char ch = rest.charAt(i);
+                    if (ch == 'Z' || ch == 'z' || ch == '+' || (ch == '-' && i > 0)) {
+                        at = i;
+                        break;
+                    }
+                }
+                if (at >= 0) {
+                    zone = rest.substring(at);
+                    rest = rest.substring(0, at);
+                }
+                if (Integer.parseInt(rest.substring(0, 2)) > 23
+                        || Integer.parseInt(rest.substring(3, 5)) > 59) {
+                    return false;
+                }
+                if (rest.length() >= 8 && Integer.parseInt(rest.substring(6, 8)) > 59) {
+                    return false;
+                }
+                if (zone.length() > 1) {
+                    String digits = zone.substring(1).replace(":", "");
+                    int oh = Integer.parseInt(digits.substring(0, 2));
+                    int om = Integer.parseInt(digits.substring(2));
+                    if (oh > 18 || om > 59 || oh * 60 + om > 18 * 60) {
+                        return false;
+                    }
+                }
+            }
+            // Where a strict Calendar reports an impossible day.
+            c.getTime();
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private static boolean isLong(String v) {

@@ -122,6 +122,7 @@ public class CN1IntentService extends IntentService {
             shouldStopContext = true;
             AndroidImplementation.startContext(this);
         }
+        installDispatcher();
         // The headless flag arrived in the URI because at the moment of the tap there were no
         // declarations to consult. There are now, and they are the authority: a shortcut minted
         // before an app update can carry h=1 for an intent that has since become non-headless,
@@ -160,6 +161,30 @@ public class CN1IntentService extends IntentService {
         }
     }
 
+    /// Installs the build-time generated dispatcher, which nothing else does on this path.
+    ///
+    /// `AndroidImplementation.startContext` boots Display and no more. The generated
+    /// `new cn1app.IntentBootstrap()` is spliced into the main Activity's resume, and a headless
+    /// shortcut starting a dead process launches this service and nothing else -- so the
+    /// dispatcher stayed null, every dispatch queued waiting for it, and the service timed out
+    /// and tore the runtime down having run nothing.
+    ///
+    /// By name because a port class cannot reference a per-application generated one. The
+    /// builder emits a keep rule for it when the app uses intents, so R8 leaves the name alone.
+    private static void installDispatcher() {
+        if (!Intents.getDeclarations().isEmpty()) {
+            return;
+        }
+        try {
+            Class.forName("cn1app.IntentBootstrap").newInstance();
+        } catch (ClassNotFoundException e) {
+            // An app that declares no @AppIntent has no bootstrap, which is not an error: it can
+            // still index content and donate.
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not install the intent dispatcher", t);
+        }
+    }
+
     /// Starts the runtime and holds the service open long enough for the framework to install
     /// its dispatcher and run whatever was parked.
     ///
@@ -173,6 +198,7 @@ public class CN1IntentService extends IntentService {
         shouldStopContext = true;
         try {
             AndroidImplementation.startContext(this);
+            installDispatcher();
             long deadline = System.currentTimeMillis()
                     + (DEFAULT_BUDGET_SECONDS + BACKSTOP_MARGIN_SECONDS) * 1000L;
             while (System.currentTimeMillis() < deadline
