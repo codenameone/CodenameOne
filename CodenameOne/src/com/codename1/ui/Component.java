@@ -5493,7 +5493,7 @@ public class Component implements Animation, StyleListener, Editable {
         return false;
     }
 
-    private boolean updateMaterialPullToRefresh(final Form p, int y) {
+    private boolean updateMaterialPullToRefresh(final TopLevelContainer p, int y) {
         if (refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode() &&
                 pullY < getHeight() / 4 &&
                 scrollableYFlag() && getScrollY() == 0) {
@@ -5525,11 +5525,12 @@ public class Component implements Animation, StyleListener, Editable {
                     refreshLabel.putClientProperty("cn1$opacityMotion", opacityMotion);
                     refreshLabel.putClientProperty("cn1$rotationMotion", rotationMotion);
                     c.add(refreshLabel);
-                    p.addPointerReleasedListener(new ActionListener<ActionEvent>() {
+                    final Container pc = p.asContainer();
+                    pc.addPointerReleasedListener(new ActionListener<ActionEvent>() {
                         @Override
                         public void actionPerformed(ActionEvent evt) {
                             pointerReleaseMaterialPullToRefresh();
-                            p.removePointerReleasedListener(this);
+                            pc.removePointerReleasedListener(this);
                             evt.consume();
                         }
                     });
@@ -5834,9 +5835,12 @@ public class Component implements Animation, StyleListener, Editable {
             lastScrollY = y;
             lastScrollX = x;
         } else {
-            //try to find a scrollable element until you reach the Form
+            //try to find a scrollable element until you reach the top level
             Component parent = getParent();
-            if (!(parent instanceof Form)) {
+            // Any top level, not just a Form: a Window dispatches drags to the pressed
+            // component itself, so bubbling past one would come straight back here and
+            // recurse until the stack ran out.
+            if (parent != null && !(parent instanceof TopLevelContainer)) {
                 parent.pointerDragged(x, y);
             }
         }
@@ -7920,7 +7924,10 @@ public class Component implements Animation, StyleListener, Editable {
             }
             showNativeOverlay();
             if (refreshTask != null && InfiniteProgress.isDefaultMaterialDesignMode()) {
-                final Form p = getComponentForm();
+                // The top level rather than the Form: a component inside a Window has
+                // no Form, and this ran listener methods on the result immediately, so
+                // showing such a window threw.
+                final TopLevelContainer p = getTopLevelContainer();
                 if (refreshTaskDragListener == null) {
                     refreshTaskDragListener = new ActionListener() {
                         @Override
@@ -7935,8 +7942,10 @@ public class Component implements Animation, StyleListener, Editable {
                         }
                     };
                 }
-                p.addPointerDraggedListener(refreshTaskDragListener);
-                p.addPointerPressedListener(refreshTaskDragListener);
+                if (p != null) {
+                    p.asContainer().addPointerDraggedListener(refreshTaskDragListener);
+                    p.asContainer().addPointerPressedListener(refreshTaskDragListener);
+                }
             }
         }
     }

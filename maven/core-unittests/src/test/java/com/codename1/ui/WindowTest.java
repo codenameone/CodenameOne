@@ -555,6 +555,84 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void draggingANonScrollableChildDoesNotRecurse() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drags", new BorderLayout());
+        Label plain = new Label("not scrollable");
+        w.add(BorderLayout.CENTER, plain);
+        w.show();
+
+        // A drag bubbles up looking for something scrollable and used to stop only at
+        // a Form. A Window dispatches drags to the pressed child itself, so bubbling
+        // past it came straight back and recursed until the stack ran out.
+        w.pointerPressed(10, 10);
+        w.pointerDragged(12, 14);
+        w.pointerReleased(12, 14);
+        w.dispose();
+    }
+
+    @FormTest
+    void aPressInTheTitleAreaReachesIt() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("titled", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        final AtomicInteger pressed = new AtomicInteger();
+        Button chrome = new Button("close");
+        chrome.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                pressed.incrementAndGet();
+            }
+        });
+        w.getTitleArea().add(BorderLayout.EAST, chrome);
+        w.show();
+        w.revalidate();
+
+        // The title area is a sibling of the content pane, so hit testing that always
+        // started at the content pane could never reach a button drawn as chrome.
+        int x = chrome.getAbsoluteX() + chrome.getWidth() / 2;
+        int y = chrome.getAbsoluteY() + chrome.getHeight() / 2;
+        w.pointerPressed(x, y);
+        w.pointerReleased(x, y);
+        assertEquals(1, pressed.get(),
+                "a component in the title area has to receive presses");
+        w.dispose();
+    }
+
+    @FormTest
+    void anUnownedWindowModalBlocksNothing() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("unowned modal");
+        w.setModalityType(Window.MODALITY_WINDOW);
+        w.show();
+
+        // Window modality blocks the owning window. There is none, so it blocks
+        // nothing -- treating that as main-form ownership would block the main form
+        // on a window that never claimed it.
+        assertFalse(Display.getInstance().windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "the main form is not the owner, so it must not be blocked");
+        w.dispose();
+    }
+
+    @FormTest
+    void showingAChildFirstStillEstablishesTheRealOwner() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+
+        // The owner has never been shown, so it has no peer. Creating the child now
+        // would fix the wrong native owner permanently, since every port establishes
+        // the relation at creation.
+        child.show();
+
+        assertNotNull(wm.getLastWindow().getOwner(),
+                "the owner's native window has to exist before the child's");
+        assertFalse(wm.getLastWindow().isOwnedByMainWindow());
+        owner.dispose();
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

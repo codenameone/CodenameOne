@@ -3498,8 +3498,14 @@ public final class Display extends CN1Constants {
         if (owner instanceof Window) {
             return ((Window) owner).getWindowId() == windowId;
         }
-        // owned by the main form
-        return windowId == 0;
+        if (owner != null) {
+            // owned by the main form
+            return windowId == 0;
+        }
+        // No owner at all. Window modality blocks the owning window, and there is
+        // none, so it blocks nothing -- treating this as main-form ownership would
+        // block the main form on a window that never claimed it.
+        return false;
     }
 
     /// Paints every open window after the main surface. Iterates by index and

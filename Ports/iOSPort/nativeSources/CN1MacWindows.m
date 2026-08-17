@@ -183,6 +183,11 @@ typedef struct {
     int inUse;
     int pendingWidth;
     int pendingHeight;
+    /* The visibility the framework last asked for. A scene is requested
+     * asynchronously, so a show()/hide() pair can both land before one exists;
+     * without recording it the hide is dropped and adoption shows the window
+     * anyway, leaving a native window on screen the framework no longer paints. */
+    int pendingVisible;
     NSString* pendingTitle;
 } CN1MacWindow;
 
@@ -376,7 +381,13 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     w->controller.content = w->content;
 
     w->window.rootViewController = w->controller;
-    [w->window makeKeyAndVisible];
+    /* Honour the visibility last asked for rather than always showing: a window
+     * hidden before its scene arrived must not appear now. */
+    if (w->pendingVisible) {
+        [w->window makeKeyAndVisible];
+    } else {
+        w->window.hidden = YES;
+    }
 
     if (w->pendingTitle != nil) {
         scene.title = w->pendingTitle;
@@ -450,6 +461,8 @@ void CN1MacWindowShow(int slot, BOOL visible) {
     if (w == NULL) {
         return;
     }
+    /* Recorded whether or not a scene exists yet, so adoption can honour it. */
+    w->pendingVisible = visible ? 1 : 0;
     UIWindow* window = w->window;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (window != nil) {

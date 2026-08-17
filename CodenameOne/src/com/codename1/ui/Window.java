@@ -114,6 +114,7 @@ public class Window extends Container implements TopLevelContainer {
     private Painter glassPane;
     private Toolbar toolbar;
 
+    private ArrayList<Component> componentsAwaitingRelease;
     private Component focused;
     private Component dragged;
     private Component pressedCmp;
@@ -1151,6 +1152,12 @@ public class Window extends Container implements TopLevelContainer {
         }
         WindowManager wm = manager();
         if (nativePeer == null) {
+            if (ownerWindow instanceof Window && ((Window) ownerWindow).nativePeer == null) {
+                // Showing a window whose owner has not been shown yet would create the
+                // child against the wrong native owner, permanently: every port fixes
+                // the relation at creation. Create the owner's native window first.
+                ((Window) ownerWindow).show();
+            }
             Object parentPeer = ownerWindow instanceof Window
                     ? ((Window) ownerWindow).nativePeer : null;
             // A null peer means two different things -- no owner at all, or an owner
@@ -1785,6 +1792,13 @@ public class Window extends Container implements TopLevelContainer {
         if (windowLayeredPane != null && windowLayeredPane.getResponderAt(x, y) != null) {
             return windowLayeredPane;
         }
+        // The title area is a sibling of the content pane, not inside it, so a point
+        // in the north region resolves to nothing without this -- and a Toolbar or a
+        // button placed there, which is exactly how an undecorated window draws its
+        // own chrome, would never receive a press.
+        if (titleArea.contains(x, y) && titleArea.getComponentCount() > 0) {
+            return titleArea;
+        }
         return getActualPane();
     }
 
@@ -1794,8 +1808,8 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// A `Container` has no hit testing of its own -- `Form` does that work itself --
     /// so a `Window` has to as well, or a press would never reach the component under
-    /// it. This is the same walk `Form` performs, without the title area and menu bar
-    /// special cases a window has no equivalent of.
+    /// it. This is the same walk `Form` performs, without the menu bar special case a
+    /// window has no equivalent of.
     @Override
     public void pointerPressed(int x, int y) {
         initialPressX = x;
@@ -1977,6 +1991,31 @@ public class Window extends Container implements TopLevelContainer {
             fireWindowEvent(WindowEvent.Type.Restored);
             repaint();
             Display.getInstance().wakeEdt();
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public <C extends Component> void addComponentAwaitingRelease(C c) {
+        if (componentsAwaitingRelease == null) {
+            componentsAwaitingRelease = new ArrayList<Component>();
+        }
+        componentsAwaitingRelease.add(c);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public <C extends Component> void removeComponentAwaitingRelease(C c) {
+        if (componentsAwaitingRelease != null) {
+            componentsAwaitingRelease.remove(c);
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void clearComponentsAwaitingRelease() {
+        if (componentsAwaitingRelease != null) {
+            componentsAwaitingRelease.clear();
         }
     }
 

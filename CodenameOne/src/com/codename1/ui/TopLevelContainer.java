@@ -52,6 +52,25 @@ public interface TopLevelContainer {
     /// #### Returns
     ///
     /// this instance, as a `Container`
+    /// Records a component that is waiting for a pointer release, so the top level can
+    /// release it if the gesture ends somewhere else.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component awaiting a release
+    <C extends Component> void addComponentAwaitingRelease(C c);
+
+    /// Stops tracking a component that was waiting for a pointer release.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component to stop tracking
+    <C extends Component> void removeComponentAwaitingRelease(C c);
+
+    /// Drops every component waiting for a pointer release, used when a gesture is
+    /// taken over by something else -- a pull to refresh, for instance.
+    void clearComponentsAwaitingRelease();
+
     Container asContainer();
 
     // ---- content and structure ------------------------------------------------

@@ -416,6 +416,43 @@ public class JavaSEWindowManager extends WindowManager {
         }
         p.modalElevated = modal;
         applyAlwaysOnTop(p);
+
+        // Elevation alone is not enough. The framework filters canvas input, but the
+        // native title bar is outside that filter: closing a blocked secondary frame
+        // would still fire a close request, and closing the enabled main frame would
+        // exit the application. Disable the frames this window blocks.
+        final Peer owner = peer(ownerPeer);
+        final boolean enable = !modal;
+        runOnAwt(new Runnable() {
+            @Override
+            public void run() {
+                if (applicationWide) {
+                    java.awt.Window main = port.findTopFrame();
+                    if (main != null) {
+                        main.setEnabled(enable);
+                    }
+                    for (Peer each : snapshotPeers()) {
+                        if (each != p) { //NOPMD CompareObjectsWithEquals
+                            each.frame.setEnabled(enable);
+                        }
+                    }
+                } else if (owner != null) {
+                    owner.frame.setEnabled(enable);
+                } else {
+                    java.awt.Window main = port.findTopFrame();
+                    if (main != null) {
+                        main.setEnabled(enable);
+                    }
+                }
+            }
+        });
+    }
+
+    /// A copy of the peer list, so the AWT thread never walks the live one.
+    private Peer[] snapshotPeers() {
+        synchronized (peers) {
+            return peers.toArray(new Peer[peers.size()]);
+        }
     }
 
     /// Floats the frame when the application asked for it or while it is modal.
