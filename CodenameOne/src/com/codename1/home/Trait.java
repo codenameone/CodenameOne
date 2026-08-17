@@ -157,9 +157,14 @@ public final class Trait {
     /// the write path can check without a constant in hand.
     private static Trait choice(String id, boolean readOnly, Enum<?>[] domain,
             Enum<?>[] writable) {
+        // Null when the writable set IS the domain, so acceptsEnumWrite has
+        // nothing to check. Compared by length rather than by reference:
+        // every caller passes either the same array or a strict subset, and
+        // an identity test is the kind of thing that reads as a bug.
+        String[] writableNames = writable.length == domain.length
+                ? null : namesOf(writable);
         return define(id, TraitValueKind.ENUM, TraitUnit.NONE, readOnly, 0, 0,
-                false, namesOf(domain),
-                writable == domain ? null : namesOf(writable));
+                false, namesOf(domain), writableNames);
     }
 
     private static String[] namesOf(Enum<?>[] constants) {
@@ -799,8 +804,8 @@ public final class Trait {
             // domain, which acceptsEnumValue has already bounds-checked.
             name = enumNames[value.getEnumOrdinal()];
         }
-        for (int i = 0; i < writableEnumNames.length; i++) {
-            if (writableEnumNames[i].equals(name)) {
+        for (String writable : writableEnumNames) {
+            if (writable.equals(name)) {
                 return true;
             }
         }
