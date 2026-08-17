@@ -418,6 +418,35 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aNarrowerModalDoesNotLiftABroaderOne() {
+        implementation.setMultiWindowSupported(true);
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+
+        Window child = new Window("window modal");
+        child.setOwnerWindow(appModal);
+        child.setModalityType(Window.MODALITY_WINDOW);
+        child.show();
+
+        // The window modal on top blocks only its owner. Consulting just the newest
+        // blocker would answer "not blocked" for the main form and for every unrelated
+        // window, silently letting input back in while an application modal is still up.
+        // The wheel entry point is the one that reports the answer synchronously.
+        Display d = Display.getInstance();
+        assertTrue(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "the main form stays blocked while an application modal is registered");
+
+        child.dispose();
+        assertTrue(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "and stays blocked once the narrower one is gone");
+
+        appModal.dispose();
+        assertFalse(d.windowMouseWheelEvent(0, 5, 5, 0, 120, false, 0),
+                "input returns once no modal window is registered");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

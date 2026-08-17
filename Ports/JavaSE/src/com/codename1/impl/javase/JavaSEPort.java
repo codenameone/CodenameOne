@@ -2910,6 +2910,29 @@ public class JavaSEPort extends CodenameOneImplementation {
          */
         int windowId;
 
+        /**
+         * This canvas's own drawable width, which is what its pointer bounds checks
+         * and coordinate clamping have to use. The display dimensions describe the
+         * <em>primary</em> canvas, so a secondary window larger than it -- or shown
+         * before a main form has sized it -- would silently discard presses outside
+         * those dimensions and clamp drags into them. The primary canvas keeps going
+         * through the display dimensions unchanged, because those also account for a
+         * loaded skin's screen coordinates.
+         */
+        int surfaceWidth() {
+            if (windowId == 0) {
+                return getDisplayWidthImpl();
+            }
+            return Math.max(1, (int) (getWidth() * retinaScale));
+        }
+
+        int surfaceHeight() {
+            if (windowId == 0) {
+                return getDisplayHeightImpl();
+            }
+            return Math.max(1, (int) (getHeight() * retinaScale));
+        }
+
         C() {
             super(null);
             setFocusTraversalKeysEnabled(false);
@@ -3830,7 +3853,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 releaseLock = false;
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
+                if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
                     if (touchDevice) {
                         if (testRecorder != null) {
                             testRecorder.eventPointerPressed(x, y);
@@ -3893,10 +3916,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             if ((e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0 || (e.getModifiers() & MouseEvent.BUTTON3_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
+                if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        x = Math.min(getDisplayWidthImpl(), Math.max(0, x));
-                        y = Math.min(getDisplayHeightImpl(), Math.max(0, y));
+                        x = Math.min(surfaceWidth(), Math.max(0, x));
+                        y = Math.min(surfaceHeight(), Math.max(0, y));
                         if (testRecorder != null) {
                             testRecorder.eventPointerReleased(x, y);
                         }
@@ -3931,10 +3954,10 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
+                if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        x = Math.min(getDisplayWidthImpl(), Math.max(0, x));
-                        y = Math.min(getDisplayHeightImpl(), Math.max(0, y));
+                        x = Math.min(surfaceWidth(), Math.max(0, x));
+                        y = Math.min(surfaceHeight(), Math.max(0, y));
                         if (testRecorder != null && hasDragStarted(x, y)) {
                             testRecorder.eventPointerDragged(x, y);
                         }
@@ -3949,9 +3972,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!releaseLock && isPinchZoom(e)) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (mouseDown || (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl())) {
+                if (mouseDown || (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight())) {
                     if (touchDevice) {
-                        JavaSEPort.this.pointerDragged(new int[]{Math.min(getDisplayWidthImpl(), Math.max(0,x)), 0}, new int[]{Math.min(getDisplayHeightImpl(), Math.max(0, y)), 0});
+                        JavaSEPort.this.pointerDragged(new int[]{Math.min(surfaceWidth(), Math.max(0,x)), 0}, new int[]{Math.min(surfaceHeight(), Math.max(0, y)), 0});
                     }
                 } 
                 return;
@@ -4115,18 +4138,22 @@ public class JavaSEPort extends CodenameOneImplementation {
             if(invokePointerHover || JavaSEPort.this.isDesktop()) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    JavaSEPort.this.pointerHover(x, y);
+                if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
+                    JavaSEPort.this.windowPointerHover(windowId, x, y);
                 }
 
 
             }
-            Form f = Display.getInstance().getCurrent();
-            if (f != null && f.isEnableCursors()) {
+            // Cursors resolve against this canvas's own top level, not the current
+            // form: a window's components are the ones under the pointer here.
+            com.codename1.ui.TopLevelContainer top = windowId > 0
+                    ? com.codename1.ui.Desktop.getInstance().windowById(windowId)
+                    : Display.getInstance().getCurrent();
+            if (top != null && top.isEnableCursors()) {
                 int x = scaleCoordinateX(e.getX());
                 int y = scaleCoordinateY(e.getY());
-                if (x >= 0 && x < getDisplayWidthImpl() && y >= 0 && y < getDisplayHeightImpl()) {
-                    Component cmp = f.getComponentAt(x, y);
+                if (x >= 0 && x < surfaceWidth() && y >= 0 && y < surfaceHeight()) {
+                    Component cmp = top.asContainer().getComponentAt(x, y);
                     if (cmp != null) {
                         int cursor = cmp.getCursor();
                         if (cursor != currentCursor) {

@@ -2497,13 +2497,40 @@ public final class Display extends CN1Constants {
     ///
     /// - `y`: the y position of the pointer
     public void pointerHover(final int[] x, final int[] y) {
-        if (impl.getCurrentForm() == null) {
+        pointerHoverImpl(0, x, y);
+    }
+
+    /// Pushes a pointer hover event that arrived over a specific native window.
+    ///
+    /// A port with desktop windows has to say which window the pointer was over, or
+    /// hovering a second window sends the event to whatever the main form has at the
+    /// same coordinates -- so the window gets no tooltips and the main form gets
+    /// spurious ones.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHover(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0) {
+            pointerHoverImpl(windowId, x, y);
+        }
+    }
+
+    private void pointerHoverImpl(int windowId, final int[] x, final int[] y) {
+        if (windowId == 0 && impl.getCurrentForm() == null) {
+            return;
+        }
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) == null) {
             return;
         }
         if (x.length == 1) {
-            addPointerEventWithTimestamp(POINTER_HOVER, x[0], y[0]);
+            addPointerEventWithTimestamp(POINTER_HOVER | (windowId << 8), x[0], y[0]);
         } else {
-            addPointerEvent(POINTER_HOVER, x, y);
+            addPointerEvent(POINTER_HOVER | (windowId << 8), x, y);
         }
     }
 
@@ -3419,19 +3446,33 @@ public final class Display extends CN1Constants {
     /// Indicates whether input aimed at the given window is currently blocked by a
     /// modal window above it.
     private boolean isBlockedByModal(int windowId) {
+        // Every registered blocker is consulted rather than only the newest one.
+        // Modal windows nest: a window modal opened from inside an application modal
+        // blocks only its own owner, and stopping at the top of the stack would let
+        // input back into the main form and every unrelated window for as long as the
+        // narrower one was up.
         int len = modalWindows.size();
-        if (len == 0) {
-            return false;
+        for (int iter = len - 1; iter >= 0; iter--) {
+            Window modal = modalWindows.get(iter);
+            if (modal.getWindowId() == windowId) {
+                // A modal window is never blocked by itself, and a modal opened from
+                // inside another is not blocked by the one it was opened from.
+                return false;
+            }
+            if (blocks(modal, windowId)) {
+                return true;
+            }
         }
-        Window top = modalWindows.get(len - 1);
-        if (top.getWindowId() == windowId) {
-            return false;
-        }
-        if (top.getModalityType() == Window.MODALITY_APPLICATION) {
+        return false;
+    }
+
+    /// Whether one modal window blocks input to the window with the given id.
+    private boolean blocks(Window modal, int windowId) {
+        if (modal.getModalityType() == Window.MODALITY_APPLICATION) {
             return true;
         }
         // window modal: only the owner is blocked
-        TopLevelContainer owner = top.getOwnerWindow();
+        TopLevelContainer owner = modal.getOwnerWindow();
         if (owner instanceof Window) {
             return ((Window) owner).getWindowId() == windowId;
         }

@@ -264,11 +264,26 @@ This is worth knowing about because it was the single most common way an early
 multi-window implementation looks correct and isn't: the peer or the text caret appears
 on the main window while the content it belongs to is in another one.
 
+=== Overlays inside a window
+
+A window has the same layered panes a form does, and that's what an overlay attaches to:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopWindowsJava013Snippet.java[tag=desktop-windows-java-013,indent=0]
+----
+
+The ready-made overlay components aren't window-aware yet. `Dialog`, `Sheet`,
+`InteractionDialog` and `ToastBar` all resolve their host through
+`CN.getCurrentForm()` or `getComponentForm()`, so from inside a window they either
+attach to the main form or find nothing at all - `getComponentForm()` returns null in a
+window by design. Showing one from a window puts it on the main window, which isn't what
+the calling code meant. Build the overlay against the window's own layered pane, as
+above, until those components gain a top-level-aware attachment path.
+
 === Unsupported inside a window
 
-* `Dialog.show()` routes through the main surface and will appear on the main window. Use
-  `Sheet` or `InteractionDialog` inside a window instead - both attach to the window's own
-  layered pane and work normally.
+* `Dialog`, `Sheet`, `InteractionDialog` and `ToastBar`, for the reason just described.
 * `Form` transitions into or out of a window.
 * `HTMLComponent`.
 * Accessibility on secondary windows.

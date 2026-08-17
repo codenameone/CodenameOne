@@ -1286,10 +1286,14 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// - `type`: one of `#MODALITY_NONE`, `#MODALITY_WINDOW` or `#MODALITY_APPLICATION`
     public void setModalityType(int type) {
+        // Released under the *old* scope before the type changes, because that is the
+        // scope the port was told about. Releasing afterwards would hand the port the
+        // new one and undo the wrong block -- on Windows, switching an application
+        // modal to window modal would re-enable an owner rather than decrement the
+        // main window's disable count, leaving the main window disabled for good.
+        releaseModal();
         modalityType = type;
-        if (type == MODALITY_NONE) {
-            releaseModal();
-        } else if (nativeVisible) {
+        if (type != MODALITY_NONE && nativeVisible) {
             acquireModal();
         }
     }
@@ -1337,6 +1341,19 @@ public class Window extends Container implements TopLevelContainer {
     /// more than once is harmless.
     public void dispose() {
         if (disposing) {
+            return;
+        }
+        if (!Display.getInstance().isEdt()) {
+            // Marshalled exactly as show() is. Tearing the hierarchy down, firing the
+            // window events and mutating the desktop and paint registries from a
+            // background thread would race the event dispatch thread while it is
+            // painting this very window or dispatching input to it.
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    dispose();
+                }
+            });
             return;
         }
         disposing = true;
@@ -1791,6 +1808,49 @@ public class Window extends Container implements TopLevelContainer {
             if (first != null) {
                 setFocused(first);
             }
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// `Component`'s implementation is empty, so without this a window would receive
+    /// hover events and drop them: no tooltips, and no hover state on the components
+    /// under the pointer.
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+        if (dragged != null) {
+            LeadUtil.pointerHover(dragged, x, y);
+            return;
+        }
+        Component cmp = resolveComponentAt(x[0], y[0]);
+        if (cmp != null) {
+            LeadUtil.pointerHover(cmp, x, y);
+            if (TooltipManager.getInstance() != null) {
+                String tip = cmp.getTooltip();
+                if (tip != null && tip.length() > 0) {
+                    TooltipManager.getInstance().prepareTooltip(tip, cmp);
+                } else {
+                    TooltipManager.getInstance().clearTooltip();
+                }
+            }
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHoverReleased(int[] x, int[] y) {
+        Component cmp = resolveComponentAt(x[0], y[0]);
+        if (cmp != null) {
+            LeadUtil.pointerHoverReleased(cmp, x, y);
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHoverPressed(int[] x, int[] y) {
+        Component cmp = resolveComponentAt(x[0], y[0]);
+        if (cmp != null) {
+            LeadUtil.pointerHoverPressed(cmp, x, y);
         }
     }
 

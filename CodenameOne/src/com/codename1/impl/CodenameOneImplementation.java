@@ -3458,6 +3458,26 @@ public abstract class CodenameOneImplementation {
         pointerHover(xPointerEvent, yPointerEvent);
     }
 
+    /// Same as `#pointerHover(int, int)`, for a hover over a specific native window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created, or 0 for
+    ///   the application's main surface
+    ///
+    /// - `x`: the position of the event
+    ///
+    /// - `y`: the position of the event
+    protected void windowPointerHover(final int windowId, final int x, final int y) {
+        xPointerEvent[0] = x;
+        yPointerEvent[0] = y;
+        if (windowId > 0) {
+            Display.getInstance().windowPointerHover(windowId, xPointerEvent, yPointerEvent);
+        } else {
+            pointerHover(xPointerEvent, yPointerEvent);
+        }
+    }
+
     /// Subclasses should invoke this method, it delegates the event to the display and into
     /// Codename One.
     ///
