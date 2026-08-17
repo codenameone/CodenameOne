@@ -15224,7 +15224,10 @@ static NSString *cn1IntentsWriteStagedImages(NSString *token) {
         if ([cn1IntentImages count] == 0) {
             return nil;
         }
-        snapshot = [cn1IntentImages copy];
+        // Autoreleased rather than owned: this function has four exits and the app target is
+        // MRC, so a plain -copy would leak every staged blob on three of them. The caller is
+        // inside a POOL_BEGIN/POOL_END pair.
+        snapshot = [[cn1IntentImages copy] autorelease];
     }
     NSArray *caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory,
             NSUserDomainMask, YES);
@@ -15330,9 +15333,13 @@ void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang
         }
     }
     [activity becomeCurrent];
-    // Held for the lifetime of the process: an NSUserActivity that is released stops being
-    // current, and the donation is lost.
+    // Held by the array, not by us: an NSUserActivity that is released outright stops being
+    // current and the donation is lost, so ownership moves to cn1IntentActivities. Dropping
+    // this alloc's own reference is what makes that array's bound mean anything -- without it
+    // evicting an old entry releases only the array's retain and every donated activity stays
+    // alive for the life of the process.
     cn1IntentsRetainActivity(activity);
+    [activity release];
     POOL_END();
 }
 
@@ -15370,8 +15377,10 @@ void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD
             if (uid == nil) {
                 continue;
             }
-            CSSearchableItemAttributeSet *attrs = [[CSSearchableItemAttributeSet alloc]
-                    initWithItemContentType:(NSString *)kUTTypeItem];
+            // Autoreleased: the app target is MRC and this loop runs once per entity, so an
+            // owned attribute set would leak its thumbnail data on every index call.
+            CSSearchableItemAttributeSet *attrs = [[[CSSearchableItemAttributeSet alloc]
+                    initWithItemContentType:(NSString *)kUTTypeItem] autorelease];
             attrs.title = [e objectForKey:@"title"];
             attrs.contentDescription = [e objectForKey:@"subtitle"];
             id keywords = [e objectForKey:@"keywords"];
@@ -15387,10 +15396,10 @@ void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD
                     }
                 }
             }
-            CSSearchableItem *item = [[CSSearchableItem alloc]
+            CSSearchableItem *item = [[[CSSearchableItem alloc]
                     initWithUniqueIdentifier:uid
                             domainIdentifier:[e objectForKey:@"type"]
-                                attributeSet:attrs];
+                                attributeSet:attrs] autorelease];
             [items addObject:item];
         }
         if ([items count] > 0) {

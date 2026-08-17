@@ -155,6 +155,19 @@ class IOSAppIntentsBuilderTest {
         assertTrue(swift.contains("openAppWhenRun: Bool = false"));
     }
 
+    /// headless is what decides this, not opensRoute alone. A handler that did not declare
+    /// headless is allowed to touch a Form -- that is the whole meaning of the flag -- so
+    /// running it with no foreground window hands it a Display with nothing on screen, inside
+    /// Siri, where there is nowhere to report the failure.
+    @Test
+    void anIntentThatIsNotHeadlessOpensTheApp() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("show_summary", "Show summary", "headless", Boolean.FALSE)),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("openAppWhenRun: Bool = true"));
+    }
+
     @Test
     void anEntityParameterCrossesAsItsIdOnly() {
         String swift = intentsSwift(

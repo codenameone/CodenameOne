@@ -50,7 +50,14 @@ static void cn1IntentsEnsureState(void) {
     @synchronized (cn1PendingLock) {
         token = [NSString stringWithFormat:@"cn1i-%lld", ++cn1IntentTokenCounter];
         if (completion != nil) {
-            [cn1PendingIntents setObject:[completion copy] forKey:token];
+            // -copy moves the block off the stack and hands us ownership of the result; the
+            // dictionary takes its own retain. Releasing ours is what lets the block -- and the
+            // Swift continuation it captures -- actually go away when the token is removed. The
+            // app target is MRC, and there is no guaranteed autorelease pool on the thread
+            // Swift calls this from, so this is explicit rather than -autorelease.
+            void (^owned)(NSString *, NSString *) = [completion copy];
+            [cn1PendingIntents setObject:owned forKey:token];
+            [owned release];
         }
     }
 
@@ -75,13 +82,16 @@ static void cn1IntentsEnsureState(void) {
     cn1IntentsEnsureState();
     void (^completion)(NSString *, NSString *) = nil;
     @synchronized (cn1PendingLock) {
-        completion = [cn1PendingIntents objectForKey:token];
+        // Retained before the removal: the dictionary holds the only reference, so removing
+        // first would deallocate the block and leave this pointer dangling into the call below.
+        completion = [[cn1PendingIntents objectForKey:token] retain];
         // Removed before firing, so a late handler result racing the deadline cannot resume
         // the same continuation twice.
         [cn1PendingIntents removeObjectForKey:token];
     }
     if (completion != nil) {
         completion(resultJson == nil ? @"{}" : resultJson, imagesDir);
+        [completion release];
     }
 }
 

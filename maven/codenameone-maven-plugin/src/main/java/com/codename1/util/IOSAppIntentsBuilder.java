@@ -118,9 +118,14 @@ public final class IOSAppIntentsBuilder {
             sb.append("    static var description = IntentDescription(\"")
                     .append(swift(description)).append("\")\n");
         }
-        // openAppWhenRun is the switch between "answer in place" and "continue in the app".
-        // A headless intent that also names a route still opens: the route is the point.
-        sb.append("    static var openAppWhenRun: Bool = ").append(opensApp).append("\n");
+        // openAppWhenRun is the switch between "answer in place" and "continue in the app", and
+        // headless is what decides it. A handler that did not declare headless is allowed to
+        // touch a Form -- that is the entire meaning of the flag -- so running it with no
+        // foreground window would hand it a Display with nothing on screen and fail inside
+        // Siri, where there is nowhere to report it. A headless intent that names a route
+        // opens anyway: the route is the point.
+        sb.append("    static var openAppWhenRun: Bool = ")
+                .append(opensApp || !headless).append("\n");
         // discoverable=false means the capability is donation-only. Without this override App
         // Intents keeps its discoverable default and lists it in the Shortcuts catalog before it
         // has ever been donated, which is the opposite of what the declaration asked for.

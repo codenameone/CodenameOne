@@ -243,6 +243,94 @@ public class AppIntentAnnotationProcessorTest {
         }
     }
 
+    /// Out-of-range fields are the reason the parser sets a strict Calendar: a lenient one
+    /// rolls 2026-13-40 forward into a real date in 2027 and the handler acts on a day nobody
+    /// named.
+    @Test
+    public void anImpossibleDateIsRejectedRatherThanNormalized() throws Exception {
+        File classes = compile(source(
+                "public static java.util.Date seen;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log a workout\")\n"
+                        + "public static IntentResult logWorkout(\n"
+                        + "        @IntentParam(value = \"when\", required = false)\n"
+                        + "        java.util.Date when) {\n"
+                        + "    seen = when;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            assertNull("month 13 is not a month", read(invoke, registry, seen, "2026-13-01"));
+            assertNull("nor is the 40th", read(invoke, registry, seen, "2026-03-40"));
+            assertNull("nor hour 25", read(invoke, registry, seen, "2026-03-14T25:00:00Z"));
+            assertNull("nor a leap day in a common year",
+                    read(invoke, registry, seen, "2026-02-29"));
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// A required parameter has no default to fall back to, so a present-but-unconvertible
+    /// value must stop the invocation rather than reach the handler as 0. Committing a side
+    /// effect on a number nobody supplied is the failure worth preventing here.
+    @Test
+    public void aRequiredNumberRejectsAValueThatIsNotOne() throws Exception {
+        File classes = compile(source(
+                "public static int seen = -1;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log a workout\")\n"
+                        + "public static IntentResult logWorkout(\n"
+                        + "        @IntentParam(\"minutes\") int minutes) {\n"
+                        + "    seen = minutes;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            Map<String, Object> bad = new LinkedHashMap<String, Object>();
+            bad.put("minutes", "abc");
+            try {
+                invoke.invoke(registry, "log_workout", bad, null);
+                fail("a required int given \"abc\" must not run the handler");
+            } catch (java.lang.reflect.InvocationTargetException e) {
+                assertTrue(e.getCause() instanceof IllegalArgumentException);
+                assertTrue(e.getCause().getMessage(),
+                        e.getCause().getMessage().contains("minutes"));
+            }
+            assertEquals("the handler must not have run", -1, seen.getInt(null));
+
+            // The convertible forms still work, so this is strictness rather than a new rule
+            // about what a number may look like on the wire.
+            Map<String, Object> good = new LinkedHashMap<String, Object>();
+            good.put("minutes", "20");
+            invoke.invoke(registry, "log_workout", good, null);
+            assertEquals(20, seen.getInt(null));
+        } finally {
+            loader.close();
+        }
+    }
+
     /// Invokes the fixture with one parameter value and reports what the handler received.
     private static Object read(java.lang.reflect.Method invoke, Object registry,
                                java.lang.reflect.Field seen, Object value) throws Exception {

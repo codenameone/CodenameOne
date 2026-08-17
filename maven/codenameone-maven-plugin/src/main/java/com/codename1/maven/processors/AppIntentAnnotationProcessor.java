@@ -816,6 +816,12 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     }
 
     /// The reader used once a required value is known to be present.
+    ///
+    /// The primitives read strictly here, unlike their optional counterparts. An optional
+    /// parameter has a default to fall back to and falling back is the declared behaviour; a
+    /// required one does not, so `{"minutes": "abc"}` reaching the handler as 0 would run it
+    /// on a number nobody supplied -- and for a value the caller marked required, that is a
+    /// side effect committed on a misunderstanding.
     private String requiredReader(ParamDef p) {
         String key = quote(p.name);
         if ("entity".equals(p.kind)) {
@@ -825,7 +831,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "asDate(params, " + key + ", null)";
         }
         if ("boolean".equals(p.kind)) {
-            return "asBoolean(params, " + key + ", false)";
+            return "requiredBoolean(params, " + key + ")";
         }
         if (!p.options.isEmpty() && "string".equals(p.kind)) {
             return "oneOf(params, " + key + ", null, " + stringArrayExpr(p.options) + ")";
@@ -834,15 +840,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "asString(params, " + key + ", null)";
         }
         if ("int".equals(p.kind)) {
-            return "asInt(params, " + key + ", 0)";
+            return "(int) requiredLong(params, " + key + ")";
         }
         if ("long".equals(p.kind)) {
-            return "asLong(params, " + key + ", 0L)";
+            return "requiredLong(params, " + key + ")";
         }
         if ("float".equals(p.kind)) {
-            return "(float) asDouble(params, " + key + ", 0d)";
+            return "(float) requiredDouble(params, " + key + ")";
         }
-        return "asDouble(params, " + key + ", 0d)";
+        return "requiredDouble(params, " + key + ")";
     }
 
     private void generateQueryEntities(StringBuilder sb, List<EntityDef> ents) {
@@ -998,6 +1004,49 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("                + \"\\\" is not an accepted value for \" + k);\n");
         sb.append("    }\n\n");
 
+        // The strict counterparts of asLong/asDouble/asBoolean, used only for a required
+        // parameter with no default. They reject a present-but-unconvertible value instead of
+        // substituting a fallback the declaration never offered.
+        sb.append("    private static long requiredLong(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o instanceof Number) { return ((Number) o).longValue(); }\n");
+        sb.append("        if (o instanceof String) {\n");
+        sb.append("            try { return Long.parseLong(((String) o).trim()); }\n");
+        sb.append("            catch (NumberFormatException e) {\n");
+        sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                        + \"\\\" is not a whole number for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static double requiredDouble(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o instanceof Number) { return ((Number) o).doubleValue(); }\n");
+        sb.append("        if (o instanceof String) {\n");
+        sb.append("            try { return Double.parseDouble(((String) o).trim()); }\n");
+        sb.append("            catch (NumberFormatException e) {\n");
+        sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                        + \"\\\" is not a number for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    private static boolean requiredBoolean(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o instanceof Boolean) { return ((Boolean) o).booleanValue(); }\n");
+        sb.append("        if (o instanceof Number) { return ((Number) o).doubleValue() != 0; }\n");
+        sb.append("        if (o instanceof String) {\n");
+        sb.append("            String v = ((String) o).trim();\n");
+        sb.append("            if (\"true\".equalsIgnoreCase(v) || \"1\".equals(v)) { return true; }\n");
+        sb.append("            if (\"false\".equalsIgnoreCase(v) || \"0\".equals(v)) { return false; }\n");
+        sb.append("            throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                    + \"\\\" is not true or false for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
         sb.append("    private static <T> T required(Map<String, Object> p, String k, T value) {\n");
         sb.append("        if (p == null || !p.containsKey(k) || p.get(k) == null) {\n");
         sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
@@ -1041,6 +1090,9 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        java.util.Calendar c = java.util.Calendar.getInstance(\n");
         sb.append("                java.util.TimeZone.getTimeZone(\"GMT\"));\n");
         sb.append("        c.clear();\n");
+        // Without this, 2026-13-40 normalizes into a real date in 2027 and the handler acts on
+        // something nobody asked for. Strict is the only setting that can say "not a date".
+        sb.append("        c.setLenient(false);\n");
         sb.append("        int offsetMinutes = 0;\n");
         sb.append("        try {\n");
         sb.append("            int year = Integer.parseInt(s.substring(0, 4));\n");
@@ -1082,12 +1134,16 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("            }\n");
         sb.append("            c.set(year, month - 1, day, hour, minute, second);\n");
         sb.append("            c.set(java.util.Calendar.MILLISECOND, millis);\n");
+        // getTime() is where a strict Calendar validates, so it has to be inside the guard.
+        sb.append("            return new java.util.Date(\n");
+        sb.append("                    c.getTime().getTime() - offsetMinutes * 60000L);\n");
         sb.append("        } catch (NumberFormatException e) {\n");
         sb.append("            return null;\n");
         sb.append("        } catch (IndexOutOfBoundsException e) {\n");
         sb.append("            return null;\n");
+        sb.append("        } catch (IllegalArgumentException e) {\n");
+        sb.append("            return null;\n");
         sb.append("        }\n");
-        sb.append("        return new java.util.Date(c.getTime().getTime() - offsetMinutes * 60000L);\n");
         sb.append("    }\n");
     }
 

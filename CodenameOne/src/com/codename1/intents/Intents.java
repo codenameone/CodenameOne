@@ -103,6 +103,13 @@ public final class Intents {
 
     /// Platform activities that arrived before the declarations did. Drained once the generated
     /// dispatcher installs itself, and dropped if it turns out nothing declares them.
+    ///
+    /// Guarded by `pending`, the dispatcher's own lock, rather than by itself. "Is the
+    /// dispatcher installed, and if not, queue this" has to be one decision: with two locks the
+    /// dispatcher can install and drain an empty queue in the window between the answer and the
+    /// enqueue, and the activity then sits here forever with nothing left to drain it -- a
+    /// donated shortcut tap on a cold start that launches the app and does nothing, which is
+    /// the exact failure this queue exists to prevent.
     private static final List<PendingActivity> pendingActivities =
             new ArrayList<PendingActivity>();
 
@@ -740,14 +747,6 @@ public final class Intents {
             dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
             return true;
         }
-        boolean ready;
-        synchronized (pending) {
-            ready = dispatcher != null;
-        }
-        if (ready) {
-            // The table exists and does not contain this type, so it belongs to somebody else.
-            return false;
-        }
         // Cold start: the platform can deliver a donated activity before the generated
         // dispatcher installs itself, so an unrecognised type is not yet evidence of anything.
         // Dropping it here is what made a shortcut tap on a dead process launch the app and
@@ -755,10 +754,18 @@ public final class Intents {
         //
         // Only ids shaped like ours are held. A third-party or handoff activity type is
         // reverse-DNS and cannot match, so claiming this one does not swallow theirs.
-        if (!looksLikeIntentId(activityType)) {
-            return false;
-        }
-        synchronized (pendingActivities) {
+        //
+        // The test and the enqueue are one critical section, and it is the dispatcher's own
+        // lock: anything less lets setDispatcher install and drain in the gap between them.
+        synchronized (pending) {
+            if (dispatcher != null) {
+                // The table exists and does not contain this type, so it belongs to somebody
+                // else.
+                return false;
+            }
+            if (!looksLikeIntentId(activityType)) {
+                return false;
+            }
             pendingActivities.add(new PendingActivity(activityType, params));
         }
         return true;
@@ -813,16 +820,25 @@ public final class Intents {
     /// - `d`: the generated dispatcher
     public static void setDispatcher(IntentDispatcher d) {
         List<PendingInvocation> queued = null;
+        List<PendingActivity> activities = null;
         synchronized (pending) {
             dispatcher = d;
-            if (d != null && !pending.isEmpty()) {
-                queued = new ArrayList<PendingInvocation>(pending);
-                pending.clear();
+            if (d != null) {
+                if (!pending.isEmpty()) {
+                    queued = new ArrayList<PendingInvocation>(pending);
+                    pending.clear();
+                }
+                // Taken under the same lock that just installed the dispatcher, so nothing can
+                // be queued after this snapshot and before the queue stops being consulted.
+                if (!pendingActivities.isEmpty()) {
+                    activities = new ArrayList<PendingActivity>(pendingActivities);
+                    pendingActivities.clear();
+                }
             }
         }
         if (d != null) {
             publishDeclarations(d);
-            drainPendingActivities();
+            drainPendingActivities(activities);
         }
         if (queued != null) {
             for (PendingInvocation q : queued) {
@@ -866,6 +882,7 @@ public final class Intents {
         synchronized (pending) {
             dispatcher = null;
             pending.clear();
+            pendingActivities.clear();
         }
         synchronized (dynamic) {
             dynamic.clear();
@@ -873,9 +890,6 @@ public final class Intents {
         synchronized (pendingSelections) {
             selectionHandler = null;
             pendingSelections.clear();
-        }
-        synchronized (pendingActivities) {
-            pendingActivities.clear();
         }
     }
 
@@ -910,14 +924,13 @@ public final class Intents {
 
     /// Runs the activities that arrived before the declarations did, dropping any the
     /// application turns out not to declare.
-    private static void drainPendingActivities() {
-        List<PendingActivity> queued;
-        synchronized (pendingActivities) {
-            if (pendingActivities.isEmpty()) {
-                return;
-            }
-            queued = new ArrayList<PendingActivity>(pendingActivities);
-            pendingActivities.clear();
+    ///
+    /// Takes the snapshot as a parameter rather than reading the queue itself: the caller
+    /// drained it under the lock that installed the dispatcher, which is what closes the window
+    /// an activity could otherwise be queued into and never taken out of.
+    private static void drainPendingActivities(List<PendingActivity> queued) {
+        if (queued == null) {
+            return;
         }
         for (PendingActivity a : queued) {
             if (getDeclaration(a.activityType) != null) {

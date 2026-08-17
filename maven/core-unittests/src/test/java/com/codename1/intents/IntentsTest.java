@@ -579,6 +579,31 @@ class IntentsTest {
         assertEquals(Arrays.asList("known"), d.invoked);
     }
 
+    /// The queue and the dispatcher have to be one decision. Two locks let setDispatcher
+    /// install and drain an empty queue between an activity being told "not ready" and being
+    /// enqueued, after which nothing ever drains it again -- an activity claimed and then
+    /// silently lost, which is worse than never claiming it. Racing threads cannot pin that;
+    /// this pins the invariant instead, that an activity is only ever claimed while the
+    /// dispatcher is genuinely absent.
+    @Test
+    void anActivityIsNeverClaimedOnceTheDispatcherExists() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        assertFalse(Intents.dispatchUserActivity("never_declared", null),
+                "the table exists and does not declare it, so it belongs to somebody else");
+        assertTrue(d.invoked.isEmpty());
+
+        // And nothing was left behind: installing a dispatcher again must not surface an
+        // activity that was refused rather than queued.
+        FakeDispatcher second = new FakeDispatcher();
+        second.declarations.add(declaration("never_declared"));
+        Intents.setDispatcher(second);
+
+        assertTrue(second.invoked.isEmpty(), "a refused activity must not be queued at all");
+    }
+
     @Test
     void aThirdPartyActivityIsNeverClaimed() {
         // Handoff and third-party types are reverse-DNS, so claiming everything while the table
