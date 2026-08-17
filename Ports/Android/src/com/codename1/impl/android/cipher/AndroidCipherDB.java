@@ -289,6 +289,22 @@ class AndroidCipherDB extends Database {
         }
     }
 
+    /**
+     * Changes the key of this database.
+     *
+     * <p>Converting to or from plaintext cannot be done in place on this engine -- SQLCipher's
+     * own instruction is to export into a second database -- so the connection the caller holds
+     * is closed and reopened on the converted file. The settings SQLite will report are carried
+     * across: foreign key enforcement, recursive triggers and the busy timeout, which between
+     * them decide whether statements are refused, whether triggers recurse, and whether a
+     * contended write waits or fails.
+     *
+     * <p>A pragma SQLite offers no way to read back cannot be carried, because there is nothing
+     * to read: {@code case_sensitive_like} and {@code ignore_check_constraints} are the two worth
+     * naming. An application that sets either has to set it again after this returns. Every other
+     * port re-keys in place and keeps the whole connection, so this is the one platform where
+     * that applies.
+     */
     @Override
     public void changeKey(DatabaseConfig config) throws IOException {
         checkOpen();
@@ -376,6 +392,58 @@ class AndroidCipherDB extends Database {
             return c.moveToFirst() ? c.getInt(0) : 0;
         } finally {
             c.close();
+        }
+    }
+
+    /**
+     * The connection-scoped settings to put back on the connection this conversion replaces.
+     *
+     * <p>Every other port re-keys in place, so their connection survives the operation with
+     * whatever the application had configured on it. This one cannot: SQLCipher converts by
+     * exporting into a second database and swapping the files, which means the connection the
+     * caller holds is closed and a new one opened underneath it. A new SQLite connection starts
+     * at the defaults, so a caller that had switched foreign key enforcement on carried on
+     * inserting afterwards with it silently off, writing rows the constraint existed to refuse.
+     *
+     * <p>Null until a conversion captures them.
+     */
+    private java.util.List<String> connectionSettings;
+
+    /**
+     * Reads back the connection-scoped settings this can restore.
+     *
+     * <p>Only the ones SQLite will report. A pragma with no getter -- case_sensitive_like and
+     * ignore_check_constraints among them -- cannot be captured by anything short of the caller
+     * telling us, and silently losing those is documented on changeKey rather than pretended
+     * about here.
+     */
+    private java.util.List<String> captureConnectionSettings() {
+        java.util.List<String> settings = new java.util.ArrayList<String>();
+        // Semantics first: these two decide whether statements are refused or rows are written,
+        // which is the difference between a conversion that preserved the caller's database and
+        // one that quietly changed the rules it runs under.
+        settings.add("PRAGMA foreign_keys = " + readHeaderPragma("PRAGMA foreign_keys"));
+        settings.add("PRAGMA recursive_triggers = " + readHeaderPragma("PRAGMA recursive_triggers"));
+        // Not semantics but not cosmetic either: a caller that raised the busy timeout did it
+        // because its workload contends, and a connection back at zero starts failing instead of
+        // waiting.
+        settings.add("PRAGMA busy_timeout = " + readHeaderPragma("PRAGMA busy_timeout"));
+        return settings;
+    }
+
+    /** Puts the captured settings back on a connection that has just replaced the old one. */
+    private void applyConnectionSettings(SQLiteDatabase opened) {
+        if (connectionSettings == null) {
+            return;
+        }
+        for (String pragma : connectionSettings) {
+            try {
+                opened.execSQL(pragma);
+            } catch (RuntimeException rejected) {
+                // One setting that will not go back is not a reason to abandon a conversion that
+                // has already succeeded, and it is not silent either: the value is readable by
+                // the caller, which is more than it had before.
+            }
         }
     }
 
@@ -478,6 +546,9 @@ class AndroidCipherDB extends Database {
 
     /** The conversion itself, with this database claimed for the duration. */
     private void migrateThroughExportExclusively(String targetKey, String path) throws IOException {
+        // Before anything is exported or swapped, while this is still the connection the caller
+        // configured.
+        connectionSettings = captureConnectionSettings();
         String name = new File(path).getName();
         File dir = AndroidImplementation.databaseMigrationDir(path);
         if (dir == null) {
@@ -747,6 +818,7 @@ class AndroidCipherDB extends Database {
             throw new IOException("The converted database could not be reopened: "
                     + err.getMessage(), err);
         }
+        applyConnectionSettings(opened);
         // Read something before calling this open a success, the way AndroidCipherFactory does.
         // SQLCipher applies the key lazily, so a file it cannot decrypt or cannot read opens
         // without complaint and fails at the first real query. Here that would be worse than
