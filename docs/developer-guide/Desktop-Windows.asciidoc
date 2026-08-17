@@ -47,8 +47,8 @@ Windows are a desktop feature, and the API says so plainly:
 |
 
 |macOS (Mac Catalyst)
-|Opt-in
-|Requires the `macNative.multiWindow` build hint. See <<mac-catalyst-windows>>.
+|Yes
+|See <<mac-catalyst-windows>> for how a window is rendered there.
 
 |iOS, Android, JavaScript
 |No
@@ -305,20 +305,16 @@ window. Components inside a window should size against their own top level.
 [[mac-catalyst-windows]]
 === Mac Catalyst
 
-Multi-window on the macOS (Mac Catalyst) target is opt-in through a build hint:
+Windows work on the macOS (Mac Catalyst) target with no configuration. A second
+Codename One window is a second `UIWindowScene`, which needs the
+`UIApplicationSupportsMultipleScenes` key in `Info.plist`; the builder emits that key
+for Catalyst builds and for no other target, so iPhone and iPad apps are unaffected.
 
-----
-macNative.multiWindow=true
-----
+`Desktop.isSupported()` reads the key back out of the running bundle rather than
+trusting a build flag, so the API and the `Info.plist` can never disagree -- including
+in a project that was generated once and then hand-edited.
 
-The hint is required because a second Codename One window is a second `UIWindowScene`,
-and that needs the process-wide `UIApplicationSupportsMultipleScenes` key in
-`Info.plist`. Enabling that key changes Catalyst windowing for the whole application, so
-it stays off for every app by default. The hint gates both the plist key and the
-windowing API together, so the two can't disagree: with the hint off,
-`Desktop.isSupported()` reports false on Catalyst and constructing a `Window` throws.
-
-Catalyst also differs in one implementation detail worth knowing: a window's Codename One
+Catalyst differs in one implementation detail worth knowing: a window's Codename One
 content is rendered into an off-screen raster and presented to the scene's view, rather
 than the window owning a second GPU surface. Native peers and text editing still use the
 scene's real view hierarchy, so they behave normally.

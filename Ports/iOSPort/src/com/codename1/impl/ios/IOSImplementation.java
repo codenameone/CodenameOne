@@ -968,13 +968,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     /**
      * @inheritDoc
      *
-     * Desktop windows exist only on the Mac Catalyst slice, and only when the app
-     * opted in through the {@code macNative.multiWindow} build hint. That hint writes
-     * {@code UIApplicationSupportsMultipleScenes} into Info.plist, which is
-     * process-wide and is what actually makes a second scene possible -- turning it
-     * on unconditionally previously destabilised the Catalyst screenshot suite, so it
-     * stays opt-in. This reads the key itself rather than the hint, so the API and the
-     * plist cannot disagree.
+     * Desktop windows exist only on the Mac Catalyst slice, where the builder writes
+     * {@code UIApplicationSupportsMultipleScenes} into Info.plist. That key is what
+     * actually makes a second scene possible, so this reads it back out of the bundle
+     * rather than trusting a build flag -- the API and the plist then cannot disagree,
+     * including in a hand-edited project.
      */
     @Override
     public com.codename1.impl.WindowManager getWindowManager() {
@@ -982,9 +980,8 @@ public class IOSImplementation extends CodenameOneImplementation {
             return null;
         }
         // The Info.plist key is the single source of truth: without multiple scenes
-        // enabled the system refuses to activate a second one, so reporting
-        // supported here would hand back windows that never appear. The
-        // macNative.multiWindow build hint is what writes that key.
+        // enabled the system refuses to activate a second one, so reporting supported
+        // here would hand back windows that never appear.
         if (!nativeInstance.macMultiWindowSupported()) {
             return null;
         }

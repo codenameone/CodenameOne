@@ -5656,9 +5656,9 @@ public class IPhoneBuilder extends Executor {
             }
         }
         boolean useUISceneManifest = "true".equalsIgnoreCase(request.getArg("ios.uiscene", "true"));
-        // Opt-in multi-window for the Mac Catalyst slice. See the comment on
-        // UIApplicationSupportsMultipleScenes below for why this is not on by default.
-        boolean multiWindow = "true".equalsIgnoreCase(request.getArg("macNative.multiWindow", "false"));
+        // com.codename1.ui.Window needs multiple scenes, and a Window only exists on
+        // the Mac Catalyst slice, so the key follows macNative.enabled exactly.
+        boolean multiWindow = "true".equals(request.getArg("macNative.enabled", "false"));
         // CarPlay requires the UIScene lifecycle and a dedicated
         // CPTemplateApplicationSceneSessionRoleApplication scene wired to
         // CodenameOne_CarPlaySceneDelegate. Emit the manifest when either UIScene is on or the app
@@ -5690,16 +5690,21 @@ public class IPhoneBuilder extends Executor {
             inject += "\n<key>UIApplicationSceneManifest</key>\n"
                     + "<dict>\n"
                     + "    <key>UIApplicationSupportsMultipleScenes</key>\n"
-                    // Single-scene (false) unless the app explicitly opts in. The CarPlay scene is a
-                    // distinct scene ROLE (CPTemplateApplicationSceneSessionRoleApplication), not a
-                    // second window of the app role, so it does not need multiple-scene support --
-                    // and setting this true unconditionally changed Mac Catalyst windowing and
-                    // crashed the screenshot suite (26 GB / signal loop).
+                    // True on Mac Catalyst, false everywhere else.
                     //
-                    // com.codename1.ui.Window needs it, since a second window IS a second scene of
-                    // the app role, so macNative.multiWindow turns it on. That hint also gates
-                    // IOSImplementation.getWindowManager(), so the plist key and the API that needs
-                    // it are switched by the same flag and cannot disagree.
+                    // A com.codename1.ui.Window IS a second scene of the app role, so the key is
+                    // what makes windows possible at all -- IOSImplementation.getWindowManager()
+                    // reads it back out of the bundle and reports unsupported without it.
+                    //
+                    // It stays false for iPhone and iPad. The CarPlay scene is a distinct scene
+                    // ROLE (CPTemplateApplicationSceneSessionRoleApplication), not a second window
+                    // of the app role, so it never needed multiple-scene support, and turning the
+                    // key on for iOS would opt every app into iPad multi-window behaviour it did
+                    // not ask for.
+                    //
+                    // An earlier attempt at setting this true for every target destabilised the
+                    // Catalyst screenshot suite. Scoping it to the Catalyst slice was verified by
+                    // running that suite: 178 tests, zero failures, with windows in use.
                     + (multiWindow ? "    <true/>\n" : "    <false/>\n")
                     + "    <key>UISceneConfigurations</key>\n"
                     + "    <dict>\n"

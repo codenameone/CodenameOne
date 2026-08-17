@@ -38,11 +38,11 @@ import com.codename1.ui.Image;
  * ARC. The scene still owns a real UIKit view hierarchy, so native peers and
  * native text editing work normally inside a window.</p>
  *
- * <p>Multiple scenes have to be enabled in Info.plist for any of this to work,
- * and that key is process-wide -- turning it on once destabilised the Catalyst
- * screenshot suite. The builder therefore only emits it when an application asks
- * for multi-window through the {@code macNative.multiWindow} build hint, and this
- * manager is only offered when the same hint is set.</p>
+ * <p>Multiple scenes have to be enabled in Info.plist for any of this to work. The
+ * builder emits that key for the Catalyst slice and nowhere else, and
+ * {@code IOSImplementation.getWindowManager()} reads it back out of the bundle, so
+ * this manager is never offered to a build that could not actually open a
+ * window.</p>
  *
  * @author Shai Almog
  */

@@ -142,21 +142,6 @@ ensure_setting "codename1.arg.macNative.appCategory" \
 # default for real apps -- only the screenshot sample sets this.
 ensure_setting "codename1.arg.macNative.fixedWindowSize" \
     "${MAC_NATIVE_FIXED_WINDOW_SIZE:-1024x685}"
-# Additional native windows (com.codename1.ui.Window). This flips
-# UIApplicationSupportsMultipleScenes in Info.plist, which is process-wide
-# and changes Catalyst windowing for the whole application.
-#
-# OFF by default because the key is process-wide and an older attempt at
-# enabling it destabilised this suite. Measured here across three runs with it
-# ON: the app boots, all 178 tests run, and no crash of the kind that warning
-# describes occurs. One run saw OrientationLockScreenshotTest time out restoring
-# portrait, but it passed with the key still on in the following runs, so that
-# was a slow-machine flake rather than a consequence of multiple scenes.
-# It stays opt-in regardless: real apps should not have Catalyst windowing
-# changed underneath them without asking. Set MAC_NATIVE_MULTI_WINDOW=true to
-# build a Catalyst app that can open windows.
-ensure_setting "codename1.arg.macNative.multiWindow" \
-    "${MAC_NATIVE_MULTI_WINDOW:-false}"
 
 bma_log "macNative.* hints in codenameone_settings.properties:"
 grep -n 'codename1\.arg\.macNative' "$CN1_SETTINGS_FILE" || true
