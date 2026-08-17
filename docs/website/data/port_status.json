@@ -1287,27 +1287,27 @@
       "test": "Media360PanoramaScreenshotTest"
     },
     {
-      "pattern": "Window-Layout",
+      "pattern": "Window-Layout*",
       "test": "WindowLayoutTest"
     },
     {
-      "pattern": "Window-Scroll",
+      "pattern": "Window-Scroll*",
       "test": "WindowScrollTest"
     },
     {
-      "pattern": "Window-Graphics",
+      "pattern": "Window-Graphics*",
       "test": "WindowGraphicsTest"
     },
     {
-      "pattern": "Window-Editing",
+      "pattern": "Window-Editing*",
       "test": "WindowEditingTest"
     },
     {
-      "pattern": "Window-Overlay",
+      "pattern": "Window-Overlay*",
       "test": "WindowOverlayTest"
     },
     {
-      "pattern": "Window-Modal",
+      "pattern": "Window-Modal*",
       "test": "WindowModalTest"
     }
   ]
