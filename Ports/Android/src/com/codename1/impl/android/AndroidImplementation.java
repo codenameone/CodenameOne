@@ -6293,6 +6293,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return surfaceBridge;
     }
 
+    private com.codename1.intents.spi.IntentBridge intentBridge;
+
+    @Override
+    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        if (intentBridge == null) {
+            intentBridge = new com.codename1.impl.android.intents.AndroidIntentBridge();
+        }
+        return intentBridge;
+    }
+
     /// Invoked once the app has started (from the generated stub, next to
     /// `deliverPendingSharedContent`) to flush surface actions that arrived through the
     /// `CN1SurfaceActionActivity` trampoline before the app instance existed.

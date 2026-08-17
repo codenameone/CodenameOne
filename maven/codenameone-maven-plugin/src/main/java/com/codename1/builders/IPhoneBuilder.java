@@ -23,6 +23,7 @@
 package com.codename1.builders;
 
 import com.codename1.build.shared.PlatformFeatureCatalog;
+import com.codename1.util.IOSAppIntentsBuilder;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
 import org.w3c.dom.Document;
@@ -278,6 +279,15 @@ public class IPhoneBuilder extends Executor {
     // target, the app group / CN1SurfacesAppGroup + NSSupportsLiveActivities plist injection and
     // the cn1surface URL scheme. Apps that never touch the API see no change.
     private boolean usesSurfaces;
+    // True when the app references com.codename1.intents. Gates the CN1_USE_INTENTS native
+    // define, CoreSpotlight.framework, the generated Swift App Intents declarations and, only
+    // when an @AppIntent is actually declared, the App Intents deployment floor.
+    private boolean usesIntents;
+    // True when intents.json declares at least one @AppIntent, as opposed to an app that only
+    // indexes content. The distinction is what keeps an indexing-only app off the newer floor.
+    private boolean declaresAppIntents;
+    private java.util.List<Map<String, Object>> intentsManifest = new ArrayList<Map<String, Object>>();
+    private java.util.List<Map<String, Object>> entitiesManifest = new ArrayList<Map<String, Object>>();
     // usesSurfaces && ios.surfaces.extension != false. When the developer opts out with
     // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
     // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
@@ -1359,6 +1369,13 @@ public class IPhoneBuilder extends Executor {
                     if (!usesWearable && cls.indexOf("com/codename1/wearable/") == 0) {
                         usesWearable = true;
                     }
+                    // App intents (com.codename1.intents.*). Gated on actual usage so
+                    // CoreSpotlight.framework, the CN1_USE_INTENTS natives and the generated
+                    // Swift declarations are only added for apps that expose something to
+                    // Siri or device search.
+                    if (!usesIntents && cls.indexOf("com/codename1/intents/") == 0) {
+                        usesIntents = true;
+                    }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
                     // iOS 12+).
@@ -1601,6 +1618,12 @@ public class IPhoneBuilder extends Executor {
         // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
         // group. Widget kinds must be known at build time -- the Swift WidgetBundle is static.
         parseSurfacesManifest(resDir, request);
+
+        // App intents: read the build-time manifest the annotation processor emitted into the
+        // project jar. Deliberately softer than surfaces, where a missing manifest fails the
+        // build: indexing content and donating shortcuts are perfectly legitimate with no
+        // @AppIntent declared at all, so an absent manifest is simply "no declarations".
+        parseIntentsManifest(resDir, request);
 
         // Apply AI/ML dependency table hits accumulated during the
         // scan. We route iOS pods through the existing
@@ -2819,6 +2842,15 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WATCHCONNECTIVITY", "#define CN1_USE_WATCHCONNECTIVITY");
             }
 
+            // com.codename1.intents usage compiles the Core Spotlight / App Intents glue (gated
+            // by CN1_USE_INTENTS so other builds carry no such symbols), and opens the
+            // non-browsing NSUserActivity path in the app delegate. The define lives in the
+            // shared CodenameOne_GLViewController.h so it reaches every intents translation
+            // unit, mirroring CN1_USE_WIDGETS.
+            if (usesIntents) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_INTENTS", "#define CN1_USE_INTENTS");
+            }
+
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_BODY", glAppDelegeateBody);
@@ -3696,6 +3728,18 @@ public class IPhoneBuilder extends Executor {
                     addLibs += ";BackgroundTasks.framework";
                 }
 
+                // Core Spotlight backs the indexing half of com.codename1.intents. It is
+                // Objective-C and available well below this port's floor, so linking it costs
+                // an app nothing in minimum version. App Intents is autolinked by Swift and
+                // needs no entry here.
+                if (usesIntents) {
+                    if (addLibs == null) {
+                        addLibs = "CoreSpotlight.framework";
+                    } else if (!addLibs.toLowerCase().contains("corespotlight")) {
+                        addLibs += ";CoreSpotlight.framework";
+                    }
+                }
+
                 if (request.getArg("ios.useJavascriptCore", "false").equalsIgnoreCase("true")) {
                     replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_JAVASCRIPTCORE", "#define CN1_USE_JAVASCRIPTCORE");
                     if (addLibs == null) {
@@ -4217,6 +4261,13 @@ public class IPhoneBuilder extends Executor {
                         // ordering note in appendWidgetExtensionRuby.
                         appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
                     }
+
+                    // App Intents needs no Xcode target of its own: the declarations compile
+                    // into the app target, which is what makes the system background-launch
+                    // the app to run them in-process, with the app's own storage and
+                    // singletons intact. Writing the sources here puts them in <Main>-src
+                    // before the schemes script sweeps that directory for Swift.
+                    generateAppIntentSources(new File(tmpFile, "dist"), request);
 
                     String installLocalizedStrings = "";
                     if (installLocalizedStringsScript.length() > 0) {
@@ -5176,6 +5227,142 @@ public class IPhoneBuilder extends Executor {
      * gallery is compiled into the native app, so kinds cannot be registered at runtime only.
      */
     @SuppressWarnings("unchecked")
+    /// The iOS release App Intents first shipped in. Only ever contributed as a
+    /// deployment floor for an app that actually declares an intent.
+    static final String APP_INTENTS_MIN_IOS = "16.0";
+
+    /// Reads the `intents.json` the annotation processor emitted into the project jar and
+    /// decides what this app has to pay for it.
+    ///
+    /// The deployment target is the interesting part. App Intents needs a newer iOS than this
+    /// port's floor, and raising every app to that for a feature most never touch would be
+    /// unacceptable, so the cost is tiered:
+    ///
+    /// - no `com.codename1.intents` usage: nothing at all, the build is unchanged
+    /// - indexing and donation only: nothing, because Core Spotlight and NSUserActivity are
+    ///   Objective-C and long predate the current floor
+    /// - at least one declared `@AppIntent`: the App Intents floor, and only then
+    ///
+    /// Even the third tier is a fallback rather than the default: every generated Swift type is
+    /// availability-guarded, so where the toolchain accepts that, `ios.intents.minDeploymentTarget`
+    /// can be set to an empty value and the intents simply go missing on older devices instead.
+    private void parseIntentsManifest(File resDir, BuildRequest request) throws BuildException {
+        if (!usesIntents) {
+            return;
+        }
+        File manifest = new File(resDir, "intents.json");
+        if (!manifest.exists()) {
+            // Legitimate: the app indexes content or donates shortcuts without declaring any
+            // @AppIntent, so the processor had nothing to emit.
+            debug("cn1: com.codename1.intents is used but no intents.json was generated; "
+                    + "building with indexing and donation only");
+            return;
+        }
+        Map<String, Object> parsed;
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(manifest), StandardCharsets.UTF_8)) {
+            parsed = new com.codename1.builders.util.JSONParser().parseJSON(reader);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to parse intents.json", ex);
+        }
+        intentsManifest = asMapList(parsed.get("intents"));
+        entitiesManifest = asMapList(parsed.get("entities"));
+
+        // A declared intent is what needs App Intents; an empty list means the project only
+        // declared entity types, or only indexes content at runtime.
+        declaresAppIntents = !intentsManifest.isEmpty();
+        if (!declaresAppIntents) {
+            return;
+        }
+        if ("false".equals(request.getArg("ios.intents.appIntents", "true"))) {
+            // The explicit way to keep indexing and donation while staying off the newer floor.
+            declaresAppIntents = false;
+            return;
+        }
+
+        String floor = request.getArg("ios.intents.minDeploymentTarget", APP_INTENTS_MIN_IOS);
+        if (floor == null || floor.trim().length() == 0) {
+            return;
+        }
+        String pinned = request.getArg("ios.deployment_target", null);
+        if (pinned != null && compareVersionStrings(pinned, floor) < 0) {
+            // Raising past an explicit pin would override a decision the developer made on
+            // purpose; silently dropping the intents would ship a build whose declared
+            // capabilities never appear, which is worse than not offering the feature. So say
+            // what happened and name both ways out. This can only fire on newly written
+            // opt-in code, never on an upgrade of an existing project.
+            throw new BuildException("This app declares an @AppIntent, which needs iOS " + floor
+                    + ", but ios.deployment_target is pinned to " + pinned + ".\n"
+                    + "Either raise ios.deployment_target to " + floor + ", or set "
+                    + "ios.intents.appIntents=false to keep Spotlight indexing and shortcut "
+                    + "donation while dropping App Intents generation.");
+        }
+        addMinDeploymentTarget(floor);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<Map<String, Object>> asMapList(Object o) {
+        java.util.List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        if (o instanceof java.util.List) {
+            for (Object e : (java.util.List<Object>) o) {
+                if (e instanceof Map) {
+                    out.add((Map<String, Object>) e);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Writes the generated Swift App Intents declarations into the app target's source
+    /// directory. The existing scheme script sweeps every `.swift` under `<Main>-src` into the
+    /// app target, so no Xcode plumbing is added here.
+    ///
+    /// Runs only when the app declares an intent. An app that merely indexes content gets Core
+    /// Spotlight and no Swift at all, which is also why an empty `AppShortcutsProvider` is never
+    /// emitted -- Apple rejects one.
+    private void generateAppIntentSources(File distDir, BuildRequest request) throws IOException {
+        if (!declaresAppIntents) {
+            return;
+        }
+        File srcDir = new File(distDir, request.getMainClass() + "-src");
+        srcDir.mkdirs();
+
+        // The static half: the Java-to-Swift bridge, the donation shim, and the Objective-C
+        // host that is the only legal way for Swift to reach the translated Java.
+        String[] staticFiles = {"CN1IntentBridge.swift", "CN1IntentDonation.swift",
+                "CN1IntentHost.h", "CN1IntentHost.m"};
+        for (String name : staticFiles) {
+            copyResourceTo("/com/codename1/builders/intents/ios/" + name,
+                    new File(srcDir, name));
+        }
+
+        IOSAppIntentsBuilder gen = new IOSAppIntentsBuilder(intentsManifest, entitiesManifest);
+        for (Map.Entry<String, String> e : gen.buildAppTargetFileMap().entrySet()) {
+            try (FileOutputStream out = new FileOutputStream(new File(srcDir, e.getKey()))) {
+                out.write(e.getValue().getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        log("Generating App Intents declarations (" + intentsManifest.size() + " intent(s), "
+                + entitiesManifest.size() + " entity type(s))");
+    }
+
+    /// Copies a plugin resource to disk, failing loudly when it is missing: a silently absent
+    /// bridge file would surface much later as an unresolved Swift symbol.
+    private void copyResourceTo(String resource, File target) throws IOException {
+        try (InputStream in = getClass().getResourceAsStream(resource)) {
+            if (in == null) {
+                throw new IOException("Missing plugin resource " + resource);
+            }
+            try (FileOutputStream out = new FileOutputStream(target)) {
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) > 0) {
+                    out.write(buf, 0, r);
+                }
+            }
+        }
+    }
+
     private void parseSurfacesManifest(File resDir, BuildRequest request) throws BuildException {
         surfacesExtensionEnabled = usesSurfaces
                 && !"false".equals(request.getArg("ios.surfaces.extension", "true"));
@@ -5856,6 +6043,22 @@ public class IPhoneBuilder extends Executor {
         // shared App Group container through this key; the CN1Widgets extension carries its own
         // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
         if (surfacesExtensionEnabled) {
+            if (declaresAppIntents && !inject.contains("NSUserActivityTypes")) {
+                // Prediction and the "continue in the app" path both key off the activity type,
+                // and iOS only offers an activity whose type the app declared here. Missing this
+                // makes donation appear to work while nothing is ever suggested.
+                StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
+                for (Map<String, Object> intent : intentsManifest) {
+                    Object id = intent.get("id");
+                    if (id instanceof String) {
+                        types.append("<string>").append((String) id).append("</string>");
+                    }
+                }
+                types.append("</array>");
+                inject += types.toString();
+                // Lets a Spotlight result continue into the app rather than only launching it.
+                inject += "\n<key>CoreSpotlightContinuation</key><true/>";
+            }
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
             }

@@ -15154,6 +15154,281 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_bo
     return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// --- App intents (Core Spotlight + App Intents) ------------------------------
+// Gated by CN1_USE_INTENTS, which the builder defines when the app references
+// com.codename1.intents. Two frameworks with very different availability sit behind this:
+//
+//  - Core Spotlight is Objective-C and long predates this port's deployment floor, so
+//    indexing is implemented directly here and works on every supported device.
+//  - App Intents is Swift-only and needs a newer iOS, so it is reached through the generated
+//    Swift declarations via CN1IntentHost (an Objective-C shim). It has to be an Objective-C
+//    shim rather than Swift calling Java directly: the translator's dead-code eliminator
+//    only scans .m sources for mangled symbols, so a Java method named only from Swift is
+//    silently eliminated into an empty stub.
+//
+// Builds without the define compile the stub branch and link neither framework.
+#ifdef CN1_USE_INTENTS
+#import <CoreSpotlight/CoreSpotlight.h>
+#import <MobileCoreServices/MobileCoreServices.h>
+
+// PNG blobs staged by Java ahead of an index/complete call, keyed by the name the serializer
+// embedded in the JSON. Guarded because staging happens on the caller's thread while the
+// consuming call may run on another.
+static NSMutableDictionary *cn1IntentImages = nil;
+static NSObject *cn1IntentImagesLock = nil;
+
+static void cn1IntentsEnsureStaging() {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1IntentImages = [[NSMutableDictionary alloc] init];
+        cn1IntentImagesLock = [[NSObject alloc] init];
+    });
+}
+
+/// The generated Swift bridge, present only when the app declares an @AppIntent. Absent is a
+/// normal state (an app may only index content), so callers must tolerate nil.
+static Class cn1IntentBridgeClass() {
+    static Class c = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        c = NSClassFromString(@"CN1IntentBridge");
+    });
+    return c;
+}
+
+static NSDictionary *cn1IntentsParseJson(NSString *json) {
+    if (json == nil) {
+        return nil;
+    }
+    NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
+    if (data == nil) {
+        return nil;
+    }
+    NSError *err = nil;
+    id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:&err];
+    if (err != nil || ![parsed isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    return (NSDictionary *)parsed;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_TRUE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.0, *)) {
+        return cn1IntentBridgeClass() != nil ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    BOOL supported = [CSSearchableIndex isIndexingAvailable];
+    POOL_END();
+    return supported ? JAVA_TRUE : JAVA_FALSE;
+}
+
+void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT declarationsJson) {
+    if (@available(iOS 16.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1IntentBridgeClass();
+        if (bridge != nil && declarationsJson != JAVA_NULL) {
+            NSString *json = toNSString(CN1_THREAD_STATE_PASS_ARG declarationsJson);
+            ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"registerIntents:"), json);
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT paramsJson) {
+    if (@available(iOS 16.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1IntentBridgeClass();
+        if (bridge != nil && intentId != JAVA_NULL) {
+            NSString *iid = toNSString(CN1_THREAD_STATE_PASS_ARG intentId);
+            NSString *params = (paramsJson == JAVA_NULL) ? @"{}"
+                    : toNSString(CN1_THREAD_STATE_PASS_ARG paramsJson);
+            ((void (*)(id, SEL, NSString *, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"donate:paramsJson:"), iid, params);
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT name, JAVA_OBJECT dataArr, JAVA_INT length) {
+    if (name == JAVA_NULL || dataArr == JAVA_NULL || length <= 0) {
+        return;
+    }
+    cn1IntentsEnsureStaging();
+    POOL_BEGIN();
+    NSString *key = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+    JAVA_ARRAY byteArray = (JAVA_ARRAY)dataArr;
+    NSData *data = [NSData dataWithBytes:(JAVA_BYTE *)byteArray->data length:length];
+    @synchronized (cn1IntentImagesLock) {
+        [cn1IntentImages setObject:data forKey:key];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entitiesJson) {
+    if (entitiesJson == JAVA_NULL || ![CSSearchableIndex isIndexingAvailable]) {
+        return;
+    }
+    cn1IntentsEnsureStaging();
+    POOL_BEGIN();
+    NSDictionary *doc = cn1IntentsParseJson(toNSString(CN1_THREAD_STATE_PASS_ARG entitiesJson));
+    NSArray *entities = [doc objectForKey:@"entities"];
+    if ([entities isKindOfClass:[NSArray class]]) {
+        NSMutableArray *items = [NSMutableArray array];
+        for (id raw in entities) {
+            if (![raw isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            NSDictionary *e = (NSDictionary *)raw;
+            NSString *uid = [e objectForKey:@"uid"];
+            if (uid == nil) {
+                continue;
+            }
+            CSSearchableItemAttributeSet *attrs = [[CSSearchableItemAttributeSet alloc]
+                    initWithItemContentType:(NSString *)kUTTypeItem];
+            attrs.title = [e objectForKey:@"title"];
+            attrs.contentDescription = [e objectForKey:@"subtitle"];
+            id keywords = [e objectForKey:@"keywords"];
+            if ([keywords isKindOfClass:[NSArray class]]) {
+                attrs.keywords = (NSArray *)keywords;
+            }
+            NSString *imageName = [e objectForKey:@"image"];
+            if (imageName != nil) {
+                @synchronized (cn1IntentImagesLock) {
+                    NSData *png = [cn1IntentImages objectForKey:imageName];
+                    if (png != nil) {
+                        attrs.thumbnailData = png;
+                    }
+                }
+            }
+            CSSearchableItem *item = [[CSSearchableItem alloc]
+                    initWithUniqueIdentifier:uid
+                            domainIdentifier:[e objectForKey:@"type"]
+                                attributeSet:attrs];
+            [items addObject:item];
+        }
+        if ([items count] > 0) {
+            [[CSSearchableIndex defaultSearchableIndex] indexSearchableItems:items
+                    completionHandler:^(NSError *error) {
+                        if (error != nil) {
+                            NSLog(@"CN1 intents: indexing failed: %@", error);
+                        }
+                    }];
+        }
+    }
+    @synchronized (cn1IntentImagesLock) {
+        [cn1IntentImages removeAllObjects];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsRemoveFromIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT idsJson) {
+    if (idsJson == JAVA_NULL || ![CSSearchableIndex isIndexingAvailable]) {
+        return;
+    }
+    POOL_BEGIN();
+    NSDictionary *doc = cn1IntentsParseJson(toNSString(CN1_THREAD_STATE_PASS_ARG idsJson));
+    NSArray *refs = [doc objectForKey:@"refs"];
+    if ([refs isKindOfClass:[NSArray class]]) {
+        NSMutableArray *uids = [NSMutableArray array];
+        for (id raw in refs) {
+            if ([raw isKindOfClass:[NSDictionary class]]) {
+                NSString *uid = [(NSDictionary *)raw objectForKey:@"uid"];
+                if (uid != nil) {
+                    [uids addObject:uid];
+                }
+            }
+        }
+        if ([uids count] > 0) {
+            [[CSSearchableIndex defaultSearchableIndex]
+                    deleteSearchableItemsWithIdentifiers:uids completionHandler:nil];
+        }
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsClearIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entityType) {
+    if (![CSSearchableIndex isIndexingAvailable]) {
+        return;
+    }
+    POOL_BEGIN();
+    CSSearchableIndex *index = [CSSearchableIndex defaultSearchableIndex];
+    if (entityType == JAVA_NULL) {
+        [index deleteAllSearchableItemsWithCompletionHandler:nil];
+    } else {
+        NSString *domain = toNSString(CN1_THREAD_STATE_PASS_ARG entityType);
+        [index deleteSearchableItemsWithDomainIdentifiers:[NSArray arrayWithObject:domain]
+                                        completionHandler:nil];
+    }
+    POOL_END();
+}
+
+void com_codename1_impl_ios_IOSNative_intentsCompleteInvocation___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token, JAVA_OBJECT resultJson) {
+    if (@available(iOS 16.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1IntentBridgeClass();
+        if (bridge != nil && token != JAVA_NULL) {
+            NSString *t = toNSString(CN1_THREAD_STATE_PASS_ARG token);
+            NSString *json = (resultJson == JAVA_NULL) ? @"{}"
+                    : toNSString(CN1_THREAD_STATE_PASS_ARG resultJson);
+            // The Swift side owns the one-shot guarantee for its continuation; the Java side
+            // has already guaranteed this fires once per token.
+            ((void (*)(id, SEL, NSString *, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"completeInvocation:resultJson:"), t, json);
+        }
+        POOL_END();
+    }
+}
+
+#else // CN1_USE_INTENTS
+
+// Intents not enabled: no Core Spotlight or App Intents references, everything unsupported.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT declarationsJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT paramsJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT name, JAVA_OBJECT dataArr, JAVA_INT length) {
+}
+void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entitiesJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsRemoveFromIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT idsJson) {
+}
+void com_codename1_impl_ios_IOSNative_intentsClearIndex___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT entityType) {
+}
+void com_codename1_impl_ios_IOSNative_intentsCompleteInvocation___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT token, JAVA_OBJECT resultJson) {
+}
+#endif // CN1_USE_INTENTS
+
+// New-VM (return-type-encoded) manglings for the value-returning intent natives. Defined after
+// the implementations/stubs above so each call targets an already-declared function. The void
+// intents* methods need no _R_ wrapper. Always defined regardless of CN1_USE_INTENTS.
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
 // --- Phone-to-watch link (com.codename1.wearable / WatchConnectivity) --------
 //
 // Compiled into BOTH the phone target and the watch target: WCSession is symmetric, so the two

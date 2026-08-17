@@ -26,8 +26,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.objectweb.asm.Opcodes;
 
@@ -47,6 +49,7 @@ public final class AnnotatedClass {
     private final List<MethodInfo> methods;
     private final List<FieldInfo> fields;
     private final File classFile;
+    private final Set<String> allAnnotationDescriptors;
 
     AnnotatedClass(
             String internalName,
@@ -73,6 +76,33 @@ public final class AnnotatedClass {
                 ? Collections.<FieldInfo>emptyList()
                 : Collections.unmodifiableList(new ArrayList<FieldInfo>(fields));
         this.classFile = classFile;
+        this.allAnnotationDescriptors = collectAllDescriptors(
+                this.annotations, this.methods, this.fields);
+    }
+
+    /// Every annotation descriptor that appears anywhere in this class -- on the
+    /// class itself, on a method, on a method parameter, or on a field.
+    ///
+    /// A class whose only annotation is on a method has an *empty*
+    /// `getClassAnnotations()`, so dispatching a processor on that map alone
+    /// silently skips it. Processors declare interest by descriptor, not by
+    /// element kind, so this union is what "does this class concern the
+    /// processor?" has to be answered with.
+    private static Set<String> collectAllDescriptors(
+            Map<String, AnnotationValues> classAnnotations,
+            List<MethodInfo> methods,
+            List<FieldInfo> fields) {
+        Set<String> all = new LinkedHashSet<String>(classAnnotations.keySet());
+        for (MethodInfo m : methods) {
+            all.addAll(m.getAnnotations().keySet());
+            for (Map<String, AnnotationValues> params : m.getParameterAnnotations()) {
+                all.addAll(params.keySet());
+            }
+        }
+        for (FieldInfo f : fields) {
+            all.addAll(f.getAnnotations().keySet());
+        }
+        return Collections.unmodifiableSet(all);
     }
 
     /// JVM internal name (`com/example/ProfileForm`).
@@ -105,6 +135,13 @@ public final class AnnotatedClass {
 
     /// Looks up a class-level annotation by descriptor, returning null if absent.
     public AnnotationValues getClassAnnotation(String descriptor) { return annotations.get(descriptor); }
+
+    /// Every annotation descriptor present anywhere in this class -- class,
+    /// method, method parameter or field. This is the set to test a processor's
+    /// declared interest against; `getClassAnnotations()` alone would miss a
+    /// class annotated only on a method, such as a static `@Route` factory or
+    /// an `@AppIntent` handler.
+    public Set<String> getAllAnnotationDescriptors() { return allAnnotationDescriptors; }
 
     public List<MethodInfo> getMethods() { return methods; }
     public List<FieldInfo> getFields() { return fields; }

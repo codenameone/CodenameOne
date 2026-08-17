@@ -312,6 +312,13 @@ public class AndroidGradleBuilder extends Executor {
     // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
     // pre-baked layout resources and the manifest receivers/trampoline activity.
     private boolean usesSurfaces;
+    /// True when the app references com.codename1.intents. Gates the shortcut resources, the
+    /// trampoline activity and the headless service, so an app that exposes nothing to the
+    /// launcher carries none of them.
+    private boolean usesIntents;
+    /// The `android.app.shortcuts` meta-data, which must be spliced into the launcher activity
+    /// rather than emitted beside it. Empty when the app declares no static shortcuts.
+    private String intentsShortcutsMetaData = "";
     // Set when the app references com.codename1.wearable.* (the phone-to-watch link). Gates the
     // play-services-wearable dependency, the WearableListenerService manifest entry and the
     // injected Data Layer glue.
@@ -1871,6 +1878,9 @@ public class AndroidGradleBuilder extends Executor {
                     if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
                         usesSurfaces = true;
                     }
+                    if (!usesIntents && cls.indexOf("com/codename1/intents/") == 0) {
+                        usesIntents = true;
+                    }
 
                     // Phone-to-watch link (com.codename1.wearable.*). Gated on actual usage so the
                     // play-services-wearable dependency, the listener service and the injected Data
@@ -3269,6 +3279,14 @@ public class AndroidGradleBuilder extends Executor {
         // appwidget-provider metadata. The matching manifest receivers and the tap trampoline
         // activity are assembled here and injected into the manifest further below. No gradle
         // dependencies are involved -- the runtime lowering is plain RemoteViews in the port.
+        String intentsManifestEntries = usesIntents
+                ? buildIntentsManifestEntries(assetsDir, resDir)
+                : "";
+        // The launcher only reads a shortcut list through meta-data on the activity carrying the
+        // LAUNCHER intent filter, so this half is spliced into the main activity rather than
+        // sitting beside it at application level, where it would be silently ignored.
+        String intentsActivityMetaData = intentsShortcutsMetaData;
+
         String surfacesManifestEntries = "";
         if (usesSurfaces) {
             File surfacesJsonFile = new File(assetsDir, "surfaces.json");
@@ -4596,6 +4614,7 @@ public class AndroidGradleBuilder extends Executor {
                 + tvLeanbackCategory
                 + "            </intent-filter>\n"
                 + request.getArg("android.xintent_filter", "")
+                + intentsActivityMetaData
                 + "        </activity>\n"
                 + facebookActivityMetaData
                 + facebookActivity
@@ -4621,6 +4640,7 @@ public class AndroidGradleBuilder extends Executor {
                 + carAppService
                 + wearableListenerService
                 + surfacesManifestEntries
+                + intentsManifestEntries
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
                 + basePermissions
@@ -7346,6 +7366,122 @@ public class AndroidGradleBuilder extends Executor {
         File dir = new File(resDir, dirName);
         dir.mkdirs();
         return new File(dir, childFileName);
+    }
+
+
+    /// Writes the static shortcut resource and returns the manifest fragment for app intents.
+    ///
+    /// Android's half of this feature is launcher shortcuts, not an assistant: there is no
+    /// contract by which Google Assistant invokes an app capability and receives a typed result,
+    /// so nothing here claims one. What it does produce is real -- a static shortcut per
+    /// discoverable intent, the invisible trampoline that routes a tap, and the service that
+    /// runs a headless intent with no Activity.
+    ///
+    /// A missing manifest is not an error, mirroring iOS: an app may reference the package purely
+    /// to index content or donate shortcuts at runtime, in which case the processor emitted
+    /// nothing to compile in.
+    private String buildIntentsManifestEntries(File assetsDir, File resDir) throws BuildException {
+        StringBuilder entries = new StringBuilder();
+
+        // The trampoline is the only exported door. Everything else -- notably the service that
+        // can run an application capability -- stays internal, so no other installed app can ask
+        // this one to perform an action.
+        entries.append("        <activity android:name=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
+                .append("                  android:theme=\"@android:style/Theme.NoDisplay\"\n")
+                .append("                  android:exported=\"true\"\n")
+                .append("                  android:excludeFromRecents=\"true\"\n")
+                .append("                  android:noHistory=\"true\"\n")
+                .append("                  android:taskAffinity=\"\">\n")
+                .append("            <intent-filter>\n")
+                .append("                <action android:name=\"android.intent.action.VIEW\" />\n")
+                .append("                <category android:name=\"android.intent.category.DEFAULT\" />\n")
+                .append("                <data android:scheme=\"cn1intent\" />\n")
+                .append("            </intent-filter>\n")
+                .append("        </activity>\n");
+        entries.append("        <service android:name=\"com.codename1.impl.android.intents.CN1IntentService\"\n")
+                .append("                 android:exported=\"false\" />\n");
+
+        File manifest = new File(assetsDir, "intents.json");
+        if (!manifest.exists()) {
+            return entries.toString();
+        }
+        Map<String, Object> parsed;
+        try {
+            parsed = new JSONParser().parseJSON(new InputStreamReader(
+                    new FileInputStream(manifest), StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            throw new BuildException("Failed to parse intents.json", ex);
+        }
+        java.util.List<Object> declared = (java.util.List<Object>) parsed.get("intents");
+        if (declared == null || declared.isEmpty()) {
+            return entries.toString();
+        }
+
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+        xml.append("<shortcuts xmlns:android=\"http://schemas.android.com/apk/res/android\">\n");
+        int count = 0;
+        for (Object o : declared) {
+            if (!(o instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> intent = (Map<String, Object>) o;
+            Object id = intent.get("id");
+            Object discoverable = intent.get("discoverable");
+            boolean offered = discoverable == null || Boolean.TRUE.equals(discoverable)
+                    || "true".equals(discoverable);
+            if (!(id instanceof String) || !offered) {
+                continue;
+            }
+            if (count == 5) {
+                // Android shows at most five static shortcuts. Truncating quietly would look
+                // like the later ones failing at random.
+                log("Only the first 5 intents become static launcher shortcuts; Android caps "
+                        + "the static list. The rest remain invocable and can be donated.");
+                break;
+            }
+            String label = intent.get("title") instanceof String
+                    ? (String) intent.get("title") : (String) id;
+            xml.append("    <shortcut android:shortcutId=\"").append(xmlEscape((String) id))
+                    .append("\"\n")
+                    .append("              android:enabled=\"true\"\n")
+                    .append("              android:shortcutShortLabel=\"")
+                    .append(xmlEscape(label)).append("\">\n")
+                    .append("        <intent android:action=\"android.intent.action.VIEW\"\n")
+                    .append("                android:targetPackage=\"${applicationId}\"\n")
+                    .append("                android:targetClass=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
+                    .append("                android:data=\"cn1intent://run?id=")
+                    .append(xmlEscape((String) id)).append("\" />\n")
+                    .append("    </shortcut>\n");
+            count++;
+        }
+        xml.append("</shortcuts>\n");
+
+        if (count > 0) {
+            File xmlValues = new File(resDir, "xml");
+            xmlValues.mkdirs();
+            try {
+                createFile(new File(xmlValues, "cn1_shortcuts.xml"),
+                        xml.toString().getBytes("UTF-8"));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write the app intent shortcuts", ex);
+            }
+            // Recorded rather than appended here: this one fragment has to land inside the
+            // launcher activity, and putting it at application level would be accepted by the
+            // manifest merger and then quietly do nothing.
+            intentsShortcutsMetaData =
+                    "            <meta-data android:name=\"android.app.shortcuts\"\n"
+                    + "                       android:resource=\"@xml/cn1_shortcuts\" />\n";
+        }
+        return entries.toString();
+    }
+
+    private static String xmlEscape(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private String permissionAdd(BuildRequest request, String permission, String text) {

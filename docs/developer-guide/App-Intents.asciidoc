@@ -1,0 +1,167 @@
+== App Intents: Siri, Spotlight and Shortcuts
+
+Siri, Spotlight, the Shortcuts app, an Android launcher shortcut, a button on a home-screen widget and a large language model are all asking your application the same question: what can you do, and will you do it now? Codename One models them as one concept -- an app intent -- under the `com.codename1.intents` package. You declare a capability once and the framework projects it to each of them.
+
+=== Three nouns
+
+An *intent* is a named, titled, invokable capability. It takes *parameters*, which are either primitives or *entities* -- your application's own nouns, which the platform can list, search and ask the user to choose between before your code runs. It produces an `IntentResult`: a value, a line to speak, a snippet to show, a route to open, or any combination of those.
+
+=== Declaring an intent
+
+A handler is a `public static` method carrying `@AppIntent`:
+
+[source,java]
+----
+@AppIntent(value = "log_workout", title = "Log a workout",
+        description = "Records a completed workout",
+        phrases = {"Log a workout in ${applicationName}",
+                   "Log a ${minutes} minute ${kind} in ${applicationName}"},
+        headless = true, timeoutSeconds = 5)
+public static IntentResult logWorkout(
+        @IntentParam(value = "kind", title = "What kind of workout?",
+                     options = {"run", "ride", "swim"}) String kind,
+        @IntentParam(value = "minutes", title = "How many minutes?") int minutes) {
+    WorkoutStore.append(kind, minutes);
+    return IntentResult.spoken("Logged a " + minutes + " minute " + kind + ".");
+}
+----
+
+The method is `static` for a reason that matters on a device rather than as a style preference: the build generates a direct static call to it, and a direct call is the only form that survives the iOS translator's dead-code elimination and Android's obfuscation. It also makes the contract visible -- a handler can be asked to run in a process that exists only to answer it, where no instance of your class has been constructed and nothing is on screen.
+
+At build time the Codename One Maven plugin scans your compiled bytecode, validates every declaration, and generates both the reflection-free dispatch table and the native declarations each platform compiles into the app. A malformed declaration fails the build rather than going quiet on a device. That includes a check worth more than most of the code behind this feature: every phrase must contain `${applicationName}`, because Apple rejects App Shortcut phrases that omit the app name, and finding that out from App Review is an expensive way to learn it.
+
+=== Intents and routes are different questions
+
+A `@Route` answers "given this URL, what do I show?" and hands back a `Form`. An intent answers "given this verb and these arguments, what do I do and what do I return?" and hands back a value. They cannot be merged: a deep link has no return channel, always foregrounds, is stringly typed, and has no way to express "ask the user which playlist first".
+
+They meet at exactly one point -- an intent that opens the app *is* a deep link -- so that is the one place they are joined. Declare `opensRoute` and the framework builds the URL from the bound parameters and navigates through your existing route table:
+
+[source,java]
+----
+@AppIntent(value = "show_order", title = "Show order", opensRoute = "/orders/{orderId}")
+public static IntentResult showOrder(@IntentParam("orderId") String orderId) {
+    return IntentResult.opens("/orders/" + orderId);
+}
+----
+
+One screen, one route pattern, two ways in. The build checks that `opensRoute` matches a `@Route` you actually declared.
+
+=== Entities: the part that makes intents feel intelligent
+
+An entity-typed parameter is what lets the platform run its *own* picker before your code is ever called. "Play a playlist" with nothing specified makes the system ask "Which one?", fill the list from your suggested query, and hand your handler the chosen object. A plain `String` parameter can never do that -- it can only be typed or spoken verbatim.
+
+[source,java]
+----
+@IntentEntity(value = "playlist", title = "Playlist")
+public class Playlist {
+    @EntityId    public String getId()   { return id; }
+    @EntityTitle public String getName() { return name; }
+
+    @EntityQuery(EntityQuery.Kind.BY_ID)
+    public static Playlist byId(String id) { return Library.playlist(id); }
+
+    @EntityQuery(EntityQuery.Kind.SUGGESTED)
+    public static List<Playlist> recent() { return Library.recentPlaylists(); }
+
+    @EntityQuery(EntityQuery.Kind.SEARCH)
+    public static List<Playlist> matching(String query) { return Library.search(query); }
+}
+----
+
+Your class stays your class: there is no interface to implement and no base class to extend, because a domain model outlives the framework it's used with. The build reads the annotated members and generates the adapter.
+
+A `BY_ID` query is mandatory. An entity crosses the platform boundary as its id and nothing else, so resolving that id back to an object is the one lookup the framework cannot do without.
+
+[WARNING]
+====
+Entity ids outlive your process and often your release. The device search index and the system's donated shortcuts both persist your id and hand it back later, so an id derived from a list position or a content hash will silently start resolving to the wrong object after your data changes, and nothing anywhere will report an error.
+====
+
+=== Publishing content to device search
+
+Indexing is the half of this feature most applications will get the most from, and it costs the least:
+
+[source,java]
+----
+// After a sync, off the EDT
+Intents.index(recentOrders);
+
+// In init(), so a tap that cold-started the app is delivered as soon as possible
+Intents.setSelectionHandler(entity -> Navigation.navigate("/orders/" + entity.getId()));
+----
+
+Remove entries when the content behind them goes away. An index entry outlives the data it describes, so deleted content keeps appearing in device search and taps resolve to nothing until the application removes it:
+
+[source,java]
+----
+Intents.removeFromIndex("order", orderId);
+----
+
+=== The headless contract
+
+A `headless` intent can run in a process the system started only to answer it, with nothing on screen. That is what lets an assistant answer without your app appearing, and it is a real constraint rather than a flag.
+
+A headless handler *may* use `Storage`, `Preferences`, `Database`, `NetworkManager`, `Log`, surfaces publishing and `Intents.index`. It *must not* touch `Form`, `Dialog`, `Component`, `Display.getCurrent()`, the camera, capture, or anything else that needs a window: there is no window. It must also not call `Display.callSeriallyAndWait`, which can deadlock against a foregrounded event dispatch thread.
+
+Handlers never run on the event dispatch thread, on any platform and from any source. An invocation can arrive while your app is visible -- a widget button, a search result tapped on a running app -- and a handler blocking the event thread there is a visible freeze.
+
+Every invocation carries a deadline, and `IntentContext.isCancelled()` flips when it passes. Cancellation is cooperative: nothing interrupts a running handler, and anything it returns afterwards is discarded, so commit durable work to storage as you go rather than only at the end.
+
+[TIP]
+====
+The platform will usually allow around twenty seconds. Don't use them. A spoken interaction that takes ten seconds has already failed as an interaction. Aim under two, and for anything genuinely slower return `IntentResult.opens(...)` and do the work in the app where there's a UI to show progress in.
+====
+
+=== What each platform actually does
+
+[cols="2,2,2,2", options="header"]
+|===
+| Capability | iOS | Android | Simulator
+
+| Declared intent | App Intent and App Shortcut | launcher shortcut | Intents window row
+| Voice invocation | Siri, from your phrases | *none* | typed into the window
+| Headless execution | background launch of the app | service, no Activity | in process
+| Open a route | native, then your route table | trampoline, then your route table | shows the form
+| Entity parameters | system picker and search | passed by id | picker from your real queries
+| System disambiguation | yes | *no* -- the app foregrounds its own picker | in-app picker
+| Content indexing | Core Spotlight | long-lived launcher shortcuts | searchable list
+| Donation | learned suggestions | dynamic shortcuts | logged
+| Spoken result | spoken aloud | *dropped* | shown as text
+| Returned value | piped to the next action | result extras | shown
+|===
+
+*Android is not Siri parity and this framework doesn't pretend otherwise.* Android has no contract by which an assistant invokes an application capability and receives a typed result back, so phrases, system disambiguation and spoken results are iOS-only. Branch on `Intents.isVoiceInvocationSupported()`, not on `areIntentsSupported()`, when deciding whether to tell a user they can talk to your app.
+
+What Android does deliver is real: launcher shortcuts, dynamic shortcuts the system learns to suggest from donation, and genuinely headless execution -- the last of which is actually easier there than on iOS, because the Android port already boots without an Activity for background fetch.
+
+=== The floor everything else sits on
+
+An intent is guaranteed only to be invokable with its parameters supplied, and to produce a value. Everything else -- phrases, pickers, speech, snippets, indexing, donation -- is an enhancement some platform may not offer. Write each handler so it's still correct when nothing arrives but its parameters and nothing is consumed but its return value, and it will behave the same everywhere.
+
+Because dispatch is generated code rather than a platform service, `Intents.invoke(...)` works on *every* port, including those with no intent support at all. An application can use its own intents as an internal command layer and get the platform integration as a bonus where it exists.
+
+=== Testing without a device
+
+The simulator's `Simulate -> App Intents` window lists every intent your application declares, generates a parameter form from the declaration, fills entity pickers from your real query methods, and runs the intent through the same entry point the iOS and Android ports call. Nothing in it is a shortcut around the framework, so a bug in marshalling, coercion or the deadline shows up on your desktop rather than on a device.
+
+=== What this costs your iOS deployment target
+
+Nothing, unless you declare an intent -- and possibly nothing even then.
+
+Indexing and donation run on Core Spotlight and `NSUserActivity`, which are Objective-C and have been available since long before the framework's current minimum, so an application that only publishes content to device search never changes its deployment target.
+
+Declaring an `@AppIntent` brings in Apple's App Intents framework, which needs a newer minimum. Every generated type is availability-guarded, so the intended outcome is that your target is untouched and the intents simply don't appear on older devices. Where a toolchain refuses that, the build raises the floor *only for applications that declare an intent*. Two build hints keep the decision yours:
+
+[cols="1,3", options="header"]
+|===
+| Hint | Effect
+
+| `ios.intents.minDeploymentTarget` | The floor a declared intent contributes. Defaults to the App Intents minimum; set it empty to contribute none.
+| `ios.intents.appIntents` | `false` keeps Spotlight indexing and shortcut donation while suppressing App Intents generation entirely.
+|===
+
+If you've pinned a deployment target below what a declared intent needs, the build says so and stops rather than quietly moving your pin or quietly dropping your intents.
+
+=== Zero cost when unused
+
+Referencing this package is what makes the build inject the native plumbing. An application that never touches `com.codename1.intents` gets none of it -- no frameworks, no shortcut resources, no manifest entries, no deployment-target change -- and builds exactly as it did before.

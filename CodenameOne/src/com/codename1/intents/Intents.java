@@ -1,0 +1,800 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+import com.codename1.intents.spi.IntentBridge;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The entry point for app intents: the capabilities your application offers to
+/// the outside world.
+///
+/// You do not register intents here. You declare them with
+/// `com.codename1.annotations.AppIntent` on a `public static` method and the
+/// build generates the table, because the platforms compile their intent
+/// catalogues into the native binary and a runtime-only registration could never
+/// reach them. What this class gives you is everything around that declaration:
+/// running an intent yourself, telling the system one just happened, publishing
+/// content to device search, and asking what the current platform can actually
+/// do.
+///
+/// ```java
+/// // In your application code, once:
+/// @AppIntent(value = "log_workout", title = "Log a workout",
+///         phrases = {"Log a workout in ${applicationName}"}, headless = true)
+/// public static IntentResult logWorkout(
+///         @IntentParam("minutes") int minutes) {
+///     WorkoutStore.append(minutes);
+///     return IntentResult.spoken("Logged " + minutes + " minutes.");
+/// }
+///
+/// // Later, after the user does it by hand, so the system learns to suggest it:
+/// Intents.donate("log_workout", params);
+/// ```
+///
+/// #### What is honestly supported where
+///
+/// Ask, do not assume. [#areIntentsSupported()] is true wherever intents can be
+/// exposed to the platform at all, but the interesting question is usually
+/// [#isVoiceInvocationSupported()], which is true on iOS and false on Android --
+/// Android has no assistant contract that hands a typed result back to an app.
+/// Android gets launcher shortcuts and headless execution; it does not get Siri.
+/// The package documentation has the full table.
+///
+/// #### Zero cost when unused
+///
+/// Referencing this package is what makes the build inject the native plumbing.
+/// An application that never touches `com.codename1.intents` gets none of it and
+/// builds exactly as it did before.
+public final class Intents {
+
+    private static IntentBridge bridge;
+    private static boolean bridgeOverridden;
+    private static IntentDispatcher dispatcher;
+    private static int defaultTimeoutSeconds = 20;
+
+    /// Intents declared at runtime rather than by the build. Kept separate from
+    /// the generated table so [#getDeclarations()] can present one list without
+    /// either source being able to corrupt the other.
+    private static final Map<String, IntentDeclaration> dynamic =
+            new LinkedHashMap<String, IntentDeclaration>();
+
+    /// Invocations that arrived before the generated dispatcher installed
+    /// itself -- the cold start where a tap on a shortcut is what launched the
+    /// process. Drained in arrival order once the dispatcher appears.
+    private static final List<PendingInvocation> pending =
+            new ArrayList<PendingInvocation>();
+
+    private static EntitySelectionHandler selectionHandler;
+
+    /// Search-result taps that arrived before a handler was registered -- the
+    /// common case, since a tap is often what launched the process.
+    private static final List<Entity> pendingSelections = new ArrayList<Entity>();
+
+    private Intents() {
+    }
+
+    // ------------------------------------------------------------------
+    // Capability queries
+    // ------------------------------------------------------------------
+
+    /// True when this platform can expose intents to the system.
+    ///
+    /// False does not make the API useless: [#invoke] still runs your handlers
+    /// in-process on every platform, because the dispatch table is generated
+    /// code rather than a platform service. Only the projections outward --
+    /// voice, search indexing, shortcuts -- go quiet.
+    public static boolean areIntentsSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.areIntentsSupported();
+    }
+
+    /// True when this platform can run an intent without bringing the app to the
+    /// foreground.
+    public static boolean isHeadlessExecutionSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.isHeadlessExecutionSupported();
+    }
+
+    /// True when a voice assistant can invoke intents here.
+    ///
+    /// This is the honest discriminator between the platforms. Branch on it
+    /// rather than on [#areIntentsSupported()] when deciding whether to tell a
+    /// user they can talk to your app.
+    public static boolean isVoiceInvocationSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.isVoiceInvocationSupported();
+    }
+
+    /// True when [#index] can publish content to a system-wide search index.
+    public static boolean isIndexingSupported() {
+        IntentBridge b = bridgeInternal();
+        return b != null && b.isIndexingSupported();
+    }
+
+    // ------------------------------------------------------------------
+    // Declarations
+    // ------------------------------------------------------------------
+
+    /// Every intent this application declares, from the build-time table and
+    /// from [#registerDynamicIntent].
+    ///
+    /// The simulator's Intents window is built from exactly this list, which is
+    /// what makes it trustworthy: it can only show what actually shipped.
+    public static List<IntentDeclaration> getDeclarations() {
+        List<IntentDeclaration> out = new ArrayList<IntentDeclaration>();
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d != null) {
+            try {
+                List<IntentDeclaration> declared = d.describe();
+                if (declared != null) {
+                    out.addAll(declared);
+                }
+            } catch (Throwable t) {
+                logError(t);
+            }
+        }
+        synchronized (dynamic) {
+            out.addAll(dynamic.values());
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    /// The declaration with this id, or null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the intent id
+    public static IntentDeclaration getDeclaration(String intentId) {
+        if (intentId == null) {
+            return null;
+        }
+        for (IntentDeclaration d : getDeclarations()) {
+            if (intentId.equals(d.getId())) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /// Declares a parameterization of an existing intent at runtime -- a
+    /// specific shortcut such as "reorder my usual", built from data only known
+    /// once the app is running.
+    ///
+    /// This cannot introduce a new capability. The native catalogue is compiled
+    /// into the app, so a genuinely new verb could never reach the platform, and
+    /// pretending otherwise would produce an API that works in the simulator and
+    /// silently does nothing on a device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `declaration`: the runtime declaration; its id must not collide with a
+    ///   build-time one
+    public static void registerDynamicIntent(IntentDeclaration declaration) {
+        if (declaration == null) {
+            return;
+        }
+        synchronized (dynamic) {
+            dynamic.put(declaration.getId(), declaration);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Invocation
+    // ------------------------------------------------------------------
+
+    /// Runs an intent on the calling thread and returns its result.
+    ///
+    /// This is the in-app path -- your own code deciding to perform one of its
+    /// declared capabilities -- and it works on every platform, including those
+    /// with no intent support at all, because the dispatch table is generated
+    /// code rather than a platform service.
+    ///
+    /// Platform-initiated invocations do not come through here; they arrive at
+    /// [#dispatchInvocation], which adds thread marshalling and a deadline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the declared intent id
+    /// - `params`: parameter values keyed by name; may be null
+    ///
+    /// #### Returns
+    ///
+    /// the handler's result, or a failed result when no such intent exists
+    public static IntentResult invoke(String intentId, Map<String, Object> params) {
+        IntentDeclaration decl = getDeclaration(intentId);
+        int timeout = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
+        IntentContext ctx = new IntentContext(IntentSource.IN_APP, false,
+                System.currentTimeMillis() + timeout * 1000L);
+        return invokeInternal(intentId, params, ctx);
+    }
+
+    /// Framework/port entry point: runs an intent the platform asked for and
+    /// reports the outcome exactly once.
+    ///
+    /// Ports call this after decoding their platform payload. It owns everything
+    /// the ports should not each reinvent: queuing across a cold start, running
+    /// the handler off the event dispatch thread, enforcing the deadline, and
+    /// guaranteeing the completion fires once and only once.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the intent to run
+    /// - `params`: parameter values keyed by name; may be null
+    /// - `source`: where the invocation came from
+    /// - `headless`: true when the app has no UI on screen
+    /// - `completion`: notified with the outcome; may be null
+    public static void dispatchInvocation(final String intentId,
+                                          final Map<String, Object> params,
+                                          final IntentSource source,
+                                          final boolean headless,
+                                          final IntentCompletion completion) {
+        PendingInvocation inv = new PendingInvocation(intentId, params, source,
+                headless, completion);
+        IntentDispatcher d;
+        // Read the dispatcher and decide queue-vs-run atomically under the same
+        // lock setDispatcher installs it and drains under, so an invocation
+        // cannot slip in between the drain and the install and be stranded.
+        synchronized (pending) {
+            d = dispatcher;
+            if (d == null) {
+                pending.add(inv);
+                return;
+            }
+        }
+        run(inv);
+    }
+
+    /// Overrides how long a handler may run before the framework gives up, for
+    /// intents that did not state their own budget.
+    ///
+    /// Raising this is rarely the right fix. The platform's patience is not the
+    /// constraint that matters -- a spoken interaction that takes ten seconds
+    /// has already failed as an interaction. An intent that genuinely needs
+    /// longer should return [IntentResult#opens] and do the work in the app.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the default budget; values below 1 are ignored
+    public static void setDefaultTimeout(int seconds) {
+        if (seconds >= 1) {
+            defaultTimeoutSeconds = seconds;
+        }
+    }
+
+    /// The default handler time budget in seconds.
+    public static int getDefaultTimeout() {
+        return defaultTimeoutSeconds;
+    }
+
+    // ------------------------------------------------------------------
+    // Donation and indexing
+    // ------------------------------------------------------------------
+
+    /// Tells the system the user just performed this capability, so it can
+    /// suggest or predict it later.
+    ///
+    /// Donate when the user does the thing *in your app by hand*. That is the
+    /// signal the system learns from; donating on every intent invocation
+    /// teaches it only that the user uses shortcuts.
+    ///
+    /// Callable from any thread. A no-op where unsupported.
+    ///
+    /// #### Parameters
+    ///
+    /// - `intentId`: the capability that was performed
+    /// - `params`: the values it was performed with; may be null
+    public static void donate(String intentId, Map<String, Object> params) {
+        if (intentId == null) {
+            return;
+        }
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.areIntentsSupported()) {
+            return;
+        }
+        try {
+            b.donate(intentId, IntentSerializer.serializeParams(params));
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Publishes app content to the device's search index, replacing any entry
+    /// carrying the same type and id.
+    ///
+    /// #### Threading
+    ///
+    /// A background thread is the right thread, not merely a permitted one. This
+    /// writes through to the platform index and encodes any thumbnails on the
+    /// way, so calling it on the event dispatch thread looks instantaneous in
+    /// the simulator and stalls the UI on a device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entities`: the content to publish; null and empty are no-ops
+    public static void index(List<Entity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return;
+        }
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.isIndexingSupported()) {
+            return;
+        }
+        Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+        String json = IntentSerializer.serializeEntities(entities, images);
+        try {
+            b.index(json, images);
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Publishes a single entity. Shorthand for the list form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entity`: the content to publish
+    public static void index(Entity entity) {
+        if (entity != null) {
+            index(Collections.singletonList(entity));
+        }
+    }
+
+    /// Removes one entry from the search index.
+    ///
+    /// Removal matters more than it looks. An index entry outlives the data
+    /// behind it, so content the user deleted keeps appearing in device search
+    /// and taps resolve to nothing until the app removes it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the entity type id
+    /// - `id`: the entity id
+    public static void removeFromIndex(String entityType, String id) {
+        if (entityType == null || id == null) {
+            return;
+        }
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.isIndexingSupported()) {
+            return;
+        }
+        try {
+            b.removeFromIndex(IntentSerializer.serializeEntityRef(entityType, id));
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    /// Removes every indexed entry of one type, or everything this app indexed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the type to clear, or null for all of this app's entries
+    public static void clearIndex(String entityType) {
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.isIndexingSupported()) {
+            return;
+        }
+        try {
+            b.clearIndex(entityType);
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Entity queries
+    // ------------------------------------------------------------------
+
+    /// Runs one of an entity type's declared queries.
+    ///
+    /// The platform calls this on its own when it has to disambiguate a
+    /// parameter -- "which playlist?" -- and the simulator calls it to populate
+    /// its picker, which is why the simulator exercises the real query rather
+    /// than a stand-in.
+    ///
+    /// #### Parameters
+    ///
+    /// - `entityType`: the entity type id
+    /// - `kind`: `byId`, `suggested` or `search`
+    /// - `argument`: the id, the search text, or null
+    ///
+    /// #### Returns
+    ///
+    /// the matching entities, never null
+    public static List<Entity> queryEntities(String entityType, String kind, String argument) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d == null || entityType == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<Entity> out = d.queryEntities(entityType, kind, argument);
+            return out == null ? Collections.<Entity>emptyList() : out;
+        } catch (Throwable t) {
+            logError(t);
+            return Collections.emptyList();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Search-result selection
+    // ------------------------------------------------------------------
+
+    /// Registers the single handler that receives taps on content published with
+    /// [#index].
+    ///
+    /// Registration drains anything that arrived before it, which is the normal
+    /// case: a tap in device search is frequently what started the process, so
+    /// the selection is already waiting by the time your `init()` runs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: the handler, or null to clear
+    public static void setSelectionHandler(EntitySelectionHandler handler) {
+        // Install and drain under the same lock dispatchSpotlightSelection reads
+        // it under, so a selection cannot slip between the drain and the install
+        // and be stranded forever.
+        List<Entity> queued = null;
+        synchronized (pendingSelections) {
+            selectionHandler = handler;
+            if (handler != null && !pendingSelections.isEmpty()) {
+                queued = new ArrayList<Entity>(pendingSelections);
+                pendingSelections.clear();
+            }
+        }
+        if (queued != null) {
+            for (Entity e : queued) {
+                deliverSelection(handler, e);
+            }
+        }
+    }
+
+    /// Framework/port entry point: the user opened an indexed item. The id is the
+    /// composite the framework indexed under, `type:id`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uniqueId`: the identifier the platform handed back
+    public static void dispatchSpotlightSelection(String uniqueId) {
+        if (uniqueId == null || uniqueId.length() == 0) {
+            return;
+        }
+        int sep = uniqueId.indexOf(':');
+        if (sep <= 0 || sep == uniqueId.length() - 1) {
+            return;
+        }
+        Entity e = new Entity(uniqueId.substring(0, sep), uniqueId.substring(sep + 1));
+        EntitySelectionHandler h;
+        synchronized (pendingSelections) {
+            h = selectionHandler;
+            if (h == null) {
+                pendingSelections.add(e);
+                return;
+            }
+        }
+        deliverSelection(h, e);
+    }
+
+    /// Framework/port entry point: a platform activity arrived that is not a web
+    /// link. Returns true when this application claimed it.
+    ///
+    /// Answering honestly matters. Claiming everything would swallow handoff and
+    /// third-party activities the app never declared, so an activity is claimed
+    /// only when its type names an intent this application actually declares --
+    /// which is the shape the platform uses to continue a donated action.
+    ///
+    /// #### Parameters
+    ///
+    /// - `activityType`: the platform activity type
+    /// - `params`: the activity payload, may be null
+    public static boolean dispatchUserActivity(String activityType, Map<String, Object> params) {
+        if (activityType == null || getDeclaration(activityType) == null) {
+            return false;
+        }
+        dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
+        return true;
+    }
+
+    private static void deliverSelection(final EntitySelectionHandler h, final Entity e) {
+        if (h == null) {
+            return;
+        }
+        if (Display.isInitialized()) {
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    h.onEntitySelected(e);
+                }
+            });
+        } else {
+            h.onEntitySelected(e);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Framework / port entry points
+    // ------------------------------------------------------------------
+
+    /// Internal: installs the build-time-generated dispatcher and drains any
+    /// invocation that arrived before it. Invoked once during startup by the
+    /// generated bootstrap; application code should not call this.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the generated dispatcher
+    public static void setDispatcher(IntentDispatcher d) {
+        List<PendingInvocation> queued = null;
+        synchronized (pending) {
+            dispatcher = d;
+            if (d != null && !pending.isEmpty()) {
+                queued = new ArrayList<PendingInvocation>(pending);
+                pending.clear();
+            }
+        }
+        if (d != null) {
+            publishDeclarations(d);
+        }
+        if (queued != null) {
+            for (PendingInvocation q : queued) {
+                run(q);
+            }
+        }
+    }
+
+    /// Framework/port/test entry point: overrides the bridge resolved from the
+    /// platform port. Passing null restores platform resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bridge, or null
+    public static void setBridge(IntentBridge b) {
+        bridge = b;
+        bridgeOverridden = b != null;
+    }
+
+    static IntentBridge bridgeInternal() {
+        if (bridgeOverridden) {
+            return bridge;
+        }
+        if (!Display.isInitialized()) {
+            return null;
+        }
+        try {
+            return Display.getInstance().getIntentBridge();
+        } catch (Throwable t) {
+            logError(t);
+            return null;
+        }
+    }
+
+    /// Test seam: clears the bridge override, the dispatcher, queued invocations
+    /// and runtime declarations.
+    static void reset() {
+        bridge = null;
+        bridgeOverridden = false;
+        defaultTimeoutSeconds = 20;
+        synchronized (pending) {
+            dispatcher = null;
+            pending.clear();
+        }
+        synchronized (dynamic) {
+            dynamic.clear();
+        }
+        synchronized (pendingSelections) {
+            selectionHandler = null;
+            pendingSelections.clear();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Internals
+    // ------------------------------------------------------------------
+
+    /// Logs a swallowed failure without ever being able to become one.
+    ///
+    /// Every `catch` in this class exists to guarantee that a broken handler
+    /// still produces a result rather than an exception. `Log.e` can itself
+    /// throw when the logging stack is not fully up -- which is precisely the
+    /// state a headless invocation runs in, since the process may have been
+    /// started for no other reason than to answer it. Letting that escape would
+    /// turn a handled failure into an unhandled one at exactly the wrong moment.
+    private static void logError(Throwable t) {
+        try {
+            Log.e(t);
+        } catch (Throwable ignored) {
+            // Nothing useful is left to do: the reporting path is the thing that
+            // is broken. Losing the log entry is strictly better than losing the
+            // result the caller is waiting for.
+        }
+    }
+
+    private static void publishDeclarations(IntentDispatcher d) {
+        IntentBridge b = bridgeInternal();
+        if (b == null || !b.areIntentsSupported()) {
+            return;
+        }
+        try {
+            b.registerIntents(IntentSerializer.serializeDeclarations(d.describe()));
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
+    private static IntentResult invokeInternal(String intentId, Map<String, Object> params,
+                                               IntentContext ctx) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d == null) {
+            return IntentResult.failed("No intents are declared in this application");
+        }
+        Map<String, Object> safe = params == null
+                ? Collections.<String, Object>emptyMap()
+                : new HashMap<String, Object>(params);
+        try {
+            IntentResult r = d.invoke(intentId, safe, ctx);
+            if (r == null) {
+                return IntentResult.failed("Unknown intent \"" + intentId + "\"");
+            }
+            return r;
+        } catch (Throwable t) {
+            logError(t);
+            return IntentResult.failed("The action could not be completed");
+        }
+    }
+
+    /// Runs one invocation off the event dispatch thread and reports it once.
+    ///
+    /// The handler never runs on the EDT. An invocation can arrive while the app
+    /// is foregrounded and visible -- a widget button, a search hit on a running
+    /// app -- and a handler that blocks the EDT for even a second there is a
+    /// visible freeze. Handlers are forbidden from touching UI precisely so they
+    /// do not need it.
+    private static void run(final PendingInvocation inv) {
+        final IntentDeclaration decl = getDeclaration(inv.intentId);
+        int timeout = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
+        if (timeout < 1) {
+            timeout = defaultTimeoutSeconds;
+        }
+        final IntentContext ctx = new IntentContext(inv.source, inv.headless,
+                System.currentTimeMillis() + timeout * 1000L);
+        final CompletionGuard guard = new CompletionGuard(inv.completion);
+        final int timeoutMillis = timeout * 1000;
+
+        Runnable body = new Runnable() {
+            @Override
+            public void run() {
+                IntentResult r = invokeInternal(inv.intentId, inv.params, ctx);
+                guard.complete(r);
+            }
+        };
+
+        if (!Display.isInitialized()) {
+            // No Display: unit tests and the very earliest startup. Run inline
+            // so behaviour stays deterministic rather than depending on a thread
+            // pool that does not exist yet. The deadline still applies; there is
+            // simply nobody else to enforce it.
+            body.run();
+            return;
+        }
+
+        Display.getInstance().startThread(body, "CN1 Intent " + inv.intentId).start();
+        Display.getInstance().startThread(new Runnable() {
+            @Override
+            public void run() {
+                // Wait on the guard rather than sleeping the whole budget, so a
+                // handler that answers in 50ms does not leave a thread parked
+                // for the remaining 20 seconds.
+                if (guard.awaitCompletion(timeoutMillis)) {
+                    return;
+                }
+                ctx.cancel();
+                guard.complete(IntentResult.failed(
+                        "The action took too long and was stopped"));
+            }
+        }, "CN1 Intent timeout").start();
+    }
+
+    /// Makes the one-call guarantee real. The platform side of this boundary --
+    /// a Swift continuation on iOS -- crashes hard when it is resumed twice, and
+    /// the timeout racing a slow handler is exactly the situation that would do
+    /// it, so the check has to be atomic rather than a plain flag test.
+    private static final class CompletionGuard {
+        private final IntentCompletion completion;
+        private boolean done;
+
+        CompletionGuard(IntentCompletion completion) {
+            this.completion = completion;
+        }
+
+        /// Blocks until the handler completes or the budget runs out. Returns
+        /// true when it completed in time.
+        boolean awaitCompletion(long millis) {
+            long giveUpAt = System.currentTimeMillis() + millis;
+            synchronized (this) {
+                while (!done) {
+                    long left = giveUpAt - System.currentTimeMillis();
+                    if (left <= 0) {
+                        return false;
+                    }
+                    try {
+                        wait(left);
+                    } catch (InterruptedException e) {
+                        return done;
+                    }
+                }
+                return true;
+            }
+        }
+
+        void complete(IntentResult result) {
+            synchronized (this) {
+                if (done) {
+                    return;
+                }
+                done = true;
+                notifyAll();
+            }
+            if (completion != null) {
+                try {
+                    completion.onIntentResult(result == null ? IntentResult.ok() : result);
+                } catch (Throwable t) {
+                    logError(t);
+                }
+            }
+        }
+    }
+
+    private static final class PendingInvocation {
+        private final String intentId;
+        private final Map<String, Object> params;
+        private final IntentSource source;
+        private final boolean headless;
+        private final IntentCompletion completion;
+
+        PendingInvocation(String intentId, Map<String, Object> params, IntentSource source,
+                          boolean headless, IntentCompletion completion) {
+            this.intentId = intentId;
+            this.params = params == null
+                    ? Collections.<String, Object>emptyMap()
+                    : new HashMap<String, Object>(params);
+            this.source = source;
+            this.headless = headless;
+            this.completion = completion;
+        }
+    }
+}

@@ -174,6 +174,19 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 #undef CN1_USE_WIDGETS
 #endif
 
+// CN1_USE_INTENTS gates the app intents native bridge: the IOSNative intents* implementations
+// (Core Spotlight directly, App Intents through the generated Swift CN1IntentBridge via the
+// CN1IntentHost Objective-C shim) plus the non-browsing NSUserActivity handling in
+// CodenameOne_GLAppDelegate. IPhoneBuilder uncomments this only when the classpath scanner saw
+// com.codename1.intents.*, so apps that expose nothing to Siri or device search link neither
+// framework. Lives in this central header so the define is visible across translation units,
+// mirroring CN1_USE_WIDGETS.
+//#define CN1_USE_INTENTS
+// Core Spotlight and App Intents are unavailable on watchOS / tvOS; undo the define there.
+#if TARGET_OS_WATCH || TARGET_OS_TV
+#undef CN1_USE_INTENTS
+#endif
+
 // CN1_USE_WATCHCONNECTIVITY gates the phone-to-watch link (CN1WatchConnectivity.{h,m} + the
 // IOSNative wearable* trampolines) backing com.codename1.wearable. IPhoneBuilder uncomments this
 // only when the classpath scanner saw com.codename1.wearable.*, so apps that never talk to a watch

@@ -455,6 +455,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         return surfaceBridge;
     }
 
+    /// Returns the JavaSE app-intents bridge, created lazily on first use. The desktop has no
+    /// assistant and no system search index, so the bridge records what the application publishes
+    /// and the simulator presents it -- which lets an intent be built and debugged with no device,
+    /// against the same generated table a device would read.
+    @Override
+    public com.codename1.intents.spi.IntentBridge getIntentBridge() {
+        if (intentBridge == null) {
+            intentBridge = new JavaSEIntentBridge();
+        }
+        return intentBridge;
+    }
+
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
         if (!isDesktop() || !Display.isInitialized()) {
             return;
@@ -1114,6 +1126,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
     // apps that never touch the surfaces API pay nothing.
     private JavaSEWidgetBridge surfaceBridge;
+    private JavaSEIntentBridge intentBridge;
     // Phone-to-watch link (com.codename1.wearable). Both halves of a paired pair run their own
     // simulator process and meet through the shared app home; created lazily so apps that never
     // touch the wearable API pay nothing.
@@ -6736,6 +6749,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(arSim);
 
+        JMenuItem intentsSim = new JMenuItem("App Intents");
+        intentsSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                // Hand it the real bridge and let it drive the real dispatch
+                // entry point. A simulator control that shortcuts the framework
+                // would report a state it did not actually cause, which is the
+                // failure this window exists to catch.
+                SimulatorIntents.showWindow(
+                        (JavaSEIntentBridge) getIntentBridge(), window);
+            }
+        });
+        simulateMenu.add(intentsSim);
+
         JMenuItem pushSim = new JMenuItem("Push Simulation");
         pushSim.addActionListener(new ActionListener() {
             @Override
@@ -10129,7 +10156,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 "cn1app.RestClientBootstrap",
                 "cn1app.ProtoBootstrap",
                 "cn1app.GrpcClientBootstrap",
-                "cn1app.GraphQLClientBootstrap"}) {
+                "cn1app.GraphQLClientBootstrap",
+                "cn1app.IntentBootstrap"}) {
             try {
                 Class.forName(bootstrap).newInstance();
             } catch (ClassNotFoundException ignored) {

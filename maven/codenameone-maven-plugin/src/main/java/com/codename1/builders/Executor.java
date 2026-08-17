@@ -2982,6 +2982,9 @@ public abstract class Executor {
         if (projectHasBootstrap(sourceZip, "cn1app/GraphQLClientBootstrap.class")) {
             sb.append(indent).append("new cn1app.GraphQLClientBootstrap();\n");
         }
+        if (projectHasBootstrap(sourceZip, "cn1app/IntentBootstrap.class")) {
+            sb.append(indent).append("new cn1app.IntentBootstrap();\n");
+        }
         return sb.toString();
     }
 
