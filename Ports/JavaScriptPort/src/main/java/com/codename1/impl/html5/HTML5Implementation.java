@@ -10825,10 +10825,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
             historySuppressPop = false;
             return;
         }
-        awaitSuppressionConsumed(token, 0);
+        awaitSuppressionConsumed(token, System.currentTimeMillis() + SUPPRESSION_TIMEOUT_MILLIS);
     }
 
-    private void awaitSuppressionConsumed(final int token, final int attempt) {
+    /**
+     * How long a traversal the port asked for is given to raise its popstate before the
+     * expectation is given up. On the clock rather than on turns of the event loop: the event
+     * comes from the main thread and an idle loop can turn many times while it is on its way.
+     */
+    private static final long SUPPRESSION_TIMEOUT_MILLIS = 1000;
+
+    private void awaitSuppressionConsumed(final int token, final long deadline) {
         callSerially(new Runnable() {
             @Override
             public void run() {
@@ -10837,8 +10844,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // expectation now.
                     return;
                 }
-                if (attempt < 40) {
-                    awaitSuppressionConsumed(token, attempt + 1);
+                if (System.currentTimeMillis() < deadline) {
+                    awaitSuppressionConsumed(token, deadline);
                     return;
                 }
                 historySuppressPop = false;
@@ -10984,6 +10991,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * run its command again -- two entries would be spent while the application moved one.
      * Each step waits for the form to actually change before the next is issued.</p>
      */
+    /**
+     * How long a back command is given to land before it is taken as refused. Long enough for a
+     * form transition, which the framework runs before installing the destination.
+     */
+    private static final long BACK_OUTCOME_TIMEOUT_MILLIS = 2000;
+
     private void replayTraversal() {
         if (pendingTraversalEntries <= 0) {
             traversalActive = false;
@@ -11009,7 +11022,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // already spent.
         handlingPopState = true;
         current.dispatchCommand(back, new ActionEvent(back));
-        awaitBackOutcome(current, pendingTraversalEntries, 0);
+        awaitBackOutcome(current, pendingTraversalEntries,
+                System.currentTimeMillis() + BACK_OUTCOME_TIMEOUT_MILLIS);
         // Nothing is pushed to replace the entry that was just popped. Every form show pushes
         // one, so the history depth already tracks the navigation depth: popping one entry and
         // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
@@ -11023,7 +11037,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * @param outstanding entries still owed when the command was dispatched
      * @param attempt how many times this has already looked
      */
-    private void awaitBackOutcome(final Form before, final int outstanding, final int attempt) {
+    private void awaitBackOutcome(final Form before, final int outstanding, final long deadline) {
         callSerially(new Runnable() {
             @Override
             public void run() {
@@ -11038,8 +11052,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     replayTraversal();
                     return;
                 }
-                if (attempt < 40) {
-                    awaitBackOutcome(before, outstanding, attempt + 1);
+                if (System.currentTimeMillis() < deadline) {
+                    // Waited on the clock rather than on a number of turns of the event loop. A
+                    // form transition takes a couple of hundred milliseconds and the framework
+                    // does not install the destination until it ends, while forty turns of an
+                    // idle loop can pass in a fraction of that -- and reading that as a refusal
+                    // pushes browser history the wrong way for a navigation that was about to
+                    // land.
+                    awaitBackOutcome(before, outstanding, deadline);
                     return;
                 }
                 // The same form is still showing, so a pop guard refused the navigation. The
@@ -11884,6 +11904,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // device pixels and everything drawn with it is divided by the ratio to reach CSS
         // pixels, so the height only means anything alongside the ratio it was sized against.
         double ratioBasis = getDevicePixelRatio();
+        // The height this font was created with, which never changes. Identity has to be built
+        // from something that does not move: a font can be a key in a map when the display's
+        // ratio changes, and a hash that changes underneath a stored key loses it.
+        double identityHeight = Double.NaN;
         
         String cssCached_, cssFontFamilyCached__;
 
@@ -11907,6 +11931,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // and the band would then report no change while every coordinate drawn with this
             // font is divided by the new ratio: text would come out two thirds of its size.
             double scale = current / ratioBasis;
+            if (Double.isNaN(identityHeight)) {
+                identityHeight = height;
+            }
             height = height * scale;
             ascent = (int) Math.round(ascent * scale);
             ratioBasis = current;
@@ -12101,6 +12128,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return getCSS()+" (Face: "+face+" style "+style+" size "+size+")";
         }
 
+        /**
+         * The height this font is identified by, which is the one it was created with even after
+         * the display's pixel ratio has moved the height it draws at. A font can be a key in a
+         * map, and a key whose hash changes while it is stored is a key that cannot be found
+         * again.
+         */
+        private double identity() {
+            return Double.isNaN(identityHeight) ? height : identityHeight;
+        }
+
         @Override
         public boolean equals(Object obj) {
             if (this == obj) {
@@ -12113,7 +12150,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return face == other.face
                     && style == other.style
                     && size == other.size
-                    && Double.doubleToLongBits(height) == Double.doubleToLongBits(other.height)
+                    && Double.doubleToLongBits(identity()) == Double.doubleToLongBits(other.identity())
                     && java.util.Objects.equals(fileName, other.fileName)
                     && java.util.Objects.equals(fontName, other.fontName);
         }
@@ -12124,7 +12161,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             hash = 31 * hash + face;
             hash = 31 * hash + style;
             hash = 31 * hash + size;
-            long heightBits = Double.doubleToLongBits(height);
+            long heightBits = Double.doubleToLongBits(identity());
             hash = 31 * hash + (int)(heightBits ^ (heightBits >>> 32));
             hash = 31 * hash + (fileName != null ? fileName.hashCode() : 0);
             hash = 31 * hash + (fontName != null ? fontName.hashCode() : 0);
