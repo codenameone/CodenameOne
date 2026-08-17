@@ -322,7 +322,7 @@ public final class Intents {
     /// the handler's result, or a failed result when no such intent exists
     public static IntentResult invoke(String intentId, Map<String, Object> params) {
         IntentDeclaration decl = getDeclaration(intentId);
-        int timeout = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
+        int timeout = budgetFor(decl);
         // The deadline is carried so a handler can size its work the same way it would under a
         // platform invocation, and deliberately not enforced afterwards: the caller is blocked
         // in this method waiting for exactly this result, so turning a late success into a
@@ -683,7 +683,7 @@ public final class Intents {
             }
             ToolCompletion done = new ToolCompletion();
             dispatchInvocation(declaration.getId(), args, IntentSource.MODEL, false, done);
-            IntentResult r = done.awaitResult(declaration.getTimeoutSeconds());
+            IntentResult r = done.awaitResult(budgetFor(declaration));
             Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
             return IntentSerializer.serializeResult(r, images);
         }
@@ -961,6 +961,18 @@ public final class Intents {
     // Internals
     // ------------------------------------------------------------------
 
+    /// The budget an invocation of this declaration gets, in seconds.
+    ///
+    /// One definition on purpose. The build rejects a non-positive timeoutSeconds, but a
+    /// DynamicIntent or a declaration built at runtime can still carry one, and three callers
+    /// each reading it their own way is how the same handler ended up with contradictory
+    /// deadlines: platform dispatch substituting the default, Intents.invoke building an
+    /// already-expired context, and a model waiting on the raw number.
+    private static int budgetFor(IntentDeclaration decl) {
+        int declared = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
+        return declared < 1 ? defaultTimeoutSeconds : declared;
+    }
+
     private static IntentDeclaration findById(List<IntentDeclaration> all, String id) {
         for (IntentDeclaration d : all) {
             if (d.getId().equals(id)) {
@@ -1234,10 +1246,7 @@ public final class Intents {
     /// do not need it.
     private static void run(final PendingInvocation inv) {
         final IntentDeclaration decl = getDeclaration(inv.intentId);
-        int timeout = decl == null ? defaultTimeoutSeconds : decl.getTimeoutSeconds();
-        if (timeout < 1) {
-            timeout = defaultTimeoutSeconds;
-        }
+        final int timeout = budgetFor(decl);
         final IntentContext ctx = new IntentContext(inv.source, inv.headless,
                 System.currentTimeMillis() + timeout * 1000L);
         final CompletionGuard guard = new CompletionGuard(inv.completion);

@@ -741,6 +741,61 @@ public class AppIntentAnnotationProcessorTest {
     /// numeric() emits 0 for an int it cannot parse, an unparseable boolean becomes false, and
     /// an unparseable date becomes null. An omitted value then reached the handler as a value
     /// the declaration never named.
+    /// Callers disagreed about what a non-positive budget meant -- platform dispatch
+    /// substituted the default, Intents.invoke built an already-expired context, and a model
+    /// waited on the raw number -- so the same handler got contradictory deadlines depending on
+    /// who called it.
+    @Test
+    public void aNonPositiveTimeoutIsRejected() throws Exception {
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\", timeoutSeconds = 0)\n"
+                        + "public static void log() { }\n")),
+                "at least 1 second");
+        assertError(compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\", timeoutSeconds = -5)\n"
+                        + "public static void log() { }\n")),
+                "at least 1 second");
+    }
+
+    /// Epoch millis are a number like any other, and longValue() truncates and saturates
+    /// silently -- so a date arrived as a moment the caller never named.
+    @Test
+    public void aNumericDateRejectsValuesItCannotRepresent() throws Exception {
+        File classes = compile(source(
+                "public static java.util.Date seen;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log a workout\")\n"
+                        + "public static IntentResult logWorkout(\n"
+                        + "        @IntentParam(value = \"when\", required = false)\n"
+                        + "        java.util.Date when) {\n"
+                        + "    seen = when;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            assertNull("a fraction of a millisecond is not a moment anyone named",
+                    read(invoke, registry, seen, Double.valueOf(1.5)));
+            assertNull("nor is a value past what a long can hold",
+                    read(invoke, registry, seen, Double.valueOf(1e20)));
+            assertEquals("a real epoch value still works",
+                    new java.util.Date(1773446400000L),
+                    read(invoke, registry, seen, Long.valueOf(1773446400000L)));
+        } finally {
+            loader.close();
+        }
+    }
+
     @Test
     public void aMalformedDefaultIsRejectedForItsType() throws Exception {
         assertError(compile(source(

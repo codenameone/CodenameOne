@@ -356,6 +356,16 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         def.destructive = ann.getBoolOrDefault("destructive", false);
         def.opensRoute = ann.getStringOrDefault("opensRoute", "");
         def.timeoutSeconds = ann.getIntOrDefault("timeoutSeconds", 20);
+        if (def.timeoutSeconds < 1) {
+            // Callers disagree about what a non-positive budget means: platform dispatch
+            // substitutes the default, while Intents.invoke builds an already-expired context
+            // and a model waits on the raw number. One handler would get contradictory
+            // deadlines depending on who called it, which is not a behaviour worth defining.
+            ctx.error(cls, "@AppIntent " + def.where + " declares timeoutSeconds="
+                    + def.timeoutSeconds + ". A budget has to be at least 1 second; leave it "
+                    + "unset for the default.");
+            return;
+        }
         for (Object o : asList(ann.get("phrases"))) {
             if (o instanceof String) {
                 def.phrases.add((String) o);
@@ -1242,7 +1252,16 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        Object o = p == null ? null : p.get(k);\n");
         sb.append("        if (o == null) { o = def; }\n");
         sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
-        sb.append("        if (o instanceof Number) { return new java.util.Date(((Number) o).longValue()); }\n");
+        // Epoch millis are a number like any other: longValue() would truncate 1.5 and
+        // saturate 1e20, handing the handler a moment nobody named.
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            double d = ((Number) o).doubleValue();\n");
+        sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)\n");
+        sb.append("                    || d < -9223372036854775808.0 || d >= 9223372036854775808.0) {\n");
+        sb.append("                return null;\n");
+        sb.append("            }\n");
+        sb.append("            return new java.util.Date(((Number) o).longValue());\n");
+        sb.append("        }\n");
         // A string may be epoch millis or ISO-8601. Both arrive in practice: the platforms send
         // millis, and a language model handed this parameter through asTools() writes a date the
         // way it writes dates. Rejecting the second form would fail the invocation over

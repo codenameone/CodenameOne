@@ -123,6 +123,7 @@ class IntentsTest {
     private static final class FakeDispatcher implements IntentDispatcher {
         final List<String> invoked = new ArrayList<String>();
         Map<String, Object> lastParams = Collections.emptyMap();
+        IntentContext lastContext;
         final List<IntentDeclaration> declarations = new ArrayList<IntentDeclaration>();
         IntentResult next = IntentResult.ok();
         RuntimeException throwOnInvoke;
@@ -138,6 +139,7 @@ class IntentsTest {
                                     IntentContext ctx) {
             invoked.add(intentId);
             lastParams = params;
+            lastContext = ctx;
             if (throwOnInvoke != null) {
                 throw throwOnInvoke;
             }
@@ -699,6 +701,30 @@ class IntentsTest {
     /// A schema that says "string" and nothing else lets a model send an ISO date, a weekday
     /// name or a sentence, all schema-valid and all of which the dispatcher reads as null. The
     /// description is the only place the accepted forms can be stated, so it has to state them.
+    /// The build rejects a non-positive timeoutSeconds, but a DynamicIntent or a declaration
+    /// built at runtime can still carry one -- and every caller has to read it the same way.
+    /// Intents.invoke used the raw value, so a handler declaring 0 was handed a context that
+    /// had already expired before it ran a line.
+    @Test
+    void aNonPositiveDeclaredTimeoutFallsBackToTheDefault() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                "", 0, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+
+        Intents.invoke("known", null);
+
+        assertEquals(Arrays.asList("known"), d.invoked);
+        assertNotNull(d.lastContext);
+        assertFalse(d.lastContext.isCancelled(),
+                "a declared 0 must not hand the handler an expired context");
+        assertTrue(d.lastContext.getRemainingTime() > 0,
+                "and it must have real time left, got " + d.lastContext.getRemainingTime());
+    }
+
     @Test
     void aDateParameterTellsTheModelWhichFormsAreAccepted() {
         IntentParameterInfo when = new IntentParameterInfo("when", "When?",
