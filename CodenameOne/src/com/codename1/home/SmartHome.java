@@ -944,7 +944,8 @@ public final class SmartHome {
         synchronized (this) {
             subscriptionId = "s" + (nextSubscriptionId++);
         }
-        boolean push = b != null && b.isPushDelivery();
+        boolean push = b != null && b.isPushDelivery()
+                && allWatchedTraitsNotify(request);
         TraitSubscription handle =
                 new TraitSubscription(subscriptionId, this, push);
         SubscriptionState state = new SubscriptionState(subscriptionId,
@@ -972,6 +973,48 @@ public final class SmartHome {
             deliverInitialValues(state, request);
         }
         return handle;
+    }
+
+    /// Whether every trait in a request reports its own changes.
+    ///
+    /// A backend that pushes still has individual traits that do not -- a
+    /// HomeKit characteristic without event notification is read when
+    /// somebody asks and never volunteers -- and those reach a listener only
+    /// through [#drainChanges()]. Reporting push for a subscription that
+    /// holds one tells the caller it need not drain, which is precisely how
+    /// that trait then never updates.
+    ///
+    /// Unknown answers count as notifying: the graph may not be loaded yet,
+    /// and claiming a trait needs polling when it does not costs a drain the
+    /// caller did not need, whereas the reverse costs them the value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: what is being subscribed to
+    ///
+    /// #### Returns
+    ///
+    /// `true` when nothing in the request has to be polled
+    private boolean allWatchedTraitsNotify(SubscriptionRequest request) {
+        List<String> accessoryIds = request.getAccessoryIds();
+        List<String> serviceIds = request.getServiceIds();
+        List<Trait> traits = request.getTraits();
+        for (int i = 0; i < traits.size(); i++) {
+            Accessory accessory = findAccessory(accessoryIds.get(i));
+            if (accessory == null) {
+                continue;
+            }
+            AccessoryService service =
+                    accessory.getService(serviceIds.get(i));
+            if (service == null) {
+                continue;
+            }
+            TraitConstraint c = service.getConstraint(traits.get(i));
+            if (c != null && !c.notifiesOnChange()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void deliverInitialValues(final SubscriptionState state,

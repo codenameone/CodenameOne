@@ -1527,6 +1527,27 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
                            cn1homeUuid([accessory uniqueIdentifier]));
 }
 
+// An accessory whose services changed -- a firmware update that adds one, a
+// reconfiguration that renames one. The encoded services and their trait
+// constraints are built from exactly this, so without these the app keeps
+// offering controls that no longer exist and misses the ones that appeared.
+//
+// The delegates have to be reattached too: a service added now brings
+// characteristics this bridge has never registered for.
+- (void)accessoryDidUpdateServices:(HMAccessory *)accessory {
+    cn1homeRebuildSnapshot();
+    cn1homeAttachDelegates();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil,
+                           cn1homeUuid([accessory uniqueIdentifier]));
+}
+
+- (void)accessory:(HMAccessory *)accessory
+        didUpdateNameForService:(HMService *)service {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil,
+                           cn1homeUuid([accessory uniqueIdentifier]));
+}
+
 - (void)accessoryDidUpdateReachability:(HMAccessory *)accessory {
     // Not a full rebuild's worth of work in principle, but the reachability
     // flag lives in the encoded accessory record, so the snapshot is stale

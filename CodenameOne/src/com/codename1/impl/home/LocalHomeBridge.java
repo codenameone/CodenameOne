@@ -894,6 +894,7 @@ public class LocalHomeBridge implements HomeBridge {
             int[] kinds, double[] numericValues, String[] stringValues,
             int[] unitWireIds) {
         String line;
+        boolean announceScenes = false;
         synchronized (this) {
             Structure s = structures.get(structureId);
             if (s == null) {
@@ -936,10 +937,21 @@ public class LocalHomeBridge implements HomeBridge {
                         serviceIds[i], trait, v));
             }
             s.scenes.put(sceneId, scene);
+            announceScenes = true;
             line = HomeWire.join(new String[] {sceneId, name,
                 Integer.toString(scene.typeOrdinal), HomeWire.flag(true)});
         }
         answer(new SceneResult(requestId, line, structureId, null));
+        if (announceScenes) {
+            // The graph the app reads is a snapshot, and nothing in the
+            // answer to createScene updates it -- so without this the new
+            // scene is absent from getStructures() until something unrelated
+            // refreshes, and no listener is told to. The commissioning path
+            // announces its added accessory the same way.
+            SmartHome.notifyStructureChanged(
+                    StructureChangeKind.SCENES_CHANGED.ordinal(), structureId,
+                    null);
+        }
     }
 
     @Override
