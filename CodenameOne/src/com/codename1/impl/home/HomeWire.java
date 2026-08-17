@@ -512,8 +512,18 @@ public final class HomeWire {
             return TraitReading.absent(accessoryId, serviceId, trait);
         }
         boolean hasRaw = field(f, 7).length() > 0;
-        TraitValue value = decodeValue(trait, integer(f, 3, -1), real(f, 4, 0),
-                field(f, 5), integer(f, 6, -1), integer(f, 7, 0), hasRaw);
+        // No fallback for the number. A record that says it has a value and
+        // then does not carry a readable one is malformed, and defaulting it
+        // to zero is the worst available answer: zero is SECURED for a lock
+        // and false for a flag, so a truncated record would read as a locked
+        // door rather than as the missing data it is.
+        double numeric = real(f, 4, Double.NaN);
+        boolean numericReadable = !Double.isNaN(numeric)
+                || "NaN".equals(field(f, 4).trim());
+        TraitValue value = numericReadable
+                ? decodeValue(trait, integer(f, 3, -1), numeric, field(f, 5),
+                        integer(f, 6, -1), integer(f, 7, 0), hasRaw)
+                : null;
         if (value == null) {
             return TraitReading.failed(accessoryId, serviceId, trait,
                     HomeError.INVALID_DATA,

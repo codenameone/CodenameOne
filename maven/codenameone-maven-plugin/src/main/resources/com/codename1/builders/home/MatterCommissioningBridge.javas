@@ -368,6 +368,17 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
                     "there is no activity to run the add-device flow in");
             return;
         }
+        if (((CodenameOneActivity) activity).isWaitingForResult()) {
+            // Some other flow -- a camera, a file picker -- owns the
+            // activity's result channel, and registering a listener while it
+            // does is silently ignored. Launching anyway sends the Matter
+            // sheet's result to that flow and leaves this one waiting for an
+            // answer that was handed to somebody else.
+            callback.onError("BUSY",
+                    "another screen is already waiting for a result; try"
+                            + " again once it has finished");
+            return;
+        }
         if (pendingCommission != null) {
             // Play services shows one add-device UI at a time, and a second
             // request would replace the parked callback so the first caller

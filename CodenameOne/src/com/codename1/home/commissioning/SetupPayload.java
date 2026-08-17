@@ -224,6 +224,18 @@ public final class SetupPayload {
         int offset = 0;
         int version = (int) readBits(bytes, offset, VERSION_BITS);
         offset += VERSION_BITS;
+        // Only version zero has the layout read below. A future version need
+        // not, so reading its bits as though it did would hand the platform a
+        // discriminator and a passcode invented out of a field boundary that
+        // moved -- and report the code as valid on the way.
+        if (version != 0) {
+            throw new IllegalArgumentException(
+                    "this setup code declares Matter payload version "
+                            + version + ", which this build does not know how"
+                            + " to read; pass the code through unparsed with"
+                            + " CommissioningRequest.setRawSetupPayload"
+                            + " instead");
+        }
         int vendorId = (int) readBits(bytes, offset, VENDOR_BITS);
         offset += VENDOR_BITS;
         int productId = (int) readBits(bytes, offset, PRODUCT_BITS);

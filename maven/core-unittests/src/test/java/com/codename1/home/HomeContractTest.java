@@ -317,6 +317,64 @@ class HomeContractTest {
     }
 
     /**
+     * A scene action against a target the home does not have fails the whole
+     * scene.
+     *
+     * <p>This is the backend the simulator and the desktop run on, so a scene
+     * it accepts is one a developer believes works. Saving an action against
+     * an accessory that is not there lets the simulator approve a scene every
+     * real backend rejects.</p>
+     */
+    @Test
+    void aSceneActionAgainstAMissingAccessoryFailsTheScene() {
+        LocalHomeBridge bridge = new LocalHomeBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        HomeStructure structure = home.getPrimaryStructure();
+        List<SceneAction> actions = new ArrayList<SceneAction>();
+        actions.add(new SceneAction("no-such-lamp", "1", Trait.ON_OFF,
+                TraitValue.of(true)));
+        AsyncResource<Scene> r = HomeAwait.settled(
+                home.createScene(structure, "Good night", actions));
+
+        assertFalse(r.isReady(), "the scene must not be created");
+        int before = structure.getScenes().size();
+        HomeAwait.settled(home.refresh());
+        assertEquals(before,
+                home.getPrimaryStructure().getScenes().size(),
+                "and nothing may be left behind");
+    }
+
+    /**
+     * A read is lined up against what was sent, not against a request the
+     * caller has gone on editing.
+     */
+    @Test
+    void aReadIsAnsweredAgainstTheRequestAsItWasSent() {
+        CapturingBridge bridge = new CapturingBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory thermostat = home.findAccessory("thermostat");
+        AccessoryService svc = thermostat.getPrimaryService();
+        TraitReadRequest request = new TraitReadRequest();
+        request.add(thermostat, svc, Trait.CURRENT_TEMPERATURE);
+        AsyncResource<List<TraitReading>> r = home.read(request);
+        request.add(thermostat, svc, Trait.CURRENT_HUMIDITY);
+        HomeAwait.settled(r);
+
+        assertEquals(1, r.get().size(),
+                "the answer covers what was asked for, not what was added"
+                        + " afterwards");
+        assertSame(Trait.CURRENT_TEMPERATURE, r.get().get(0).getTrait());
+    }
+
+    /**
      * A change that lands while the up-front read is in flight arrives
      * after it, not before.
      *

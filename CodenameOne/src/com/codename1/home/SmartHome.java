@@ -696,18 +696,23 @@ public final class SmartHome {
         }
         int id = nextRequestId();
         EdtResult<List<TraitReading>> result = pendingReads.open(id);
+        // A snapshot, because the request is the caller's object and they are
+        // free to keep adding to it. What comes back is lined up against what
+        // went out, position by position, and the two have to be the same
+        // list for that to mean anything.
+        TraitReadRequest sent = copyOf(request);
         synchronized (this) {
-            readRequests.put(Integer.valueOf(id), request);
+            readRequests.put(Integer.valueOf(id), sent);
         }
-        List<String> accessoryIds = request.getAccessoryIds();
-        List<String> serviceIds = request.getServiceIds();
-        List<Trait> traits = request.getTraits();
+        List<String> accessoryIds = sent.getAccessoryIds();
+        List<String> serviceIds = sent.getServiceIds();
+        List<Trait> traits = sent.getTraits();
         String[] traitIds = new String[traits.size()];
         for (int i = 0; i < traits.size(); i++) {
             traitIds[i] = traits.get(i).getId();
         }
         b.readTraits(id, toArray(accessoryIds), toArray(serviceIds), traitIds,
-                request.isAllowCached());
+                sent.isAllowCached());
         return result;
     }
 
@@ -1813,6 +1818,28 @@ public final class SmartHome {
             out[i] = list.get(i);
         }
         return out;
+    }
+
+    /// A copy of a read request, so a caller mutating theirs cannot change
+    /// what is in flight.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the caller's request
+    ///
+    /// #### Returns
+    ///
+    /// an equal request that nothing else holds
+    private static TraitReadRequest copyOf(TraitReadRequest request) {
+        TraitReadRequest copy = new TraitReadRequest();
+        copy.setAllowCached(request.isAllowCached());
+        List<String> accessoryIds = request.getAccessoryIds();
+        List<String> serviceIds = request.getServiceIds();
+        List<Trait> traits = request.getTraits();
+        for (int i = 0; i < traits.size(); i++) {
+            copy.add(accessoryIds.get(i), serviceIds.get(i), traits.get(i));
+        }
+        return copy;
     }
 
     /// Reads a request too large for the backend, in pieces.

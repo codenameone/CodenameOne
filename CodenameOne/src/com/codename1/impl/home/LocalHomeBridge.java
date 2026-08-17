@@ -855,18 +855,30 @@ public class LocalHomeBridge implements HomeBridge {
             } while (s.scenes.containsKey(sceneId));
             SceneRecord scene = new SceneRecord(sceneId, name,
                     com.codename1.home.SceneType.USER_DEFINED.ordinal());
+            // Each action is checked the way a write to the same target would
+            // be, and one bad action fails the whole scene.
+            //
+            // This is the backend the simulator and the desktop run on, so a
+            // scene it accepts is a scene the developer believes works. Saving
+            // an action against an accessory that is not there, or a trait the
+            // service does not have, would let the simulator approve a scene
+            // every real backend rejects -- and executeScene() would then
+            // report a successful change for an accessory that does not exist.
             for (int i = 0; i < traitIds.length; i++) {
                 Trait trait = Trait.forId(traitIds[i]);
-                if (trait == null) {
-                    continue;
+                TraitValue v = trait == null ? null
+                        : HomeWire.decodeValue(trait, kinds[i],
+                                numericValues[i], stringValues[i],
+                                unitWireIds[i], 0, false);
+                String refusal = refuseSceneAction(accessoryIds[i],
+                        serviceIds[i], trait, v);
+                if (refusal != null) {
+                    answer(new SceneResult(requestId, null, structureId,
+                            refusal));
+                    return;
                 }
-                TraitValue v = HomeWire.decodeValue(trait, kinds[i],
-                        numericValues[i], stringValues[i], unitWireIds[i], 0,
-                        false);
-                if (v != null) {
-                    scene.actions.add(new ActionRecord(accessoryIds[i],
-                            serviceIds[i], trait, v));
-                }
+                scene.actions.add(new ActionRecord(accessoryIds[i],
+                        serviceIds[i], trait, v));
             }
             s.scenes.put(sceneId, scene);
             line = HomeWire.join(new String[] {sceneId, name,
@@ -996,6 +1008,61 @@ public class LocalHomeBridge implements HomeBridge {
     private Service serviceOf(String accessoryId, String serviceId) {
         Accessory a = accessories.get(accessoryId);
         return a == null ? null : a.services.get(serviceId);
+    }
+
+    /// Why a scene action cannot be saved, or `null` when it can.
+    ///
+    /// The same checks a write to the same target makes, minus the
+    /// reachability one: a scene is created now and runs later, and an
+    /// accessory that happens to be offline at this moment is not a reason to
+    /// refuse it.
+    ///
+    /// Callers hold this instance's monitor.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessoryId`: the accessory the action targets
+    ///
+    /// - `serviceId`: the service on it
+    ///
+    /// - `trait`: the trait, or `null` when this build does not know it
+    ///
+    /// - `value`: the decoded value, or `null` when it would not decode
+    ///
+    /// #### Returns
+    ///
+    /// an encoded error, or `null`
+    private String refuseSceneAction(String accessoryId, String serviceId,
+            Trait trait, TraitValue value) {
+        if (trait == null) {
+            return HomeError.TRAIT_NOT_SUPPORTED.name()
+                    + "\tthis build does not know that trait";
+        }
+        if (value == null) {
+            return HomeError.INVALID_ARGUMENT.name()
+                    + "\tthat value does not fit this trait";
+        }
+        Accessory a = accessories.get(accessoryId);
+        if (a == null) {
+            return HomeError.ACCESSORY_NOT_FOUND.name()
+                    + "\tno such accessory in the simulated home";
+        }
+        Service svc = a.services.get(serviceId);
+        TraitConstraint c = svc == null ? null : svc.constraintFor(trait);
+        if (c == null) {
+            return HomeError.TRAIT_NOT_SUPPORTED.name()
+                    + "\tthis service does not have that trait";
+        }
+        if (!c.isWritable()) {
+            return HomeError.READ_ONLY_TRAIT.name()
+                    + "\tthis trait reports what the accessory is doing";
+        }
+        if (!c.accepts(value)) {
+            return HomeError.VALUE_OUT_OF_RANGE.name()
+                    + "\tthis accessory accepts " + c.getMinimum() + " to "
+                    + c.getMaximum();
+        }
+        return null;
     }
 
     private static String key(String accessoryId, String serviceId,
