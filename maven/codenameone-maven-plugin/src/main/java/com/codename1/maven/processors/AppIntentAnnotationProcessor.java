@@ -846,7 +846,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "requiredLong(params, " + key + ")";
         }
         if ("float".equals(p.kind)) {
-            return "(float) requiredDouble(params, " + key + ")";
+            return "requiredFloat(params, " + key + ")";
         }
         return "requiredDouble(params, " + key + ")";
     }
@@ -1014,9 +1014,16 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         // than a rounding decision the framework gets to make on their behalf.
         sb.append("        if (o instanceof Number) {\n");
         sb.append("            double d = ((Number) o).doubleValue();\n");
-        sb.append("            if (d != Math.floor(d) || Double.isInfinite(d)) {\n");
+        sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)) {\n");
         sb.append("                throw new IllegalArgumentException(o\n");
         sb.append("                        + \" is not a whole number for \" + k);\n");
+        sb.append("            }\n");
+        // longValue() saturates rather than failing, so 1e20 would arrive as Long.MAX_VALUE --
+        // a number the caller never sent, and one the handler cannot tell from a real one. The
+        // upper bound is >= because (double) Long.MAX_VALUE rounds up to 2^63 exactly.
+        sb.append("            if (d < -9223372036854775808.0 || d >= 9223372036854775808.0) {\n");
+        sb.append("                throw new IllegalArgumentException(o\n");
+        sb.append("                        + \" is out of range for \" + k);\n");
         sb.append("            }\n");
         sb.append("            return ((Number) o).longValue();\n");
         sb.append("        }\n");
@@ -1043,7 +1050,14 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
         sb.append("    private static double requiredDouble(Map<String, Object> p, String k) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
-        sb.append("        if (o instanceof Number) { return ((Number) o).doubleValue(); }\n");
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            double d = ((Number) o).doubleValue();\n");
+        sb.append("            if (Double.isNaN(d) || Double.isInfinite(d)) {\n");
+        sb.append("                throw new IllegalArgumentException(o\n");
+        sb.append("                        + \" is not a finite number for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("            return d;\n");
+        sb.append("        }\n");
         sb.append("        if (o instanceof String) {\n");
         sb.append("            try { return Double.parseDouble(((String) o).trim()); }\n");
         sb.append("            catch (NumberFormatException e) {\n");
@@ -1052,6 +1066,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        // A plain (float) cast on the double silently produces Infinity for anything past
+        // Float.MAX_VALUE, so 1e100 would reach the handler as a non-finite float.
+        sb.append("    private static float requiredFloat(Map<String, Object> p, String k) {\n");
+        sb.append("        double d = requiredDouble(p, k);\n");
+        sb.append("        if (d < -3.4028234663852886E38 || d > 3.4028234663852886E38) {\n");
+        sb.append("            throw new IllegalArgumentException(d\n");
+        sb.append("                    + \" is out of range for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return (float) d;\n");
         sb.append("    }\n\n");
 
         sb.append("    private static boolean requiredBoolean(Map<String, Object> p, String k) {\n");
@@ -1137,8 +1162,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("                    if (!\"Z\".equals(z) && !\"z\".equals(z)) {\n");
         sb.append("                        String digits = z.substring(1).replace(\":\", \"\");\n");
         sb.append("                        if (digits.length() != 4) { return null; }\n");
-        sb.append("                        offsetMinutes = Integer.parseInt(digits.substring(0, 2)) * 60\n");
-        sb.append("                                + Integer.parseInt(digits.substring(2));\n");
+        sb.append("                        int oh = Integer.parseInt(digits.substring(0, 2));\n");
+        sb.append("                        int om = Integer.parseInt(digits.substring(2));\n");
+        // +01:99 is four digits and parses fine, then shifts the instant by 159 minutes and
+        // returns a date nobody asked for. ZoneOffset's own bound is +/-18:00, so that is the
+        // bound used here rather than inventing a looser one.
+        sb.append("                        if (oh > 18 || om > 59 || oh * 60 + om > 18 * 60) {\n");
+        sb.append("                            return null;\n");
+        sb.append("                        }\n");
+        sb.append("                        offsetMinutes = oh * 60 + om;\n");
         sb.append("                        if (z.charAt(0) == '-') { offsetMinutes = -offsetMinutes; }\n");
         sb.append("                    }\n");
         sb.append("                }\n");

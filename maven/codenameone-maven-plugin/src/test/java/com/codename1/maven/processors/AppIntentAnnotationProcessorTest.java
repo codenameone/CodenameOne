@@ -331,7 +331,135 @@ public class AppIntentAnnotationProcessorTest {
         }
     }
 
+    /// The conversions that silently succeed with a wrong answer, which is worse than failing:
+    /// longValue() saturates, a (float) cast overflows to infinity, and an out-of-range ISO
+    /// offset shifts the instant. Each would hand a side-effecting handler a number or a moment
+    /// the caller never sent.
+    @Test
+    public void aRequiredNumberRejectsValuesItCannotRepresent() throws Exception {
+        File classes = compile(source(
+                "public static double seen = -1;\n"
+                        + "@AppIntent(value = \"set_size\", title = \"Set\")\n"
+                        + "public static IntentResult set(@IntentParam(\"big\") long big) {\n"
+                        + "    seen = big;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+
+            // 1e20 is integral and finite, and longValue() would saturate it to Long.MAX_VALUE.
+            assertRejected(invoke, registry, "set_size", "big", Double.valueOf(1e20), "range");
+            // Still accepts what it can represent, so this is a bound rather than a new rule.
+            Map<String, Object> ok = new LinkedHashMap<String, Object>();
+            ok.put("big", Long.valueOf(1234567890123L));
+            invoke.invoke(registry, "set_size", ok, null);
+            assertEquals(1234567890123d,
+                    loader.loadClass("com.example.Handlers").getField("seen").getDouble(null), 0d);
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
+    public void aRequiredFloatRejectsAValueThatWouldBecomeInfinity() throws Exception {
+        File classes = compile(source(
+                "public static float seen = -1;\n"
+                        + "@AppIntent(value = \"set_ratio\", title = \"Set\")\n"
+                        + "public static IntentResult set(@IntentParam(\"r\") float r) {\n"
+                        + "    seen = r;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+
+            assertRejected(invoke, registry, "set_ratio", "r", Double.valueOf(1e100), "range");
+
+            Map<String, Object> ok = new LinkedHashMap<String, Object>();
+            ok.put("r", Double.valueOf(1.5));
+            invoke.invoke(registry, "set_ratio", ok, null);
+            assertEquals(1.5f,
+                    loader.loadClass("com.example.Handlers").getField("seen").getFloat(null), 0f);
+        } finally {
+            loader.close();
+        }
+    }
+
+    @Test
+    public void anOutOfRangeIsoOffsetIsRejected() throws Exception {
+        File classes = compile(source(
+                "public static java.util.Date seen;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log a workout\")\n"
+                        + "public static IntentResult logWorkout(\n"
+                        + "        @IntentParam(value = \"when\", required = false)\n"
+                        + "        java.util.Date when) {\n"
+                        + "    seen = when;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            assertNull("99 is not a count of minutes",
+                    read(invoke, registry, seen, "2026-03-14T12:00:00+01:99"));
+            assertNull("nor is 25 a count of hours",
+                    read(invoke, registry, seen, "2026-03-14T12:00:00+25:00"));
+            assertNull("ZoneOffset's own bound is 18 hours",
+                    read(invoke, registry, seen, "2026-03-14T12:00:00+19:00"));
+            assertEquals("a legitimate offset still applies",
+                    new java.util.Date(1773489600000L - 3600000L),
+                    read(invoke, registry, seen, "2026-03-14T12:00:00+01:00"));
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// Invokes an intent with one bad value and asserts it failed loudly rather than running.
+    private static void assertRejected(java.lang.reflect.Method invoke, Object registry,
+                                       String intentId, String param, Object value,
+                                       String expectedInMessage) throws Exception {
+        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        params.put(param, value);
+        try {
+            invoke.invoke(registry, intentId, params, null);
+            fail(value + " must not reach the handler");
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            assertTrue(String.valueOf(e.getCause()),
+                    e.getCause() instanceof IllegalArgumentException);
+            assertTrue(e.getCause().getMessage(),
+                    e.getCause().getMessage().contains(expectedInMessage));
+        }
+    }
+
     /// Invokes the fixture with one parameter value and reports what the handler received.
+
     private static Object read(java.lang.reflect.Method invoke, Object registry,
                                java.lang.reflect.Field seen, Object value) throws Exception {
         seen.set(null, null);
