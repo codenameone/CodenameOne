@@ -650,3 +650,13 @@ unretraceable
 [Mm]inif(y|ies|ied|ier|ication)
 [Uu]nminif(y|ies|ied|ier|ication)
 [Rr]etrace(d|s|able)?
+
+# -----------------------------------------------------------------------------
+# Smart home (Smart-Home.asciidoc) terminology.
+# -----------------------------------------------------------------------------
+# The reciprocal colour-temperature unit both HomeKit and Matter express a
+# light's warmth in; "mired" is the standard spelling of it.
+[Mm]ireds?
+# The value a thermostat is aiming for, as the HVAC industry and both
+# platforms name it.
+[Ss]etpoints?

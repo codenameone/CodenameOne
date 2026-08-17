@@ -8,7 +8,7 @@ Every callback -- `AsyncResource` results, change batches, structure events -- i
 
 === The model
 
-A `HomeStructure` holds `HomeRoom`+s+ and `Accessory`+s+. An accessory has one or more `AccessoryService`+s+ -- a two-gang wall switch is one accessory with two services -- and a service exposes `Trait`+s+.
+A `HomeStructure` holds rooms (`HomeRoom`) and accessories (`Accessory`). An accessory has one or more services (`AccessoryService`) -- a two-gang wall switch is one accessory with two services -- and a service exposes traits (`Trait`).
 
 A trait is a canonical capability, not a platform identifier. `Trait.BRIGHTNESS` is the same constant whether the accessory is behind HomeKit or Matter, and the port maps it to `HMCharacteristicTypeBrightness` or to Level Control's `CurrentLevel` for you. No HomeKit characteristic string and no Matter cluster id ever reaches your code.
 
@@ -66,13 +66,13 @@ Writing is the mirror image, and a batch write partly succeeding is equally norm
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SmartHomeJava002Snippet.java[tag=smart-home-java-002,indent=0]
 ----
 
-Build controls from the accessory's own `TraitConstraint` rather than from the trait's nominal range. A dimmer whose floor is 10 percent says so there, and a write below the floor is **refused rather than clamped**: an app that asked for 5 percent and got 10 percent without being told never learns it was wrong.
+Build controls from the accessory's own `TraitConstraint` rather than from the trait's nominal range. A dimmer whose floor is 10 percent says so there, and writing below the floor is **refused rather than clamped**: an app that asked for 5 percent and got 10 percent without being told never learns it was wrong.
 
 === Values and units
 
 `TraitValue` is one type with kind-checked getters rather than a class per trait. There's no zero-argument `getDouble()` on purpose: `getDouble(TraitUnit)` makes you name the unit you expect and refuses a cross-dimension request, which is what stops a Celsius setpoint being rendered as Fahrenheit.
 
-Everything proportional is normalized to a percentage, so Matter's 0..254 level control and 0..10000 covering position never reach your code. Colour temperature is in mireds, because that's what both platforms use natively -- and remember that **a higher mired value is a warmer light**. `TraitValue.getColorTemperatureKelvin()` converts if you would rather think in Kelvin.
+Everything proportional is normalized to a percentage, so Matter's 0-254 level control and 0-10000 covering position never reach your code. Color temperature is in mireds, because that's what both platforms use natively -- and remember that **a higher mired value is a warmer light**. `TraitValue.getColorTemperatureKelvin()` converts if you would rather think in Kelvin.
 
 Where a mapping is lossy, `TraitValue.getRawPlatformValue()` carries the platform's own ordinal alongside the canonical one. Air quality has six levels on HomeKit and seven on Matter; the canonical enum follows Matter and the raw value is there for an app that needs to be exact.
 
