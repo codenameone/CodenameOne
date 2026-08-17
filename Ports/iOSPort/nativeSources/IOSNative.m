@@ -15273,9 +15273,17 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsSupported__(CN1_THREAD_STAT
 }
 
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsAppIntentsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+#ifdef CN1_APP_INTENTS_DECLARED
     if (@available(iOS 16.0, *)) {
+        // The class test still matters: it is what catches a device below the App Intents
+        // minimum, where the Swift is present but its types are unavailable.
         return cn1IntentBridgeClass() != nil ? JAVA_TRUE : JAVA_FALSE;
     }
+#endif
+    // No declarations were generated -- either the app declares no @AppIntent, or it set
+    // ios.intents.appIntents=false. Answering true here made isVoiceInvocationSupported() and
+    // isHeadlessExecutionSupported() promise an assistant path that cannot exist, so apps built
+    // Siri UI that could never work.
     return JAVA_FALSE;
 }
 
@@ -15304,7 +15312,7 @@ void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THR
 /// It is NSUserActivity underneath, which long predates App Intents, so gating it on iOS 16
 /// made every donation a no-op on exactly the devices the ios.intents.appIntents=false opt-out
 /// exists to keep working. Nothing here needs Swift.
-void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT paramsJson) {
+void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT title, JAVA_OBJECT paramsJson) {
     if (intentId == JAVA_NULL) {
         return;
     }
@@ -15313,7 +15321,11 @@ void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang
     NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:iid];
     activity.eligibleForPrediction = YES;
     activity.eligibleForSearch = YES;
-    activity.title = iid;
+    // The activity type has to be the machine id -- it is what the continuation path matches on
+    // -- but the title is what Siri suggestions and Spotlight show a person. Using the id for
+    // both put "log_workout" in front of the user next to the "Log a workout" the app declared.
+    NSString *label = (title == JAVA_NULL) ? iid : toNSString(CN1_THREAD_STATE_PASS_ARG title);
+    activity.title = ([label length] > 0) ? label : iid;
     if (paramsJson != JAVA_NULL) {
         NSDictionary *params = cn1IntentsParseJson(
                 toNSString(CN1_THREAD_STATE_PASS_ARG paramsJson));
@@ -15500,7 +15512,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_intentsIndexingSupported__(CN1_THR
 }
 void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT declarationsJson) {
 }
-void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT paramsJson) {
+void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT title, JAVA_OBJECT paramsJson) {
 }
 void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT name, JAVA_OBJECT dataArr, JAVA_INT length) {
 }

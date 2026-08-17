@@ -96,10 +96,15 @@ final class IOSIntentBridge implements IntentBridge {
         com.codename1.intents.DynamicIntent dyn =
                 com.codename1.intents.Intents.getDynamicIntent(intentId);
         if (dyn == null) {
-            nativeInstance.intentsDonate(intentId, paramsJson);
+            // The declared title, not the id: the id is the activity type the continuation
+            // matches on, while the title is what a Siri suggestion or a Spotlight row shows.
+            nativeInstance.intentsDonate(intentId, titleOf(intentId), paramsJson);
             return;
         }
-        nativeInstance.intentsDonate(dyn.getBaseIntentId(),
+        // A parameterization keeps its own title even though it runs its base intent -- "Order
+        // my usual" is the whole reason to register one, and reducing it to the base intent's
+        // title throws away the only part the user recognises.
+        nativeInstance.intentsDonate(dyn.getBaseIntentId(), dyn.getTitle(),
                 com.codename1.intents.IntentSerializer.mergeParams(
                         dyn.getBoundParameters(), paramsJson));
     }
@@ -127,6 +132,17 @@ final class IOSIntentBridge implements IntentBridge {
             stage(images);
             nativeInstance.intentsCompleteInvocation(token, resultJson);
         }
+    }
+
+    /// The human-readable title for a declared intent, or its id when nothing declares it.
+    private static String titleOf(String intentId) {
+        com.codename1.intents.IntentDeclaration decl =
+                com.codename1.intents.Intents.getDeclaration(intentId);
+        if (decl == null) {
+            return intentId;
+        }
+        String title = decl.getTitle();
+        return title == null || title.length() == 0 ? intentId : title;
     }
 
     /// Stages this request's blobs. Always called while holding the staging lock.

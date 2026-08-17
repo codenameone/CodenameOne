@@ -28,6 +28,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 
+import com.codename1.intents.Exposure;
 import com.codename1.intents.IntentDeclaration;
 import com.codename1.intents.IntentParameterInfo;
 import com.codename1.intents.Intents;
@@ -183,6 +184,14 @@ public class CN1IntentTrampolineActivity extends Activity {
             return false;
         }
         if (!decl.isDiscoverable() || decl.isDestructive()) {
+            return false;
+        }
+        // exposure is a restriction, not a hint. An intent offered only to a language model
+        // opted out of platform access entirely, and this Activity is exported -- so without
+        // this check any installed app could reach it with a fabricated cn1intent:// URI. The
+        // static shortcut builder already filters on exposure; the runtime door has to agree,
+        // because it is the one an attacker actually knocks on.
+        if (!decl.isExposedTo(Exposure.ASSISTANT)) {
             return false;
         }
         for (IntentParameterInfo p : decl.getParameters()) {

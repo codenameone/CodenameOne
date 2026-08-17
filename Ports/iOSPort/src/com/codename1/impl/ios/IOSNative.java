@@ -1166,7 +1166,7 @@ public final class IOSNative {
     native void intentsRegister(String declarationsJson);
 
     /** Records that the user performed a capability, so the system can suggest it later. */
-    native void intentsDonate(String intentId, String paramsJson);
+    native void intentsDonate(String intentId, String title, String paramsJson);
 
     /**
      * Stages a PNG blob under {@code name} for the next indexing or completion call, which

@@ -2853,6 +2853,15 @@ public class IPhoneBuilder extends Executor {
             if (usesIntents) {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_INTENTS", "#define CN1_USE_INTENTS");
             }
+            // Narrower than CN1_USE_INTENTS: this says declarations were actually generated, so
+            // the runtime can answer isVoiceInvocationSupported() honestly. An app that only
+            // indexes content, or that set ios.intents.appIntents=false, still gets the bridge
+            // Swift for donation and queries -- so the class being present proves nothing about
+            // whether an App Intent can run.
+            if (declaresAppIntents) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"),
+                        "//#define CN1_APP_INTENTS_DECLARED", "#define CN1_APP_INTENTS_DECLARED");
+            }
 
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {

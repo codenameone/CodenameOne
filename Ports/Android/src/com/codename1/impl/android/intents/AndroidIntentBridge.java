@@ -35,6 +35,8 @@ import android.os.Build;
 import android.util.Log;
 
 import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.intents.IntentCompletion;
+import com.codename1.intents.IntentResult;
 import com.codename1.intents.IntentSource;
 import com.codename1.intents.Intents;
 import com.codename1.intents.spi.IntentBridge;
@@ -128,7 +130,63 @@ public class AndroidIntentBridge implements IntentBridge {
         // headless=true, and the trampoline had already foregrounded by then.
         com.codename1.intents.IntentDeclaration decl = Intents.getDeclaration(parked);
         boolean headless = decl != null && decl.isHeadless();
-        Intents.dispatchInvocation(parked, null, IntentSource.SHORTCUT, headless, null);
+        // The completion is what CN1IntentService.wakeRuntime waits on. Without it the service
+        // that started this runtime has no idea when the handler finished, and tearing the
+        // runtime down underneath a handler that was still working loses whatever it was doing.
+        int budget = decl == null ? Intents.getDefaultTimeout() : decl.getTimeoutSeconds();
+        parkedBudgetSeconds = budget;
+        Intents.dispatchInvocation(parked, null, IntentSource.SHORTCUT, headless,
+                new ParkedCompletion());
+    }
+
+    /// Signals the service waiting on the parked invocation. Named and static for the same
+    /// reason as ForegroundWaiter: an anonymous class would hold the bridge instance, and this
+    /// outlives the call that created it.
+    private static final class ParkedCompletion implements IntentCompletion {
+        public void onIntentResult(IntentResult r) {
+            synchronized (PARKED) {
+                parkedFinished = true;
+                PARKED.notifyAll();
+            }
+        }
+    }
+
+    /// Set once the parked invocation reports its outcome. Guarded by PARKED.
+    private static boolean parkedFinished;
+    /// The declared budget of whatever registerIntents dispatched, for the service to wait out.
+    private static volatile int parkedBudgetSeconds;
+
+    /// Waits for the request `registerIntents` dispatched, so the service that booted the
+    /// runtime for it does not tear that runtime down while the handler is still running.
+    ///
+    /// Returns when the handler completes, when its declared budget expires, or immediately if
+    /// nothing was dispatched.
+    ///
+    /// #### Parameters
+    ///
+    /// - `marginSeconds`: extra time beyond the declared budget, matching the service's own
+    ///   backstop
+    static void awaitParkedCompletion(int marginSeconds) throws InterruptedException {
+        long deadline;
+        synchronized (PARKED) {
+            if (parkedBudgetSeconds == 0) {
+                // registerIntents ran and dispatched nothing -- refused, or nothing was parked.
+                return;
+            }
+            deadline = System.currentTimeMillis()
+                    + (parkedBudgetSeconds + marginSeconds) * 1000L;
+            while (!parkedFinished) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    Log.w(TAG, "A parked intent did not complete within its budget");
+                    return;
+                }
+                PARKED.wait(remaining);
+            }
+            // Reset so a second cold start in the same process does not see a stale answer.
+            parkedFinished = false;
+            parkedBudgetSeconds = 0;
+        }
     }
 
     /// Requests that must not run until the app is actually in front, with the parameters the
@@ -177,31 +235,38 @@ public class AndroidIntentBridge implements IntentBridge {
     /// showing minutes later. A stale capability running unannounced is worse than one that did
     /// not run.
     private static void startWaiter() {
-        Thread t = new Thread(new Runnable() {
-            public void run() {
-                try {
-                    while (true) {
-                        if (Display.isInitialized() && Display.getInstance().getCurrent() != null
-                                && AndroidImplementation.getActivity() != null) {
-                            deliverPendingForegroundRequests();
-                            return;
-                        }
-                        if (dropExpired()) {
-                            return;
-                        }
-                        Thread.sleep(FOREGROUND_POLL_MILLIS);
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    synchronized (FOREGROUND) {
-                        waiting = false;
-                    }
-                }
-            }
-        }, "CN1IntentForeground");
+        Thread t = new Thread(new ForegroundWaiter(), "CN1IntentForeground");
         t.setDaemon(true);
         t.start();
+    }
+
+    /// Polls for the window a parked request needs.
+    ///
+    /// Named and static rather than anonymous for the same reason CN1IntentService's Latch is:
+    /// an anonymous inner class here holds a reference to its enclosing instance, and this
+    /// outlives the bridge call that started it.
+    private static final class ForegroundWaiter implements Runnable {
+        public void run() {
+            try {
+                while (true) {
+                    if (Display.isInitialized() && Display.getInstance().getCurrent() != null
+                            && AndroidImplementation.getActivity() != null) {
+                        deliverPendingForegroundRequests();
+                        return;
+                    }
+                    if (dropExpired()) {
+                        return;
+                    }
+                    Thread.sleep(FOREGROUND_POLL_MILLIS);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                synchronized (FOREGROUND) {
+                    waiting = false;
+                }
+            }
+        }
     }
 
     /// Drops requests whose wait has run out. Returns true when nothing is left to wait for.

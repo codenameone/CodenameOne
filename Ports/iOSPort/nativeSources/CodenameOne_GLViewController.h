@@ -182,9 +182,20 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // framework. Lives in this central header so the define is visible across translation units,
 // mirroring CN1_USE_WIDGETS.
 //#define CN1_USE_INTENTS
-// Core Spotlight and App Intents are unavailable on watchOS / tvOS; undo the define there.
+
+// CN1_APP_INTENTS_DECLARED is the narrower question: did the build actually generate App Intent
+// declarations? CN1_USE_INTENTS only says the app references the package, and an app can use
+// indexing and donation while switching declarations off with ios.intents.appIntents=false.
+// Both cases still compile CN1IntentBridge.swift -- it carries the donation and query plumbing
+// too -- so testing for that class answers "is the Swift here", not "can this app run an App
+// Intent". Reporting the latter from the former made an opted-out app advertise Siri support it
+// had explicitly removed.
+//#define CN1_APP_INTENTS_DECLARED
+
+// Core Spotlight and App Intents are unavailable on watchOS / tvOS; undo the defines there.
 #if TARGET_OS_WATCH || TARGET_OS_TV
 #undef CN1_USE_INTENTS
+#undef CN1_APP_INTENTS_DECLARED
 #endif
 
 // CN1_USE_WATCHCONNECTIVITY gates the phone-to-watch link (CN1WatchConnectivity.{h,m} + the

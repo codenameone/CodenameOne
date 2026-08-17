@@ -162,9 +162,11 @@ public class CN1IntentService extends IntentService {
                     && Intents.getDeclarations().isEmpty()) {
                 Thread.sleep(50);
             }
-            // The parked request dispatches from registerIntents on the framework's own thread;
-            // this margin is what keeps the service alive across it.
-            Thread.sleep(500);
+            // registerIntents dispatches the parked request on the framework's own thread, so
+            // this has to wait for that handler rather than for a fixed interval. A fixed sleep
+            // meant any handler slower than it had the only runtime it has torn down from
+            // underneath it, halfway through, with its declared budget ignored.
+            AndroidIntentBridge.awaitParkedCompletion(BACKSTOP_MARGIN_SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Throwable t) {
