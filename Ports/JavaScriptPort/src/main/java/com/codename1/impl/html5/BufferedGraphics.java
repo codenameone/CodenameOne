@@ -170,11 +170,12 @@ public class BufferedGraphics extends HTML5Graphics {
         // painted over that part and the DOM run cannot be painted over at all. So the question
         // asked of the shape is whether it meets the text anywhere.
         final float[][] outline = outlineOf(shape);
+        final int winding = windingOf(shape);
         noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
                 new JavaScriptTextLayer.CoverTest() {
                     @Override
                     public boolean covers(int x, int y, int w, int h) {
-                        return outlineMeetsRect(outline, x, y, w, h);
+                        return outlineMeetsRect(outline, winding, x, y, w, h);
                     }
                 });
     }
@@ -319,6 +320,22 @@ public class BufferedGraphics extends HTML5Graphics {
         return out;
     }
 
+    /**
+     * The rule a shape's fill uses to decide what is inside it, which is what says whether a hole
+     * is a hole.
+     */
+    private static int windingOf(Shape shape) {
+        try {
+            com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
+            if (it != null) {
+                return it.getWindingRule();
+            }
+        } catch (Throwable ignored) {
+            // Treated as non-zero below, which is what a plain outline fills as.
+        }
+        return com.codename1.ui.geom.PathIterator.WIND_NON_ZERO;
+    }
+
     private static float[] toArray(java.util.List<Float> values) {
         float[] out = new float[values.size()];
         for (int i = 0; i < out.length; i++) {
@@ -332,6 +349,11 @@ public class BufferedGraphics extends HTML5Graphics {
      * inside the outline, or an edge crossing one of its sides.
      */
     private static boolean outlineMeetsRect(float[][] outline, int x, int y, int w, int h) {
+        return outlineMeetsRect(outline, com.codename1.ui.geom.PathIterator.WIND_NON_ZERO, x, y, w, h);
+    }
+
+    private static boolean outlineMeetsRect(float[][] outline, int winding,
+            int x, int y, int w, int h) {
         if (outline == null || outline.length == 0) {
             // Nothing to go by, so treat the draw as reaching the text: leaving a run above a
             // draw that covered it is the error that shows on screen.
@@ -347,31 +369,46 @@ public class BufferedGraphics extends HTML5Graphics {
                     return true;
                 }
             }
-            if (pointInLoop(px, py, x, y) || pointInLoop(px, py, right, y)
-                    || pointInLoop(px, py, x, bottom) || pointInLoop(px, py, right, bottom)) {
-                return true;
-            }
             for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
                 if (segmentMeetsRect(px[j], py[j], px[i], py[i], x, y, right, bottom)) {
                     return true;
                 }
             }
         }
-        return false;
+        // No boundary passes through the rectangle, so the rectangle is either entirely painted
+        // or entirely not. Which one is decided across every subpath at once, under the rule the
+        // fill uses: a rectangle sitting in a hole is not painted, however far inside the outer
+        // loop it lies.
+        return pointInOutline(outline, winding, x, y)
+                || pointInOutline(outline, winding, right, y)
+                || pointInOutline(outline, winding, x, bottom)
+                || pointInOutline(outline, winding, right, bottom);
     }
 
-    private static boolean pointInLoop(float[] px, float[] py, float x, float y) {
-        boolean inside = false;
-        for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
-            if ((py[i] > y) == (py[j] > y)) {
-                continue;
-            }
-            double crossing = (double) (px[j] - px[i]) * (y - py[i]) / (double) (py[j] - py[i]) + px[i];
-            if (x < crossing) {
-                inside = !inside;
+    private static boolean pointInOutline(float[][] outline, int winding, float x, float y) {
+        int crossings = 0;
+        for (int p = 0; p + 1 < outline.length; p += 2) {
+            float[] px = outline[p];
+            float[] py = outline[p + 1];
+            for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
+                if ((py[i] > y) == (py[j] > y)) {
+                    continue;
+                }
+                double crossing = (double) (px[j] - px[i]) * (y - py[i])
+                        / (double) (py[j] - py[i]) + px[i];
+                if (x >= crossing) {
+                    continue;
+                }
+                if (winding == com.codename1.ui.geom.PathIterator.WIND_NON_ZERO) {
+                    crossings += py[i] > py[j] ? 1 : -1;
+                } else {
+                    crossings++;
+                }
             }
         }
-        return inside;
+        return winding == com.codename1.ui.geom.PathIterator.WIND_NON_ZERO
+                ? crossings != 0
+                : (crossings & 1) == 1;
     }
 
     private static boolean segmentMeetsRect(float x1, float y1, float x2, float y2,
@@ -466,8 +503,24 @@ public class BufferedGraphics extends HTML5Graphics {
         if (clipEmpty || getAlpha() <= 0) {
             return;
         }
+        // Clipped first, in the coordinates the clip is kept in, and only then projected: the
+        // tracker holds the clip in user space while a projected rectangle is in screen space,
+        // and intersecting one with the other compares two different spaces.
+        int clipLeft = clipBoundsTracker.getX();
+        int clipTop = clipBoundsTracker.getY();
+        int left = Math.max(x, clipLeft);
+        int top = Math.max(y, clipTop);
+        int right = Math.min(x + w, clipLeft + clipBoundsTracker.getWidth());
+        int bottom = Math.min(y + h, clipTop + clipBoundsTracker.getHeight());
+        if (right <= left || bottom <= top) {
+            return;
+        }
+        x = left;
+        y = top;
+        w = right - left;
+        h = bottom - top;
         if (transform == null || transform.isIdentity()) {
-            reportCover(x, y, w, h, test);
+            layer.noteCanvasCover(x, y, w, h, test);
             return;
         }
         // Where the image lands, not where it was asked for: text is only promoted under an
@@ -487,8 +540,8 @@ public class BufferedGraphics extends HTML5Graphics {
                 transform.transformPoint(corner, out);
             } catch (Throwable ignored) {
                 // A transform the platform will not project -- treat the draw as covering what
-                // it was asked to cover, which is what the untransformed rectangle says.
-                reportCover(x, y, w, h, test);
+                // it was asked to cover, which is what the clipped rectangle says.
+                layer.noteCanvasCover(x, y, w, h, test);
                 return;
             }
             minX = Math.min(minX, out[0]);
@@ -499,33 +552,10 @@ public class BufferedGraphics extends HTML5Graphics {
         // The outline test belongs to untransformed coordinates, so it is dropped here rather
         // than asked the wrong question: what remains is the projected bounding box, which is
         // what the draw is known to be inside.
-        reportCover((int) Math.floor(minX), (int) Math.floor(minY),
+        layer.noteCanvasCover((int) Math.floor(minX), (int) Math.floor(minY),
                 (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY), null);
     }
 
-    /**
-     * Reports the part of a draw that can actually reach the canvas.
-     *
-     * <p>Clipped to what the graphics is clipped to: a draw whose bounds cross a promoted run
-     * but whose clip excludes it changes nothing there, and taking that run off the layer would
-     * lose the only copy of the text for the frame and its promotion for good.</p>
-     */
-    private void reportCover(int x, int y, int w, int h, JavaScriptTextLayer.CoverTest test) {
-        JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
-        if (layer == null) {
-            return;
-        }
-        int clipLeft = clipBoundsTracker.getX();
-        int clipTop = clipBoundsTracker.getY();
-        int left = Math.max(x, clipLeft);
-        int top = Math.max(y, clipTop);
-        int right = Math.min(x + w, clipLeft + clipBoundsTracker.getWidth());
-        int bottom = Math.min(y + h, clipTop + clipBoundsTracker.getHeight());
-        if (right <= left || bottom <= top) {
-            return;
-        }
-        layer.noteCanvasCover(left, top, right - left, bottom - top, test);
-    }
 
     /// Buffers a blit of a raw canvas (an offscreen WebGL render target) into the
     /// display op stream. Used by the GPU compositing path so a RenderView's 3D

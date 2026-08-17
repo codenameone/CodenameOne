@@ -10790,69 +10790,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private int historyIndex;
 
-    /**
-     * True while a popstate is expected because the port itself asked the browser to go back,
-     * having consumed a form through an in-app back command.
-     */
-    private boolean historySuppressPop;
-
-    /**
-     * Identifies the traversal the suppression belongs to, so a later request's flag is never
-     * cleared by an earlier request's watcher.
-     */
-    private int historySuppressToken;
-
-    /**
-     * Asks the browser to traverse history on the port's own behalf, and expects the popstate
-     * that follows to be ignored.
-     *
-     * <p>The traversal may not happen at all -- asking to go further back than the session has
-     * entries does nothing, and raises no popstate. The expectation is therefore given up
-     * after a bounded wait: left standing it would swallow the user's next real Back and leave
-     * the application on a form the browser has already moved away from.</p>
-     *
-     * @param delta entries to move, negative for backwards
-     */
-    private void requestSuppressedTraversal(int delta) {
-        if (delta == 0) {
-            return;
-        }
-        historySuppressPop = true;
-        final int token = ++historySuppressToken;
-        try {
-            window.getHistory().go(delta);
-        } catch (Throwable ignored) {
-            historySuppressPop = false;
-            return;
-        }
-        awaitSuppressionConsumed(token, System.currentTimeMillis() + SUPPRESSION_TIMEOUT_MILLIS);
-    }
-
-    /**
-     * How long a traversal the port asked for is given to raise its popstate before the
-     * expectation is given up. On the clock rather than on turns of the event loop: the event
-     * comes from the main thread and an idle loop can turn many times while it is on its way.
-     */
-    private static final long SUPPRESSION_TIMEOUT_MILLIS = 1000;
-
-    private void awaitSuppressionConsumed(final int token, final long deadline) {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (!historySuppressPop || token != historySuppressToken) {
-                    // Either the popstate arrived and spent it, or a later traversal owns the
-                    // expectation now.
-                    return;
-                }
-                if (System.currentTimeMillis() < deadline) {
-                    awaitSuppressionConsumed(token, deadline);
-                    return;
-                }
-                historySuppressPop = false;
-            }
-        });
-    }
-
     private void pushHistoryState() {
         if (handlingPopState) {
             return;
@@ -10867,9 +10804,76 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * Routes a browser Back gesture to the current form's back command, so the browser control
-     * and the in-app control agree.
+     * Traversals the port itself asked the browser to make, each with the moment it stops being
+     * expected. A popstate takes the oldest of them rather than clearing a single flag: two
+     * in-app back navigations can each ask for one before either event arrives, and one flag
+     * would let the first event answer for both -- leaving the second to be read as the user
+     * pressing Back and a form leaving that the user never asked to leave.
      */
+    private final List<Long> suppressedTraversals = new ArrayList<Long>();
+
+    /**
+     * How long a traversal the port asked for is given to raise its popstate before it stops
+     * being expected. On the clock rather than on turns of the event loop: the event comes from
+     * the main thread and an idle loop can turn many times while it is on its way.
+     */
+    private static final long SUPPRESSION_TIMEOUT_MILLIS = 1000;
+
+    /**
+     * Asks the browser to traverse history on the port's own behalf, and expects the popstate
+     * that follows to be ignored.
+     *
+     * <p>The traversal may not happen at all -- asking to go further back than the session has
+     * entries does nothing, and raises no popstate. The expectation is therefore given up after a
+     * bounded wait: left standing it would swallow the user's next real Back and leave the
+     * application on a form the browser has already moved away from.</p>
+     *
+     * @param delta entries to move, negative for backwards
+     */
+    private void requestSuppressedTraversal(int delta) {
+        if (delta == 0) {
+            return;
+        }
+        suppressedTraversals.add(Long.valueOf(System.currentTimeMillis() + SUPPRESSION_TIMEOUT_MILLIS));
+        try {
+            window.getHistory().go(delta);
+        } catch (Throwable ignored) {
+            suppressedTraversals.remove(suppressedTraversals.size() - 1);
+            return;
+        }
+        awaitSuppressionConsumed();
+    }
+
+    /**
+     * True when this popstate belongs to a traversal the port asked for, in which case it is that
+     * traversal's and no form should move for it.
+     */
+    private boolean consumeSuppressedTraversal() {
+        if (suppressedTraversals.isEmpty()) {
+            return false;
+        }
+        suppressedTraversals.remove(0);
+        return true;
+    }
+
+    private void awaitSuppressionConsumed() {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                long now = System.currentTimeMillis();
+                while (!suppressedTraversals.isEmpty()
+                        && suppressedTraversals.get(0).longValue() <= now) {
+                    // Never arrived -- a traversal the browser had nowhere to make. Giving it up
+                    // keeps it from swallowing the user's next real Back.
+                    suppressedTraversals.remove(0);
+                }
+                if (!suppressedTraversals.isEmpty()) {
+                    awaitSuppressionConsumed();
+                }
+            }
+        });
+    }
+
     /**
      * Handles a history traversal.
      *
@@ -10882,10 +10886,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final int previous = historyIndex;
         final boolean backward = restored < previous;
         historyIndex = restored;
-        if (historySuppressPop) {
+        if (consumeSuppressedTraversal()) {
             // The port asked for this one, to spend an entry belonging to a form an in-app back
             // command had already left.
-            historySuppressPop = false;
             return;
         }
         if (restored == previous) {
