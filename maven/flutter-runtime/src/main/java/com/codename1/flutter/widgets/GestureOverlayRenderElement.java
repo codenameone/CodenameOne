@@ -96,9 +96,65 @@ public class GestureOverlayRenderElement extends RenderElement {
         }
     }
 
+    /**
+     * The interactive component of THIS gesture's own subtree under {@code (x, y)}, or null.
+     *
+     * <p>The overlay covers its whole subtree and grabs pointer events, which is what lets a
+     * GestureDetector wrap ordinary content — a label, a card — and still be tappable. But
+     * it also means a wrapper sitting above a BUTTON swallows that button's presses, and
+     * Flutter's hit test does the opposite: the innermost target wins. The gallery hits this
+     * wherever a scrollable or a tappable region contains controls, which is how the app
+     * bar's overflow button came to render perfectly and do nothing at all.</p>
+     *
+     * <p>Walking our own subtree — rather than everything under the point — keeps a
+     * neighbouring widget's components from being handed events that were never theirs.</p>
+     */
+    private Component interactiveTargetAt(int x, int y) {
+        Element p = parent();
+        if (!(p instanceof GestureRenderElement)) {
+            return null;
+        }
+        Element content = ((GestureRenderElement) p).contentElement();
+        if (content == null) {
+            return null;
+        }
+        java.util.List<Component> hits = new java.util.ArrayList<Component>();
+        collectInteractive(content, x, y, hits);
+        // Last in tree order is the topmost, and the deepest — Flutter's winner.
+        return hits.isEmpty() ? null : hits.get(hits.size() - 1);
+    }
+
+    private static void collectInteractive(Element e, final int x, final int y,
+            final java.util.List<Component> out) {
+        if (e == null) {
+            return;
+        }
+        if (e instanceof RenderElement) {
+            Component c = ((RenderElement) e).component();
+            if (c != null && c.isEnabled() && c.contains(x, y) && isInteractive(c)) {
+                out.add(c);
+            }
+        }
+        e.visitChildren(new Funcs.VoidFunc1<Element>() {
+            @Override
+            public void call(Element child) {
+                collectInteractive(child, x, y, out);
+            }
+        });
+    }
+
+    /** Components that act on a press of their own — the ones a wrapper must not shadow. */
+    private static boolean isInteractive(Component c) {
+        return c instanceof com.codename1.ui.Button
+                || c instanceof com.codename1.ui.TextArea
+                || c instanceof OverlayComponent;
+    }
+
     class OverlayComponent extends Component {
 
         private boolean suppressTap;
+        /** The inner component this press was handed to, if any. */
+        private Component forwardTo;
 
         OverlayComponent() {
             setUIID("FlutterGesture");
@@ -117,6 +173,14 @@ public class GestureOverlayRenderElement extends RenderElement {
         @Override
         public void pointerPressed(int x, int y) {
             suppressTap = false;
+            forwardTo = interactiveTargetAt(x, y);
+            if (forwardTo != null) {
+                // The press belongs to something inside us. We stay CN1's event target, so
+                // an ancestor scroll still sees the drag, but the tap itself is not ours.
+                forwardTo.pointerPressed(x, y);
+                super.pointerPressed(x, y);
+                return;
+            }
             ink.press(this, x - getAbsoluteX(), y - getAbsoluteY(), inkResponse());
             super.pointerPressed(x, y);
         }
@@ -141,6 +205,17 @@ public class GestureOverlayRenderElement extends RenderElement {
         @Override
         public void pointerReleased(int x, int y) {
             boolean wasDrag = isDragActivated();
+            if (forwardTo != null) {
+                Component target = forwardTo;
+                forwardTo = null;
+                super.pointerReleased(x, y);
+                // A drag was a scroll, not a tap on the control: let it go, as CN1 would.
+                if (!wasDrag) {
+                    target.pointerReleased(x, y);
+                }
+                suppressTap = false;
+                return;
+            }
             super.pointerReleased(x, y);
             if (wasDrag) {
                 ink.cancel(this);

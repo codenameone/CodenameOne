@@ -45,6 +45,18 @@ public final class PopupMenus {
      * has no itemBuilder.
      */
     public static void show(BuildContext context, PopupMenuButton<?> button) {
+        show(context, button, null);
+    }
+
+    /**
+     * Shows the menu anchored to {@code anchor} — the button's own component.
+     *
+     * <p>Anchoring matters beyond neatness: a plain dialog is centred and dims the screen
+     * behind it, which is a modal gesture. Flutter's menu is a small surface beside the
+     * control that opened it, and CN1's popup dialog is that same shape.</p>
+     */
+    public static void show(BuildContext context, PopupMenuButton<?> button,
+            com.codename1.ui.Component anchor) {
         if (button == null || !button.isEnabled() || button.getItemBuilder() == null) {
             return;
         }
@@ -65,8 +77,38 @@ public final class PopupMenus {
         d.add(BorderLayout.CENTER, c);
         openMenu = d;
         openRoot = ((FlutterRootLayout) c.getLayout()).host().rootElement();
-        // Modeless, like showDialog: the caller keeps running, as the Dart expects.
-        d.showPacked(BorderLayout.NORTH, false);
+        if (anchor != null) {
+            // Beside the button — Flutter's menu, and CN1's popup dialog. The popup's own
+            // chrome is dropped: CN1 draws a speech-bubble arrow and dims the screen behind
+            // it, and a Material menu does neither. The Material surface underneath supplies
+            // the rounded card.
+            stripPopupChrome(d);
+            d.showPopupDialog(anchor);
+        } else {
+            // Modeless, like showDialog: the caller keeps running, as the Dart expects.
+            d.showPacked(BorderLayout.NORTH, false);
+        }
+    }
+
+    /**
+     * Removes the arrow border and the dimming a CN1 popup dialog brings with it, so what
+     * shows is the Material surface and nothing else.
+     */
+    private static void stripPopupChrome(com.codename1.ui.Dialog d) {
+        try {
+            d.setDialogUIID("Container");
+            d.getDialogStyle().setBorder(com.codename1.ui.plaf.Border.createEmpty());
+            d.getDialogStyle().setBgTransparency(0);
+            d.getDialogStyle().setPadding(0, 0, 0, 0);
+            d.getDialogStyle().setMargin(0, 0, 0, 0);
+            // The dim comes from the dialog FORM's own background, not the surface.
+            d.getAllStyles().setBgTransparency(0);
+            d.getContentPane().getAllStyles().setBgTransparency(0);
+            d.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);
+            d.getContentPane().getAllStyles().setMargin(0, 0, 0, 0);
+        } catch (Throwable t) {
+            // chrome is cosmetic; a themed popup still works
+        }
     }
 
     /** Closes the open menu, if any. */
@@ -136,14 +178,23 @@ public final class PopupMenus {
                     continue;
                 }
                 final PopupMenuItem item = (PopupMenuItem) entry;
+                // Material menu item metrics: 48lp tall, 16lp either side, start-aligned.
+                com.codename1.flutter.widgets.Container box =
+                        new com.codename1.flutter.widgets.Container();
+                box.padding(com.codename1.flutter.EdgeInsets.symmetric(0, 16));
+                box.height(48);
+                box.alignment(com.codename1.flutter.AlignmentDirectional.centerStart);
+                box.child(item.getChild());
                 InkWell row = new InkWell();
-                row.child(item.getChild());
-                row.onTap(new Funcs.VoidFunc0() {
-                    @Override
-                    public void call() {
-                        select(item);
-                    }
-                });
+                row.child(box);
+                if (item.isEnabled()) {
+                    row.onTap(new Funcs.VoidFunc0() {
+                        @Override
+                        public void call() {
+                            select(item);
+                        }
+                    });
+                }
                 rows.add(row);
             }
             Column col = new Column();

@@ -25,7 +25,7 @@ public class PopupMenuButtonRenderElement extends ButtonRenderElement {
         public void call() {
             // Read through widget() so a rebuilt configuration is honoured rather than the
             // one that happened to be current when this element was created.
-            PopupMenus.show(PopupMenuButtonRenderElement.this, button());
+            PopupMenus.show(PopupMenuButtonRenderElement.this, button(), component());
         }
     };
 

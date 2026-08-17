@@ -27,6 +27,11 @@ public class GestureRenderElement extends RenderElement {
         return (GestureDetector) widget();
     }
 
+    /** The wrapped content (slot 0) — the subtree the overlay must not shadow. */
+    Element contentElement() {
+        return childElement;
+    }
+
     @Override
     protected void syncChildren() {
         childElement = updateChild(childElement, gesture().getChild(), 0);
