@@ -40,6 +40,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -301,7 +302,7 @@ class NativeSignatureVerifierTest {
 
     /** The #if / #else pair the iOS port uses for watchOS and tvOS stubs. */
     @Test
-    void oneOfTwoConditionallyCompiledDefinitionsIsEnough() throws IOException {
+    void bothArmsOfAConditionalDefinitionAreAccepted() throws IOException {
         assertEquals(Collections.emptyList(), verify(signature("flag", "()Z", false),
                 "#if TARGET_OS_WATCH\n"
                 + "JAVA_BOOLEAN com_example_Natives_flag___R_boolean(CN1_THREAD_STATE_MULTI_ARG"
@@ -310,6 +311,64 @@ class NativeSignatureVerifierTest {
                 + "JAVA_BOOLEAN com_example_Natives_flag___R_boolean(CN1_THREAD_STATE_MULTI_ARG"
                 + " JAVA_OBJECT me) {\n    return JAVA_TRUE;\n}\n"
                 + "#endif\n"));
+    }
+
+    /**
+     * EVERY arm has to match, not just one. They are the same C symbol under
+     * mutually exclusive branches, so a build that selects the bad arm links by
+     * name and then reads its arguments wrong -- exactly what this gate exists to
+     * stop, and invisible if one good arm were enough.
+     */
+    @Test
+    void oneBadArmOfAConditionalDefinitionIsStillFatal() throws IOException {
+        List<Problem> problems = verify(signature("flag", "()Z", false),
+                "#if TARGET_OS_WATCH\n"
+                + "JAVA_BOOLEAN com_example_Natives_flag___R_boolean(CN1_THREAD_STATE_MULTI_ARG"
+                + " JAVA_OBJECT me) {\n    return JAVA_FALSE;\n}\n"
+                + "#else\n"
+                // the watch arm above is right; this one forgot the thread state
+                + "JAVA_BOOLEAN com_example_Natives_flag___R_boolean(JAVA_OBJECT me) {\n"
+                + "    return JAVA_TRUE;\n}\n"
+                + "#endif\n");
+
+        assertEquals(1, problems.size());
+        assertEquals(Kind.SIGNATURE, problems.get(0).kind);
+        assertTrue(problems.get(0).fatal);
+        // and it points at the offending arm, not merely the first definition
+        assertTrue(problems.get(0).message.startsWith("natives.m:6:"), problems.get(0).message);
+    }
+
+    /**
+     * {@code JAVA_LONG} is {@code long long}; a native that spells the underlying
+     * type is ABI-correct and must not be rejected. Reading only the token nearest
+     * the name would see {@code long} and call it a mismatch.
+     */
+    @Test
+    void aMultiwordReturnTypeIsReadWhole() throws IOException {
+        assertEquals(Collections.emptyList(), verify(signature("scale", "(I)J", false),
+                "long long com_example_Natives_scale___int_R_long(CODENAME_ONE_THREAD_STATE,"
+                + " JAVA_OBJECT me, JAVA_INT n) {\n    return n;\n}\n"));
+        assertEquals(Collections.emptyList(), verify(signature("scale", "(I)I", false),
+                "unsigned int com_example_Natives_scale___int_R_int(CODENAME_ONE_THREAD_STATE,"
+                + " JAVA_OBJECT me, JAVA_INT n) {\n    return n;\n}\n"));
+    }
+
+    /**
+     * ...but reading leftwards must stop at the type. Nothing separates a return
+     * type from what precedes the declaration, and an Objective-C {@code @end} on
+     * the line above was being swallowed into it, turning every implementation that
+     * follows a class into a bogus mismatch.
+     */
+    @Test
+    void whatPrecedesTheDeclarationIsNotPartOfTheReturnType() throws IOException {
+        assertEquals(Collections.emptyList(), verify(signature("flag", "()Z", false),
+                "@interface Foo : NSObject\n@end\n"
+                + "JAVA_BOOLEAN com_example_Natives_flag___R_boolean(CN1_THREAD_STATE_MULTI_ARG"
+                + " JAVA_OBJECT me) {\n    return JAVA_TRUE;\n}\n"));
+        assertEquals(Collections.emptyList(), verify(signature("noop", "()V", false),
+                "static NSString* CN1_TAG = @\"x\";\n"
+                + "static void com_example_Natives_noop__(CN1_THREAD_STATE_MULTI_ARG"
+                + " JAVA_OBJECT me) {\n}\n"));
     }
 
     // --------------------------------------------------------- near-miss policy
@@ -389,6 +448,28 @@ class NativeSignatureVerifierTest {
                 System.setProperty(NativeSignatureVerifier.MODE_PROPERTY, previous);
             }
         }
+    }
+
+    // ------------------------------------------------- translator runtime C
+
+    /**
+     * The translator copies some of its own runtime C into the project AFTER this
+     * check runs -- on the clean target {@code java_io_File.m} is conditional on a
+     * header {@code writeOutput} generates -- so the index has to read those off
+     * the classpath. Missing this reported all 23 {@code java.io.File} natives as
+     * unimplemented and failed FileClassIntegrationTest.
+     */
+    @Test
+    void theTranslatorsOwnRuntimeCIsIndexedEvenBeforeItIsCopiedOut() throws IOException {
+        Map<String, String> bundled = NativeSignatureVerifier.bundledRuntimeSources();
+        assertTrue(bundled.containsKey("java_io_File.m"),
+                "java_io_File.m must be readable from the translator jar; found " + bundled.keySet());
+
+        SourceIndex index = new SourceIndex(Collections.<File>emptyList(), bundled);
+        assertFalse(index.get("java_io_File_existsImpl___java_lang_String_R_boolean").isEmpty(),
+                "the bundled java.io.File runtime should define existsImpl");
+        assertFalse(index.get("java_lang_System_currentTimeMillis___R_long").isEmpty(),
+                "the bundled nativeMethods.m should define currentTimeMillis");
     }
 
     // ------------------------------------------------------------ escape hatch

@@ -329,6 +329,19 @@ public class NativeSignatureVerifier {
         private final Set<String> ignored = new LinkedHashSet<String>();
 
         public SourceIndex(Collection<File> files) throws IOException {
+            this(files, Collections.<String, String>emptyMap());
+        }
+
+        /**
+         * @param files on-disk native sources
+         * @param additionalSources name -&gt; content for native sources the project
+         *        will contain but that are not on disk yet. The translator writes
+         *        some of its own runtime C after the point this check runs (on the
+         *        clean target, {@code java_io_File.m} lands only once the header it
+         *        is conditional on exists), and those implementations count.
+         */
+        public SourceIndex(Collection<File> files, Map<String, String> additionalSources)
+                throws IOException {
             List<File> sorted = new ArrayList<File>(files);
             Collections.sort(sorted, BY_PATH);
             for (File file : sorted) {
@@ -339,7 +352,11 @@ public class NativeSignatureVerifier {
                 if (!isNativeSource(file)) {
                     continue;
                 }
-                scan(file, definitions, occurrences);
+                scan(file, readFile(file), definitions, occurrences);
+            }
+            for (Map.Entry<String, String> source : new java.util.TreeMap<String, String>(
+                    additionalSources).entrySet()) {
+                scan(new File(source.getKey()), source.getValue(), definitions, occurrences);
             }
         }
 
@@ -451,9 +468,8 @@ public class NativeSignatureVerifier {
         }
     }
 
-    private static void scan(File file, Map<String, List<Definition>> into,
-                             Map<String, int[]> occurrences) throws IOException {
-        String raw = readFile(file);
+    private static void scan(File file, String raw, Map<String, List<Definition>> into,
+                             Map<String, int[]> occurrences) {
         String code = blankNonCode(raw);
         int length = code.length();
         for (int iter = 0; iter < length; iter++) {
@@ -658,36 +674,84 @@ public class NativeSignatureVerifier {
     }
 
     /**
-     * The type token immediately before a function name, or null when what precedes
-     * it cannot be a return type (so the match is a call, not a definition).
+     * The full return type before a function name, or null when what precedes it
+     * cannot be one (so the match is a call, not a definition).
+     *
+     * <p>Reads the WHOLE type specifier, not just the token nearest the name: a
+     * native returning Java {@code long} may spell its C type {@code long long},
+     * and stopping at {@code long} would map to an unknown type and reject an
+     * ABI-correct implementation. Storage classes and cv-qualifiers are dropped --
+     * they do not change the machine type -- while {@code long}/{@code short}/
+     * {@code unsigned}/{@code signed} are kept, because they are the type.</p>
      */
     private static String returnTypeBefore(String code, int nameStart) {
-        int end = nameStart - 1;
+        int cursor = nameStart - 1;
         boolean pointer = false;
-        while (end >= 0 && (Character.isWhitespace(code.charAt(end)) || code.charAt(end) == '*')) {
-            if (code.charAt(end) == '*') {
-                pointer = true;
+        List<String> tokens = new ArrayList<String>();
+        while (cursor >= 0) {
+            char c = code.charAt(cursor);
+            if (Character.isWhitespace(c)) {
+                cursor--;
+                continue;
             }
-            end--;
+            if (c == '*') {
+                pointer = true;
+                cursor--;
+                continue;
+            }
+            if (!isIdentifierPart(c)) {
+                // ';' '}' '{' ')' ',' '@' -- the declaration starts here
+                break;
+            }
+            int end = cursor;
+            while (cursor >= 0 && isIdentifierPart(code.charAt(cursor))) {
+                cursor--;
+            }
+            String token = code.substring(cursor + 1, end + 1);
+            if (RESERVED_BEFORE_CALL.contains(token)) {
+                return null;
+            }
+            if (DECLARATION_QUALIFIERS.contains(token)) {
+                continue;
+            }
+            // Keep reading left only while the tokens can still be part of ONE type.
+            // Nothing separates a return type from whatever precedes the declaration
+            // -- an @end, a macro, the tail of a #define -- so the type keywords are
+            // the only reliable signal that a second word belongs to it.
+            if (!tokens.isEmpty() && !MULTIWORD_TYPE_PARTS.contains(token)) {
+                break;
+            }
+            tokens.add(0, token);
         }
-        if (end < 0 || !isIdentifierPart(code.charAt(end))) {
+        if (tokens.isEmpty()) {
             return null;
         }
-        int start = end;
-        while (start >= 0 && isIdentifierPart(code.charAt(start))) {
-            start--;
+        StringBuilder type = new StringBuilder();
+        for (String token : tokens) {
+            if (type.length() > 0) {
+                type.append(' ');
+            }
+            type.append(token);
         }
-        String token = code.substring(start + 1, end + 1);
-        if (RESERVED_BEFORE_CALL.contains(token)) {
-            return null;
+        if (pointer) {
+            type.append('*');
         }
-        return pointer ? token + "*" : token;
+        return type.toString();
     }
 
     /** Keywords that can precede a '(' without the match being a definition. */
     private static final Set<String> RESERVED_BEFORE_CALL = new HashSet<String>(Arrays.asList(
             "return", "if", "else", "while", "for", "switch", "case", "do", "sizeof",
             "typedef", "goto", "break", "continue", "new", "delete", "throw"));
+
+    /** Precedes a return type without being part of it. */
+    private static final Set<String> DECLARATION_QUALIFIERS = new HashSet<String>(Arrays.asList(
+            "static", "extern", "inline", "__inline", "__inline__", "register", "auto",
+            "const", "volatile", "restrict", "__restrict", "_Noreturn", "CN1_UNUSED"));
+
+    /** Words that can extend a type leftwards: {@code long long}, {@code unsigned int}. */
+    private static final Set<String> MULTIWORD_TYPE_PARTS = new HashSet<String>(Arrays.asList(
+            "long", "short", "unsigned", "signed", "struct", "enum", "union"));
 
     /**
      * The parameter types of a C parameter list, with the ParparVM thread-state
@@ -747,7 +811,7 @@ public class NativeSignatureVerifier {
         }
         StringBuilder joined = new StringBuilder();
         for (String token : tokens) {
-            if ("const".equals(token) || "volatile".equals(token)) {
+            if (DECLARATION_QUALIFIERS.contains(token)) {
                 continue;
             }
             if (joined.length() > 0 && !"*".equals(token)) {
@@ -875,17 +939,23 @@ public class NativeSignatureVerifier {
                 continue;
             }
             // Several definitions of one symbol are normal -- #if TARGET_OS_WATCH and
-            // its #else branch both define it. One of them agreeing is enough.
+            // its #else branch both define it -- and EVERY one has to match. They are
+            // the same C symbol under mutually exclusive branches, so their prototypes
+            // cannot legitimately differ; accepting the symbol as soon as one branch
+            // agreed would pass a build whose selected branch is the ABI-incompatible
+            // one, which links by name and then reads its arguments wrong.
             String reason = null;
+            Definition offender = null;
             for (Definition definition : found) {
                 reason = mismatch(signature, definition);
-                if (reason == null) {
+                if (reason != null) {
+                    offender = definition;
                     break;
                 }
             }
             if (reason != null) {
                 problems.add(new Problem(Kind.SIGNATURE, true, signature.symbol,
-                        found.get(0).where() + ": " + signature.symbol + " " + reason + "\n"
+                        offender.where() + ": " + signature.symbol + " " + reason + "\n"
                         + "    C links on the name alone, so this compiles and then reads its"
                         + " arguments out of the wrong registers at runtime.\n"
                         + "    Required: " + signature.prototype));
@@ -963,7 +1033,44 @@ public class NativeSignatureVerifier {
         return b.toString();
     }
 
-    /** {@code -Dparparvm.nativeVerify}, defaulting to strict. */
+    /**
+     * The translator's own bundled runtime C, read off the classpath.
+     *
+     * <p>These implement the {@code java.*} natives and are copied into every
+     * generated project -- but not all of them before this check runs. On the clean
+     * target {@code java_io_File.m} is copied only AFTER {@code Parser.writeOutput},
+     * because it is conditional on a header that pass generates, so reading it from
+     * disk would report all 23 {@code java.io.File} natives as unimplemented.
+     * Reading the resource instead sees what the project is about to contain.</p>
+     *
+     * <p>Indexing one that IS already on disk is harmless: a symbol may be defined
+     * more than once (the ports do it with {@code #if}/{@code #else}), and both the
+     * definition count and the occurrence count move together, so the
+     * "is anything calling this" arithmetic is unaffected.</p>
+     */
+    public static Map<String, String> bundledRuntimeSources() {
+        Map<String, String> sources = new LinkedHashMap<String, String>();
+        for (String name : new String[]{"nativeMethods.m", "cn1_globals.m", "java_io_File.m"}) {
+            InputStream in = NativeSignatureVerifier.class.getResourceAsStream("/" + name);
+            if (in == null) {
+                continue;
+            }
+            try {
+                try {
+                    sources.put(name, new String(readAll(in), UTF8));
+                } finally {
+                    in.close();
+                }
+            } catch (IOException ignored) {
+                // A runtime source we cannot read just is not indexed; the worst
+                // outcome is a MISSING report the developer can see through, which
+                // beats aborting a translation over it.
+            }
+        }
+        return sources;
+    }
+
+    /** The mode this translation runs in; see the opt-in note on the class. */
     public static Mode mode() {
         String value = System.getProperty(MODE_PROPERTY);
         if (value == null) {

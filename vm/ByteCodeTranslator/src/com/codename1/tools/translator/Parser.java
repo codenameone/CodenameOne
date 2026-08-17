@@ -966,8 +966,8 @@ public class Parser extends ClassVisitor {
         if (required.isEmpty()) {
             return;
         }
-        NativeSignatureVerifier.SourceIndex index =
-                new NativeSignatureVerifier.SourceIndex(handWrittenNativeSources);
+        NativeSignatureVerifier.SourceIndex index = new NativeSignatureVerifier.SourceIndex(
+                handWrittenNativeSources, NativeSignatureVerifier.bundledRuntimeSources());
         List<NativeSignatureVerifier.Problem> problems =
                 NativeSignatureVerifier.verify(required, index);
         if (problems.isEmpty()) {

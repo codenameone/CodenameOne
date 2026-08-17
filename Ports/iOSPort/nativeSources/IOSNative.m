@@ -12671,13 +12671,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String_R_bo
     return com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, url);
 }
 #else
-JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
 }
 #endif
 
 
 #ifndef NEW_CODENAME_ONE_VM
-JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
     int offset = ((java_lang_String*) string)->fields.java_lang_String.offset_;
     int strlen = ((java_lang_String*) string)->fields.java_lang_String.count_;
     org_xmlvm_runtime_XMLVMArray* srcArr = ((java_lang_String*) string)->fields.java_lang_String.value_;
