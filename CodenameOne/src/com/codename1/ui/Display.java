@@ -3507,7 +3507,7 @@ public final class Display extends CN1Constants {
     /// invokeAndBlock -- can dispose a window part way through.
     private void paintOpenWindows() {
         ArrayList<Window> open = Desktop.getInstance().windowList();
-        for (int iter = 0; iter < open.size(); iter++) {
+        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
             Window w = open.get(iter);
             if (!w.isWindowShowing()) {
                 continue;
@@ -3530,7 +3530,7 @@ public final class Display extends CN1Constants {
 
     private boolean anyWindowHasAnimations() {
         ArrayList<Window> open = Desktop.getInstance().windowList();
-        for (int iter = 0; iter < open.size(); iter++) {
+        for (int iter = 0; iter < open.size(); iter++) { // NOPMD ForLoopCanBeForeach
             Window w = open.get(iter);
             if (w.isWindowShowing() && w.hasAnimations()) {
                 return true;

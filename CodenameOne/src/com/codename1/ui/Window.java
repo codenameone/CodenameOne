@@ -95,8 +95,10 @@ public class Window extends Container implements TopLevelContainer {
     private Graphics windowGraphics;
     /// Set as soon as dispose() begins, so re-entering it is a no-op.
     private boolean disposing;
-    /// Published under Display.lock once teardown is complete; showModal waits on it.
-    private volatile boolean disposed;
+    /// Published under Display.lock once teardown is complete; showModal waits on it,
+    /// and isWindowDisposed() reads it under the same monitor rather than relying on
+    /// volatile, so the write is visible to a parked caller on any thread.
+    private boolean disposed;
     private boolean nativeVisible;
     /// Set while this window holds a modal blocker, so it is pushed and popped once.
     private boolean modalRegistered;
@@ -525,7 +527,7 @@ public class Window extends Container implements TopLevelContainer {
 
     private void loopAnimations(ArrayList<Animation> v) {
         // iterate by index and re-read the size: animate() may deregister itself
-        for (int iter = 0; iter < v.size(); iter++) {
+        for (int iter = 0; iter < v.size(); iter++) { // NOPMD ForLoopCanBeForeach
             Animation an = v.get(iter);
             if (an != null && an.animate()) {
                 if (an instanceof Component) {
@@ -1418,9 +1420,8 @@ public class Window extends Container implements TopLevelContainer {
         // An owned window cannot outlive its owner: the platform would leave it open
         // with no owner behind it, and it would keep painting. Snapshot first -- each
         // dispose deregisters, which mutates the registry being walked.
-        Window[] owned = Desktop.getInstance().windowsOwnedBy(this);
-        for (int iter = 0; iter < owned.length; iter++) {
-            owned[iter].dispose();
+        for (Window each : Desktop.getInstance().windowsOwnedBy(this)) {
+            each.dispose();
         }
         releaseModal();
         Desktop.getInstance().deregisterWindow(this);
@@ -1466,7 +1467,9 @@ public class Window extends Container implements TopLevelContainer {
     ///
     /// true once `#dispose()` has run
     public boolean isWindowDisposed() {
-        return disposed;
+        synchronized (Display.lock) {
+            return disposed;
+        }
     }
 
     /// Indicates whether this window has completed at least one paint cycle, and so
@@ -1489,7 +1492,9 @@ public class Window extends Container implements TopLevelContainer {
         paintedOnce = true;
     }
 
-    private volatile boolean paintedOnce;
+    /// Written by the paint loop and read by whatever is waiting for content, both on
+    /// the event dispatch thread, so no cross thread publication is involved.
+    private boolean paintedOnce;
 
     /// Captures this window's current contents.
     ///

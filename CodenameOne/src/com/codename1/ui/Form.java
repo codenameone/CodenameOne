@@ -411,6 +411,7 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// The text selection support for this form.
     ///
+    @Override
     public TextSelection getTextSelection() {
         if (textSelection == null) {
             textSelection = new TextSelection(getContentPane());
@@ -430,6 +431,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - #setEnableCursors(boolean)
     ///
     /// - Component#setCursor(int)
+    @Override
     public boolean isEnableCursors() {
         return enableCursors;
     }
@@ -443,6 +445,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### See also
     ///
     /// - Component#setCursor(int)
+    @Override
     public void setEnableCursors(boolean e) {
         this.enableCursors = e;
     }
@@ -478,6 +481,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### See also
     ///
     /// - #setCurrentInputDevice(com.codename1.ui.VirtualInputDevice)
+    @Override
     public VirtualInputDevice getCurrentInputDevice() {
         return currentInputDevice;
     }
@@ -494,6 +498,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Throws
     ///
     /// - `Exception`
+    @Override
     public void setCurrentInputDevice(VirtualInputDevice device) throws Exception {
         if (currentInputDevice != null) {
             currentInputDevice.close();
@@ -534,6 +539,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### See also
     ///
     /// - #setOverrideInvisibleAreaUnderVKB(int)
+    @Override
     public int getInvisibleAreaUnderVKB() {
         if (bottomPaddingMode) {
             return 0;
@@ -596,6 +602,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - Container#setSafeArea(boolean)
     ///
     /// - Container#isSafeArea()
+    @Override
     public Rectangle getSafeArea() {
         if (safeAreaDirty) {
             Display.impl.getDisplaySafeArea(safeArea);
@@ -775,6 +782,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Deprecated
     ///
     /// this is effectively invalidated by the newer animation framework
+    @Override
     public boolean grabAnimationLock() {
         if (globalAnimationLock) {
             return false;
@@ -788,6 +796,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Deprecated
     ///
     /// this is effectively invalidated by the newer animation framework
+    @Override
     public void releaseAnimationLock() {
         globalAnimationLock = false;
     }
@@ -802,6 +811,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### See also
     ///
     /// - Component#isEditing()
+    @Override
     public Component findCurrentlyEditingComponent() {
         return ComponentSelector.select("*", this).filter(new CurrentlyEditingFilter()).asComponent();
     }
@@ -817,6 +827,7 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// @deprecated this method was exposed to allow some hacks, you are advised not to use it.
     /// There are some alternatives such as command behavior (thru Display or the theme constants)
+    @Override
     public Container getTitleArea() {
         if (toolbar != null && toolbar.getParent() != null) {
             return toolbar;
@@ -878,6 +889,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `l`: listener
+    @Override
     public void addShowListener(ActionListener l) {
         if (showListener == null) {
             showListener = new EventDispatcher();
@@ -890,6 +902,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `l`: the listener
+    @Override
     public void removeShowListener(ActionListener l) {
         if (showListener == null) {
             return;
@@ -934,6 +947,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `l`: listener
+    @Override
     public void addSizeChangedListener(ActionListener l) {
         if (sizeChangedListener == null) {
             sizeChangedListener = new EventDispatcher();
@@ -946,6 +960,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `l`: the listener
+    @Override
     public void removeSizeChangedListener(ActionListener l) {
         if (sizeChangedListener == null) {
             return;
@@ -1186,6 +1201,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### See also
     ///
     /// - com.codename1.ui.painter.PainterChain#installGlassPane(Form, com.codename1.ui.Painter)
+    @Override
     public Painter getGlassPane() {
         return glassPane;
     }
@@ -1223,6 +1239,7 @@ public class Form extends Container implements TopLevelContainer {
     ///
     /// - `glassPane`: @param glassPane a new glass pane to install. It is generally recommended to
     /// use a painter chain if more than one painter is required.
+    @Override
     public void setGlassPane(Painter glassPane) {
         this.glassPane = glassPane;
         repaint();
@@ -1270,6 +1287,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - `keyCode`: code on which to send the event
     ///
     /// - `listener`: listener to invoke when the key code released.
+    @Override
     public void addKeyListener(int keyCode, ActionListener listener) {
         if (keyListeners == null) {
             keyListeners = new HashMap<Integer, ArrayList<ActionListener>>();
@@ -1284,6 +1302,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - `keyCode`: code on which the event is sent
     ///
     /// - `listener`: listener instance to remove
+    @Override
     public void removeKeyListener(int keyCode, ActionListener listener) {
         if (keyListeners == null) {
             return;
@@ -1625,6 +1644,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// a content pane instance
+    @Override
     public Container getContentPane() {
         return contentPane;
     }
@@ -1642,6 +1662,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the LayeredPane
+    @Override
     public Container getLayeredPane() {
         return getLayeredPane(null, false);
     }
@@ -1658,6 +1679,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the layered pane instance
+    @Override
     public Container getLayeredPane(Class c, boolean top) {
         return TopLevelSupport.layeredPane(getLayeredPaneImpl(), c, top);
     }
@@ -1674,6 +1696,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the layered pane instance
+    @Override
     public Container getLayeredPane(Class c, int zIndex) {
         return TopLevelSupport.layeredPane(getLayeredPaneImpl(), c, zIndex);
     }
@@ -1692,6 +1715,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the layered pane instance
+    @Override
     public Container getFormLayeredPane(Class c, boolean top) {
         if (formLayeredPane == null) {
             formLayeredPane = new Container(new LayeredLayout()) {
@@ -1890,6 +1914,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// returns the form title
+    @Override
     public String getTitle() {
         if (toolbar != null) {
             Component cmp = toolbar.getTitleComponent();
@@ -1906,6 +1931,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `title`: the form title
+    @Override
     public void setTitle(String title) {
         if (toolbar != null) {
             toolbar.setTitle(title);
@@ -2109,6 +2135,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cmp`: component that would be animated
+    @Override
     public final void registerAnimated(Animation cmp) {
         if (animatableComponents == null) {
             animatableComponents = new ArrayList<Animation>();
@@ -2172,6 +2199,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cmp`: component that would no longer receive animation events
+    @Override
     public void deregisterAnimated(Animation cmp) {
         if (animatableComponents != null) {
             animatableComponents.remove(cmp);
@@ -2361,6 +2389,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `l`: the command action listener
+    @Override
     public void addCommandListener(ActionListener l) {
         if (commandListener == null) {
             commandListener = new EventDispatcher();
@@ -2374,6 +2403,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `l`: the command action listener
+    @Override
     public void removeCommandListener(ActionListener l) {
         commandListener.removeListener(l);
     }
@@ -2497,6 +2527,7 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     /// Displays the current form on the screen
+    @Override
     public void show() {
         Display.impl.onShow(this);
         show(false);
@@ -2974,6 +3005,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `focused`: the newly focused component or null for no focus
+    @Override
     public void setFocused(Component focused) {
         if (this.focused == focused && focused != null) { //NOPMD CompareObjectsWithEquals
             this.focused.repaint();
@@ -3101,6 +3133,7 @@ public class Form extends Container implements TopLevelContainer {
     /// - Component#getPreferredTabIndex()
     ///
     /// - Component#setPreferredTabIndex(int)
+    @Override
     public TabIterator getTabIterator(Component start) {
         return buildTabIterator(this, start);
     }
@@ -3862,6 +3895,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// true if there is one focusable component in this form, false for 0 or more
+    @Override
     public boolean isSingleFocusMode() {
         if (formLayeredPane != null) {
             return countFocusables(formLayeredPane) + countFocusables(getActualPane()) < 2;
@@ -4160,6 +4194,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Deprecated
     ///
     /// Please use `Toolbar#getComponentCount()` or similar methods
+    @Override
     public int getCommandCount() {
         return menuBar.getCommandCount();
     }
@@ -4173,6 +4208,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the command at the given index
+    @Override
     public Command getCommand(int index) {
         return menuBar.getCommand(index);
     }
@@ -4192,6 +4228,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Deprecated
     ///
     /// Please use `Toolbar#addCommandToLeftBar(com.codename1.ui.Command)` or similar methods
+    @Override
     public final void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);
         addCommand(cmd, 0);
@@ -4202,6 +4239,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cmd`: the Form command to be removed
+    @Override
     public void removeCommand(Command cmd) {
         menuBar.removeCommand(cmd);
     }
@@ -4434,6 +4472,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// true if focus should cycle
+    @Override
     public boolean isCyclicFocus() {
         return cyclicFocus;
     }
@@ -4443,6 +4482,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `cyclicFocus`: marks whether focus should cycle
+    @Override
     public void setCyclicFocus(boolean cyclicFocus) {
         this.cyclicFocus = cyclicFocus;
     }
@@ -4579,6 +4619,7 @@ public class Form extends Container implements TopLevelContainer {
     }
 
     /// Clear menu commands from the menu bar
+    @Override
     public void removeAllCommands() {
         menuBar.removeAllCommands();
     }
@@ -4747,6 +4788,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Returns
     ///
     /// the Toolbar instance or null if does not exists.
+    @Override
     public Toolbar getToolbar() {
         return toolbar;
     }
@@ -4756,6 +4798,7 @@ public class Form extends Container implements TopLevelContainer {
     /// #### Parameters
     ///
     /// - `toolbar`
+    @Override
     public void setToolbar(Toolbar toolbar) {
         this.toolbar = toolbar;
         setMenuBar(toolbar.getMenuBar());
