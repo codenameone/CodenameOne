@@ -100,7 +100,7 @@ jobs:
         working-directory: maven
         run: |
           set -euo pipefail
-          mvn -B -Dmaven.javadoc.skip=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
               -DunitTests=true \
               -Plocal-dev-javase \
               -P unittests \

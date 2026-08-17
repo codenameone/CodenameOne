@@ -115,7 +115,7 @@ jobs:
         if: ${{ matrix.java-version == 8 }}
         run: |
           cd maven
-          mvn -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -pl css-compiler -am install -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase
           cd ..
           ./scripts/build-native-themes.sh
           test -f Themes/iOSModernTheme.res || { echo "missing Themes/iOSModernTheme.res"; exit 1; }
@@ -147,7 +147,7 @@ jobs:
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
-          mvn -B -Dmaven.javadoc.skip=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
             -DunitTests=true \
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
@@ -173,11 +173,11 @@ jobs:
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
-          mvn -B -Dmaven.javadoc.skip=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -am -Plocal-dev-javase -DskipTests install
-          mvn -B -Dmaven.javadoc.skip=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl javase -Plocal-dev-javase test
@@ -325,11 +325,11 @@ jobs:
           # built here -- designer, java-runtime, ports). Install the
           # plugin + everything it transitively needs, then run package
           # on each cn1lib's common module.
-          mvn -B -Dmaven.javadoc.skip=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Plocal-dev-javase \
             -pl codenameone-maven-plugin -am -DskipTests install
-          mvn -B -Dmaven.javadoc.skip=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Dmaven.javadoc.skip=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Plocal-dev-javase \
             -pl "$CN1LIB_MODULES" \
@@ -340,13 +340,13 @@ jobs:
         env:
           CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
         run: |
-          mvn -B -DskipTests=true \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -DskipTests=true \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -Pcompile-android \
             -pl android,ios,codenameone-maven-plugin -am verify
       - name: Run SpotBugs for ByteCodeTranslator
         if: ${{ matrix.java-version == 8 }}
-        run: mvn -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
+        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -DskipTests=true -f vm/ByteCodeTranslator/pom.xml verify
       # ParparVM's CHECKCAST is unchecked, so a failed cast does not throw
       # ClassCastException on iOS -- code written to catch it silently uses the
       # wrong object instead (issue #5531). core/android/ios are already compiled
@@ -354,12 +354,12 @@ jobs:
       - name: Check cast semantics
         if: ${{ matrix.java-version == 8 }}
         run: |
-          mvn -B -q -f vm/pom.xml -pl JavaAPI -am package -DskipTests
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -q -f vm/pom.xml -pl JavaAPI -am package -DskipTests
           scripts/check-cast-semantics.sh --require-all
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm
-        run: mvn -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
+        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B test -pl tests -am -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false -Dtest=JavaScriptPortSmokeIntegrationTest
       - name: Generate static analysis HTML summaries
         if: ${{ always() && matrix.java-version == 8 }}
         env:
@@ -572,7 +572,7 @@ jobs:
 
       - name: Build iOS VM API
         if: ${{ matrix.java-version == 8 }}
-        run: mvn -f vm/JavaAPI/pom.xml package
+        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -f vm/JavaAPI/pom.xml package
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8
@@ -583,7 +583,7 @@ jobs:
 
       - name: Build iOS VM
         if: ${{ matrix.java-version == 8 }}
-        run: mvn -f vm/ByteCodeTranslator/pom.xml package
+        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -f vm/ByteCodeTranslator/pom.xml package
 
       - name: Upload a Build Artifact
         if: matrix.java-version == 8

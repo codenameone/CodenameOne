@@ -75,7 +75,7 @@ jobs:
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
-          mvn -B -ntp \
+          $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -ntp \
             -Dgenerate-gui-sources-done=true \
             -Dcodename1.platform=javase \
             -f docs/demos/pom.xml \

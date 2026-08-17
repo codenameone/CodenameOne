@@ -59,4 +59,4 @@ jobs:
 
       - name: Run Error Prone over the core module
         working-directory: maven
-        run: mvn -B -Perrorprone -pl core -am install -DskipTests
+        run: $GITHUB_WORKSPACE/scripts/ci-mvn-retry.sh -B -Perrorprone -pl core -am install -DskipTests
