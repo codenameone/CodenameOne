@@ -143,6 +143,7 @@ public class AndroidIntentBridge implements IntentBridge {
     /// reason as ForegroundWaiter: an anonymous class would hold the bridge instance, and this
     /// outlives the call that created it.
     private static final class ParkedCompletion implements IntentCompletion {
+        @Override
         public void onIntentResult(IntentResult r) {
             synchronized (PARKED) {
                 parkedFinished = true;
@@ -246,6 +247,7 @@ public class AndroidIntentBridge implements IntentBridge {
     /// an anonymous inner class here holds a reference to its enclosing instance, and this
     /// outlives the bridge call that started it.
     private static final class ForegroundWaiter implements Runnable {
+        @Override
         public void run() {
             try {
                 while (true) {

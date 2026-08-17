@@ -696,6 +696,7 @@ public final class Intents {
         private IntentResult result;
         private boolean done;
 
+        @Override
         public void onIntentResult(IntentResult r) {
             synchronized (this) {
                 result = r;

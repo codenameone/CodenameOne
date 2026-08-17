@@ -92,6 +92,7 @@ final class IOSIntentCallbacks {
         Map<String, Object> params = parse(paramsJson);
         Intents.dispatchInvocation(intentId, params, IntentSource.VOICE, headless,
                 new IntentCompletion() {
+                    @Override
                     public void onIntentResult(IntentResult result) {
                         Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
                         String json = IntentSerializer.serializeResult(result, images);
