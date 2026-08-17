@@ -3480,15 +3480,31 @@ public class IPhoneBuilder extends Executor {
                 applyCatalogPlistEntry(request, new String[] {
                     "NSLocalNetworkUsageDescription",
                     "Used to find smart home accessories on your network."});
-                String bonjour = request.getArg("ios.NSBonjourServices", null);
-                String matterServices = "_matter._tcp.,_matterc._udp.";
-                if (bonjour == null) {
-                    request.putArgument("ios.NSBonjourServices",
-                            matterServices);
-                } else if (!bonjour.contains("_matterc._udp")) {
-                    request.putArgument("ios.NSBonjourServices",
-                            bonjour + "," + matterServices);
+                // Each service considered on its own. Matter needs both --
+                // _matterc._udp. to find a commissionable accessory and
+                // _matter._tcp. to talk to it afterwards -- and a project
+                // that already declared one used to suppress the other, so
+                // the accessory was discovered and then unreachable.
+                String bonjour = request.getArg("ios.NSBonjourServices", "");
+                for (String service : new String[] {"_matter._tcp.",
+                        "_matterc._udp."}) {
+                    boolean declared = false;
+                    for (String existing : bonjour.split(",")) {
+                        String trimmed = existing.trim();
+                        // With and without the trailing dot: both spellings
+                        // appear in the wild and mean the same service.
+                        if (trimmed.equals(service)
+                                || (trimmed + ".").equals(service)) {
+                            declared = true;
+                            break;
+                        }
+                    }
+                    if (!declared) {
+                        bonjour = bonjour.trim().length() == 0 ? service
+                                : bonjour.trim() + "," + service;
+                    }
                 }
+                request.putArgument("ios.NSBonjourServices", bonjour);
             }
 
             // First-class health (com.codename1.health.*). Gated on

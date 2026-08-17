@@ -216,17 +216,25 @@ class HomeWireTest {
     }
 
     /**
-     * A unit wire id this build does not have falls back to the trait's own
-     * canonical unit, which is right by construction: the port and this build
-     * agree on what the trait measures even when they disagree about which
-     * units exist.
+     * A unit wire id this build does not have is refused.
+     *
+     * <p>This used to fall back to the trait's canonical unit, on the
+     * reasoning that the two sides agree about what the trait measures. They
+     * do -- but not about the scale: a future temperature unit carries a
+     * number that is not degrees Celsius, and relabelling it Celsius is a
+     * guess presented as a fact. The decoder cannot read the value, which is
+     * what INVALID_DATA means.</p>
      */
     @Test
-    void anUnknownUnitFallsBackToTheTraitsCanonicalOne() {
-        TraitValue v = HomeWire.decodeValue(Trait.BRIGHTNESS,
-                TraitValueKind.DOUBLE.ordinal(), 40, "", 9999, 0, false);
-        assertNotNull(v);
-        assertSame(TraitUnit.PERCENT, v.getUnit());
+    void anUnknownUnitIsRefusedRatherThanRelabelled() {
+        assertNull(HomeWire.decodeValue(Trait.BRIGHTNESS,
+                TraitValueKind.DOUBLE.ordinal(), 40, "", 9999, 0, false));
+        // The known one still decodes, so this is not refusing everything.
+        TraitValue ok = HomeWire.decodeValue(Trait.BRIGHTNESS,
+                TraitValueKind.DOUBLE.ordinal(), 40, "",
+                TraitUnit.PERCENT.getWireId(), 0, false);
+        assertNotNull(ok);
+        assertSame(TraitUnit.PERCENT, ok.getUnit());
     }
 
     @Test

@@ -2007,10 +2007,15 @@ com_codename1_impl_ios_IOSNative_homeReadTraits___int_java_lang_String_java_lang
                                          nil, nil)];
                 continue;
             }
-            if (cached) {
+            if (cached && [c value] != nil) {
                 // HomeKit keeps the last value it saw, and answering from it
                 // is instant and costs a battery-powered accessory nothing.
                 // TraitReadRequest.setAllowCached documents the trade.
+                //
+                // Only when there IS one. allowCached defaults to true, so
+                // taking this branch with an empty cache would answer the
+                // very first read of a real sensor with "no value" and never
+                // go to the accessory at all.
                 //
                 // Stamped unknown rather than now: this value is of whatever
                 // age HomeKit's cache is, and calling it fresh is the one
