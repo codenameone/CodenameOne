@@ -3568,7 +3568,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         ClipRect.resetClip(context, graphics.getClipState());
         context.restore();
         graphics.flush();
+        // The batch is on its way, so the sources it blits can be collected again.
+        blitSourcesInFlight.clear();
         return true;
+    }
+
+    /**
+     * Images whose surface a recorded blit refers to, held until the batch carrying it has been
+     * shipped.
+     *
+     * <p>A blit records a surface id, not the image. An image drawn into and blitted within one
+     * paint -- which is what a component rendering through a fresh mutable image every frame
+     * does -- is unreachable the moment that paint returns, so its finalizer can tell the host
+     * to release the surface while the batch that blits it is still waiting to be replayed. The
+     * result is a blank where the image should be. Holding the image until the batch is on its
+     * way closes that window.</p>
+     */
+    private final List<Object> blitSourcesInFlight = new ArrayList<Object>();
+
+    /**
+     * Keeps a blit's source image alive until the batch referring to it has been shipped.
+     *
+     * @param source the image whose surface a recorded blit refers to
+     */
+    void retainBlitSource(Object source) {
+        if (source != null) {
+            blitSourcesInFlight.add(source);
+        }
     }
 
     private void scheduleAnimationFrame() {
@@ -8545,6 +8571,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             ctx.drawImage(src.img, parkX, parkY);
         } else if (src.mutableGraphics != null) {
             src.mutableGraphics.flush();
+            retainBlitSource(src);
             ((SurfaceCommandRecorder)ctx).blitSurface(src.mutableGraphics.getSurfaceId(), parkX, parkY, -1, -1);
         }
         ctx.restore();
@@ -11714,6 +11741,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // (so the host has its pixels) then record a blit by id onto
                     // the target surface. No canvas host-ref crosses.
                     mutableGraphics.flush();
+                    retainBlitSource(NativeImage.this);
                     ((SurfaceCommandRecorder)ctx).blitSurface(mutableGraphics.getSurfaceId(), drawX, drawY, drawWidth, drawHeight);
                 }
             }, x, y, width, height);
