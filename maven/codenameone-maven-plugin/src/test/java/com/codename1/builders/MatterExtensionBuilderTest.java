@@ -80,6 +80,28 @@ public class MatterExtensionBuilderTest {
     }
 
     /**
+     * An explicit Info.plist is not merged with anything.
+     *
+     * <p>PRODUCT_BUNDLE_IDENTIFIER on the target does not reach a plist that
+     * does not ask for it, and a bundle with no identifier and no executable
+     * key compiles and then fails validation on the way to the device -- which
+     * blocks the whole build, not just commissioning.</p>
+     */
+    @Test
+    public void thePlistCarriesTheBundleKeysXcodeDoesNotMergeIn()
+            throws Exception {
+        String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
+                "Lights"), "Info.plist");
+        assertTrue(plist.contains("<key>CFBundleExecutable</key>"), plist);
+        assertTrue(plist.contains("$(EXECUTABLE_NAME)"), plist);
+        assertTrue(plist.contains("<key>CFBundleIdentifier</key>"), plist);
+        assertTrue(plist.contains("$(PRODUCT_BUNDLE_IDENTIFIER)"), plist);
+        assertTrue(plist.contains("<key>CFBundleVersion</key>"), plist);
+        assertTrue(plist.contains("<key>CFBundleShortVersionString</key>"),
+                plist);
+    }
+
+    /**
      * Swift classes are namespaced by their module, so the unqualified name
      * does not resolve at runtime. {@code $(PRODUCT_MODULE_NAME)} is what
      * makes it work without the builder having to know what the developer

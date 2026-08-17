@@ -176,13 +176,30 @@ public final class MatterExtensionBuilder {
                 + "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n");
         sb.append("<plist version=\"1.0\">\n");
         sb.append("<dict>\n");
+        sb.append("    <key>CFBundleDevelopmentRegion</key>\n");
+        sb.append("    <string>en</string>\n");
         sb.append("    <key>CFBundleDisplayName</key>\n");
         sb.append("    <string>").append(escape(displayName))
                 .append("</string>\n");
+        // Set from the build settings rather than left out. An explicit
+        // Info.plist is not merged with anything: PRODUCT_BUNDLE_IDENTIFIER
+        // on the target does not reach a plist that does not ask for it, and
+        // a bundle with no identifier and no executable key compiles and then
+        // fails validation on the way to the device.
+        sb.append("    <key>CFBundleExecutable</key>\n");
+        sb.append("    <string>$(EXECUTABLE_NAME)</string>\n");
+        sb.append("    <key>CFBundleIdentifier</key>\n");
+        sb.append("    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n");
+        sb.append("    <key>CFBundleInfoDictionaryVersion</key>\n");
+        sb.append("    <string>6.0</string>\n");
         sb.append("    <key>CFBundleName</key>\n");
         sb.append("    <string>").append(EXTENSION_NAME).append("</string>\n");
         sb.append("    <key>CFBundlePackageType</key>\n");
         sb.append("    <string>XPC!</string>\n");
+        sb.append("    <key>CFBundleShortVersionString</key>\n");
+        sb.append("    <string>1.0</string>\n");
+        sb.append("    <key>CFBundleVersion</key>\n");
+        sb.append("    <string>1</string>\n");
         sb.append("    <key>NSExtension</key>\n");
         sb.append("    <dict>\n");
         sb.append("        <key>NSExtensionPointIdentifier</key>\n");

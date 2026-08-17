@@ -424,30 +424,62 @@ static NSDictionary *cn1homeTraitByCharacteristic(void) {
                 [m setObject:traitId forKey:ct];
             }
         }
-        // The alternates cn1homeFindCharacteristic accepts when the primary
-        // characteristic is absent, so a service that spells power as Active
-        // -- fan v2, air purifier, heater-cooler -- or carries only the
-        // vertical half of a covering's tilt is described in the graph the
-        // same way it can be written. Without them the trait is reachable and
-        // invisible: a caller who reads the graph to build its UI sees no
-        // ON_OFF constraint and treats a supported control as absent.
-        //
-        // Added after the primary pass, so a service carrying both keeps the
-        // primary's answer.
-        if ([m objectForKey:HMCharacteristicTypeActive] == nil) {
-            [m setObject:@"on_off" forKey:HMCharacteristicTypeActive];
-        }
-        if ([m objectForKey:HMCharacteristicTypeCurrentVerticalTilt] == nil) {
-            [m setObject:@"covering_tilt"
-                  forKey:HMCharacteristicTypeCurrentVerticalTilt];
-        }
-        if ([m objectForKey:HMCharacteristicTypeTargetVerticalTilt] == nil) {
-            [m setObject:@"target_covering_tilt"
-                  forKey:HMCharacteristicTypeTargetVerticalTilt];
-        }
         reverse = [[NSDictionary dictionaryWithDictionary:m] retain];
     });
     return reverse;
+}
+
+/// Declared ahead of its definition below, because the per-service resolver
+/// needs a trait's primary characteristic to know whether an alternate
+/// applies.
+static NSArray *cn1homeEntryFor(NSString *traitId);
+
+/// The alternates cn1homeFindCharacteristic accepts when a service does not
+/// carry the primary characteristic: characteristic type -> portable trait.
+///
+/// Applied per service rather than folded into the reverse table, because a
+/// covering can carry BOTH tilt axes. Aliased globally, a vertical-axis
+/// notification arrives as a horizontal covering_tilt change and overwrites
+/// the value that was just read from the axis the read and write paths both
+/// prefer.
+static NSDictionary *cn1homeAlternateTraitByCharacteristic(void) {
+    static NSDictionary *alternates = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        alternates = [[NSDictionary alloc] initWithObjectsAndKeys:
+            @"on_off", HMCharacteristicTypeActive,
+            @"covering_tilt", HMCharacteristicTypeCurrentVerticalTilt,
+            @"target_covering_tilt", HMCharacteristicTypeTargetVerticalTilt,
+            nil];
+    });
+    return alternates;
+}
+
+/// The portable trait a characteristic stands for on the service it belongs
+/// to, or nil.
+///
+/// An alternate answers only when the service does not carry the primary
+/// characteristic for that trait -- which is the same rule
+/// cn1homeFindCharacteristic reads by, so the graph describes exactly what
+/// can be read and written and nothing else.
+static NSString *cn1homeTraitFor(HMService *service, HMCharacteristic *c) {
+    NSString *type = [c characteristicType];
+    NSString *traitId = [cn1homeTraitByCharacteristic() objectForKey:type];
+    if (traitId != nil) {
+        return traitId;
+    }
+    traitId = [cn1homeAlternateTraitByCharacteristic() objectForKey:type];
+    if (traitId == nil) {
+        return nil;
+    }
+    NSArray *entry = cn1homeEntryFor(traitId);
+    NSString *primary = entry == nil ? nil : [entry objectAtIndex:0];
+    for (HMCharacteristic *other in [service characteristics]) {
+        if ([[other characteristicType] isEqualToString:primary]) {
+            return nil;
+        }
+    }
+    return traitId;
 }
 
 static NSArray *cn1homeEntryFor(NSString *traitId) {
@@ -885,10 +917,9 @@ static void cn1homeEncodeTraitsForService(HMAccessory *accessory,
                                           HMService *service,
                                           NSMutableDictionary *into) {
     NSMutableArray *records = [NSMutableArray array];
-    NSDictionary *reverse = cn1homeTraitByCharacteristic();
     NSMutableSet *seen = [NSMutableSet set];
     for (HMCharacteristic *c in [service characteristics]) {
-        NSString *traitId = [reverse objectForKey:[c characteristicType]];
+        NSString *traitId = cn1homeTraitFor(service, c);
         if (traitId == nil) {
             // A characteristic outside the canonical vocabulary. Skipped
             // rather than surfaced with its HomeKit identifier: exposing one
@@ -1059,7 +1090,6 @@ static void cn1homeRebuildSnapshot(void) {
                  cn1homeFlag(!triggerOwned), nil])];
 
             NSMutableArray *actionRecords = [NSMutableArray array];
-            NSDictionary *reverse = cn1homeTraitByCharacteristic();
             for (HMAction *action in [actionSet actions]) {
                 if (![action isKindOfClass:[HMCharacteristicWriteAction class]]) {
                     continue;
@@ -1067,8 +1097,7 @@ static void cn1homeRebuildSnapshot(void) {
                 HMCharacteristicWriteAction *write =
                         (HMCharacteristicWriteAction *) action;
                 HMCharacteristic *c = [write characteristic];
-                NSString *traitId = [reverse objectForKey:
-                                     [c characteristicType]];
+                NSString *traitId = cn1homeTraitFor([c service], c);
                 if (traitId == nil) {
                     continue;
                 }
@@ -1312,8 +1341,7 @@ static void cn1homeAttachDelegates(void) {
 - (void)accessory:(HMAccessory *)accessory
                      service:(HMService *)service
   didUpdateValueForCharacteristic:(HMCharacteristic *)characteristic {
-    NSString *traitId = [cn1homeTraitByCharacteristic()
-                         objectForKey:[characteristic characteristicType]];
+    NSString *traitId = cn1homeTraitFor(service, characteristic);
     if (traitId == nil) {
         return;
     }
