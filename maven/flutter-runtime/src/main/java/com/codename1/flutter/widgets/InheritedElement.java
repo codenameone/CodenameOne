@@ -69,6 +69,33 @@ public class InheritedElement extends StatelessElement {
      * serial call means the whole tree is consistent before any reader is asked to rebuild,
      * which is the same guarantee {@code setState} already relies on.</p>
      */
+    /// Whether {@code e}'s widget is named in a comma-separated allow-list. Used to notify
+    /// readers a few at a time while working out which rebuild is destructive - the census
+    /// says WHO reads the value, this says which of them get told.
+    private static boolean matches(Element e, String csv) {
+        Widget w = e.widget();
+        if (w == null) {
+            return false;
+        }
+        // Scanned by hand rather than with String.split: ParparVM's Java API does not
+        // carry the regex-based String methods, so split compiles on the desktop and fails
+        // the iOS translation with an undeclared-function error.
+        String n = w.getClass().getSimpleName();
+        int from = 0;
+        while (from <= csv.length()) {
+            int comma = csv.indexOf(',', from);
+            int end = comma < 0 ? csv.length() : comma;
+            if (n.equals(csv.substring(from, end).trim())) {
+                return true;
+            }
+            if (comma < 0) {
+                break;
+            }
+            from = comma + 1;
+        }
+        return false;
+    }
+
     private void notifyDependents() {
         if (dependents.isEmpty()) {
             return;
@@ -79,15 +106,22 @@ public class InheritedElement extends StatelessElement {
         Runnable mark = new Runnable() {
             @Override
             public void run() {
+                String only = com.codename1.ui.Display.isInitialized()
+                        ? com.codename1.ui.Display.getInstance()
+                                .getProperty("cn1.flutter.inheritedOnly", "")
+                        : "";
                 for (int i = 0; i < snapshot.size(); i++) {
                     Element e = snapshot.get(i);
                     // Re-checked here, not at snapshot time: an element that left the tree
                     // in the meantime must never be scheduled.
-                    if (e.isMounted()) {
-                        e.markNeedsBuild();
-                    } else {
+                    if (!e.isMounted()) {
                         dependents.remove(e);
+                        continue;
                     }
+                    if (only != null && only.length() > 0 && !matches(e, only)) {
+                        continue;
+                    }
+                    e.markNeedsBuild();
                 }
             }
         };
