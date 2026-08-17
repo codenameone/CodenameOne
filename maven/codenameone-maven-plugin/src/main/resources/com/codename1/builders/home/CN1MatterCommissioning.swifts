@@ -53,7 +53,13 @@ import Foundation
 // watch build therefore compiled this file and failed on the type rather than
 // skipping the file -- and it reaches those slices even when correctly
 // injected, because the watch target restages the app's own sources.
-#if canImport(MatterSupport) && os(iOS)
+//
+// Catalyst is excluded for a different reason: os(iOS) is true there, but the
+// extension this shim needs is filtered to the iOS slice when the target is
+// wired up -- Apple's add-device sheet is not a Mac feature. Left in, the Mac
+// app would offer commissioning and then fail for want of an extension that
+// was never embedded.
+#if canImport(MatterSupport) && os(iOS) && !targetEnvironment(macCatalyst)
 import Matter
 import MatterSupport
 

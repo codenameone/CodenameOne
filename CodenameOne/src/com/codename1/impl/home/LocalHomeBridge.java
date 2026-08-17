@@ -925,8 +925,8 @@ public class LocalHomeBridge implements HomeBridge {
                         : HomeWire.decodeValue(trait, kinds[i],
                                 numericValues[i], stringValues[i],
                                 unitWireIds[i], 0, false);
-                String refusal = refuseSceneAction(accessoryIds[i],
-                        serviceIds[i], trait, v);
+                String refusal = refuseSceneAction(structureId,
+                        accessoryIds[i], serviceIds[i], trait, v);
                 if (refusal != null) {
                     answer(new SceneResult(requestId, null, structureId,
                             refusal));
@@ -1103,8 +1103,8 @@ public class LocalHomeBridge implements HomeBridge {
     /// #### Returns
     ///
     /// an encoded error, or `null`
-    private String refuseSceneAction(String accessoryId, String serviceId,
-            Trait trait, TraitValue value) {
+    private String refuseSceneAction(String structureId, String accessoryId,
+            String serviceId, Trait trait, TraitValue value) {
         if (trait == null) {
             return HomeError.TRAIT_NOT_SUPPORTED.name()
                     + "\tthis build does not know that trait";
@@ -1117,6 +1117,15 @@ public class LocalHomeBridge implements HomeBridge {
         if (a == null) {
             return HomeError.ACCESSORY_NOT_FOUND.name()
                     + "\tno such accessory in the simulated home";
+        }
+        if (!a.structureId.equals(structureId)) {
+            // A scene belongs to one home and acts on that home's
+            // accessories. The accessory index is global here, so without
+            // this an action naming a device in another house was stored and
+            // executed -- the simulator approving a scene no real backend
+            // would let you build.
+            return HomeError.INVALID_ARGUMENT.name()
+                    + "\tthat accessory is in a different home";
         }
         Service svc = a.services.get(serviceId);
         TraitConstraint c = svc == null ? null : svc.constraintFor(trait);

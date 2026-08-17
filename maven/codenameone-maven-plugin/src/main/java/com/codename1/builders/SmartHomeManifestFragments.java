@@ -92,7 +92,14 @@ final class SmartHomeManifestFragments {
      * @return the body with the Google Home package declared
      */
     static String injectQueries(String xQueries) {
-        if (xQueries != null && xQueries.contains(GOOGLE_HOME_PACKAGE)) {
+        // The complete attribute, not the bare name: a project already
+        // declaring com.google.android.apps.chromecast.app.preview contains
+        // this package's name as a prefix, and skipping on that basis leaves
+        // the exact entry out. Package visibility is matched exactly on API
+        // 30+, so getLaunchIntentForPackage then answers null with Google
+        // Home installed -- and openEcosystemApp() silently does nothing.
+        if (xQueries != null
+                && xQueries.contains("\"" + GOOGLE_HOME_PACKAGE + "\"")) {
             return xQueries;
         }
         return (xQueries == null ? "" : xQueries)

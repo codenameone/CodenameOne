@@ -1824,6 +1824,19 @@ public final class SmartHome {
                 continue;
             }
             String[] f = HomeWire.split(lines[i]);
+            // Checked against the write it is claimed to answer, the way the
+            // read decoder checks its own rows. A well-formed row in the
+            // wrong slot attaches one accessory's failure to another
+            // accessory's write, and the caller lines this list up against
+            // the one it passed in.
+            if (!HomeWire.field(f, 0).equals(w.getAccessoryId())
+                    || !HomeWire.field(f, 1).equals(w.getServiceId())
+                    || !HomeWire.field(f, 2).equals(w.getTrait().getId())) {
+                out.add(TraitWriteResult.failed(w, HomeError.INVALID_DATA,
+                        "the port's outcome for this write named a different"
+                                + " trait"));
+                continue;
+            }
             String errorName = HomeWire.field(f, 4);
             if (errorName.length() > 0) {
                 out.add(TraitWriteResult.failed(w,
