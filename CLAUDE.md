@@ -255,6 +255,59 @@ Platform-specific native code locations:
 - **Android**: Within Android port module (Java/Kotlin)
 - **JavaSE**: Within JavaSE port (Java)
 
+#### ParparVM native names are checked, and getting one wrong is silent
+
+ParparVM encodes the **whole Java signature in the C function name**. For
+`boolean isBiometricsSupported()` on `com.codename1.impl.ios.IOSNative`:
+
+```c
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject)
+```
+
+Three rules, all easy to get wrong by hand:
+
+- `__` opens the argument list and **every argument adds its own leading `_`**, so
+  a no-arg method ends in `__` and a one-int method ends in `___int` -- three
+  underscores.
+- A non-void return appends **`_R` plus that same per-type `_`**: `_R_boolean`,
+  `_R_java_lang_String`. Omitting it still compiles.
+- Array dimensions collapse to one token: `byte[][]` is `byte_2ARRAY`, never
+  `byte_1ARRAY_1ARRAY`.
+- Instance methods take `JAVA_OBJECT` after the thread state; static ones do not.
+
+**Neither the compiler nor the linker catches a mistake here.** A misspelled name
+is just a different function, so it compiles and links; the correctly named symbol
+is then absent, and since a native method is kept alive *by* its symbol appearing
+in the native sources (`BytecodeMethod.isMethodUsedByNative`), the dead-code pass
+reads that absence as "unused" and drops the Java method. The build is green and
+the feature is inert on the device. A right name with a wrong *prototype* is worse:
+C links on the name alone, so it runs and reads its arguments out of the wrong
+registers.
+
+`NativeSignatureVerifier` gates this, in two places:
+
+- **Every translation** (iOS, native Windows, native Linux) verifies the generated
+  project -- app, cn1libs and the native-interface glue the builders inject -- and
+  fails before emitting any C. Per-symbol opt-out for a native that lives in a
+  prebuilt `.a`/`.framework`: list it in `cn1-native-verify-ignore.txt` beside the
+  native sources. Blunt opt-out: the `nativeVerify=warn` (or `off`) build hint,
+  or `-Dparparvm.nativeVerify=warn` directly on the translator.
+- **PR CI** runs the same verifier offline over our own ports, which needs no
+  device build:
+
+```bash
+source tools/env.sh
+scripts/check-native-signatures.sh          # skips ports that are not built
+scripts/check-native-signatures.sh --require-all   # what CI runs
+```
+
+Findings come in three kinds. `MISSING` and `SIGNATURE` fail the build. `ORPHAN`
+-- a C function whose name is a near miss for one of ours and that nothing else
+calls -- is a warning: it is dead code, not a broken build. Note the offline gate
+reads `target/classes`, so **a stale port build reports natives that no longer
+exist**; rebuild the module before believing a finding.
+
 ### Integration Tests
 
 Located in `maven/integration-tests/`:

@@ -776,6 +776,12 @@ public class Parser extends ClassVisitor {
             // because a native source may be the only thing referencing a class,
             // and the class may be purged before it even has a shot.
             readNativeFiles(outputDirectory);
+            // Snapshot the project's native sources BEFORE the per-class .c/.h are
+            // written into the same directory: what is here now is exactly the
+            // hand-written and builder-injected code the verifier has to judge, with
+            // none of the translator's own output to confuse it.
+            List<File> handWrittenNativeSources =
+                    NativeSignatureVerifier.listNativeSources(outputDirectory);
 
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
@@ -848,6 +854,13 @@ public class Parser extends ClassVisitor {
             if (ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT) {
                 JavascriptBundleWriter.write(outputDirectory, classes);
             } else {
+                // Before a single line of C is emitted: every native method that
+                // survived into this program must have an implementation the
+                // generated code can actually call. The JavaScript target has its
+                // own registry (JavascriptNativeRegistry) and reports its own
+                // missing natives, so it is not run through this.
+                verifyNativeMethods(handWrittenNativeSources);
+
                 generateClassAndMethodIndexHeader(outputDirectory);
 
                 boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
@@ -863,6 +876,12 @@ public class Parser extends ClassVisitor {
                     writeSymbolSidecar(outputDirectory);
                 }
             }
+        } catch(NativeSignatureVerifier.VerificationFailedException t) {
+            // Not a translation failure: the report above already says exactly which
+            // native methods are wrong and what to write instead. Naming whichever
+            // class the loop happened to be on, and dumping a stack into the build
+            // log, would bury it.
+            throw t;
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
             t.printStackTrace();
@@ -907,7 +926,66 @@ public class Parser extends ClassVisitor {
             System.out.println("Native files total "+(size/1024)+"K");
         }
     }
-    
+
+    /**
+     * Fails the translation when a native method that survived into this program has
+     * no C implementation, or has one whose prototype the generated call site would
+     * not match.
+     *
+     * <p>Checked over EVERY native method of every surviving class, not just the ones
+     * the dead-code pass kept: a native method is kept alive precisely by its symbol
+     * appearing in the native sources (see {@link BytecodeMethod#isMethodUsedByNative}),
+     * so a misspelled implementation makes the method look unused and it is dropped.
+     * Keying the check on "survived elimination" would therefore skip exactly the
+     * methods it exists to catch.</p>
+     *
+     * @param handWrittenNativeSources the project's native sources as they were
+     *        before the translator wrote its own C into the same directory
+     */
+    private static void verifyNativeMethods(List<File> handWrittenNativeSources) throws IOException {
+        NativeSignatureVerifier.Mode mode = NativeSignatureVerifier.mode();
+        if (mode == NativeSignatureVerifier.Mode.OFF) {
+            return;
+        }
+        List<NativeSignatureVerifier.Signature> required =
+                new ArrayList<NativeSignatureVerifier.Signature>();
+        for (ByteCodeClass bc : classes) {
+            for (BytecodeMethod m : bc.getMethods()) {
+                if (m.isNative()) {
+                    required.add(m.getNativeSignature());
+                }
+            }
+        }
+        if (required.isEmpty()) {
+            return;
+        }
+        NativeSignatureVerifier.SourceIndex index =
+                new NativeSignatureVerifier.SourceIndex(handWrittenNativeSources);
+        List<NativeSignatureVerifier.Problem> problems =
+                NativeSignatureVerifier.verify(required, index);
+        if (problems.isEmpty()) {
+            if (ByteCodeTranslator.verbose) {
+                System.out.println("Native signature check: " + required.size()
+                        + " native method(s) verified against " + index.size()
+                        + " C definition(s).");
+            }
+            return;
+        }
+        // Warnings are collapsed to one line here on purpose: they are near-miss C
+        // functions nothing calls, which in an app build almost always live in a port
+        // or a cn1lib the app author did not write. Listing them in full would bury
+        // the errors that ARE theirs. scripts/check-native-signatures.sh prints them.
+        int fatal = NativeSignatureVerifier.report(problems, mode,
+                required.size() + " native methods", false);
+        if (fatal > 0) {
+            throw new NativeSignatureVerifier.VerificationFailedException(
+                    "Native signature check failed: " + fatal
+                    + " native method(s) have no callable C implementation."
+                    + " Fix the names listed above, or pass -Dparparvm.nativeVerify=warn"
+                    + " to downgrade this to a warning.");
+        }
+    }
+
     private static int eliminateUnusedMethods() {
         return(eliminateUnusedMethods(false, 0));
     }

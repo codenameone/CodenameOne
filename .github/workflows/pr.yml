@@ -356,6 +356,20 @@ jobs:
         run: |
           mvn -B -q -f vm/pom.xml -pl JavaAPI -am package -DskipTests
           scripts/check-cast-semantics.sh --require-all
+      # ParparVM encodes the whole Java signature in the C function name, so a
+      # native whose implementation is spelled even slightly differently is NOT a
+      # link error: nothing references the real symbol, the dead-code pass reads
+      # that as "unused" and drops the Java method, and the feature ships inert.
+      # ios/core come from the SpotBugs step and JavaAPI from the cast step; the
+      # two desktop ports are not built yet, so compile them here.
+      - name: Check native method signatures
+        if: ${{ matrix.java-version == 8 }}
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          mvn -B -q -f maven/pom.xml -pl windows,linux -am -DskipTests \
+            -Dcn1.binaries="${CN1_BINARIES}" compile
+          scripts/check-native-signatures.sh --require-all
       - name: Run JavaScript Port smoke integration
         if: ${{ matrix.java-version == 8 }}
         working-directory: vm

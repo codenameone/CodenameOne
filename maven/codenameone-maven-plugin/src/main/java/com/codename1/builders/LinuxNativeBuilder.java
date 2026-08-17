@@ -310,6 +310,7 @@ public class LinuxNativeBuilder extends Executor {
         if (!heapOverridden) {
             parparCmd.add("-Xmx" + heapMB + "m");
         }
+        NativeVerifyOption.addTo(parparCmd, request, "linux");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         parparCmd.add("clean");
