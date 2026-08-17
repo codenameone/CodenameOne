@@ -109,6 +109,14 @@ class IntentsTest {
                                         Map<String, byte[]> images) {
             completions.add(token);
         }
+
+        boolean canForeground = true;
+        int foregroundRequests;
+
+        public boolean requestForeground() {
+            foregroundRequests++;
+            return canForeground;
+        }
     }
 
     /** A dispatcher standing in for the build-time generated one. */
@@ -788,6 +796,9 @@ class IntentsTest {
     void donationReachesTheBridgeWithSerializedParameters() {
         FakeBridge b = new FakeBridge();
         Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("log_workout"));
+        Intents.setDispatcher(d);
 
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("minutes", Integer.valueOf(20));
@@ -797,6 +808,80 @@ class IntentsTest {
         assertEquals("log_workout", b.donatedId);
         Map parsed = parse(b.donatedParams);
         assertEquals("run", parsed.get("kind"));
+    }
+
+    /// A donation is durable in a way an ordinary call is not: Android persists a shortcut and
+    /// iOS records an activity the system may suggest for weeks. One published for an id nothing
+    /// declares can never dispatch, so it becomes a launcher entry or a Siri suggestion that
+    /// opens the app and does nothing, with no later moment at which it gets cleaned up. A typo
+    /// in an id is the ordinary way to arrive here.
+    @Test
+    void donatingAnUndeclaredIntentIsRefused() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("log_workout"));
+        Intents.setDispatcher(d);
+
+        Intents.donate("log_workuot", new HashMap<String, Object>());
+
+        assertNull(b.donatedId, "a misspelled id must not reach the platform");
+    }
+
+    /// A headless handler that decides on a route at runtime has no window to show it in --
+    /// the runtime it ran in has nothing on screen. Navigating without asking the port to bring
+    /// the app forward builds the destination Form where nobody can see it.
+    @Test
+    void aHeadlessResultThatOpensARouteAsksThePortToForeground() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        d.next = IntentResult.opens("/orders/42");
+        Intents.setDispatcher(d);
+
+        Intents.invoke("known", null);
+
+        assertEquals(1, b.foregroundRequests);
+    }
+
+    /// A declared opensRoute is different: the platform already brought the app forward before
+    /// the handler ran, which is what the flag is for. Asking again would be a second launch.
+    @Test
+    void aDeclaredRouteDoesNotAskTwice() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                "/orders", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+
+        Intents.invoke("known", null);
+
+        assertEquals(0, b.foregroundRequests);
+    }
+
+    /// A parameterization registered at runtime is a declaration too -- donating one is the
+    /// point of DynamicIntent, so the check must not refuse it.
+    @Test
+    void donatingADynamicIntentIsAllowed() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("log_workout"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("log_run", "log_workout", "Log a run")
+                .bind("kind", "run"));
+
+        Intents.donate("log_run", new HashMap<String, Object>());
+
+        assertEquals("log_run", b.donatedId);
     }
 
     @Test

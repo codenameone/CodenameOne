@@ -4729,6 +4729,14 @@ public class AndroidGradleBuilder extends Executor {
                     += "        com.codename1.impl.android.AndroidImplementation.deliverPendingSurfaceActions();\n";
         }
 
+        if (usesIntents) {
+            // Same shape, different trampoline: a non-headless intent tapped in the launcher is
+            // parked rather than dispatched, because its handler may touch a Form and there is
+            // no window at the moment of the tap. This is the point where there is one.
+            localNotificationCode
+                    += "        com.codename1.impl.android.AndroidImplementation.deliverPendingIntentRequests();\n";
+        }
+
 
         // Install the build-time-generated @Route dispatcher before the
         // first Display init. The reinit branch doesn't repeat the call
@@ -7457,6 +7465,19 @@ public class AndroidGradleBuilder extends Executor {
                 log("Not offering \"" + id + "\" as a launcher shortcut: it has a required "
                         + "parameter and a static shortcut cannot supply one. It remains "
                         + "invocable and can be donated with its values bound.");
+                continue;
+            }
+            // A static shortcut is minted at build time, so it carries no runtime nonce and the
+            // trampoline treats it as unauthenticated -- and that policy refuses anything
+            // destructive, deliberately. Emitting one anyway produces a launcher entry that on
+            // every tap opens the app and logs a refusal, which reads to the user as the action
+            // being broken rather than protected.
+            Object destructive = intent.get("destructive");
+            if (Boolean.TRUE.equals(destructive) || "true".equals(destructive)) {
+                log("Not offering \"" + id + "\" as a launcher shortcut: it is destructive, and "
+                        + "a static shortcut cannot be confirmed the way the platform confirms "
+                        + "a Shortcuts or assistant invocation. It remains invocable and can be "
+                        + "donated, which mints a shortcut this app has authenticated.");
                 continue;
             }
             String label = intent.get("title") instanceof String

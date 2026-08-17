@@ -95,12 +95,72 @@ public final class IOSAppIntentsBuilder {
             // An intent that only offered itself to a language model must not become an App
             // Intent; exposure is a restriction, not a hint.
             if (isExposedToAssistant(intent)) {
+                appendChoiceEnums(sb, intent);
                 appendIntent(sb, intent);
             }
         }
         appendShortcutsProvider(sb);
         sb.append("#endif\n");
         return sb.toString();
+    }
+
+    /// True when this parameter declared a closed vocabulary the platform should offer as a
+    /// choice list rather than as free text.
+    private static boolean hasChoices(Map<String, Object> p) {
+        return "string".equals(str(p, "type")) && !options(p).isEmpty();
+    }
+
+    /// The Swift enum name backing one parameter's declared `options`.
+    static String choiceEnumName(String intentId, String paramName) {
+        return "CN1Choice_" + sanitize(intentId) + "_" + sanitize(paramName);
+    }
+
+    /// Emits an `AppEnum` per closed-vocabulary parameter.
+    ///
+    /// Without this the parameter is a plain `String`, so Shortcuts and Siri accept any text
+    /// and the declared vocabulary is enforced only by the Java `oneOf` check -- after the user
+    /// has finished the interaction, which is the worst possible moment to reject it. An
+    /// AppEnum makes the platform offer exactly the declared values and never produce another.
+    private void appendChoiceEnums(StringBuilder sb, Map<String, Object> intent) {
+        String id = str(intent, "id");
+        for (Map<String, Object> p : params(intent)) {
+            if (!hasChoices(p)) {
+                continue;
+            }
+            String name = choiceEnumName(id, str(p, "name"));
+            List<String> opts = options(p);
+            sb.append("@available(iOS 16.0, *)\n");
+            sb.append("enum ").append(name).append(": String, AppEnum {\n");
+            for (String option : opts) {
+                sb.append("    case ").append(caseName(option)).append(" = \"")
+                        .append(swift(option)).append("\"\n");
+            }
+            sb.append("\n    static var typeDisplayRepresentation: TypeDisplayRepresentation =\n");
+            sb.append("        TypeDisplayRepresentation(name: \"")
+                    .append(swift(str(p, "title"))).append("\")\n");
+            sb.append("    static var caseDisplayRepresentations: [").append(name)
+                    .append(": DisplayRepresentation] = [\n");
+            for (String option : opts) {
+                sb.append("        .").append(caseName(option)).append(": \"")
+                        .append(swift(option)).append("\",\n");
+            }
+            sb.append("    ]\n");
+            sb.append("}\n\n");
+        }
+    }
+
+    /// A Swift case name for a declared option. Options are application strings, so they may be
+    /// anything; the raw value carries the real text and this only has to be a stable, legal
+    /// identifier that does not collide.
+    private static String caseName(String option) {
+        String s = sanitize(option);
+        if (s.length() == 0 || !Character.isLetter(s.charAt(0))) {
+            s = "v" + s;
+        }
+        if (SWIFT_KEYWORDS.contains(s)) {
+            return "`" + s + "`";
+        }
+        return s;
     }
 
     private void appendIntent(StringBuilder sb, Map<String, Object> intent) {
@@ -140,9 +200,12 @@ public final class IOSAppIntentsBuilder {
             // An optional declaration has to produce an optional Swift type, or the system keeps
             // prompting for a value the handler was willing to do without.
             String optional = bool(p, "required") ? "" : "?";
+            String declaredType = hasChoices(p)
+                    ? choiceEnumName(str(intent, "id"), str(p, "name"))
+                    : swiftType(type, str(p, "entityType"));
             sb.append("    @Parameter(title: \"").append(swift(str(p, "title"))).append("\")\n");
             sb.append("    var ").append(varName(str(p, "name"))).append(": ")
-                    .append(swiftType(type, str(p, "entityType"))).append(optional).append("\n\n");
+                    .append(declaredType).append(optional).append("\n\n");
         }
 
         // ReturnsValue is declared unconditionally so the signature does not vary with the
@@ -169,7 +232,12 @@ public final class IOSAppIntentsBuilder {
             if (!required) {
                 sb.append("        if let v = ").append(var).append(" {\n    ");
             }
-            if ("entity".equals(type)) {
+            if (hasChoices(p)) {
+                // The enum exists so the platform offers the declared vocabulary; Java still
+                // receives the plain string it declared.
+                sb.append("        params[\"").append(swift(name)).append("\"] = ")
+                        .append(read).append(".rawValue\n");
+            } else if ("entity".equals(type)) {
                 // Entities cross as their id and nothing else; the Java side resolves it
                 // through the type's own BY_ID query.
                 sb.append("        params[\"").append(swift(name)).append("\"] = ")
@@ -194,7 +262,7 @@ public final class IOSAppIntentsBuilder {
         sb.append("        }\n");
         // A result carrying a route is navigated by the framework once the app is up; this only
         // has to make sure the app is up, which openAppWhenRun already did.
-        sb.append("        return .result(value: outcome.value ?? \"\",\n");
+        sb.append("        return .result(value: outcome.resultValue,\n");
         sb.append("                       dialog: IntentDialog(stringLiteral: outcome.spoken),\n");
         sb.append("                       view: CN1IntentSnippetView(node: outcome.snippet,\n");
         sb.append("                                                  imagesDir: outcome.imagesDir))\n");
@@ -494,6 +562,22 @@ public final class IOSAppIntentsBuilder {
     @SuppressWarnings("unchecked")
     private static List<String> phrases(Map<String, Object> intent) {
         Object o = intent.get("phrases");
+        if (o instanceof List) {
+            List<String> out = new ArrayList<String>();
+            for (Object s : (List<Object>) o) {
+                if (s instanceof String) {
+                    out.add((String) s);
+                }
+            }
+            return out;
+        }
+        return new ArrayList<String>();
+    }
+
+    /// A parameter's declared closed vocabulary, or empty.
+    @SuppressWarnings("unchecked")
+    private static List<String> options(Map<String, Object> param) {
+        Object o = param.get("options");
         if (o instanceof List) {
             List<String> out = new ArrayList<String>();
             for (Object s : (List<Object>) o) {

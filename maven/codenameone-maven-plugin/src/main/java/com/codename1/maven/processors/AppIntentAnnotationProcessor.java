@@ -840,7 +840,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "asString(params, " + key + ", null)";
         }
         if ("int".equals(p.kind)) {
-            return "(int) requiredLong(params, " + key + ")";
+            return "requiredInt(params, " + key + ")";
         }
         if ("long".equals(p.kind)) {
             return "requiredLong(params, " + key + ")";
@@ -1009,7 +1009,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         // substituting a fallback the declaration never offered.
         sb.append("    private static long requiredLong(Map<String, Object> p, String k) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
-        sb.append("        if (o instanceof Number) { return ((Number) o).longValue(); }\n");
+        // 1.5 is a Number, and longValue() would quietly make it 1. A caller that sent a
+        // fraction meant something this parameter cannot express, so it is a rejection rather
+        // than a rounding decision the framework gets to make on their behalf.
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            double d = ((Number) o).doubleValue();\n");
+        sb.append("            if (d != Math.floor(d) || Double.isInfinite(d)) {\n");
+        sb.append("                throw new IllegalArgumentException(o\n");
+        sb.append("                        + \" is not a whole number for \" + k);\n");
+        sb.append("            }\n");
+        sb.append("            return ((Number) o).longValue();\n");
+        sb.append("        }\n");
         sb.append("        if (o instanceof String) {\n");
         sb.append("            try { return Long.parseLong(((String) o).trim()); }\n");
         sb.append("            catch (NumberFormatException e) {\n");
@@ -1018,6 +1028,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("            }\n");
         sb.append("        }\n");
         sb.append("        throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("    }\n\n");
+
+        // A plain (int) cast on the long would wrap: 4294967296 would arrive as 0, which is a
+        // value the caller never sent and the handler cannot tell from one they did.
+        sb.append("    private static int requiredInt(Map<String, Object> p, String k) {\n");
+        sb.append("        long v = requiredLong(p, k);\n");
+        sb.append("        if (v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {\n");
+        sb.append("            throw new IllegalArgumentException(v\n");
+        sb.append("                    + \" is out of range for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return (int) v;\n");
         sb.append("    }\n\n");
 
         sb.append("    private static double requiredDouble(Map<String, Object> p, String k) {\n");

@@ -168,6 +168,50 @@ class IOSAppIntentsBuilderTest {
         assertTrue(swift.contains("openAppWhenRun: Bool = true"));
     }
 
+    /// A closed vocabulary the platform does not know about is a vocabulary the platform will
+    /// not offer: Shortcuts accepts any text and the Java `oneOf` check only rejects it after
+    /// the interaction is over, which is the worst moment to tell someone their answer was
+    /// wrong. An AppEnum makes the picker offer exactly the declared values.
+    @Test
+    void aClosedVocabularyBecomesAnAppEnum() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout",
+                        "params", Arrays.asList(param("kind", "string",
+                                "options", Arrays.asList("run", "ride"))))),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("enum CN1Choice_log_workout_kind: String, AppEnum"));
+        assertTrue(swift.contains("case run = \"run\""));
+        assertTrue(swift.contains("case ride = \"ride\""));
+        assertTrue(swift.contains("var kind: CN1Choice_log_workout_kind"),
+                "the parameter has to be typed as the enum or the platform still takes free text");
+        assertTrue(swift.contains("kind.rawValue"),
+                "Java declared a String, so that is what must cross");
+    }
+
+    @Test
+    void aStringWithoutOptionsStaysAPlainString() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout",
+                        "params", Arrays.asList(param("note", "string")))),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("AppEnum"));
+        assertTrue(swift.contains("var note: String"));
+    }
+
+    /// IntentResult.entity(...) writes no "value", so returning outcome.value gave Shortcuts an
+    /// empty string for a result form the API advertises as feeding a following action.
+    @Test
+    void anEntityResultIsNotReturnedAsAnEmptyString() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("find_order", "Find order")),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("value: outcome.resultValue"));
+        assertFalse(swift.contains("value: outcome.value ?? \"\""));
+    }
+
     @Test
     void anEntityParameterCrossesAsItsIdOnly() {
         String swift = intentsSwift(
@@ -258,7 +302,9 @@ class IOSAppIntentsBuilderTest {
                 new ArrayList<Map<String, Object>>());
 
         assertTrue(swift.contains("ReturnsValue<String>"), swift);
-        assertTrue(swift.contains(".result(value: outcome.value ?? \"\""), swift);
+        // resultValue is outcome.value, falling back to a returned entity's title -- see
+        // anEntityResultIsNotReturnedAsAnEmptyString.
+        assertTrue(swift.contains(".result(value: outcome.resultValue"), swift);
     }
 
     @Test

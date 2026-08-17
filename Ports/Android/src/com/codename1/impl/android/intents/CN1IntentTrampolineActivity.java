@@ -115,8 +115,19 @@ public class CN1IntentTrampolineActivity extends Activity {
                 return true;
             }
             String params = data.getQueryParameter("p");
+            // The headless flag travels in the URI rather than being looked up, because at a
+            // cold start the declaration table does not exist yet. A caller-supplied flag is
+            // only ever believed in the direction that costs nothing: claiming headless can at
+            // worst deny an intent its window, while claiming foreground for a headless intent
+            // would only ever make the app appear. The declaration overrides it the moment one
+            // exists.
+            boolean headless = "1".equals(data.getQueryParameter("h"));
+            IntentDeclaration decl = Intents.getDeclaration(id);
+            if (decl != null) {
+                headless = decl.isHeadless();
+            }
             if (!trusted) {
-                if (!Intents.getDeclarations().isEmpty()) {
+                if (decl != null || !Intents.getDeclarations().isEmpty()) {
                     // The runtime is up, so the policy can be applied now: held to what the
                     // launcher already offers, and stripped of parameters so a fabricated URI
                     // cannot choose the values a capability acts on.
@@ -129,25 +140,32 @@ public class CN1IntentTrampolineActivity extends Activity {
                     // nothing to check the request against yet. Rejecting here would break every
                     // build-time static shortcut, which is exactly the case that has no nonce.
                     // So the request is parked and re-evaluated once the declarations exist.
+                    //
+                    // Foregrounding is decided by the URI's own hint, which the build wrote.
+                    // Returning true unconditionally made the first tap after process death
+                    // visibly open the app for an intent that declared headless=true, and by
+                    // the time the parked request ran there was no undoing it.
                     AndroidIntentBridge.parkUntrustedRequest(id);
+                    if (headless) {
+                        // Something has to boot the runtime, and for a headless request that is
+                        // the service rather than the main Activity. The parked id is what
+                        // actually runs, once registerIntents has judged it.
+                        CN1IntentService.wake(this);
+                        return false;
+                    }
                     return true;
                 }
                 params = null;
-            }
-            // The headless flag travels in the URI rather than being looked up, because at a
-            // cold start the declaration table does not exist yet. It is only believed from a
-            // URI this application published: a caller-supplied flag could otherwise run an
-            // intent that expects a window in a process that has none.
-            boolean headless = trusted && "1".equals(data.getQueryParameter("h"));
-            IntentDeclaration decl = Intents.getDeclaration(id);
-            if (decl != null) {
-                headless = decl.isHeadless();
             }
             if (headless) {
                 CN1IntentService.run(this, id, params);
                 return false;
             }
-            CN1IntentService.runInProcess(id, params);
+            // Not headless: the handler may touch a Form, so it must not run until there is one.
+            // Parking it and letting onCreate foreground first is the difference between the
+            // handler seeing its own screen and seeing whatever the app was showing when it was
+            // last backgrounded -- or no window at all.
+            AndroidIntentBridge.parkForegroundRequest(id, params);
             return true;
         }
         return true;

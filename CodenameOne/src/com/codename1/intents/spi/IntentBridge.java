@@ -108,4 +108,19 @@ public interface IntentBridge {
     /// - `resultJson`: the serialized result
     /// - `images`: PNG blobs referenced by a snippet; may be empty, never null
     void completeInvocation(String token, String resultJson, Map<String, byte[]> images);
+
+    /// Asks the platform to bring the application to the foreground, and reports whether it
+    /// could.
+    ///
+    /// Called when a handler that ran without a window returns a route. The route is navigated
+    /// either way -- the `Form` is built in whatever runtime is up -- but on a headless
+    /// invocation that runtime has nothing on screen, so without this the destination is
+    /// created and never seen.
+    ///
+    /// **False is a legitimate answer, not a failure.** iOS does not let an application bring
+    /// itself forward; there, foregrounding is decided before the handler runs, by the
+    /// `openAppWhenRun` the build derives from `opensRoute`. A port that answers false is
+    /// telling the framework to say so rather than leaving the developer to discover it on a
+    /// device.
+    boolean requestForeground();
 }

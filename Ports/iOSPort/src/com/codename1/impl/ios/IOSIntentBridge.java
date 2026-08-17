@@ -77,6 +77,14 @@ final class IOSIntentBridge implements IntentBridge {
         return nativeInstance.intentsIndexingSupported();
     }
 
+    public boolean requestForeground() {
+        // iOS gives an application no way to bring itself forward, and the workarounds that
+        // appear to are rejected. Whether an intent opens the app is decided before its handler
+        // runs, by the openAppWhenRun the build derives from opensRoute. Saying so lets the
+        // framework tell the developer that rather than silently building a Form nobody sees.
+        return false;
+    }
+
     public void registerIntents(String declarationsJson) {
         nativeInstance.intentsRegister(declarationsJson);
     }

@@ -6310,6 +6310,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         com.codename1.impl.android.surfaces.AndroidSurfaceBridge.deliverPendingActions();
     }
 
+    /// Invoked once the app has started (from the generated stub, beside
+    /// `deliverPendingSurfaceActions`) to run intent requests the trampoline parked rather than
+    /// dispatched.
+    ///
+    /// A non-headless handler is allowed to touch a `Form`, so the launcher tap can only ask for
+    /// the app to be brought forward; running the handler has to wait until it is.
+    public static void deliverPendingIntentRequests() {
+        com.codename1.impl.android.intents.AndroidIntentBridge.deliverPendingForegroundRequests();
+    }
+
     /**
      * Executes r on the UI thread and blocks the EDT to completion
      * @param r runnable to execute

@@ -38,6 +38,7 @@ import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.intents.IntentSource;
 import com.codename1.intents.Intents;
 import com.codename1.intents.spi.IntentBridge;
+import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -73,6 +74,9 @@ public class AndroidIntentBridge implements IntentBridge {
     /// there even though the runtime values are fixed and public.
     private static final int API_LONG_LIVED = 29;
     private static final int API_PUSH_DYNAMIC = 30;
+    /// How long a parked foreground request waits for the app to actually appear.
+    private static final long FOREGROUND_WAIT_MILLIS = 15000L;
+    private static final long FOREGROUND_POLL_MILLIS = 50L;
 
     private final List<String> indexed = new ArrayList<String>();
     /// A cold-start request waiting for the declaration table to exist.
@@ -118,8 +122,99 @@ public class AndroidIntentBridge implements IntentBridge {
             Log.w(TAG, "Refusing the parked unauthenticated request for \"" + parked + "\"");
             return;
         }
-        // Parameters were dropped at the door, so this runs exactly as declared.
-        Intents.dispatchInvocation(parked, null, IntentSource.SHORTCUT, false, null);
+        // Parameters were dropped at the door, so this runs exactly as declared -- including
+        // its headless flag, which is only knowable now. Parking one as foreground made the
+        // first tap after process death visibly open the app for an intent that declared
+        // headless=true, and the trampoline had already foregrounded by then.
+        com.codename1.intents.IntentDeclaration decl = Intents.getDeclaration(parked);
+        boolean headless = decl != null && decl.isHeadless();
+        Intents.dispatchInvocation(parked, null, IntentSource.SHORTCUT, headless, null);
+    }
+
+    /// Requests that must not run until the app is actually in front, with the parameters the
+    /// trampoline accepted.
+    ///
+    /// A non-headless handler is allowed to touch a `Form` -- that is precisely what the flag
+    /// means -- so dispatching it the moment a launcher tap arrives runs it against a window
+    /// that does not exist yet, or against whatever the app happened to be showing when it was
+    /// backgrounded. The trampoline brings the app forward and leaves the work here.
+    private static final List<String[]> FOREGROUND = new ArrayList<String[]>();
+
+    /// Records a foreground request the trampoline has just asked the launcher to bring the app
+    /// forward for, and starts waiting for the window that request needs.
+    ///
+    /// The waiting lives here rather than in a port lifecycle callback on purpose. A hook in
+    /// `CodenameOneActivity.onResume` would be a hard reference from every Android app to this
+    /// package, which is exactly the cost this feature promises not to impose on an app that
+    /// never declares an intent.
+    static void parkForegroundRequest(String intentId, String paramsJson) {
+        if (intentId == null) {
+            return;
+        }
+        synchronized (FOREGROUND) {
+            FOREGROUND.add(new String[]{intentId, paramsJson});
+        }
+        awaitForeground();
+    }
+
+    /// Waits, off any UI thread, until the app has a window and then drains the queue.
+    ///
+    /// Bounded: if the app never comes forward -- the user dismissed it, the launch was refused
+    /// -- the request is dropped rather than firing into whatever the app is showing minutes
+    /// later. A stale capability running unannounced is worse than one that did not run.
+    private static void awaitForeground() {
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                long deadline = System.currentTimeMillis() + FOREGROUND_WAIT_MILLIS;
+                while (System.currentTimeMillis() < deadline) {
+                    if (Display.isInitialized() && Display.getInstance().getCurrent() != null
+                            && AndroidImplementation.getActivity() != null) {
+                        deliverPendingForegroundRequests();
+                        return;
+                    }
+                    try {
+                        Thread.sleep(FOREGROUND_POLL_MILLIS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+                synchronized (FOREGROUND) {
+                    if (!FOREGROUND.isEmpty()) {
+                        Log.w(TAG, "The app did not come forward; dropping "
+                                + FOREGROUND.size() + " intent request(s)");
+                        FOREGROUND.clear();
+                    }
+                }
+            }
+        }, "CN1IntentForeground");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /// Runs everything parked for the foreground. Called once the app instance exists (from the
+    /// generated stub, beside the surfaces equivalent) and again whenever it comes forward, so
+    /// both the cold start and the already-running-but-backgrounded case are covered.
+    ///
+    /// Draining twice is harmless and dropping the work is not, which is why this is idempotent
+    /// on an empty queue rather than guarded by a flag.
+    public static void deliverPendingForegroundRequests() {
+        List<String[]> drained;
+        synchronized (FOREGROUND) {
+            if (FOREGROUND.isEmpty()) {
+                return;
+            }
+            drained = new ArrayList<String[]>(FOREGROUND);
+            FOREGROUND.clear();
+        }
+        for (String[] request : drained) {
+            try {
+                Intents.dispatchInvocation(request[0], CN1IntentService.parse(request[1]),
+                        IntentSource.SHORTCUT, false, null);
+            } catch (Throwable t) {
+                Log.w(TAG, "Could not run a foreground intent request", t);
+            }
+        }
     }
 
     /// Records a request that arrived before the declarations existed. Only the id is kept:
@@ -133,6 +228,26 @@ public class AndroidIntentBridge implements IntentBridge {
             // not two things to run.
             PARKED.clear();
             PARKED.add(intentId);
+        }
+    }
+
+    public boolean requestForeground() {
+        Context ctx = context();
+        if (ctx == null) {
+            return false;
+        }
+        try {
+            Intent launch = ctx.getPackageManager()
+                    .getLaunchIntentForPackage(ctx.getPackageName());
+            if (launch == null) {
+                return false;
+            }
+            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            ctx.startActivity(launch);
+            return true;
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not bring the app forward", t);
+            return false;
         }
     }
 

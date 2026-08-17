@@ -75,6 +75,21 @@ public class JavaSEIntentBridge implements IntentBridge {
         return true;
     }
 
+    public boolean requestForeground() {
+        // The simulator's window is the app, and it is already on screen. Answering true keeps
+        // the developer seeing what a headless routed result does on the platform that supports
+        // it, rather than the diagnostic for the platform that does not.
+        foregroundRequests++;
+        return true;
+    }
+
+    /// How many times a handler asked for the app to be brought forward, for the Intents window.
+    public int getForegroundRequestCount() {
+        return foregroundRequests;
+    }
+
+    private int foregroundRequests;
+
     public void registerIntents(String json) {
         synchronized (lock) {
             declarationsJson = json;

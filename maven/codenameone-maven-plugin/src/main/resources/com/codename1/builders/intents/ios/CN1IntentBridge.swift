@@ -200,11 +200,31 @@ public struct CN1IntentOutcome {
         // Typing this properly needs the declaration to state a return type, which is a
         // deliberate future addition rather than something derivable from what exists today.
         self.snippet = doc["snippet"] as? [String: Any]
+        self.entity = doc["entity"] as? [String: Any]
         if let v = doc["value"] {
             self.value = String(describing: v)
         } else {
             self.value = nil
         }
+    }
+
+    /// The entity a handler returned through `IntentResult.entity(...)`, or nil.
+    public let entity: [String: Any]?
+
+    /// The value a following Shortcuts action receives.
+    ///
+    /// An entity result has no `value` of its own, and returning an empty string for it made
+    /// `IntentResult.entity(...)` look like it did nothing. Its title is what a person would
+    /// recognise, so that is what is handed on. A typed `AppEntity` return would need the
+    /// declaration to name one entity type as the intent's return type, which it does not --
+    /// the same reason `value` is reduced to text above.
+    public var resultValue: String {
+        if let v = value, !v.isEmpty { return v }
+        if let e = entity {
+            if let title = e["title"] as? String, !title.isEmpty { return title }
+            if let id = e["id"] as? String { return id }
+        }
+        return ""
     }
 
     /// What the assistant says. Falls back to the failure message so an error is never silent.

@@ -420,7 +420,17 @@ public final class Intents {
         // MODEL-only capability as a launcher shortcut or a predictable activity would expose
         // exactly what it opted out of. The static builders filter this; so must the runtime.
         IntentDeclaration decl = getDeclaration(intentId);
-        if (decl != null && !decl.isExposedTo(Exposure.ASSISTANT)) {
+        if (decl == null) {
+            // A donation is a durable publication: Android persists a shortcut and iOS records
+            // an activity the system may suggest for weeks. Publishing one for an id nothing
+            // declares produces a launcher entry or a Siri suggestion that opens the app and
+            // does nothing, and there is no later moment at which that gets cleaned up. A typo
+            // in an id is the ordinary way to get here.
+            logDiagnostic("Ignoring a donation for \"" + intentId
+                    + "\", which no @AppIntent declares and no dynamic intent registers");
+            return;
+        }
+        if (!decl.isExposedTo(Exposure.ASSISTANT)) {
             return;
         }
         try {
@@ -951,7 +961,8 @@ public final class Intents {
             return;
         }
         String url = r.getOpenUrl();
-        if (url == null || url.length() == 0) {
+        boolean fromResult = url != null && url.length() > 0;
+        if (!fromResult) {
             // The handler named no route, but the declaration may have. That is the whole point
             // of opensRoute: a handler can return ok() and still be an "open the app here"
             // intent, and without expanding the template the app foregrounds onto whatever
@@ -961,12 +972,42 @@ public final class Intents {
         if (url == null || url.length() == 0) {
             return;
         }
+        // A declared opensRoute has already brought the app forward -- that is what the flag is
+        // for. A route the handler decided on at runtime has not, and if it ran headless the
+        // destination would otherwise be built somewhere nobody can see.
+        if (fromResult && decl != null && decl.isHeadless()) {
+            requestForeground(decl);
+        }
         try {
             // Marshals to the EDT itself and is a no-op when no route matches.
             com.codename1.router.Navigation.dispatchExternalUrl(url);
         } catch (Throwable t) {
             logError(t);
         }
+    }
+
+    /// Asks the port to bring the app forward for a route the handler chose at runtime, and
+    /// says so plainly when the platform will not.
+    private static void requestForeground(IntentDeclaration decl) {
+        IntentBridge b = bridgeInternal();
+        if (b == null) {
+            return;
+        }
+        try {
+            if (b.requestForeground()) {
+                return;
+            }
+        } catch (Throwable t) {
+            logError(t);
+            return;
+        }
+        // iOS is the case that reaches here: an app cannot bring itself forward, so whether it
+        // does is fixed before the handler runs. Naming the fix is the useful part -- declaring
+        // opensRoute is what sets openAppWhenRun, and it works on every platform.
+        logDiagnostic("\"" + decl.getId() + "\" ran headless and returned a route, but this "
+                + "platform does not let an app foreground itself, so the destination will not "
+                + "be shown. Declare opensRoute on the @AppIntent to have the platform open the "
+                + "app for it.");
     }
 
     /// Fills a declared route template from the values the intent ran with, or returns null
@@ -1024,6 +1065,18 @@ public final class Intents {
             // Nothing useful is left to do: the reporting path is the thing that
             // is broken. Losing the log entry is strictly better than losing the
             // result the caller is waiting for.
+        }
+    }
+
+    /// Reports a request the framework declined to act on.
+    ///
+    /// Guarded the same way as [#logError]: `Log.p` reaches for the Display, which a headless
+    /// invocation may not have started yet.
+    private static void logDiagnostic(String message) {
+        try {
+            Log.p("[intents] " + message, Log.WARNING);
+        } catch (Throwable ignored) {
+            // See logError: the reporting path failing must not fail the caller.
         }
     }
 

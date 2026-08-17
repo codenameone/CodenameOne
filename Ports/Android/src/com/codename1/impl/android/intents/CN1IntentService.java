@@ -89,6 +89,23 @@ public class CN1IntentService extends IntentService {
         Intents.dispatchInvocation(intentId, parse(paramsJson), IntentSource.SHORTCUT, false, null);
     }
 
+    /// Boots the runtime without running anything, so a request parked at a cold start gets
+    /// judged and dispatched by `AndroidIntentBridge.registerIntents`.
+    ///
+    /// This exists for the one case the trampoline cannot decide by itself: a build-time static
+    /// shortcut declaring `headless=true`. It carries no nonce -- there was no runtime at build
+    /// time to mint one -- so the id has to be parked, and parking it used to mean foregrounding
+    /// the app to get a runtime, which is exactly what a headless intent promises not to do.
+    public static void wake(Context ctx) {
+        try {
+            Intent svc = new Intent(ctx, CN1IntentService.class);
+            svc.setData(Uri.parse(SCHEME + "://wake"));
+            ctx.startService(svc);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not start the intent service", t);
+        }
+    }
+
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent == null || intent.getDataString() == null) {
@@ -97,6 +114,7 @@ public class CN1IntentService extends IntentService {
         Uri data = Uri.parse(intent.getDataString());
         final String id = data.getQueryParameter("id");
         if (id == null) {
+            wakeRuntime();
             return;
         }
         if (!Display.isInitialized()) {
@@ -118,6 +136,39 @@ public class CN1IntentService extends IntentService {
             Thread.currentThread().interrupt();
         } catch (Throwable t) {
             Log.e(TAG, "Intent " + id + " failed", t);
+        } finally {
+            if (shouldStopContext) {
+                AndroidImplementation.stopContext(this);
+            }
+        }
+    }
+
+    /// Starts the runtime and holds the service open long enough for the framework to install
+    /// its dispatcher and run whatever was parked.
+    ///
+    /// The wait is on the parked work actually leaving the queue rather than on a fixed sleep,
+    /// with a bound for the case where the request is refused and nothing ever runs.
+    private void wakeRuntime() {
+        if (Display.isInitialized()) {
+            // Already up, so registerIntents has already run; nothing was waiting on this.
+            return;
+        }
+        shouldStopContext = true;
+        try {
+            AndroidImplementation.startContext(this);
+            long deadline = System.currentTimeMillis()
+                    + (DEFAULT_BUDGET_SECONDS + BACKSTOP_MARGIN_SECONDS) * 1000L;
+            while (System.currentTimeMillis() < deadline
+                    && Intents.getDeclarations().isEmpty()) {
+                Thread.sleep(50);
+            }
+            // The parked request dispatches from registerIntents on the framework's own thread;
+            // this margin is what keeps the service alive across it.
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Throwable t) {
+            Log.e(TAG, "Could not start the runtime for a parked request", t);
         } finally {
             if (shouldStopContext) {
                 AndroidImplementation.stopContext(this);
@@ -196,7 +247,8 @@ public class CN1IntentService extends IntentService {
         }
     }
 
-    private static Map<String, Object> parse(String json) {
+    /// Shared with the bridge's foreground queue, which decodes the same payload.
+    static Map<String, Object> parse(String json) {
         if (json == null || json.length() == 0) {
             return null;
         }
