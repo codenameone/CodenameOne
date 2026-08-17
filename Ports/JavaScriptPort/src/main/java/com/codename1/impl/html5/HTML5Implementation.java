@@ -4473,6 +4473,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // otherwise convertToPixels() keeps answering in the old density's units while
                 // getDeviceDensity() reports the new one.
                 ppi = 0;
+                // Copied from when a font carries no height of its own, so it has to be current
+                // before any of those copies are taken.
+                if (defaultFont != null) {
+                    defaultFont.syncDensity();
+                }
                 themeGeneration++;
                 refreshThemeIfStale(getCurrentForm());
             }
@@ -5756,6 +5761,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         boolean password = (constraint & TextArea.PASSWORD) != 0;
         boolean sensitive = (constraint & TextArea.SENSITIVE) != 0
                 || (constraint & TextArea.NON_PREDICTIVE) != 0;
+        boolean username = (constraint & TextArea.USERNAME) != 0;
 
         String resolvedType = "text";
         if (password) {
@@ -5807,6 +5813,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
             autocomplete = "off";
         } else if (password) {
             autocomplete = "current-password";
+        } else if (username) {
+            // Ahead of the address-style tokens: an application that marks a field as the
+            // username has said what it is for, and a password manager needs that token to
+            // pair it with the password field rather than treating the two as unrelated. An
+            // email address used as a username is still the username here.
+            autocomplete = "username";
         } else if (base == TextArea.EMAILADDR) {
             autocomplete = "email";
         } else if (base == TextArea.PHONENUMBER) {
@@ -9277,6 +9289,38 @@ public class HTML5Implementation extends CodenameOneImplementation {
             + "if (density) return parseInt(density); else return 0;")
     private native static int getDensityOverride();
     
+    /**
+     * How much a font is scaled for the display's density.
+     *
+     * <p>Font heights are kept in device pixels, so the factor in force when a font was made is
+     * part of what its height means. It is read back when a font is used, because the display's
+     * density can change under a running application -- a browser zoom, or a window dragged to
+     * another screen.</p>
+     *
+     * @return the multiplier applied to the base font size
+     */
+    private double fontDensityFactor() {
+        switch (getDeviceDensity()) {
+            case Display.DENSITY_LOW:
+            case Display.DENSITY_VERY_LOW:
+                return 0.5;
+            case Display.DENSITY_HIGH:
+                return 1.5;
+            case Display.DENSITY_VERY_HIGH:
+                return 2;
+            case Display.DENSITY_HD:
+                return 3;
+            case Display.DENSITY_560:
+                return 4;
+            case Display.DENSITY_2HD:
+                return 5;
+            case Display.DENSITY_4K:
+                return 6;
+            default:
+                return 1;
+        }
+    }
+
     @Override
     public Object createFont(int face, int style, int size) {
         
@@ -9284,23 +9328,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (height == 0) {
             height = 16;
         }
-        switch (getDeviceDensity()) {
-            case Display.DENSITY_LOW:
-            case Display.DENSITY_VERY_LOW:
-                height = height/2; break;
-            case Display.DENSITY_HIGH:
-                height = height + height/2; break;
-            case Display.DENSITY_VERY_HIGH:
-                height = height * 2; break;
-            case Display.DENSITY_HD:
-                height = height * 3; break;
-            case Display.DENSITY_560:
-                height = height * 4; break;
-            case Display.DENSITY_2HD:
-                height = height * 5; break;
-            case Display.DENSITY_4K:
-                height = height * 6; break; 
-        }
+        height = (int) (height * fontDensityFactor());
         int diff = height / 3;
 
         switch (size) {
@@ -11655,8 +11683,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
         double height;
         String fileName;
         String fontName;
+        // The density this font's height was measured against. A height is in device pixels,
+        // so it only means anything alongside the density in force when it was worked out.
+        double densityFactor = fontDensityFactor();
         
         String cssCached_, cssFontFamilyCached__;
+
+        /**
+         * Brings the height up to the current display density.
+         *
+         * <p>A browser zoom or a move to another screen changes the density under a font that
+         * has already been created and handed to a style. Left alone, its height stays in the
+         * old display's pixels while everything drawn with it is divided by the new ratio, so
+         * text comes out at the wrong size -- half of it, going from a 1x display to a 2x one.
+         * Styles hold their fonts, and the theme holds the ones it loaded, so there is no
+         * single place to recreate them: each brings itself up to date as it is used.</p>
+         */
+        void syncDensity() {
+            double current = fontDensityFactor();
+            if (current <= 0 || densityFactor <= 0 || current == densityFactor) {
+                return;
+            }
+            double scale = current / densityFactor;
+            height = height * scale;
+            ascent = (int) Math.round(ascent * scale);
+            densityFactor = current;
+            cssCached_ = null;
+        }
         
         public int fontLeading() {
             return (int)Math.ceil(determineFontLeading(getCSS()));
@@ -11783,6 +11836,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public String getCSS(){
+            syncDensity();
             if (cssCached_ == null) {
                 StringBuilder sb = new StringBuilder();
                 //sb.append(height).append("px ");
@@ -11806,7 +11860,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         
         public String getScaledCSS(){
-            
+            syncDensity();
             StringBuilder sb = new StringBuilder();
             //sb.append(height).append("px ");
             //if ((style & Font.STYLE_ITALIC) != 0) {
