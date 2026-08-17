@@ -141,6 +141,11 @@ public struct CN1EntityValue {
 /// compile on whatever deployment target the application chose. Only the generated App Intents
 /// declarations reference it, and those carry the same fence.
 #if canImport(AppIntents)
+// canImport only tests availability; the module still has to be imported, and the import in the
+// separately generated CN1AppIntents.swift is file-scoped, so without this the protocol below
+// is undefined and this file does not compile.
+import AppIntents
+
 @available(iOS 16.0, *)
 public struct CN1IntentFailure: Error, CustomLocalizedStringResourceConvertible {
     public let message: String

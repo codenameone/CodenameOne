@@ -626,6 +626,91 @@ class IntentsTest {
         }
     }
 
+    @Test
+    void onlyModelExposedIntentsBecomeTools() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("assistant_only"));
+        d.declarations.add(new IntentDeclaration("model_one", "Model", "Does a thing", true,
+                true, false, "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(), Arrays.asList(Exposure.MODEL)));
+        Intents.setDispatcher(d);
+
+        java.util.List<com.codename1.ai.Tool> tools = Intents.asTools();
+
+        assertEquals(1, tools.size(), "a model must not reach an intent that never opted in");
+        assertEquals("model_one", tools.get(0).getName());
+        assertEquals("Does a thing", tools.get(0).getDescription());
+    }
+
+    @Test
+    void aToolSchemaDescribesTheDeclaredParameters() {
+        IntentParameterInfo kind = new IntentParameterInfo("kind", "What kind?",
+                IntentParameterType.STRING, true, null, null, Arrays.asList("run", "ride"));
+        IntentParameterInfo minutes = new IntentParameterInfo("minutes", "How long?",
+                IntentParameterType.INTEGER, false, null, null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("log_workout", "Log", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(kind, minutes),
+                Arrays.asList(Exposure.MODEL)));
+        Intents.setDispatcher(d);
+
+        Map schema = parse(Intents.asTools().get(0).getParametersJsonSchema());
+        Map props = (Map) schema.get("properties");
+
+        assertEquals("integer", ((Map) props.get("minutes")).get("type"));
+        assertNotNull(((Map) props.get("kind")).get("enum"), "a closed vocabulary is offered");
+        // Only the required one is listed, so the model may omit the other.
+        assertEquals(1, ((List) schema.get("required")).size());
+    }
+
+    @Test
+    void aToolRunsTheIntentAndReturnsItsSerializedResult() throws Exception {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(), Arrays.asList(Exposure.MODEL)));
+        d.next = IntentResult.value("A-42").withDialog("done");
+        Intents.setDispatcher(d);
+
+        String json = Intents.asTools().get(0).invoke("{\"size\":\"large\"}");
+
+        assertEquals(Arrays.asList("known"), d.invoked);
+        assertEquals("large", d.lastParams.get("size"));
+        Map doc = parse(json);
+        assertEquals("A-42", doc.get("value"));
+        assertEquals("done", doc.get("dialog"));
+    }
+
+    @Test
+    void aRouteValueIsEncodedSoItCannotChangeTheUrlStructure() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", false, true, false,
+                    "/orders/{orderId}", 5, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.ok();
+            Intents.setDispatcher(d);
+
+            Map<String, Object> params = new HashMap<String, Object>();
+            params.put("orderId", "a/b");
+            Intents.invoke("known", params);
+
+            assertEquals(1, navigated.size());
+            assertFalse(navigated.get(0).contains("orders/a/b"),
+                    "an unencoded slash adds a path segment and stops matching the route");
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
     // ------------------------------------------------------------------
     // AppEntity queries
     // ------------------------------------------------------------------

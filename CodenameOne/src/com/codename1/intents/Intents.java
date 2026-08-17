@@ -22,7 +22,10 @@
  */
 package com.codename1.intents;
 
+import com.codename1.ai.Tool;
+import com.codename1.ai.ToolHandler;
 import com.codename1.intents.spi.IntentBridge;
+import com.codename1.io.JSONWriter;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
 
@@ -527,6 +530,114 @@ public final class Intents {
     }
 
     // ------------------------------------------------------------------
+    // Language-model projection
+    // ------------------------------------------------------------------
+
+    /// The intents that opted into [Exposure#MODEL], projected down to
+    /// `com.codename1.ai.Tool` so they can be handed to a language model or an MCP host.
+    ///
+    /// Nothing is exposed by calling this. It returns descriptions; the application decides
+    /// whether to give them to a model, which is deliberately a separate act from declaring the
+    /// intent, because a model calls a capability because it inferred it should rather than
+    /// because a person asked by name.
+    ///
+    /// The projection is one-way and lossy on purpose. A `Tool` is stringly typed -- a JSON
+    /// schema in, a JSON string out -- which is right for a model and wrong for the platform,
+    /// where entity types let the system run its own picker before the handler is reached. So
+    /// the richer declaration projects down to the weaker one, never the reverse.
+    ///
+    /// #### Returns
+    ///
+    /// one tool per model-exposed intent, never null
+    public static List<Tool> asTools() {
+        List<Tool> out = new ArrayList<Tool>();
+        for (IntentDeclaration d : getDeclarations()) {
+            if (!d.isExposedTo(Exposure.MODEL)) {
+                continue;
+            }
+            out.add(new Tool(d.getId(), toolDescription(d), toolSchema(d), new IntentTool(d)));
+        }
+        return out;
+    }
+
+    private static String toolDescription(IntentDeclaration d) {
+        String description = d.getDescription();
+        if (description != null && description.length() > 0) {
+            return description;
+        }
+        return d.getTitle();
+    }
+
+    /// Builds the JSON schema a model needs. Entity parameters are described as strings,
+    /// because that is what crosses the boundary: the id, which the handler resolves.
+    private static String toolSchema(IntentDeclaration d) {
+        Map<String, Object> properties = new LinkedHashMap<String, Object>();
+        List<Object> required = new ArrayList<Object>();
+        for (IntentParameterInfo p : d.getParameters()) {
+            Map<String, Object> prop = new LinkedHashMap<String, Object>();
+            prop.put("type", schemaType(p.getType()));
+            prop.put("description", p.getTitle());
+            if (!p.getOptions().isEmpty()) {
+                prop.put("enum", new ArrayList<Object>(p.getOptions()));
+            }
+            if (p.getType() == IntentParameterType.ENTITY) {
+                prop.put("description", p.getTitle() + " (the id of a "
+                        + p.getEntityType() + ")");
+            }
+            properties.put(p.getName(), prop);
+            if (p.isRequired()) {
+                required.add(p.getName());
+            }
+        }
+        Map<String, Object> schema = new LinkedHashMap<String, Object>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        if (!required.isEmpty()) {
+            schema.put("required", required);
+        }
+        return JSONWriter.toJson(schema);
+    }
+
+    private static String schemaType(IntentParameterType type) {
+        if (type == IntentParameterType.INTEGER) {
+            return "integer";
+        }
+        if (type == IntentParameterType.NUMBER) {
+            return "number";
+        }
+        if (type == IntentParameterType.BOOLEAN) {
+            return "boolean";
+        }
+        // Dates cross as epoch millis but read better to a model as text it can produce.
+        return "string";
+    }
+
+    /// Runs one intent on behalf of a model.
+    ///
+    /// Named rather than anonymous because it holds the declaration it belongs to, and because
+    /// the iOS translator's dead-code elimination is easier to reason about with a real type.
+    private static final class IntentTool implements ToolHandler {
+        private final IntentDeclaration declaration;
+
+        IntentTool(IntentDeclaration declaration) {
+            this.declaration = declaration;
+        }
+
+        @Override
+        public String invoke(String argumentsJson) throws Exception {
+            Map<String, Object> args = null;
+            if (argumentsJson != null && argumentsJson.length() > 0) {
+                args = com.codename1.io.JSONParser.parseJSON(argumentsJson);
+            }
+            IntentContext ctx = new IntentContext(IntentSource.MODEL, false,
+                    System.currentTimeMillis() + declaration.getTimeoutSeconds() * 1000L);
+            IntentResult r = invokeInternal(declaration.getId(), args, ctx);
+            Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
+            return IntentSerializer.serializeResult(r, images);
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Search-result selection
     // ------------------------------------------------------------------
 
@@ -852,7 +963,10 @@ public final class Intents {
                 // navigating at all.
                 return null;
             }
-            out.append(value);
+            // Encoded, because a value is data and the template is structure. An id
+            // containing "/" would otherwise add a path segment and stop matching the route it
+            // was built for, and "?" or "#" would invent a query or a fragment.
+            out.append(com.codename1.io.Util.encodeUrl(String.valueOf(value)));
             i = close + 1;
         }
         return out.toString();

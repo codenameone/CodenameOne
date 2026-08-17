@@ -77,8 +77,6 @@ public class AndroidIntentBridge implements IntentBridge {
     private final List<String> indexed = new ArrayList<String>();
     /// A cold-start request waiting for the declaration table to exist.
     private static final List<String> PARKED = new ArrayList<String>();
-    /// Thumbnails for the index call in progress, keyed by the name embedded in its JSON.
-    private Map<String, byte[]> pendingImages;
 
     public boolean areIntentsSupported() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1;
@@ -171,9 +169,12 @@ public class AndroidIntentBridge implements IntentBridge {
 
     public void index(String entitiesJson, Map<String, byte[]> images) {
         // The images map is the only place an entity's thumbnail exists -- the JSON carries the
-        // name it was registered under, not the bytes -- so dropping it left every entry
-        // showing the application icon.
-        this.pendingImages = images;
+        // name it was registered under, not the bytes.
+        //
+        // Carried through the loop as a parameter rather than staged on the instance: two
+        // background threads indexing at once would otherwise have the second overwrite the
+        // field between the first parsing its JSON and reading its blobs, so the first would
+        // publish the other request's thumbnails or none.
         if (!isIndexingSupported()) {
             return;
         }
@@ -204,7 +205,7 @@ public class AndroidIntentBridge implements IntentBridge {
                     openUri += "&n=" + Uri.encode(nonce);
                 }
                 pushShortcut(ctx, uid, title, subtitle, Uri.parse(openUri),
-                        imageFor(imageName));
+                        imageFor(images, imageName));
                 synchronized (indexed) {
                     if (!indexed.contains(uid)) {
                         indexed.add(uid);
@@ -412,9 +413,8 @@ public class AndroidIntentBridge implements IntentBridge {
 
     /// Builds the shortcut URI. The headless flag rides along so the trampoline can route a
     /// cold-start tap without the declaration table, which does not exist yet at that point.
-    /// The staged bytes for a name the serializer embedded, or null.
-    private byte[] imageFor(String name) {
-        Map<String, byte[]> images = pendingImages;
+    /// The bytes for a name the serializer embedded, from this request's own map.
+    private static byte[] imageFor(Map<String, byte[]> images, String name) {
         if (name == null || images == null) {
             return null;
         }
