@@ -103,10 +103,17 @@ public abstract class WindowHostTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
         if (!Desktop.isSupported()) {
-            // Not a failure: this platform has no windowing system, and the suite
-            // deliberately emits no golden for it.
-            println("CN1SS:INFO:test=" + baseImageName()
-                    + " message=multi-window unsupported on this platform, skipping");
+            // Reported as SKIPPED, not as a pass. This platform has no windowing
+            // system and emits no golden, and a pass here would put a tick against
+            // multi-window on the public port status table for a port that cannot
+            // open a window at all.
+            // Named by test class, not by golden name: the skip marker is parsed
+            // with [A-Za-z0-9_]+, which the hyphenated screenshot names would not
+            // match, and an unmatched marker is silently dropped -- leaving the
+            // very pass this is here to avoid.
+            println("CN1SS:INFO:test=" + getClass().getName().substring(
+                    getClass().getName().lastIndexOf('.') + 1)
+                    + " status=SKIPPED reason=no-windowing-system");
             done();
             return true;
         }
