@@ -361,7 +361,8 @@ class AndroidCipherDB extends Database {
      * versioning or file identification would otherwise silently come back at zero. auto_vacuum
      * is carried too, and before the export rather than after it: SQLite fixes that one in the
      * header when the first table is created, so a database that vacuumed itself would come back
-     * never doing so again, retaining every page it deleted.
+     * never doing so again, retaining every page it deleted. journal_mode goes back afterwards,
+     * because WAL cannot be entered from inside the transaction the export runs in.
      *
      * The new database is built beside the old one and swapped in only once it is complete. The
      * original is renamed aside rather than deleted, so a complete database exists under one of
@@ -376,6 +377,38 @@ class AndroidCipherDB extends Database {
         } finally {
             c.close();
         }
+    }
+
+    /**
+     * The journal mode of the database being converted, or null when it is not one this can
+     * safely put back.
+     *
+     * <p>A name, not a number, and it goes into the SQL text of a PRAGMA -- so it is matched
+     * against the modes SQLite defines rather than passed through. A value this does not
+     * recognize means the mode is left at the target's default, which is worth strictly more
+     * than interpolating whatever came back into a statement.
+     *
+     * <p>"memory" and "off" are deliberately not restored: both trade durability for speed on a
+     * database whose contents this method is in the middle of copying, and neither is a state a
+     * conversion should quietly install.
+     */
+    private String readJournalMode() {
+        android.database.Cursor c = db.rawQuery("PRAGMA journal_mode", null);
+        String mode;
+        try {
+            mode = c.moveToFirst() ? c.getString(0) : null;
+        } finally {
+            c.close();
+        }
+        if (mode == null) {
+            return null;
+        }
+        String lower = mode.toLowerCase();
+        if ("delete".equals(lower) || "truncate".equals(lower) || "persist".equals(lower)
+                || "wal".equals(lower)) {
+            return lower;
+        }
+        return null;
     }
 
     /**
@@ -474,6 +507,7 @@ class AndroidCipherDB extends Database {
             userVersion = readHeaderPragma("PRAGMA user_version");
             applicationId = readHeaderPragma("PRAGMA application_id");
             int autoVacuum = readHeaderPragma("PRAGMA auto_vacuum");
+            String journalMode = readJournalMode();
             db.execSQL("ATTACH DATABASE " + toPragmaLiteral(target.getPath())
                     + " AS cn1migrate KEY " + toPragmaLiteral(targetKey));
             // Before the export, unlike the two pragmas below, because this one cannot be set
@@ -494,6 +528,15 @@ class AndroidCipherDB extends Database {
             }
             db.execSQL("PRAGMA cn1migrate.user_version = " + userVersion);
             db.execSQL("PRAGMA cn1migrate.application_id = " + applicationId);
+            if (journalMode != null) {
+                // After the export, unlike auto_vacuum: the journal mode is settable at any point
+                // in a database's life, and WAL in particular cannot be entered from inside a
+                // transaction, which is where the export runs. Persistent in the header like the
+                // others, and not carried by sqlcipher_export -- so a database an application put
+                // into WAL once came back in DELETE mode after a key change, losing the reader
+                // and writer concurrency it was relying on and taking new lock failures with it.
+                db.execSQL("PRAGMA cn1migrate.journal_mode = " + journalMode);
+            }
             db.execSQL("DETACH DATABASE cn1migrate");
         } catch (RuntimeException err) {
             // Detach before giving up. A caller that catches this and carries on with the same
