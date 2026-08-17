@@ -157,6 +157,11 @@ final class SmartHomeManifestFragments {
      */
     static String[] availabilityOnlyCalls() {
         return new String[] {
+            // getInstance first, because every call goes through it: an app
+            // that only probes availability calls getInstance() and
+            // getAvailability(), and the scanner reports both -- so leaving
+            // it out made the entitlement-free probe demand the entitlement.
+            "getInstance",
             "getAvailability", "isSupported", "getBackend",
             "getConfigurationProblems", "areIdsPersistent",
             "isAutomationSupported", "getAuthorizationStatus",
