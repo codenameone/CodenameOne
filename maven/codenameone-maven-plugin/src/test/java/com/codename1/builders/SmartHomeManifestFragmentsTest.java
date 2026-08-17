@@ -118,6 +118,12 @@ public class SmartHomeManifestFragmentsTest {
         assertTrue(SmartHomeManifestFragments.isAccessoryDataCall(
                 "executeScene"));
         assertTrue(SmartHomeManifestFragments.isAccessoryDataCall("identify"));
+        // A method nobody has classified counts as data access. The list is a
+        // blacklist of the availability-only calls, so a method added to
+        // SmartHome later cannot quietly build without the entitlement and
+        // then fail every accessory call on the device.
+        assertTrue(SmartHomeManifestFragments.isAccessoryDataCall(
+                "someMethodAddedNextYear"));
         assertTrue(SmartHomeManifestFragments.isAccessoryDataCall(
                 "drainChanges"));
     }

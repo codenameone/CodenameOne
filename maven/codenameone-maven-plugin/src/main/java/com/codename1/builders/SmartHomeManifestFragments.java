@@ -118,22 +118,30 @@ final class SmartHomeManifestFragments {
      * @return true when the call implies reading or writing accessory state
      */
     static boolean isAccessoryDataCall(String method) {
-        if (method == null) {
+        if (method == null || method.length() == 0) {
+            // No method observed at all, which is not the same as one this
+            // list has not heard of: there is nothing to classify, and
+            // demanding an entitlement for it would be a build failure caused
+            // by a blank string.
             return false;
         }
-        return method.startsWith("read")
-                || method.startsWith("write")
-                || method.startsWith("subscribe")
-                || method.startsWith("drainChanges")
-                || method.startsWith("executeScene")
-                || method.startsWith("createScene")
-                || method.startsWith("deleteScene")
-                || method.startsWith("identify")
-                || method.startsWith("getStructures")
-                || method.startsWith("getPrimaryStructure")
-                || method.startsWith("findAccessory")
-                || method.startsWith("refresh")
-                || method.startsWith("requestAuthorization");
+        // Everything EXCEPT the availability-only list, rather than a list of
+        // the calls that count. The two readings fail in opposite directions
+        // and only one of them is recoverable: a method this list has not
+        // heard of is most likely a new one that touches the graph, and
+        // guessing "not data" ships an app that codesigns cleanly and then
+        // fails every accessory call on the device. Guessing "data" costs a
+        // build error naming the entitlement, which the developer can act on.
+        //
+        // It also means adding a method to SmartHome cannot silently widen
+        // what builds without the entitlement: it has to be put on the
+        // availability-only list deliberately.
+        for (String safe : availabilityOnlyCalls()) {
+            if (safe.equals(method)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

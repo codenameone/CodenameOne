@@ -29,6 +29,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,6 +42,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * makes them worth pinning: a cloud build would report success either way.</p>
  */
 public class MatterExtensionBuilderTest {
+
+    /** The containing app's versions, which the extension has to echo. */
+    private static final String SHORT_VERSION = "2.4";
+    private static final String BUNDLE_VERSION = "17";
 
     private static final String PACKAGE = "com.example.lights";
     private static final String GROUP = "group.com.example.lights";
@@ -57,7 +62,7 @@ public class MatterExtensionBuilderTest {
     public void theExtensionCarriesItsHandlerPlistAndEntitlements()
             throws Exception {
         Map<String, byte[]> files =
-                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights");
+                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION);
         assertEquals(3, files.size(), files.keySet().toString());
         assertNotNull(files.get("RequestHandler.swift"));
         assertNotNull(files.get("Info.plist"));
@@ -73,10 +78,47 @@ public class MatterExtensionBuilderTest {
     @Test
     public void thePlistNamesApplesAddDeviceExtensionPoint() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights"), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         assertTrue(plist.contains(
                 "com.apple.matter.support.extension.device-setup"), plist);
         assertTrue(plist.contains("NSExtensionPointIdentifier"), plist);
+    }
+
+    /**
+     * An extension's versions must equal its containing app's, or archive
+     * validation rejects the bundle -- for every release that is not
+     * literally 1.0, which is every release after the first.
+     */
+    @Test
+    public void theExtensionEchoesTheHostVersions() throws Exception {
+        String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
+        assertTrue(plist.contains("<string>" + SHORT_VERSION + "</string>"),
+                plist);
+        assertTrue(plist.contains("<string>" + BUNDLE_VERSION + "</string>"),
+                plist);
+        assertFalse(plist.contains("<string>1.0</string>"),
+                "the hard-coded marketing version must be gone: " + plist);
+    }
+
+    /**
+     * The overrides have to match MatterSupport's own signatures exactly, and
+     * nothing in a Codename One build compiles this file until a customer
+     * runs a commissioning build -- so a wrong type here is a defect that
+     * only ever surfaces on somebody else's machine.
+     */
+    @Test
+    public void theHandlerUsesMatterSupportsAssociationTypes()
+            throws Exception {
+        String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
+                "Lights", SHORT_VERSION, BUNDLE_VERSION),
+                "RequestHandler.swift");
+        assertTrue(swift.contains("WiFiNetworkAssociation"), swift);
+        assertTrue(swift.contains("ThreadNetworkAssociation"), swift);
+        // The names that do not exist, spelled out so this fails loudly if
+        // somebody "simplifies" them back.
+        assertFalse(swift.contains(".WiFiAssociation"), swift);
+        assertFalse(swift.contains(".ThreadAssociation"), swift);
     }
 
     /**
@@ -91,7 +133,7 @@ public class MatterExtensionBuilderTest {
     public void thePlistCarriesTheBundleKeysXcodeDoesNotMergeIn()
             throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights"), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         assertTrue(plist.contains("<key>CFBundleExecutable</key>"), plist);
         assertTrue(plist.contains("$(EXECUTABLE_NAME)"), plist);
         assertTrue(plist.contains("<key>CFBundleIdentifier</key>"), plist);
@@ -110,7 +152,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void thePrincipalClassIsModuleQualified() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights"), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         assertTrue(plist.contains(
                 "$(PRODUCT_MODULE_NAME).RequestHandler"), plist);
     }
@@ -118,7 +160,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void thePlistIsAnExtensionBundle() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights"), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         assertTrue(plist.contains("<string>XPC!</string>"), plist);
     }
 
@@ -129,7 +171,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void theEntitlementsCarryTheSharedAppGroup() throws Exception {
         String entitlements = text(
-                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights"),
+                MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION),
                 MatterExtensionBuilder.EXTENSION_NAME + ".entitlements");
         assertTrue(entitlements.contains(
                 "com.apple.security.application-groups"), entitlements);
@@ -160,7 +202,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void theHandlerImplementsApplesProtocol() throws Exception {
         String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights"), "RequestHandler.swift");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "RequestHandler.swift");
         assertTrue(swift.contains("import MatterSupport"), swift);
         assertTrue(swift.contains(
                 "MatterAddDeviceExtensionRequestHandler"), swift);
@@ -178,7 +220,7 @@ public class MatterExtensionBuilderTest {
     @Test
     public void aDisplayNameWithMarkupInItIsEscaped() throws Exception {
         String plist = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Tom & Jerry <Home>"), "Info.plist");
+                "Tom & Jerry <Home>", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         assertTrue(plist.contains("Tom &amp; Jerry &lt;Home&gt;"), plist);
     }
 
@@ -190,9 +232,9 @@ public class MatterExtensionBuilderTest {
     @Test
     public void generationIsDeterministic() throws Exception {
         String first = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
-                "Lights"), "Info.plist");
+                "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         String second = text(MatterExtensionBuilder.buildFileMap(PACKAGE,
-                GROUP, "Lights"), "Info.plist");
+                GROUP, "Lights", SHORT_VERSION, BUNDLE_VERSION), "Info.plist");
         assertEquals(first, second);
     }
 }

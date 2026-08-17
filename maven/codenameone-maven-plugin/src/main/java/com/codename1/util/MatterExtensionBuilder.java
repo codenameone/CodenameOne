@@ -87,14 +87,18 @@ public final class MatterExtensionBuilder {
      *
      * @param packageName the application's bundle identifier
      * @param appGroup    the app group shared by the app and the extension
-     * @param displayName the name shown in the setup sheet
+     * @param displayName    the name shown in the setup sheet
+     * @param shortVersion   the containing app's CFBundleShortVersionString
+     * @param bundleVersion  the containing app's CFBundleVersion
      * @return path to content, in a stable order
      */
     public static Map<String, byte[]> buildFileMap(String packageName,
-            String appGroup, String displayName) {
+            String appGroup, String displayName, String shortVersion,
+            String bundleVersion) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
         files.put("RequestHandler.swift", utf8(requestHandlerSwift()));
-        files.put("Info.plist", utf8(infoPlist(displayName)));
+        files.put("Info.plist",
+                utf8(infoPlist(displayName, shortVersion, bundleVersion)));
         files.put(EXTENSION_NAME + ".entitlements",
                 utf8(entitlements(packageName, appGroup)));
         return files;
@@ -143,8 +147,13 @@ public final class MatterExtensionBuilder {
         sb.append("    override func selectWiFiNetwork(\n");
         sb.append("            from wifiScanResults: "
                 + "[MatterAddDeviceExtensionRequestHandler.WiFiScanResult])\n");
+        // WiFiNetworkAssociation, not WiFiAssociation: the override has to
+        // match MatterSupport's own signature exactly or the extension does
+        // not compile, and nothing in a Codename One build compiles this file
+        // until a customer runs a commissioning build.
         sb.append("            async throws -> "
-                + "MatterAddDeviceExtensionRequestHandler.WiFiAssociation {\n");
+                + "MatterAddDeviceExtensionRequestHandler"
+                + ".WiFiNetworkAssociation {\n");
         sb.append("        // The OS asks the user when this defers, which is\n");
         sb.append("        // right: the app has no idea which network the\n");
         sb.append("        // accessory should be on.\n");
@@ -156,7 +165,7 @@ public final class MatterExtensionBuilder {
                 + ".ThreadScanResult])\n");
         sb.append("            async throws -> "
                 + "MatterAddDeviceExtensionRequestHandler"
-                + ".ThreadAssociation {\n");
+                + ".ThreadNetworkAssociation {\n");
         sb.append("        return .defaultSystemNetwork\n");
         sb.append("    }\n");
         sb.append("}\n");
@@ -169,7 +178,8 @@ public final class MatterExtensionBuilder {
      * @param displayName the name shown in the setup sheet
      * @return the plist XML
      */
-    static String infoPlist(String displayName) {
+    static String infoPlist(String displayName, String shortVersion,
+            String bundleVersion) {
         StringBuilder sb = new StringBuilder();
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         sb.append("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
@@ -196,10 +206,18 @@ public final class MatterExtensionBuilder {
         sb.append("    <string>").append(EXTENSION_NAME).append("</string>\n");
         sb.append("    <key>CFBundlePackageType</key>\n");
         sb.append("    <string>XPC!</string>\n");
+        // The containing app's own versions, not 1.0/1. Apple validates an
+        // embedded extension's marketing and build versions against its
+        // host, so a hard-coded pair fails archive validation for every
+        // release that is not literally 1.0 -- which is every release after
+        // the first. The watch builder carries the same rule and the same
+        // scar; see its CFBundleVersion comment.
         sb.append("    <key>CFBundleShortVersionString</key>\n");
-        sb.append("    <string>1.0</string>\n");
+        sb.append("    <string>").append(escape(shortVersion))
+                .append("</string>\n");
         sb.append("    <key>CFBundleVersion</key>\n");
-        sb.append("    <string>1</string>\n");
+        sb.append("    <string>").append(escape(bundleVersion))
+                .append("</string>\n");
         sb.append("    <key>NSExtension</key>\n");
         sb.append("    <dict>\n");
         sb.append("        <key>NSExtensionPointIdentifier</key>\n");

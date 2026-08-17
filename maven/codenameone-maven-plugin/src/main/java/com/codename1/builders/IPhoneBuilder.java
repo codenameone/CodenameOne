@@ -3314,16 +3314,20 @@ public class IPhoneBuilder extends Executor {
                     // instruction, and honouring it signs the app without the
                     // capability so every HomeKit call fails at runtime while
                     // the build looked perfectly healthy.
-                    error("This app uses com.codename1.home but sets "
+                    // Thrown, not logged. Executor.error only writes to the
+                    // log and returns, so the build carried on and shipped
+                    // the app the paragraph above says it must not -- the
+                    // refusal has to be a refusal, like the missing
+                    // usage-description path below.
+                    throw new BuildException(
+                            "This app uses com.codename1.home but sets "
                             + "ios.entitlements.com.apple.developer.homekit="
                             + homeEntitlement + ". HomeKit cannot be used "
                             + "without that entitlement: the app would be "
                             + "signed without the capability and every "
                             + "accessory call would fail at runtime. Remove "
                             + "the hint to have it added for you, set it to "
-                            + "true, or stop touching the home.",
-                            new RuntimeException(
-                                "homekit entitlement disabled"));
+                            + "true, or stop touching the home.");
                 }
                 if (usesHomeAccessoryData && homeEntitlement == null) {
                     request.putArgument(
@@ -3369,19 +3373,54 @@ public class IPhoneBuilder extends Executor {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_MATTER_SETUP", ex);
                 }
-                if (request.getArg("ios.entitlements.com.apple.developer"
-                        + ".matter.allow-setup-payload", null) == null) {
+                String setupPayloadEntitlement = request.getArg(
+                        "ios.entitlements.com.apple.developer"
+                        + ".matter.allow-setup-payload", null);
+                if (setupPayloadEntitlement == null) {
                     request.putArgument("ios.entitlements.com.apple.developer"
                             + ".matter.allow-setup-payload", "true");
+                } else if (!"true".equalsIgnoreCase(
+                        setupPayloadEntitlement)) {
+                    // Refused rather than honoured, for the same reason as
+                    // the HomeKit entitlement above: the renderer would emit
+                    // <false/> while everything else -- the framework, the
+                    // extension target, the bridge -- is still built, and
+                    // MatterAddDeviceRequest.perform() fails on the device
+                    // with nothing at build time to explain it. The way to
+                    // opt out is ios.home.commissioning=false, which turns
+                    // the whole thing off.
+                    throw new BuildException(
+                            "This app adds Matter accessories but sets "
+                            + "ios.entitlements.com.apple.developer.matter"
+                            + ".allow-setup-payload="
+                            + setupPayloadEntitlement + ". Commissioning "
+                            + "cannot work without that entitlement. Remove "
+                            + "the hint to have it added for you, set it to "
+                            + "true, or set ios.home.commissioning=false to "
+                            + "leave commissioning out of the build.");
                 }
                 // The app group is the only channel between the extension and
                 // the app, and Apple refuses to launch an extension whose
                 // group does not match its host's. ios.app_groups is the
                 // established comma-separated hint the entitlements generator
                 // already consumes, shared with the widgets flow.
-                String matterGroup = request.getArg("ios.home.appGroup",
-                        MatterExtensionBuilder.defaultAppGroup(
-                                request.getPackageName()));
+                // Trimmed, and blank counts as absent. getArg keeps an
+                // explicitly empty hint, and an empty group reaches the
+                // extension's entitlements as "" -- which signs, and then
+                // fails to launch, for a reason nothing reports.
+                String matterGroup = request.getArg("ios.home.appGroup", "");
+                matterGroup = matterGroup == null ? "" : matterGroup.trim();
+                if (matterGroup.length() == 0) {
+                    matterGroup = MatterExtensionBuilder.defaultAppGroup(
+                            request.getPackageName());
+                } else if (!matterGroup.startsWith("group.")) {
+                    // Apple's own rule. Caught here rather than at codesign,
+                    // where it is an opaque provisioning error.
+                    throw new BuildException(
+                            "ios.home.appGroup must be an app group "
+                            + "identifier starting \"group.\", got \""
+                            + matterGroup + "\".");
+                }
                 // Compared entry by entry, not as a substring: an app group
                 // named group.com.acme.shared contains group.com.acme, and
                 // deciding the group is already there on that basis entitles
@@ -3413,18 +3452,21 @@ public class IPhoneBuilder extends Executor {
                             : modes + ",bluetooth-central";
                     request.putArgument("ios.background_modes", modes);
                 }
-                if (request.getArg("ios.NSBluetoothAlwaysUsageDescription",
-                        null) == null) {
-                    request.putArgument(
-                            "ios.NSBluetoothAlwaysUsageDescription",
-                            "Used to set up new smart home accessories.");
-                }
-                if (request.getArg("ios.NSLocalNetworkUsageDescription", null)
-                        == null) {
-                    request.putArgument("ios.NSLocalNetworkUsageDescription",
-                            "Used to find smart home accessories on your "
-                            + "network.");
-                }
+                // Through applyCatalogPlistEntry, which puts the value in
+                // privacyUsageDescriptions as well as in the request. A bare
+                // putArgument is too late to matter here: the one-time sweep
+                // that copies ios.NS*UsageDescription hints into that map ran
+                // long before this block, and the generated Info.plist is
+                // written from the map -- so the defaults existed as build
+                // arguments and never reached the device, leaving the Matter
+                // flow to touch Bluetooth and the local network with no
+                // declared purpose.
+                applyCatalogPlistEntry(request, new String[] {
+                    "NSBluetoothAlwaysUsageDescription",
+                    "Used to set up new smart home accessories."});
+                applyCatalogPlistEntry(request, new String[] {
+                    "NSLocalNetworkUsageDescription",
+                    "Used to find smart home accessories on your network."});
                 String bonjour = request.getArg("ios.NSBonjourServices", null);
                 String matterServices = "_matter._tcp.,_matterc._udp.";
                 if (bonjour == null) {
@@ -4591,14 +4633,17 @@ public class IPhoneBuilder extends Executor {
                             + "      rescue\n"
                             + "      end\n"
                             + "    end\n"
-                            // The CN1Widgets extension's Swift sources must never be swept into
-                            // the APP target: on script re-runs (post dependency integration)
+                            // No app-extension target's Swift sources may be swept into the
+                            // APP target: on script re-runs (post dependency integration)
                             // the extension group already exists and this catch-all would
-                            // otherwise add WidgetKit sources to the app's compile phase.
+                            // otherwise add WidgetKit -- or the Matter request handler --
+                            // to the app's compile phase, where it is compiled and linked
+                            // into the host as well as into the .appex.
                             + "    swift_refs = xcproj.files.select do |f|\n"
                             + "      file_name = f.path || f.name || f.display_name\n"
                             + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
-                            + SURFACES_EXTENSION_NAME + "/') && !file_name.include?('/"
+                            + SURFACES_EXTENSION_NAME + "/') && !file_name.start_with?('"
+                            + MatterExtensionBuilder.EXTENSION_NAME + "/') && !file_name.include?('/"
                             + WatchNativeBuilder.WATCH_SRC_DIR + "/')\n"
                             + "    end\n"
                             + "    swift_refs.each do |ref|\n"
@@ -5430,9 +5475,21 @@ public class IPhoneBuilder extends Executor {
         String name = MatterExtensionBuilder.EXTENSION_NAME;
         String displayName = request.getArg("ios.home.commissioning.displayName",
                 request.getDisplayName() == null ? name : request.getDisplayName());
+        // The host's own versions, through the helpers the watch builder uses
+        // for the same rule: an embedded extension whose marketing or build
+        // version differs from its containing app fails archive validation.
+        String injectedShort = WatchNativeBuilder.injectedPlistString(request,
+                "CFBundleShortVersionString");
+        String extShort = injectedShort != null ? injectedShort
+                : WatchNativeBuilder.shortVersion(request);
+        String injectedBundle = WatchNativeBuilder.injectedPlistString(request,
+                "CFBundleVersion");
+        String extBundle = injectedBundle != null ? injectedBundle
+                : request.getArg("ios.bundleVersion",
+                        WatchNativeBuilder.shortVersion(request));
         IOSWalletExtensionBuilder.writeFileMap(
                 MatterExtensionBuilder.buildFileMap(request.getPackageName(),
-                        matterAppGroup, displayName),
+                        matterAppGroup, displayName, extShort, extBundle),
                 new File(distDir, name));
         // The app-side Swift shim, into <MainClass>-src, exactly where the
         // surfaces glue goes and for the same reason: this method runs while
