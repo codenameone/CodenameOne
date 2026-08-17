@@ -244,6 +244,16 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `Display.addWindowListener()` is unchanged and still reports only the application's main
 window, so existing code that casts `getSource()` to `Display` keeps working.
 
+Close listeners and window events answer different questions, and the distinction
+matters when a listener does real work:
+
+* A *close listener* is the user asking to close the window. It runs before anything is
+  destroyed and consuming it vetoes the close, which is how a window prompts the user to
+  save first. It fires once per close attempt.
+* `WindowEvent.Type.Disposed` reports that the window is already gone. Nothing can veto
+  it, and it's what to listen for when the work has to happen whether the close came
+  from the user or from a call to `dispose()`.
+
 === Peer components and native text editing
 
 Both work inside a window. A `BrowserComponent`, a video player, a map or a native text
