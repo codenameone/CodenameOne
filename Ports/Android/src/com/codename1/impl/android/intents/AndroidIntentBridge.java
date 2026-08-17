@@ -369,6 +369,12 @@ public class AndroidIntentBridge implements IntentBridge {
     }
 
     public boolean requestForeground() {
+        return requestForegroundStatic();
+    }
+
+    /// Brings the app forward. Static because it reads nothing but the application context, and
+    /// because CN1IntentService needs it without holding a bridge.
+    static boolean requestForegroundStatic() {
         Context ctx = context();
         if (ctx == null) {
             return false;

@@ -33,6 +33,7 @@ import android.widget.Toast;
 
 import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.intents.IntentCompletion;
+import com.codename1.intents.IntentDeclaration;
 import com.codename1.intents.IntentResult;
 import com.codename1.intents.IntentSource;
 import com.codename1.intents.Intents;
@@ -120,6 +121,22 @@ public class CN1IntentService extends IntentService {
         if (!Display.isInitialized()) {
             shouldStopContext = true;
             AndroidImplementation.startContext(this);
+        }
+        // The headless flag arrived in the URI because at the moment of the tap there were no
+        // declarations to consult. There are now, and they are the authority: a shortcut minted
+        // before an app update can carry h=1 for an intent that has since become non-headless,
+        // and running that handler here gives it no Activity and no visible Form. Hand it to
+        // the foreground path instead of honouring a flag the app no longer agrees with.
+        IntentDeclaration decl = Intents.getDeclaration(id);
+        if (decl != null && !decl.isHeadless()) {
+            Log.w(TAG, "Shortcut for \"" + id + "\" asked for headless, but the declaration is "
+                    + "not; running it in the foreground instead");
+            AndroidIntentBridge.parkForegroundRequest(id, data.getQueryParameter("p"));
+            AndroidIntentBridge.requestForegroundStatic();
+            if (shouldStopContext) {
+                AndroidImplementation.stopContext(this);
+            }
+            return;
         }
         try {
             Latch latch = new Latch();

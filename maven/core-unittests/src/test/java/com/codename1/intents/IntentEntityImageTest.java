@@ -154,13 +154,51 @@ class IntentEntityImageTest extends UITestBase {
         }
     }
 
+    /**
+     * A model is the caller least able to notice a missed deadline -- it receives a string and
+     * has no view of how long anything took. Calling the dispatcher directly made it the one
+     * caller whose handlers had no enforced budget: the deadline passed, the context reported
+     * cancelled, and the late result was serialized back anyway.
+     *
+     * Needs a Display for the same reason as the test above: without one there is no timeout
+     * thread to enforce anything.
+     */
+    @FormTest
+    void aModelInvocationIsCutOffAtItsDeadline() throws Exception {
+        Intents.setDispatcher(new SlowDispatcher());
+        final String[] answer = new String[1];
+        try {
+            final java.util.List<com.codename1.ai.Tool> tools = Intents.asTools();
+            assertEquals(1, tools.size(), "the fixture is exposed to a model");
+
+            // invoke() blocks, so it runs off the event thread; the event thread has to stay
+            // free for the framework to marshal onto.
+            com.codename1.ui.Display.getInstance().invokeAndBlock(new Runnable() {
+                public void run() {
+                    try {
+                        answer[0] = tools.get(0).invoke("{}");
+                    } catch (Exception e) {
+                        answer[0] = "threw: " + e;
+                    }
+                }
+            });
+
+            assertTrue(answer[0] != null && answer[0].contains("\"ok\":false"),
+                    "an overrun must come back as a failure, got " + answer[0]);
+            assertFalse(answer[0].contains("/orders/42"),
+                    "and must not carry the late handler's result, got " + answer[0]);
+        } finally {
+            Intents.reset();
+        }
+    }
+
     /** Declares a one-second budget and takes two, so the timeout always wins. */
     private static final class SlowDispatcher implements IntentDispatcher {
         public java.util.List<IntentDeclaration> describe() {
             return Arrays.asList(new IntentDeclaration("slow", "Slow", "", true, true, false,
                     "", 1, java.util.Collections.<String>emptyList(),
                     java.util.Collections.<IntentParameterInfo>emptyList(),
-                    Arrays.asList(Exposure.ASSISTANT)));
+                    Arrays.asList(Exposure.ASSISTANT, Exposure.MODEL)));
         }
 
         public IntentResult invoke(String intentId, Map<String, Object> params,

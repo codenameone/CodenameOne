@@ -664,19 +664,73 @@ public final class Intents {
             this.declaration = declaration;
         }
 
+        /// Runs the intent through the same deadline-enforcing path a platform invocation
+        /// uses, and blocks until it answers.
+        ///
+        /// Calling the dispatcher directly would have made a model the one caller whose
+        /// handlers had no enforced budget: the deadline would pass, the context would report
+        /// cancelled, and the late result would still be serialized and still navigate. A model
+        /// is the caller least able to notice that, since it just receives a string.
+        ///
+        /// Blocking is correct here and is not the same as blocking under
+        /// [Intents#invoke]: the tool contract is synchronous, and what arrives is whichever
+        /// outcome won the race -- the handler's, or the timeout's.
         @Override
         public String invoke(String argumentsJson) throws Exception {
             Map<String, Object> args = null;
             if (argumentsJson != null && argumentsJson.length() > 0) {
                 args = com.codename1.io.JSONParser.parseJSON(argumentsJson);
             }
-            IntentContext ctx = new IntentContext(IntentSource.MODEL, false,
-                    System.currentTimeMillis() + declaration.getTimeoutSeconds() * 1000L);
-            IntentResult r = invokeInternal(declaration.getId(), args, ctx);
+            ToolCompletion done = new ToolCompletion();
+            dispatchInvocation(declaration.getId(), args, IntentSource.MODEL, false, done);
+            IntentResult r = done.awaitResult(declaration.getTimeoutSeconds());
             Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
             return IntentSerializer.serializeResult(r, images);
         }
     }
+
+    /// Blocks a model's synchronous tool call until the framework reports an outcome.
+    ///
+    /// Named and static rather than anonymous so it holds nothing but its own result.
+    private static final class ToolCompletion implements IntentCompletion {
+        private IntentResult result;
+        private boolean done;
+
+        public void onIntentResult(IntentResult r) {
+            synchronized (this) {
+                result = r;
+                done = true;
+                notifyAll();
+            }
+        }
+
+        /// Waits for the outcome. The framework's own timeout is what ends the wait in the
+        /// normal case; the margin here exists only so a completion lost to a bug cannot block
+        /// the caller forever.
+        IntentResult awaitResult(int timeoutSeconds) {
+            long giveUpAt = System.currentTimeMillis()
+                    + (timeoutSeconds + COMPLETION_BACKSTOP_SECONDS) * 1000L;
+            synchronized (this) {
+                while (!done) {
+                    long left = giveUpAt - System.currentTimeMillis();
+                    if (left <= 0) {
+                        return IntentResult.failed("The action took too long and was stopped");
+                    }
+                    try {
+                        wait(left);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return IntentResult.failed("The action was interrupted");
+                    }
+                }
+                return result == null ? IntentResult.ok() : result;
+            }
+        }
+    }
+
+    /// How far past its own deadline the framework is given to report, before a blocked caller
+    /// gives up on it.
+    private static final int COMPLETION_BACKSTOP_SECONDS = 5;
 
     // ------------------------------------------------------------------
     // Search-result selection
