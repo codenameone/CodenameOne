@@ -149,12 +149,48 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
-     * Tells the text layer that an image landed on the canvas, so it can put back any text it
-     * promoted this frame that the image would have covered.
+     * Reports the bounds of a filled shape as covering, so promoted text underneath goes back to
+     * the canvas where the shape can actually paint over it.
+     */
+    private void noteCanvasCover(Shape shape) {
+        if (shape == null) {
+            return;
+        }
+        com.codename1.ui.geom.Rectangle bounds = shape.getBounds();
+        if (bounds == null) {
+            return;
+        }
+        noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+    }
+
+    /**
+     * Reports the bounds of a filled polygon as covering.
+     */
+    private void noteCanvasCover(int[] xPoints, int[] yPoints, int nPoints) {
+        if (xPoints == null || yPoints == null || nPoints <= 0) {
+            return;
+        }
+        int minX = xPoints[0];
+        int maxX = xPoints[0];
+        int minY = yPoints[0];
+        int maxY = yPoints[0];
+        for (int i = 1; i < nPoints && i < xPoints.length && i < yPoints.length; i++) {
+            minX = Math.min(minX, xPoints[i]);
+            maxX = Math.max(maxX, xPoints[i]);
+            minY = Math.min(minY, yPoints[i]);
+            maxY = Math.max(maxY, yPoints[i]);
+        }
+        noteCanvasCover(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    /**
+     * Tells the text layer that something landed on the canvas, so it can put back any text it
+     * promoted this frame that the draw would have covered.
      *
-     * <p>Text promoted into the DOM sits above the whole canvas. An image drawn over it in the
-     * original renderer would have hidden it; here it cannot, so the promotion has to be given
-     * up rather than leave the frame showing something the application did not draw.</p>
+     * <p>Text promoted into the DOM sits above the whole canvas. Anything drawn over it in the
+     * original renderer would have hidden it -- an image, a fill, a shape -- and here it cannot,
+     * so the promotion has to be given up rather than leave the frame showing something the
+     * application did not draw.</p>
      */
     private void noteCanvasCover(int x, int y, int w, int h) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
@@ -204,12 +240,14 @@ public class BufferedGraphics extends HTML5Graphics {
         if (canvas == null || w <= 0 || h <= 0) {
             return;
         }
+        noteCanvasCover(x, y, w, h);
         upcoming.add(new com.codename1.impl.html5.graphics.DrawCanvas(canvas, x, y, w, h, 255));
     }
 
     @Override
     public void tileImage(Object img, int x, int y, int w, int h) {
         if (clipEmpty) { return; }
+        noteCanvasCover(x, y, w, h);
         imageTransformRenderAdapter.tileImage((NativeImage)img, x, y, w, h);
     }
     
@@ -222,6 +260,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void fillRect(int x, int y, int width, int height) {
+        noteCanvasCover(x, y, width, height);
         primitiveRenderAdapter.fillRect(x, y, width, height);
     }
 
@@ -270,6 +309,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
+        noteCanvasCover(x, y, width, height);
         addOp(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
@@ -280,6 +320,7 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void fillPolygon(int[] xPoints, int[] yPoints, int nPoints) {
+        noteCanvasCover(xPoints, yPoints, nPoints);
         addOp(new FillPolygon(xPoints, yPoints, nPoints, getColor(), getAlpha()));
     }
 
@@ -290,6 +331,7 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillShape(Shape shape) {
+        noteCanvasCover(shape);
         shapeGradientRenderAdapter.fillShape(shape);
     }
 
@@ -400,6 +442,7 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillArc(int x, int y, int width, int height, int startAngle, int arcAngle) {
+        noteCanvasCover(x, y, width, height);
         addOp(new FillArc(x, y, width, height, startAngle, arcAngle, getColor(), getAlpha()));
     }
 
@@ -686,16 +729,19 @@ public class BufferedGraphics extends HTML5Graphics {
     
     @Override
     public void fillLinearGradient(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
+        noteCanvasCover(x, y, width, height);
         shapeGradientRenderAdapter.fillLinearGradient(x, y, width, height, startColor, endColor, horizontal);
     }
 
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
+        noteCanvasCover(x, y, width, height);
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, startAngle, arcAngle);
     }
     
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
+        noteCanvasCover(x, y, width, height);
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, 0, 360);
     }
 

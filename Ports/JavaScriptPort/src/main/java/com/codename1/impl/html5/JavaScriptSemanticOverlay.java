@@ -859,7 +859,14 @@ public final class JavaScriptSemanticOverlay {
             out.put("aria-valuetext", node.getValue());
         }
         if (node.getSelected() != null) {
-            out.put("aria-selected", String.valueOf(node.getSelected()));
+            if (node.getRole() == AccessibilityRole.TOGGLE_BUTTON && node.getPressed() == null) {
+                // A toggle button's state is aria-pressed. The framework infers "selected" for
+                // one, and aria-selected on a button says nothing a screen reader will read out,
+                // so it would be announced as an ordinary button with no state at all.
+                out.put("aria-pressed", String.valueOf(node.getSelected()));
+            } else {
+                out.put("aria-selected", String.valueOf(node.getSelected()));
+            }
         }
         if (node.getExpanded() != null) {
             out.put("aria-expanded", String.valueOf(node.getExpanded()));

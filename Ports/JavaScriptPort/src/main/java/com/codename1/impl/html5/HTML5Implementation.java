@@ -1330,8 +1330,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // rewrite the style of every run through the bridge -- which slows the animation down
         // enough to be seen. The canvas carries the text for the duration, and it comes back to
         // the DOM the moment the form is still again.
+        boolean animating = isAnimationRunning(currentForm);
         boolean shouldSuspend = Display.getInstance().isInTransition() || overlayBlocked
-                || isAnimationRunning(currentForm);
+                || animating;
         if (textLayerDisabledByReadback) {
             // A pixel read has already claimed the canvas as the source of truth.
             return;
@@ -1341,10 +1342,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         textLayer.setSuspended(shouldSuspend);
         // Only the dirty region is repainting, so whatever lies outside it still carries the
-        // previous representation. Ask for a full repaint so the whole form agrees. A
-        // transition needs no help: it painted its buffers offscreen, which always rasterizes
-        // text.
-        if (currentForm != null && (overlayBlocked || !shouldSuspend)) {
+        // previous representation -- and suspending hides the layer as a whole, so every run on
+        // the form goes with it, not only the ones the dirty region covers. Ask for a full
+        // repaint so the whole form agrees, whichever way the switch went. A transition needs no
+        // help: it painted its buffers offscreen, which always rasterizes text.
+        if (currentForm != null && (overlayBlocked || animating || !shouldSuspend)) {
             currentForm.repaint();
         }
     }
