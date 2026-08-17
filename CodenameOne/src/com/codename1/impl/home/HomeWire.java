@@ -25,6 +25,7 @@ package com.codename1.impl.home;
 import com.codename1.home.Accessory;
 import com.codename1.home.AccessoryCategory;
 import com.codename1.home.AccessoryService;
+import com.codename1.home.HomeConfigurationException;
 import com.codename1.home.HomeError;
 import com.codename1.home.HomeException;
 import com.codename1.home.HomeRoom;
@@ -275,6 +276,14 @@ public final class HomeWire {
         String message = field(parts, 1);
         if (message.length() == 0) {
             message = error.name();
+        }
+        if (error == HomeError.NOT_CONFIGURED) {
+            // The subtype the constant promises. It is the one error that
+            // says "this build is wrong", not "this did not work" -- a
+            // missing usage description, a shim that was not injected -- and
+            // a caller that cannot tell it apart offers the user a retry
+            // button for something no user can fix.
+            return new HomeConfigurationException(message);
         }
         return new HomeException(error, message);
     }

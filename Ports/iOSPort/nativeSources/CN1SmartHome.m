@@ -1333,6 +1333,12 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
     // Usually the first of the two to fire, and the one that carries a denial:
     // a user who refuses gets no database load worth waiting for.
     cn1homeResolvePendingAuth(NO);
+    // And it also fires when the user changes their mind in Settings while
+    // the app is running, with nothing else to announce it. An app that
+    // greyed its controls out on a refusal would leave them grey after the
+    // user granted access, which is the state AVAILABILITY_CHANGED exists
+    // to correct.
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_AVAILABILITY, nil, nil);
 }
 
 - (void)homeManager:(HMHomeManager *)manager didAddHome:(HMHome *)home {
@@ -1379,6 +1385,24 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
 }
 
 - (void)home:(HMHome *)home didRemoveActionSet:(HMActionSet *)actionSet {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+// A scene edited in the Apple Home app -- renamed, or its actions changed --
+// arrives through these rather than through add and remove. Without them the
+// cached name and actions stay as they were until something unrelated forced
+// a refresh, so an app's scene list showed the old name indefinitely.
+- (void)home:(HMHome *)home
+        didUpdateNameForActionSet:(HMActionSet *)actionSet {
+    cn1homeRebuildSnapshot();
+    cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
+                           cn1homeUuid([home uniqueIdentifier]), nil);
+}
+
+- (void)home:(HMHome *)home
+        didUpdateActionsForActionSet:(HMActionSet *)actionSet {
     cn1homeRebuildSnapshot();
     cn1homeNotifyStructure(CN1_HOME_CHANGE_SCENES,
                            cn1homeUuid([home uniqueIdentifier]), nil);
