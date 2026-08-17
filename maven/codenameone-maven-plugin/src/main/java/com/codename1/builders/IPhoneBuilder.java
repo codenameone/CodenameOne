@@ -1186,7 +1186,17 @@ public class IPhoneBuilder extends Executor {
         // the cipher amalgamation replaces the system libsqlite3 -- so an application that never
         // touches com.codename1.db must not carry either.
         try {
-            DatabaseUsage databaseUsage = scanForDatabaseUsage(classesDir);
+            // The libraries as well as the loose classes. unzip() routes a submitted .jar to the
+            // libs directory, which is btres here, and ParparVM translates it alongside the
+            // application -- so an application whose dependency is the only thing that calls
+            // DatabaseConfig scanned as using no database at all, and the build then linked the
+            // system SQLite and left the library's encrypted open failing as unsupported.
+            //
+            // Read before the port's own jars are unzipped into btres further down, which is what
+            // keeps the framework's use of the database from answering for the application's. The
+            // scan filters the framework's classes by name as well, in both trees.
+            DatabaseUsage databaseUsage = scanForDatabaseUsage(classesDir)
+                    .merge(scanForDatabaseUsage(buildinRes));
             usesDatabase = databaseUsage.usesDatabase();
             usesDatabaseCipher = databaseUsage.usesDatabaseCipher();
         } catch (IOException ex) {

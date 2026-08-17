@@ -1000,6 +1000,14 @@ public abstract class Database {
     /// connection closes, so this has to as well.
     private java.util.Hashtable attachments;
 
+    /// Whether a reconciliation is already running on this connection, so the DETACH it may
+    /// issue does not start another one.
+    private boolean reconciling;
+
+    /// A refusal a reconciliation could not report from where it happened, waiting for the first
+    /// place that can throw it.
+    private IOException attachmentRefusal;
+
     /// Reserves the databases a script is about to attach, before the engine attaches them.
     ///
     /// Called by every port at the top of `#execute(String)`. Reserving first is what makes this
@@ -1013,14 +1021,29 @@ public abstract class Database {
     /// execute leaves a reservation that is given back when the connection closes; the cost is a
     /// delete refused until then. The other direction loses data.
     ///
+    /// A **relative** name is reserved under this port's database directory, which is not always
+    /// the file the engine opens: SQLite resolves a relative name against the process working
+    /// directory, and only the ports whose engine has no filesystem -- the browser, where a name
+    /// is a pool entry -- resolve it the same way this does. Predicting the other answer is not
+    /// possible from here; the working directory belongs to the process, differs per platform,
+    /// and is not something this API exposes or controls. So the reservation covers the file a
+    /// Codename One name means, which is what an application attaching `'data.db'` almost
+    /// certainly intends, and the reconciliation afterwards is what covers the file the engine
+    /// really opened -- including undoing an attachment that turns out to be unholdable. Attach
+    /// by an absolute path from `#getDatabasePath(String)` to be reserved exactly.
+    ///
     /// #### Parameters
     ///
     /// - `sql`: the script about to run
     ///
     /// #### Throws
     ///
-    /// - `IOException`: if a database it attaches is being deleted or converted
+    /// - `IOException`: if a database it attaches is being deleted or converted, or if an earlier
+    ///   attachment had to be undone and nothing has reported that yet
     protected void reserveAttachments(String sql) throws IOException {
+        // Every execute path on every port passes through here, which makes it the first place a
+        // refusal from the previous statement's reconciliation can be thrown from.
+        requireAttachmentsHeld();
         if (sql == null) {
             return;
         }
@@ -1122,10 +1145,28 @@ public abstract class Database {
     /// attached, so a failed DETACH keeps its reservation and a reused schema follows the file it
     /// now names.
     ///
-    /// Failure here leaves every reservation as it is. That holds a delete off a file that may no
-    /// longer be attached, which is the recoverable direction; the other one unlinks a database
-    /// somebody is writing through.
+    /// Failure to *ask* leaves every reservation as it is. That holds a delete off a file that may
+    /// no longer be attached, which is the recoverable direction; the other one unlinks a database
+    /// somebody is writing through. An answer that cannot be held is a different matter: the
+    /// attachment is undone here and the refusal left for `#requireAttachmentsHeld()` to report,
+    /// because ports run this from a `finally` and a throw from there would replace the failure
+    /// the statement itself is reporting.
     private void reconcileAttachments() {
+        if (reconciling) {
+            // The detach below runs through the port's own execute, which lands back here. One
+            // reconciliation is enough: the statement it runs is a DETACH, so it cannot attach
+            // anything this pass would have to account for.
+            return;
+        }
+        reconciling = true;
+        try {
+            reconcileAttachmentsOnce();
+        } finally {
+            reconciling = false;
+        }
+    }
+
+    private void reconcileAttachmentsOnce() {
         java.util.Hashtable live = new java.util.Hashtable();
         Cursor cursor = null;
         try {
@@ -1144,7 +1185,9 @@ public abstract class Database {
                 }
                 String key = Display.getInstance().databaseIdentityForEngineFile(file);
                 if (key != null) {
-                    live.put(key, key);
+                    // The schema is kept, not just the key: it is the only handle a DETACH can be
+                    // written against if this attachment turns out to be one that cannot be held.
+                    live.put(key, schema);
                 }
             }
         } catch (IOException cannotAsk) {
@@ -1185,9 +1228,24 @@ public abstract class Database {
             try {
                 registerOpenDatabase(key);
             } catch (IOException beingDeleted) {
-                // Attached already, and something else has claimed the file. Nothing here can undo
-                // the attach -- which is why a reservation is also taken before the statement
-                // runs, where a refusal can still stop it.
+                // Attached already, and something else has claimed the file: it is being deleted
+                // or converted right now. The reservation taken before the statement ran is the
+                // first line of defence, but it cannot always be keyed on the file the engine
+                // ends up opening -- a relative name resolves against the process directory for
+                // SQLite and against this port's database directory here, and a bound parameter
+                // is not read at all. So this is where it has to be stopped, and swallowing the
+                // refusal is what let a delete run against a database SQLite still had open.
+                //
+                // An attach cannot be undone, but it can be reversed: the attachment is detached
+                // and the caller told. Best effort, because a DETACH is itself refused inside a
+                // transaction or while another connection holds the file -- the throw happens
+                // either way, since a caller that is told nothing carries on writing through an
+                // attachment whose file is about to be unlinked.
+                detachQuietly((String) live.get(key));
+                attachmentRefusal = new IOException("An ATTACH named a database that is being "
+                        + "deleted or converted, so it could not be attached: " + key + ". The "
+                        + "attachment has been undone. Complete the delete or the key change "
+                        + "first, or attach a database nothing else is claiming.", beingDeleted);
                 continue;
             }
             if (attachments == null) {
@@ -1197,6 +1255,57 @@ public abstract class Database {
         }
     }
 
+    /// Reports an attachment a reconciliation had to undo.
+    ///
+    /// Thrown from the start of the next statement rather than from the one that attached,
+    /// because ports reconcile from a `finally` and a throw from there replaces whatever failure
+    /// the statement was already reporting -- the one error the caller most needs. So the attach
+    /// is reversed as it is discovered, and the news waits for a place that can carry it.
+    ///
+    /// Late, but not lost, and not misattributed either: the message names an ATTACH rather than
+    /// "this statement". The alternative is silence, and an application whose attachment quietly
+    /// did not happen reads the absence of its tables as corruption.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a reconciliation undid an attachment and nothing has reported it yet
+    protected void requireAttachmentsHeld() throws IOException {
+        if (reconciling) {
+            // The DETACH a reconciliation issues runs through the port's own execute and arrives
+            // back here. Reporting into it would hand the refusal to the catch inside
+            // `#detachQuietly(String)`, which swallows it -- losing the one thing this is for.
+            return;
+        }
+        IOException refusal = attachmentRefusal;
+        if (refusal != null) {
+            attachmentRefusal = null;
+            throw refusal;
+        }
+    }
+
+    /// Detaches a schema the engine reported, swallowing whatever it says about it.
+    ///
+    /// The caller is on its way to throwing already, and the reason it throws is the one worth
+    /// reporting. A DETACH is refused inside a transaction and while the file is locked, and
+    /// neither refusal changes what the caller has to be told.
+    ///
+    /// #### Parameters
+    ///
+    /// - `schema`: the schema name as `PRAGMA database_list` gave it
+    private void detachQuietly(String schema) {
+        if (schema == null || schema.length() == 0) {
+            return;
+        }
+        try {
+            // Quoted as an identifier, doubling any quote inside it, because a schema name is
+            // whatever the ATTACH said it was and it reaches here unaltered.
+            execute("DETACH DATABASE \"" + replaceAll(schema, "\"", "\"\"") + "\"");
+        } catch (IOException stillAttached) {
+            // Reported by the throw the caller is about to make.
+        } catch (RuntimeException stillAttached) {
+            // As above: a port that fails a DETACH some other way changes nothing here.
+        }
+    }
 
     /// The file an ATTACH statement names, or null when the statement does not name one outright.
     ///
@@ -1621,6 +1730,10 @@ public abstract class Database {
     ///
     /// - `IOException`: if the statement is transaction control
     protected void requireQueryStatement(String sql) throws IOException {
+        // The query counterpart of the same funnel `#reserveAttachments(String)` uses: a caller
+        // that only ever reads would otherwise never be told its ATTACH was undone, and would
+        // read "no such table" as a database that has lost its contents.
+        requireAttachmentsHeld();
         if (isLegacyBehavior() || sql == null) {
             return;
         }
@@ -1634,6 +1747,26 @@ public abstract class Database {
                     + "commitTransaction(), rollbackTransaction(), or execute(\"" + keyword
                     + " ...\").");
         }
+        if ("ATTACH".equals(keyword) || "DETACH".equals(keyword)) {
+            // The same fault as transaction control, in the one place it is most dangerous. A
+            // cursor runs its statement when it is stepped, which is after the reservation would
+            // have been taken and after the reconciliation would have read the engine back -- so
+            // an attachment made this way is held by SQLite and absent from the registry, and a
+            // delete or a key change on that file goes ahead underneath it.
+            //
+            // Also the only statement of the pair that can be made safe by refusing it. ATTACH
+            // and DETACH return no rows, so a cursor over one was never useful, and execute()
+            // runs both with the bookkeeping around them.
+            throw new IOException("Attachment control cannot be run through executeQuery: a "
+                    + "cursor runs its statement when it is stepped, so the database would be "
+                    + attachedOrDetached(keyword) + " without this database knowing, and a "
+                    + "delete or a key change on that file would not see it. Use execute(\""
+                    + keyword + " ...\").");
+        }
+    }
+
+    private static String attachedOrDetached(String keyword) {
+        return "ATTACH".equals(keyword) ? "attached" : "detached";
     }
 
     private static String leadingKeyword(String statement) {

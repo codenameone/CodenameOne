@@ -329,6 +329,25 @@ afterward, because there's nothing left to roll back and the call throws. The en
 here on their own -- Android ends the transaction before it reports the failure, while the SQLite C
 API and JDBC leave it open -- so the port reconciles them and your code sees one behaviour.
 
+==== Attaching a second database
+
+`ATTACH` makes another database part of the connection, and SQLite holds it until you detach it or
+close the connection. Codename One counts an attached database as open, so deleting it, converting
+it or changing its key is refused while it's attached, the same as for the database you opened
+directly. That's the protection you want: unlinking a file SQLite still has open loses everything
+written through it.
+
+Run `ATTACH` and `DETACH` through `execute()`. `executeQuery()` refuses them, because a cursor runs
+its statement when it's stepped -- so the attachment would happen after the bookkeeping, and the
+file could then be deleted while SQLite still holds it.
+
+Name the file with an absolute path from `Database.getDatabasePath()`. A relative name is resolved
+by SQLite against the process working directory, which is a different place on every platform and
+isn't something a Codename One application controls -- so a relative name may reach a file that
+isn't the database you meant, and can't be accounted for exactly beforehand. If an attachment turns
+out to name a database that something else is deleting or converting, it's detached again and the
+next call on that connection throws to tell you.
+
 ==== Threading
 
 A `Database` and its cursors aren't thread safe. Either give each thread its own connection, or
@@ -424,6 +443,7 @@ The hint works in the simulator too, so you can test either mode without a devic
 | `rollbackTransaction` leaves the connection outside autocommit | Simulator
 | `getColumnName` reports the table column rather than the result set label | Simulator
 | `executeQuery` accepts a transaction control statement such as `BEGIN` | all
+| `executeQuery` accepts `ATTACH` and `DETACH` | all
 |====
 
 The flag doesn't cover defects, nor capabilities that used to throw and now work:

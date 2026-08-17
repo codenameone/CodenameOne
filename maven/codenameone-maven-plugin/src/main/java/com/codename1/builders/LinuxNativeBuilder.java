@@ -258,7 +258,13 @@ public class LinuxNativeBuilder extends Executor {
         // read the stub's own reference back and call every application a database user.
         DatabaseUsage databaseUsage;
         try {
-            databaseUsage = scanForDatabaseUsage(classesDir);
+            // The libraries as well as the loose classes. unzip() routes a submitted .jar to the
+            // libs directory, which is btres here, and the translator reads it alongside the
+            // application -- so an application whose dependency is the only thing that calls
+            // DatabaseConfig scanned as using no database at all, and the build then compiled
+            // without the SQLite amalgamation the library needs.
+            databaseUsage = scanForDatabaseUsage(classesDir)
+                    .merge(scanForDatabaseUsage(buildinRes));
         } catch (IOException ex) {
             throw new BuildException("Failed to scan for database usage", ex);
         }

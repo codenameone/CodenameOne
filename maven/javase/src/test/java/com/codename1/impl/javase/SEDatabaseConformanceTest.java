@@ -29,8 +29,10 @@ import com.codename1.testing.DatabaseConformanceSuite;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.ArrayList;
@@ -43,6 +45,7 @@ import org.sqlite.mc.SQLiteMCSqlCipherConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -803,6 +806,40 @@ public class SEDatabaseConformanceTest {
         } finally {
             chk.close();
         }
+    }
+
+    @Test
+    public void executeQueryRefusesAttachmentControl() throws Exception {
+        // A cursor runs its statement when it is stepped, which is after the reservation would
+        // have been taken and after the engine would have been read back. An ATTACH that arrives
+        // this way is held by SQLite and absent from the registry, so a delete of that file goes
+        // ahead underneath it -- the one thing the registry exists to stop.
+        String[] attachmentControl = {
+            "ATTACH DATABASE ':memory:' AS aux",
+            "DETACH DATABASE aux",
+            // Lower case and with leading trivia, because the guard reads the leading keyword and
+            // a reader that stopped at the first character of the string would pass the first two
+            // and let this one through.
+            "  /* comment */ attach database ':memory:' as aux2",
+        };
+        for (int iter = 0; iter < attachmentControl.length; iter++) {
+            final String sql = attachmentControl[iter];
+            IOException refused = assertThrows(IOException.class, new Executable() {
+                @Override
+                public void execute() throws Throwable {
+                    db.executeQuery(sql);
+                }
+            }, "executeQuery must refuse " + sql);
+            assertTrue(refused.getMessage().indexOf("executeQuery") >= 0,
+                    "the refusal says which call refused it: " + refused.getMessage());
+        }
+        // And the connection is still usable, rather than left with a half-run statement.
+        db.execute("CREATE TABLE after_refusal (id INTEGER PRIMARY KEY)");
+
+        // execute() is the way in, and it still works: this is a route being closed, not a
+        // capability being withdrawn.
+        db.execute("ATTACH DATABASE ':memory:' AS aux");
+        db.execute("DETACH DATABASE aux");
     }
 
     private static boolean startsWithPlaintextHeader(File f) throws Exception {

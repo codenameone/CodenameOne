@@ -1378,6 +1378,42 @@ public final class DatabaseConformanceSuite {
                 db.rollbackTransaction();
             }
 
+            // ---- and attachment control is not something executeQuery will run either
+            // The same fault, in the place it costs the most. A cursor runs its statement when it
+            // is stepped, which is after the reservation would have been taken and after the
+            // engine would have been read back -- so an ATTACH reached this way is held by SQLite
+            // and absent from the registry, and a delete of that file goes ahead underneath it.
+            // Both words, because DETACH through a cursor loses a reservation the same way.
+            String[] attachmentControl = {
+                "ATTACH DATABASE ':memory:' AS cn1queryattached",
+                "DETACH DATABASE cn1queryattached",
+            };
+            for (int iter = 0; iter < attachmentControl.length; iter++) {
+                boolean refused = false;
+                Cursor attachment = null;
+                try {
+                    attachment = db.executeQuery(attachmentControl[iter]);
+                } catch (IOException expected) {
+                    refused = true;
+                }
+                if (attachment != null) {
+                    try {
+                        attachment.close();
+                    } catch (IOException ignored) {
+                        // The refusal above is what is under test.
+                    }
+                }
+                r.check(refused, "executeQuery refuses " + attachmentControl[iter]);
+            }
+            // In memory, so nothing was created on disk to clean up -- and if the refusal above
+            // ever regresses, this leaves the connection as it found it rather than carrying an
+            // attachment into the checks that follow.
+            try {
+                db.execute("DETACH DATABASE cn1queryattached");
+            } catch (IOException neverAttached) {
+                // The expected outcome: the ATTACH was refused, so there is nothing to detach.
+            }
+
             // ---- a cursor over a writing statement never runs it twice
             // executeQuery prepares and steps, so an INSERT ... RETURNING does its insert while
             // the cursor is walked. Anything that rewinds -- getCount(), last(), going backwards
