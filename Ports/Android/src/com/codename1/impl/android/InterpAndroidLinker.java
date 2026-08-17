@@ -89,6 +89,15 @@ public class InterpAndroidLinker implements InterpLinker {
         return c;
     }
 
+    public void initializeClass(String internalName) throws Throwable {
+        // findClass resolves with initialize=false on purpose; this is the one
+        // caller that wants the initializer to have run.
+        Object c = findClass(internalName);
+        if (c instanceof Class) {
+            Class.forName(((Class)c).getName(), true, loader);
+        }
+    }
+
     private Class resolve(String internalName) throws ClassNotFoundException {
         if (internalName.length() == 1) {
             switch (internalName.charAt(0)) {
@@ -317,6 +326,14 @@ public class InterpAndroidLinker implements InterpLinker {
         // wants.
         String component = arrayDescriptor.substring(dimensions.length);
         return Array.newInstance(resolve(component), dimensions);
+    }
+
+    public Object cloneArray(Object source) {
+        Class component = source.getClass().getComponentType();
+        if (component == null) {
+            return null;
+        }
+        return Array.newInstance(component, Array.getLength(source));
     }
 
     public Object classObject(Object hostClass) {

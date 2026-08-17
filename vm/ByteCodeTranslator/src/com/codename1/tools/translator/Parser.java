@@ -483,8 +483,27 @@ public class Parser extends ClassVisitor {
             // that predate original-name tracking.
             jvmName = bc.getClsName().replace('_', '/');
         }
+        // Interfaces as a comma-separated seventh column. The device runtime
+        // resolves a call by walking up from the receiver's class, and a default
+        // method lives on an interface -- `new ArrayList().sort(c)` reaches
+        // java/util/List.sort, which no superclass of ArrayList declares. A
+        // reader that only knows about superclasses answers "no such method"
+        // for a method the app plainly has.
+        StringBuilder ifaces = new StringBuilder();
+        if (bc.getBaseInterfacesObject() != null) {
+            for (ByteCodeClass iface : bc.getBaseInterfacesObject()) {
+                if (iface == null) {
+                    continue;
+                }
+                if (ifaces.length() > 0) {
+                    ifaces.append(',');
+                }
+                ifaces.append(iface.getClassOffset());
+            }
+        }
         return "class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
-                + "\t" + sourceFile + "\t" + superId + "\t" + jvmName + "\n";
+                + "\t" + sourceFile + "\t" + superId + "\t" + jvmName
+                + "\t" + ifaces + "\n";
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {

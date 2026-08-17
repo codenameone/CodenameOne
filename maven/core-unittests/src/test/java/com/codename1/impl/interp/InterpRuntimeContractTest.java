@@ -117,18 +117,26 @@ class InterpRuntimeContractTest {
         rt.setEdtBudgetMs(250);
 
         long started = System.currentTimeMillis();
-        try {
-            rt.runMain(new String[0]);
-            throw new AssertionError("expected the EDT budget to fire");
-        } catch (InterpThrowable e) {
-            assertTrue(unwrap(e) instanceof InterpCancelled,
-                    "expected cancellation, got " + unwrap(e));
-            long elapsed = System.currentTimeMillis() - started;
-            assertTrue(elapsed < 15000,
-                    "the budget should fire promptly, took " + elapsed + "ms");
-            assertTrue(e.getMessage().indexOf("without yielding") > 0,
-                    "the message should explain why, was: " + e.getMessage());
-        }
+        final InterpRuntime runtime = rt;
+        Throwable e = runWhereTheBudgetApplies(new Runnable() {
+            public void run() {
+                try {
+                    runtime.runMain(new String[0]);
+                } catch (RuntimeException re) {
+                    throw re;
+                } catch (Throwable t) {
+                    throw new IllegalStateException(t);
+                }
+            }
+        });
+        assertNotNull(e, "expected the EDT budget to fire");
+        assertTrue(unwrap(e) instanceof InterpCancelled,
+                "expected cancellation, got " + unwrap(e));
+        long elapsed = System.currentTimeMillis() - started;
+        assertTrue(elapsed < 15000,
+                "the budget should fire promptly, took " + elapsed + "ms");
+        assertTrue(e.getMessage().indexOf("without yielding") > 0,
+                "the message should explain why, was: " + e.getMessage());
     }
 
     /// The budget covers one entry into the interpreter, not the session.
@@ -361,9 +369,8 @@ class InterpRuntimeContractTest {
     /// whatever half of the initializer managed to assign, and the program
     /// misbehaves somewhere far away instead of reporting the class as broken.
     ///
-    /// The first touch surfaces the initializer's own exception -- the JVM
-    /// wraps it in ExceptionInInitializerError, which ParparVM's java.lang does
-    /// not have -- and every touch after it says the class is unusable.
+    /// The first touch surfaces ExceptionInInitializerError, as the JVM does,
+    /// and every touch after it says the class is unusable.
     @Test
     @DisplayName("a class whose initializer throws stays broken")
     void aFailedClassInitializerIsSticky() throws Throwable {
@@ -388,7 +395,7 @@ class InterpRuntimeContractTest {
             System.setOut(originalOut);
         }
         String out = captured.toString("UTF-8").trim();
-        assertTrue(out.startsWith("0:java.lang.IllegalStateException"),
+        assertTrue(out.startsWith("0:java.lang.ExceptionInInitializerError"),
                 "the initializer's own failure should reach the caller, got: " + out);
         assertTrue(out.endsWith("1:java.lang.NoClassDefFoundError"),
                 "a second touch must report the class as unusable, not hand back "
@@ -512,6 +519,172 @@ class InterpRuntimeContractTest {
                 + "}}");
         assertEquals(r[0].output, r[1].output,
                 "interface initialization order should match the JVM's");
+    }
+
+    /// `B.Z` where an interface declares Z compiles to a field reference owned
+    /// by B, which declares no such field. Searching only the superclass chain
+    /// answered with B and produced the field's *default* value -- a wrong
+    /// number rather than an error, which is the worst way to be wrong.
+    @Test
+    @DisplayName("statics declared by an interface resolve through implementors")
+    void interfaceStaticsResolveThroughImplementors() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("IfaceStatics",
+                "public class IfaceStatics {"
+                + " interface I { int Z = 7; String S = \"seven\"; }"
+                + " static class B implements I {}"
+                + " static class C extends B {}"
+                + " public static void main(String[] a) {"
+                + "  System.out.println(B.Z + \":\" + B.S + \":\" + C.Z);"
+                + "}}");
+        assertEquals(r[0].output, r[1].output);
+    }
+
+    /// `B.m()` where B inherits a static m from A records B as the owner. The
+    /// vtable holds instance methods only, by design, so the lookup missed and
+    /// fell through to the host -- which has never heard of B.
+    @Test
+    @DisplayName("a static method inherited from an interpreted class resolves")
+    void inheritedStaticMethodsResolve() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("StaticInherit",
+                "public class StaticInherit {"
+                + " static class A { static int twice(int v) { return v * 2; } }"
+                + " static class B extends A {}"
+                + " public static void main(String[] a) {"
+                + "  System.out.println(B.twice(21));"
+                + "}}");
+        assertEquals(r[0].output, r[1].output);
+    }
+
+    /// An interpreted object with no peer reaches host code as itself, and host
+    /// code puts it in a HashMap. Identity equality there is not a missing
+    /// nicety: keys the program considers equal hash differently and every
+    /// lookup misses, quietly.
+    @Test
+    @DisplayName("equals and hashCode reach the interpreted overrides")
+    void equalsAndHashCodeAreDelegated() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("EqualsKeys",
+                "import java.util.HashMap;"
+                + "public class EqualsKeys {"
+                + " static class Key {"
+                + "  final int v;"
+                + "  Key(int v) { this.v = v; }"
+                + "  public boolean equals(Object o) { return o instanceof Key && ((Key)o).v == v; }"
+                + "  public int hashCode() { return v; }"
+                + " }"
+                + " public static void main(String[] a) {"
+                + "  HashMap<Key,String> m = new HashMap<Key,String>();"
+                + "  m.put(new Key(1), \"one\");"
+                + "  System.out.println(m.get(new Key(1)));"
+                + "  System.out.println(new Key(2).equals(new Key(2)));"
+                + "}}");
+        assertEquals(r[0].output, r[1].output);
+    }
+
+    /// `super.toString()` in an override used to dispatch straight back into
+    /// that override: unbounded recursion reported as a stack overflow, in code
+    /// that reads as ordinary Java.
+    @Test
+    @DisplayName("super.toString does not recurse into the override")
+    void superToStringReachesObject() throws Throwable {
+        InterpRuntime rt = load("SuperToString",
+                "public class SuperToString {"
+                + " static class T { public String toString() { return \"T:\" + super.toString().length(); } }"
+                + " public static void main(String[] a) {"
+                + "  System.out.println(new T().toString().startsWith(\"T:\"));"
+                + "}}");
+        rt.setEdtBudgetMs(0);
+        java.io.PrintStream out = System.out;
+        java.io.ByteArrayOutputStream captured = new java.io.ByteArrayOutputStream();
+        try {
+            System.setOut(new java.io.PrintStream(captured, true, "UTF-8"));
+            rt.runMain(new String[0]);
+        } finally {
+            System.setOut(out);
+        }
+        assertEquals("true", captured.toString("UTF-8").trim());
+    }
+
+    /// wait/notify on an object of a pushed-only class: the wrapper is a real
+    /// Java object with a real monitor, and a synchronized block on a peerless
+    /// object locks that same wrapper. Without this the runtime reported the
+    /// methods as not implemented, so ordinary producer/consumer code failed.
+    @Test
+    @DisplayName("wait and notify work on a pushed-only class")
+    void waitAndNotifyWorkOnPushedObjects() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("WaitNotify",
+                "public class WaitNotify {"
+                + " static class Lock {}"
+                + " static boolean ready;"
+                + " public static void main(String[] a) throws Exception {"
+                + "  final Lock lock = new Lock();"
+                + "  Thread t = new Thread(new Runnable() { public void run() {"
+                + "     synchronized (lock) { ready = true; lock.notifyAll(); } } });"
+                + "  synchronized (lock) {"
+                + "   t.start();"
+                + "   while (!ready) { lock.wait(2000); }"
+                + "  }"
+                + "  System.out.println(\"woken:\" + ready);"
+                + "}}");
+        assertEquals(r[0].output, r[1].output);
+    }
+
+    /// Object is recorded as an extern and no interpreted class lists it as an
+    /// interpreted supertype, so the hierarchy walk answered false for
+    /// `x instanceof Object` -- true of every non-null reference there has been.
+    @Test
+    @DisplayName("a pushed object is an instance of Object")
+    void everythingIsAnObject() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("ObjectInstance",
+                "public class ObjectInstance {"
+                + " static class Thing {}"
+                + " public static void main(String[] a) {"
+                + "  Object o = new Thing();"
+                + "  System.out.println((o instanceof Object) + \":\" + (((Object)new Thing()) != null));"
+                + "}}");
+        assertEquals(r[0].output, r[1].output);
+    }
+
+    /// JLS 12.4.2 wraps a non-Error initializer failure, which is how Java code
+    /// catches it. An Error passes through unwrapped, as the spec says.
+    @Test
+    @DisplayName("a non-Error initializer failure arrives as ExceptionInInitializerError")
+    void initializerFailuresAreWrapped() throws Exception {
+        InterpTestHarness.Result[] r = InterpTestHarness.runBoth("InitWrap",
+                "public class InitWrap {"
+                + " static class Boom { static int V; static { V = 1; if (V > 0) {"
+                + "   throw new IllegalStateException(\"boom\"); } } }"
+                + " public static void main(String[] a) {"
+                + "  try { System.out.println(Boom.V); }"
+                + "  catch (ExceptionInInitializerError e) {"
+                + "   System.out.println(\"wrapped:\" + e.getException().getClass().getName()); }"
+                + "}}");
+        assertEquals(r[0].output, r[1].output);
+    }
+
+    /// Runs on the thread the wall-clock budget applies to.
+    ///
+    /// The budget is the event thread's rule -- a worker computing for ten
+    /// seconds blocks nothing -- so a test of it has to be on the event thread
+    /// whenever there is one. Surefire reuses the JVM, so whether Display has
+    /// been initialized depends on which tests ran first, and asserting from
+    /// whatever thread JUnit happens to use would pass or fail on that.
+    private static Throwable runWhereTheBudgetApplies(final Runnable body) {
+        final Throwable[] thrown = new Throwable[1];
+        Runnable capture = new Runnable() {
+            public void run() {
+                try {
+                    body.run();
+                } catch (Throwable t) {
+                    thrown[0] = t;
+                }
+            }
+        };
+        if (com.codename1.ui.Display.isInitialized()) {
+            com.codename1.ui.Display.getInstance().callSeriallyAndWait(capture);
+        } else {
+            capture.run();
+        }
+        return thrown[0];
     }
 
     private static Throwable unwrap(Throwable t) {

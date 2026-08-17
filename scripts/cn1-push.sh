@@ -46,11 +46,14 @@ if [ -z "$JDK" ]; then
     exit 1
 fi
 
-CORE_JAR="$(ls "$REPO_ROOT"/.m2-local/com/codenameone/codenameone-core/*/codenameone-core-*.jar 2>/dev/null | head -1)"
+# `|| true` because a checkout without .m2-local is the normal case, and `ls`
+# failing there would end the script under `set -e` before reaching the
+# ~/.m2 fallback two lines down.
+CORE_JAR="$(ls "$REPO_ROOT"/.m2-local/com/codenameone/codenameone-core/*/codenameone-core-*.jar 2>/dev/null | head -1 || true)"
 if [ -z "$CORE_JAR" ]; then
-    CORE_JAR="$(ls "$HOME"/.m2/repository/com/codenameone/codenameone-core/*/codenameone-core-*.jar 2>/dev/null | head -1)"
+    CORE_JAR="$(ls "$HOME"/.m2/repository/com/codenameone/codenameone-core/*/codenameone-core-*.jar 2>/dev/null | head -1 || true)"
 fi
-PARPAR_JAR="$(ls "$REPO_ROOT"/.m2-local/com/codenameone/codenameone-parparvm/*/codenameone-parparvm-*.jar 2>/dev/null | grep -v -- '-sources\|-javadoc\|-bundle' | head -1)"
+PARPAR_JAR="$(ls "$REPO_ROOT"/.m2-local/com/codenameone/codenameone-parparvm/*/codenameone-parparvm-*.jar 2>/dev/null | grep -v -- '-sources\|-javadoc\|-bundle' | head -1 || true)"
 if [ -z "$PARPAR_JAR" ]; then
     echo "codenameone-parparvm not found in .m2-local; build it first:" >&2
     echo "  mvn -pl parparvm install -f maven/pom.xml" >&2
@@ -108,8 +111,13 @@ public final class Pack {
             // path relative to the tree, which is how an application loads them.
             w.addResourceTree(sourceRoot);
         } else {
-            w.addSource(sourceRoot.getName(),
-                    new String(Files.readAllBytes(sourceRoot.toPath()), "UTF-8"));
+            // Keyed by the declared package, exactly as addSourceTree does:
+            // the reader looks a class's source up as <package>/<SourceFile>,
+            // so a lone com.example.Main stored under "Main.java" is a bundle
+            // the device refuses as missing its own source.
+            String text = new String(Files.readAllBytes(sourceRoot.toPath()), "UTF-8");
+            w.addSource(InterpBundleWriter.sourceKey(
+                    InterpBundleWriter.packageOf(text), sourceRoot.getName()), text);
         }
         if (mainClass.length() == 0) {
             mainClass = findEntryPoint(classesDir, classes);

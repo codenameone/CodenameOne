@@ -304,7 +304,16 @@ public final class DevicePush {
         String peerId = peerId();
         String peerName = System.getProperty("user.name") + "@"
                 + InetAddress.getLocalHost().getHostName();
-        if (!send(payload, port, peerId, false) && rejectedAsUnpaired()) {
+        if (send(payload, port, peerId, false)) {
+            return;
+        }
+        if (!rejectedAsUnpaired()) {
+            // Denied on the device, or the program threw. Either way the push
+            // did not run, and a Maven goal that exits 0 there reports green
+            // for a program that never started.
+            System.exit(1);
+        }
+        {
             // Either this computer has never paired, or the device has
             // forgotten it -- reinstalled, or "forget paired computers". Both
             // recover the same way, and doing it automatically beats making the

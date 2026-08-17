@@ -317,16 +317,30 @@ public final class InterpRuntime {
 
     private Object execute(InterpFrame f) throws Throwable {
         ThreadState st = state();
-        if (st.depth == 0) {
-            // The budget covers one entry into the interpreter, not the age of
-            // the session. Measuring from the start of the run made every
-            // callback that arrived more than edtBudgetMs after the program
-            // began -- which is every button press in a real application --
-            // fail instantly with "ran without yielding", having done nothing.
-            // The framework enters here for each callback, so this is the point
-            // at which the clock starts.
+        // A fresh entry into the interpreter, which is what the budget covers.
+        //
+        // "Fresh" is not "depth == 0". A host call can run a nested event loop
+        // -- Dialog.show, invokeAndBlock -- and dispatch a callback into the
+        // interpreter from inside it, on the same thread, while the outer
+        // frames are still on the stack. That callback is a new entry and needs
+        // its own clock; without one it inherits an already-spent budget, or
+        // (worse) is exempted from the check entirely because the outer host
+        // call is still counted.
+        //
+        // Measuring from the start of the run instead of per entry made every
+        // callback arriving more than edtBudgetMs after the program began --
+        // which is every button press in a real application -- fail instantly
+        // with "ran without yielding", having done nothing.
+        boolean freshEntry = st.depth == 0 || st.hostCallDepth > 0;
+        int enclosingHostCalls = 0;
+        if (freshEntry) {
             st.runStartMs = System.currentTimeMillis();
             st.fuel = fuelPerCheck;
+            // The host calls below this entry are not this entry's business:
+            // leaving them counted would exempt every reentrant callback from
+            // the budget, which is exactly the wedge the budget exists to stop.
+            enclosingHostCalls = st.hostCallDepth;
+            st.hostCallDepth = 0;
         }
         st.depth++;
         if (st.depth > maxDepth) {
@@ -340,6 +354,9 @@ public final class InterpRuntime {
         } finally {
             st.callStack.removeElementAt(st.callStack.size() - 1);
             st.depth--;
+            if (freshEntry) {
+                st.hostCallDepth = enclosingHostCalls;
+            }
         }
     }
 
@@ -875,6 +892,15 @@ public final class InterpRuntime {
                                     new NullPointerException("monitorenter on null"),
                                     snapshotStack());
                         }
+                        // The peer, when there is one: a synchronized method on
+                        // an interpreted Form locks the peer (that is where the
+                        // call runs), so a synchronized block locking the
+                        // wrapper would be a second, unrelated monitor over
+                        // state Java says the same one protects.
+                        if (lock instanceof InterpObject
+                                && ((InterpObject) lock).hostPeer != null) {
+                            lock = ((InterpObject) lock).hostPeer;
+                        }
                         Object nested;
                         synchronized (lock) {
                             nested = run(f, insn + 1, true);
@@ -946,7 +972,13 @@ public final class InterpRuntime {
             throw new InterpThrowable(new InterpCancelled("stopped by request"),
                     snapshotStack());
         }
-        if (edtBudgetMs > 0 && st.hostCallDepth == 0 && st.runStartMs > 0) {
+        // Only on the event thread. A worker thread computing for ten seconds
+        // blocks nothing and is a perfectly ordinary thing for a program to do;
+        // killing it would be the runtime inventing a rule Java does not have.
+        // Cancellation above applies to every thread, which is what the Stop
+        // button needs.
+        if (edtBudgetMs > 0 && st.hostCallDepth == 0 && st.runStartMs > 0
+                && isEventThread()) {
             long elapsed = System.currentTimeMillis() - st.runStartMs;
             if (elapsed > edtBudgetMs) {
                 throw new InterpThrowable(new InterpCancelled(
@@ -954,6 +986,30 @@ public final class InterpRuntime {
                         snapshotStack());
             }
         }
+    }
+
+    /// What an interpreted failure actually carries: the thrown object when it
+    /// arrived in the interpreter's carrier, the throwable itself otherwise.
+    private static Object unwrapInterpreted(Throwable failure) {
+        if (failure instanceof InterpThrowable) {
+            return ((InterpThrowable) failure).getThrown();
+        }
+        return failure;
+    }
+
+    /// Whether the wall-clock budget applies on this thread.
+    ///
+    /// It is an *event thread* budget: a worker thread computing for ten
+    /// seconds blocks nothing, and killing it would be the runtime inventing a
+    /// rule Java does not have. Cancellation is separate and applies
+    /// everywhere, which is what the Stop button needs.
+    ///
+    /// With no Display -- the conformance harness, and anything embedding the
+    /// interpreter headless -- there is no event thread to protect and no way
+    /// to identify one, so the budget applies to whatever thread is running.
+    private boolean isEventThread() {
+        return !com.codename1.ui.Display.isInitialized()
+                || com.codename1.ui.Display.getInstance().isEdt();
     }
 
     // ------------------------------------------------------------- constants
@@ -980,7 +1036,15 @@ public final class InterpRuntime {
                 // the host has never heard of, so the class object is the
                 // InterpClass itself. Every consumer that can receive one --
                 // Enum.valueOf is the one javac generates -- checks for it.
-                InterpClass local = bundle.findClass(externOwnerName(operand));
+                String literal = externOwnerName(operand);
+                InterpClass local = bundle.findClass(literal);
+                if (local == null && isInterpretedLeaf(literal)) {
+                    // `Entry[].class` for a bundle-only Entry. There is no host
+                    // class for it and asking the linker to load `[LEntry;`
+                    // fails before the program can so much as call getName();
+                    // the leaf's own token is the honest stand-in.
+                    local = bundle.findClass(leafOf(literal));
+                }
                 f.pushRef(local != null
                         ? (Object) local
                         : linker.classObject(resolveExternClass(operand)));
@@ -1039,22 +1103,40 @@ public final class InterpRuntime {
         try {
             if (c.superInterp != null) {
                 ensureInitialized(c.superInterp);
+            } else if (c.superExtern >= 0) {
+                // A host superclass has to be initialized first too. Resolution
+                // deliberately does not initialize, so without this the host
+                // parent's <clinit> runs whenever its first peer is constructed
+                // -- after the interpreted subclass's, which reverses the order
+                // Java guarantees and with it any registration the parent does.
+                linker.initializeClass(externOwnerName(c.superExtern));
             }
             // JLS 12.4.1: initializing a class initializes the superinterfaces
-            // that declare a default method, and only those. An interface
-            // without one is initialized when a field of it is read, not when
-            // an implementor is -- so initializing them all would run
-            // initializers Java never runs, which is as wrong as running them
-            // late.
-            for (int i = 0; i < c.interpInterfaces.length; i++) {
-                InterpClass iface = c.interpInterfaces[i];
-                if (iface != null && declaresDefaultMethod(iface)) {
-                    ensureInitialized(iface);
-                }
-            }
+            // that declare a default method, and only those. Reaching one
+            // through an interface that declares none does not initialize the
+            // intermediate interface -- so this walks the hierarchy but
+            // initializes only the interfaces that themselves declare a
+            // default method. Initializing more would run initializers Java
+            // never runs, which is as wrong as running them late.
+            initializeDefaultBearingInterfaces(c);
             InterpMethod clinit = c.declaredMethod("<clinit>", "()V");
             if (clinit != null) {
-                invokeInterpreted(clinit, null, null);
+                try {
+                    invokeInterpreted(clinit, null, null);
+                } catch (Throwable failure) {
+                    // JLS 12.4.2: a non-Error failure is wrapped, so
+                    // `catch (ExceptionInInitializerError)` -- which is how Java
+                    // code catches this -- actually catches it. An Error passes
+                    // through unwrapped, as the spec says, and so does
+                    // cancellation, which is not the program's failure at all.
+                    Object thrown = unwrapInterpreted(failure);  //NOPMD AvoidInstanceofChecksInCatchClause - the carrier has to be looked through
+                    if (thrown instanceof Error) {
+                        throw failure;
+                    }
+                    ExceptionInInitializerError wrapped = new ExceptionInInitializerError(
+                            thrown instanceof Throwable ? (Throwable) thrown : null);
+                    throw new InterpThrowable(wrapped, interpretedStackFor(failure));
+                }
             }
             ok = true;
         } finally {
@@ -1074,6 +1156,11 @@ public final class InterpRuntime {
     /// `[[LEntry;` from a `multianewarray`. Only the leaf says whether the host
     /// has ever heard of the type.
     private boolean isInterpretedLeaf(String descriptor) {
+        return bundle.findClass(leafOf(descriptor)) != null;
+    }
+
+    /// The class name at the bottom of a descriptor: `[[LEntry;` is `Entry`.
+    private static String leafOf(String descriptor) {
         String at = descriptor;
         while (at.length() > 0 && at.charAt(0) == '[') {
             at = at.substring(1);
@@ -1081,7 +1168,7 @@ public final class InterpRuntime {
         if (at.length() > 2 && at.charAt(0) == 'L' && at.endsWith(";")) {
             at = at.substring(1, at.length() - 1);
         }
-        return bundle.findClass(at) != null;
+        return at;
     }
 
     /// The interpreter's representation of a multi-dimensional array of an
@@ -1101,19 +1188,30 @@ public final class InterpRuntime {
     /// through a superinterface -- the condition JLS 12.4.1 attaches to
     /// initializing an interface on behalf of an implementor.
     private boolean declaresDefaultMethod(InterpClass iface) {
-        for (int i = 0; i < iface.methods.length; i++) {
-            InterpMethod m = iface.methods[i];
+        for (InterpMethod m : iface.methods) {
             if (!m.isStatic() && !m.isAbstract() && !"<clinit>".equals(m.name)) {
                 return true;
             }
         }
-        for (int i = 0; i < iface.interpInterfaces.length; i++) {
-            InterpClass parent = iface.interpInterfaces[i];
-            if (parent != null && declaresDefaultMethod(parent)) {
-                return true;
+        return false;
+    }
+
+    /// Initializes every superinterface that declares a default method itself.
+    ///
+    /// Walks through the ones that do not, rather than stopping at them: an
+    /// interface with no default method is not initialized on an implementor's
+    /// behalf, but an interface *above* it that has one still is.
+    private void initializeDefaultBearingInterfaces(InterpClass c) throws Throwable {
+        for (InterpClass iface : c.interpInterfaces) {
+            if (iface == null) {
+                continue;
+            }
+            if (declaresDefaultMethod(iface)) {
+                ensureInitialized(iface);
+            } else {
+                initializeDefaultBearingInterfaces(iface);
             }
         }
-        return false;
     }
 
     // ---------------------------------------------------------------- fields
@@ -1163,15 +1261,63 @@ public final class InterpRuntime {
         return io.indexOf(declaring, name);
     }
 
-    private static InterpClass findStaticHolder(InterpClass c, String name) {
+    private InterpClass findStaticHolder(InterpClass c, String name) throws Throwable {
         InterpClass k = c;
         while (k != null) {
             if (k.declaresStatic(name)) {
                 return k;
             }
+            // Interfaces too, and before moving up: `B.Z` where B implements an
+            // interface declaring Z compiles to a field reference owned by B,
+            // and searching only the superclass chain answers with B, which
+            // declares no such field. That reads as the field's default value
+            // rather than as an error, which is the worst way to be wrong.
+            InterpClass fromInterface = findStaticInInterfaces(k, name);
+            if (fromInterface != null) {
+                return fromInterface;
+            }
             k = k.superInterp;
         }
         return c;
+    }
+
+    /// The interface that declares a static field, searching an interpreted
+    /// class's interfaces depth first. Initializes it on the way, since reading
+    /// an interface's field is exactly what initializes that interface.
+    private InterpClass findStaticInInterfaces(InterpClass c, String name) throws Throwable {
+        for (InterpClass iface : c.interpInterfaces) {
+            if (iface == null) {
+                continue;
+            }
+            if (iface.declaresStatic(name)) {
+                ensureInitialized(iface);
+                return iface;
+            }
+            InterpClass deeper = findStaticInInterfaces(iface, name);
+            if (deeper != null) {
+                return deeper;
+            }
+        }
+        return null;
+    }
+
+    /// A static method declared by this class or inherited from an interpreted
+    /// superclass.
+    ///
+    /// The vtable cannot answer: it holds instance methods only, by design, and
+    /// javac records the *call site's* owner for a static call, so `B.m()` where
+    /// B inherits m from A arrives naming B. Falling through to the host linker
+    /// from there asks it for a class only the bundle has.
+    private static InterpMethod resolveStatic(InterpClass c, String name, String desc) {
+        InterpClass k = c;
+        while (k != null) {
+            InterpMethod m = k.declaredMethod(name, desc);
+            if (m != null && m.isStatic()) {
+                return m;
+            }
+            k = k.superInterp;
+        }
+        return null;
     }
 
     private void getField(InterpFrame f, int ext) throws Throwable {
@@ -1240,6 +1386,9 @@ public final class InterpRuntime {
             if (ic != null) {
                 ensureInitialized(ic);
                 InterpMethod m = ic.declaredMethod(name, desc);
+                if (m == null) {
+                    m = resolveStatic(ic, name, desc);
+                }
                 if (m == null) {
                     m = ic.resolve(name, desc);
                 }
@@ -1403,7 +1552,7 @@ public final class InterpRuntime {
             // inherit them from. getClass() is not an exotic case: javac emits
             // a `receiver.getClass()` null check in front of every bound
             // method reference, so `self::method` needs it.
-            Object r = objectCall(io, name, args);
+            Object r = objectCall(io, name, args, op == InterpOpcodes.INVOKESPECIAL);
             if (r != NOT_OBJECT_METHOD) {
                 pushBoxed(f, returnKind, r);
                 return;
@@ -1491,6 +1640,16 @@ public final class InterpRuntime {
         // block for a long time (invokeAndBlock waiting on the network) and
         // that must not read as a runaway loop.
         ThreadState st = state();
+        // A class token for a bundle-only type is an InterpClass, and the host
+        // method wants a java.lang.Class. The documented resource idiom --
+        // `getResourceAsStream(getClass(), "/theme.res")` -- hits this on every
+        // pushed program, so the token is exchanged for the class of its
+        // nearest host ancestor: the same class loader, and a real Class.
+        for (int i = 0; i < args.length; i++) {
+            if (args[i] instanceof InterpClass) {
+                args[i] = hostClassFor((InterpClass) args[i]);
+            }
+        }
         st.hostCallDepth++;
         try {
             if (target == null) {
@@ -1515,6 +1674,24 @@ public final class InterpRuntime {
         } finally {
             st.hostCallDepth--;
         }
+    }
+
+    /// The host class standing in for an interpreted one: the nearest ancestor
+    /// the installed app actually has, or `java.lang.Object`.
+    ///
+    /// There is no host class for a type that exists only in the bundle, and
+    /// nothing can conjure one. What the callers of this actually want is a
+    /// class loader and an identity in the app -- which the nearest host
+    /// ancestor provides.
+    private Object hostClassFor(InterpClass c) throws Throwable {
+        InterpClass k = c;
+        while (k != null) {
+            if (k.superExtern >= 0) {
+                return resolveExternClass(k.superExtern);
+            }
+            k = k.superInterp;
+        }
+        return linker.findClass("java/lang/Object");
     }
 
     private void replaceOnStack(InterpFrame f, Object placeholder, Object created) {
@@ -1597,12 +1774,22 @@ public final class InterpRuntime {
             return isInstanceOf(args[0], c.getName()) ? Boolean.TRUE : Boolean.FALSE;
         }
         if ("getSuperclass".equals(name) && args.length == 0) {
-            return c.superInterp;
+            if (c.superInterp != null) {
+                return c.superInterp;
+            }
+            // Null only for an interface and for Object itself. Every other
+            // interpreted class has a host parent -- Form, or Object -- and
+            // answering null there says the class has no superclass at all.
+            if (c.isInterface() || c.superExtern < 0) {
+                return null;
+            }
+            return resolveExternClass(c.superExtern);
         }
         return NOT_CLASS_METHOD;
     }
 
-    private Object objectCall(InterpObject io, String name, Object[] args) {
+    private Object objectCall(InterpObject io, String name, Object[] args, boolean special)
+            throws Throwable {
         if ("getClass".equals(name) && args.length == 0) {
             // The interpreted class is its own class object: there is no host
             // class to hand back, and the bundle is what knows the type.
@@ -1615,7 +1802,41 @@ public final class InterpRuntime {
             return args[0] == io ? Boolean.TRUE : Boolean.FALSE;  //NOPMD CompareObjectsWithEquals - Object.equals default is identity
         }
         if ("toString".equals(name) && args.length == 0) {
+            if (special) {
+                // `super.toString()` from an interpreted override. Calling
+                // io.toString() would dispatch straight back into that
+                // override: an infinite recursion reported as a stack
+                // overflow, in code that reads as ordinary Java.
+                return io.type.getName().replace('/', '.') + "@"
+                        + Integer.toHexString(System.identityHashCode(io));
+            }
             return io.toString();
+        }
+        // wait/notify on an object of a pushed-only class. The wrapper is a
+        // real Java object with a real monitor, and the interpreter locks that
+        // same wrapper for a synchronized block on a peerless object -- so
+        // producer/consumer code written against `new CustomLock()` works
+        // rather than dying on "not implemented".
+        if ("wait".equals(name)) {
+            if (args.length == 0) {
+                io.wait();
+            } else if (args.length == 1) {
+                io.wait(((Long) args[0]).longValue());
+            } else {
+                io.wait(((Long) args[0]).longValue(), ((Integer) args[1]).intValue());
+            }
+            return null;
+        }
+        if ("notify".equals(name) && args.length == 0) {
+            // notify(), because that is the method the program called.
+            // Substituting notifyAll() would be the runtime quietly changing
+            // what the pushed code asked for.
+            io.notify();  //NOPMD UseNotifyAllInsteadOfNotify - implementing Object.notify
+            return null;
+        }
+        if ("notifyAll".equals(name) && args.length == 0) {
+            io.notifyAll();
+            return null;
         }
         return NOT_OBJECT_METHOD;
     }
@@ -1692,10 +1913,17 @@ public final class InterpRuntime {
     /// Written out per kind rather than through java.lang.reflect.Array:
     /// ParparVM has no reflection, and a reference to it would eliminate this
     /// whole method on iOS.
-    private static Object copyArray(Object a) {
+    private Object copyArray(Object a) throws Throwable {
         if (a instanceof Object[]) {
             Object[] s = (Object[]) a;
-            Object[] d = new Object[s.length];
+            // A String[] must clone to a String[]. The interpreter's own
+            // reference arrays are Object[] and stay that way, but a host array
+            // arriving here carries a real component type, and a copy that lost
+            // it fails the moment it is handed back to a host method.
+            Object[] d = (Object[]) linker.cloneArray(s);
+            if (d == null) {
+                d = new Object[s.length];
+            }
             System.arraycopy(s, 0, d, 0, s.length);
             return d;
         }
@@ -1792,6 +2020,13 @@ public final class InterpRuntime {
             return iface.isSubclassOfInterp(name)
                     || "com/codename1/system/NativeInterface".equals(name);
         }
+        if ("java/lang/Object".equals(name)) {
+            // Object is recorded as an extern and no interpreted class lists it
+            // as an interpreted supertype, so the hierarchy walk below answers
+            // false -- for `x instanceof Object`, which is true of every
+            // non-null reference there has ever been.
+            return true;
+        }
         if (v instanceof InterpObject) {
             InterpObject io = (InterpObject) v;
             if (io.type.isSubclassOfInterp(name)) {
@@ -1838,6 +2073,17 @@ public final class InterpRuntime {
         }
         if (!(v instanceof Object[])) {
             return false;
+        }
+        // When the leaf type is one the host has, the host can answer exactly,
+        // and exactly is better than the element scan below: casting an empty
+        // Object[] to String[] must throw, and scanning no elements says yes.
+        // The scan is for arrays whose leaf exists only in the bundle, where
+        // there is nothing to ask.
+        if (!isInterpretedLeaf(name)) {
+            Object hostArrayClass = linker.findClass(name);
+            if (hostArrayClass != null) {
+                return linker.isInstance(hostArrayClass, v);
+            }
         }
         if (component.charAt(0) == '[') {
             Object[] a = (Object[]) v;
@@ -1953,6 +2199,15 @@ public final class InterpRuntime {
                 int i = f.popInt();
                 Object a = f.popRef();
                 checkArray(a, i);
+                // `Form[] forms = new Form[1]; forms[0] = new MyForm();` gives
+                // us a real Form[] and an InterpObject, and storing the wrapper
+                // is an ArrayStoreException for code that is perfectly legal
+                // Java. Only an Object[] can hold the wrapper.
+                if (v instanceof InterpObject && !(a instanceof InterpObject[])
+                        && ((InterpObject) v).hostPeer != null
+                        && !a.getClass().getName().equals("[Ljava.lang.Object;")) {
+                    v = ((InterpObject) v).hostPeer;
+                }
                 ((Object[]) a)[i] = v;
                 return;
             }

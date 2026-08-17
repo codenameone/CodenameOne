@@ -409,4 +409,26 @@
         <Class name="~com\.codename1\.ui\.editor\..*" />
         <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
     </Match>
+    <!--
+    The device runtime's interpreted-object wrapper.
+
+    EQ_UNUSUAL: equals() delegates to the interpreted class's own equals, which
+    is exactly the point. A peerless interpreted object reaches host code as
+    itself and ends up as a HashMap key; identity equality there means keys the
+    program considers equal never match. There is no way to express that
+    delegation in a shape SpotBugs recognizes.
+
+    NO_NOTIFY_NOT_NOTIFYALL: the interpreter implements Object.notify() for
+    pushed code, so it has to call notify(). Calling notifyAll() instead would
+    be the runtime silently changing the semantics of the method the program
+    asked for.
+    -->
+    <Match>
+        <Class name="com.codename1.impl.interp.InterpObject" />
+        <Bug pattern="EQ_UNUSUAL" />
+    </Match>
+    <Match>
+        <Class name="com.codename1.impl.interp.InterpRuntime" />
+        <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL" />
+    </Match>
 </FindBugsFilter>

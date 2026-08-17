@@ -96,7 +96,15 @@ jobs:
             17
 
       - name: Build the framework and the Android port
+        env:
+          # setup-java makes the LAST version listed the default, so JAVA_HOME
+          # is 17 here despite the step name. The framework build wants 8 -- the
+          # newer JDK trips JaCoCo -- and the Android port wants 17, so each
+          # command names its own.
+          JAVA8: ${{ env.JAVA_HOME_8_X64 }}
         run: |
+          export JAVA_HOME="$JAVA8"
+          export PATH="$JAVA_HOME/bin:$PATH"
           cd maven
           mvn -B -q -DskipTests install -pl core,parparvm -am
           mvn -B -q -DskipTests -Pcompile-android install -pl android
@@ -164,7 +172,13 @@ jobs:
             17
 
       - name: Build the framework, translator and iOS port
+        env:
+          JAVA8: ${{ env.JAVA_HOME_8_X64 }}
         run: |
+          # As above: the last JDK listed to setup-java is the default, and the
+          # framework build wants 8.
+          export JAVA_HOME="$JAVA8"
+          export PATH="$JAVA_HOME/bin:$PATH"
           cd maven
           mvn -B -q -DskipTests install -pl core,parparvm,ios -am
 

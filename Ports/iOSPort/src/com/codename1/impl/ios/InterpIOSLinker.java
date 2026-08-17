@@ -70,6 +70,15 @@ public class InterpIOSLinker implements InterpLinker {
                 && InterpIOSSymbols.getInstance().isAvailable();
     }
 
+    public void initializeClass(String internalName) {
+        // ParparVM has no separate "initialize this class" entry point: a
+        // generated method body runs its class's initializer on first entry,
+        // and every route the interpreter takes into a host class -- a thunk, a
+        // constructor, a static-field accessor -- goes through one. So the
+        // ordering this exists to guarantee already holds here, and there is
+        // nothing to ask for.
+    }
+
     public Object findClass(String internalName) {
         Integer cached = (Integer)classIdCache.get(internalName);
         if (cached != null) {
@@ -248,6 +257,14 @@ public class InterpIOSLinker implements InterpLinker {
     public boolean isInstance(Object hostClass, Object value) {
         int id = idOf(hostClass);
         return id >= 0 && InterpIOSNative.isInstanceOfId(id, value);
+    }
+
+    public Object cloneArray(Object source) {
+        // ParparVM arrays carry their element type in the object itself, and
+        // there is no reflective way to ask for it from Java. Returning null
+        // leaves the caller with an Object[] of the right length, which is what
+        // the interpreter's own arrays are anyway.
+        return null;
     }
 
     public Object newArray(String componentDescriptor, int length) throws Throwable {

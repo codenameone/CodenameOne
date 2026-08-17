@@ -197,7 +197,7 @@ public class InterpBundleWriter {
      * its {@code SourceFile} attribute combine, which is how the reader looks
      * one up.
      */
-    static String sourceKey(String packageName, String fileName) {
+    public static String sourceKey(String packageName, String fileName) {
         if (packageName == null || packageName.length() == 0) {
             return fileName;
         }
@@ -208,7 +208,7 @@ public class InterpBundleWriter {
      * The declared package of a source file, read from the file rather than
      * inferred from its path -- a source root is not always the package root.
      */
-    static String packageOf(String text) {
+    public static String packageOf(String text) {
         for (String raw : text.split("\n")) {
             String line = raw.trim();
             if (line.startsWith("package ")) {

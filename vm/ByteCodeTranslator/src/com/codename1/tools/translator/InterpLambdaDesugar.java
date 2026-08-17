@@ -302,16 +302,64 @@ final class InterpLambdaDesugar {
             return;
         }
         if (toPrimitive) {
-            String box = boxed(to);
+            // Unbox what actually arrived, then widen. Casting to the
+            // destination's wrapper instead is wrong whenever the two differ:
+            // `Function<Integer, Long> f = Long::valueOf` hands the SAM an
+            // Integer and the implementation wants a long, and a CHECKCAST to
+            // Long fails on an Integer that was never anything else.
+            Type source = from.getSort() == Type.OBJECT && isBoxed(from)
+                    ? unboxedType(from) : to;
+            String box = boxed(source);
             il.add(new TypeInsnNode(Opcodes.CHECKCAST, box));
-            il.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, box, unboxMethod(to),
-                    "()" + to.getDescriptor(), false));
+            il.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, box, unboxMethod(source),
+                    "()" + source.getDescriptor(), false));
+            widen(il, source, to);
             return;
         }
         if (!"java/lang/Object".equals(to.getInternalName())
                 && to.getSort() == Type.OBJECT) {
             il.add(new TypeInsnNode(Opcodes.CHECKCAST, to.getInternalName()));
         }
+    }
+
+    /// Whether a reference type is one of the eight primitive wrappers.
+    private static boolean isBoxed(Type t) {
+        return unboxedTypeOrNull(t) != null;
+    }
+
+    /// The primitive a wrapper wraps.
+    private static Type unboxedType(Type t) {
+        Type p = unboxedTypeOrNull(t);
+        return p == null ? t : p;
+    }
+
+    private static Type unboxedTypeOrNull(Type t) {
+        String n = t.getInternalName();
+        if ("java/lang/Integer".equals(n)) {
+            return Type.INT_TYPE;
+        }
+        if ("java/lang/Long".equals(n)) {
+            return Type.LONG_TYPE;
+        }
+        if ("java/lang/Short".equals(n)) {
+            return Type.SHORT_TYPE;
+        }
+        if ("java/lang/Byte".equals(n)) {
+            return Type.BYTE_TYPE;
+        }
+        if ("java/lang/Character".equals(n)) {
+            return Type.CHAR_TYPE;
+        }
+        if ("java/lang/Boolean".equals(n)) {
+            return Type.BOOLEAN_TYPE;
+        }
+        if ("java/lang/Float".equals(n)) {
+            return Type.FLOAT_TYPE;
+        }
+        if ("java/lang/Double".equals(n)) {
+            return Type.DOUBLE_TYPE;
+        }
+        return null;
     }
 
     private static void widen(InsnList il, Type from, Type to) {

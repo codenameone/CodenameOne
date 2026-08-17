@@ -73,6 +73,14 @@ public class ReflectionInterpLinker implements InterpLinker {
         this.loader = loader;
     }
 
+    public void initializeClass(String internalName) throws Throwable {
+        Object c = findClass(internalName);
+        if (c instanceof Class) {
+            Class.forName(((Class) c).getName(), true,
+                    ReflectionInterpLinker.class.getClassLoader());
+        }
+    }
+
     public Object findClass(String internalName) {
         Class c = classCache.get(internalName);
         if (c != null) {
@@ -303,6 +311,14 @@ public class ReflectionInterpLinker implements InterpLinker {
 
     public boolean isInstance(Object hostClass, Object value) {
         return hostClass != null && ((Class) hostClass).isInstance(value);
+    }
+
+    public Object cloneArray(Object source) {
+        Class<?> component = source.getClass().getComponentType();
+        if (component == null) {
+            return null;
+        }
+        return java.lang.reflect.Array.newInstance(component, java.lang.reflect.Array.getLength(source));
     }
 
     public Object newArray(String componentDescriptor, int length) throws Throwable {

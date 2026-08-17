@@ -138,4 +138,37 @@ public final class InterpObject {
         }
         return type.name.replace('/', '.') + "@interp";
     }
+
+    /// Delegates to an interpreted `equals`, for the same reason `toString`
+    /// does.
+    ///
+    /// A peerless object reaches host code as itself, and host code puts it in
+    /// a `HashMap`. Leaving equality as identity there does not merely lose a
+    /// nicety: two keys the program considers equal hash differently and every
+    /// lookup misses, quietly.
+    @Override
+    public boolean equals(Object other) {
+        if (runtime != null) {
+            Object r = runtime.dispatch(this, "equals", "(Ljava/lang/Object;)Z",
+                    new Object[] {other});
+            if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
+                return ((Boolean) r).booleanValue();
+            }
+        }
+        return other == this;  //NOPMD CompareObjectsWithEquals - Object.equals is identity
+    }
+
+    /// Delegates to an interpreted `hashCode`. Overriding `equals` without this
+    /// is the classic way to break every hash-based collection, and here the
+    /// collection belongs to the host.
+    @Override
+    public int hashCode() {
+        if (runtime != null) {
+            Object r = runtime.dispatch(this, "hashCode", "()I", new Object[0]);
+            if (r != InterpRuntime.NOT_OVERRIDDEN) {  //NOPMD CompareObjectsWithEquals - a sentinel
+                return ((Integer) r).intValue();
+            }
+        }
+        return System.identityHashCode(this);
+    }
 }

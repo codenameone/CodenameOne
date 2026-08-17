@@ -68,6 +68,17 @@ class InterpIOSSymbols {
     /** class id -> superclass id, as an Integer. */
     private final Hashtable superIds = new Hashtable();
 
+    /**
+     * class id -> the ids of the interfaces it implements, as an int[].
+     *
+     * <p>Needed because a default method lives on an interface and nowhere in
+     * the superclass chain. {@code new ArrayList().sort(c)} targets
+     * {@code java/util/List.sort}; a walk that knows only about superclasses
+     * visits AbstractList and Object, finds nothing, and reports NoSuchMethod
+     * for a method the app certainly has.</p>
+     */
+    private final Hashtable interfaceIds = new Hashtable();
+
     private static InterpIOSSymbols instance;
 
     /** Loads the table on first use; it is immutable afterwards. */
@@ -118,6 +129,9 @@ class InterpIOSSymbols {
                 // java.lang.Object, and the interfaces.
                 if (p[4].length() > 0) {
                     superIds.put(id, Integer.valueOf(p[4]));
+                }
+                if (p.length >= 7 && p[6].length() > 0) {
+                    interfaceIds.put(id, parseIds(p[6]));
                 }
             }
         } else if (table.charAt(start) == 'm' && table.startsWith("method\t", start)) {
@@ -172,6 +186,27 @@ class InterpIOSSymbols {
         return out;
     }
 
+    /** A comma-separated id list, as an int[]. */
+    private static int[] parseIds(Stringlist) {
+        int count = 1;
+        for (int i = 0; i <list.length(); i++) {
+            if (list.charAt(i) == ',') {
+                count++;
+            }
+        }
+        int[] out = new int[count];
+        int idx = 0;
+        int from = 0;
+        for (int i = 0; i <list.length(); i++) {
+            if (list.charAt(i) == ',') {
+                out[idx++] = Integer.parseInt(list.substring(from, i));
+                from = i + 1;
+            }
+        }
+        out[idx] = Integer.parseInt(list.substring(from));
+        return out;
+    }
+
     /** The JVM internal name for a class id, or null. */
     String classNameFor(int classId) {
         return (String)classNames.get(Integer.valueOf(classId));
@@ -198,7 +233,43 @@ class InterpIOSSymbols {
             if (id != null) {
                 return id.intValue();
             }
+            // Interfaces of this class before moving up, because that is where
+            // a default method lives and no superclass declares it.
+            int fromInterface = interfaceMethodId(currentOwner, name, descriptor, 0);
+            if (fromInterface >= 0) {
+                return fromInterface;
+            }
             currentOwner = superName(currentOwner);
+        }
+        return -1;
+    }
+
+    /** Searches a class's interfaces, and theirs, for a method. */
+    private int interfaceMethodId(String owner, String name, String descriptor, int depth) {
+        if (depth > 16) {
+            return -1;
+        }
+        Integer ownerId = (Integer)classIds.get(owner);
+        if (ownerId == null) {
+            return -1;
+        }
+        int[] ifaces = (int[])interfaceIds.get(ownerId);
+        if (ifaces == null) {
+            return -1;
+        }
+        for (int i = 0; i < ifaces.length; i++) {
+            String ifaceName = (String)classNames.get(Integer.valueOf(ifaces[i]));
+            if (ifaceName == null) {
+                continue;
+            }
+            Integer id = (Integer)methodIds.get(ifaceName + "." + name + descriptor);
+            if (id != null) {
+                return id.intValue();
+            }
+            int deeper = interfaceMethodId(ifaceName, name, descriptor, depth + 1);
+            if (deeper >= 0) {
+                return deeper;
+            }
         }
         return -1;
     }

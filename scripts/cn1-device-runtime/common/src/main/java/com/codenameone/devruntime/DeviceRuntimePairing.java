@@ -107,7 +107,7 @@ public final class DeviceRuntimePairing {
      * @return what they typed, or null if they declined or typed nothing
      */
     static String promptForCode(final String peerId, final String peerName) {
-        if (peerId == null || peerId.length() == 0 || peerName == null) {
+        if (!isWellFormedPeerId(peerId) || peerName == null) {
             return null;
         }
         final String[] result = new String[1];
@@ -165,6 +165,30 @@ public final class DeviceRuntimePairing {
         return result[0];
     }
 
+    /**
+     * Whether a peer id is safe to store and to index.
+     *
+     * <p>The removable index is a tab-separated list, so an id containing a tab
+     * would split into pieces on the way out and "forget all paired computers"
+     * would delete none of them -- leaving a computer authenticated, and
+     * silently approved if the user had chosen Always. Hex is what both push
+     * tools generate, so requiring it costs nothing and closes the question
+     * rather than escaping around it.</p>
+     */
+    static boolean isWellFormedPeerId(String peerId) {
+        if (peerId == null || peerId.length() == 0 || peerId.length() > 64) {
+            return false;
+        }
+        for (int i = 0; i < peerId.length(); i++) {
+            char c = peerId.charAt(i);
+            boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!hex) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Records a computer as paired, with the secret both ends derived. */
     static void completePairing(String peerId, String peerName, byte[] secret) {
         Preferences.set(PREF_PAIRED + peerId, peerName);
@@ -203,7 +227,7 @@ public final class DeviceRuntimePairing {
 
     /// The secret established with a peer, or null if it has never paired.
     static byte[] secretFor(String peerId) {
-        if (peerId == null) {
+        if (!isWellFormedPeerId(peerId)) {
             return null;
         }
         String hex = Preferences.get(PREF_SECRET + peerId, null);

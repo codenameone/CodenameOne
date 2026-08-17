@@ -185,13 +185,50 @@ public final class InterpClass {
         return (InterpMethod) vtable.get(methodName + desc);
     }
 
+    /// The interfaces ordered so a supertype is copied before its subtype.
+    ///
+    /// Insertion sort over "does A extend B": the arrays here have a handful of
+    /// entries at most, and the relation is a partial order, so anything
+    /// cleverer would be more machinery than the problem deserves.
+    private static InterpClass[] sortBySpecificity(InterpClass[] ifaces) {
+        InterpClass[] out = new InterpClass[ifaces.length];
+        System.arraycopy(ifaces, 0, out, 0, ifaces.length);
+        for (int i = 1; i < out.length; i++) {
+            for (int j = i; j > 0; j--) {
+                if (out[j] != null && out[j - 1] != null
+                        && extendsInterface(out[j - 1], out[j])) {
+                    InterpClass tmp = out[j - 1];
+                    out[j - 1] = out[j];
+                    out[j] = tmp;
+                } else {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /// Whether `sub` reaches `parent` through its interpreted superinterfaces.
+    private static boolean extendsInterface(InterpClass sub, InterpClass parent) {
+        for (InterpClass up : sub.interpInterfaces) {
+            if (up == parent || (up != null && extendsInterface(up, parent))) {  //NOPMD CompareObjectsWithEquals - one class object, not an equal one
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void buildVtable() {
         Hashtable t = new Hashtable();
         // Supertypes first so an override replaces the inherited entry.
         // Interfaces before the superclass: a default method is only reached
         // when no class in the chain provides an implementation, and the
         // superclass pass below overwrites anything it does declare.
-        for (InterpClass iface : interpInterfaces) {
+        // Least specific first, so a sub-interface's override lands on top of
+        // the one it overrides. `class C implements B, A` where `B extends A`
+        // is legal and declaration order says nothing about which default wins
+        // -- Java says the most specific one does.
+        for (InterpClass iface : sortBySpecificity(interpInterfaces)) {
             copyInto(t, iface);
         }
         if (superInterp != null) {

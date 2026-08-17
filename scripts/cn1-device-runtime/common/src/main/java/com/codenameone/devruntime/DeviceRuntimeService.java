@@ -346,17 +346,21 @@ public class DeviceRuntimeService {
                 }
                 SocketConnection sc = new SocketConnection() {
                     public void connectionEstablished(InputStream is, OutputStream os) {
-                        // Found something listening. handle() checks the magic,
-                        // so a random service on this port is refused rather
-                        // than mistaken for the tool.
-                        synchronized (found) {
-                            if (found[0]) {
-                                return;
+                        // Something is listening, which is not the same as it
+                        // being the push tool. Remember the address only if the
+                        // exchange actually spoke our protocol -- otherwise the
+                        // first unrelated service on the subnet becomes "the
+                        // desktop" and every later dial goes to it while the
+                        // real one is never contacted.
+                        boolean spoke = handle(is, os, false);
+                        if (spoke) {
+                            synchronized (found) {
+                                if (!found[0]) {
+                                    found[0] = true;
+                                    foundAt[0] = candidate;
+                                }
                             }
-                            found[0] = true;
-                            foundAt[0] = candidate;
                         }
-                        handle(is, os, false);
                     }
 
                     public void connectionError(int errorCode, String message) {
@@ -453,6 +457,12 @@ public class DeviceRuntimeService {
         handle(is, os, true);
     }
 
+    /// Whether the peer on this connection spoke the push protocol at all.
+    ///
+    /// Distinct from whether the push succeeded: a refused push is still a
+    /// desktop push tool at the other end, and a subnet sweep wants to know
+    /// which address that is.
+
     /**
      * Serves one connection.
      *
@@ -463,7 +473,7 @@ public class DeviceRuntimeService {
      * that had once seen a network address refused USB pushes for the rest of
      * its life.</p>
      */
-    void handle(InputStream is, OutputStream os, boolean loopback) {
+    boolean handle(InputStream is, OutputStream os, boolean loopback) {
         firstContact();
         DataInputStream in = new DataInputStream(is);
         DataOutputStream out = new DataOutputStream(os);
@@ -492,10 +502,10 @@ public class DeviceRuntimeService {
                         out.writeByte(1);
                         out.writeUTF(DeviceRuntimePairing.deviceId());
                         out.flush();
-                        return;
+                        return true;
                     } else if (frame == FRAME_PAIR) {
                         handlePairing(in, out);
-                        return;
+                        return true;
                     } else if (frame == FRAME_PUSH) {
                         String peerId = in.readUTF();
                         byte[] secret = DeviceRuntimePairing.secretFor(peerId);
@@ -549,7 +559,9 @@ public class DeviceRuntimeService {
                 out.writeByte(0);
                 out.writeUTF(reject);
                 out.flush();
-                return;
+                // "bad magic" is the one refusal that says the peer is not a
+                // push tool at all; every other one is our protocol saying no.
+                return !"bad magic".equals(reject);
             }
             try {
                 String result = loadAndRun(payload);
@@ -562,10 +574,12 @@ public class DeviceRuntimeService {
                 out.writeUTF(described);
             }
             out.flush();
+            return true;
         } catch (Throwable t) {
             // The peer is gone or the framing is broken; there is nobody left to
             // tell, so record it for the on-device status line and move on.
             status = "push failed: " + describe(t);
+            return false;
         }
     }
 
@@ -735,10 +749,22 @@ public class DeviceRuntimeService {
 
     public void stopProgram() {
         InterpRuntime rt = runtime;
-        if (rt != null) {
-            rt.requestCancel();
-            status = "stop requested";
+        if (rt == null) {
+            return;
         }
+        rt.requestCancel();
+        // Cancellation alone stops interpreted code that is *running*. A normal
+        // Lifecycle program is not running when Stop is pressed: its start()
+        // returned after showing a Form, and what remains is listeners the
+        // framework still holds. Detaching the runtime is what makes those
+        // callbacks stop, and putting the runtime's own screen back is what
+        // tells the user it worked.
+        runtime = null;
+        loadedName = "";
+        loadedSource = "";
+        CodenameOneImplementation.clearLocalResources();
+        status = "stopped";
+        DeviceRuntimeForm.showIt();
     }
 
     public String getStatus() {

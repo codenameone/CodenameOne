@@ -47,6 +47,17 @@ public interface InterpLinker {
     /// point of use rather than at load.
     Object findClass(String internalName);
 
+    /// Runs a host class's static initializer, if the platform has a way to ask
+    /// for that and has not run it already.
+    ///
+    /// [#findClass(String)] deliberately does not: resolution happens for all
+    /// sorts of reasons -- a cast, an `instanceof`, a symbol lookup -- and
+    /// initializing on every one of them would run initializers Java does not.
+    /// Initializing an interpreted class, on the other hand, has to initialize
+    /// its host superclass first, or the parent's static state is built after
+    /// the child's rather than before it.
+    void initializeClass(String internalName) throws Throwable;
+
     /// Constructs a host object.
     Object construct(Object hostClass, String descriptor, Object[] args) throws Throwable;
 
@@ -86,6 +97,15 @@ public interface InterpLinker {
 
     /// Allocates a multi-dimensional array.
     Object newMultiArray(String arrayDescriptor, int[] dimensions) throws Throwable;
+
+    /// An empty array of the same runtime type and length as `source`, or null
+    /// when the platform cannot say what that type is.
+    ///
+    /// `clone()` on a `String[]` has to produce a `String[]`. The interpreter
+    /// represents its own reference arrays as `Object[]`, but an array that came
+    /// from the host carries a real component type, and a copy that lost it
+    /// fails the moment it is passed back.
+    Object cloneArray(Object source) throws Throwable;
 
     /// The `java.lang.Class` object for a host class, for `ldc` of a class
     /// literal.
