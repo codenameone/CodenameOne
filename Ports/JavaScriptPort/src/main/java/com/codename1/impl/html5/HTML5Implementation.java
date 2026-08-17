@@ -10706,75 +10706,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * Waits for a back command to either navigate or turn out to have been refused.
-     *
-     * @param before the form that was displayed when the command was dispatched
-     * @param attempt how many times this has already looked
-     */
-    private void awaitBackOutcome(final Form before, final int attempt) {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (Display.getInstance().getCurrent() != before) {
-                    handlingPopState = false;
-                    return;
-                }
-                if (attempt < 40) {
-                    awaitBackOutcome(before, attempt + 1);
-                    return;
-                }
-                // The same form is still showing, so a pop guard refused the navigation -- but
-                // the entry has already been spent. Put it back, or the next Back would leave
-                // the app instead of asking the guard again.
-                handlingPopState = false;
-                pushHistoryState();
-            }
-        });
-    }
-
-    /**
-     * Leaves a number of forms, one at a time.
-     *
-     * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
-     * back command issued straight away would read the form the first one was still leaving and
-     * run its command again -- two entries would be spent while the application moved one.
-     * Each step waits for the form to actually change before the next is issued.</p>
-     */
-    private void dispatchBrowserBackTimes(int remaining) {
-        if (remaining <= 0) {
-            return;
-        }
-        Form before = Display.getInstance().getCurrent();
-        dispatchBrowserBack();
-        if (remaining > 1) {
-            awaitFormChangeThenBack(before, remaining - 1, 0);
-        }
-    }
-
-    private void awaitFormChangeThenBack(final Form before, final int remaining, final int attempt) {
-        callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (Display.getInstance().getCurrent() != before) {
-                    dispatchBrowserBackTimes(remaining);
-                    return;
-                }
-                // Bounded: a back command that refuses to navigate -- a pop guard, or a form
-                // with nowhere to go -- must not leave this waiting for a change that is never
-                // coming.
-                if (attempt < 40) {
-                    awaitFormChangeThenBack(before, remaining, attempt + 1);
-                    return;
-                }
-                // Still on the same form, so that step was refused. The remaining steps are
-                // dropped rather than dispatched: they would ask the same guard again on the
-                // same form, and one of the later answers could navigate even though the jump
-                // this belongs to was already refused.
-            }
-        });
-    }
-
-    /**
      * Reads the id stamped into a history entry. Entries this port did not push -- the document
      * entry the app started on -- carry no id and read as being before everything.
      */
@@ -10789,44 +10720,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
     }
 
-    private void dispatchBrowserBack() {
+    /**
+     * Runs one step of a browser traversal and, once it lands, the steps after it.
+     *
+     * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
+     * back command issued straight away would read the form the first one was still leaving and
+     * run its command again -- two entries would be spent while the application moved one.
+     * Each step waits for the form to actually change before the next is issued.</p>
+     *
+     * @param remaining how many entries of the traversal are still to be accounted for,
+     * including the one this step is for
+     */
+    private void dispatchBrowserBackTimes(final int remaining) {
+        if (remaining <= 0) {
+            return;
+        }
         final Form current = Display.getInstance().getCurrent();
         if (current == null) {
             return;
         }
         Command back = current.getBackCommand();
         if (back == null) {
-            // The form was shown normally, so it has an entry, but it offers no back action --
-            // popping that entry would otherwise look like a press that did nothing and the user
-            // would have to press again. Carry the traversal outwards instead, which leaves the
-            // document, since that is what Back means on a form with nowhere to go.
-            //
-            // Every entry this port pushed has to go, not just one: a form reached through
-            // several others still has theirs above the document, and stepping over a single
-            // one would leave the browser inside a history the application has no forms for.
-            //
-            // The document's own entry counts too. The gesture that got here has already spent
-            // the entry belonging to the form being left, so what remains above the document is
-            // the rest of the pushed entries -- traversing only those would land on the
-            // document with the same form still showing, and the user would have to press Back
-            // again to actually leave.
-            int remaining = historyEntriesPushed + 1;
-            int available = 0;
-            try {
-                available = window.getHistory().getLength() - 1;
-            } catch (Throwable ignored) {
-                // No length to go by; ask for the full distance and let the browser stop where
-                // its history does.
-            }
-            if (available > 0 && remaining > available) {
-                remaining = available;
-            }
-            historySuppressPop = true;
-            try {
-                window.getHistory().go(-remaining);
-            } catch (Throwable ignored) {
-                historySuppressPop = false;
-            }
+            leaveDocument();
             return;
         }
         // Held until the form change actually lands, not just until the command returns: a
@@ -10835,11 +10750,99 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // already spent.
         handlingPopState = true;
         current.dispatchCommand(back, new ActionEvent(back));
-        awaitBackOutcome(current, 0);
+        awaitBackOutcome(current, remaining, 0);
         // Nothing is pushed to replace the entry that was just popped. Every form show pushes
         // one, so the history depth already tracks the navigation depth: popping one entry and
         // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
         // from the root form the first Back did nothing and only the second left the app.
+    }
+
+    /**
+     * Waits for a back command to either navigate or turn out to have been refused.
+     *
+     * @param before the form that was displayed when the command was dispatched
+     * @param remaining entries of the traversal still to be accounted for, this one included
+     * @param attempt how many times this has already looked
+     */
+    private void awaitBackOutcome(final Form before, final int remaining, final int attempt) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (Display.getInstance().getCurrent() != before) {
+                    handlingPopState = false;
+                    dispatchBrowserBackTimes(remaining - 1);
+                    return;
+                }
+                if (attempt < 40) {
+                    awaitBackOutcome(before, remaining, attempt + 1);
+                    return;
+                }
+                // The same form is still showing, so a pop guard refused the navigation. The
+                // browser has already moved across every entry of this traversal, so all of
+                // them are returned, not only this step's. The steps after it are dropped:
+                // they would ask the same guard again on the same form, and one of the later
+                // answers could navigate even though the traversal was refused.
+                handlingPopState = false;
+                restoreTraversal(remaining);
+            }
+        });
+    }
+
+    /**
+     * Returns the browser to the entry a refused traversal started from.
+     *
+     * <p>Going forward rather than pushing: the entries the gesture moved across are still
+     * there to return to, while a push would replace them and lose everything the user could
+     * still have reached with Forward.</p>
+     *
+     * @param steps how many entries the traversal crossed without the application following
+     */
+    private void restoreTraversal(int steps) {
+        if (steps <= 0) {
+            return;
+        }
+        historyEntriesPushed += steps;
+        historySuppressPop = true;
+        try {
+            window.getHistory().go(steps);
+        } catch (Throwable ignored) {
+            historySuppressPop = false;
+        }
+    }
+
+    /**
+     * Carries a Back gesture outwards, out of the document.
+     *
+     * <p>That is what Back means on a form offering no back action: the form was shown
+     * normally so it has an entry, but popping that entry would look like a press that did
+     * nothing and the user would have to press again.</p>
+     */
+    private void leaveDocument() {
+        // Every entry this port pushed has to go, not just one: a form reached through several
+        // others still has theirs above the document, and stepping over a single one would
+        // leave the browser inside a history the application has no forms for.
+        //
+        // The document's own entry counts too. The gesture that got here has already spent the
+        // entry belonging to the form being left, so what remains above the document is the
+        // rest of the pushed entries -- traversing only those would land on the document with
+        // the same form still showing, and the user would have to press Back again to leave.
+        int remaining = historyEntriesPushed + 1;
+        int available = 0;
+        try {
+            available = window.getHistory().getLength() - 1;
+        } catch (Throwable ignored) {
+            // No length to go by; ask for the full distance and let the browser stop where its
+            // history does.
+        }
+        if (available > 0 && remaining > available) {
+            remaining = available;
+        }
+        historySuppressPop = true;
+        try {
+            window.getHistory().go(-remaining);
+        } catch (Throwable ignored) {
+            historySuppressPop = false;
+        }
     }
 
     /**
