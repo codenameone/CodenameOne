@@ -117,6 +117,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 `hide()` hides the window while keeping it alive, so it can be shown again. `dispose()` destroys
 the native window and releases everything behind it; calling it twice is harmless.
 
+`setOwnerWindow()` has to be called before the window is shown. Native ownership is
+established when the window is created -- the owner window handle on Windows, the
+transient parent on GTK, the owner passed to the dialog on Java SE -- and no platform
+lets it be re-pointed afterwards, so changing it later throws rather than pretending.
+
 `setCloseOperation()` decides what the platform's own close control does:
 
 [cols="1,4"]
@@ -145,6 +150,11 @@ Geometry has two coordinate systems and two sets of names, which is deliberate:
   are *native* coordinates and include the platform's own chrome.
 * `getWidth()` and `getHeight()`, inherited from `Component`, are the Codename One
   content size in Codename One pixels.
+
+A size is a *request*. Every window system is free to adjust it -- a minimum size, a
+constraint from the window manager, or a screen too small for what you asked -- so read
+`getWidth()` and `getHeight()` back rather than assuming the request was granted, and
+listen for `Resized` if it matters.
 
 `centerOnDesktop()` centers the window on the *work area* of the monitor it's on, so it
 doesn't land under the task bar or the dock. `centerOn(other)` centers it over another
@@ -182,14 +192,20 @@ Three modality types are available:
 [cols="1,4"]
 |===
 |`MODALITY_NONE` |Blocks nothing. The default.
-|`MODALITY_WINDOW` |Blocks input to the window that owns it.
+|`MODALITY_WINDOW` |Blocks input to the window that owns it, and nothing at all when
+the window has no owner.
 |`MODALITY_APPLICATION` |Blocks input to every other window and to the main form.
 |===
 
-Input blocking is enforced by Codename One rather than by the platform, so modality
-behaves identically everywhere whether the underlying window system implements its
-own. Ports additionally set the native modal flag, which is what gives you the platform's
-expected focus, stacking and task-bar behavior - but correctness never depends on it.
+Codename One decides which windows a modal blocks, so modality behaves identically
+everywhere whether the underlying window system implements its own or not. That decision
+depends on the whole stack of open modal windows, not just the newest one, which is why
+it isn't left to the ports: a window modal opened from inside an application modal
+narrows what *it* blocks without lifting anything the outer one still blocks.
+
+The framework then tells each port which windows to disable natively. That matters
+beyond appearances, because a blocked window's own title bar is outside the input filter
+- without it, the close button of a window you've blocked still reaches your application.
 
 === Monitors and per-monitor DPI
 
@@ -309,6 +325,11 @@ Catalyst differs in one implementation detail worth knowing: a window's Codename
 content is rendered into an off-screen raster and presented to the scene's view, rather
 than the window owning a second GPU surface. Native peers and text editing still use the
 scene's real view hierarchy, so they behave normally.
+
+Scenes also arrive asynchronously. `show()` asks the system to activate one and is
+handed it back later, so a window exists for a moment before its scene does, and a closed
+window's scene is kept for the next one rather than destroyed -- asking for a scene
+while a destruction is still in flight is refused by the system.
 
 === Threading
 
