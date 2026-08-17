@@ -10697,10 +10697,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // or history.go(-N) -- so the distance decides how many forms to leave, not one.
         final int distance = Math.max(1, previous - restored);
         historyEntriesPushed = Math.max(0, historyEntriesPushed - distance);
+        // The browser has already crossed every entry of the jump in this one traversal, so
+        // the count of what the application still owes is the state the replay works from --
+        // and what a back command that skips forms draws down as it goes.
+        pendingTraversalEntries = distance;
         callSerially(new Runnable() {
             @Override
             public void run() {
-                dispatchBrowserBackTimes(distance);
+                replayTraversal();
             }
         });
     }
@@ -10721,26 +10725,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
-     * Runs one step of a browser traversal and, once it lands, the steps after it.
+     * Entries a browser traversal has already crossed that the application has not yet
+     * followed. A back command can leave more than one form at a time, so the replay draws
+     * this down by however many forms each step actually left rather than by one.
+     */
+    private int pendingTraversalEntries;
+
+    /**
+     * Runs one step of a browser traversal and, once it lands, whatever is still outstanding.
      *
      * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
      * back command issued straight away would read the form the first one was still leaving and
      * run its command again -- two entries would be spent while the application moved one.
      * Each step waits for the form to actually change before the next is issued.</p>
-     *
-     * @param remaining how many entries of the traversal are still to be accounted for,
-     * including the one this step is for
      */
-    private void dispatchBrowserBackTimes(final int remaining) {
-        if (remaining <= 0) {
+    private void replayTraversal() {
+        if (pendingTraversalEntries <= 0) {
             return;
         }
         final Form current = Display.getInstance().getCurrent();
         if (current == null) {
+            pendingTraversalEntries = 0;
             return;
         }
         Command back = current.getBackCommand();
         if (back == null) {
+            pendingTraversalEntries = 0;
             leaveDocument();
             return;
         }
@@ -10750,7 +10760,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // already spent.
         handlingPopState = true;
         current.dispatchCommand(back, new ActionEvent(back));
-        awaitBackOutcome(current, remaining, 0);
+        awaitBackOutcome(current, pendingTraversalEntries, 0);
         // Nothing is pushed to replace the entry that was just popped. Every form show pushes
         // one, so the history depth already tracks the navigation depth: popping one entry and
         // going back one form keeps them in step. Re-pushing here left a dead entry behind, so
@@ -10761,29 +10771,37 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Waits for a back command to either navigate or turn out to have been refused.
      *
      * @param before the form that was displayed when the command was dispatched
-     * @param remaining entries of the traversal still to be accounted for, this one included
+     * @param outstanding entries still owed when the command was dispatched
      * @param attempt how many times this has already looked
      */
-    private void awaitBackOutcome(final Form before, final int remaining, final int attempt) {
+    private void awaitBackOutcome(final Form before, final int outstanding, final int attempt) {
         callSerially(new Runnable() {
             @Override
             public void run() {
                 if (Display.getInstance().getCurrent() != before) {
                     handlingPopState = false;
-                    dispatchBrowserBackTimes(remaining - 1);
+                    if (pendingTraversalEntries >= outstanding) {
+                        // The form that appeared was not one this traversal was unwinding
+                        // towards, so nothing was drawn down. Count the step anyway: the
+                        // application has moved and the replay has to end somewhere.
+                        pendingTraversalEntries = outstanding - 1;
+                    }
+                    replayTraversal();
                     return;
                 }
                 if (attempt < 40) {
-                    awaitBackOutcome(before, remaining, attempt + 1);
+                    awaitBackOutcome(before, outstanding, attempt + 1);
                     return;
                 }
                 // The same form is still showing, so a pop guard refused the navigation. The
-                // browser has already moved across every entry of this traversal, so all of
+                // browser has already moved across every entry still outstanding, so all of
                 // them are returned, not only this step's. The steps after it are dropped:
                 // they would ask the same guard again on the same form, and one of the later
                 // answers could navigate even though the traversal was refused.
                 handlingPopState = false;
-                restoreTraversal(remaining);
+                int owed = pendingTraversalEntries;
+                pendingTraversalEntries = 0;
+                restoreTraversal(owed);
             }
         });
     }
@@ -10912,21 +10930,28 @@ public class HTML5Implementation extends CodenameOneImplementation {
             for (int i = 0; i < steps; i++) {
                 historyStack.remove(historyStack.size() - 1);
             }
-            historyEntriesPushed = Math.max(0, historyEntriesPushed - steps);
             if (handlingPopState) {
-                // The user's own Back already spent one entry. If the command skipped forms,
-                // the entries for the ones in between are still above the displayed form and
-                // have to go as well, or the next Back would pop one with no form to match.
-                if (steps > 1) {
+                // The gesture has already crossed entries the application had not yet
+                // followed, so those are what this form change settles first. Only forms left
+                // beyond them still have an entry standing above the displayed form, and only
+                // those need a traversal of their own -- going back for the ones the user's
+                // own gesture already crossed would leave the document early, or spend an
+                // entry the replay was about to account for.
+                int settled = Math.min(steps, pendingTraversalEntries);
+                pendingTraversalEntries -= settled;
+                int extra = steps - settled;
+                if (extra > 0) {
+                    historyEntriesPushed = Math.max(0, historyEntriesPushed - extra);
                     historySuppressPop = true;
                     try {
-                        window.getHistory().go(-(steps - 1));
+                        window.getHistory().go(-extra);
                     } catch (Throwable ignored) {
                         historySuppressPop = false;
                     }
                 }
                 return;
             }
+            historyEntriesPushed = Math.max(0, historyEntriesPushed - steps);
             historySuppressPop = true;
             try {
                 // One traversal for the whole jump, so it raises a single popstate.
