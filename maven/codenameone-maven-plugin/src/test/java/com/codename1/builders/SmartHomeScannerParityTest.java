@@ -176,6 +176,28 @@ public class SmartHomeScannerParityTest {
     }
 
     /**
+     * The Android delegate is injected after the scan that decides whether to.
+     *
+     * <p>usesSmartHome is set by a callback the class scan runs. Injected
+     * above that call it is always false, so the delegate never lands and the
+     * whole Android API reports itself unsupported on a device that supports
+     * it -- with nothing in the build log to say why. Ordering is the entire
+     * bug, so ordering is what this checks.</p>
+     */
+    @Test
+    public void theAndroidDelegateIsInjectedAfterTheScanThatDecidesIt()
+            throws Exception {
+        String src = source("AndroidGradleBuilder");
+        int scan = src.indexOf("scanClassesForPermissions(dummyClassesDir");
+        int inject = src.indexOf("SmartHomeInjector.injectAndroid");
+        assertTrue(scan > 0, "the scan call must exist");
+        assertTrue(inject > 0, "the injection must exist");
+        assertTrue(inject > scan,
+                "the injection must follow the scan that sets usesSmartHome;"
+                        + " before it the flag is always false");
+    }
+
+    /**
      * The gate that does the linking, checked where it lives. HomeKit hangs
      * off the plain smart-home scan; MatterSupport hangs off
      * matterExtensionEnabled, which is what honours the opt-out.

@@ -1471,12 +1471,12 @@ public class AndroidGradleBuilder extends Executor {
         // com.codename1.maps package and returns the onCreate snippet that
         // registers it. Keeps the core framework free of any map SDK.
         String mapsProviderSupport = MapsProviderInjector.injectAndroid(this, request, srcDir);
-        // Only for apps that referenced com.codename1.home. The delegate this
-        // copies in is what makes the API answer anything other than
-        // "unsupported" on Android, and it has to be registered before any
-        // application code runs -- see SmartHomeInjector.
-        String smartHomeSupport = usesSmartHome
-                ? SmartHomeInjector.injectAndroid(this, srcDir) : "";
+        // The smart-home delegate is injected further down, after the class
+        // scan has run: usesSmartHome is still false here, and injecting on it
+        // now would never inject at all -- the API would report itself
+        // unsupported on a device that supports it, with nothing in the build
+        // log to say why.
+        String smartHomeSupport = "";
         File dummyClassesDir = new File(tmpFile, "Classes");
         dummyClassesDir.mkdirs();
         File libsDir = new File(projectDir, "libs");
@@ -2474,6 +2474,10 @@ public class AndroidGradleBuilder extends Executor {
             log("Smart home fragments version "
                     + SmartHomeManifestFragments.FRAGMENT_VERSION
                     + (usesHomeCommissioning ? " (with commissioning)" : ""));
+            // The delegate, and the onCreate snippet that registers it. Here
+            // rather than beside the maps injection above, because that runs
+            // before the scan that sets this flag.
+            smartHomeSupport = SmartHomeInjector.injectAndroid(this, srcDir);
             if (targetSDKVersionInt >= 30) {
                 // Package visibility. Without this
                 // getLaunchIntentForPackage answers null even when Google
