@@ -738,6 +738,53 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// The string form accepts only true/false/1/0 and a declared default only 0 or 1, so a
+    /// number was the one place a value nobody defined became a confident yes.
+    @Test
+    public void aNumericBooleanIsOnlyZeroOrOne() throws Exception {
+        File classes = compile(source(
+                "public static int seen = -1;\n"
+                        + "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static IntentResult log(@IntentParam(\"hard\") boolean hard) {\n"
+                        + "    seen = hard ? 1 : 0;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            assertRejected(invoke, registry, "log_workout", "hard", Integer.valueOf(2),
+                    "not true or false");
+            assertRejected(invoke, registry, "log_workout", "hard", Integer.valueOf(-1),
+                    "not true or false");
+            assertRejected(invoke, registry, "log_workout", "hard", Double.valueOf(Double.NaN),
+                    "not true or false");
+            assertEquals("the handler must not have run", -1, seen.getInt(null));
+
+            Map<String, Object> one = new LinkedHashMap<String, Object>();
+            one.put("hard", Integer.valueOf(1));
+            invoke.invoke(registry, "log_workout", one, null);
+            assertEquals(1, seen.getInt(null));
+
+            Map<String, Object> zero = new LinkedHashMap<String, Object>();
+            zero.put("hard", Integer.valueOf(0));
+            invoke.invoke(registry, "log_workout", zero, null);
+            assertEquals(0, seen.getInt(null));
+        } finally {
+            loader.close();
+        }
+    }
+
     /// A malformed default is a compile-time constant that silently became something else:
     /// numeric() emits 0 for an int it cannot parse, an unparseable boolean becomes false, and
     /// an unparseable date becomes null. An omitted value then reached the handler as a value

@@ -1327,7 +1327,16 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("    private static boolean requiredBoolean(Map<String, Object> p, String k) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
         sb.append("        if (o instanceof Boolean) { return ((Boolean) o).booleanValue(); }\n");
-        sb.append("        if (o instanceof Number) { return ((Number) o).doubleValue() != 0; }\n");
+        // 2, -1 and NaN were all true. The string form accepts only true/false/1/0 and a
+        // declared default only 0 or 1, so numbers were the one place a value nobody defined
+        // became a confident yes.
+        sb.append("        if (o instanceof Number) {\n");
+        sb.append("            double d = ((Number) o).doubleValue();\n");
+        sb.append("            if (d == 0) { return false; }\n");
+        sb.append("            if (d == 1) { return true; }\n");
+        sb.append("            throw new IllegalArgumentException(o\n");
+        sb.append("                    + \" is not true or false for \" + k);\n");
+        sb.append("        }\n");
         sb.append("        if (o instanceof String) {\n");
         sb.append("            String v = ((String) o).trim();\n");
         sb.append("            if (\"true\".equalsIgnoreCase(v) || \"1\".equals(v)) { return true; }\n");

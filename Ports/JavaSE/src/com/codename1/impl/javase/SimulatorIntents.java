@@ -277,7 +277,18 @@ class SimulatorIntents {
             return new ChoiceEditor(new JComboBox(new DefaultComboBoxModel(labels)), ids);
         }
         if (!p.getOptions().isEmpty()) {
-            String[] opts = p.getOptions().toArray(new String[p.getOptions().size()]);
+            List<String> choices = new ArrayList<String>();
+            boolean omittable = !p.isRequired()
+                    && (p.getDefaultValue() == null || p.getDefaultValue().length() == 0);
+            if (omittable) {
+                // A combo always has a selection, so without this the form submits the first
+                // option and the window quietly exercises a request a device might never send:
+                // an optional parameter with no default can simply be absent, and then the
+                // handler receives null. The blank entry is what "absent" looks like here.
+                choices.add("");
+            }
+            choices.addAll(p.getOptions());
+            String[] opts = choices.toArray(new String[choices.size()]);
             return new ChoiceEditor(new JComboBox(new DefaultComboBoxModel(opts)), opts);
         }
         if (p.getType() == IntentParameterType.BOOLEAN) {

@@ -66,6 +66,28 @@ final class IOSIntentCallbacks {
     private IOSIntentCallbacks() {
     }
 
+    /// The bridge, asking the implementation for it when nothing has yet.
+    ///
+    /// `bridge` is only assigned when something calls through the port -- an application using
+    /// `Intents.index`, for instance. An application that only declares intents never does, so
+    /// the very first App Intent would reach the completion below with a null bridge and drop
+    /// its result, leaving the Swift continuation unresumed: the handler ran, and the assistant
+    /// was told nothing. Going through Display also flushes the declarations that could not be
+    /// published before Display.init existed.
+    private static IOSIntentBridge resolveBridge() {
+        IOSIntentBridge b = bridge;
+        if (b != null) {
+            return b;
+        }
+        try {
+            // Assigns the static as a side effect, through getBridge below.
+            Display.getInstance().getIntentBridge();
+        } catch (Throwable t) {
+            Log.e(t);
+        }
+        return bridge;
+    }
+
     /// Returns the singleton intent bridge, creating it on first use.
     static synchronized IOSIntentBridge getBridge(IOSNative nativeInstance) {
         if (bridge == null) {
@@ -96,7 +118,7 @@ final class IOSIntentCallbacks {
                     public void onIntentResult(IntentResult result) {
                         Map<String, byte[]> images = new LinkedHashMap<String, byte[]>();
                         String json = IntentSerializer.serializeResult(result, images);
-                        IOSIntentBridge b = bridge;
+                        IOSIntentBridge b = resolveBridge();
                         if (b != null) {
                             b.completeInvocation(token, json, images);
                         }

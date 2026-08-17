@@ -7493,7 +7493,14 @@ public class AndroidGradleBuilder extends Executor {
             // The headless flag rides in the URI so the trampoline can route a cold-start tap
             // without the declaration table, which is not installed yet at that point.
             Object headlessValue = intent.get("headless");
-            String headlessFlag = Boolean.TRUE.equals(headlessValue) || "true".equals(headlessValue)
+            // An intent naming a route is never headless on this path, however it was declared:
+            // the route has to open somewhere the user can see, and the trampoline applies the
+            // same rule when a declaration is available. iOS decides it statically too.
+            Object routeValue = intent.get("opensRoute");
+            boolean opensRoute = routeValue instanceof String
+                    && ((String) routeValue).length() > 0;
+            String headlessFlag = !opensRoute
+                    && (Boolean.TRUE.equals(headlessValue) || "true".equals(headlessValue))
                     ? "&amp;h=1" : "";
             xml.append("    <shortcut android:shortcutId=\"").append(xmlEscape((String) id))
                     .append("\"\n")

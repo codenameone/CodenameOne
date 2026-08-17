@@ -84,6 +84,36 @@ class AndroidIntentShortcutsTest {
         return (String) f.get(b);
     }
 
+    /// A declared route needs a window to land in, so the URI must not claim headless however
+    /// the intent was declared -- otherwise the trampoline hands it to the service and the Form
+    /// is built where nobody sees it, in a runtime that then stops.
+    @Test
+    void anIntentWithARouteIsNotMarkedHeadless(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"show_order\","
+                + " \"title\": \"Show order\", \"headless\": true,"
+                + " \"discoverable\": true, \"destructive\": false,"
+                + " \"opensRoute\": \"/orders\", \"params\": [],"
+                + " \"exposure\": [\"ASSISTANT\"]}]}");
+
+        String xml = shortcutsXml(dir);
+
+        assertTrue(xml.contains("show_order"), xml);
+        assertFalse(xml.contains("h=1"),
+                "a route has to open the app, so the shortcut must not ask for headless: " + xml);
+    }
+
+    /// The counterpart: a genuinely headless intent still gets the flag.
+    @Test
+    void aHeadlessIntentWithoutARouteKeepsTheFlag(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\": 1, \"intents\": [{\"id\": \"log_workout\","
+                + " \"title\": \"Log a workout\", \"headless\": true,"
+                + " \"discoverable\": true, \"destructive\": false,"
+                + " \"opensRoute\": \"\", \"params\": [],"
+                + " \"exposure\": [\"ASSISTANT\"]}]}");
+
+        assertTrue(shortcutsXml(dir).contains("h=1"));
+    }
+
     @Test
     void theServiceThatRunsCapabilitiesIsNotExported(@TempDir Path dir) throws Exception {
         String entries = entriesFor(dir, null);
