@@ -30,6 +30,25 @@
         </resources>
         <plugins>
             <plugin>
+                <!--
+                  Publishes the headless UI harness (UITestBase and the test
+                  implementation) so other modules can boot a real Display in their own
+                  tests. flutter-runtime needs it: without a Display its render elements
+                  create no components at all, so a test there can pass while the thing it
+                  is meant to check - components being attached, and surviving a rebuild -
+                  never happens. Three separate regressions passed the display-less suite
+                  and rendered blank pages on a device before this existed.
+                -->
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.1</version>
