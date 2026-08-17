@@ -632,10 +632,19 @@ public class LocalHomeBridge implements HomeBridge {
                     "this accessory is simulated as unreachable");
         }
         Service s = a.services.get(serviceId);
-        if (s == null || s.constraintFor(trait) == null) {
+        TraitConstraint constraint = s == null ? null : s.constraintFor(trait);
+        if (constraint == null) {
             return TraitReading.failed(accessoryId, serviceId, trait,
                     HomeError.TRAIT_NOT_SUPPORTED,
                     "this service does not have that trait");
+        }
+        if (!constraint.isReadable()) {
+            // A write-only trait holds a value here -- it has to, so a write
+            // has somewhere to land -- and handing it back would let a
+            // simulator test pass for a read a real accessory refuses.
+            return TraitReading.failed(accessoryId, serviceId, trait,
+                    HomeError.WRITE_ONLY_TRAIT,
+                    "this trait can be set but not read");
         }
         TraitValue v = values.get(key(accessoryId, serviceId, traitId));
         if (v == null) {

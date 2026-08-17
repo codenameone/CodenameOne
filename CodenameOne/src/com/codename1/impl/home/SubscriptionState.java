@@ -201,15 +201,24 @@ public final class SubscriptionState {
             if (disposed) {
                 return;
             }
-            for (TraitReading r : readings) {
-                pending.put(keyOf(r), r);
-            }
             hold = awaitingInitial;
-            if (hold || windowMillis <= 0) {
+            if (windowMillis <= 0 && !hold) {
+                // A window of zero means every step, and this delivery can
+                // carry several for one trait -- a drain of writes that
+                // accumulated while nobody was looking. Keyed into `pending`
+                // they collapse to the last one, which is the one thing a
+                // zero window promises not to do.
                 arm = false;
-            } else if (!flushArmed) {
-                flushArmed = true;
-                arm = true;
+            } else {
+                for (TraitReading r : readings) {
+                    pending.put(keyOf(r), r);
+                }
+                if (hold) {
+                    arm = false;
+                } else if (!flushArmed) {
+                    flushArmed = true;
+                    arm = true;
+                }
             }
         }
         if (hold) {
@@ -217,7 +226,10 @@ public final class SubscriptionState {
             return;
         }
         if (windowMillis <= 0) {
+            // Whatever was already pending goes first, so a resync flag or a
+            // batch held for the initial read keeps its place in the order.
             flush();
+            dispatch(new TraitChangeBatch(id, readings, false, false));
             return;
         }
         if (arm) {

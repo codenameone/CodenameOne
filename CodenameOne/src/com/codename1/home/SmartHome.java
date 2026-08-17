@@ -118,9 +118,12 @@ import java.util.TimerTask;
 ///   `ios.NSHomeKitUsageDescription` build hint; the build fails with an
 ///   actionable message if the description is missing. Commissioning is
 ///   iOS-only.
-/// - **Android** -- Google Play services Matter commissioning always, and the
-///   full Google Home APIs graph when the `android.googleHome.enabled` build
-///   hint and its project configuration are present.
+/// - **Android** -- Google Play services Matter commissioning, reported as
+///   [HomeAvailability#COMMISSIONING_ONLY]: an accessory can be added to the
+///   user's home, and there is no graph to read or control it through. The
+///   Google Home APIs that would provide one need a per-developer Cloud
+///   project and consent screen that cannot be shipped for you, and are not
+///   in this release.
 /// - **Simulator, desktop, JavaScript** -- a local, app-private simulated
 ///   home, reported as [HomeAvailability#LOCAL_ONLY].
 ///

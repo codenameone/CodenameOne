@@ -323,6 +323,34 @@ class LocalHomeTest {
         TraitSubscription sub = home.subscribe(
                 new SubscriptionRequest()
                         .add(lamp, svc, Trait.BRIGHTNESS)
+                        .setMinIntervalMillis(40),
+                seen::set);
+        for (int i = 20; i <= 90; i += 10) {
+            bridge.setValue("lamp-living", "1", Trait.BRIGHTNESS,
+                    TraitValue.of(i, TraitUnit.PERCENT));
+        }
+        settled(home.drainChanges());
+        awaitBatch(seen);
+        assertEquals(1, seen.get().getReadings().size(),
+                "eight steps of a dimmer must arrive as one value, not eight");
+        assertEquals(90.0, seen.get().getReadings().get(0).getValue()
+                .getDouble(TraitUnit.PERCENT), 0.0001);
+        sub.stop();
+    }
+
+    /**
+     * And a window of zero is the escape hatch the documentation offers for
+     * exactly that: every step, at the cost of every step.
+     */
+    @Test
+    void aZeroWindowKeepsEveryStep() {
+        Accessory lamp = home.findAccessory("lamp-living");
+        AccessoryService svc = lamp.getPrimaryService();
+        AtomicReference<TraitChangeBatch> seen =
+                new AtomicReference<TraitChangeBatch>();
+        TraitSubscription sub = home.subscribe(
+                new SubscriptionRequest()
+                        .add(lamp, svc, Trait.BRIGHTNESS)
                         .setMinIntervalMillis(0),
                 seen::set);
         for (int i = 20; i <= 90; i += 10) {
@@ -331,11 +359,26 @@ class LocalHomeTest {
         }
         settled(home.drainChanges());
         assertNotNull(seen.get());
-        assertEquals(1, seen.get().getReadings().size(),
-                "eight steps of a dimmer must arrive as one value, not eight");
-        assertEquals(90.0, seen.get().getReadings().get(0).getValue()
-                .getDouble(TraitUnit.PERCENT), 0.0001);
+        assertEquals(8, seen.get().getReadings().size(),
+                "a zero window promises the journey, not the destination");
+        assertEquals(90.0, seen.get().getReadings().get(7).getValue()
+                .getDouble(TraitUnit.PERCENT), 0.0001,
+                "in order, ending where the dimmer ended");
         sub.stop();
+    }
+
+    /** Waits for a coalescing window to elapse and hand a batch over. */
+    private static void awaitBatch(AtomicReference<TraitChangeBatch> seen) {
+        long limit = System.currentTimeMillis() + 4000;
+        while (seen.get() == null && System.currentTimeMillis() < limit) {
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        assertNotNull(seen.get(), "the window must elapse and deliver");
     }
 
     @Test
