@@ -164,19 +164,161 @@ public class BufferedGraphics extends HTML5Graphics {
             noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
             return;
         }
-        // A shape covers what it encloses, not what its bounding rectangle encloses: a filled
-        // triangle drawn around a label reaches none of it. The shape itself decides, corner by
-        // corner, and only text it covers entirely goes back to the canvas.
+        // A shape reaches what it encloses, not what its bounding rectangle encloses: a filled
+        // triangle drawn around a label reaches none of it, while a triangle over one corner of
+        // that label reaches part of it -- and any part is enough, because the canvas would have
+        // painted over that part and the DOM run cannot be painted over at all. So the question
+        // asked of the shape is whether it meets the text anywhere.
+        final float[][] outline = outlineOf(shape);
         noteCanvasCover(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),
                 new JavaScriptTextLayer.CoverTest() {
                     @Override
                     public boolean covers(int x, int y, int w, int h) {
-                        int right = x + Math.max(0, w - 1);
-                        int bottom = y + Math.max(0, h - 1);
-                        return shape.contains(x, y) && shape.contains(right, y)
-                                && shape.contains(x, bottom) && shape.contains(right, bottom);
+                        return outlineMeetsRect(outline, x, y, w, h);
                     }
                 });
+    }
+
+    /**
+     * Flattens a shape's outline into one array of x coordinates and one of y coordinates per
+     * subpath, so it can be asked whether it meets a rectangle.
+     *
+     * <p>Curves are taken through their control points. That traces slightly wide of the curve
+     * itself, which errs towards saying the shape meets the text -- the same side the canvas errs
+     * on, since text it may have painted over must not stay above it.</p>
+     */
+    private static float[][] outlineOf(Shape shape) {
+        java.util.List<float[]> xs = new java.util.ArrayList<float[]>();
+        java.util.List<float[]> ys = new java.util.ArrayList<float[]>();
+        java.util.List<Float> curX = new java.util.ArrayList<Float>();
+        java.util.List<Float> curY = new java.util.ArrayList<Float>();
+        float[] coords = new float[6];
+        com.codename1.ui.geom.PathIterator it = shape.getPathIterator();
+        while (it != null && !it.isDone()) {
+            int type = it.currentSegment(coords);
+            if (type == com.codename1.ui.geom.PathIterator.SEG_MOVETO) {
+                if (curX.size() > 1) {
+                    xs.add(toArray(curX));
+                    ys.add(toArray(curY));
+                }
+                curX.clear();
+                curY.clear();
+                curX.add(Float.valueOf(coords[0]));
+                curY.add(Float.valueOf(coords[1]));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_LINETO) {
+                curX.add(Float.valueOf(coords[0]));
+                curY.add(Float.valueOf(coords[1]));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_QUADTO) {
+                curX.add(Float.valueOf(coords[0]));
+                curY.add(Float.valueOf(coords[1]));
+                curX.add(Float.valueOf(coords[2]));
+                curY.add(Float.valueOf(coords[3]));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_CUBICTO) {
+                for (int i = 0; i < 6; i += 2) {
+                    curX.add(Float.valueOf(coords[i]));
+                    curY.add(Float.valueOf(coords[i + 1]));
+                }
+            }
+            it.next();
+        }
+        if (curX.size() > 1) {
+            xs.add(toArray(curX));
+            ys.add(toArray(curY));
+        }
+        float[][] out = new float[xs.size() * 2][];
+        for (int i = 0; i < xs.size(); i++) {
+            out[i * 2] = xs.get(i);
+            out[i * 2 + 1] = ys.get(i);
+        }
+        return out;
+    }
+
+    private static float[] toArray(java.util.List<Float> values) {
+        float[] out = new float[values.size()];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = values.get(i).floatValue();
+        }
+        return out;
+    }
+
+    /**
+     * Whether a flattened outline meets a rectangle at all -- a vertex inside it, a corner of it
+     * inside the outline, or an edge crossing one of its sides.
+     */
+    private static boolean outlineMeetsRect(float[][] outline, int x, int y, int w, int h) {
+        if (outline == null || outline.length == 0) {
+            // Nothing to go by, so treat the draw as reaching the text: leaving a run above a
+            // draw that covered it is the error that shows on screen.
+            return true;
+        }
+        float right = x + Math.max(0, w);
+        float bottom = y + Math.max(0, h);
+        for (int p = 0; p + 1 < outline.length; p += 2) {
+            float[] px = outline[p];
+            float[] py = outline[p + 1];
+            for (int i = 0; i < px.length; i++) {
+                if (px[i] >= x && px[i] <= right && py[i] >= y && py[i] <= bottom) {
+                    return true;
+                }
+            }
+            if (pointInLoop(px, py, x, y) || pointInLoop(px, py, right, y)
+                    || pointInLoop(px, py, x, bottom) || pointInLoop(px, py, right, bottom)) {
+                return true;
+            }
+            for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
+                if (segmentMeetsRect(px[j], py[j], px[i], py[i], x, y, right, bottom)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean pointInLoop(float[] px, float[] py, float x, float y) {
+        boolean inside = false;
+        for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
+            if ((py[i] > y) == (py[j] > y)) {
+                continue;
+            }
+            double crossing = (double) (px[j] - px[i]) * (y - py[i]) / (double) (py[j] - py[i]) + px[i];
+            if (x < crossing) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    private static boolean segmentMeetsRect(float x1, float y1, float x2, float y2,
+            float left, float top, float right, float bottom) {
+        return segmentsMeet(x1, y1, x2, y2, left, top, right, top)
+                || segmentsMeet(x1, y1, x2, y2, right, top, right, bottom)
+                || segmentsMeet(x1, y1, x2, y2, right, bottom, left, bottom)
+                || segmentsMeet(x1, y1, x2, y2, left, bottom, left, top);
+    }
+
+    private static boolean segmentsMeet(float ax1, float ay1, float ax2, float ay2,
+            float bx1, float by1, float bx2, float by2) {
+        double d1 = side(bx1, by1, bx2, by2, ax1, ay1);
+        double d2 = side(bx1, by1, bx2, by2, ax2, ay2);
+        double d3 = side(ax1, ay1, ax2, ay2, bx1, by1);
+        double d4 = side(ax1, ay1, ax2, ay2, bx2, by2);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0))
+                && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+            return true;
+        }
+        return (d1 == 0 && between(bx1, by1, bx2, by2, ax1, ay1))
+                || (d2 == 0 && between(bx1, by1, bx2, by2, ax2, ay2))
+                || (d3 == 0 && between(ax1, ay1, ax2, ay2, bx1, by1))
+                || (d4 == 0 && between(ax1, ay1, ax2, ay2, bx2, by2));
+    }
+
+    private static double side(float x1, float y1, float x2, float y2, float px, float py) {
+        return (double) (x2 - x1) * (py - y1) - (double) (y2 - y1) * (px - x1);
+    }
+
+    private static boolean between(float x1, float y1, float x2, float y2, float px, float py) {
+        return px >= Math.min(x1, x2) && px <= Math.max(x1, x2)
+                && py >= Math.min(y1, y2) && py <= Math.max(y1, y2);
     }
 
     /**
@@ -196,41 +338,22 @@ public class BufferedGraphics extends HTML5Graphics {
             minY = Math.min(minY, yPoints[i]);
             maxY = Math.max(maxY, yPoints[i]);
         }
-        // Like a filled shape, a polygon covers what it encloses rather than what its bounding
-        // rectangle does, so each corner of a candidate run is tested against the outline.
+        // Like a filled shape, a polygon reaches what it encloses rather than what its bounding
+        // rectangle does -- and any part of the text it reaches is enough to send that text back
+        // to the canvas.
+        int count = Math.min(nPoints, Math.min(xPoints.length, yPoints.length));
+        final float[][] outline = new float[][] { new float[count], new float[count] };
+        for (int i = 0; i < count; i++) {
+            outline[0][i] = xPoints[i];
+            outline[1][i] = yPoints[i];
+        }
         noteCanvasCover(minX, minY, maxX - minX, maxY - minY,
                 new JavaScriptTextLayer.CoverTest() {
                     @Override
                     public boolean covers(int x, int y, int w, int h) {
-                        int right = x + Math.max(0, w - 1);
-                        int bottom = y + Math.max(0, h - 1);
-                        return inPolygon(xPoints, yPoints, nPoints, x, y)
-                                && inPolygon(xPoints, yPoints, nPoints, right, y)
-                                && inPolygon(xPoints, yPoints, nPoints, x, bottom)
-                                && inPolygon(xPoints, yPoints, nPoints, right, bottom);
+                        return outlineMeetsRect(outline, x, y, w, h);
                     }
                 });
-    }
-
-    /**
-     * Whether a point lies inside a polygon, by the even-odd rule the canvas fills it with.
-     */
-    private static boolean inPolygon(int[] xPoints, int[] yPoints, int nPoints, int x, int y) {
-        boolean inside = false;
-        int count = Math.min(nPoints, Math.min(xPoints.length, yPoints.length));
-        for (int i = 0, j = count - 1; i < count; j = i++) {
-            int yi = yPoints[i];
-            int yj = yPoints[j];
-            if ((yi > y) == (yj > y)) {
-                continue;
-            }
-            double crossing = (double) (xPoints[j] - xPoints[i]) * (y - yi)
-                    / (double) (yj - yi) + xPoints[i];
-            if (x < crossing) {
-                inside = !inside;
-            }
-        }
-        return inside;
     }
 
     /**
