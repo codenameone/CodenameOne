@@ -3273,6 +3273,25 @@ public class IPhoneBuilder extends Executor {
                         break;
                     }
                 }
+                // A project that declares the array through ios.plistInject
+                // is left alone. The plist renderer emits its own
+                // LSApplicationQueriesSchemes key for this hint without
+                // looking at the injected fragment, so setting the hint as
+                // well would put the key in the plist twice -- and a plist
+                // with a duplicate key is not a plist that reliably keeps
+                // either value. Said out loud, because the consequence
+                // (openEcosystemApp finding nothing) is otherwise a mystery.
+                if (!homeSchemeDeclared
+                        && request.getArg("ios.plistInject", "")
+                                .contains("LSApplicationQueriesSchemes")) {
+                    log("ios.plistInject already declares "
+                            + "LSApplicationQueriesSchemes, so com.apple.Home "
+                            + "was not added for you. Add it to that array or "
+                            + "SmartHome.openEcosystemApp() will report the "
+                            + "Apple Home app missing on devices that have "
+                            + "it.");
+                    homeSchemeDeclared = true;
+                }
                 if (!homeSchemeDeclared) {
                     request.putArgument("ios.applicationQueriesSchemes",
                             queries.trim().length() == 0 ? "com.apple.Home"
@@ -3296,8 +3315,18 @@ public class IPhoneBuilder extends Executor {
                 // satisfied the requirement below and produced exactly the
                 // app that requirement exists to prevent: linked, entitled,
                 // and terminated on launch for a missing purpose string.
+                // Either source: ios.plistInject is a supported way to
+                // supply a purpose string, and reading only the direct hint
+                // failed a build whose generated plist carries a perfectly
+                // good disclosure. WatchNativeBuilder resolves the same two
+                // sources for the watch.
                 String homeUsage = trimToNull(request.getArg(
                         "ios.NSHomeKitUsageDescription", null));
+                if (homeUsage == null) {
+                    homeUsage = trimToNull(WatchNativeBuilder
+                            .injectedPlistString(request,
+                                    "NSHomeKitUsageDescription"));
+                }
                 if ("false".equalsIgnoreCase(homeUsage)) {
                     homeUsage = null;
                 }

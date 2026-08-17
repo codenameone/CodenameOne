@@ -155,6 +155,9 @@ public final class SmartHome {
     /// which on iOS rebuilds a snapshot of an HMHomeManager that has not
     /// loaded yet and resolves with no homes at all.
     private boolean starting;
+    /// The request id of the start in flight, so its answer is told apart
+    /// from an ordinary refresh's. Zero when nothing is starting.
+    private int startingRequestId;
     /// The refreshes that arrived during that window, answered together with
     /// the start rather than sent to a backend that is not up.
     private final List<Integer> deferredGraphRequests =
@@ -530,6 +533,7 @@ public final class SmartHome {
                 deferred = true;
             } else if (!started) {
                 starting = true;
+                startingRequestId = id;
                 needsStart = true;
             }
         }
@@ -1500,13 +1504,28 @@ public final class SmartHome {
         HomeException failure = HomeWire.decodeError(error);
         List<Integer> waiting;
         if (failure != null) {
+            boolean wasStart;
             synchronized (this) {
-                // A failed start must not leave the flag set, or the retry
-                // would call refresh() on a bridge that never connected and
-                // fail in a way that no longer names the real problem.
-                started = false;
-                starting = false;
-                waiting = drainDeferred();
+                // Only the START's own failure resets the startup state. Both
+                // answers arrive here, and clearing it for an ordinary
+                // refresh failure -- an accessory that timed out an hour
+                // later -- marked a perfectly connected bridge as never
+                // started, so the next refresh called start() on it again;
+                // worse, a second stale failure could land while that retry
+                // was in flight and fail its deferred callers with an
+                // unrelated error.
+                wasStart = starting && requestId == startingRequestId;
+                if (wasStart) {
+                    // A failed start must not leave the flag set, or the
+                    // retry would call refresh() on a bridge that never
+                    // connected and fail in a way that no longer names the
+                    // real problem.
+                    started = false;
+                    starting = false;
+                    startingRequestId = 0;
+                }
+                waiting = wasStart ? drainDeferred()
+                        : Collections.<Integer>emptyList();
             }
             if (result != null) {
                 result.error(failure);
@@ -1523,11 +1542,16 @@ public final class SmartHome {
         List<HomeStructure> rebuilt = buildGraph();
         synchronized (this) {
             structures = rebuilt;
-            if (starting) {
+            if (starting && requestId == startingRequestId) {
                 starting = false;
+                startingRequestId = 0;
                 started = true;
             }
-            waiting = drainDeferred();
+            // Same rule as the failure path: the deferred requests are
+            // waiting for the START, so an unrelated refresh answering first
+            // must not hand them its own result.
+            waiting = starting ? Collections.<Integer>emptyList()
+                    : drainDeferred();
         }
         if (result != null) {
             result.complete(rebuilt);
@@ -1758,6 +1782,17 @@ public final class SmartHome {
         for (int i = 0; i < count; i++) {
             TraitReading reading = lines != null && i < lines.length
                     ? HomeWire.decodeReading(lines[i]) : null;
+            // Checked against the slot it landed in, not just decoded. A row
+            // that is well formed but out of order -- a port that reordered
+            // its answer, or repeated one -- reads as a perfectly good value
+            // for the wrong control, and read() promises the caller can line
+            // its own list up against this one by position.
+            if (reading != null
+                    && !(accessoryIds.get(i).equals(reading.getAccessoryId())
+                            && serviceIds.get(i).equals(reading.getServiceId())
+                            && traits.get(i) == reading.getTrait())) {
+                reading = null;
+            }
             if (reading == null) {
                 reading = TraitReading.failed(accessoryIds.get(i),
                         serviceIds.get(i), traits.get(i),

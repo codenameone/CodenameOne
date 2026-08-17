@@ -2604,11 +2604,25 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                 }
                 NSString *encoded = [[firstFailure retain] autorelease];
                 [home removeActionSet:actionSet
-                    completionHandler:^(NSError *ignored) {
-                    // The removal's own outcome is not reported: the caller
-                    // asked to create a scene and the answer is that it was
-                    // not created. A failure to clean up is ours, not theirs.
-                    answer(encoded);
+                    completionHandler:^(NSError *removeError) {
+                    if (removeError == nil) {
+                        answer(encoded);
+                        return;
+                    }
+                    // The rollback failed too, so a half-built scene IS in
+                    // the user's home. Saying only "creation failed" invites
+                    // a retry that leaves a second one beside it, and the
+                    // caller cannot see either. The scene id goes back with
+                    // the error so it can be found and removed.
+                    answer(cn1homeError(@"IO_ERROR",
+                        [NSError errorWithDomain:@"CN1SmartHome" code:0
+                            userInfo:[NSDictionary dictionaryWithObject:
+                                [NSString stringWithFormat:
+                                    @"the scene could not be created and the "
+                                     "partly built one could not be removed "
+                                     "either; it is in the home as \"%@\" "
+                                     "and has to be deleted", sceneName]
+                                forKey:NSLocalizedDescriptionKey]]));
                 }];
             };
             if (remaining == 0) {
