@@ -1962,6 +1962,21 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
                 double speed = cn1homeFanModeSpeed((int) numeric);
                 HMCharacteristic *speedChar = speed < 0 ? nil
                         : cn1homeFindCharacteristic(service, @"fan_speed");
+                if (speed >= 0 && speedChar == nil) {
+                    // LOW, MEDIUM and HIGH are a speed, and RotationSpeed is
+                    // optional on a HomeKit fan. Without it the rest of this
+                    // write would select manual and switch the fan on at
+                    // whatever speed it was already at, and report the
+                    // requested mode as applied.
+                    [records replaceObjectAtIndex:i
+                                       withObject:cn1homeJoinFields(
+                        [base arrayByAddingObjectsFromArray:
+                         [NSArray arrayWithObjects:@"0",
+                          @"TRAIT_NOT_SUPPORTED",
+                          @"this fan has no speed control", nil]])];
+                    outstanding--;
+                    continue;
+                }
                 if (speedChar != nil) {
                     [chars addObject:speedChar];
                     [values addObject:[NSNumber numberWithDouble:speed]];
@@ -2313,6 +2328,16 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                     }
                     HMCharacteristic *speedChar = speed < 0 ? nil
                             : cn1homeFindCharacteristic(service, @"fan_speed");
+                    if (speed >= 0 && speedChar == nil) {
+                        // As in the direct write path: a speed-naming mode on
+                        // a fan with no RotationSpeed is a scene that would
+                        // run every night and never set the speed asked for.
+                        failedActions++;
+                        if (firstFailure == nil) {
+                            firstFailure = [cn1homeError(
+                                @"TRAIT_NOT_SUPPORTED", nil) retain];
+                        }
+                    }
                     if (speedChar != nil) {
                         [extraChars addObject:speedChar];
                         [extraValues addObject:

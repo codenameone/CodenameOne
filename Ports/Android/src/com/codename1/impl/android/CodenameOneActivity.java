@@ -463,7 +463,14 @@ public class CodenameOneActivity extends Activity {
     public void startIntentSenderForResult(IntentSender intent, int requestCode,
             Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags)
             throws IntentSender.SendIntentException {
-        waitingForResult = true;
+        // The queue reset only, deliberately -- NOT waitingForResult.
+        // Callers of this method differ from callers of
+        // startActivityForResult: GoogleImpl launches its sign-in resolution
+        // here and registers its listener afterwards, and marking the channel
+        // busy first makes setIntentResultListener a no-op, so the resolution
+        // result would go nowhere and the client would never reconnect.
+        // Registering a listener is what marks the channel busy, whichever
+        // side of the launch it happens on.
         intentResult = new Vector();
         if (InPlaceEditView.isEditing()) {
             AndroidImplementation.stopEditing(true);
