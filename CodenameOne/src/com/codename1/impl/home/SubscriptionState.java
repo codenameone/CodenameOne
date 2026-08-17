@@ -192,7 +192,14 @@ public final class SubscriptionState {
                     return;
                 }
                 awaitingInitial = false;
-                held = !pending.isEmpty();
+                // resyncRequired counts as something held: markResyncRequired
+                // deliberately does not deliver while the initial read is in
+                // flight, so if nothing else is pending this is the only
+                // chance to hand the flag over. Without it a subscription
+                // whose notification registration failed during its own
+                // initial read delivered those values looking perfectly
+                // healthy and never said they could not be trusted.
+                held = !pending.isEmpty() || resyncRequired;
                 if (!heldSteps.isEmpty()) {
                     steps = new ArrayList<TraitReading>(heldSteps);
                     heldSteps.clear();

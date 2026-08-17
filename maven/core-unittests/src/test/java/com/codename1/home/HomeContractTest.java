@@ -503,6 +503,41 @@ class HomeContractTest {
     }
 
     /**
+     * A resync raised while the initial read is in flight still reaches the
+     * listener.
+     *
+     * <p>markResyncRequired deliberately holds the flag during that window,
+     * so if nothing else is pending the initial delivery is the only chance
+     * to hand it over. Lost, a subscription whose notification registration
+     * failed delivered its initial values looking perfectly healthy and never
+     * said they could not be trusted.</p>
+     */
+    @Test
+    void aResyncRaisedDuringTheInitialReadIsStillDelivered() {
+        final List<TraitChangeBatch> seen = new ArrayList<TraitChangeBatch>();
+        SubscriptionState state = new SubscriptionState("sub-5",
+                new HomeChangeListener() {
+                    @Override
+                    public void traitsChanged(TraitChangeBatch batch) {
+                        seen.add(batch);
+                    }
+                }, 0, true);
+
+        state.markResyncRequired();
+        assertEquals(0, seen.size(), "held while the read is in flight");
+
+        state.offer(readingOf(true, 1L), true);
+        boolean flagged = false;
+        for (TraitChangeBatch batch : seen) {
+            flagged = flagged || batch.isResyncRequired();
+        }
+        assertTrue(flagged,
+                "the resync flag must reach the listener: " + seen.size()
+                        + " batch(es)");
+        state.dispose();
+    }
+
+    /**
      * And a read that comes back with nothing must not hold them forever.
      */
     @Test

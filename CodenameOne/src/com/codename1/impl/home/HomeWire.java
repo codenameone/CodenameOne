@@ -664,12 +664,19 @@ public final class HomeWire {
                     // cannot read it, which is true.
                     return null;
                 }
-                if (!unit.isCompatibleWith(trait.getUnit())) {
+                if (!trait.acceptsUnit(unit)) {
                     // A brightness labelled in Celsius. Accepted, it becomes
                     // a value every caller throws on the moment they ask for
                     // it in the unit the trait documents -- an exception in
                     // their code for a defect in the port's. INVALID_DATA
                     // says whose it is.
+                    //
+                    // Asked of the trait rather than of its nominal unit,
+                    // because a trait may legitimately arrive in another
+                    // dimension: VOC is micrograms per cubic metre on
+                    // HomeKit and parts per billion on Matter, and its
+                    // javadoc tells callers to read getUnit() for exactly
+                    // that reason.
                     return null;
                 }
                 value = TraitValue.of(numeric, unit);

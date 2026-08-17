@@ -100,11 +100,20 @@ public final class Trait {
     /// here so a write can be refused rather than stored and reported
     /// successful by whichever backend happens to accept anything.
     private final String[] writableEnumNames;
+    /// Units this trait may arrive in besides its nominal one, when the two
+    /// measure different things.
+    ///
+    /// Exactly one trait needs this today and its javadoc says why: HomeKit
+    /// reports VOC in micrograms per cubic metre and Matter commonly reports
+    /// it in parts per billion, which is a different dimension entirely. The
+    /// wire codec has to let that reading through, because the alternative is
+    /// refusing a value the trait's own contract promises.
+    private final TraitUnit[] alternateUnits;
 
     private Trait(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double nominalMin, double nominalMax,
             boolean hasNominalRange, String[] enumNames,
-            String[] writableEnumNames) {
+            String[] writableEnumNames, TraitUnit[] alternateUnits) {
         this.id = id;
         this.kind = kind;
         this.unit = unit;
@@ -114,18 +123,28 @@ public final class Trait {
         this.hasNominalRange = hasNominalRange;
         this.enumNames = enumNames;
         this.writableEnumNames = writableEnumNames;
+        this.alternateUnits = alternateUnits;
     }
 
     private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double min, double max, boolean ranged) {
-        return define(id, kind, unit, readOnly, min, max, ranged, null, null);
+        return define(id, kind, unit, readOnly, min, max, ranged, null, null,
+                null);
     }
 
     private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double min, double max, boolean ranged,
             String[] enumNames, String[] writableEnumNames) {
+        return define(id, kind, unit, readOnly, min, max, ranged, enumNames,
+                writableEnumNames, null);
+    }
+
+    private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
+            boolean readOnly, double min, double max, boolean ranged,
+            String[] enumNames, String[] writableEnumNames,
+            TraitUnit[] alternateUnits) {
         Trait t = new Trait(id, kind, unit, readOnly, min, max, ranged,
-                enumNames, writableEnumNames);
+                enumNames, writableEnumNames, alternateUnits);
         BY_ID.put(id, t);
         ALL.add(t);
         return t;
@@ -184,6 +203,13 @@ public final class Trait {
     /// A measured quantity with no fixed range.
     private static Trait measure(String id, TraitUnit unit, boolean readOnly) {
         return define(id, TraitValueKind.DOUBLE, unit, readOnly, 0, 0, false);
+    }
+
+    /// A quantity a backend may report in a unit of another dimension.
+    private static Trait measure(String id, TraitUnit unit, boolean readOnly,
+            TraitUnit... alternates) {
+        return define(id, TraitValueKind.DOUBLE, unit, readOnly, 0, 0, false,
+                null, null, alternates);
     }
 
     // ------------------------------------------------------------------
@@ -626,7 +652,8 @@ public final class Trait {
     /// refuses to convert between the two dimensions. Read
     /// [TraitValue#getUnit()] before you render this one.
     public static final Trait VOC_DENSITY =
-            measure("voc_density", TraitUnit.MICROGRAM_PER_CUBIC_METER, true);
+            measure("voc_density", TraitUnit.MICROGRAM_PER_CUBIC_METER, true,
+                    TraitUnit.PPB);
 
     // ------------------------------------------------------------------
     // power source
@@ -737,6 +764,38 @@ public final class Trait {
 
     /// Whether this trait can only ever be read.
     ///
+    /// Whether a reading of this trait may arrive in the given unit.
+    ///
+    /// The trait's own unit always may. So may one of the alternates, which
+    /// exist for the traits whose javadoc says the unit varies by accessory
+    /// -- VOC arrives in micrograms per cubic metre from HomeKit and in parts
+    /// per billion from Matter, and refusing the second would refuse a
+    /// reading this API promises to deliver.
+    ///
+    /// #### Parameters
+    ///
+    /// - `unit`: the unit the value carries
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a value in that unit is a valid reading of this trait
+    public boolean acceptsUnit(TraitUnit unit) {
+        if (unit == null) {
+            return false;
+        }
+        if (unit.isCompatibleWith(this.unit)) {
+            return true;
+        }
+        if (alternateUnits != null) {
+            for (TraitUnit alternate : alternateUnits) {
+                if (unit.isCompatibleWith(alternate)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /// Whether a value belongs to this trait's domain enum.
     ///
     /// Checked by constant name where the value has one, which is every value

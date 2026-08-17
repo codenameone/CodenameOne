@@ -76,6 +76,11 @@ static NSMutableDictionary *cn1homeWatches = nil;
 // exists because the SPI is shared with backends that do not push.
 static NSMutableDictionary *cn1homeUndelivered = nil;
 
+// The last value drainChanges() saw for a watched characteristic that cannot
+// notify, keyed "subscriptionId \t accessoryId \t serviceId \t traitId".
+// Without it a drain would report every polled trait as changed every time.
+static NSMutableDictionary *cn1homeLastPolled = nil;
+
 // The request id of a start() that is waiting for the first
 // homeManagerDidUpdateHomes:. Zero when nothing is waiting.
 static JAVA_INT cn1homePendingStart = 0;
@@ -879,6 +884,19 @@ static HMCharacteristic *cn1homeFindCharacteristic(HMService *service,
     return nil;
 }
 
+/// A reading record with its timestamp blanked, for comparing two polls.
+///
+/// The timestamp is field 9 and moves on every read, so whole-record equality
+/// would call every poll a change.
+static NSString *cn1homeReadingWithoutTimestamp(NSString *record) {
+    NSMutableArray *fields = [[[record componentsSeparatedByString:@"\t"]
+                               mutableCopy] autorelease];
+    if ([fields count] > 9) {
+        [fields replaceObjectAtIndex:9 withObject:@""];
+    }
+    return [fields componentsJoinedByString:@"\t"];
+}
+
 static NSString *cn1homeReadingKey(NSString *accessoryId, NSString *serviceId,
                                    NSString *traitId) {
     return [NSString stringWithFormat:@"%@\t%@\t%@", accessoryId, serviceId,
@@ -1555,6 +1573,7 @@ static void cn1homeInit(void) {
         cn1homeSnapshotLock = [[NSLock alloc] init];
         cn1homeWatches = [[NSMutableDictionary alloc] init];
         cn1homeUndelivered = [[NSMutableDictionary alloc] init];
+        cn1homeLastPolled = [[NSMutableDictionary alloc] init];
         cn1homeAccessoryObjects = [[NSMutableDictionary alloc] init];
         cn1homeHomeObjects = [[NSMutableDictionary alloc] init];
         cn1homeDelegate = [[CN1HomeDelegate alloc] init];
@@ -1699,6 +1718,7 @@ void com_codename1_impl_ios_IOSNative_homeStop__(
         cn1homePendingAuth = 0;
         [cn1homeWatches removeAllObjects];
         [cn1homeUndelivered removeAllObjects];
+        [cn1homeLastPolled removeAllObjects];
     });
 }
 
@@ -2363,8 +2383,85 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                              cn1homeJoinRecords(records)));
         }
         [cn1homeUndelivered removeAllObjects];
-        com_codename1_impl_ios_IOSHomeCallbacks_drained___int_int_java_lang_String(
-            getThreadLocalData(), rid, delivered, JAVA_NULL);
+
+        // And then the traits HomeKit will not report on its own.
+        //
+        // A characteristic without SupportsEventNotification never fires the
+        // delegate, so a subscription to one produced its initial value and
+        // then nothing, for the life of the screen. TraitConstraint's
+        // notifiesOnChange says such a subscription still works through
+        // drainChanges(), and this is what makes that true: a live read of
+        // each one, delivered only where the value actually moved.
+        NSMutableArray *pollSubs = [NSMutableArray array];
+        NSMutableArray *pollKeys = [NSMutableArray array];
+        NSMutableArray *pollChars = [NSMutableArray array];
+        for (NSString *subscriptionId in cn1homeWatches) {
+            for (NSString *key in [cn1homeWatches
+                                   objectForKey:subscriptionId]) {
+                NSArray *parts = [key componentsSeparatedByString:@"\t"];
+                if ([parts count] != 3) {
+                    continue;
+                }
+                HMService *service = cn1homeFindService(
+                    [parts objectAtIndex:0], [parts objectAtIndex:1]);
+                HMCharacteristic *c = cn1homeFindCharacteristic(
+                    service, [parts objectAtIndex:2]);
+                if (c == nil
+                        || [[c properties] containsObject:
+                            HMCharacteristicPropertySupportsEventNotification]
+                        || ![[c properties] containsObject:
+                            HMCharacteristicPropertyReadable]) {
+                    continue;
+                }
+                [pollSubs addObject:subscriptionId];
+                [pollKeys addObject:key];
+                [pollChars addObject:c];
+            }
+        }
+        if ([pollChars count] == 0) {
+            com_codename1_impl_ios_IOSHomeCallbacks_drained___int_int_java_lang_String(
+                getThreadLocalData(), rid, delivered, JAVA_NULL);
+            return;
+        }
+        __block NSUInteger remaining = [pollChars count];
+        __block int polled = 0;
+        for (NSUInteger i = 0; i < [pollChars count]; i++) {
+            HMCharacteristic *c = [pollChars objectAtIndex:i];
+            NSString *subscriptionId = [pollSubs objectAtIndex:i];
+            NSString *key = [pollKeys objectAtIndex:i];
+            [c readValueWithCompletionHandler:^(NSError *error) {
+                if (error == nil) {
+                    NSArray *parts =
+                            [key componentsSeparatedByString:@"\t"];
+                    NSString *record = cn1homeEncodeReading(
+                        [parts objectAtIndex:0], [parts objectAtIndex:1],
+                        [parts objectAtIndex:2], [c value], nil, nil);
+                    // Compared without the timestamp, which is the last
+                    // field and moves on every read: comparing whole records
+                    // would report every poll as a change.
+                    NSString *stateKey = [NSString stringWithFormat:@"%@\t%@",
+                                          subscriptionId, key];
+                    NSString *previous = [cn1homeLastPolled
+                                          objectForKey:stateKey];
+                    NSString *current = cn1homeReadingWithoutTimestamp(record);
+                    if (previous == nil
+                            || ![previous isEqualToString:current]) {
+                        [cn1homeLastPolled setObject:current forKey:stateKey];
+                        polled++;
+                        com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
+                            getThreadLocalData(),
+                            fromNSString(getThreadLocalData(), subscriptionId),
+                            fromNSString(getThreadLocalData(), record));
+                    }
+                }
+                remaining--;
+                if (remaining == 0) {
+                    com_codename1_impl_ios_IOSHomeCallbacks_drained___int_int_java_lang_String(
+                        getThreadLocalData(), rid, delivered + polled,
+                        JAVA_NULL);
+                }
+            }];
+        }
     });
 }
 

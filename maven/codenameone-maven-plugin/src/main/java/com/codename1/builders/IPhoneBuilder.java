@@ -3290,8 +3290,17 @@ public class IPhoneBuilder extends Executor {
                 //
                 // Trimmed, and blank counts as absent -- a hint present but
                 // empty produces exactly the empty string iOS refuses.
+                // "false" is this builder's way of suppressing a privacy
+                // string -- the plist renderer skips any value equal to it --
+                // so it means absent here, not present. Read as present, it
+                // satisfied the requirement below and produced exactly the
+                // app that requirement exists to prevent: linked, entitled,
+                // and terminated on launch for a missing purpose string.
                 String homeUsage = trimToNull(request.getArg(
                         "ios.NSHomeKitUsageDescription", null));
+                if ("false".equalsIgnoreCase(homeUsage)) {
+                    homeUsage = null;
+                }
                 if (homeUsage != null) {
                     request.putArgument("ios.NSHomeKitUsageDescription",
                             homeUsage);
@@ -3474,6 +3483,29 @@ public class IPhoneBuilder extends Executor {
                 // arguments and never reached the device, leaving the Matter
                 // flow to touch Bluetooth and the local network with no
                 // declared purpose.
+                // Refused before defaulting, because "false" suppresses the
+                // string in the plist renderer while commissioning stays
+                // fully enabled: the flow would reach Bluetooth and the local
+                // network with no declaration, which iOS answers by killing
+                // the app. ios.home.commissioning=false is the way to opt out
+                // of the flow; there is no way to keep the flow and drop its
+                // purpose strings.
+                for (String matterPrivacyKey : new String[] {
+                        "ios.NSBluetoothAlwaysUsageDescription",
+                        "ios.NSLocalNetworkUsageDescription"}) {
+                    if ("false".equalsIgnoreCase(
+                            request.getArg(matterPrivacyKey, null))) {
+                        throw new BuildException(
+                                "This app adds Matter accessories but sets "
+                                + matterPrivacyKey + "=false. Commissioning "
+                                + "uses Bluetooth to reach a new accessory "
+                                + "and the local network to find it "
+                                + "afterwards, and iOS terminates an app that "
+                                + "does either without a purpose string. "
+                                + "Supply one, or set "
+                                + "ios.home.commissioning=false.");
+                    }
+                }
                 applyCatalogPlistEntry(request, new String[] {
                     "NSBluetoothAlwaysUsageDescription",
                     "Used to set up new smart home accessories."});
