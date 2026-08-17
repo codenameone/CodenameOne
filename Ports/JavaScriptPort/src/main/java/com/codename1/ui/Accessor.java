@@ -43,7 +43,7 @@ public class Accessor {
      * @return true when the change came from showBack()
      */
     public static boolean isNavigatingBack(Form f) {
-        return f != null && f.isShownWithReverse();
+        return f != null && f.consumeShownWithReverse();
     }
 
     /**

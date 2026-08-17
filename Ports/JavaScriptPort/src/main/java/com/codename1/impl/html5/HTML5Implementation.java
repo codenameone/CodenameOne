@@ -11100,6 +11100,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // resolved then, so it is brought up to date as it appears rather than coming back in
         // the old palette.
         refreshThemeIfStale(f);
+        // Taken for every arrival, whatever is done with it: the framework queues one direction
+        // per display asked for, and a queue read only on some paths would drift out of step
+        // with what is still waiting.
+        boolean navigatingBack = com.codename1.ui.Accessor.isNavigatingBack(f);
         if (!historyRootShown) {
             // The first form has nothing behind it. Pushing for it left a dead entry that the
             // first Back popped without navigating anywhere, so leaving the app from the root
@@ -11115,7 +11119,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // A, B, then A again -- and treating that as a back would spend entries the user can
         // still reach.
         if (previousIndex >= 0 && previousIndex < depth - 1
-                && (handlingPopState || com.codename1.ui.Accessor.isNavigatingBack(f))) {
+                && (handlingPopState || navigatingBack)) {
             // Backward navigation, from a toolbar back command or showBack(). Keeping the whole
             // chain rather than a single predecessor is what lets consecutive unwinds -- C to B
             // to A -- each be recognised.

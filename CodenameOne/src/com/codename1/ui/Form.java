@@ -1402,26 +1402,35 @@ public class Form extends Container {
         return previousForm;
     }
 
-    /// True when the pending display of this form is a backward navigation -- showBack()
-    /// rather than show(). Recorded on the form itself, not in one shared field, because a
-    /// transition can defer the change and a later navigation would otherwise overwrite it
-    /// before the port that needs the direction is told.
-    ///
-    /// Review asked for this to be bound to each pending display operation rather than to the
-    /// form, so that two navigations to the SAME cached form, with a transition still in
-    /// flight, cannot share the slot. That window is real but narrow, and closing it means
-    /// carrying the direction through `CodenameOneImplementation.setCurrentForm` -- an API every
-    /// port implements. Widening a cross-port interface does not belong in a change to one
-    /// port; per-form already fixes the case that occurs in practice, which is navigations to
-    /// different forms overwriting each other.
-    private boolean shownWithReverse;
+    /// Directions of the displays asked for on this form that have not arrived yet, oldest
+    /// first. A transition defers a form change, so two navigations to the same form can be in
+    /// flight at once -- showBack() to it, then show() while the first is still animating -- and
+    /// a single field would give both arrivals the direction of the later one.
+    private java.util.ArrayList<Boolean> pendingReverse;
+
+    /// The direction of the last arrival, for a form change with nothing queued behind it.
+    private boolean lastShownWithReverse;
 
     void setShownWithReverse(boolean value) {
-        shownWithReverse = value;
+        if (pendingReverse == null) {
+            pendingReverse = new java.util.ArrayList<Boolean>();
+        }
+        // A setCurrent() can turn out not to change anything -- the form is already showing --
+        // and then nothing takes the direction it queued. Keeping the queue short means such an
+        // entry is dropped rather than shifting every later answer by one.
+        if (pendingReverse.size() > 3) {
+            pendingReverse.clear();
+        }
+        pendingReverse.add(Boolean.valueOf(value));
     }
 
-    boolean isShownWithReverse() {
-        return shownWithReverse;
+    /// Takes the direction belonging to the form change that is arriving now.
+    boolean consumeShownWithReverse() {
+        if (pendingReverse == null || pendingReverse.isEmpty()) {
+            return lastShownWithReverse;
+        }
+        lastShownWithReverse = pendingReverse.remove(0).booleanValue();
+        return lastShownWithReverse;
     }
 
     void setPreviousForm(Form previousForm) {
