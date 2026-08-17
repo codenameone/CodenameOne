@@ -10672,6 +10672,56 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private boolean historySuppressPop;
 
+    /**
+     * Identifies the traversal the suppression belongs to, so a later request's flag is never
+     * cleared by an earlier request's watcher.
+     */
+    private int historySuppressToken;
+
+    /**
+     * Asks the browser to traverse history on the port's own behalf, and expects the popstate
+     * that follows to be ignored.
+     *
+     * <p>The traversal may not happen at all -- asking to go further back than the session has
+     * entries does nothing, and raises no popstate. The expectation is therefore given up
+     * after a bounded wait: left standing it would swallow the user's next real Back and leave
+     * the application on a form the browser has already moved away from.</p>
+     *
+     * @param delta entries to move, negative for backwards
+     */
+    private void requestSuppressedTraversal(int delta) {
+        if (delta == 0) {
+            return;
+        }
+        historySuppressPop = true;
+        final int token = ++historySuppressToken;
+        try {
+            window.getHistory().go(delta);
+        } catch (Throwable ignored) {
+            historySuppressPop = false;
+            return;
+        }
+        awaitSuppressionConsumed(token, 0);
+    }
+
+    private void awaitSuppressionConsumed(final int token, final int attempt) {
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (!historySuppressPop || token != historySuppressToken) {
+                    // Either the popstate arrived and spent it, or a later traversal owns the
+                    // expectation now.
+                    return;
+                }
+                if (attempt < 40) {
+                    awaitSuppressionConsumed(token, attempt + 1);
+                    return;
+                }
+                historySuppressPop = false;
+            }
+        });
+    }
+
     private void pushHistoryState() {
         if (handlingPopState) {
             return;
@@ -10713,12 +10763,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // navigation -- so rather than leave the browser sitting on an entry the app is not
             // on, step back to the entry that does match. Forward is inert, which is the honest
             // degradation.
-            historySuppressPop = true;
-            try {
-                window.getHistory().back();
-            } catch (Throwable ignored) {
-                historySuppressPop = false;
-            }
+            requestSuppressedTraversal(-1);
             return;
         }
         // A traversal can cross more than one entry at once -- the Back button's history menu,
@@ -10880,12 +10925,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         historyEntriesPushed += steps;
-        historySuppressPop = true;
-        try {
-            window.getHistory().go(steps);
-        } catch (Throwable ignored) {
-            historySuppressPop = false;
-        }
+        requestSuppressedTraversal(steps);
     }
 
     /**
@@ -10915,12 +10955,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         if (available > 0 && remaining > available) {
             remaining = available;
         }
-        historySuppressPop = true;
-        try {
-            window.getHistory().go(-remaining);
-        } catch (Throwable ignored) {
-            historySuppressPop = false;
-        }
+        requestSuppressedTraversal(-remaining);
     }
 
     /**
@@ -11002,23 +11037,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 int extra = steps - settled;
                 if (extra > 0) {
                     historyEntriesPushed = Math.max(0, historyEntriesPushed - extra);
-                    historySuppressPop = true;
-                    try {
-                        window.getHistory().go(-extra);
-                    } catch (Throwable ignored) {
-                        historySuppressPop = false;
-                    }
+                    requestSuppressedTraversal(-extra);
                 }
                 return;
             }
             historyEntriesPushed = Math.max(0, historyEntriesPushed - steps);
-            historySuppressPop = true;
-            try {
-                // One traversal for the whole jump, so it raises a single popstate.
-                window.getHistory().go(-steps);
-            } catch (Throwable ignored) {
-                historySuppressPop = false;
-            }
+            // One traversal for the whole jump, so it raises a single popstate.
+            requestSuppressedTraversal(-steps);
             return;
         }
         historyStack.add(f);
