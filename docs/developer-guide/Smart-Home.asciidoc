@@ -95,7 +95,7 @@ Hold on to the `TraitSubscription` and stop it. A dropped one keeps its listener
 
 A scene is a named set of accessory states that can be applied in one go: HomeKit's action set, a Google Home scene. `TraitWrite.toSceneAction()` turns the changes a user just made into one.
 
-Automations -- a scene plus a trigger -- are *not* supported. HomeKit, Google Home and Matter model triggers in three incompatible ways and Matter has none, so there's no honest common shape. `SmartHome.isAutomationSupported()` answers `false` everywhere, so an app can say why the feature it wanted isn't offered.
+Automations -- a scene plus a trigger -- *aren't supported*. HomeKit, Google Home and Matter model triggers in three incompatible ways and Matter has none, so there's no honest common shape. `SmartHome.isAutomationSupported()` answers `false` everywhere, so an app can say why the feature it wanted isn't offered.
 
 === Adding an accessory
 
