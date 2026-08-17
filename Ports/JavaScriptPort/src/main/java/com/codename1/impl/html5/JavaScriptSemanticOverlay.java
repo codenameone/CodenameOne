@@ -105,6 +105,9 @@ public final class JavaScriptSemanticOverlay {
         private final List<Long> childOrder = new ArrayList<Long>();
         private Map<String, HTMLElement> customActions;
         private Map<String, String> customActionLabels;
+        // The document id the action controls were pointed at. An application can change a
+        // node's identifier, and a control left pointing at the old one refers to nothing.
+        private String actionOwnerId;
         private HTMLElement textNode;
         private String geometry;
         private String text;
@@ -533,6 +536,17 @@ public final class JavaScriptSemanticOverlay {
 
     private void applyCustomActions(Entry entry, AccessibilityNodeSnapshot node) {
         Set<String> desired = null;
+        String owner = ownerId(entry);
+        if (entry.customActions != null && !owner.equals(entry.actionOwnerId)) {
+            // The node's identifier changed, so every control still pointing at the old one
+            // has lost its association with what it acts on -- and its description with it.
+            for (Iterator<HTMLElement> it = entry.customActions.values().iterator(); it.hasNext();) {
+                HTMLElement button = it.next();
+                button.setAttribute("aria-controls", owner);
+                button.setAttribute("aria-describedby", owner);
+            }
+        }
+        entry.actionOwnerId = owner;
         List<AccessibilityAction> actions = node.getActions();
         for (int i = 0; i < actions.size(); i++) {
             AccessibilityAction action = actions.get(i);
@@ -589,10 +603,7 @@ public final class JavaScriptSemanticOverlay {
         button.setAttribute("aria-label", label);
         // Names the node this acts on as the button's description, since the button no longer
         // sits inside it: "Delete" on its own says nothing about what would be deleted.
-        String owner = entry.attributes.get("id");
-        if (owner == null) {
-            owner = elementId(entry.id);
-        }
+        String owner = ownerId(entry);
         button.setAttribute("aria-controls", owner);
         button.setAttribute("aria-describedby", owner);
         button.setTextContent(label);
@@ -630,6 +641,17 @@ public final class JavaScriptSemanticOverlay {
             container.appendChild(actionsContainer);
         }
         return actionsContainer;
+    }
+
+    /**
+     * The document id a node's element currently carries.
+     *
+     * @param entry the node
+     * @return the id an action control points at
+     */
+    private String ownerId(Entry entry) {
+        String owner = entry.attributes.get("id");
+        return owner == null ? elementId(entry.id) : owner;
     }
 
     /**

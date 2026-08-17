@@ -10728,7 +10728,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // The browser has already crossed every entry of the jump in this one traversal, so
         // the count of what the application still owes is the state the replay works from --
         // and what a back command that skips forms draws down as it goes.
-        pendingTraversalEntries = distance;
+        //
+        // Added to rather than assigned: a second Back pressed while a transition is still
+        // running arrives here before the first has landed, and overwriting would lose the
+        // entries the first one was still working through -- the browser would end up several
+        // entries ahead of the application, for good.
+        pendingTraversalEntries += distance;
+        if (traversalActive) {
+            // A replay is already walking the forms; it reads the count after each one lands,
+            // so this traversal joins the one in flight rather than starting a second that
+            // would run the same form's back command twice.
+            return;
+        }
         callSerially(new Runnable() {
             @Override
             public void run() {
@@ -10770,6 +10781,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private int pendingTraversalEntries;
 
     /**
+     * True while the replay is walking forms. Further traversals add to the count it reads
+     * rather than starting a walk of their own.
+     */
+    private boolean traversalActive;
+
+    /**
      * Runs one step of a browser traversal and, once it lands, whatever is still outstanding.
      *
      * <p>The steps cannot be run in a loop: a transition defers the form change, so a second
@@ -10779,19 +10796,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
      */
     private void replayTraversal() {
         if (pendingTraversalEntries <= 0) {
+            traversalActive = false;
             return;
         }
         final Form current = Display.getInstance().getCurrent();
         if (current == null) {
             pendingTraversalEntries = 0;
+            traversalActive = false;
             return;
         }
         Command back = current.getBackCommand();
         if (back == null) {
             pendingTraversalEntries = 0;
+            traversalActive = false;
             leaveDocument();
             return;
         }
+        traversalActive = true;
         // Held until the form change actually lands, not just until the command returns: a
         // transition defers the change, and if the flag were already clear by then the change
         // would look like an ordinary showBack() and traverse the entry this gesture had
@@ -10837,6 +10858,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 // they would ask the same guard again on the same form, and one of the later
                 // answers could navigate even though the traversal was refused.
                 handlingPopState = false;
+                traversalActive = false;
                 int owed = pendingTraversalEntries;
                 pendingTraversalEntries = 0;
                 restoreTraversal(owed);
