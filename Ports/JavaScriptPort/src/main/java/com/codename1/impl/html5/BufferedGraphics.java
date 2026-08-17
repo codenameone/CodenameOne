@@ -180,6 +180,47 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
+     * A coverage test for a rounded rectangle, whose corners are cut away.
+     */
+    private static JavaScriptTextLayer.CoverTest roundRectCoverTest(int x, int y, int width,
+            int height, int arcWidth, int arcHeight) {
+        int rx = Math.min(Math.max(0, arcWidth) / 2, width / 2);
+        int ry = Math.min(Math.max(0, arcHeight) / 2, height / 2);
+        if (rx <= 0 || ry <= 0) {
+            return null;
+        }
+        // Traced clockwise from the top-left corner's end, with each corner approximated by a
+        // quarter ellipse.
+        int perCorner = 6;
+        int points = 4 * (perCorner + 1);
+        final float[][] outline = new float[][] { new float[points], new float[points] };
+        int at = 0;
+        int[][] corners = new int[][] {
+            { x + width - rx, y + ry, 0 },
+            { x + width - rx, y + height - ry, 270 },
+            { x + rx, y + height - ry, 180 },
+            { x + rx, y + ry, 90 }
+        };
+        for (int c = 0; c < corners.length; c++) {
+            double cx = corners[c][0];
+            double cy = corners[c][1];
+            double from = corners[c][2];
+            for (int i = 0; i <= perCorner; i++) {
+                double radians = Math.toRadians(from + (90.0 * i) / perCorner);
+                outline[0][at] = (float) (cx + rx * Math.cos(radians));
+                outline[1][at] = (float) (cy - ry * Math.sin(radians));
+                at++;
+            }
+        }
+        return new JavaScriptTextLayer.CoverTest() {
+            @Override
+            public boolean covers(int rectX, int rectY, int rectW, int rectH) {
+                return outlineMeetsRect(outline, rectX, rectY, rectW, rectH);
+            }
+        };
+    }
+
+    /**
      * A coverage test for the sector a filled arc actually paints.
      *
      * <p>The bounding rectangle of an arc holds a good deal the arc never reaches -- the corners
@@ -521,6 +562,12 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void blurRegion(int x, int y, int width, int height, float radius, float cornerRadius) {
+        // A blur rewrites what is under it. Promoted text is not under it -- it is above the
+        // canvas entirely -- so it would come out unblurred beside everything else. Back to the
+        // canvas it goes.
+        noteCanvasCover(x, y, width, height, cornerRadius > 0
+                ? roundRectCoverTest(x, y, width, height, (int) (cornerRadius * 2), (int) (cornerRadius * 2))
+                : null);
         // Route through addOp (this class's chokepoint) so the empty-clip cull
         // applies; the base class records into its own immediate context.
         addOp(new com.codename1.impl.html5.graphics.BlurRegion(x, y, width, height, radius, cornerRadius));
@@ -564,7 +611,8 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void fillRoundRect(int x, int y, int width, int height, int arcWidth, int arcHeight) {
-        noteCanvasCover(x, y, width, height);
+        noteCanvasCover(x, y, width, height,
+                roundRectCoverTest(x, y, width, height, arcWidth, arcHeight));
         addOp(new FillRoundRect(x, y, width, height, arcWidth, arcHeight, getColor(), getAlpha()));
     }
 
@@ -990,18 +1038,21 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height, int startAngle, int arcAngle) {
-        noteCanvasCover(x, y, width, height);
+        // A radial gradient fills the oval inscribed in these bounds, or a sector of it -- not
+        // the bounds themselves, whose corners it never reaches.
+        noteCanvasCover(x, y, width, height, arcCoverTest(x, y, width, height, startAngle, arcAngle));
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, startAngle, arcAngle);
     }
     
     @Override
     public void fillRadialGradient(int startColor, int endColor, int x, int y, int width, int height) {
-        noteCanvasCover(x, y, width, height);
+        noteCanvasCover(x, y, width, height, arcCoverTest(x, y, width, height, 0, 360));
         shapeGradientRenderAdapter.fillRadialGradient(x, y, width, height, startColor, endColor, 0, 360);
     }
 
     public void fillRectRadialGradient(int startColor, int endColor, int x, int y, int width, int height,
             float relativeX, float relativeY, float relativeSize) {
+        noteCanvasCover(x, y, width, height);
         shapeGradientRenderAdapter.fillRectRadialGradient(x, y, width, height, startColor, endColor, relativeX, relativeY, relativeSize);
     }
     

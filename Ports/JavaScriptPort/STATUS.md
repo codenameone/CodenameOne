@@ -57,7 +57,11 @@ Text that stays on the canvas, by design:
   component stays there -- a sheet's scrim, a tab bar's composited lens, a
   clipped rotation over a title. Who is drawing decides: a component painting its
   own background, or a container painting behind children it is about to paint,
-  covers text it draws again a moment later and hides nothing.
+  covers text it draws again a moment later and hides nothing. What the draw
+  reaches decides too: an empty clip or a fully transparent one reaches nothing,
+  the report is clipped to the graphics clip, and a shape, polygon, arc, radial
+  gradient or rounded rectangle is asked whether its outline meets the glyphs
+  rather than whether its bounding rectangle does.
 
 Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`
 itself and never reaches the implementation.
