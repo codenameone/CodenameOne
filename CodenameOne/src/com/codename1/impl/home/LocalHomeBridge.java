@@ -957,13 +957,21 @@ public class LocalHomeBridge implements HomeBridge {
     @Override
     public void deleteScene(int requestId, String structureId,
             String sceneId) {
+        boolean removed;
         synchronized (this) {
             Structure s = structures.get(structureId);
-            if (s != null) {
-                s.scenes.remove(sceneId);
-            }
+            removed = s != null && s.scenes.remove(sceneId) != null;
         }
         answer(new SceneResult(requestId, null, structureId, null));
+        if (removed) {
+            // The same reason creation announces itself: the graph the app
+            // reads is a snapshot and nothing in this answer updates it, so
+            // without the event getStructures() keeps returning a scene that
+            // is gone.
+            SmartHome.notifyStructureChanged(
+                    StructureChangeKind.SCENES_CHANGED.ordinal(), structureId,
+                    null);
+        }
     }
 
     // ------------------------------------------------------------------
