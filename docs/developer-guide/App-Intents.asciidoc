@@ -15,15 +15,15 @@ A handler is a `public static` method carrying `@AppIntent`:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AppIntentsJava001Snippet.java[tag=app-intents-java-001,indent=0]
 ----
 
-The method is `static` for a reason that matters on a device rather than as a style preference: the build generates a direct static call to it, and a direct call is the only form that survives the iOS translator's dead-code elimination and Android's obfuscation. It also makes the contract visible -- a handler can be asked to run in a process that exists only to answer it, where no instance of your class has been constructed and nothing is on screen.
+The method is `static` for a reason that matters on a device rather than as a style preference: the build generates a direct static call to it, and a direct call is the only form that survives the iOS translator's dead-code elimination and Android's obfuscation. It also makes the contract visible -- a handler can be asked to run in a process that exists only to answer it, where no instance of your class has been constructed and there is no user interface.
 
 At build time the Codename One Maven plugin scans your compiled bytecode, validates every declaration, and generates both the reflection-free dispatch table and the native declarations each platform compiles into the app. A malformed declaration fails the build rather than going quiet on a device. That includes a check worth more than most of the code behind this feature: every phrase must contain `${applicationName}`, because Apple rejects App Shortcut phrases that omit the app name, and finding that out from App Review is an expensive way to learn it.
 
 === Intents and routes are different questions
 
-A `@Route` answers "given this URL, what do I show?" and hands back a `Form`. An intent answers "given this verb and these arguments, what do I do and what do I return?" and hands back a value. They cannot be merged: a deep link has no return channel, always foregrounds, is stringly typed, and has no way to express "ask the user which playlist first".
+A `@Route` answers "given this URL, which screen?" and hands back a `Form`. An intent answers "given this verb and these arguments, what happens and what comes back?" and hands back a value. They can't be merged: a deep link has no return channel, always foregrounds, is stringly typed, and has no way to express "ask the user which playlist first."
 
-They meet at exactly one point -- an intent that opens the app *is* a deep link -- so that is the one place they are joined. Declare `opensRoute` and the framework builds the URL from the bound parameters and navigates through your existing route table:
+They meet at exactly one point -- an intent that opens the app *is* a deep link -- so that's the one place they're joined. Declare `opensRoute` and the framework builds the URL from the bound parameters and navigates through your existing route table:
 
 [source,java]
 ----
@@ -32,9 +32,9 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 One screen, one route pattern, two ways in. The build checks that `opensRoute` matches a `@Route` you actually declared.
 
-=== Entities: the part that makes intents feel intelligent
+=== Entities: The part that makes intents feel intelligent
 
-An entity-typed parameter is what lets the platform run its *own* picker before your code is ever called. "Play a playlist" with nothing specified makes the system ask "Which one?", fill the list from your suggested query, and hand your handler the chosen object. A plain `String` parameter can never do that -- it can only be typed or spoken verbatim.
+An entity-typed parameter is what lets the platform run its *own* picker before your code is ever called. "Play a playlist" with nothing specified makes the system ask "Which one?" then fill the list from your suggested query, and hand your handler the chosen object. A plain `String` parameter can never do that -- it can only be typed or spoken verbatim.
 
 [source,java]
 ----
@@ -43,11 +43,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Your class stays your class: there is no interface to implement and no base class to extend, because a domain model outlives the framework it's used with. The build reads the annotated members and generates the adapter.
 
-A `BY_ID` query is mandatory. An entity crosses the platform boundary as its id and nothing else, so resolving that id back to an object is the one lookup the framework cannot do without.
+A `BY_ID` query is mandatory. An entity crosses the platform boundary as its id and nothing else, so resolving that id back to an object is the one lookup the framework can't do without.
 
 [WARNING]
 ====
-Entity ids outlive your process and often your release. The device search index and the system's donated shortcuts both persist your id and hand it back later, so an id derived from a list position or a content hash will silently start resolving to the wrong object after your data changes, and nothing anywhere will report an error.
+Entity ids outlive your process and often your release. The device search index and the system's donated shortcuts both persist your id and hand it back later, so an id derived from a list position or a content hash starts resolving to the wrong object after your data changes, with no error reported anywhere.
 ====
 
 === Publishing content to device search
@@ -68,13 +68,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 === The headless contract
 
-A `headless` intent can run in a process the system started only to answer it, with nothing on screen. That is what lets an assistant answer without your app appearing, and it is a real constraint rather than a flag.
+A `headless` intent can run in a process the system started only to answer it, with nothing on screen. That's what lets an assistant answer without your app appearing, and it's a real constraint rather than a flag.
 
 A headless handler *may* use `Storage`, `Preferences`, `Database`, `NetworkManager`, `Log`, surfaces publishing and `Intents.index`. It *must not* touch `Form`, `Dialog`, `Component`, `Display.getCurrent()`, the camera, capture, or anything else that needs a window: there is no window. It must also not call `Display.callSeriallyAndWait`, which can deadlock against a foregrounded event dispatch thread.
 
 Handlers never run on the event dispatch thread, on any platform and from any source. An invocation can arrive while your app is visible -- a widget button, a search result tapped on a running app -- and a handler blocking the event thread there is a visible freeze.
 
-Every invocation carries a deadline, and `IntentContext.isCancelled()` flips when it passes. Cancellation is cooperative: nothing interrupts a running handler, and anything it returns afterwards is discarded, so commit durable work to storage as you go rather than only at the end.
+Every invocation carries a deadline, and `IntentContext.isCancelled()` flips when it passes. Cancellation is cooperative: nothing interrupts a running handler, and anything it returns afterward is discarded, so commit durable work to storage as you go rather than only at the end.
 
 [TIP]
 ====
@@ -99,7 +99,7 @@ The platform will usually allow around twenty seconds. Don't use them. A spoken 
 | Returned value | piped to the next action | result extras | shown
 |===
 
-*Android is not Siri parity and this framework doesn't pretend otherwise.* Android has no contract by which an assistant invokes an application capability and receives a typed result back, so phrases, system disambiguation and spoken results are iOS-only. Branch on `Intents.isVoiceInvocationSupported()`, not on `areIntentsSupported()`, when deciding whether to tell a user they can talk to your app.
+*Android isn't Siri parity, and this framework doesn't pretend otherwise.* Android has no contract by which an assistant invokes an application capability and receives a typed result back, so phrases, system disambiguation and spoken results are iOS-only. Branch on `Intents.isVoiceInvocationSupported()`, not on `areIntentsSupported()`, when deciding whether to tell a user they can talk to your app.
 
 What Android does deliver is real: launcher shortcuts, dynamic shortcuts the system learns to suggest from donation, and genuinely headless execution -- the last of which is actually easier there than on iOS, because the Android port already boots without an Activity for background fetch.
 
@@ -111,7 +111,7 @@ Because dispatch is generated code rather than a platform service, `Intents.invo
 
 === Testing without a device
 
-The simulator's `Simulate -> App Intents` window lists every intent your application declares, generates a parameter form from the declaration, fills entity pickers from your real query methods, and runs the intent through the same entry point the iOS and Android ports call. Nothing in it is a shortcut around the framework, so a bug in marshalling, coercion or the deadline shows up on your desktop rather than on a device.
+The simulator's `Simulate -> App Intents` window lists every intent your application declares, generates a parameter form from the declaration, fills entity pickers from your real query methods, and runs the intent through the same entry point the iOS and Android ports call. Nothing in it shortcuts the framework, so a bug in marshalling, coercion or the deadline shows up on your desktop rather than on a device.
 
 === What this costs your iOS deployment target
 
@@ -129,7 +129,7 @@ Declaring an `@AppIntent` brings in Apple's App Intents framework, which needs a
 | `ios.intents.appIntents` | `false` keeps Spotlight indexing and shortcut donation while suppressing App Intents generation entirely.
 |===
 
-If you've pinned a deployment target below what a declared intent needs, the build says so and stops rather than quietly moving your pin or quietly dropping your intents.
+If you've pinned a deployment target below what a declared intent needs, the build says so and stops rather than moving your pin or dropping your intents behind your back.
 
 === Zero cost when unused
 
