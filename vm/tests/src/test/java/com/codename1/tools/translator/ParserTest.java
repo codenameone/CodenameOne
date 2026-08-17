@@ -131,8 +131,11 @@ class ParserTest {
         );
         cls.setClassOffset(17);
 
+        // The seventh column lists the implemented interfaces' ids, empty here.
+        // The device runtime reads it to resolve a default method, which lives
+        // on an interface and nowhere in the superclass chain.
         assertEquals(
-                "class\t17\tcom_example_my_app_Main_1\tMain.java\t-1\tcom/example/my_app/Main$1\n",
+                "class\t17\tcom_example_my_app_Main_1\tMain.java\t-1\tcom/example/my_app/Main$1\t\n",
                 Parser.classSymbolRow(cls, "Main.java")
         );
     }
