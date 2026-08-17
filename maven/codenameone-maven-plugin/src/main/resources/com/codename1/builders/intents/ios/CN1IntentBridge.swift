@@ -64,19 +64,6 @@ public class CN1IntentBridge: NSObject {
         return declarations[id]
     }
 
-    /// Records that the user performed a capability so the system can predict it later.
-    ///
-    /// Donation is availability-gated rather than assumed: an app can be built against a newer
-    /// SDK and still run where this does not exist, and a missing suggestion is a far better
-    /// outcome than a crash.
-    @objc public static func donate(_ intentId: String, paramsJson: String) {
-        #if canImport(AppIntents)
-        if #available(iOS 16.0, *) {
-            CN1IntentDonation.donate(intentId: intentId, paramsJson: paramsJson)
-        }
-        #endif
-    }
-
     /// Called from Java with the outcome of an invocation the system started.
     @objc public static func completeInvocation(_ token: String, resultJson: String) {
         CN1IntentHost.completeToken(token, resultJson: resultJson)

@@ -15196,6 +15196,24 @@ static Class cn1IntentBridgeClass() {
     return c;
 }
 
+/// Donated activities have to outlive the call that created them.
+static NSMutableArray *cn1IntentActivities = nil;
+
+static void cn1IntentsRetainActivity(NSUserActivity *activity) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        cn1IntentActivities = [[NSMutableArray alloc] init];
+    });
+    @synchronized (cn1IntentActivities) {
+        // Bounded: a long-running app that donates on every user action would otherwise grow
+        // this without limit, and only the recent ones are of any use to the system.
+        if ([cn1IntentActivities count] > 32) {
+            [cn1IntentActivities removeObjectAtIndex:0];
+        }
+        [cn1IntentActivities addObject:activity];
+    }
+}
+
 static NSDictionary *cn1IntentsParseJson(NSString *json) {
     if (json == nil) {
         return nil;
@@ -15243,19 +15261,44 @@ void com_codename1_impl_ios_IOSNative_intentsRegister___java_lang_String(CN1_THR
     }
 }
 
+/// Donation is deliberately Objective-C and carries no availability gate.
+///
+/// It is NSUserActivity underneath, which long predates App Intents, so gating it on iOS 16
+/// made every donation a no-op on exactly the devices the ios.intents.appIntents=false opt-out
+/// exists to keep working. Nothing here needs Swift.
 void com_codename1_impl_ios_IOSNative_intentsDonate___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT intentId, JAVA_OBJECT paramsJson) {
-    if (@available(iOS 16.0, *)) {
-        POOL_BEGIN();
-        Class bridge = cn1IntentBridgeClass();
-        if (bridge != nil && intentId != JAVA_NULL) {
-            NSString *iid = toNSString(CN1_THREAD_STATE_PASS_ARG intentId);
-            NSString *params = (paramsJson == JAVA_NULL) ? @"{}"
-                    : toNSString(CN1_THREAD_STATE_PASS_ARG paramsJson);
-            ((void (*)(id, SEL, NSString *, NSString *))objc_msgSend)((id)bridge,
-                    NSSelectorFromString(@"donate:paramsJson:"), iid, params);
-        }
-        POOL_END();
+    if (intentId == JAVA_NULL) {
+        return;
     }
+    POOL_BEGIN();
+    NSString *iid = toNSString(CN1_THREAD_STATE_PASS_ARG intentId);
+    NSUserActivity *activity = [[NSUserActivity alloc] initWithActivityType:iid];
+    activity.eligibleForPrediction = YES;
+    activity.eligibleForSearch = YES;
+    activity.title = iid;
+    if (paramsJson != JAVA_NULL) {
+        NSDictionary *params = cn1IntentsParseJson(
+                toNSString(CN1_THREAD_STATE_PASS_ARG paramsJson));
+        if (params != nil) {
+            // userInfo has to be property-list representable, so anything else is dropped
+            // rather than risking an exception inside what is only ever a hint to the system.
+            NSMutableDictionary *safe = [NSMutableDictionary dictionary];
+            for (id key in params) {
+                id value = [params objectForKey:key];
+                if ([key isKindOfClass:[NSString class]]
+                        && ([value isKindOfClass:[NSString class]]
+                                || [value isKindOfClass:[NSNumber class]])) {
+                    [safe setObject:value forKey:key];
+                }
+            }
+            activity.userInfo = safe;
+        }
+    }
+    [activity becomeCurrent];
+    // Held for the lifetime of the process: an NSUserActivity that is released stops being
+    // current, and the donation is lost.
+    cn1IntentsRetainActivity(activity);
+    POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_intentsStageImage___java_lang_String_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT name, JAVA_OBJECT dataArr, JAVA_INT length) {
@@ -15385,6 +15428,12 @@ void com_codename1_impl_ios_IOSNative_intentsCompleteInvocation___java_lang_Stri
                     NSSelectorFromString(@"completeInvocation:resultJson:"), t, json);
         }
         POOL_END();
+    }
+    // Staged for this result and now consumed. Without this an app returning fresh imagery on
+    // every invocation retains every blob for the life of the process.
+    cn1IntentsEnsureStaging();
+    @synchronized (cn1IntentImagesLock) {
+        [cn1IntentImages removeAllObjects];
     }
 }
 

@@ -28,6 +28,10 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 
+import com.codename1.intents.IntentDeclaration;
+import com.codename1.intents.IntentParameterInfo;
+import com.codename1.intents.Intents;
+
 
 /// Invisible trampoline for a tapped shortcut or an indexed item.
 ///
@@ -90,6 +94,13 @@ public class CN1IntentTrampolineActivity extends Activity {
     private boolean route(Uri data, boolean trusted) {
         String host = data.getHost();
         if ("open".equals(host)) {
+            // Indexed shortcuts are always published at runtime, so they always carry the
+            // nonce. An "open" without one is therefore never ours, and honouring it would let
+            // any app drive this application's selection handler with an id of its choosing.
+            if (!trusted) {
+                Log.w(TAG, "Refusing an unauthenticated indexed-item tap");
+                return true;
+            }
             String uid = data.getQueryParameter("uid");
             if (uid != null) {
                 // Queued by the framework until a handler is registered, so a tap that cold
@@ -105,25 +116,32 @@ public class CN1IntentTrampolineActivity extends Activity {
             }
             String params = data.getQueryParameter("p");
             if (!trusted) {
-                // Held to what the launcher already offers, and stripped of parameters so a
-                // fabricated URI cannot choose the values a capability acts on. Deliberately
-                // silent: an app probing for capabilities should learn nothing from the
-                // difference between a refused known id and a refused unknown one.
-                if (!isSafeForUntrustedCallers(id)) {
-                    Log.w(TAG, "Refusing an unauthenticated request for \"" + id + "\"");
+                if (!Intents.getDeclarations().isEmpty()) {
+                    // The runtime is up, so the policy can be applied now: held to what the
+                    // launcher already offers, and stripped of parameters so a fabricated URI
+                    // cannot choose the values a capability acts on.
+                    if (!isSafeForUntrustedCallers(id)) {
+                        Log.w(TAG, "Refusing an unauthenticated request for \"" + id + "\"");
+                        return true;
+                    }
+                } else {
+                    // Cold start: the generated dispatcher has not installed itself, so there is
+                    // nothing to check the request against yet. Rejecting here would break every
+                    // build-time static shortcut, which is exactly the case that has no nonce.
+                    // So the request is parked and re-evaluated once the declarations exist.
+                    AndroidIntentBridge.parkUntrustedRequest(id);
                     return true;
                 }
                 params = null;
             }
-            // The headless flag travels in the URI rather than being looked up. At a cold start
-            // -- a tapped shortcut on a dead process, which is the common case -- the generated
-            // dispatcher has not installed itself yet, so the declaration table is empty and a
-            // lookup would report every intent as non-headless and visibly open the app.
-            boolean headless = "1".equals(data.getQueryParameter("h"));
-            if (!headless) {
-                com.codename1.intents.IntentDeclaration decl =
-                        com.codename1.intents.Intents.getDeclaration(id);
-                headless = decl != null && decl.isHeadless();
+            // The headless flag travels in the URI rather than being looked up, because at a
+            // cold start the declaration table does not exist yet. It is only believed from a
+            // URI this application published: a caller-supplied flag could otherwise run an
+            // intent that expects a window in a process that has none.
+            boolean headless = trusted && "1".equals(data.getQueryParameter("h"));
+            IntentDeclaration decl = Intents.getDeclaration(id);
+            if (decl != null) {
+                headless = decl.isHeadless();
             }
             if (headless) {
                 CN1IntentService.run(this, id, params);
@@ -141,18 +159,15 @@ public class CN1IntentTrampolineActivity extends Activity {
     /// An intent the application declared as not discoverable, or as destructive, or that needs
     /// a value nobody supplied, is never in that set -- so an arbitrary app cannot reach the
     /// capabilities most worth protecting.
-    private boolean isSafeForUntrustedCallers(String id) {
-        com.codename1.intents.IntentDeclaration decl =
-                com.codename1.intents.Intents.getDeclaration(id);
+    static boolean isSafeForUntrustedCallers(String id) {
+        IntentDeclaration decl = Intents.getDeclaration(id);
         if (decl == null) {
-            // Either it does not exist, or the runtime is not up yet at a cold start. Neither is
-            // a basis for running something on an unauthenticated request.
             return false;
         }
         if (!decl.isDiscoverable() || decl.isDestructive()) {
             return false;
         }
-        for (com.codename1.intents.IntentParameterInfo p : decl.getParameters()) {
+        for (IntentParameterInfo p : decl.getParameters()) {
             if (p.isRequired() && (p.getDefaultValue() == null
                     || p.getDefaultValue().length() == 0)) {
                 return false;

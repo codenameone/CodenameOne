@@ -33,6 +33,8 @@ import android.os.Build;
 import android.util.Log;
 
 import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.intents.IntentSource;
+import com.codename1.intents.Intents;
 import com.codename1.intents.spi.IntentBridge;
 
 import java.util.ArrayList;
@@ -71,6 +73,8 @@ public class AndroidIntentBridge implements IntentBridge {
     private static final int API_PUSH_DYNAMIC = 30;
 
     private final List<String> indexed = new ArrayList<String>();
+    /// A cold-start request waiting for the declaration table to exist.
+    private static final List<String> PARKED = new ArrayList<String>();
 
     public boolean areIntentsSupported() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1;
@@ -90,11 +94,44 @@ public class AndroidIntentBridge implements IntentBridge {
         return areIntentsSupported();
     }
 
+    /// Called by the framework once the generated dispatcher installs itself, which is the
+    /// first moment the declaration table exists.
+    ///
+    /// That makes it the right place to settle a request that arrived before it did. A
+    /// build-time static shortcut carries no nonce -- there is no runtime at build time to mint
+    /// one -- so on a cold start the trampoline cannot yet tell whether the request is one this
+    /// application published or one an arbitrary app fabricated. Rejecting outright would break
+    /// every static shortcut, so the request is parked and judged here instead, against the same
+    /// policy an unauthenticated request is always held to.
     public void registerIntents(String declarationsJson) {
-        // The static shortcuts were compiled into res/xml at build time from the same manifest,
-        // so there is nothing to register at runtime. Kept as a no-op rather than removed from
-        // the SPI: iOS genuinely needs it, and a bridge method that exists everywhere is easier
-        // to reason about than one that does not.
+        String parked;
+        synchronized (PARKED) {
+            parked = PARKED.isEmpty() ? null : PARKED.remove(0);
+            PARKED.clear();
+        }
+        if (parked == null) {
+            return;
+        }
+        if (!CN1IntentTrampolineActivity.isSafeForUntrustedCallers(parked)) {
+            Log.w(TAG, "Refusing the parked unauthenticated request for \"" + parked + "\"");
+            return;
+        }
+        // Parameters were dropped at the door, so this runs exactly as declared.
+        Intents.dispatchInvocation(parked, null, IntentSource.SHORTCUT, false, null);
+    }
+
+    /// Records a request that arrived before the declarations existed. Only the id is kept:
+    /// an unauthenticated request never gets to choose parameter values.
+    static void parkUntrustedRequest(String intentId) {
+        if (intentId == null) {
+            return;
+        }
+        synchronized (PARKED) {
+            // One is enough. A second tap before the runtime is up is the user pressing twice,
+            // not two things to run.
+            PARKED.clear();
+            PARKED.add(intentId);
+        }
     }
 
     public void donate(String intentId, String paramsJson) {

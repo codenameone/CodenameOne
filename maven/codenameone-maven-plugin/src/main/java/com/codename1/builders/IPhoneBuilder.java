@@ -5345,19 +5345,18 @@ public class IPhoneBuilder extends Executor {
 
         // The static half: the Java-to-Swift bridge, the donation shim, and the Objective-C
         // host that is the only legal way for Swift to reach the translated Java.
-        String[] staticFiles = {"CN1IntentBridge.swift", "CN1IntentDonation.swift",
-                "CN1IntentHost.h", "CN1IntentHost.m"};
+        String[] staticFiles = {"CN1IntentBridge.swift", "CN1IntentHost.h", "CN1IntentHost.m"};
         for (String name : staticFiles) {
             copyResourceTo("/com/codename1/builders/intents/ios/" + name,
                     new File(srcDir, name));
         }
 
         if (appIntentsSuppressed) {
-            // The declarations were opted out of, but the bridge and the donation shim are what
-            // the native donation path reaches through NSClassFromString. Leaving them out would
-            // make donation silently do nothing, which is the opposite of what the opt-out
-            // promises.
-            log("Generating the app intents donation bridge only (ios.intents.appIntents=false)");
+            // Nothing more to emit. Donation is Objective-C and needs no Swift at all, which is
+            // what lets it keep working on devices below the App Intents minimum -- the reason
+            // this opt-out exists.
+            log("App Intents declarations suppressed (ios.intents.appIntents=false); "
+                    + "Spotlight indexing and donation are unaffected");
             return;
         }
         IOSAppIntentsBuilder gen = new IOSAppIntentsBuilder(intentsManifest, entitiesManifest);
