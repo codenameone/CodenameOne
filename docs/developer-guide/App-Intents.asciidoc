@@ -12,18 +12,7 @@ A handler is a `public static` method carrying `@AppIntent`:
 
 [source,java]
 ----
-@AppIntent(value = "log_workout", title = "Log a workout",
-        description = "Records a completed workout",
-        phrases = {"Log a workout in ${applicationName}",
-                   "Log a ${minutes} minute ${kind} in ${applicationName}"},
-        headless = true, timeoutSeconds = 5)
-public static IntentResult logWorkout(
-        @IntentParam(value = "kind", title = "What kind of workout?",
-                     options = {"run", "ride", "swim"}) String kind,
-        @IntentParam(value = "minutes", title = "How many minutes?") int minutes) {
-    WorkoutStore.append(kind, minutes);
-    return IntentResult.spoken("Logged a " + minutes + " minute " + kind + ".");
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AppIntentsJava001Snippet.java[tag=app-intents-java-001,indent=0]
 ----
 
 The method is `static` for a reason that matters on a device rather than as a style preference: the build generates a direct static call to it, and a direct call is the only form that survives the iOS translator's dead-code elimination and Android's obfuscation. It also makes the contract visible -- a handler can be asked to run in a process that exists only to answer it, where no instance of your class has been constructed and nothing is on screen.
@@ -38,10 +27,7 @@ They meet at exactly one point -- an intent that opens the app *is* a deep link 
 
 [source,java]
 ----
-@AppIntent(value = "show_order", title = "Show order", opensRoute = "/orders/{orderId}")
-public static IntentResult showOrder(@IntentParam("orderId") String orderId) {
-    return IntentResult.opens("/orders/" + orderId);
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AppIntentsJava002Snippet.java[tag=app-intents-java-002,indent=0]
 ----
 
 One screen, one route pattern, two ways in. The build checks that `opensRoute` matches a `@Route` you actually declared.
@@ -52,20 +38,7 @@ An entity-typed parameter is what lets the platform run its *own* picker before 
 
 [source,java]
 ----
-@IntentEntity(value = "playlist", title = "Playlist")
-public class Playlist {
-    @EntityId    public String getId()   { return id; }
-    @EntityTitle public String getName() { return name; }
-
-    @EntityQuery(EntityQuery.Kind.BY_ID)
-    public static Playlist byId(String id) { return Library.playlist(id); }
-
-    @EntityQuery(EntityQuery.Kind.SUGGESTED)
-    public static List<Playlist> recent() { return Library.recentPlaylists(); }
-
-    @EntityQuery(EntityQuery.Kind.SEARCH)
-    public static List<Playlist> matching(String query) { return Library.search(query); }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AppIntentsJava003Snippet.java[tag=app-intents-java-003,indent=0]
 ----
 
 Your class stays your class: there is no interface to implement and no base class to extend, because a domain model outlives the framework it's used with. The build reads the annotated members and generates the adapter.
@@ -83,18 +56,14 @@ Indexing is the half of this feature most applications will get the most from, a
 
 [source,java]
 ----
-// After a sync, off the EDT
-Intents.index(recentOrders);
-
-// In init(), so a tap that cold-started the app is delivered as soon as possible
-Intents.setSelectionHandler(entity -> Navigation.navigate("/orders/" + entity.getId()));
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AppIntentsJava004Snippet.java[tag=app-intents-java-004,indent=0]
 ----
 
 Remove entries when the content behind them goes away. An index entry outlives the data it describes, so deleted content keeps appearing in device search and taps resolve to nothing until the application removes it:
 
 [source,java]
 ----
-Intents.removeFromIndex("order", orderId);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AppIntentsJava005Snippet.java[tag=app-intents-java-005,indent=0]
 ----
 
 === The headless contract

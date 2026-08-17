@@ -117,7 +117,7 @@ class IntentsTest {
         final List<IntentDeclaration> declarations = new ArrayList<IntentDeclaration>();
         IntentResult next = IntentResult.ok();
         RuntimeException throwOnInvoke;
-        List<Entity> queryResult = Collections.emptyList();
+        List<AppEntity> queryResult = Collections.emptyList();
         String lastQueryKind;
         String lastQueryArgument;
 
@@ -137,7 +137,7 @@ class IntentsTest {
             return next;
         }
 
-        public List<Entity> queryEntities(String entityType, String kind, String argument) {
+        public List<AppEntity> queryEntities(String entityType, String kind, String argument) {
             lastQueryKind = kind;
             lastQueryArgument = argument;
             return queryResult;
@@ -169,7 +169,7 @@ class IntentsTest {
 
         // None of these may throw on a port that cannot support intents.
         Intents.donate("anything", new HashMap<String, Object>());
-        Intents.index(new Entity("order", "1"));
+        Intents.index(new AppEntity("order", "1"));
         Intents.removeFromIndex("order", "1");
         Intents.clearIndex(null);
         assertTrue(Intents.getDeclarations().isEmpty());
@@ -195,7 +195,7 @@ class IntentsTest {
         b.indexingSupported = false;
         Intents.setBridge(b);
 
-        Intents.index(new Entity("order", "1").setTitle("Order 1"));
+        Intents.index(new AppEntity("order", "1").setTitle("Order 1"));
         Intents.removeFromIndex("order", "1");
         Intents.clearIndex("order");
 
@@ -287,7 +287,7 @@ class IntentsTest {
                 return IntentResult.ok();
             }
 
-            public List<Entity> queryEntities(String t, String k, String a) {
+            public List<AppEntity> queryEntities(String t, String k, String a) {
                 return Collections.emptyList();
             }
         };
@@ -314,7 +314,7 @@ class IntentsTest {
                 return IntentResult.ok();
             }
 
-            public List<Entity> queryEntities(String t, String k, String a) {
+            public List<AppEntity> queryEntities(String t, String k, String a) {
                 return Collections.emptyList();
             }
         });
@@ -374,16 +374,16 @@ class IntentsTest {
     }
 
     // ------------------------------------------------------------------
-    // Entity queries
+    // AppEntity queries
     // ------------------------------------------------------------------
 
     @Test
     void entityQueriesReachTheDispatcher() {
         FakeDispatcher d = new FakeDispatcher();
-        d.queryResult = Arrays.asList(new Entity("playlist", "1").setTitle("Focus"));
+        d.queryResult = Arrays.asList(new AppEntity("playlist", "1").setTitle("Focus"));
         Intents.setDispatcher(d);
 
-        List<Entity> out = Intents.queryEntities("playlist", "search", "foc");
+        List<AppEntity> out = Intents.queryEntities("playlist", "search", "foc");
 
         assertEquals(1, out.size());
         assertEquals("Focus", out.get(0).getTitle());
@@ -421,7 +421,7 @@ class IntentsTest {
         Intents.setBridge(b);
 
         Intents.index(Arrays.asList(
-                new Entity("order", "42").setTitle("Two coffees").setSubtitle("Delivered")
+                new AppEntity("order", "42").setTitle("Two coffees").setSubtitle("Delivered")
                         .addKeywords("coffee", "latte")));
 
         assertNotNull(b.indexedJson);
@@ -436,7 +436,7 @@ class IntentsTest {
         FakeBridge b = new FakeBridge();
         Intents.setBridge(b);
 
-        Intents.index(new ArrayList<Entity>());
+        Intents.index(new ArrayList<AppEntity>());
 
         assertNull(b.indexedJson);
     }
@@ -512,7 +512,7 @@ class IntentsTest {
     void parametersReduceToWireTypesWithoutCasting() {
         Map<String, Object> params = new HashMap<String, Object>();
         params.put("when", new Date(1234567890L));
-        params.put("shop", new Entity("coffee_shop", "shop-7"));
+        params.put("shop", new AppEntity("coffee_shop", "shop-7"));
         params.put("count", Integer.valueOf(3));
         params.put("flag", Boolean.TRUE);
         // Deliberately unsupported: it must be dropped rather than guessed at.
@@ -530,13 +530,13 @@ class IntentsTest {
     @Test
     void anEntityRequiresATypeAndAnId() {
         try {
-            new Entity(null, "1");
+            new AppEntity(null, "1");
             org.junit.jupiter.api.Assertions.fail("a type is required");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected.getMessage());
         }
         try {
-            new Entity("order", "");
+            new AppEntity("order", "");
             org.junit.jupiter.api.Assertions.fail("an id is required");
         } catch (IllegalArgumentException expected) {
             assertNotNull(expected.getMessage());

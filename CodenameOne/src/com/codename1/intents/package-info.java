@@ -114,7 +114,7 @@
 /// | Voice invocation | Siri, from `phrases` | **none** | typed in the window | none |
 /// | Headless execution | background launch | service, no Activity | in-process | in-process |
 /// | Open a route | native, then the route table | trampoline, then the route table | shows the form | route only |
-/// | Entity parameters | system picker and search | passed by id | picker from the real queries | by id |
+/// | AppEntity parameters | system picker and search | passed by id | picker from the real queries | by id |
 /// | System disambiguation | yes | **no** -- the app foregrounds its own picker | in-app picker | in-app picker |
 /// | Content indexing | device search | launcher shortcuts | searchable list | no-op |
 /// | Donation | learned suggestions | dynamic shortcuts | logged | no-op |

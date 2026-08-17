@@ -30,7 +30,7 @@ import com.codename1.annotations.EntityTitle;
 import com.codename1.annotations.IntentEntity;
 import com.codename1.annotations.IntentParam;
 import com.codename1.annotations.Route;
-import com.codename1.intents.Entity;
+import com.codename1.intents.AppEntity;
 import com.codename1.intents.IntentContext;
 import com.codename1.intents.IntentResult;
 import com.codename1.intents.Intents;
@@ -73,7 +73,7 @@ public class AppIntentsSample {
         // the process is delivered as soon as there is somewhere to deliver it to. The framework
         // queues anything that arrived first.
         Intents.setSelectionHandler(new com.codename1.intents.EntitySelectionHandler() {
-            public void onEntitySelected(Entity entity) {
+            public void onEntitySelected(AppEntity entity) {
                 com.codename1.router.Navigation.navigate("/workouts/" + entity.getId());
             }
         });
@@ -264,9 +264,9 @@ public class AppIntentsSample {
 
     /** Publishes the workouts to device search so they show up outside the app. */
     private static void publishRecent() {
-        List<Entity> entities = new ArrayList<Entity>();
+        List<AppEntity> entities = new ArrayList<AppEntity>();
         for (Workout w : Workout.all()) {
-            entities.add(new Entity("workout", w.getId())
+            entities.add(new AppEntity("workout", w.getId())
                     .setTitle(w.getName())
                     .setSubtitle(w.getDetail())
                     .addKeywords("workout", "training"));

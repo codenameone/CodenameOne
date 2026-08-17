@@ -39,5 +39,5 @@ public interface EntitySelectionHandler {
     /// #### Parameters
     ///
     /// - `entity`: the type and id that were indexed
-    void onEntitySelected(Entity entity);
+    void onEntitySelected(AppEntity entity);
 }

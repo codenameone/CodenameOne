@@ -69,5 +69,5 @@ public interface IntentDispatcher {
     /// #### Returns
     ///
     /// the matching entities, empty when the type declares no such query
-    List<Entity> queryEntities(String entityType, String kind, String argument);
+    List<AppEntity> queryEntities(String entityType, String kind, String argument);
 }

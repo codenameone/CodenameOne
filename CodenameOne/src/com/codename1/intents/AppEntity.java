@@ -34,7 +34,7 @@ import java.util.List;
 /// This is what an entity looks like *after* it has left your code. Your own
 /// class stays your own class; the build reads its `EntityId` / `EntityTitle` /
 /// `EntitySubtitle` / `EntityImage` members and generates the adapter that
-/// produces one of these. You construct `Entity` directly only when indexing
+/// produces one of these. You construct `AppEntity` directly only when indexing
 /// content that has no annotated class behind it.
 ///
 /// The field set is small because it is the intersection of what every platform
@@ -49,7 +49,7 @@ import java.util.List;
 /// same thing after an app update as it did before. An id derived from a list
 /// position or a content hash will silently start resolving to the wrong object
 /// and nothing will report an error.
-public final class Entity {
+public final class AppEntity {
 
     private final String type;
     private final String id;
@@ -64,7 +64,7 @@ public final class Entity {
     ///
     /// - `type`: the entity type id, matching an `IntentEntity` declaration
     /// - `id`: the stable identifier of this instance
-    public Entity(String type, String id) {
+    public AppEntity(String type, String id) {
         if (type == null || type.length() == 0) {
             throw new IllegalArgumentException("type is required");
         }
@@ -100,7 +100,7 @@ public final class Entity {
     /// #### Returns
     ///
     /// this entity, for chaining
-    public Entity setTitle(String title) {
+    public AppEntity setTitle(String title) {
         this.title = title;
         return this;
     }
@@ -119,7 +119,7 @@ public final class Entity {
     /// #### Returns
     ///
     /// this entity, for chaining
-    public Entity setSubtitle(String subtitle) {
+    public AppEntity setSubtitle(String subtitle) {
         this.subtitle = subtitle;
         return this;
     }
@@ -143,7 +143,7 @@ public final class Entity {
     /// #### Returns
     ///
     /// this entity, for chaining
-    public Entity setImage(EncodedImage image) {
+    public AppEntity setImage(EncodedImage image) {
         this.image = image;
         return this;
     }
@@ -158,7 +158,7 @@ public final class Entity {
     /// #### Returns
     ///
     /// this entity, for chaining
-    public Entity addKeywords(String... words) {
+    public AppEntity addKeywords(String... words) {
         if (words != null) {
             for (String w : words) {
                 if (w != null && w.length() > 0) {

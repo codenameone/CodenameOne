@@ -100,22 +100,16 @@ public class CN1IntentService extends IntentService {
             AndroidImplementation.startContext(this);
         }
         try {
-            final CountDownLatch done = new CountDownLatch(1);
-            final IntentResult[] out = new IntentResult[1];
+            Latch latch = new Latch();
             Intents.dispatchInvocation(id, parse(data.getQueryParameter("p")),
-                    IntentSource.SHORTCUT, true, new IntentCompletion() {
-                        public void onIntentResult(IntentResult result) {
-                            out[0] = result;
-                            done.countDown();
-                        }
-                    });
+                    IntentSource.SHORTCUT, true, latch);
             // The service must outlive the handler, so this waits -- but never forever. The
             // framework enforces its own per-intent deadline; this is the backstop for the case
             // where the completion itself never arrives.
-            if (!done.await(BUDGET_SECONDS, TimeUnit.SECONDS)) {
+            if (!latch.await(BUDGET_SECONDS, TimeUnit.SECONDS)) {
                 Log.w(TAG, "Intent " + id + " did not complete within its budget");
             }
-            report(out[0]);
+            report(latch.result());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Throwable t) {
@@ -135,20 +129,53 @@ public class CN1IntentService extends IntentService {
         if (result == null) {
             return;
         }
-        final String message = result.isFailed() ? result.getErrorMessage() : result.getDialog();
+        String message = result.isFailed() ? result.getErrorMessage() : result.getDialog();
         if (message == null || message.length() == 0) {
             return;
         }
-        final Context ctx = getApplicationContext();
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            public void run() {
-                try {
-                    Toast.makeText(ctx, message, Toast.LENGTH_LONG).show();
-                } catch (Throwable ignored) {
-                    // A toast is a courtesy; losing it must not fail the invocation.
-                }
+        new Handler(Looper.getMainLooper()).post(new ShowToast(getApplicationContext(), message));
+    }
+
+    /// Blocks the service thread until the handler answers.
+    ///
+    /// A named class rather than an anonymous one: it captures nothing from the service, so
+    /// making that explicit keeps it from holding a reference to the enclosing instance for the
+    /// lifetime of the invocation.
+    private static final class Latch implements IntentCompletion {
+        private final CountDownLatch done = new CountDownLatch(1);
+        private IntentResult result;
+
+        public void onIntentResult(IntentResult r) {
+            result = r;
+            done.countDown();
+        }
+
+        boolean await(int seconds, TimeUnit unit) throws InterruptedException {
+            return done.await(seconds, unit);
+        }
+
+        IntentResult result() {
+            return result;
+        }
+    }
+
+    /// Shows the handler's spoken line, since Android has no assistant to say it.
+    private static final class ShowToast implements Runnable {
+        private final Context ctx;
+        private final String message;
+
+        ShowToast(Context ctx, String message) {
+            this.ctx = ctx;
+            this.message = message;
+        }
+
+        public void run() {
+            try {
+                Toast.makeText(ctx, message, Toast.LENGTH_LONG).show();
+            } catch (Throwable ignored) {
+                // A toast is a courtesy; losing it must not fail the invocation.
             }
-        });
+        }
     }
 
     private static Map<String, Object> parse(String json) {

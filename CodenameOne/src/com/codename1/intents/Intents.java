@@ -96,7 +96,7 @@ public final class Intents {
 
     /// Search-result taps that arrived before a handler was registered -- the
     /// common case, since a tap is often what launched the process.
-    private static final List<Entity> pendingSelections = new ArrayList<Entity>();
+    private static final List<AppEntity> pendingSelections = new ArrayList<AppEntity>();
 
     private Intents() {
     }
@@ -342,7 +342,7 @@ public final class Intents {
     /// #### Parameters
     ///
     /// - `entities`: the content to publish; null and empty are no-ops
-    public static void index(List<Entity> entities) {
+    public static void index(List<AppEntity> entities) {
         if (entities == null || entities.isEmpty()) {
             return;
         }
@@ -364,7 +364,7 @@ public final class Intents {
     /// #### Parameters
     ///
     /// - `entity`: the content to publish
-    public static void index(Entity entity) {
+    public static void index(AppEntity entity) {
         if (entity != null) {
             index(Collections.singletonList(entity));
         }
@@ -413,7 +413,7 @@ public final class Intents {
     }
 
     // ------------------------------------------------------------------
-    // Entity queries
+    // AppEntity queries
     // ------------------------------------------------------------------
 
     /// Runs one of an entity type's declared queries.
@@ -432,7 +432,7 @@ public final class Intents {
     /// #### Returns
     ///
     /// the matching entities, never null
-    public static List<Entity> queryEntities(String entityType, String kind, String argument) {
+    public static List<AppEntity> queryEntities(String entityType, String kind, String argument) {
         IntentDispatcher d;
         synchronized (pending) {
             d = dispatcher;
@@ -441,8 +441,8 @@ public final class Intents {
             return Collections.emptyList();
         }
         try {
-            List<Entity> out = d.queryEntities(entityType, kind, argument);
-            return out == null ? Collections.<Entity>emptyList() : out;
+            List<AppEntity> out = d.queryEntities(entityType, kind, argument);
+            return out == null ? Collections.<AppEntity>emptyList() : out;
         } catch (Throwable t) {
             logError(t);
             return Collections.emptyList();
@@ -467,16 +467,16 @@ public final class Intents {
         // Install and drain under the same lock dispatchSpotlightSelection reads
         // it under, so a selection cannot slip between the drain and the install
         // and be stranded forever.
-        List<Entity> queued = null;
+        List<AppEntity> queued = null;
         synchronized (pendingSelections) {
             selectionHandler = handler;
             if (handler != null && !pendingSelections.isEmpty()) {
-                queued = new ArrayList<Entity>(pendingSelections);
+                queued = new ArrayList<AppEntity>(pendingSelections);
                 pendingSelections.clear();
             }
         }
         if (queued != null) {
-            for (Entity e : queued) {
+            for (AppEntity e : queued) {
                 deliverSelection(handler, e);
             }
         }
@@ -496,7 +496,7 @@ public final class Intents {
         if (sep <= 0 || sep == uniqueId.length() - 1) {
             return;
         }
-        Entity e = new Entity(uniqueId.substring(0, sep), uniqueId.substring(sep + 1));
+        AppEntity e = new AppEntity(uniqueId.substring(0, sep), uniqueId.substring(sep + 1));
         EntitySelectionHandler h;
         synchronized (pendingSelections) {
             h = selectionHandler;
@@ -528,7 +528,7 @@ public final class Intents {
         return true;
     }
 
-    private static void deliverSelection(final EntitySelectionHandler h, final Entity e) {
+    private static void deliverSelection(final EntitySelectionHandler h, final AppEntity e) {
         if (h == null) {
             return;
         }

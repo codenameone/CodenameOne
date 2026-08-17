@@ -22,7 +22,7 @@
  */
 package com.codename1.impl.ios;
 
-import com.codename1.intents.Entity;
+import com.codename1.intents.AppEntity;
 import com.codename1.intents.IntentCompletion;
 import com.codename1.intents.IntentResult;
 import com.codename1.intents.IntentSerializer;
@@ -131,7 +131,7 @@ final class IOSIntentCallbacks {
             return null;
         }
         try {
-            List<Entity> found = Intents.queryEntities(entityType, kind, argument);
+            List<AppEntity> found = Intents.queryEntities(entityType, kind, argument);
             return IntentSerializer.serializeEntities(found, new HashMap<String, byte[]>());
         } catch (Throwable t) {
             Log.e(t);

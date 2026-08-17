@@ -22,7 +22,7 @@
  */
 package com.codename1.impl.javase;
 
-import com.codename1.intents.Entity;
+import com.codename1.intents.AppEntity;
 import com.codename1.intents.IntentCompletion;
 import com.codename1.intents.IntentDeclaration;
 import com.codename1.intents.IntentParameterInfo;
@@ -259,7 +259,7 @@ class SimulatorIntents {
     /// the query is missing, slow, or returns nothing.
     private JComponent0 editorFor(IntentParameterInfo p) {
         if (p.getType() == IntentParameterType.ENTITY) {
-            List<Entity> options = Intents.queryEntities(p.getEntityType(), "suggested", null);
+            List<AppEntity> options = Intents.queryEntities(p.getEntityType(), "suggested", null);
             if (options.isEmpty()) {
                 JTextField field = new JTextField();
                 field.setToolTipText("No suggested entities: the " + p.getEntityType()
@@ -270,7 +270,7 @@ class SimulatorIntents {
             String[] labels = new String[options.size()];
             String[] ids = new String[options.size()];
             for (int i = 0; i < options.size(); i++) {
-                Entity e = options.get(i);
+                AppEntity e = options.get(i);
                 labels[i] = e.getTitle() == null ? e.getId() : e.getTitle() + "  (" + e.getId() + ")";
                 ids[i] = e.getId();
             }

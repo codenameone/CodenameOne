@@ -103,7 +103,7 @@ public final class IntentSerializer {
     /// Serializes a parameter map for donation or invocation.
     ///
     /// Values are reduced to the wire types -- text, numbers, booleans and epoch
-    /// millis for dates -- because the receiving side is not Java. An [Entity]
+    /// millis for dates -- because the receiving side is not Java. An [AppEntity]
     /// value reduces to its id, which is the only part of it the platform needs
     /// in order to hand the same entity back later.
     ///
@@ -129,12 +129,12 @@ public final class IntentSerializer {
     ///
     /// - `entities`: the entities to serialize
     /// - `images`: receives PNG blobs keyed by the name used in the JSON
-    public static String serializeEntities(List<Entity> entities, Map<String, byte[]> images) {
+    public static String serializeEntities(List<AppEntity> entities, Map<String, byte[]> images) {
         Map<String, Object> doc = new LinkedHashMap<String, Object>();
         doc.put("v", Integer.valueOf(VERSION));
         List<Object> out = new ArrayList<Object>();
         if (entities != null) {
-            for (Entity e : entities) {
+            for (AppEntity e : entities) {
                 out.add(entityToMap(e, images));
             }
         }
@@ -204,7 +204,7 @@ public final class IntentSerializer {
         return JSONWriter.toJson(doc);
     }
 
-    private static Map<String, Object> entityToMap(Entity e, Map<String, byte[]> images) {
+    private static Map<String, Object> entityToMap(AppEntity e, Map<String, byte[]> images) {
         Map<String, Object> m = new LinkedHashMap<String, Object>();
         m.put("type", e.getType());
         m.put("id", e.getId());
@@ -254,8 +254,8 @@ public final class IntentSerializer {
         if (value instanceof Date) {
             return Long.valueOf(((Date) value).getTime());
         }
-        if (value instanceof Entity) {
-            return ((Entity) value).getId();
+        if (value instanceof AppEntity) {
+            return ((AppEntity) value).getId();
         }
         if (value instanceof Character) {
             return value.toString();

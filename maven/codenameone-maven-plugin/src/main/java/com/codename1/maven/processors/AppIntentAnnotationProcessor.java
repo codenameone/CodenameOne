@@ -594,7 +594,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private String generateRegistry(List<IntentDef> defs, List<EntityDef> ents) {
         StringBuilder sb = new StringBuilder();
         sb.append("package ").append(REGISTRY_PACKAGE).append(";\n\n");
-        sb.append("import com.codename1.intents.Entity;\n");
+        sb.append("import com.codename1.intents.AppEntity;\n");
         sb.append("import com.codename1.intents.Exposure;\n");
         sb.append("import com.codename1.intents.IntentContext;\n");
         sb.append("import com.codename1.intents.IntentDeclaration;\n");
@@ -715,15 +715,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     }
 
     private void generateQueryEntities(StringBuilder sb, List<EntityDef> ents) {
-        sb.append("    public List<Entity> queryEntities(String entityType, String kind,\n");
+        sb.append("    public List<AppEntity> queryEntities(String entityType, String kind,\n");
         sb.append("                                       String argument) {\n");
         for (EntityDef e : ents) {
             sb.append("        if (").append(quote(e.type)).append(".equals(entityType)) {\n");
             String byId = e.queries.get("BY_ID");
             if (byId != null) {
                 sb.append("            if (\"byId\".equals(kind)) {\n");
-                sb.append("                List<Entity> out = new ArrayList<Entity>();\n");
-                sb.append("                Entity one = adapt_").append(e.type).append("(")
+                sb.append("                List<AppEntity> out = new ArrayList<AppEntity>();\n");
+                sb.append("                AppEntity one = adapt_").append(e.type).append("(")
                         .append(sourceName(e.binaryName)).append(".").append(byId)
                         .append("(argument));\n");
                 sb.append("                if (one != null) { out.add(one); }\n");
@@ -754,10 +754,10 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
     private void generateAdapters(StringBuilder sb, List<EntityDef> ents) {
         for (EntityDef e : ents) {
-            sb.append("    private static Entity adapt_").append(e.type).append("(")
+            sb.append("    private static AppEntity adapt_").append(e.type).append("(")
                     .append(sourceName(e.binaryName)).append(" o) {\n");
             sb.append("        if (o == null) { return null; }\n");
-            sb.append("        Entity e = new Entity(").append(quote(e.type)).append(", ")
+            sb.append("        AppEntity e = new AppEntity(").append(quote(e.type)).append(", ")
                     .append(read(e.idAccessor)).append(");\n");
             if (e.titleAccessor != null) {
                 sb.append("        e.setTitle(").append(readAsString(e.titleAccessor)).append(");\n");
@@ -772,12 +772,12 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             sb.append("        return e;\n");
             sb.append("    }\n\n");
 
-            sb.append("    private static List<Entity> adaptAll_").append(e.type)
+            sb.append("    private static List<AppEntity> adaptAll_").append(e.type)
                     .append("(List<").append(sourceName(e.binaryName)).append("> in) {\n");
-            sb.append("        List<Entity> out = new ArrayList<Entity>();\n");
+            sb.append("        List<AppEntity> out = new ArrayList<AppEntity>();\n");
             sb.append("        if (in != null) {\n");
             sb.append("            for (").append(sourceName(e.binaryName)).append(" o : in) {\n");
-            sb.append("                Entity a = adapt_").append(e.type).append("(o);\n");
+            sb.append("                AppEntity a = adapt_").append(e.type).append("(o);\n");
             sb.append("                if (a != null) { out.add(a); }\n");
             sb.append("            }\n");
             sb.append("        }\n");

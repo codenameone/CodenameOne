@@ -57,7 +57,7 @@ public final class IntentResult {
     private String dialog;
     private SurfaceNode snippet;
     private String openUrl;
-    private Entity entity;
+    private AppEntity entity;
     private String errorMessage;
 
     private IntentResult(boolean failed) {
@@ -98,7 +98,7 @@ public final class IntentResult {
     /// #### Parameters
     ///
     /// - `e`: the entity produced
-    public static IntentResult entity(Entity e) {
+    public static IntentResult entity(AppEntity e) {
         IntentResult r = new IntentResult(false);
         r.entity = e;
         return r;
@@ -204,7 +204,7 @@ public final class IntentResult {
     }
 
     /// The entity produced, or null.
-    public Entity getEntity() {
+    public AppEntity getEntity() {
         return entity;
     }
 
