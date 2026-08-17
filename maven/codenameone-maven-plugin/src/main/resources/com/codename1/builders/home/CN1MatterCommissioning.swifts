@@ -84,7 +84,6 @@ public final class CN1MatterCommissioning: NSObject {
     public static func commission(_ request: [String: Any]) {
         let requestId = (request["requestId"] as? NSNumber)?.int32Value ?? 0
         let payloadText = request["setupPayload"] as? String ?? ""
-        let suggestedName = request["suggestedName"] as? String ?? ""
         // The requested home is deliberately not read back out. Nothing
         // here can tell which home the accessory joined -- the sheet lets the
         // user pick -- and the result's structure id means the home it JOINED.
@@ -98,7 +97,7 @@ public final class CN1MatterCommissioning: NSObject {
         Task {
             do {
                 let request = MatterAddDeviceRequest(
-                    topology: topology(named: suggestedName),
+                    topology: topology(),
                     setupPayload: setupPayload(from: payloadText))
                 try await request.perform()
                 // Success, and deliberately with neither an accessory id
@@ -126,18 +125,24 @@ public final class CN1MatterCommissioning: NSObject {
     /// The app's display name, because that is what the user recognizes --
     /// this is the "add to <ecosystem>" line in the sheet, and a bundle
     /// identifier there reads like a bug.
+    /// The suggested name is deliberately NOT used here.
+    ///
+    /// `Home.displayName` names a HOME in the topology the sheet offers, and
+    /// `CommissioningRequest.setSuggestedName` is a name for the ACCESSORY.
+    /// Passing one as the other invented a destination home called "Kettle"
+    /// and applied the caller's preference nowhere. MatterSupport takes no
+    /// accessory-name hint, so the preference goes unused on iOS -- which the
+    /// setter's own javadoc says the platform is free to do.
     @available(iOS 16.1, *)
-    private static func topology(named suggestedName: String)
-            -> MatterAddDeviceRequest.Topology {
+    private static func topology() -> MatterAddDeviceRequest.Topology {
         let bundle = Bundle.main
         let appName = (bundle.object(
                 forInfoDictionaryKey: "CFBundleDisplayName") as? String)
             ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
             ?? "Codename One"
-        let homeName = suggestedName.isEmpty ? appName : suggestedName
         return MatterAddDeviceRequest.Topology(
             ecosystemName: appName,
-            homes: [MatterAddDeviceRequest.Home(displayName: homeName)])
+            homes: [MatterAddDeviceRequest.Home(displayName: appName)])
     }
 
     /// Parses a scanned code, or answers nil so Apple's sheet scans one

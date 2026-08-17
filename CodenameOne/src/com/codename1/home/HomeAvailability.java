@@ -89,5 +89,18 @@ public enum HomeAvailability {
     /// No smart-home support on this port, OS version or build. Where the
     /// cause is a missing build hint or entitlement rather than the platform,
     /// [SmartHome#getConfigurationProblems()] says which.
-    NOT_SUPPORTED
+    NOT_SUPPORTED,
+
+    /// The user was asked and said no.
+    ///
+    /// Its own state rather than [#PERMISSION_REQUIRED], because the recovery
+    /// is different and the wrong one gets nowhere: iOS asks for HomeKit once
+    /// and never again, so an app that answers a refusal by calling
+    /// [SmartHome#requestAuthorization()] gets the same refusal back with no
+    /// prompt shown and no way for the user to see what is being asked.
+    /// Send them to [SmartHome#openHomeSettings()] instead.
+    ///
+    /// Last in this enum, and new constants go after it: the ports carry
+    /// these across as ordinals.
+    PERMISSION_DENIED
 }

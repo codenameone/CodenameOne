@@ -434,6 +434,12 @@ static NSDictionary *cn1homeTraitByCharacteristic(void) {
 /// applies.
 static NSArray *cn1homeEntryFor(NSString *traitId);
 
+/// Likewise: the delegate answers a pending start with the same availability
+/// this reports, and it is defined further down with the rest of the native
+/// entry points.
+JAVA_INT com_codename1_impl_ios_IOSNative_homeAvailability___R_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me);
+
 /// The alternates cn1homeFindCharacteristic accepts when a service does not
 /// carry the primary characteristic: characteristic type -> portable trait.
 ///
@@ -1289,8 +1295,11 @@ static void cn1homeAttachDelegates(void) {
     JAVA_INT pending = cn1homePendingStart;
     if (pending != 0) {
         cn1homePendingStart = 0;
-        int availability = [[manager homes] count] == 0
-                ? CN1_HOME_AVAIL_NOT_CONFIGURED : CN1_HOME_AVAIL_AVAILABLE;
+        // Through the same accessor the availability call uses, so a refusal
+        // reads as DENIED here too rather than as an empty house.
+        int availability =
+                com_codename1_impl_ios_IOSNative_homeAvailability___R_int(
+                    getThreadLocalData(), JAVA_NULL);
         com_codename1_impl_ios_IOSHomeCallbacks_started___int_int_java_lang_String(
             getThreadLocalData(), pending, availability, JAVA_NULL);
         return;
@@ -1459,7 +1468,14 @@ com_codename1_impl_ios_IOSNative_homeAvailability___R_int(
         if ((status & HMHomeManagerAuthorizationStatusRestricted) != 0) {
             result = CN1_HOME_AVAIL_RESTRICTED;
         } else if ((status & HMHomeManagerAuthorizationStatusAuthorized) == 0) {
-            result = CN1_HOME_AVAIL_PERMISSION_REQUIRED;
+            // Asked and refused is not the same as not yet asked. iOS shows
+            // the HomeKit prompt once, so an app that answers a refusal by
+            // calling requestAuthorization() gets the refusal back with
+            // nothing on screen; DENIED points it at openHomeSettings()
+            // instead, which is the only way back.
+            result = (status & HMHomeManagerAuthorizationStatusDetermined) != 0
+                    ? CN1_HOME_AVAIL_PERMISSION_DENIED
+                    : CN1_HOME_AVAIL_PERMISSION_REQUIRED;
         } else if ([[cn1homeManager homes] count] == 0) {
             // Its own state, because HomeKit exists on every device and
             // "supported" tells a user who has never opened the Home app
@@ -1511,8 +1527,9 @@ void com_codename1_impl_ios_IOSNative_homeStart___int(
         if (cn1homeManager != nil && cn1homeHomesLoaded) {
             // Already connected, so answer from what is already loaded rather
             // than waiting for a delegate callback that will not come again.
-            int availability = [[cn1homeManager homes] count] == 0
-                    ? CN1_HOME_AVAIL_NOT_CONFIGURED : CN1_HOME_AVAIL_AVAILABLE;
+            int availability =
+                    com_codename1_impl_ios_IOSNative_homeAvailability___R_int(
+                        getThreadLocalData(), JAVA_NULL);
             com_codename1_impl_ios_IOSHomeCallbacks_started___int_int_java_lang_String(
                 getThreadLocalData(), rid, availability, JAVA_NULL);
             return;

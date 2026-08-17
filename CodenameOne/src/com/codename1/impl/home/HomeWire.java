@@ -424,8 +424,21 @@ public final class HomeWire {
                     values);
         }
         if (flag(f, 4)) {
-            return TraitConstraint.ranged(trait, readable, writable, notifies,
-                    real(f, 5, 0), real(f, 6, 0), real(f, 7, 0));
+            // All three bounds read before any of them is used, and a range
+            // that will not read becomes a constraint with no range rather
+            // than an exception. Defaulted to zero, a minimum of 10 with an
+            // unreadable maximum is the inverted range 10..0, and
+            // TraitConstraint.ranged throws on it -- in the middle of the
+            // native callback that builds the graph, which loses the whole
+            // refresh over one malformed trait this codec promised to skip.
+            double min = real(f, 5, Double.NaN);
+            double max = real(f, 6, Double.NaN);
+            double step = real(f, 7, 0);
+            if (!Double.isNaN(min) && !Double.isNaN(max) && min <= max
+                    && !Double.isNaN(step) && step >= 0) {
+                return TraitConstraint.ranged(trait, readable, writable,
+                        notifies, min, max, step);
+            }
         }
         return TraitConstraint.of(trait, readable, writable, notifies);
     }
