@@ -542,8 +542,8 @@ public final class JavaScriptTextLayer {
                 // and is now drawing over it, or a child of it did during this same paint and the
                 // painter has come back to draw on top -- a container that calls super.paint(g)
                 // and then paints over its children. Both are covered on the canvas, so both
-                // have to be here. A run from an earlier pass predates this paint and will be
-                // drawn again by it.
+                // belong here. A run from an earlier pass predates this paint and will be drawn
+                // again by it.
                 boolean drawnThisPaint = painterPass >= 0 && run.claimedPass >= painterPass;
                 if (!drawnThisPaint && painter != null
                         && isSelfOrDescendant(entry.getKey(), painter)) {
