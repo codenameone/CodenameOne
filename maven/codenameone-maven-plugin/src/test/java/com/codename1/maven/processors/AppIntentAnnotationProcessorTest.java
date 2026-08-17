@@ -992,6 +992,29 @@ public class AppIntentAnnotationProcessorTest {
         return classes;
     }
 
+    /// Keeping the later of two same-kind queries picks a resolver by declaration order, which
+    /// nobody chose -- and for BY_ID it decides what every entity id in the app resolves to.
+    @Test
+    public void aDuplicateEntityQueryKindIsRejected() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Playlist",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "@IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "public class Playlist {\n"
+                                + "  @EntityId public String getId() { return \"1\"; }\n"
+                                + "  @EntityTitle public String getName() { return \"Focus\"; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist byId(String id) { return null; }\n"
+                                + "  @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "  public static Playlist alsoById(String id) { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        assertError(classes, "declares BY_ID twice");
+    }
+
     /// An optional entity parameter's default is an id like any other and has to resolve
     /// through the same BY_ID query; ignoring it handed the handler null for exactly the case
     /// the default exists for.

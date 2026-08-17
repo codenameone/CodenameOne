@@ -258,6 +258,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         + " instance of your class in existence");
                 continue;
             }
+            String existing = def.queries.get(kind);
+            if (existing != null) {
+                // Silently keeping the later one picks a resolver by declaration order, which
+                // is not something the author chose. A second BY_ID in particular decides which
+                // object every entity id in the app resolves to.
+                ctx.error(cls, "@IntentEntity " + cls.getBinaryName() + " declares "
+                        + kind + " twice, on " + existing + " and " + m.getName()
+                        + ". Each query kind resolves to exactly one method; keep the one the "
+                        + "platform should call.");
+                continue;
+            }
             def.queries.put(kind, m.getName());
         }
 
