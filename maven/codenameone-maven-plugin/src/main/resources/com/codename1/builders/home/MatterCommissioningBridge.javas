@@ -432,6 +432,21 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
 
     private void launch(final Activity activity, IntentSender sender) {
         final CodenameOneActivity cn1 = (CodenameOneActivity) activity;
+        if (cn1.isWaitingForResult()) {
+            // Re-checked here, not only in commission(): the Play services
+            // call that produces this IntentSender is asynchronous, and
+            // another screen can take the result channel while it runs.
+            // Registering then is silently ignored, so launching anyway hands
+            // this flow's result to that screen.
+            Callback waiting = pendingCommission;
+            pendingCommission = null;
+            if (waiting != null) {
+                waiting.onError("BUSY",
+                        "another screen took over while the add-device"
+                                + " screen was being prepared");
+            }
+            return;
+        }
         cn1.setIntentResultListener(new IntentResultListener() {
             @Override
             public void onActivityResult(int requestCode, int resultCode,

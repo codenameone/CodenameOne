@@ -2097,7 +2097,11 @@ public final class SmartHome {
     /// - `requestId`: the request to fail
     ///
     /// - `timeoutMillis`: the limit; zero leaves the platform's own
-    private void armCommissioningTimeout(int requestId, int timeoutMillis) {
+    ///
+    /// - `result`: the resource being timed, so the timer goes away when it
+    ///   answers
+    private void armCommissioningTimeout(int requestId, int timeoutMillis,
+            EdtResult<CommissioningResult> result) {
         if (timeoutMillis <= 0) {
             return;
         }
@@ -2105,6 +2109,28 @@ public final class SmartHome {
         timer.schedule(
                 new CommissioningTimeout(this, timer, requestId, timeoutMillis),
                 timeoutMillis);
+        // Cancelled the moment the request answers, however it answers.
+        // Timer's thread is not a daemon, so a flow that finished in seconds
+        // would otherwise hold the process open for the whole limit -- and a
+        // user commissioning an accessory may reasonably have been given
+        // minutes.
+        result.onResult(new CancelTimeout(timer));
+    }
+
+    /// Cancels a commissioning timeout once its request has answered.
+    private static final class CancelTimeout
+            implements com.codename1.util.AsyncResult<CommissioningResult> {
+
+        private final Timer timer;
+
+        CancelTimeout(Timer timer) {
+            this.timer = timer;
+        }
+
+        @Override
+        public void onReady(CommissioningResult value, Throwable error) {
+            timer.cancel();
+        }
     }
 
     /// Named rather than anonymous so the scheduled task carries no synthetic
@@ -2297,7 +2323,7 @@ public final class SmartHome {
                     orEmpty(request.getRoomId()),
                     orEmpty(request.getSuggestedName()),
                     request.getTimeoutMillis());
-            armCommissioningTimeout(id, request.getTimeoutMillis());
+            armCommissioningTimeout(id, request.getTimeoutMillis(), result);
             return result;
         }
 

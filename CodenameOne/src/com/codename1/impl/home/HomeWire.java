@@ -512,14 +512,17 @@ public final class HomeWire {
             return TraitReading.absent(accessoryId, serviceId, trait);
         }
         boolean hasRaw = field(f, 7).length() > 0;
-        // No fallback for the number. A record that says it has a value and
-        // then does not carry a readable one is malformed, and defaulting it
-        // to zero is the worst available answer: zero is SECURED for a lock
-        // and false for a flag, so a truncated record would read as a locked
-        // door rather than as the missing data it is.
+        // No fallback for the number, and nothing non-finite either. A
+        // record that says it has a value and then does not carry a readable
+        // finite one is malformed, and defaulting it to zero is the worst
+        // available answer: zero is SECURED for a lock and false for a flag,
+        // so a truncated record would read as a locked door rather than as
+        // the missing data it is. NaN is no better -- it casts to ordinal
+        // zero and compares non-zero -- and no trait carries one: a reading
+        // with no value says so with its own flag.
         double numeric = real(f, 4, Double.NaN);
         boolean numericReadable = !Double.isNaN(numeric)
-                || "NaN".equals(field(f, 4).trim());
+                && !Double.isInfinite(numeric);
         TraitValue value = numericReadable
                 ? decodeValue(trait, integer(f, 3, -1), numeric, field(f, 5),
                         integer(f, 6, -1), integer(f, 7, 0), hasRaw)
