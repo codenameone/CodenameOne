@@ -106,10 +106,15 @@ extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    /* Pin the content view to the controller's view rather than relying on the
+     * autoresizing mask. The mask distributes a resize *delta*, so a content view
+     * created while the window still had zero bounds stays at zero forever -- and
+     * the size query reads the content view, so the window then reports nothing. */
+    if (self.content != nil) {
+        self.content.frame = self.view.bounds;
+    }
     CGSize size = self.view.bounds.size;
     CGFloat scale = self.view.window != nil ? self.view.window.screen.scale : 1.0;
-    NSLog(@"CN1: window %d laid out at %dx%d (scale %f)", self.windowId,
-            (int) (size.width * scale), (int) (size.height * scale), scale);
     CN1MacWindowDeliverResize(self.windowId,
             (int) (size.width * scale), (int) (size.height * scale));
 }
@@ -256,8 +261,6 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
 
     dispatch_async(dispatch_get_main_queue(), ^{
         UIWindowScene* recycled = takeFreeScene();
-        NSLog(@"CN1: window slot %d asking for a scene (recycled=%d)",
-                slot, recycled != nil);
         if (recycled != nil) {
             /* Adopt it straight away rather than going through the pending queue:
              * there is no asynchronous delivery to wait for. */
@@ -293,8 +296,6 @@ BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
     if (g_pendingCount <= 0 || slotForScene(scene) >= 0) {
         // Nothing is waiting, or this scene was already adopted: it belongs to the
         // application's main form.
-        NSLog(@"CN1: scene connected but not adopted (pending=%d already=%d)",
-                g_pendingCount, slotForScene(scene));
         return NO;
     }
     CN1MacWindowSceneConnected(scene);
@@ -307,8 +308,6 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     if (slot < 0 || !g_macWindows[slot].inUse) {
         return;
     }
-    NSLog(@"CN1: adopting scene into window slot %d (%dx%d requested)",
-            slot, g_macWindows[slot].pendingWidth, g_macWindows[slot].pendingHeight);
     w = &g_macWindows[slot];
     w->scene = [scene retain];
 
@@ -478,11 +477,13 @@ int CN1MacWindowGetWidth(int slot) {
     if (w == NULL) {
         return 0;
     }
-    if (w->content == nil) {
+    if (w->controller == nil) {
         return w->pendingWidth;
     }
+    /* The controller's view, not the content subview: that is what the window
+     * manager lays out and what viewDidLayoutSubviews reports back. */
     CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
-    return (int) (w->content.bounds.size.width * scale);
+    return (int) (w->controller.view.bounds.size.width * scale);
 }
 
 int CN1MacWindowGetHeight(int slot) {
@@ -490,11 +491,11 @@ int CN1MacWindowGetHeight(int slot) {
     if (w == NULL) {
         return 0;
     }
-    if (w->content == nil) {
+    if (w->controller == nil) {
         return w->pendingHeight;
     }
     CGFloat scale = w->window != nil ? w->window.screen.scale : 1.0;
-    return (int) (w->content.bounds.size.height * scale);
+    return (int) (w->controller.view.bounds.size.height * scale);
 }
 
 void CN1MacWindowFocus(int slot) {

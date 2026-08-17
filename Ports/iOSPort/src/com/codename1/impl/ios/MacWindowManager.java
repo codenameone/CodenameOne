@@ -23,8 +23,10 @@
 package com.codename1.impl.ios;
 
 import com.codename1.impl.WindowManager;
+import com.codename1.ui.Desktop;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
+import com.codename1.ui.Window;
 
 /**
  * The Mac Catalyst implementation of the desktop windowing contract.
@@ -57,12 +59,14 @@ public class MacWindowManager extends WindowManager {
     /** One native window: its slot, and the raster it is rendered through. */
     static final class Peer {
         final int slot;
+        final int windowId;
         Object mutableImage;
         int rasterWidth;
         int rasterHeight;
 
-        Peer(int slot) {
+        Peer(int slot, int windowId) {
             this.slot = slot;
+            this.windowId = windowId;
         }
     }
 
@@ -85,7 +89,7 @@ public class MacWindowManager extends WindowManager {
         if (s < 0) {
             return null;
         }
-        return new Peer(s);
+        return new Peer(s, windowId);
     }
 
     @Override
@@ -176,8 +180,16 @@ public class MacWindowManager extends WindowManager {
         if (w == null) {
             return null;
         }
-        int width = Math.max(1, getWidth(p));
-        int height = Math.max(1, getHeight(p));
+        // Sized from the framework's window rather than the scene's drawable. The two
+        // agree once the scene has settled, but the scene arrives and resizes
+        // asynchronously, so a raster allocated from the drawable can be left holding
+        // an intermediate size that nothing later reconciles -- the framework paints
+        // into it at its own size and the capture then disagrees with the window.
+        // The window is what was laid out and painted, so it is what the raster has
+        // to match; the drawable is only the fallback until a window exists.
+        Window window = Desktop.getInstance().windowById(w.windowId);
+        int width = Math.max(1, window != null ? window.getWidth() : getWidth(p));
+        int height = Math.max(1, window != null ? window.getHeight() : getHeight(p));
         if (w.mutableImage == null || w.rasterWidth != width || w.rasterHeight != height) {
             w.mutableImage = impl.createMutableImage(width, height, 0xff000000);
             w.rasterWidth = width;
