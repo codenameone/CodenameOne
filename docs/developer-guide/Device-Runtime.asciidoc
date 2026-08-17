@@ -118,7 +118,7 @@ The consequence is that interpreted depth is bounded by the real stack. `setMaxD
 
 == Extending framework classes
 
-An interpreted `class MyForm extends Form` has to be an object the framework accepts as a `Form` and whose overrides the framework calls. The framework was compiled before your class existed, and neither platform lets you define a class at run time.
+Writing `class MyForm extends Form` in a pushed program has to produce something the framework accepts as a `Form`, whose overrides it then calls. The framework was compiled before your class existed, and neither platform lets you define a class at run time.
 
 *iOS* uses runtime clazz synthesis. ParparVM allocates each class's vtable on the heap and fills it slot by slot, so a subclass can be built by copying the parent's `struct clazz`, copying its vtable, and repointing the overridden slots at a trampoline into the interpreter. Nothing is generated and nothing is written to executable memory, which is what makes it acceptable on iOS.
 
@@ -126,7 +126,7 @@ Three details matter. The synthetic class reuses the *parent's* classId, because
 
 *Android* can't patch a vtable and can't load dex at run time, so the guard is compiled ahead of time: a generated subclass per extensible framework class, each overridable method either delegating to the interpreter or calling `super`.
 
-What actually ships uses the generated-subclass approach on *both* platforms. Android could have covered interfaces with `java.lang.reflect.Proxy` and generated only classes; iOS has no `Proxy`, because `Proxy` is `defineClass` in a trenchcoat. Two factories that fail in different places is worse than one that fails in the same place twice, so `ShimObjectFactory` generates shims for classes and for interfaces alike and both platforms run identical code.
+What actually ships uses the generated-subclass approach on *both* platforms. Android could have covered interfaces with `java.lang.reflect.Proxy` and generated only classes; iOS has no `Proxy`, because `Proxy` is `defineClass` wearing a disguise. Two factories that fail in different places is worse than one that fails in the same place twice, so `ShimObjectFactory` generates shims for classes and for interfaces alike and both platforms run identical code.
 
 *Nothing about the set is curated.* it's every public, non-final, constructible class and every public interface the device exposes -- both the framework under `com.codename1` and the device's own `java.*`, taken from the `codenameone-java-runtime` artifact that applications actually compile against. That's 851 classes and 269 interfaces, and about 111,000 methods once the `super_` bridges are counted.
 
@@ -197,7 +197,7 @@ Lambdas and method references are handled without a flag. `InterpLambdaDesugar` 
 
 The runtime app ships on a store cadence; your SDK doesn't. A program compiled against a newer framework than the installed app will reference symbols that aren't there.
 
-The device is the source of truth. Resolution of host symbols is lazy, so a program that never touches a missing symbol never fails because of it; one that does gets a `NoClassDefFoundError` naming the class and saying it's not present in the installed app.
+The device is the source of truth. Resolution of host symbols is lazy, so a program that never touches a missing symbol never fails because of it; one that does fail gets a `NoClassDefFoundError` naming the class and saying it's not present in the installed app.
 
 The bundle format is versioned and a mismatch is refused outright, with a message telling you to rebuild.
 
@@ -242,7 +242,7 @@ They're published to `CodenameOneImplementation`, not to `Display`. That's not a
 
 `list.add(x)` where `list` is declared `java.util.List` compiles to a call naming `java.util.List`. Resolving the method from that name finds `AbstractList.add`, whose body is `throw new UnsupportedOperationException()`. A linker has to start from the receiver's actual class and walk up from there; that walk *is* the virtual dispatch, because there is no vtable to consult from Java.
 
-Android gets this free -- `Method.invoke` dispatches virtually. iOS doesn't, and the symptom is worth recognising: every collection call from pushed code fails with a bare `UnsupportedOperationException` and no message, while `Form.show()` works, because that call site happens to name the receiver's own class.
+Android gets this free -- `Method.invoke` dispatches virtually. iOS doesn't, and the symptom is worth recognizing: every collection call from pushed code fails with a bare `UnsupportedOperationException` and no message, while `Form.show()` works, because that call site happens to name the receiver's own class.
 
 === Enums are interpreted, not shimmed
 
@@ -298,7 +298,7 @@ This is the normal case, not an edge one. The thread running a pushed `main` and
 The caches are the other half of that, and they're where this actually went wrong twice. Both bugs presented identically and neither pointed at concurrency:
 
 * The extern-class cache is two arrays, a result and an "attempted" flag, which are one logical entry. Setting the flag before storing the result leaves a window where another thread reads "attempted, and null" and reports `NoClassDefFoundError: java/lang/StringBuilder` -- for a class that resolved without trouble microseconds earlier. Store the result first, and take a lock over the pair.
-* The reflection linker memoises resolved classes and methods in a `HashMap`. Concurrent `put` on an unsynchronised `HashMap` doesn't merely lose an entry: it can return null for a key that's present, producing the same impossible `NoClassDefFoundError`.
+* The reflection linker memoizes resolved classes and methods in a `HashMap`. Concurrent `put` on an unsynchronized `HashMap` doesn't merely lose an entry: it can return null for a key that's present, producing the same impossible `NoClassDefFoundError`.
 
 If you add a cache to this code path, assume every thread in the program will hit it at once, because they will.
 
@@ -386,19 +386,19 @@ Both device scripts delete the generated native project before rebuilding. That'
 
 The listener speaks two protocol versions and they exist for different situations.
 
-Protocol *v1* is an unauthenticated push. It's the only thing `cn1-push.sh` sends, and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorised device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog. It's refused on any connection that didn't arrive over loopback, and that's a property of the connection rather than a mode -- treating it as a mode once meant a device that had seen a network address refused USB pushes for the rest of its life.
+Protocol *v1* is an unauthenticated push. It's the only thing `cn1-push.sh` sends, and what a development build accepts, because that build's listener is bound to loopback: reaching it requires `adb forward` on an authorized device or the iOS simulator's own loopback, so possession of the device is the authentication. Iterating on the framework would be intolerable if every push needed a dialog. It's refused on any connection that didn't arrive over loopback, and that's a property of the connection rather than a mode -- treating it as a mode once meant a device that had seen a network address refused USB pushes for the rest of its life.
 
 Protocol *v3* pairs first, then authenticates every connection. It's what `DevicePush` speaks, and pushing to a phone over Wi-Fi is its job rather than the shell helper's: a third copy of the derivation in a script would only drift from the two that have to agree.
 
 Pairing is two round trips. The IDE prints a six-digit code and sends its peer id and a friendly name; the device asks a human to type the code, replies with its own device id and a fresh 32-byte challenge, and both ends then derive the same 256-bit secret from `(code, peerId, deviceId)` -- 20,000 iterations of HMAC-SHA-256, which is what makes grinding the six digits cost something. The computer answers the challenge under that secret and the device stores it only on a match. The secret is never transmitted, in either direction, at any point.
 
-Every push afterwards answers a fresh challenge, and the answer covers the bundle as well as the challenge. A captured frame therefore authenticates exactly one connection, and a program can't be substituted behind a valid answer.
+Every push afterward answers a fresh challenge, and the answer covers the bundle as well as the challenge. A captured frame therefore authenticates exactly one connection, and a program can't be substituted behind a valid answer.
 
 Pairing doesn't buy silent access. Once a connection has authenticated, it still raises "Approve connection from &lt;name&gt;?" with *Once*, *Always* and *Deny*, and only *Always* is remembered, per peer. `DeviceRuntimePairing.forgetAll()` drops the lot, secrets included. The order is deliberate: authenticate, then ask. Prompting first would let anyone on the network raise dialogs on somebody's phone until they tapped Approve to make them stop.
 
 [NOTE]
 ====
-There was a v2, in which a peer id sent in the clear authorised every later push. That's a bearer token on a LAN -- capture one frame and push forever, and what you push is arbitrary code. It's gone rather than deprecated: nothing had shipped that spoke it, and leaving it in would have made the fix optional for an attacker.
+There was a v2, in which a peer id sent in the clear authorized every later push. That's a bearer token on a LAN -- capture one frame and push forever, and what you push is arbitrary code. It's gone rather than deprecated: nothing had shipped that spoke it, and leaving it in would have made the fix optional for an attacker.
 ====
 
 [WARNING]

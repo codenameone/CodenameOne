@@ -650,3 +650,29 @@ unretraceable
 [Mm]inif(y|ies|ied|ier|ication)
 [Uu]nminif(y|ies|ied|ier|ication)
 [Rr]etrace(d|s|able)?
+
+# -----------------------------------------------------------------------------
+# Device runtime (Device-Runtime.asciidoc). VM and translator vocabulary: these
+# are the names of the things, not approximations of them.
+# -----------------------------------------------------------------------------
+# The Dalvik executable format, by its universal lowercase name.
+dex
+# The virtual method table, and ParparVM's own spelling of the class struct.
+[Vv]table
+[Cc]lazz
+# Devirtualization is the optimizer pass whose absence interp-host depends on.
+[Dd]evirtualiz(e|es|ed|ing|ation)
+# What the translator does to invokedynamic and to lambdas, at build time.
+[Dd]esugar(s|ed|ing)?
+# The JVM's term for a type above another in the hierarchy.
+[Ss]upertypes?
+# What a recursive interpreter does, and what a Throwable is.
+recurses
+recursing
+throwable
+# What a cache does to a resolved class or method.
+[Mm]emoiz(e|es|ed|ing)
+# The build system the spike tests drive.
+cmake
+# thebaselab publishes Code App, the App Store precedent for 2.5.2.
+thebaselab
