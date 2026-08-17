@@ -182,7 +182,7 @@ public final class IOSVisionImpl extends VisionImpl {
         Map root = new JSONParser().parseJSON(new StringReader(json));
         Object error = root.get("error");
         if (error != null) {
-            throw new VisionException(VisionException.BACKEND_ERROR, String.valueOf(error));
+            throw new VisionException(errorCode(root), String.valueOf(error));
         }
         List items = (List) root.get("items");
         if (items == null) {
@@ -302,6 +302,21 @@ public final class IOSVisionImpl extends VisionImpl {
             }
         }
         return filtered;
+    }
+
+    /**
+     * Classifies a native failure. The backend tags the failures that are a
+     * missing capability rather than a broken run -- a script this OS cannot
+     * recognize, a model this build did not link -- so they surface as
+     * {@code UNSUPPORTED}, the same code Android reports for the equivalent
+     * case. Callers can then branch on the portable code to offer the ML Kit
+     * fallback instead of matching on the message text. An untagged failure is
+     * a genuine backend error.
+     */
+    @SuppressWarnings("rawtypes")
+    private static int errorCode(Map root) {
+        return "unsupported".equals(stringOrNull(root, "errorCode"))
+                ? VisionException.UNSUPPORTED : VisionException.BACKEND_ERROR;
     }
 
     private static VisionRect rect(Map value) {

@@ -305,7 +305,7 @@ Japanese, or Korean:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-vision-script,indent=0]
 ----
 
-The selector names a script rather than a language, because that is what
+The selector names a script rather than a language, because that's what
 the underlying recognizers are organized by. One script covers every
 language written in it, and each script model also reads the Latin
 characters mixed into the same page. Recognize one script per analyzer;
@@ -314,16 +314,16 @@ create a second analyzer when a screen needs both.
 Android maps each script to the matching ML Kit recognizer. Apple
 platforms map it to the Vision recognition languages for that script,
 asking the OS which languages it supports rather than assuming a list.
-When the OS recognizes none of them, the analysis fails with an explicit
-error instead of silently returning Latin OCR of the page. Select
-`VisionBackends.mlKitTextRecognition()` to use ML Kit's model for that
-script on iOS instead.
+When the OS recognizes none of them, the analysis fails with
+`VisionException.UNSUPPORTED` rather than returning Latin OCR of the
+page. Select `VisionBackends.mlKitTextRecognition()` to use ML Kit's
+model for that script on iOS instead.
 
 Each script is a separate model, and referencing `TextScript.japanese()`
 is what adds it: the ML Kit script bundle on Android, and on iOS the
 matching pod when the ML Kit backend was also selected. An application
 that never names a script carries only the Latin model, and one that
-names Japanese does not carry the Korean or Devanagari models.
+names Japanese doesn't carry the Korean or Devanagari models.
 
 On an iOS simulator, the Apple barcode backend uses Vision barcode
 request revision 1. Newer simulator runtimes can otherwise complete a

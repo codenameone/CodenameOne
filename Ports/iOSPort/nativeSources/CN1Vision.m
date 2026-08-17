@@ -208,6 +208,21 @@ static NSString *cn1VisionError(NSError *error) {
     });
 }
 
+/*
+ * A capability failure rather than a runtime one: the analysis cannot run
+ * because this build or this OS lacks the model, not because it tried and
+ * broke. The symbolic code rides alongside the message so IOSVisionImpl can
+ * raise VisionException.UNSUPPORTED -- matching what Android reports for the
+ * same condition -- instead of leaving callers to pattern-match on English
+ * text to decide whether the ML Kit fallback is worth trying.
+ */
+static NSString *cn1VisionUnsupported(NSString *message) {
+    return cn1VisionJSON(@{
+        @"error": message,
+        @"errorCode": @"unsupported"
+    });
+}
+
 #if defined(CN1_HAS_MLKIT_VISION)
 static UIImageOrientation cn1UIImageOrientation(int rotation) {
     switch (rotation) {
@@ -292,9 +307,9 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
         if (scriptClassName != nil) {
             Class scriptClass = NSClassFromString(scriptClassName);
             if (scriptClass == nil) {
-                return cn1VisionJSON(@{@"error": [NSString stringWithFormat:
+                return cn1VisionUnsupported([NSString stringWithFormat:
                         @"The ML Kit %@ text model is not linked into this "
-                         "build", textScript]});
+                         "build", textScript]);
             }
             textOptions = [[scriptClass alloc] init];
         }
@@ -628,11 +643,11 @@ static NSString *cn1VisionPerform(NSData *data, CGImageRef rawImage,
                     // Latin OCR over the page and return confident nonsense,
                     // so refuse instead: the caller can select the ML Kit
                     // backend, which carries its own script model.
-                    return cn1VisionJSON(@{@"error": [NSString stringWithFormat:
+                    return cn1VisionUnsupported([NSString stringWithFormat:
                             @"Apple Vision on this OS version does not "
                              "recognize the %@ script. Select "
                              "VisionBackends.mlKitTextRecognition() to use the "
-                             "ML Kit model instead.", textScript]});
+                             "ML Kit model instead.", textScript]);
                 }
                 request.recognitionLanguages = languages;
                 request.usesLanguageCorrection = YES;
