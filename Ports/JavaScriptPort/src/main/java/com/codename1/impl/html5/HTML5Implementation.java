@@ -1296,7 +1296,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // display graphics reports its clip in absolute coordinates, the space component
             // bounds are in; Graphics.getClipX() subtracts the translation and would not be.
             textLayer.beginComponent(c, coversComponent(c), isEditingText(c),
-                    graphics.getClipWidth() <= 0 || graphics.getClipHeight() <= 0);
+                    graphics.getClipWidth() <= 0 || graphics.getClipHeight() <= 0,
+                    graphics.getClipX(), graphics.getClipY(),
+                    graphics.getClipWidth(), graphics.getClipHeight());
         }
     }
 

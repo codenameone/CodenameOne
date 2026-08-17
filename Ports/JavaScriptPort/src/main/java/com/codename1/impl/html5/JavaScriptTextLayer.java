@@ -149,6 +149,13 @@ public final class JavaScriptTextLayer {
      * component's text on the canvas from then on.
      */
     private final Set<Component> canvasOnly = new HashSet<Component>();
+    /**
+     * The region the frame being painted was asked to repaint, in Codename One pixels.
+     */
+    private int frameDirtyX;
+    private int frameDirtyY;
+    private int frameDirtyW = Integer.MAX_VALUE;
+    private int frameDirtyH = Integer.MAX_VALUE;
 
     private boolean reattachedThisFrame;
 
@@ -224,7 +231,17 @@ public final class JavaScriptTextLayer {
      * @param component the component about to paint
      */
     public void beginComponent(Component component, boolean covering, boolean editing,
-            boolean clipEmpty) {
+            boolean clipEmpty, int clipX, int clipY, int clipW, int clipH) {
+        if (depth == 0) {
+            // The outermost paint of a frame carries the region the framework decided to
+            // repaint. Every clip inside the frame is that region intersected with whatever the
+            // components impose, which is what lets a clip narrowed by the region be told from
+            // one narrowed by a container that really did get smaller.
+            frameDirtyX = clipX;
+            frameDirtyY = clipY;
+            frameDirtyW = clipW;
+            frameDirtyH = clipH;
+        }
         while (stack.size() <= depth) {
             stack.add(new Frame());
         }
@@ -361,9 +378,7 @@ public final class JavaScriptTextLayer {
         int useClipW = clipW;
         int useClipH = clipH;
         if (run.clipX != Integer.MIN_VALUE && run.lastX == x && run.lastY == y
-                && clipX >= run.clipX && clipY >= run.clipY
-                && clipX + clipW <= run.clipX + run.clipW
-                && clipY + clipH <= run.clipY + run.clipH) {
+                && isRegionNarrowing(run, clipX, clipY, clipW, clipH)) {
             useClipX = run.clipX;
             useClipY = run.clipY;
             useClipW = run.clipW;
@@ -609,6 +624,25 @@ public final class JavaScriptTextLayer {
         cellRendererDepth = 0;
         drawSequence = 0;
         reattachedThisFrame = false;
+    }
+
+    /**
+     * True when a clip is exactly what the frame's repaint region makes of the clip this run
+     * already has -- in other words, the run is subject to the same clip as before and only the
+     * region being repainted is narrower.
+     *
+     * <p>A container that really did get smaller produces a different rectangle: its own clip
+     * intersected with the region, which is smaller than the run's old clip intersected with it.
+     * That one has to be taken, or promoted text would stay visible outside the container it
+     * belongs to.</p>
+     */
+    private boolean isRegionNarrowing(Run run, int clipX, int clipY, int clipW, int clipH) {
+        int left = Math.max(run.clipX, frameDirtyX);
+        int top = Math.max(run.clipY, frameDirtyY);
+        long right = Math.min((long) run.clipX + run.clipW, (long) frameDirtyX + frameDirtyW);
+        long bottom = Math.min((long) run.clipY + run.clipH, (long) frameDirtyY + frameDirtyH);
+        return clipX == left && clipY == top
+                && (long) clipX + clipW == right && (long) clipY + clipH == bottom;
     }
 
     /**
