@@ -733,7 +733,11 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "asString(params, " + key + ", " + (def == null ? "null" : quote(def)) + ")";
         }
         if ("date".equals(p.kind)) {
-            return "asDate(params, " + key + ")";
+            // A declared default has to apply to a date too. Every other type honoured one, so
+            // an optional date silently arrived as null instead of the documented fallback --
+            // most visibly on iOS, where an absent optional parameter is left out entirely.
+            String fallback = p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue);
+            return "asDate(params, " + key + ", " + fallback + ")";
         }
         if ("boolean".equals(p.kind)) {
             return "asBoolean(params, " + key + ", " + Boolean.parseBoolean(p.defaultValue) + ")";
@@ -758,7 +762,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "entity_" + p.entityType + "(params, " + key + ")";
         }
         if ("date".equals(p.kind)) {
-            return "asDate(params, " + key + ")";
+            return "asDate(params, " + key + ", null)";
         }
         if ("boolean".equals(p.kind)) {
             return "asBoolean(params, " + key + ", false)";
@@ -946,8 +950,10 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        return value;\n");
         sb.append("    }\n\n");
 
-        sb.append("    private static java.util.Date asDate(Map<String, Object> p, String k) {\n");
+        sb.append("    private static java.util.Date asDate(Map<String, Object> p, String k,\n");
+        sb.append("                                          String def) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) { o = def; }\n");
         sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
         sb.append("        if (o instanceof Number) { return new java.util.Date(((Number) o).longValue()); }\n");
         sb.append("        if (o instanceof String) {\n");

@@ -27,6 +27,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ShortcutInfo;
 import android.content.pm.ShortcutManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
@@ -75,6 +77,8 @@ public class AndroidIntentBridge implements IntentBridge {
     private final List<String> indexed = new ArrayList<String>();
     /// A cold-start request waiting for the declaration table to exist.
     private static final List<String> PARKED = new ArrayList<String>();
+    /// Thumbnails for the index call in progress, keyed by the name embedded in its JSON.
+    private Map<String, byte[]> pendingImages;
 
     public boolean areIntentsSupported() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1;
@@ -159,13 +163,17 @@ public class AndroidIntentBridge implements IntentBridge {
                         dyn.getBoundParameters(), paramsJson);
             }
             pushShortcut(ctx, intentId, label, label,
-                    uriFor(targetId, effectiveParams, ctx));
+                    uriFor(targetId, effectiveParams, ctx), null);
         } catch (Throwable t) {
             Log.w(TAG, "Could not donate " + intentId, t);
         }
     }
 
     public void index(String entitiesJson, Map<String, byte[]> images) {
+        // The images map is the only place an entity's thumbnail exists -- the JSON carries the
+        // name it was registered under, not the bytes -- so dropping it left every entry
+        // showing the application icon.
+        this.pendingImages = images;
         if (!isIndexingSupported()) {
             return;
         }
@@ -189,12 +197,14 @@ public class AndroidIntentBridge implements IntentBridge {
             String title = entry[1];
             String subtitle = entry[2];
             try {
+                String imageName = entry.length > 3 ? entry[3] : null;
                 String openUri = SCHEME + "://open?uid=" + Uri.encode(uid);
                 String nonce = CN1IntentNonce.get(ctx);
                 if (nonce != null) {
                     openUri += "&n=" + Uri.encode(nonce);
                 }
-                pushShortcut(ctx, uid, title, subtitle, Uri.parse(openUri));
+                pushShortcut(ctx, uid, title, subtitle, Uri.parse(openUri),
+                        imageFor(imageName));
                 synchronized (indexed) {
                     if (!indexed.contains(uid)) {
                         indexed.add(uid);
@@ -302,7 +312,7 @@ public class AndroidIntentBridge implements IntentBridge {
 
     @TargetApi(Build.VERSION_CODES.N_MR1)
     private void pushShortcut(Context ctx, String id, String shortLabel, String longLabel,
-                               Uri data) {
+                               Uri data, byte[] png) {
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
             return;
@@ -323,7 +333,18 @@ public class AndroidIntentBridge implements IntentBridge {
                     new Object[]{Boolean.TRUE});
         }
         try {
-            Icon icon = Icon.createWithResource(ctx, ctx.getApplicationInfo().icon);
+            // The entity's own thumbnail when it has one, so a list of indexed content is
+            // distinguishable rather than a column of identical app icons.
+            Icon icon = null;
+            if (png != null && png.length > 0) {
+                Bitmap bitmap = BitmapFactory.decodeByteArray(png, 0, png.length);
+                if (bitmap != null) {
+                    icon = Icon.createWithBitmap(bitmap);
+                }
+            }
+            if (icon == null) {
+                icon = Icon.createWithResource(ctx, ctx.getApplicationInfo().icon);
+            }
             b.setIcon(icon);
         } catch (Throwable ignored) {
             // An icon is optional; a shortcut without one is still usable.
@@ -391,6 +412,15 @@ public class AndroidIntentBridge implements IntentBridge {
 
     /// Builds the shortcut URI. The headless flag rides along so the trampoline can route a
     /// cold-start tap without the declaration table, which does not exist yet at that point.
+    /// The staged bytes for a name the serializer embedded, or null.
+    private byte[] imageFor(String name) {
+        Map<String, byte[]> images = pendingImages;
+        if (name == null || images == null) {
+            return null;
+        }
+        return images.get(name);
+    }
+
     private static Uri uriFor(String intentId, String paramsJson, Context ctx) {
         String uri = SCHEME + "://run?id=" + Uri.encode(intentId);
         if (paramsJson != null && paramsJson.length() > 0) {

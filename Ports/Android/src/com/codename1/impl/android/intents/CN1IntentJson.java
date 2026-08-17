@@ -36,7 +36,7 @@ final class CN1IntentJson {
     private CN1IntentJson() {
     }
 
-    /// Returns `{uid, title, subtitle}` for each entity in an index document.
+    /// Returns `{uid, title, subtitle, image}` for each entity in an index document.
     static List<String[]> entities(String json) {
         List<String[]> out = new ArrayList<String[]>();
         if (json == null) {
@@ -56,7 +56,8 @@ final class CN1IntentJson {
             // picked up when this one omits it.
             int end = json.indexOf("\"uid\"", uidAt + 5);
             String scope = end < 0 ? json.substring(uidAt) : json.substring(uidAt, end);
-            out.add(new String[]{uid, field(scope, "title"), field(scope, "subtitle")});
+            out.add(new String[]{uid, field(scope, "title"), field(scope, "subtitle"),
+                    field(scope, "image")});
             at = uidAt + 5;
         }
         return out;
