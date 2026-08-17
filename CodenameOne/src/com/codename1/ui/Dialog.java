@@ -973,6 +973,20 @@ public class Dialog extends Form implements AbstractDialog {
         dialogContentPane.removeComponent(cmp);
     }
 
+    /// Refreshing the theme reinstalls the menu bar, and that moves the form's title
+    /// component into the title area. A dialog's title component is its own title label, and a
+    /// dialog keeps the form title area hidden -- so without putting the label back where it
+    /// belongs, refreshing the theme loses the dialog's title altogether, along with the space
+    /// it occupied in the centered-title layout.
+    ///
+    /// {@inheritDoc}
+    @Override
+    public void refreshTheme(boolean merge) {
+        super.refreshTheme(merge);
+        updateTitleLayout();
+        revalidate();
+    }
+
     /// {@inheritDoc}
     @Override
     public Label getTitleComponent() {
