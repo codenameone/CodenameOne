@@ -175,6 +175,27 @@ class AndroidIntentShortcutsTest {
     }
 
     @Test
+    void aHeadlessIntentCarriesItsFlagInTheShortcutUri(@TempDir Path dir) throws Exception {
+        // At a cold start the declaration table is not installed yet, so the trampoline cannot
+        // look the flag up -- it has to arrive in the URI or the app visibly opens.
+        entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
+                + "\"title\":\"Log\",\"discoverable\":true,\"headless\":true}]}");
+
+        String xml = shortcutsXml(dir);
+        assertTrue(xml.contains("cn1intent://run?id=log_workout&amp;h=1"), xml);
+    }
+
+    @Test
+    void aForegroundIntentCarriesNoHeadlessFlag(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"show_order\","
+                + "\"title\":\"Show\",\"discoverable\":true,\"headless\":false}]}");
+
+        String xml = shortcutsXml(dir);
+        assertTrue(xml.contains("cn1intent://run?id=show_order\""), xml);
+        assertFalse(xml.contains("h=1"), xml);
+    }
+
+    @Test
     void aTitleWithMarkupCannotBreakTheResource(@TempDir Path dir) throws Exception {
         entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
                 + "\"title\":\"Log <b>a</b> \\\"workout\\\" & more\",\"discoverable\":true}]}");

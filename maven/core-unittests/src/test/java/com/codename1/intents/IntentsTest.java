@@ -326,6 +326,54 @@ class IntentsTest {
         assertEquals(IntentSource.IN_APP, seen[0].getSource());
     }
 
+    @Test
+    void aResultThatNamesARouteNavigatesToIt() {
+        // The platforms only know how to bring the app forward; the route table is Java, so the
+        // framework has to do the navigating or an opens() result foregrounds the app onto
+        // whatever screen it happened to be showing.
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.next = IntentResult.opens("/orders/42");
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertEquals(Arrays.asList("/orders/42"), navigated);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
+    @Test
+    void aFailedResultDoesNotNavigate() {
+        final List<String> navigated = new ArrayList<String>();
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                navigated.add(url);
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.next = IntentResult.failed("nope").withOpenUrl("/orders/42");
+            Intents.setDispatcher(d);
+
+            Intents.invoke("known", null);
+
+            assertTrue(navigated.isEmpty(),
+                    "a failure that also carries a route must not navigate as if it worked");
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Declarations
     // ------------------------------------------------------------------

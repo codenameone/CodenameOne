@@ -6039,26 +6039,30 @@ public class IPhoneBuilder extends Executor {
             inject += "\n<key>CN1WalletAppGroup</key><string>" + walletAppGroup.trim() + "</string>";
         }
 
+        // App intents: iOS only offers an activity whose type the app declared here, so without
+        // these keys donation appears to succeed while nothing is ever suggested and a Spotlight
+        // result cannot continue into the app.
+        //
+        // Emitted for any app that declares an intent. It has nothing to do with the widget
+        // extension, and nesting it in that branch made it depend on an unrelated feature being
+        // switched on.
+        if (declaresAppIntents && !inject.contains("NSUserActivityTypes")) {
+            StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
+            for (Map<String, Object> intent : intentsManifest) {
+                Object id = intent.get("id");
+                if (id instanceof String) {
+                    types.append("<string>").append((String) id).append("</string>");
+                }
+            }
+            types.append("</array>");
+            inject += types.toString();
+            inject += "\n<key>CoreSpotlightContinuation</key><true/>";
+        }
+
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
         // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
         if (surfacesExtensionEnabled) {
-            if (declaresAppIntents && !inject.contains("NSUserActivityTypes")) {
-                // Prediction and the "continue in the app" path both key off the activity type,
-                // and iOS only offers an activity whose type the app declared here. Missing this
-                // makes donation appear to work while nothing is ever suggested.
-                StringBuilder types = new StringBuilder("\n<key>NSUserActivityTypes</key><array>");
-                for (Map<String, Object> intent : intentsManifest) {
-                    Object id = intent.get("id");
-                    if (id instanceof String) {
-                        types.append("<string>").append((String) id).append("</string>");
-                    }
-                }
-                types.append("</array>");
-                inject += types.toString();
-                // Lets a Spotlight result continue into the app rather than only launching it.
-                inject += "\n<key>CoreSpotlightContinuation</key><true/>";
-            }
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
             }

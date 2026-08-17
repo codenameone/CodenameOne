@@ -173,10 +173,14 @@ public class AndroidIntentBridge implements IntentBridge {
         if (ctx == null) {
             return;
         }
-        List<String> drop = new ArrayList<String>();
+        // Asks the platform what is actually published rather than trusting this instance's
+        // memory. Shortcuts outlive the process, so after a restart the in-memory list is empty
+        // while the launcher still shows every previously indexed item -- and a clear that
+        // quietly removed nothing is worse than one that fails loudly.
+        List<String> drop = publishedIds(ctx, entityType);
         synchronized (indexed) {
             for (String uid : indexed) {
-                if (entityType == null || uid.startsWith(entityType + ":")) {
+                if (matchesType(uid, entityType) && !drop.contains(uid)) {
                     drop.add(uid);
                 }
             }
@@ -185,6 +189,48 @@ public class AndroidIntentBridge implements IntentBridge {
         if (!drop.isEmpty()) {
             removeShortcuts(ctx, drop);
         }
+    }
+
+    /// The ids this app has published that belong to `entityType`, or all of them when null.
+    @TargetApi(Build.VERSION_CODES.N_MR1)
+    private List<String> publishedIds(Context ctx, String entityType) {
+        List<String> out = new ArrayList<String>();
+        if (!areIntentsSupported()) {
+            return out;
+        }
+        // Only the platform call is guarded. A cast inside a catch(Throwable) block reads as
+        // relying on ClassCastException, which ParparVM never throws -- and the repo's gate
+        // rejects the shape wherever it appears, so the iteration stays outside.
+        ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
+        if (manager == null) {
+            return out;
+        }
+        List<ShortcutInfo> live;
+        try {
+            live = manager.getDynamicShortcuts();
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read the published shortcuts", t);
+            return out;
+        }
+        if (live == null) {
+            return out;
+        }
+        for (ShortcutInfo info : live) {
+            String id = info.getId();
+            if (id != null && matchesType(id, entityType)) {
+                out.add(id);
+            }
+        }
+        return out;
+    }
+
+    /// An indexed id is `type:id`; an intent shortcut is a bare intent id and never matches a
+    /// type, which is what keeps clearIndex from removing the app's own launcher actions.
+    private static boolean matchesType(String uid, String entityType) {
+        if (entityType == null) {
+            return uid.indexOf(':') > 0;
+        }
+        return uid.startsWith(entityType + ":");
     }
 
     public void completeInvocation(String token, String resultJson, Map<String, byte[]> images) {
@@ -286,10 +332,17 @@ public class AndroidIntentBridge implements IntentBridge {
         return s.length() > 40 ? s.substring(0, 40) : s;
     }
 
+    /// Builds the shortcut URI. The headless flag rides along so the trampoline can route a
+    /// cold-start tap without the declaration table, which does not exist yet at that point.
     private static Uri uriFor(String intentId, String paramsJson) {
         String uri = SCHEME + "://run?id=" + Uri.encode(intentId);
         if (paramsJson != null && paramsJson.length() > 0) {
             uri += "&p=" + Uri.encode(paramsJson);
+        }
+        com.codename1.intents.IntentDeclaration decl =
+                com.codename1.intents.Intents.getDeclaration(intentId);
+        if (decl != null && decl.isHeadless()) {
+            uri += "&h=1";
         }
         return Uri.parse(uri);
     }

@@ -208,6 +208,83 @@ class IOSAppIntentsBuilderTest {
     }
 
     @Test
+    void aFailedHandlerFailsTheIntentRatherThanReportingSuccess() {
+        // A dialog-only success made Shortcuts record the action as successful and run every
+        // action after it, which is worse than the original error.
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout")),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("if !outcome.ok"), swift);
+        assertTrue(swift.contains("throw CN1IntentFailure(message: outcome.spoken)"), swift);
+    }
+
+    @Test
+    void aReturnedValueReachesTheNextShortcutAction() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout")),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("ReturnsValue<String>"), swift);
+        assertTrue(swift.contains(".result(value: outcome.value ?? \"\""), swift);
+    }
+
+    @Test
+    void aNonDiscoverableIntentIsNotOfferedBeforeItIsDonated() {
+        Map<String, Object> hidden = intent("secret_one", "Secret");
+        hidden.put("discoverable", Boolean.FALSE);
+
+        String swift = intentsSwift(Arrays.asList(hidden), new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("isDiscoverable: Bool = false"), swift);
+    }
+
+    @Test
+    void aDiscoverableIntentGetsNoOverride() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout")),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("isDiscoverable"), swift);
+    }
+
+    @Test
+    void aDestructiveIntentAsksBeforeItActs() {
+        Map<String, Object> destructive = intent("delete_all", "Delete everything");
+        destructive.put("destructive", Boolean.TRUE);
+
+        String swift = intentsSwift(Arrays.asList(destructive),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("try await requestConfirmation()"), swift);
+    }
+
+    @Test
+    void anOptionalParameterBecomesAnOptionalSwiftType() {
+        // A non-optional Swift type makes the system prompt for a value the handler was happy
+        // to do without, and the Java-side default never applies.
+        Map<String, Object> optional = param("note", "string", "required", Boolean.FALSE);
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log", "params", Arrays.asList(optional))),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("var note: String?"), swift);
+        // Absent means absent: nothing is put in the map, so Java applies its own default.
+        assertTrue(swift.contains("if let v = note"), swift);
+    }
+
+    @Test
+    void aRequiredParameterStaysNonOptional() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log",
+                        "params", Arrays.asList(param("minutes", "int")))),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("var minutes: Int\n"), swift);
+        assertFalse(swift.contains("var minutes: Int?"), swift);
+    }
+
+    @Test
     void aSwiftKeywordParameterIsEscaped() {
         // Parameter names come from application code, so a Swift keyword is reachable rather
         // than theoretical, and an unescaped one is a compile error on a Mac only.

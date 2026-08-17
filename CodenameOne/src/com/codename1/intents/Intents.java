@@ -623,6 +623,28 @@ public final class Intents {
     // Internals
     // ------------------------------------------------------------------
 
+    /// Navigates when a result names a route.
+    ///
+    /// The framework does this rather than each port, because the route table is Java and the
+    /// platforms only know how to bring the app forward -- iOS through `openAppWhenRun`, Android
+    /// through the trampoline. Without this the app would foreground and then sit on whatever
+    /// screen it happened to be showing, which is the failure an `opens` result exists to avoid.
+    private static void navigateIfRequested(IntentResult r) {
+        if (r == null || r.isFailed()) {
+            return;
+        }
+        String url = r.getOpenUrl();
+        if (url == null || url.length() == 0) {
+            return;
+        }
+        try {
+            // Marshals to the EDT itself and is a no-op when no route matches.
+            com.codename1.router.Navigation.dispatchExternalUrl(url);
+        } catch (Throwable t) {
+            logError(t);
+        }
+    }
+
     /// Logs a swallowed failure without ever being able to become one.
     ///
     /// Every `catch` in this class exists to guarantee that a broken handler
@@ -670,6 +692,7 @@ public final class Intents {
             if (r == null) {
                 return IntentResult.failed("Unknown intent \"" + intentId + "\"");
             }
+            navigateIfRequested(r);
             return r;
         } catch (Throwable t) {
             logError(t);

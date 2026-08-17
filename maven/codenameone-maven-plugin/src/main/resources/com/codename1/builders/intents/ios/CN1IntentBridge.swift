@@ -139,6 +139,27 @@ public struct CN1EntityValue {
     }
 }
 
+/// Thrown when a handler reported a failure.
+///
+/// An intent that fails has to *fail*: returning a dialog-only success would make Shortcuts
+/// record the action as successful and run everything after it, which is worse than the error
+/// itself. The message is the one the handler wrote for the user.
+///
+/// Availability-fenced because `LocalizedStringResource` is itself iOS 16+, and this file has to
+/// compile on whatever deployment target the application chose. Only the generated App Intents
+/// declarations reference it, and those carry the same fence.
+#if canImport(AppIntents)
+@available(iOS 16.0, *)
+public struct CN1IntentFailure: Error, CustomLocalizedStringResourceConvertible {
+    public let message: String
+
+    public var localizedStringResource: LocalizedStringResource {
+        LocalizedStringResource(stringLiteral: message.isEmpty
+            ? "The action could not be completed" : message)
+    }
+}
+#endif
+
 /// The decoded result of one invocation.
 public struct CN1IntentOutcome {
     public let ok: Bool

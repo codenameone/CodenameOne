@@ -7442,6 +7442,11 @@ public class AndroidGradleBuilder extends Executor {
             }
             String label = intent.get("title") instanceof String
                     ? (String) intent.get("title") : (String) id;
+            // The headless flag rides in the URI so the trampoline can route a cold-start tap
+            // without the declaration table, which is not installed yet at that point.
+            Object headlessValue = intent.get("headless");
+            String headlessFlag = Boolean.TRUE.equals(headlessValue) || "true".equals(headlessValue)
+                    ? "&amp;h=1" : "";
             xml.append("    <shortcut android:shortcutId=\"").append(xmlEscape((String) id))
                     .append("\"\n")
                     .append("              android:enabled=\"true\"\n")
@@ -7451,7 +7456,7 @@ public class AndroidGradleBuilder extends Executor {
                     .append("                android:targetPackage=\"${applicationId}\"\n")
                     .append("                android:targetClass=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
                     .append("                android:data=\"cn1intent://run?id=")
-                    .append(xmlEscape((String) id)).append("\" />\n")
+                    .append(xmlEscape((String) id)).append(headlessFlag).append("\" />\n")
                     .append("    </shortcut>\n");
             count++;
         }

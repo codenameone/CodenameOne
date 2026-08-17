@@ -113,41 +113,73 @@ public final class IOSAppIntentsBuilder {
         // openAppWhenRun is the switch between "answer in place" and "continue in the app".
         // A headless intent that also names a route still opens: the route is the point.
         sb.append("    static var openAppWhenRun: Bool = ").append(opensApp).append("\n");
-        if (bool(intent, "destructive")) {
-            sb.append("    static var isDiscoverable: Bool = true\n");
+        // discoverable=false means the capability is donation-only. Without this override App
+        // Intents keeps its discoverable default and lists it in the Shortcuts catalog before it
+        // has ever been donated, which is the opposite of what the declaration asked for.
+        if (!bool(intent, "discoverable")) {
+            sb.append("    static var isDiscoverable: Bool = false\n");
         }
         sb.append("\n");
 
         List<Map<String, Object>> params = params(intent);
         for (Map<String, Object> p : params) {
             String type = str(p, "type");
+            // An optional declaration has to produce an optional Swift type, or the system keeps
+            // prompting for a value the handler was willing to do without.
+            String optional = bool(p, "required") ? "" : "?";
             sb.append("    @Parameter(title: \"").append(swift(str(p, "title"))).append("\")\n");
             sb.append("    var ").append(varName(str(p, "name"))).append(": ")
-                    .append(swiftType(type, str(p, "entityType"))).append("\n\n");
+                    .append(swiftType(type, str(p, "entityType"))).append(optional).append("\n\n");
         }
 
-        sb.append("    func perform() async throws -> some IntentResult & ProvidesDialog {\n");
+        // ReturnsValue is declared unconditionally so the signature does not vary with the
+        // declaration: the wire value is a string, absent becomes empty, and Shortcuts can pipe
+        // it into a following action either way.
+        sb.append("    func perform() async throws -> some IntentResult & ProvidesDialog"
+                + " & ReturnsValue<String> {\n");
+        if (bool(intent, "destructive")) {
+            // Declared destructive, so the platform confirms before anything happens.
+            sb.append("        try await requestConfirmation()\n");
+        }
         sb.append("        var params: [String: Any] = [:]\n");
         for (Map<String, Object> p : params) {
             String name = str(p, "name");
             String type = str(p, "type");
             String var = varName(name);
+            boolean required = bool(p, "required");
+            // An absent optional parameter must not be sent at all, so the Java side applies the
+            // declared default rather than receiving a null it would have to guess about.
+            String read = required ? var : "v";
+            if (!required) {
+                sb.append("        if let v = ").append(var).append(" {\n    ");
+            }
             if ("entity".equals(type)) {
                 // Entities cross as their id and nothing else; the Java side resolves it
                 // through the type's own BY_ID query.
                 sb.append("        params[\"").append(swift(name)).append("\"] = ")
-                        .append(var).append(".id\n");
+                        .append(read).append(".id\n");
             } else if ("date".equals(type)) {
                 sb.append("        params[\"").append(swift(name)).append("\"] = ")
-                        .append("Int(").append(var).append(".timeIntervalSince1970 * 1000)\n");
+                        .append("Int(").append(read).append(".timeIntervalSince1970 * 1000)\n");
             } else {
                 sb.append("        params[\"").append(swift(name)).append("\"] = ")
-                        .append(var).append("\n");
+                        .append(read).append("\n");
+            }
+            if (!required) {
+                sb.append("        }\n");
             }
         }
         sb.append("        let outcome = await CN1IntentBridge.run(id: \"").append(swift(id))
                 .append("\", params: params, headless: ").append(headless).append(")\n");
-        sb.append("        return .result(dialog: IntentDialog(stringLiteral: outcome.spoken))\n");
+        // A failed handler has to fail the intent. Returning a dialog-only success made
+        // Shortcuts record success and run the following actions anyway.
+        sb.append("        if !outcome.ok {\n");
+        sb.append("            throw CN1IntentFailure(message: outcome.spoken)\n");
+        sb.append("        }\n");
+        // A result carrying a route is navigated by the framework once the app is up; this only
+        // has to make sure the app is up, which openAppWhenRun already did.
+        sb.append("        return .result(value: outcome.value ?? \"\",\n");
+        sb.append("                       dialog: IntentDialog(stringLiteral: outcome.spoken))\n");
         sb.append("    }\n");
         sb.append("}\n\n");
     }
