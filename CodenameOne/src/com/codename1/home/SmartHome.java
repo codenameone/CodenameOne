@@ -1975,7 +1975,8 @@ public final class SmartHome {
             if (reading != null
                     && !(accessoryIds.get(i).equals(reading.getAccessoryId())
                             && serviceIds.get(i).equals(reading.getServiceId())
-                            && traits.get(i) == reading.getTrait())) {
+                            && traits.get(i).getId().equals(
+                                    reading.getTrait().getId()))) {
                 reading = null;
             }
             if (reading == null) {
