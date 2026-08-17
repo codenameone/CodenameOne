@@ -3486,7 +3486,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createAudio___byte_1ARRAY_java_lang_R
 
 // ---- low latency game sound pool (com.codename1.gaming.SoundPool) ----
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT maxStreams) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT maxStreams) {
     __block JAVA_LONG result = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3496,7 +3496,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSoundPool___int(CN1_THREA
     return result;
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_OBJECT b, JAVA_INT ringSize) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_OBJECT b, JAVA_INT ringSize) {
     __block JAVA_LONG result = 0;
     dispatch_sync(dispatch_get_main_queue(), ^{
         POOL_BEGIN();
@@ -3517,7 +3517,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativeLoadSound___long_byte_1ARRAY_in
     return result;
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_nativePlaySound___long_long_float_float_float_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound, JAVA_FLOAT volume, JAVA_FLOAT pan, JAVA_FLOAT rate, JAVA_INT loop) {
+JAVA_INT com_codename1_impl_ios_IOSNative_nativePlaySound___long_long_float_float_float_int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG pool, JAVA_LONG sound, JAVA_FLOAT volume, JAVA_FLOAT pan, JAVA_FLOAT rate, JAVA_INT loop) {
     __block JAVA_INT result = -1;
     dispatch_sync(dispatch_get_main_queue(), ^{
         CN1SoundPool* sp = (BRIDGE_CAST CN1SoundPool*)((void *)pool);
@@ -10732,7 +10732,7 @@ void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String
     });
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return [UIPrintInteractionController isPrintingAvailable];
 }
 
@@ -10790,7 +10790,7 @@ void com_codename1_impl_ios_IOSNative_openStringPicker___java_lang_String_1ARRAY
 void com_codename1_impl_ios_IOSNative_openDatePicker___int_long_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT type, JAVA_LONG time, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h, JAVA_INT preferredWidth, JAVA_INT preferredHeightArg, JAVA_INT minuteStep) {}
 void com_codename1_impl_ios_IOSNative_socialShare___java_lang_String_long_com_codename1_ui_geom_Rectangle(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle) {}
 void com_codename1_impl_ios_IOSNative_socialShareWithCallback___java_lang_String_long_com_codename1_ui_geom_Rectangle_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT text, JAVA_LONG imagePeer, JAVA_OBJECT rectangle, JAVA_INT callbackId) {}
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) { return NO; }
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPrintingAvailable___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) { return NO; }
 void com_codename1_impl_ios_IOSNative_printDocument___java_lang_String_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT path, JAVA_OBJECT mimeType, JAVA_INT callbackId) {}
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV (UIPickerView / share / print)
 
@@ -12297,7 +12297,7 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1AR
     return com_codename1_impl_ios_IOSNative_createNativeVideoComponent___byte_1ARRAY_int(CN1_THREAD_STATE_PASS_ARG instanceObject, dataObject, onCompletionCallbackId);
 }
 
-JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long__int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
+JAVA_LONG com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG nsData, JAVA_INT onCompletionCallbackId) {
     return com_codename1_impl_ios_IOSNative_createVideoComponentNSData___long_int(CN1_THREAD_STATE_PASS_ARG instanceObject, nsData, onCompletionCallbackId);
 }
 
@@ -12671,13 +12671,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canExecute___java_lang_String_R_bo
     return com_codename1_impl_ios_IOSNative_canExecute___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, url);
 }
 #else
-JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_printStackTraceToStream___java_lang_Throwable_java_io_Writer(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
 }
 #endif
 
 
 #ifndef NEW_CODENAME_ONE_VM
-JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
+JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
     int offset = ((java_lang_String*) string)->fields.java_lang_String.offset_;
     int strlen = ((java_lang_String*) string)->fields.java_lang_String.count_;
     org_xmlvm_runtime_XMLVMArray* srcArr = ((java_lang_String*) string)->fields.java_lang_String.value_;
@@ -14560,7 +14560,7 @@ static void cn1_resetContext(void) {
 }
 #endif // !TARGET_OS_TV
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (NSClassFromString(@"LAContext") == NULL) {
         return JAVA_FALSE;
@@ -14575,11 +14575,11 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canAuthenticateBiometric__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
-    return com_codename1_impl_ios_IOSNative_isBiometricsSupported__(CN1_THREAD_STATE_PASS_ARG me);
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_canAuthenticateBiometric___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return com_codename1_impl_ios_IOSNative_isBiometricsSupported___R_boolean(CN1_THREAD_STATE_PASS_ARG me);
 }
 
-JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+JAVA_INT com_codename1_impl_ios_IOSNative_getAvailableBiometricTypes___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #if !TARGET_OS_WATCH && !TARGET_OS_TV
     if (NSClassFromString(@"LAContext") == NULL) {
         return 0;
@@ -15948,10 +15948,13 @@ static int cn1_nfcSendError(int requestId, NSError *err) {
 #endif // CN1_INCLUDE_NFC
 
 // ParparVM mangles non-void-returning native methods as
-// `..._methodName___R_<returnType>`. Older symbols in this file
-// (isMetalRendering__, isBiometricsSupported__) predate the
-// convention switch and are kept for binary compatibility; new natives
-// must use the suffix or the link step fails with "Undefined symbol".
+// `..._methodName___R_<returnType>`. There is no binary compatibility to keep
+// with the unsuffixed spelling: nothing links against it, so a native method
+// left that way is not merely unreachable -- the dead-code pass reads the
+// absence of its real symbol as "unused" and drops the Java method too, which
+// is how biometrics, printing, Apple Sign In, OIDC and the sound pool all
+// shipped inert. scripts/check-native-signatures.sh and the same check inside
+// the translator now fail the build on it.
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isNfcSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
 #ifdef CN1_INCLUDE_NFC
     if (@available(iOS 11.0, *)) {
@@ -16016,7 +16019,7 @@ void com_codename1_impl_ios_IOSNative_startNdefRead___int_java_lang_String_long(
     com_codename1_impl_ios_IOSNfc_nativeNfcError___int_int_java_lang_String(getThreadLocalData(), requestId, 1001, JAVA_NULL);
 }
 
-void com_codename1_impl_ios_IOSNative_startTagRead___int_java_lang_String_int_java_lang_String_1ARRAY_byte_1ARRAY_1ARRAY_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT alertMessage, JAVA_INT polling, JAVA_OBJECT systemCodes, JAVA_OBJECT aids, JAVA_LONG timeoutMs) {
+void com_codename1_impl_ios_IOSNative_startTagRead___int_java_lang_String_int_java_lang_String_1ARRAY_byte_2ARRAY_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT alertMessage, JAVA_INT polling, JAVA_OBJECT systemCodes, JAVA_OBJECT aids, JAVA_LONG timeoutMs) {
 #ifdef CN1_INCLUDE_NFC
     if (@available(iOS 13.0, *)) {
         if (![NFCTagReaderSession readingAvailable]) {
