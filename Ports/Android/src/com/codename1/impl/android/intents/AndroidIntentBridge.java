@@ -151,45 +151,72 @@ public class AndroidIntentBridge implements IntentBridge {
         if (intentId == null) {
             return;
         }
+        // Each request carries its own expiry rather than the waiter holding one deadline for
+        // the queue: two taps a few seconds apart must not have the first one's timeout throw
+        // away the second.
+        String expiry = String.valueOf(System.currentTimeMillis() + FOREGROUND_WAIT_MILLIS);
         synchronized (FOREGROUND) {
-            FOREGROUND.add(new String[]{intentId, paramsJson});
+            FOREGROUND.add(new String[]{intentId, paramsJson, expiry});
+            if (waiting) {
+                // One waiter is enough, and more than one is actively wrong: they would race to
+                // drain the same queue and each would apply its own idea of when to give up.
+                return;
+            }
+            waiting = true;
         }
-        awaitForeground();
+        startWaiter();
     }
+
+    /// True while a waiter thread is alive. Guarded by FOREGROUND.
+    private static boolean waiting;
 
     /// Waits, off any UI thread, until the app has a window and then drains the queue.
     ///
-    /// Bounded: if the app never comes forward -- the user dismissed it, the launch was refused
-    /// -- the request is dropped rather than firing into whatever the app is showing minutes
-    /// later. A stale capability running unannounced is worse than one that did not run.
-    private static void awaitForeground() {
+    /// Bounded per request: if the app never comes forward -- the user dismissed it, the launch
+    /// was refused -- that request is dropped rather than firing into whatever the app is
+    /// showing minutes later. A stale capability running unannounced is worse than one that did
+    /// not run.
+    private static void startWaiter() {
         Thread t = new Thread(new Runnable() {
             public void run() {
-                long deadline = System.currentTimeMillis() + FOREGROUND_WAIT_MILLIS;
-                while (System.currentTimeMillis() < deadline) {
-                    if (Display.isInitialized() && Display.getInstance().getCurrent() != null
-                            && AndroidImplementation.getActivity() != null) {
-                        deliverPendingForegroundRequests();
-                        return;
-                    }
-                    try {
+                try {
+                    while (true) {
+                        if (Display.isInitialized() && Display.getInstance().getCurrent() != null
+                                && AndroidImplementation.getActivity() != null) {
+                            deliverPendingForegroundRequests();
+                            return;
+                        }
+                        if (dropExpired()) {
+                            return;
+                        }
                         Thread.sleep(FOREGROUND_POLL_MILLIS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
                     }
-                }
-                synchronized (FOREGROUND) {
-                    if (!FOREGROUND.isEmpty()) {
-                        Log.w(TAG, "The app did not come forward; dropping "
-                                + FOREGROUND.size() + " intent request(s)");
-                        FOREGROUND.clear();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    synchronized (FOREGROUND) {
+                        waiting = false;
                     }
                 }
             }
         }, "CN1IntentForeground");
         t.setDaemon(true);
         t.start();
+    }
+
+    /// Drops requests whose wait has run out. Returns true when nothing is left to wait for.
+    private static boolean dropExpired() {
+        long now = System.currentTimeMillis();
+        synchronized (FOREGROUND) {
+            for (int i = FOREGROUND.size() - 1; i >= 0; i--) {
+                String[] request = FOREGROUND.get(i);
+                if (Long.parseLong(request[2]) <= now) {
+                    Log.w(TAG, "The app did not come forward; dropping \"" + request[0] + "\"");
+                    FOREGROUND.remove(i);
+                }
+            }
+            return FOREGROUND.isEmpty();
+        }
     }
 
     /// Runs everything parked for the foreground. Called once the app instance exists (from the
