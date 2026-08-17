@@ -71,6 +71,7 @@ public class BufferedGraphics extends HTML5Graphics {
     private GeneralPath clipShape = new GeneralPath();
 
     private boolean isClipShape;
+    private boolean promotionSuspended;
     // True when the current clip encloses no area. Tracked reliably via
     // clipBoundsTracker (a clamped user-space rect intersection) because the
     // projected clip bounds are unreliable for an empty clip on the shape path
@@ -373,6 +374,20 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     /**
+     * Holds text on the canvas for a run whose caller draws more than the glyphs.
+     *
+     * <p>Underline, strike-through and overline are drawn as lines after the glyphs, over them.
+     * The DOM layer sits above the whole canvas, so a promoted glyph would cover the line that
+     * is meant to cross it. A decorated run keeps glyphs and lines together on the canvas,
+     * where the drawing order still means what it says.</p>
+     *
+     * @param value true to keep text on the canvas
+     */
+    void setPromotionSuspended(boolean value) {
+        promotionSuspended = value;
+    }
+
+    /**
      * Offers a text run to the DOM text layer, which renders it as real text above the canvas.
      *
      * <p>Only runs this class can reproduce faithfully are offered. A shape clip has no
@@ -390,7 +405,7 @@ public class BufferedGraphics extends HTML5Graphics {
      */
     private boolean promoteToTextLayer(String str, int x, int y) {
         JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
-        if (layer == null || clipEmpty || isClipShape) {
+        if (layer == null || clipEmpty || isClipShape || promotionSuspended) {
             return false;
         }
         if (transform != null && !transform.isIdentity()) {

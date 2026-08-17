@@ -48,6 +48,8 @@ Text that stays on the canvas, by design:
 - anything outside the displayed form, because the layer sits above the canvas as
   a whole and nothing painted afterwards can occlude it (a modal dialog paints
   the form beneath it as its own backdrop);
+- decorated runs -- underline, strike-through, overline -- whose lines are drawn
+  after the glyphs and over them, which a promoted glyph would cover;
 - shape clips and non-identity transforms.
 
 Bitmap fonts need no exclusion: `Graphics.drawString` renders a `CustomFont`

@@ -8710,6 +8710,30 @@ public class HTML5Implementation extends CodenameOneImplementation {
         g(graphics).drawArc(x,y,width,height,startAngle, arcAngle);
     }
 
+    /**
+     * Draws text that carries a decoration.
+     *
+     * <p>The lines an underline or a strike-through are made of are drawn after the glyphs and
+     * over them. Promoting the glyphs into the DOM layer would lift them above the whole
+     * canvas, and the line meant to cross the text would end up behind it, broken wherever a
+     * glyph stands. Decorated runs therefore stay on the canvas entirely.</p>
+     */
+    @Override
+    public void drawString(Object nativeGraphics, Object nativeFont, String str, int x, int y,
+            int textDecoration) {
+        if (textDecoration == 0 || !(g(nativeGraphics) instanceof BufferedGraphics)) {
+            super.drawString(nativeGraphics, nativeFont, str, x, y, textDecoration);
+            return;
+        }
+        BufferedGraphics buffered = (BufferedGraphics) g(nativeGraphics);
+        buffered.setPromotionSuspended(true);
+        try {
+            super.drawString(nativeGraphics, nativeFont, str, x, y, textDecoration);
+        } finally {
+            buffered.setPromotionSuspended(false);
+        }
+    }
+
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
         g(graphics).drawString(str, x, y);
