@@ -85,10 +85,11 @@ public final class CN1MatterCommissioning: NSObject {
         let requestId = (request["requestId"] as? NSNumber)?.int32Value ?? 0
         let payloadText = request["setupPayload"] as? String ?? ""
         let suggestedName = request["suggestedName"] as? String ?? ""
-        let structureId = request["structureId"] as? String ?? ""
-
+        // The requested home is deliberately not read back out. Nothing
+        // here can tell which home the accessory joined -- the sheet lets the
+        // user pick -- and the result's structure id means the home it JOINED.
         guard #available(iOS 16.1, *) else {
-            deliver(requestId: requestId, structureId: structureId,
+            deliver(requestId: requestId, structureId: "",
                     error: "COMMISSIONING_UNAVAILABLE\tadding a Matter "
                          + "accessory needs iOS 16.1 or newer")
             return
@@ -100,18 +101,21 @@ public final class CN1MatterCommissioning: NSObject {
                     topology: topology(named: suggestedName),
                     setupPayload: setupPayload(from: payloadText))
                 try await request.perform()
-                // Success, and deliberately with no accessory id.
+                // Success, and deliberately with neither an accessory id
+                // nor a home id.
                 //
                 // MatterSupport reports that the flow finished and does not
-                // say what was added: the accessory joins the user's HomeKit
-                // home, and it turns up in the graph on the next refresh like
-                // any other. Inventing an id here would make
-                // wasCommissionedToThisApp() answer true for something the
-                // app cannot address.
-                deliver(requestId: requestId, structureId: structureId,
-                        error: nil)
+                // say what was added or where: the accessory joins the user's
+                // HomeKit home, and it turns up in the graph on the next
+                // refresh like any other. Inventing an accessory id would
+                // make wasCommissionedToThisApp() answer true for something
+                // the app cannot address, and echoing back the home the
+                // caller ASKED for would name the wrong one whenever the user
+                // picked a different one in the sheet -- which they are free
+                // to do, and which CommissioningResult says outright.
+                deliver(requestId: requestId, structureId: "", error: nil)
             } catch {
-                deliver(requestId: requestId, structureId: structureId,
+                deliver(requestId: requestId, structureId: "",
                         error: describe(error))
             }
         }

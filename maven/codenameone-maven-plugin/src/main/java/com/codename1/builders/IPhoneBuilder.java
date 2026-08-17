@@ -1384,10 +1384,14 @@ public class IPhoneBuilder extends Executor {
                         usesSmartHome = true;
                         if (cls.indexOf("com/codename1/home/commissioning/") == 0) {
                             usesHomeCommissioning = true;
-                            // Adding an accessory means touching the home, so it earns
-                            // the HomeKit entitlement on its own -- the commissioning
-                            // sheet puts the device into the user's HomeKit home.
-                            usesHomeAccessoryData = true;
+                            // The entitlement commissioning earns is applied
+                            // below rather than here, because it is only
+                            // earned when commissioning is actually built:
+                            // ios.home.commissioning=false is not known yet
+                            // at scan time, and an app that set it would
+                            // otherwise be made to declare a HomeKit purpose
+                            // string and carry a restricted entitlement for
+                            // machinery it explicitly turned off.
                         } else if (!"com/codename1/home/SmartHome".equals(cls)
                                 && !isSmartHomeAvailabilityType(cls)) {
                             // Naming any type beyond the facade and the
@@ -3220,6 +3224,18 @@ public class IPhoneBuilder extends Executor {
             }
 
             // Smart home (com.codename1.home.*).
+            //
+            // The commissioning opt-out is read first: everything below that
+            // asks whether the app touches the accessory graph has to see the
+            // same answer, and adding an accessory does touch it -- the
+            // commissioning sheet puts the device into the user's HomeKit
+            // home -- but only when the sheet is actually built.
+            matterExtensionEnabled = usesHomeCommissioning
+                    && !"false".equals(request.getArg(
+                            "ios.home.commissioning", "true"));
+            if (matterExtensionEnabled) {
+                usesHomeAccessoryData = true;
+            }
             if (usesSmartHome) {
                 String hk = "HomeKit.framework";
                 if (addLibs == null || addLibs.length() == 0) {
@@ -3329,10 +3345,8 @@ public class IPhoneBuilder extends Executor {
             // Adding a Matter accessory. Everything here is skipped for an app
             // that only reads its lights, which is why commissioning lives in
             // a package of its own -- the scanner matches on a prefix and
-            // cannot express an exclusion.
-            matterExtensionEnabled = usesHomeCommissioning
-                    && !"false".equals(request.getArg(
-                            "ios.home.commissioning", "true"));
+            // cannot express an exclusion. matterExtensionEnabled is decided
+            // above, before anything reads usesHomeAccessoryData.
             if (matterExtensionEnabled) {
                 // The floor MatterSupport needs, raised here rather than in
                 // the feature catalog: the catalog matches on a package
