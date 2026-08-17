@@ -249,8 +249,7 @@ public class AndroidIntentBridge implements IntentBridge {
         public void run() {
             try {
                 while (true) {
-                    if (Display.isInitialized() && Display.getInstance().getCurrent() != null
-                            && AndroidImplementation.getActivity() != null) {
+                    if (isForegrounded()) {
                         deliverPendingForegroundRequests();
                         // Anything parked while that was running keeps this waiter alive.
                         // Exiting on "I just emptied it" instead loses the request: the parking
@@ -273,6 +272,13 @@ public class AndroidIntentBridge implements IntentBridge {
                 }
             }
         }
+    }
+
+    /// True when there is a window a non-headless handler can legitimately touch: the runtime
+    /// is up, an Activity is attached, and a Form is actually showing.
+    private static boolean isForegrounded() {
+        return Display.isInitialized() && Display.getInstance().getCurrent() != null
+                && AndroidImplementation.getActivity() != null;
     }
 
     /// Clears `waiting` and reports true only when the queue is genuinely empty, both decided
@@ -308,13 +314,28 @@ public class AndroidIntentBridge implements IntentBridge {
         }
     }
 
-    /// Runs everything parked for the foreground. Called once the app instance exists (from the
-    /// generated stub, beside the surfaces equivalent) and again whenever it comes forward, so
-    /// both the cold start and the already-running-but-backgrounded case are covered.
+    /// Runs everything parked for the foreground, **if there is a foreground to run it in**.
+    ///
+    /// The precondition is checked here rather than assumed by the caller. The generated stub
+    /// calls this while the app instance is being built, which is before the lifecycle start
+    /// has created the first Form -- so a caller-trusts-its-own-timing design would dispatch a
+    /// non-headless handler into a process with no window, which is the thing this whole queue
+    /// exists to prevent. Anything not runnable yet stays queued for the waiter.
     ///
     /// Draining twice is harmless and dropping the work is not, which is why this is idempotent
     /// on an empty queue rather than guarded by a flag.
     public static void deliverPendingForegroundRequests() {
+        if (!isForegrounded()) {
+            // Not yet. Make sure somebody is watching for the window, then leave it queued.
+            synchronized (FOREGROUND) {
+                if (FOREGROUND.isEmpty() || waiting) {
+                    return;
+                }
+                waiting = true;
+            }
+            startWaiter();
+            return;
+        }
         List<String[]> drained;
         synchronized (FOREGROUND) {
             if (FOREGROUND.isEmpty()) {

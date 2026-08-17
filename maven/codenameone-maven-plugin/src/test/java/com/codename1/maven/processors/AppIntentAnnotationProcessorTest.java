@@ -666,7 +666,7 @@ public class AppIntentAnnotationProcessorTest {
                         + "        phrases = {\"Log a ${kind} in ${applicationName}\"})\n"
                         + "public static void log(@IntentParam(\"kind\") String kind) { }\n"));
 
-        assertError(classes, "only accepts an entity as a spoken phrase parameter");
+        assertError(classes, "Only an entity can be a spoken phrase parameter");
     }
 
     /// "App Intent 'X' must be visible for App Shortcuts use."
@@ -708,6 +708,129 @@ public class AppIntentAnnotationProcessorTest {
         run(classes, true);
 
         assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
+    /// A default outside its own vocabulary compiles and then throws on every invocation that
+    /// omits the value, because the generated oneOf() enforces the vocabulary against defaults
+    /// too. The handler never runs, for a declaration that reads as perfectly reasonable.
+    @Test
+    public void aDefaultOutsideItsOptionsIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"kind\",\n"
+                        + "        required = false, defaultValue = \"walk\",\n"
+                        + "        options = {\"run\", \"ride\"}) String kind) { }\n"));
+
+        assertError(classes, "not one of its options");
+    }
+
+    @Test
+    public void aDefaultInsideItsOptionsIsAccepted() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"log_workout\", title = \"Log\")\n"
+                        + "public static void log(@IntentParam(value = \"kind\",\n"
+                        + "        required = false, defaultValue = \"run\",\n"
+                        + "        options = {\"run\", \"ride\"}) String kind) { }\n"));
+
+        run(classes, true);
+
+        assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
+    /// A variable segment can only be satisfied by a route segment that accepts any value.
+    /// Matching it against a literal passed the build and then produced a URL the declared
+    /// route could never match, so navigation silently did nothing on a device.
+    @Test
+    public void aRouteVariableMustMapToAWildcardSegment() throws Exception {
+        File classes = routeFixture("/orders/recent");
+
+        assertError(classes, "does not match any @Route");
+    }
+
+    @Test
+    public void aRouteVariableMatchesADeclaredWildcard() throws Exception {
+        File classes = routeFixture("/orders/:id");
+
+        run(classes, true);
+
+        assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
+    /// A @Route with the given pattern plus an intent whose opensRoute is "/orders/{id}".
+    private File routeFixture(String routePattern) throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Screens",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.Route;\n"
+                                + "import com.codename1.ui.Form;\n"
+                                + "public class Screens {\n"
+                                + "  @Route(\"" + routePattern + "\")\n"
+                                + "  public static Form screen() { return null; }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.Handlers",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.intents.IntentResult;\n"
+                                + "public class Handlers {\n"
+                                + "  @AppIntent(value = \"show_order\", title = \"Show\",\n"
+                                + "          opensRoute = \"/orders/{id}\")\n"
+                                + "  public static IntentResult show(\n"
+                                + "      @IntentParam(\"id\") String id) { return IntentResult.ok(); }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir(), classes));
+        return classes;
+    }
+
+    /// An optional entity parameter's default is an id like any other and has to resolve
+    /// through the same BY_ID query; ignoring it handed the handler null for exactly the case
+    /// the default exists for.
+    @Test
+    public void anOptionalEntityDefaultResolvesThroughItsQuery() throws Exception {
+        File classes = tmp.newFolder();
+        JavaSourceCompiler.compile(
+                JavaSourceCompiler.singleSource("com.example.App",
+                        "package com.example;\n"
+                                + "import com.codename1.annotations.*;\n"
+                                + "import com.codename1.intents.IntentResult;\n"
+                                + "public class App {\n"
+                                + "  public static String seen;\n"
+                                + "  @IntentEntity(value = \"playlist\", title = \"Playlist\")\n"
+                                + "  public static class Playlist {\n"
+                                + "    public String pid;\n"
+                                + "    @EntityId public String getId() { return pid; }\n"
+                                + "    @EntityTitle public String getName() { return pid; }\n"
+                                + "    @EntityQuery(EntityQuery.Kind.BY_ID)\n"
+                                + "    public static Playlist byId(String id) {\n"
+                                + "      Playlist p = new Playlist(); p.pid = id; return p; }\n"
+                                + "  }\n"
+                                + "  @AppIntent(value = \"play_list\", title = \"Play\")\n"
+                                + "  public static IntentResult play(\n"
+                                + "      @IntentParam(value = \"playlist\", required = false,\n"
+                                + "                   defaultValue = \"favourites\") Playlist p) {\n"
+                                + "    seen = p == null ? null : p.getId();\n"
+                                + "    return IntentResult.ok(); }\n"
+                                + "}\n"),
+                classes, Arrays.asList(testClassesDir()));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            registry.getClass().getMethod("invoke", String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"))
+                    .invoke(registry, "play_list", new LinkedHashMap<String, Object>(), null);
+
+            assertEquals("the declared default has to resolve like any other id",
+                    "favourites", loader.loadClass("com.example.App").getField("seen").get(null));
+        } finally {
+            loader.close();
+        }
     }
 
     @Test

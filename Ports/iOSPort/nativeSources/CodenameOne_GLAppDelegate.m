@@ -271,7 +271,11 @@ static void installSignalHandlers() {
             NSData *data = [NSJSONSerialization dataWithJSONObject:userActivity.userInfo
                                                            options:0 error:nil];
             if (data != nil) {
-                payload = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+                // Autoreleased: the app target is manual-reference-counted and this method
+                // returns without a release, so every continued donated activity would retain
+                // its serialized payload for the life of the process.
+                payload = [[[NSString alloc] initWithData:data
+                                                 encoding:NSUTF8StringEncoding] autorelease];
             }
         }
         JAVA_OBJECT jtype = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG userActivity.activityType);

@@ -448,6 +448,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 pd.kind = "entity";
                 pd.entityBinary = args[i].getClassName();
             }
+            if (!pd.options.isEmpty() && pd.defaultValue.length() > 0
+                    && !pd.options.contains(pd.defaultValue)) {
+                // The generated oneOf() enforces the vocabulary, defaults included, so this
+                // would compile and then throw on every invocation that omitted the value --
+                // the handler never running, for a declaration that looks reasonable.
+                ctx.error(cls, "@IntentParam \"" + pd.name + "\" on " + def.where
+                        + " has defaultValue \"" + pd.defaultValue + "\", which is not one of "
+                        + "its options " + join(pd.options) + ". An omitted value would be "
+                        + "rejected by the vocabulary the same declaration defines.");
+                continue;
+            }
             def.params.add(pd);
         }
     }
@@ -457,9 +468,12 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     /// here turns a failed iOS build into a message naming the offending declaration.
     ///
     /// A phrase may reference at most one parameter, and that parameter has to be an entity.
-    /// Apple accepts `AppEntity` or `AppEnum`; this framework generates entities and expresses
-    /// closed vocabularies as validated strings rather than enums, so an entity is the only
-    /// kind that can appear.
+    ///
+    /// Apple accepts `AppEntity` or `AppEnum`, and a closed vocabulary does now generate an
+    /// AppEnum -- so the second rule is this framework's restriction rather than Apple's. It
+    /// stands because the phrase interpolation is only generated for entity-typed parameters,
+    /// and widening it is a feature worth verifying on a device rather than inferring. The
+    /// message says so, so nobody reads a framework limit as a platform one.
     private void checkPhraseParameters(AnnotatedClass cls, ProcessorContext ctx, String where,
                                         String phrase, IntentDef def) {
         List<String> referenced = new ArrayList<String>();
@@ -484,8 +498,8 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             ParamDef p = def.param(name);
             if (p != null && !"entity".equals(p.kind)) {
                 ctx.error(cls, "@AppIntent " + where + " phrase \"" + phrase + "\" references "
-                        + "${" + name + "}, which is a " + p.kind + ". Apple only accepts an "
-                        + "entity as a spoken phrase parameter, so declare " + name + " with an "
+                        + "${" + name + "}, which is a " + p.kind + ". Only an entity can be a "
+                        + "spoken phrase parameter here, so declare " + name + " with an "
                         + "@IntentEntity type, or drop it from the phrase -- the platform still "
                         + "asks for it, using the title on its @IntentParam.");
             }
@@ -547,7 +561,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             String p = pattern[i];
             boolean wildcard = "*".equals(p) || p.startsWith(":");
             boolean variable = want[i].startsWith("{") && want[i].endsWith("}");
-            if (!wildcard && !variable && !p.equals(want[i])) {
+            if (variable) {
+                // A variable segment can only be satisfied by a route segment that accepts any
+                // value. Letting it match a literal accepted "/orders/{id}" against a declared
+                // "/orders/recent" -- the build passed, and then every invocation expanded to a
+                // URL that route could never match, so navigation silently did nothing.
+                if (!wildcard) {
+                    return false;
+                }
+                continue;
+            }
+            if (!wildcard && !p.equals(want[i])) {
                 return false;
             }
         }
@@ -786,7 +810,8 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                     + stringArrayExpr(p.options) + ")";
         }
         if ("entity".equals(p.kind)) {
-            return "entity_" + p.entityType + "(params, " + key + ")";
+            return "entity_" + p.entityType + "(params, " + key + ", "
+                    + (p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue)) + ")";
         }
         String def = p.defaultValue.length() == 0 ? null : p.defaultValue;
         if ("string".equals(p.kind)) {
@@ -825,7 +850,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private String requiredReader(ParamDef p) {
         String key = quote(p.name);
         if ("entity".equals(p.kind)) {
-            return "entity_" + p.entityType + "(params, " + key + ")";
+            return "entity_" + p.entityType + "(params, " + key + ", null)";
         }
         if ("date".equals(p.kind)) {
             return "asDate(params, " + key + ", null)";
@@ -922,8 +947,12 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             sb.append("    }\n\n");
 
             sb.append("    private static ").append(sourceName(e.binaryName)).append(" entity_")
-                    .append(e.type).append("(Map<String, Object> params, String key) {\n");
-            sb.append("        String id = asString(params, key, null);\n");
+                    .append(e.type)
+                    .append("(Map<String, Object> params, String key, String def) {\n");
+            // The declared default is an id like any other, so it resolves through the same
+            // query. Ignoring it left an optional entity parameter null for a caller that
+            // simply omitted it, which is the case the default exists for.
+            sb.append("        String id = asString(params, key, def);\n");
             sb.append("        if (id == null) { return null; }\n");
             // Entities are never cast out of the payload: they arrive as an id
             // and become objects only through the declared BY_ID query.
