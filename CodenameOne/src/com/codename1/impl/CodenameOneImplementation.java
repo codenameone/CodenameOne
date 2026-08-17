@@ -970,16 +970,21 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `surface`: the window's paint surface, as returned by
     /// `#createPaintSurface(java.lang.Object)`
-    public void paintDirtyWindow(Object surface) {
+    public void paintDirtyWindow(Object surface, int width, int height) {
         PaintSurface s = asPaintSurface(surface);
         if (s == null || s.graphics == null) {
             return;
         }
-        WindowManager wm = getWindowManager();
-        if (wm == null) {
+        if (width <= 0 || height <= 0) {
             return;
         }
-        paintDirtySurface(s, wm.getWidth(s.nativeWindow), wm.getHeight(s.nativeWindow));
+        // The clip universe is the *framework's* size for the window, which is also
+        // what the port sizes its raster from. Taking it from the native drawable
+        // instead let the two disagree: a window resized larger than the platform had
+        // yet reported got a full sized raster and a clip still the size of the old
+        // one, so everything outside the old bounds was never painted -- a capture
+        // showed the content in the corner of an otherwise black frame.
+        paintDirtySurface(s, width, height);
     }
 
     /// Paints one surface's dirty regions. The main surface and every window share

@@ -208,6 +208,36 @@ public abstract class WindowHostTest extends BaseTest {
         });
     }
 
+    /**
+     * True when a capture is mostly unpainted. A window's raster starts out black, so
+     * a frame that is largely black was never painted in full -- which is exactly what
+     * a window resized ahead of the platform produced: correct dimensions, correct
+     * content in one corner, and the rest of the surface untouched. Dimensions alone
+     * could not see it, and a green suite hid it twice.
+     */
+    private static boolean mostlyUnpainted(Image img) {
+        int w = img.getWidth();
+        int h = img.getHeight();
+        if (w <= 0 || h <= 0) {
+            return true;
+        }
+        int[] rgb = img.getRGB();
+        int black = 0;
+        int sampled = 0;
+        // Every eighth row is plenty to tell "half the window is missing" from
+        // "this design happens to use dark pixels", and keeps the check cheap.
+        for (int y = 0; y < h; y += 8) {
+            int offset = y * w;
+            for (int x = 0; x < w; x++) {
+                if ((rgb[offset + x] & 0xffffff) == 0) {
+                    black++;
+                }
+                sampled++;
+            }
+        }
+        return sampled > 0 && black * 4 > sampled * 3;
+    }
+
     private void captureAndAdvance(final int index, int width, int height, boolean ready) {
         String name = baseImageName() + "-" + width + "x" + height;
         if (!ready) {
@@ -223,6 +253,12 @@ public abstract class WindowHostTest extends BaseTest {
         Image shot = window.capture();
         if (shot == null) {
             fail("Window capture returned null for " + name);
+            return;
+        }
+        if (mostlyUnpainted(shot)) {
+            fail("Window capture for " + name + " is mostly unpainted at "
+                    + shot.getWidth() + "x" + shot.getHeight()
+                    + "; the window was not painted over its whole surface");
             return;
         }
         Cn1ssDeviceRunnerHelper.emitImage(shot, name, new Runnable() {

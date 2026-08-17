@@ -3555,7 +3555,7 @@ public final class Display extends CN1Constants {
             }
             g.setGraphics(impl.getWindowManager().getNativeGraphics(peer));
             w.flushRevalidateQueue();
-            impl.paintDirtyWindow(w.getPaintSurface());
+            impl.paintDirtyWindow(w.getPaintSurface(), w.getWidth(), w.getHeight());
             w.repaintAnimations();
             // The window's raster exists from the moment it is shown, so a capture
             // before this point returns a blank frame of the right size. Recording
