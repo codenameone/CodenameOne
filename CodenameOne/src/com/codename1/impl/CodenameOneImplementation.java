@@ -72,6 +72,7 @@ import com.codename1.payment.PurchaseCallback;
 import com.codename1.push.PushCallback;
 import com.codename1.security.Biometrics;
 import com.codename1.security.SecureStorage;
+import com.codename1.security.TapjackingPolicy;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
@@ -11546,6 +11547,237 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `secure`: true to mark the window secure, false to clear the flag
     public void setSecureScreen(boolean secure) {
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Tapjacking / screen-overlay defense. The state lives here rather than in a port so every
+    // platform inherits the same reporting and dispatch semantics, and a port only has to supply
+    // the one thing it alone can know: whether a given touch arrived obscured.
+    // -----------------------------------------------------------------------------------------
+
+    /// Guards the three fields below. They are written from the platform's input thread and read
+    /// and written from the EDT, and the pair (policy, state) has to move together: a report that
+    /// raced a switch-off would otherwise land after the state was cleared and leave
+    /// [#isScreenObscured()] stuck true, because nothing reports again once the policy is OFF.
+    ///
+    /// A lock rather than volatile fields, because the invariant spans two fields rather than
+    /// being about the visibility of either one. Dispatch never happens while it is held: see
+    /// [#notifyScreenObscured(boolean, String)].
+    private final Object tapjackingLock = new Object();
+
+    private TapjackingPolicy tapjackingPolicy = TapjackingPolicy.OFF;
+    private boolean screenObscured;
+    private com.codename1.ui.util.EventDispatcher tapjackingListeners;
+
+    /// Sets the tapjacking policy. See
+    /// [com.codename1.security.DeviceIntegrity#setTapjackingProtection(TapjackingPolicy)]. Ports
+    /// that can also apply a platform level filter override this, call `super`, and apply it.
+    public void setTapjackingProtection(TapjackingPolicy policy) {
+        synchronized (tapjackingLock) {
+            tapjackingPolicy = policy == null ? TapjackingPolicy.OFF : policy;
+            // Switching off has to retract the state, because switching off is also what stops
+            // anything from retracting it later: a port stops reporting under OFF -- the Android
+            // one returns from tapjacked() before it reports -- so a screenObscured left true
+            // here would have isScreenObscured() answering true for the rest of the process and
+            // the listener would never receive its closing transition.
+            //
+            // Cleared here, inside the same critical section as the policy, rather than by a
+            // follow-up notifyScreenObscured(false) call. A retraction that mutated state after
+            // this lock was released could land after another thread had already re-enabled
+            // detection and reported a fresh sighting, wiping that newer observation and leaving
+            // BLOCK active over a state claiming the screen was clear. Policy and state move
+            // together or the pair is not an invariant at all.
+            if (!tapjackingPolicy.isDetecting() && screenObscured) {
+                screenObscured = false;
+                // Queued here, still holding the lock, so this retraction cannot be overtaken
+                // by an obscured report that changed the state before it.
+                queueTapjackingState(false);
+            }
+        }
+    }
+
+    /// Queues a tapjacking state change for the listeners.
+    ///
+    /// **Must be called while holding [#tapjackingLock].** That is the whole mechanism: queuing
+    /// inside the same critical section that wrote the state makes the delivery order identical
+    /// to the order the state actually changed in, on any number of threads. `callSerially`
+    /// appends to one FIFO whoever calls it, the EDT included, so nothing can overtake anything.
+    ///
+    /// Ordering is what this guarantees, deliberately, rather than currency. An earlier attempt
+    /// validated each announcement against the current state at delivery and dropped it if it no
+    /// longer matched. That silently swallowed real history: an overlay that appears and
+    /// withdraws before the EDT drains -- exactly what a malicious overlay does after a blocked
+    /// ACTION_DOWN -- would be coalesced into a single "clear" callback, and the app would never
+    /// learn that a gesture had been blocked, which is the one thing this listener exists to
+    /// tell it. Every transition is now delivered, in order, each carrying its own value; the
+    /// last one delivered is by construction the current state.
+    private void queueTapjackingState(boolean obscured) {
+        final com.codename1.ui.util.EventDispatcher target = tapjackingListeners;
+        // Display.isInitialized() implies codenameOneRunning, which is what makes callSerially
+        // queue rather than run the task inline -- and running it inline here would execute
+        // application code while this lock is held, the deadlock ShieldSignals documents. It is
+        // not a real gap either way: a listener can only be registered through Display, so
+        // before init there is nobody to tell.
+        if (target == null || !Display.isInitialized()) {
+            return;
+        }
+        // The listeners are captured now rather than resolved when the runnable finally runs.
+        // Holding the dispatcher instead would mean the set is read at delivery, so a listener
+        // registered after this transition -- while an EDT backlog held the runnable -- would be
+        // told about a change that predates it, and whether it heard that would depend on
+        // whether some unrelated listener happened to exist at queue time, since an empty set
+        // queues nothing at all. A listener removed in the same window still receives this one
+        // event, which is the same trade ShieldSignals makes by snapshotting its own array here.
+        //
+        // Copied under the dispatcher's own monitor: getListenerCollection hands back the live
+        // list, and addListener/removeListener synchronize on the dispatcher.
+        ActionListener[] snapshot;
+        synchronized (target) {
+            java.util.Collection current = target.getListenerCollection();
+            if (current == null || current.isEmpty()) {
+                return;
+            }
+            Object[] raw = current.toArray();
+            snapshot = new ActionListener[raw.length];
+            for (int i = 0; i < raw.length; i++) {
+                snapshot[i] = (ActionListener) raw[i];
+            }
+        }
+        // Boolean source so a listener can read the state straight off the event without a
+        // second call back into the API, which is what makes an ordered replay meaningful.
+        Display.getInstance().callSerially(
+                new TapjackingDispatch(snapshot, new ActionEvent(Boolean.valueOf(obscured))));
+    }
+
+    /// One queued tapjacking announcement. A named static class rather than an anonymous one
+    /// because it captures nothing from the implementation instance -- the same shape, and for
+    /// the same reason, as ShieldSignals' own dispatch.
+    private static final class TapjackingDispatch implements Runnable {
+        private final ActionListener[] targets;
+        private final ActionEvent event;
+
+        TapjackingDispatch(ActionListener[] targets, ActionEvent event) {
+            this.targets = targets;
+            this.event = event;
+        }
+
+        @Override
+        public void run() {
+            for (ActionListener l : targets) {
+                l.actionPerformed(event);
+            }
+        }
+    }
+
+    /// The tapjacking policy currently in force. Never null.
+    public TapjackingPolicy getTapjackingPolicy() {
+        synchronized (tapjackingLock) {
+            return tapjackingPolicy;
+        }
+    }
+
+    /// True when the most recently observed touch arrived while another application's window was
+    /// drawn over this app. Always false where the platform cannot report it.
+    public boolean isScreenObscured() {
+        synchronized (tapjackingLock) {
+            return screenObscured;
+        }
+    }
+
+    /// Registers a listener notified when the obscured state changes. See
+    /// [com.codename1.security.DeviceIntegrity#addTapjackingListener(ActionListener)].
+    public void addTapjackingListener(ActionListener l) {
+        if (l == null) {
+            return;
+        }
+        com.codename1.ui.util.EventDispatcher target;
+        synchronized (tapjackingLock) {
+            if (tapjackingListeners == null) {
+                tapjackingListeners = new com.codename1.ui.util.EventDispatcher();
+            }
+            target = tapjackingListeners;
+        }
+        // EventDispatcher does its own locking; the lock above is only for the lazy creation,
+        // so that two threads registering at once cannot end up with two dispatchers and one
+        // of them holding a listener nothing ever fires.
+        target.addListener(l);
+    }
+
+    /// Removes a listener added by [#addTapjackingListener(ActionListener)].
+    public void removeTapjackingListener(ActionListener l) {
+        com.codename1.ui.util.EventDispatcher target;
+        synchronized (tapjackingLock) {
+            target = tapjackingListeners;
+        }
+        if (l == null || target == null) {
+            return;
+        }
+        target.removeListener(l);
+    }
+
+    /// Called by a port when it observes a touch, to report whether that touch was obscured.
+    ///
+    /// Only a *change* is acted on. A port calls this for every touch it handles, so notifying
+    /// unconditionally would put a runnable on the EDT per touch and re-raise the same signal
+    /// forever; the interesting events are "an overlay appeared" and "it went away". The signal is
+    /// raised on the [com.codename1.security.shield.ShieldSignals] bus at severity 80, above
+    /// `ROOT` because an overlay over a live screen is an attack in progress rather than a standing
+    /// property of the device, and below `HOOK` because it has benign causes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obscured`: true when the observed touch was obscured
+    /// - `detail`: a short machine readable description of which flag fired, or null
+    public void notifyScreenObscured(boolean obscured, String detail) {
+        boolean changed;
+        synchronized (tapjackingLock) {
+            if (obscured && !tapjackingPolicy.isDetecting()) {
+                // A sighting that raced a switch-off. The port read the old policy, decided to
+                // report, and only got here after the EDT had already stored OFF and cleared the
+                // state. Letting it through would resurrect a state nothing clears afterwards --
+                // reporting has stopped -- and hand a listener an obscured callback for a
+                // protection the app had already turned off. Retractions are never dropped, only
+                // assertions, so the clearing path below still works.
+                return;
+            }
+            changed = obscured != screenObscured;
+            screenObscured = obscured;
+            if (changed) {
+                // Queued inside the lock so the delivery order matches the order the state
+                // changed in. The listener, unlike the signal bus below, is a state-change
+                // notification: announcing every touch would put a runnable on the EDT for
+                // every event of every gesture.
+                queueTapjackingState(obscured);
+            }
+        }
+        if (obscured) {
+            // Submitted on every obscured touch rather than only on the transition, because
+            // the bus and the listener want different things. ShieldSignals.add already
+            // de-duplicates: it refreshes the stored observation -- detail and timestamp --
+            // and stays silent when nothing changed. Gating this on the transition meant a
+            // partially obscured touch followed by a fully obscured one left the bus
+            // reporting "partiallyObscured" while BLOCK was dropping a fully obscured
+            // attack, and left "when did this device last look obscured" answering with the
+            // first sighting long after the fact.
+            try {
+                com.codename1.security.shield.ShieldSignals.add(
+                        com.codename1.security.shield.ShieldSignal.TAPJACK, 80, detail);
+            } catch (Throwable t) {
+                // Reporting must never break input handling: this runs on the touch path.
+                Log.e(t);
+            }
+        }
+    }
+
+    /// Asks the OS to hide non-system windows drawn over this app while it is in the foreground.
+    /// See [com.codename1.security.DeviceIntegrity#setHideOverlayWindows(boolean)]. No-op where
+    /// unsupported.
+    public void setHideOverlayWindows(boolean hide) {
+    }
+
+    /// True where [#setHideOverlayWindows(boolean)] actually does something.
+    public boolean isHideOverlayWindowsSupported() {
+        return false;
     }
 
     /// Returns the build hints for the simulator, this will only work in the debug environment and it's

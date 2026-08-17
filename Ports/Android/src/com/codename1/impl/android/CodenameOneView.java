@@ -31,6 +31,7 @@ import android.util.Log;
 import android.view.*;
 import android.view.inputmethod.EditorInfo;
 import android.os.Build;
+import com.codename1.security.TapjackingPolicy;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -630,7 +631,76 @@ public class CodenameOneView {
 
     private boolean cn1GrabbedPointer = false;
     //private boolean nativePeerGrabbedPointer = false;
-    
+
+    /**
+     * Android's own obscured-touch filtering, which
+     * {@code View.setFilterTouchesWhenObscured(true)} enables, runs inside
+     * {@code View.dispatchTouchEvent} via {@code onFilterTouchEventForSecurity}.
+     * {@link AndroidAsyncView#dispatchTouchEvent} -- the primary surface on every
+     * modern device -- calls straight into {@link #onTouchEvent} and only falls
+     * back to {@code super} when we decline the event, so that filtering never
+     * runs on the path CN1 components are actually reached through. The check has
+     * to be made explicitly here, or the flag would look enabled and do nothing.
+     *
+     * <p>Latched for the duration of a gesture rather than evaluated per event:
+     * dropping only the ACTION_DOWN would deliver a pointerReleased with no
+     * matching pointerPressed and leave the framework holding half a gesture.</p>
+     *
+     * <p>That latch is also why the port deliberately does <em>not</em> switch
+     * {@code setFilterTouchesWhenObscured} on for the native-peer fallback, which
+     * would otherwise look like free defense in depth. It filters per event, so an
+     * overlay appearing after a clean ACTION_DOWN on a peer would have the
+     * framework reject the ACTION_UP the peer was already owed, leaving a
+     * BrowserComponent or native text field stuck pressed with nothing to release
+     * it -- the same pairing failure the latch exists to avoid. A gesture that
+     * starts obscured never reaches {@code super.dispatchTouchEvent} at all,
+     * because this method claims it, so the peer is protected by the whole-gesture
+     * decision rather than by a per-event one.</p>
+     */
+    private boolean tapjackBlockedGesture = false;
+
+    /**
+     * The hover counterpart of {@link #tapjackBlockedGesture}, tracked separately
+     * because hover enter/exit interleaves with touch rather than nesting inside
+     * it -- a stylus can hover while a finger is down.
+     */
+    private boolean tapjackBlockedHover = false;
+
+    /**
+     * MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED. Added in API 21 but absent
+     * from the android.jar this port compiles against, so the value is inlined --
+     * the same approach the port already takes for FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
+     * in AndroidImplementation.
+     */
+    private static final int FLAG_WINDOW_IS_PARTIALLY_OBSCURED = 0x2;
+
+    /**
+     * Reports the obscured flags on an event and answers whether the touch it
+     * belongs to must be withheld from the application.
+     *
+     * @param event the event being handled
+     * @return true when the caller must not dispatch this event
+     */
+    private boolean tapjacked(MotionEvent event) {
+        TapjackingPolicy policy = this.implementation.getTapjackingPolicy();
+        if (policy == null || !policy.isDetecting()) {
+            return false;
+        }
+        boolean obscured;
+        boolean partial;
+        try {
+            int flags = event.getFlags();
+            obscured = (flags & MotionEvent.FLAG_WINDOW_IS_OBSCURED) != 0;
+            partial = (flags & FLAG_WINDOW_IS_PARTIALLY_OBSCURED) != 0;
+        } catch (Throwable t) {
+            // Detection must never break input handling.
+            return false;
+        }
+        this.implementation.notifyScreenObscured(obscured || partial,
+                obscured ? "obscured" : (partial ? "partiallyObscured" : null));
+        return policy.blocks(obscured, partial);
+    }
+
     public boolean onTouchEvent(MotionEvent event) {
 
         if (this.implementation.getCurrentForm() == null) {
@@ -641,12 +711,37 @@ public class CodenameOneView {
              */
             return true;
         }
+        // Tapjacking has to be resolved before ANY side effect of the touch, not merely before
+        // the pointer dispatch below. The keyboard re-summon that follows is one such side
+        // effect: an obscured ACTION_UP reaching it would reopen the keyboard for a gesture the
+        // BLOCK/STRICT policy promised to withhold. Anything added to this method later belongs
+        // after this block for the same reason.
+        //
+        // Returns true rather than the consumeEvent computed further down. That value is false
+        // when the touch landed on a native peer, and returning it would send the event back to
+        // AndroidAsyncView.dispatchTouchEvent, which hands it to super.dispatchTouchEvent and
+        // straight on to the peer -- delivering to a BrowserComponent or a native text field
+        // precisely the touch we are withholding from everything else. Claiming the event is
+        // what actually drops it.
+        boolean tapjackBlocked = tapjacked(event);
+        int tapjackAction = event.getAction();
+        if (tapjackAction == MotionEvent.ACTION_DOWN) {
+            tapjackBlockedGesture = tapjackBlocked;
+        }
+        if (tapjackBlockedGesture) {
+            if (tapjackAction == MotionEvent.ACTION_UP || tapjackAction == MotionEvent.ACTION_CANCEL) {
+                tapjackBlockedGesture = false;
+                cn1GrabbedPointer = false;
+            }
+            return true;
+        }
+
         if (event.getAction() == MotionEvent.ACTION_UP) {
             // EditText re-summons a dismissed keyboard on every tap; give the pure
             // editors the same behavior while their input session is bound
             AndroidImplementation.showSoftInputForActiveClient();
         }
-        
+
         
 
         int[] x = null;
@@ -756,6 +851,27 @@ public class CodenameOneView {
         if (this.implementation.getCurrentForm() == null) {
             return false;
         }
+        // Hover is a paired sequence rather than a gesture: the enter puts a component into a
+        // hovered state that only the exit takes it out of. Filtering it the way touches are
+        // filtered would mean an overlay appearing mid-hover swallows the exit for an enter
+        // that was already delivered, leaving the component hovered permanently. So a sequence
+        // that STARTS obscured is withheld in full -- no enter was delivered, so no exit is
+        // owed -- while one that started clean always gets its release, whatever the flags say
+        // by then.
+        boolean hoverBlocked = tapjacked(event);
+        int hoverAction = event.getActionMasked();
+        if (hoverAction == MotionEvent.ACTION_HOVER_ENTER) {
+            tapjackBlockedHover = hoverBlocked;
+        }
+        if (tapjackBlockedHover) {
+            if (hoverAction == MotionEvent.ACTION_HOVER_EXIT) {
+                tapjackBlockedHover = false;
+            }
+            return true;
+        }
+        if (hoverBlocked && hoverAction != MotionEvent.ACTION_HOVER_EXIT) {
+            return true;
+        }
         final int x = (int) event.getX();
         final int y = (int) event.getY();
         updatePointerMetadata(event, true);
@@ -783,6 +899,9 @@ public class CodenameOneView {
     public boolean onGenericMotionEvent(MotionEvent event) {
         if (this.implementation.getCurrentForm() == null) {
             return false;
+        }
+        if (tapjacked(event)) {
+            return true;
         }
         if (event.getActionMasked() == MotionEvent.ACTION_SCROLL) {
             int x = (int) event.getX();

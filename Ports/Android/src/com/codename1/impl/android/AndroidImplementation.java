@@ -2015,6 +2015,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             myView.getAndroidView().setVisibility(View.VISIBLE);
 
+            if (hideOverlayWindowsRequested) {
+                setHideOverlayWindows(true);
+            }
+
             if (Build.VERSION.SDK_INT >= 16) {
                 final View semanticHost = myView.getAndroidView();
                 accessibilityProvider = new AndroidAccessibilityProvider(semanticHost, this);
@@ -15008,6 +15012,77 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         act.getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
                     }
                 } catch(Throwable t) {
+                    com.codename1.io.Log.e(t);
+                }
+            }
+        });
+    }
+
+    @Override
+    public boolean isHideOverlayWindowsSupported() {
+        // The permission half matters as much as the API level. Window.setHideOverlayWindows
+        // throws SecurityException without HIDE_OVERLAY_WINDOWS; reflection wraps it and the
+        // catch below only logs it, so reporting support on the API level alone would tell an
+        // app its native peers were protected when in fact nothing happened. It is a normal
+        // permission, granted at install once the manifest declares it, which the
+        // android.tapjackingGuard / android.hideOverlayWindows build hints arrange.
+        return Build.VERSION.SDK_INT >= 31 && hasHideOverlayWindowsPermission();
+    }
+
+    /** The last value passed to setHideOverlayWindows, replayed onto a recreated window. */
+    private boolean hideOverlayWindowsRequested;
+
+    private boolean hasHideOverlayWindowsPermission() {
+        try {
+            Context ctx = getContext();
+            if (ctx == null) {
+                return false;
+            }
+            return ctx.checkSelfPermission("android.permission.HIDE_OVERLAY_WINDOWS")
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public void setHideOverlayWindows(final boolean hide) {
+        // Recorded before the guards below because it is a request, not a result: the flag
+        // lives on the Window, and a configuration change destroys and recreates the activity
+        // without touching this implementation instance. initSurface() replays it onto the new
+        // window, otherwise an app that hid overlays on a sensitive screen would come back from
+        // a rotation with them allowed again and no way to notice.
+        hideOverlayWindowsRequested = hide;
+        if (Build.VERSION.SDK_INT < 31) {
+            return;
+        }
+        if (!hasHideOverlayWindowsPermission()) {
+            // Said out loud rather than left to the swallowed SecurityException below: an app
+            // that calls this without the build hint would otherwise see no effect and no
+            // explanation for why its overlays were never hidden.
+            com.codename1.io.Log.p("Codename One: setHideOverlayWindows ignored, the app does "
+                    + "not hold android.permission.HIDE_OVERLAY_WINDOWS. Enable the "
+                    + "android.tapjackingGuard or android.hideOverlayWindows build hint.");
+            return;
+        }
+        final Activity act = getActivity();
+        if (act == null) {
+            return;
+        }
+        act.runOnUiThread(new Runnable() {
+            public void run() {
+                try {
+                    // Window.setHideOverlayWindows(boolean) is API 31 and absent from the
+                    // android.jar this port compiles against, so it is reached reflectively --
+                    // the same approach the port uses for the Play Integrity API.
+                    android.view.Window w = act.getWindow();
+                    if (w == null) {
+                        return;
+                    }
+                    java.lang.reflect.Method m = android.view.Window.class.getMethod(
+                            "setHideOverlayWindows", boolean.class);
+                    m.invoke(w, Boolean.valueOf(hide));
+                } catch (Throwable t) {
                     com.codename1.io.Log.e(t);
                 }
             }

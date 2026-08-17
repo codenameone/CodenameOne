@@ -23,6 +23,7 @@
 
 package com.codename1.tools.translator;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 
 import java.io.ByteArrayOutputStream;
@@ -30,6 +31,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -330,13 +332,50 @@ class JavascriptRuntimeSemanticsTest {
 
     @ParameterizedTest
     @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
-    void preservesPrimitiveArrayLiteralAndCopySemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
+    void preservesPrimitiveArrayDefaultsLiteralsAndCopySemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsPrimitiveArraySemanticsApp.java", "JsPrimitiveArraySemanticsApp");
 
-        assertEquals(1023, result.result,
-                "Translated runtime should preserve primitive array literals and overlapping System.arraycopy semantics. raw="
+        assertEquals(32767, result.result,
+                "Translated runtime should preserve Java array defaults, primitive array literals, and overlapping System.arraycopy semantics. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @Test
+    void newArrayUsesJavaDefaultsForPrimitiveReferenceAndNestedArrays() throws Exception {
+        Path runtime = Paths.get("..", "ByteCodeTranslator", "src", "javascript", "parparvm_runtime.js")
+                .toAbsolutePath().normalize();
+        assertTrue(Files.exists(runtime), "ParparVM JavaScript runtime should exist");
+
+        Path harness = Files.createTempFile("js-array-defaults", ".js");
+        String source = ""
+                + "const fs = require('fs');\n"
+                + "const vm = require('vm');\n"
+                + "global.self = global; global.window = global; global.global = global;\n"
+                + "global.postMessage = function() {};\n"
+                + "vm.runInThisContext(fs.readFileSync(" + quoteJs(runtime.toString()) + ", 'utf8'));\n"
+                + "const failures = [];\n"
+                + "const numeric = ['JAVA_BOOLEAN','JAVA_BYTE','JAVA_CHAR','JAVA_SHORT','JAVA_INT','JAVA_FLOAT','JAVA_DOUBLE'];\n"
+                + "for (const type of numeric) {\n"
+                + "  const array = jvm.newArray(2, type, 1);\n"
+                + "  if (array[0] !== 0 || array[1] !== 0) failures.push(type + '=' + String(array[0]));\n"
+                + "}\n"
+                + "const longs = jvm.newArray(2, 'JAVA_LONG', 1);\n"
+                + "if (!longs[0] || longs[0].__l !== 1 || longs[0].l !== 0 || longs[0].h !== 0) failures.push('JAVA_LONG');\n"
+                + "const references = jvm.newArray(2, 'java_lang_String', 1);\n"
+                + "if (references[0] !== null || references[1] !== null) failures.push('reference');\n"
+                + "const jagged = jvm.newArray(2, 'JAVA_INT[]', 1);\n"
+                + "if (jagged[0] !== null || jagged[1] !== null) failures.push('jagged');\n"
+                + "const multiOuter = jvm.newArray(2, 'JAVA_INT', 2);\n"
+                + "if (multiOuter[0] !== null || multiOuter[1] !== null) failures.push('multiOuter');\n"
+                + "if (failures.length) throw new Error('Wrong Java array defaults: ' + failures.join(','));\n";
+        Files.write(harness, source.getBytes(StandardCharsets.UTF_8));
+
+        Process process = new ProcessBuilder("node", harness.toString()).start();
+        String output = readAll(process.getInputStream());
+        String errors = readAll(process.getErrorStream());
+        assertEquals(0, process.waitFor(),
+                "ParparVM should initialize arrays with Java defaults. stdout: " + output + " stderr: " + errors);
     }
 
     @ParameterizedTest

@@ -342,6 +342,7 @@ public class LinuxNativeBuilder extends Executor {
         }
         parparCmd.add("-Dcn1.sqlite=" + usesDatabase);
         parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
+        NativeVerifyOption.addTo(parparCmd, request, "linux");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         parparCmd.add("clean");

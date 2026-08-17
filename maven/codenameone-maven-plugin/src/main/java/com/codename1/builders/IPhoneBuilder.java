@@ -3900,6 +3900,7 @@ public class IPhoneBuilder extends Executor {
                 if (!heapOverridden) {
                     parparCmd.add("-Xmx" + heapMB + "m");
                 }
+                NativeVerifyOption.addTo(parparCmd, request, "ios");
                 parparCmd.add("-jar");
                 parparCmd.add(parparVMCompilerJar);
                 parparCmd.add("ios");

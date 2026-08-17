@@ -2315,6 +2315,44 @@ public class BytecodeMethod implements SignatureSet {
         return nativeMethod;
     }
 
+    /**
+     * The C prototype a native implementation of this method must have, in the
+     * exact form {@link #appendCMethodPrefix} emits at the call site.
+     *
+     * <p>Built from that same method rather than from a second mangler, because the
+     * whole point of {@link NativeSignatureVerifier} is that the two agree: a
+     * verifier that mangles names its own way would bless exactly the spellings the
+     * translator will not call.</p>
+     */
+    public NativeSignatureVerifier.Signature getNativeSignature() {
+        StringBuilder prototype = new StringBuilder();
+        appendCMethodPrefix("", "", prototype, "", clsName);
+
+        StringBuilder symbol = new StringBuilder();
+        symbol.append(clsName).append('_').append(getCMethodName()).append("__");
+        String overloadPrefix = symbol.toString();
+        appendArgumentTypes(symbol);
+
+        StringBuilder cReturnType = new StringBuilder();
+        returnType.appendCSig(cReturnType);
+
+        List<String> params = new ArrayList<String>();
+        params.add("CODENAME_ONE_THREAD_STATE");
+        if (!staticMethod) {
+            StringBuilder self = new StringBuilder();
+            new ByteCodeMethodArg(clsName, 0).appendCSig(self);
+            params.add(self.toString().trim());
+        }
+        for (ByteCodeMethodArg arg : arguments) {
+            StringBuilder type = new StringBuilder();
+            arg.appendCSig(type);
+            params.add(type.toString().trim());
+        }
+        return new NativeSignatureVerifier.Signature(symbol.toString(), clsName,
+                methodName, overloadPrefix, cReturnType.toString().trim(), params,
+                prototype.toString().trim().replaceAll("\\s+", " "));
+    }
+
     public boolean isAbstract() {
         return abstractMethod;
     }

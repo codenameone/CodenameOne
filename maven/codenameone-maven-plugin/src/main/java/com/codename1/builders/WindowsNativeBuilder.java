@@ -325,6 +325,7 @@ public class WindowsNativeBuilder extends Executor {
         }
         parparCmd.add("-Dcn1.sqlite=" + usesDatabase);
         parparCmd.add("-Dcn1.sqlcipher=" + usesDatabaseCipher);
+        NativeVerifyOption.addTo(parparCmd, request, "windows");
         parparCmd.add("-jar");
         parparCmd.add(parparVMCompilerJar.getAbsolutePath());
         // Output type: the portable "clean" C target. The "windows" app type

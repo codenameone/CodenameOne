@@ -108,6 +108,8 @@ public class AndroidGradleBuilder extends Executor {
 
     private boolean accessibilityGuard = false;
 
+    private boolean tapjackingGuard = false;
+
     private boolean useGradle8 = true;
 
     // Flag to indicate whether we should strip kotlin from user classes
@@ -925,6 +927,7 @@ public class AndroidGradleBuilder extends Executor {
         fridaDetection = request.getArg("android.fridaDetection", "false").equals("true");
         playIntegrity = request.getArg("android.playIntegrity", "false").equals("true");
         accessibilityGuard = request.getArg("android.accessibilityGuard", "false").equals("true");
+        tapjackingGuard = request.getArg("android.tapjackingGuard", "false").equals("true");
         extendAppCompatActivity = request.getArg("android.extendAppCompatActivity", "false").equals("true");
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
@@ -4289,6 +4292,22 @@ public class AndroidGradleBuilder extends Executor {
                     "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n");
         }
 
+        // Window.setHideOverlayWindows (Android 12+) throws SecurityException without this
+        // permission, so declaring it is what makes DeviceIntegrity.setHideOverlayWindows do
+        // anything at all. It is a normal (install-time) permission -- no runtime prompt, no
+        // special access screen -- so it is declared only for projects that asked for the
+        // overlay mitigation rather than added to every build.
+        //
+        // android.hideOverlayWindows exists for apps that drive the runtime API directly
+        // without the launch-time guard; android.tapjackingGuard implies it unless the project
+        // opted out with .hideOverlays=false.
+        if ("true".equalsIgnoreCase(request.getArg("android.hideOverlayWindows", "false"))
+                || (tapjackingGuard && request.getArg(
+                        "android.tapjackingGuard.hideOverlays", "true").equalsIgnoreCase("true"))) {
+            permissions += permissionAdd(request, "\"android.permission.HIDE_OVERLAY_WINDOWS\"",
+                    "    <uses-permission android:name=\"android.permission.HIDE_OVERLAY_WINDOWS\" />\n");
+        }
+
         if (capturePermission) {
             String andc = request.getArg("android.captureRecord", "enabled");
             if (request.getArg("and.captureRecord", andc).equals("enabled")) {
@@ -6857,6 +6876,46 @@ public class AndroidGradleBuilder extends Executor {
 
         if (request.getArg("android.disableScreenshots", "false").equalsIgnoreCase("true")) {
             retVal += "Display.getInstance().setProperty(\"DisableScreenshots\", \"true\");\n";
+        }
+
+        // android.tapjackingGuard turns on overlay/tapjacking protection with no app code.
+        // Unlike rootCheck/accessibilityGuard this is not a launch-time exit gate, it is a
+        // standing runtime policy, so it is delivered as a Display property that
+        // AndroidImplementation applies rather than as generated code in onCreate.
+        //
+        // This class builds locally. The cloud builder is a separate codebase
+        // (com.codename1.build.daemon.AndroidGradleBuilder in the BuildDaemon repo) and needs
+        // the identical block, or the hint is a silent no-op on cloud builds while the
+        // documentation promises launch-time protection -- worse than not offering it, because
+        // the app ships believing it is guarded. The mirror is BuildDaemon#181 and the two are
+        // meant to land together; keep them in step when either side changes.
+        //
+        // On ordering, since this looks late and is not: createOnCreateCode's output is the
+        // tail of the generated onCreate. The application's start() is emitted separately, by
+        // createStartInvocation, into the generated run() method that onResume reaches -- so
+        // Android has already returned from onCreate before any of it runs. Display is usually
+        // not initialized this early, which is fine and deliberate: Display.setProperty parks
+        // both values and Display.init() applies them, and that init happens in onResume ahead
+        // of the start call. The policy and the overlay request are therefore both in force
+        // before application code can show its first form. Moving these emissions later, into
+        // the start path, would be the change that actually opened a window.
+        if (tapjackingGuard) {
+            // Locale.ENGLISH, not the default locale: in a Turkish locale "STRICT".toLowerCase()
+            // yields "strıct" (dotless i), which would silently miss the match below.
+            String mode = request.getArg("android.tapjackingGuard.mode", "block")
+                    .trim().toLowerCase(java.util.Locale.ENGLISH);
+            if (!"block".equals(mode) && !"strict".equals(mode) && !"report".equals(mode)
+                    && !"off".equals(mode)) {
+                // A typo here would silently ship an unprotected app, so say so and use the
+                // documented default rather than passing the bad value through.
+                log("WARNING: unrecognized android.tapjackingGuard.mode '" + mode
+                        + "', using 'block'. Valid values are block, strict, report, off.");
+                mode = "block";
+            }
+            retVal += "Display.getInstance().setProperty(\"TapjackingProtection\", \"" + mode + "\");\n";
+            if (request.getArg("android.tapjackingGuard.hideOverlays", "true").equalsIgnoreCase("true")) {
+                retVal += "Display.getInstance().setProperty(\"HideOverlayWindows\", \"true\");\n";
+            }
         }
 
 

@@ -75,6 +75,43 @@ public class JsPrimitiveArraySemanticsApp {
             score |= 512;
         }
 
+        byte[] defaultByte = new byte[1];
+        int[] indexedByDefault = new int[] {73};
+        if (indexedByDefault[defaultByte[0]] == 73) {
+            score |= 1024;
+        }
+
+        boolean[] defaultBoolean = new boolean[1];
+        char[] defaultChar = new char[1];
+        short[] defaultShort = new short[1];
+        int[] defaultInt = new int[1];
+        if (!defaultBoolean[0] && defaultChar[0] == '\0'
+                && defaultShort[0] == 0 && defaultInt[0] == 0) {
+            score |= 2048;
+        }
+
+        long[] defaultLong = new long[1];
+        float[] defaultFloat = new float[1];
+        double[] defaultDouble = new double[1];
+        if (defaultLong[0] == 0L && defaultFloat[0] == 0f && defaultDouble[0] == 0d) {
+            score |= 4096;
+        }
+
+        Object[] defaultObject = new Object[1];
+        String[] defaultString = new String[1];
+        if (defaultObject[0] == null && defaultString[0] == null) {
+            score |= 8192;
+        }
+
+        int[][] allocatedPrimitiveMatrix = new int[1][1];
+        int[][] jaggedPrimitiveMatrix = new int[1][];
+        Object[][] jaggedReferenceMatrix = new Object[1][];
+        if (allocatedPrimitiveMatrix[0][0] == 0
+                && jaggedPrimitiveMatrix[0] == null
+                && jaggedReferenceMatrix[0] == null) {
+            score |= 16384;
+        }
+
         result = score;
         System.exit(score);
     }
