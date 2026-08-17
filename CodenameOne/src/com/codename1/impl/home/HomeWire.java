@@ -636,7 +636,18 @@ public final class HomeWire {
             default:
                 TraitUnit unit = TraitUnit.forWireId(unitWireId);
                 if (unit == null) {
+                    // A unit this build does not know. The trait's own is the
+                    // safe reading -- the number is in whatever the port
+                    // meant, and the trait says what that ought to be.
                     unit = trait.getUnit();
+                }
+                if (!unit.isCompatibleWith(trait.getUnit())) {
+                    // A brightness labelled in Celsius. Accepted, it becomes
+                    // a value every caller throws on the moment they ask for
+                    // it in the unit the trait documents -- an exception in
+                    // their code for a defect in the port's. INVALID_DATA
+                    // says whose it is.
+                    return null;
                 }
                 value = TraitValue.of(numeric, unit);
                 break;

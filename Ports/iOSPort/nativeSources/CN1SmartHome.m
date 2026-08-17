@@ -1829,6 +1829,20 @@ com_codename1_impl_ios_IOSNative_homeReadTraits___int_java_lang_String_java_lang
                                          "trait")];
                 continue;
             }
+            if (![[c properties]
+                    containsObject:HMCharacteristicPropertyReadable]) {
+                // The graph says so through TraitConstraint.isReadable, and
+                // the local backend answers WRITE_ONLY_TRAIT -- so an app
+                // that reads one by identifier rather than from the graph
+                // gets the same answer on both, instead of a cached number
+                // HomeKit never promised to keep.
+                [records replaceObjectAtIndex:i withObject:
+                    cn1homeEncodeReading(accessoryId, serviceId, traitId, nil,
+                                         @"WRITE_ONLY_TRAIT",
+                                         @"this trait can be set but not "
+                                         "read")];
+                continue;
+            }
             if (cn1homeHasNoValueNow(service, traitId)) {
                 [records replaceObjectAtIndex:i withObject:
                     cn1homeEncodeReading(accessoryId, serviceId, traitId, nil,
