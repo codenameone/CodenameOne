@@ -850,22 +850,20 @@ public final class InterpRuntime {
 
     // ----------------------------------------------------------------- state
 
-    /**
-     * Runs a class's initializer once, following JLS 12.4.2.
-     *
-     * <p>The subtlety is that "has it been initialized" is four states, not
-     * two. Marking the class done before running `&lt;clinit&gt;` is what stops
-     * a cycle -- a static initializer that reaches back into its own class --
-     * from recursing forever, but the same mark tells <em>another</em> thread
-     * that the static fields are ready when they are not. The JVM separates the
-     * two with a per-class lock and an owning thread: the initializing thread
-     * passes straight through, everyone else waits.</p>
-     *
-     * <p>A failed initializer is the other half. Once `&lt;clinit&gt;` throws,
-     * the class is erroneous forever; leaving the "done" mark set would hand
-     * every later reader a class whose statics were half-assigned, and the
-     * failure would surface as a wrong value rather than as an error.</p>
-     */
+    /// Runs a class's initializer once, following JLS 12.4.2.
+    ///
+    /// The subtlety is that "has it been initialized" is four states, not two.
+    /// Marking the class done before running `<clinit>` is what stops a cycle
+    /// -- a static initializer that reaches back into its own class -- from
+    /// recursing forever, but the same mark tells *another* thread that the
+    /// static fields are ready when they are not. The JVM separates the two
+    /// with a per-class lock and an owning thread: the initializing thread
+    /// passes straight through, everyone else waits.
+    ///
+    /// A failed initializer is the other half. Once `<clinit>` throws, the
+    /// class is erroneous forever; leaving the "done" mark set would hand every
+    /// later reader a class whose statics were half-assigned, and the failure
+    /// would surface as a wrong value rather than as an error.
     private void ensureInitialized(InterpClass c) throws Throwable {
         synchronized (c) {
             if (c.initState == InterpClass.INIT_DONE) {
