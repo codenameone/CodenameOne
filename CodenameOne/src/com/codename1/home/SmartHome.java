@@ -799,11 +799,29 @@ public final class SmartHome {
             return failed(HomeError.NOT_SUPPORTED,
                     "this platform has no smart-home support");
         }
-        int maxWrites = b.getMaxWriteBatchSize();
-        if (maxWrites > 0 && writes.size() > maxWrites) {
-            return writeInChunks(writes, maxWrites);
+        // Every element checked before anything is sent, so an argument
+        // rejection cannot land halfway. Otherwise a batch of two against a
+        // backend that takes one throws on the second write's bad value only
+        // after the first has already moved a real accessory -- and the
+        // caller has an exception saying nothing happened.
+        List<TraitWrite> snapshot = new ArrayList<TraitWrite>(writes.size());
+        for (int i = 0; i < writes.size(); i++) {
+            TraitWrite w = writes.get(i);
+            if (w == null) {
+                throw new IllegalArgumentException(
+                        "writes cannot contain a null at index " + i);
+            }
+            requireEnumDomain(w.getTrait(), w.getValue(), "write");
+            // Throws on a cross-dimension unit, which is the other way an
+            // argument can be rejected below.
+            canonicalNumeric(w.getTrait(), w.getValue());
+            snapshot.add(w);
         }
-        int count = writes.size();
+        int maxWrites = b.getMaxWriteBatchSize();
+        if (maxWrites > 0 && snapshot.size() > maxWrites) {
+            return writeInChunks(snapshot, maxWrites);
+        }
+        int count = snapshot.size();
         String[] accessoryIds = new String[count];
         String[] serviceIds = new String[count];
         String[] traitIds = new String[count];
@@ -816,14 +834,10 @@ public final class SmartHome {
         String[] authorization = new String[count];
         List<TraitWrite> copy = new ArrayList<TraitWrite>(count);
         for (int i = 0; i < count; i++) {
-            TraitWrite w = writes.get(i);
-            if (w == null) {
-                throw new IllegalArgumentException(
-                        "writes cannot contain a null at index " + i);
-            }
+            // Already checked and copied above.
+            TraitWrite w = snapshot.get(i);
             copy.add(w);
             TraitValue v = w.getValue();
-            requireEnumDomain(w.getTrait(), v, "write");
             accessoryIds[i] = w.getAccessoryId();
             serviceIds[i] = w.getServiceId();
             traitIds[i] = w.getTrait().getId();

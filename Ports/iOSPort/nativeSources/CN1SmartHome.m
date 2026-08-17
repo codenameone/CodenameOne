@@ -2187,12 +2187,52 @@ com_codename1_impl_ios_IOSNative_homeCreateScene___int_java_lang_String_java_lan
                 HMCharacteristic *c = cn1homeFindCharacteristic(
                     service, [traits objectAtIndex:i]);
                 NSArray *entry = cn1homeEntryFor([traits objectAtIndex:i]);
+                int conversion = entry == nil ? -1
+                        : [[entry objectAtIndex:3] intValue];
+                double numeric = i < [numbers count]
+                        ? [[numbers objectAtIndex:i] doubleValue] : 0;
+                // The same fan handling the direct write path does, for the
+                // same reason: HomeKit's mode characteristic cannot say
+                // "stopped", and cannot carry a speed. A scene that only set
+                // the mode left the fan running at whatever speed it was on,
+                // every time it ran.
                 id target = nil;
+                if (conversion == CN1_HC_FAN_MODE && (int) numeric == 0) {
+                    c = cn1homeFindCharacteristic(service, @"on_off");
+                    conversion = CN1_HC_BOOL;
+                    numeric = 0;
+                }
                 if (c != nil && entry != nil) {
-                    target = cn1homeToHomeKit(
-                        [[entry objectAtIndex:3] intValue],
-                        i < [numbers count]
-                            ? [[numbers objectAtIndex:i] doubleValue] : 0);
+                    target = cn1homeToHomeKit(conversion, numeric);
+                }
+                if (target != nil && conversion == CN1_HC_FAN_MODE) {
+                    double speed = cn1homeFanModeSpeed((int) numeric);
+                    HMCharacteristic *speedChar = speed < 0 ? nil
+                            : cn1homeFindCharacteristic(service, @"fan_speed");
+                    if (speedChar != nil) {
+                        HMCharacteristicWriteAction *speedAction =
+                                [[HMCharacteristicWriteAction alloc]
+                                 initWithCharacteristic:speedChar
+                                            targetValue:
+                                     [NSNumber numberWithDouble:speed]];
+                        remaining++;
+                        [actionSet addAction:speedAction
+                           completionHandler:^(NSError *actionError) {
+                            if (actionError != nil) {
+                                failedActions++;
+                                if (firstFailure == nil) {
+                                    firstFailure = [cn1homeError(
+                                        cn1homeErrorName(actionError),
+                                        actionError) retain];
+                                }
+                            }
+                            remaining--;
+                            if (remaining == 0) {
+                                done();
+                            }
+                        }];
+                        [speedAction release];
+                    }
                 }
                 if (target == nil) {
                     failedActions++;

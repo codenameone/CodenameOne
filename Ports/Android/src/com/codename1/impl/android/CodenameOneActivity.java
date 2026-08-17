@@ -26,6 +26,7 @@ package com.codename1.impl.android;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
@@ -444,6 +445,31 @@ public class CodenameOneActivity extends Activity {
             AndroidImplementation.stopEditing(true);
         }
         super.startActivityForResult(intent, requestCode);
+    }
+
+    /**
+     * Kept in step with {@link #startActivityForResult(Intent, int)}, which is
+     * the only place the queued results were reset.
+     *
+     * <p>A flow launched through an {@code IntentSender} -- Play services
+     * hands one back for its Matter add-device sheet, In-App Billing for its
+     * purchase sheet -- otherwise left the previous flow's result sitting at
+     * the head of the queue. {@code fireIntentResult} redispatches element
+     * zero without removing it, so the second run of the same flow was
+     * answered with the first run's outcome: cancel once, retry, and the
+     * retry reports cancelled before the user has touched it.</p>
+     */
+    @Override
+    public void startIntentSenderForResult(IntentSender intent, int requestCode,
+            Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags)
+            throws IntentSender.SendIntentException {
+        waitingForResult = true;
+        intentResult = new Vector();
+        if (InPlaceEditView.isEditing()) {
+            AndroidImplementation.stopEditing(true);
+        }
+        super.startIntentSenderForResult(intent, requestCode, fillInIntent,
+                flagsMask, flagsValues, extraFlags);
     }
 
     @Override

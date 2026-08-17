@@ -493,7 +493,11 @@ public final class MatterCommissioningBridge implements SmartHomeDelegate {
             }
         });
         try {
-            activity.startIntentSenderForResult(sender, REQUEST_COMMISSION,
+            // Through the activity's own override, which resets the queued
+            // results the way startActivityForResult does. Called on the raw
+            // Activity it would be the inherited one, and a second run of
+            // this flow would be answered with the first run's outcome.
+            cn1.startIntentSenderForResult(sender, REQUEST_COMMISSION,
                     null, 0, 0, 0);
         } catch (IntentSender.SendIntentException cannotStart) {
             cn1.restoreIntentResultListener();

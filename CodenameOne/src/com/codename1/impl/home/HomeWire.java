@@ -579,16 +579,37 @@ public final class HomeWire {
         TraitValue value;
         switch (trait.getValueKind()) {
             case BOOLEAN:
+                // A flag is 1 or 0 on the wire and nothing else. Anything
+                // else is a port and this build disagreeing, and "not zero,
+                // so true" is a guess -- the wrong one for a lock's own
+                // flags.
+                if (numeric != 0 && numeric != 1) {
+                    return null;
+                }
                 value = TraitValue.of(numeric != 0);
                 break;
             case INT:
+                if (numeric != Math.floor(numeric)) {
+                    return null;
+                }
                 value = TraitValue.of((int) numeric);
                 break;
             case STRING:
                 value = TraitValue.of(text);
                 break;
             case ENUM:
+                // Whole, and inside the trait's own domain. A cast turns 0.9
+                // into SECURED, and an ordinal past the end of the enum turns
+                // into whatever the reader's total lookup falls back to --
+                // both of which report a malformed record as a value the
+                // caller will act on.
+                if (numeric != Math.floor(numeric)) {
+                    return null;
+                }
                 value = TraitValue.ofEnumOrdinal((int) numeric);
+                if (!trait.acceptsEnumValue(value)) {
+                    return null;
+                }
                 break;
             default:
                 TraitUnit unit = TraitUnit.forWireId(unitWireId);
