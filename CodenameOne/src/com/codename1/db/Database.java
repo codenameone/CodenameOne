@@ -1048,11 +1048,14 @@ public abstract class Database {
             return;
         }
         for (String statement : SQLStatementSplitter.split(sql)) {
-            String trimmed = statement.trim();
-            if (!trimmed.toUpperCase().startsWith("ATTACH")) {
+            // The leading keyword, read past comments and whitespace, rather than what the text
+            // happens to start with. "/* migration */ ATTACH ..." is an ordinary statement in a
+            // migration script and SQLite runs it, but it does not start with ATTACH, so its
+            // target went unreserved and the delete guard never saw it.
+            if (!"ATTACH".equals(leadingKeyword(statement))) {
                 continue;
             }
-            String file = attachmentFileOf(trimmed);
+            String file = attachmentFileOf(statement);
             if (file == null || file.length() == 0 || ":memory:".equals(file)) {
                 continue;
             }
@@ -1191,8 +1194,16 @@ public abstract class Database {
                     // AS b" gives two rows here with one path between them. Keeping one name
                     // detached one of them and left the other live and unregistered, which is
                     // the whole failure this exists to prevent.
-                    java.util.Vector schemas = (java.util.Vector) live.get(key);
-                    if (schemas == null) {
+                    //
+                    // Read back through instanceof rather than a cast. This runs inside a try
+                    // that catches RuntimeException, and a failed cast does not raise one on
+                    // ParparVM -- it hands the wrong object to the next instruction, which is a
+                    // native crash no catch here would ever see.
+                    Object held = live.get(key);
+                    java.util.Vector schemas;
+                    if (held instanceof java.util.Vector) {
+                        schemas = (java.util.Vector) held;
+                    } else {
                         schemas = new java.util.Vector();
                         live.put(key, schemas);
                     }
@@ -1250,7 +1261,7 @@ public abstract class Database {
                 // transaction or while another connection holds the file -- the throw happens
                 // either way, since a caller that is told nothing carries on writing through an
                 // attachment whose file is about to be unlinked.
-                detachEveryQuietly((java.util.Vector) live.get(key));
+                detachEveryQuietly(live.get(key));
                 attachmentRefusal = new IOException("An ATTACH named a database that is being "
                         + "deleted or converted, so it could not be attached: " + key + ". The "
                         + "attachment has been undone. Complete the delete or the key change "
@@ -1300,13 +1311,20 @@ public abstract class Database {
     ///
     /// #### Parameters
     ///
-    /// - `schemas`: the schema names `PRAGMA database_list` gave for that file
-    private void detachEveryQuietly(java.util.Vector schemas) {
-        if (schemas == null) {
+    /// - `held`: the schema names `PRAGMA database_list` gave for that file
+    private void detachEveryQuietly(Object held) {
+        // Typed by instanceof rather than by a cast, and taken as Object for that reason: a cast
+        // that failed would not raise anything catchable on ParparVM, and the one thing this must
+        // not do is fail silently.
+        if (!(held instanceof java.util.Vector)) {
             return;
         }
+        java.util.Vector schemas = (java.util.Vector) held;
         for (int iter = 0; iter < schemas.size(); iter++) {
-            detachQuietly((String) schemas.elementAt(iter));
+            Object schema = schemas.elementAt(iter);
+            if (schema instanceof String) {
+                detachQuietly((String) schema);
+            }
         }
     }
 
@@ -1404,6 +1422,14 @@ public abstract class Database {
         int at = 0;
         int length = statement.length();
         while (at < length) {
+            // Comments count as space between words. "ATTACH /* here */ DATABASE 'x.db' AS aux"
+            // is valid, and reading the comment as a word made "/*" the filename -- which parses
+            // as nothing quoted, so the statement reserved no database at all.
+            int trivia = skipLeadingTrivia(statement, at);
+            if (trivia != at) {
+                at = trivia;
+                continue;
+            }
             char c = statement.charAt(at);
             if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == ';') {
                 at++;
@@ -1436,6 +1462,15 @@ public abstract class Database {
             while (end < length) {
                 char e = statement.charAt(end);
                 if (e == ' ' || e == '\t' || e == '\n' || e == '\r' || e == ';') {
+                    break;
+                }
+                // A comment ends a word without any space around it: DATABASE/*c*/'x.db' is three
+                // tokens to SQLite, and reading it as one lost the filename inside a word that
+                // matched nothing.
+                if (e == '/' && end + 1 < length && statement.charAt(end + 1) == '*') {
+                    break;
+                }
+                if (e == '-' && end + 1 < length && statement.charAt(end + 1) == '-') {
                     break;
                 }
                 end++;

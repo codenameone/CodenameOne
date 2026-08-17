@@ -285,6 +285,36 @@ class AttachmentReconciliationTest extends UITestBase {
     }
 
     @FormTest
+    void anAttachIsFoundPastTheCommentsAroundIt() throws Exception {
+        // Every one of these is a statement SQLite runs and an attachment it makes. The reserve
+        // has to see the target in all of them, because a reservation is the only refusal that
+        // can still stop the attach -- afterwards there is nothing left to refuse.
+        String[] scripts = {
+            "ATTACH DATABASE '/data/guarded.db' AS aux",
+            "/* migration */ ATTACH DATABASE '/data/guarded.db' AS aux",
+            "-- migration\nATTACH DATABASE '/data/guarded.db' AS aux",
+            "  \n\t ATTACH DATABASE '/data/guarded.db' AS aux",
+            "ATTACH /* which */ DATABASE /* one */ '/data/guarded.db' AS aux",
+            "ATTACH DATABASE/* no space */'/data/guarded.db' AS aux",
+        };
+        String key = "file:///data/guarded.db";
+        for (String script : scripts) {
+            ReconcilingDatabase db = new ReconcilingDatabase();
+            // Claimed for a key change, so reserving the target is refused -- which is how this
+            // can tell the target was read at all.
+            Database.requireSoleConnectionForKeyChange(key);
+            try {
+                final ReconcilingDatabase reserving = db;
+                final String sql = script;
+                assertThrows(IOException.class, () -> reserving.about(sql),
+                        "the target of this ATTACH was never reserved: " + script);
+            } finally {
+                Database.releaseKeyChangeClaim(key);
+            }
+        }
+    }
+
+    @FormTest
     void attachmentControlCannotBeRunThroughExecuteQuery() throws Exception {
         ReconcilingDatabase db = new ReconcilingDatabase();
 
