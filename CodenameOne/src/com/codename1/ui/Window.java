@@ -187,10 +187,17 @@ public class Window extends Container implements TopLevelContainer {
         TopLevelSupport.requireMultiWindow();
         windowId = Desktop.getInstance().nextWindowId();
         setSafeAreaRoot(true);
-        setUIID("Window");
+        // A window is a top level surface, so it takes the styles a theme already
+        // defines for one. Naming these "Window" and "WindowContentPane" instead
+        // would leave every theme written before desktop windows existed with no
+        // entry for them, and an unstyled top level paints nothing at all -- the
+        // window would come up as an unpainted rectangle. A theme or an application
+        // that wants windows to look different from forms sets its own UIID.
+        setUIID("Form");
         setVisible(false);
         contentPane = new Container(contentPaneLayout);
-        contentPane.setUIID("WindowContentPane");
+        contentPane.setUIID("ContentPane");
+        titleArea.setUIID("TitleArea");
         titleArea.addComponent(BorderLayout.CENTER, this.title);
         super.addComponent(BorderLayout.NORTH, titleArea);
         super.addComponent(BorderLayout.CENTER, contentPane);

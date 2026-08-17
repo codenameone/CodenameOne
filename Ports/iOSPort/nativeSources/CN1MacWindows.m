@@ -180,6 +180,27 @@ static int popPendingSlot(void) {
     return slot;
 }
 
+/*
+ * Asks the system to give a scene the supplied frame, in points. Catalyst has no
+ * direct window-move or window-resize API; a geometry preference is the supported
+ * way to ask, and the window manager remains free to adjust the result -- which is
+ * why every caller re-reads the delivered size rather than assuming it was granted.
+ * Must be called on the main thread.
+ */
+static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
+    if (scene == nil) {
+        return;
+    }
+    if (@available(macCatalyst 16.0, *)) {
+        UIWindowSceneGeometryPreferencesMac* prefs =
+                [[UIWindowSceneGeometryPreferencesMac alloc] initWithSystemFrame:frame];
+        [scene requestGeometryUpdateWithPreferences:prefs errorHandler:^(NSError* error) {
+            NSLog(@"CN1: window geometry request failed: %@", error);
+        }];
+        [prefs release];
+    }
+}
+
 static void dropPendingSlot(int slot) {
     int read;
     int write = 0;
@@ -271,8 +292,25 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     if (w->pendingTitle != nil) {
         scene.title = w->pendingTitle;
     }
-    if (scene.sizeRestrictions != nil && w->pendingWidth > 0 && w->pendingHeight > 0) {
-        scene.sizeRestrictions.minimumSize = CGSizeMake(200, 150);
+    if (w->pendingWidth > 0 && w->pendingHeight > 0) {
+        /* Ask for the size the window was created with. Without this the system
+         * hands the scene whatever size it feels like -- in practice the main
+         * scene's size -- and the Codename One window then lays out into a raster
+         * that does not match what was requested. Codename One geometry is in
+         * pixels and UIKit's is in points, hence the divide by the screen scale.
+         * The restrictions have to be relaxed first, because the system clamps the
+         * requested frame against them and the default minimum is larger than a
+         * small window. They are lowered rather than pinned to the requested size,
+         * so the window stays resizable by hand afterwards. */
+        CGFloat scale = w->window.screen != nil ? w->window.screen.scale : 1.0;
+        CGFloat pointWidth = w->pendingWidth / scale;
+        CGFloat pointHeight = w->pendingHeight / scale;
+        if (scene.sizeRestrictions != nil) {
+            scene.sizeRestrictions.minimumSize =
+                    CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
+            scene.sizeRestrictions.maximumSize = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+        }
+        CN1MacWindowRequestGeometry(scene, CGRectMake(0, 0, pointWidth, pointHeight));
     }
 }
 
@@ -353,19 +391,12 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     w->pendingWidth = width;
     w->pendingHeight = height;
     UIWindowScene* scene = w->scene;
+    UIWindow* window = w->window;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (@available(macCatalyst 16.0, *)) {
-            if (scene != nil) {
-                /* Catalyst has no direct window-move API; the geometry request is
-                 * the supported way to ask for a size. Position is left to the
-                 * window manager, which is also what a Mac user expects. */
-                UIWindowSceneGeometryPreferencesMac* prefs =
-                        [[UIWindowSceneGeometryPreferencesMac alloc]
-                                initWithSystemFrame:CGRectMake(x, y, width, height)];
-                [scene requestGeometryUpdateWithPreferences:prefs errorHandler:nil];
-                [prefs release];
-            }
-        }
+        /* Codename One geometry is in pixels, UIKit's is in points. */
+        CGFloat scale = (window != nil && window.screen != nil) ? window.screen.scale : 1.0;
+        CN1MacWindowRequestGeometry(scene,
+                CGRectMake(x / scale, y / scale, width / scale, height / scale));
     });
 }
 
@@ -375,11 +406,14 @@ void CN1MacWindowGetBounds(int slot, int* out) {
         return;
     }
     if (w->window != nil) {
+        /* Reported in pixels, matching CN1MacWindowGetWidth/Height and the pixel
+         * geometry Codename One passes in; UIKit frames are in points. */
+        CGFloat scale = w->window.screen != nil ? w->window.screen.scale : 1.0;
         CGRect f = w->window.frame;
-        out[0] = (int) f.origin.x;
-        out[1] = (int) f.origin.y;
-        out[2] = (int) f.size.width;
-        out[3] = (int) f.size.height;
+        out[0] = (int) (f.origin.x * scale);
+        out[1] = (int) (f.origin.y * scale);
+        out[2] = (int) (f.size.width * scale);
+        out[3] = (int) (f.size.height * scale);
     } else {
         out[0] = 0;
         out[1] = 0;

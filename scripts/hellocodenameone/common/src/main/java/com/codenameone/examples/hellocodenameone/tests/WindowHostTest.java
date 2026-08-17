@@ -144,14 +144,23 @@ public abstract class WindowHostTest extends BaseTest {
      */
     private void awaitRenderable(final int index, final int width, final int height,
                                  final long deadline) {
-        // Readiness is "a capture succeeds", not "the window says it is showing".
-        // A window reports the size it was asked for before the platform has
-        // actually produced it -- on Mac Catalyst the scene arrives asynchronously --
-        // so size and visibility are both true well before anything is renderable.
-        // Both conditions matter: the raster exists from the moment the window is
-        // shown, so capture() alone succeeds against a blank frame of the right size.
-        boolean ready = window != null && window.hasPaintedOnce()
-                && window.capture() != null;
+        // Readiness has three parts, and dropping any one of them produces a golden
+        // that silently lies:
+        //
+        //   the window has laid out at the size that was asked for -- some platforms
+        //     create the native window asynchronously and only then report its real
+        //     size back (Mac Catalyst has to ask the system to activate a scene), so
+        //     until then the window is still sized to whatever it was handed;
+        //   it has painted at least once -- the raster exists from the moment the
+        //     window is shown, so a capture before the first paint is a blank frame
+        //     of exactly the right dimensions;
+        //   the captured image is that size -- which is what proves the two agree.
+        Image probe = window == null ? null : window.capture();
+        boolean ready = window != null
+                && window.getWidth() == width && window.getHeight() == height
+                && window.hasPaintedOnce()
+                && probe != null
+                && probe.getWidth() == width && probe.getHeight() == height;
         if (ready || System.currentTimeMillis() >= deadline) {
             captureAndAdvance(index, width, height, ready);
             return;
@@ -167,10 +176,13 @@ public abstract class WindowHostTest extends BaseTest {
     private void captureAndAdvance(final int index, int width, int height, boolean ready) {
         String name = baseImageName() + "-" + width + "x" + height;
         if (!ready) {
-            fail("Window never became renderable for " + name
+            Image last = window == null ? null : window.capture();
+            fail("Window never became renderable at the requested size for " + name
                     + " (showing=" + (window != null && window.isWindowShowing())
+                    + " painted=" + (window != null && window.hasPaintedOnce())
                     + " size=" + (window == null ? "none" : window.getWidth() + "x" + window.getHeight())
-                    + "); capture() never returned an image");
+                    + " capture=" + (last == null ? "none"
+                            : last.getWidth() + "x" + last.getHeight()) + ")");
             return;
         }
         Image shot = window.capture();
