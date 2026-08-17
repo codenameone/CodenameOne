@@ -3973,19 +3973,27 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         if (!semanticRefreshPending) {
             semanticRefreshPending = true;
-            awaitStillForSemantics(0);
+            awaitStillForSemantics(System.currentTimeMillis() + SEMANTIC_STILLNESS_TIMEOUT_MILLIS);
         }
         return true;
     }
 
-    private void awaitStillForSemantics(final int attempt) {
+    /**
+     * How long the tree is held still for an animation before it is brought up to date anyway.
+     * On the clock rather than on turns of the event loop: an idle loop turns many times a
+     * frame, so a count of turns runs out in a fraction of an animation and starts again on the
+     * next invalidation -- rebuilding through the animation this is meant to sit out. On the
+     * clock, an animation that never ends costs one refresh per interval.
+     */
+    private static final long SEMANTIC_STILLNESS_TIMEOUT_MILLIS = 2000;
+
+    private void awaitStillForSemantics(final long deadline) {
         callSerially(new Runnable() {
             @Override
             public void run() {
-                // Bounded, so an animation that never ends -- a progress indicator, a ticker --
-                // still gets the tree updated rather than leaving a screen reader on a stale one.
-                if (attempt < 120 && isAnimationRunning(Display.getInstance().getCurrent())) {
-                    awaitStillForSemantics(attempt + 1);
+                if (System.currentTimeMillis() < deadline
+                        && isAnimationRunning(Display.getInstance().getCurrent())) {
+                    awaitStillForSemantics(deadline);
                     return;
                 }
                 semanticRefreshPending = false;

@@ -1722,6 +1722,13 @@ public final class Display extends CN1Constants {
                     }
                 }
                 current = current.getPreviousForm();
+                if (current != null) {
+                    // Coming out of a menu back to the form underneath it, which is a backward
+                    // move: without saying so, this arrival takes whatever direction that form
+                    // has left over and a port that keeps browser history in step reads it as a
+                    // step forward, pushing an entry for a form that was already behind.
+                    current.setShownWithReverse(true);
+                }
                 impl.setCurrentForm(current);
             }
 
