@@ -19248,7 +19248,7 @@ public class JavaSEPort extends CodenameOneImplementation {
 
                 init = true;
                 cnt.setVisible(true);
-                JFrame target = resolveOwningFrame();
+                java.awt.Window target = resolveOwningFrame();
                 target.add(cnt, 0);
                 target.repaint();
             }
@@ -19262,7 +19262,7 @@ public class JavaSEPort extends CodenameOneImplementation {
          * because the peer is created before it is added to a hierarchy, so its
          * window is not known yet.
          */
-        private JFrame resolveOwningFrame() {
+        private java.awt.Window resolveOwningFrame() {
             Object peer = Display.getInstance().getWindowPeerForComponent(this);
             if (peer instanceof JavaSEWindowManager.Peer) {
                 JavaSEWindowManager.Peer owner = (JavaSEWindowManager.Peer) peer;
@@ -19288,7 +19288,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             return owningCanvas != null ? owningCanvas : instance.canvas;
         }
 
-        private JFrame owningFrame;
+        private java.awt.Window owningFrame;
         private C owningCanvas;
 
         /**
@@ -19309,7 +19309,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 peerImage = generatePeerImage();
             }
             init = false;
-            JFrame target = owningFrame != null ? owningFrame : frm;
+            java.awt.Window target = owningFrame != null ? owningFrame : frm;
             target.remove(cnt);
             target.repaint();
 

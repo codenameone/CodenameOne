@@ -341,6 +341,135 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void keysReachTheWindowsFocusedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("keys", new BorderLayout());
+        final AtomicInteger pressed = new AtomicInteger();
+        Button b = new Button("target") {
+            @Override
+            public void keyPressed(int keyCode) {
+                super.keyPressed(keyCode);
+                pressed.incrementAndGet();
+            }
+        };
+        w.add(BorderLayout.CENTER, b);
+        w.show();
+        w.setFocused(b);
+
+        // Container's inherited handler only forwards to a lead component, so without
+        // Window dispatching keys itself the focused component never sees one.
+        w.keyPressed('a');
+        assertEquals(1, pressed.get(), "the focused component must receive the key");
+
+        final AtomicInteger listened = new AtomicInteger();
+        w.addKeyListener('b', new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                listened.incrementAndGet();
+            }
+        });
+        w.keyReleased('b');
+        assertEquals(1, listened.get(), "addKeyListener must fire in a window too");
+        w.dispose();
+    }
+
+    @FormTest
+    void hidingAModalWindowStopsItBlocking() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.setCloseOperation(Window.HIDE_ON_CLOSE);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+        assertTrue(peer.isModal());
+
+        w.closeRequested();
+
+        // The user can no longer reach it, so it must not go on blocking what is
+        // behind it -- natively or in the framework.
+        assertFalse(w.isWindowShowing());
+        assertFalse(peer.isModal(),
+                "a hidden modal window must release the block it holds");
+        w.dispose();
+    }
+
+    @FormTest
+    void modalityTellsThePortWhatItBlocks() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window owner = new Window("owner");
+        owner.show();
+        TestWindowManager.FakeWindow ownerPeer = wm.getLastWindow();
+
+        Window child = new Window("child");
+        child.setOwnerWindow(owner);
+        child.setModalityType(Window.MODALITY_WINDOW);
+        child.show();
+        TestWindowManager.FakeWindow childPeer = wm.getLastWindow();
+
+        // A port applies modality by disabling the blocked window, so window scoped
+        // modality naming the main window would make an unrelated part of the
+        // application unusable.
+        assertFalse(childPeer.isModalApplicationWide());
+        assertSame(ownerPeer, childPeer.getModalOwner());
+        assertSame(ownerPeer, childPeer.getOwner(),
+                "the owner has to reach createWindow, or no platform knows the window "
+                        + "should stay above it");
+        owner.dispose();
+    }
+
+    @FormTest
+    void theUtilityWindowFlagReachesThePort() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("palette");
+        w.setUtilityWindow(true);
+        w.show();
+        assertTrue(wm.getLastWindow().isUtility(),
+                "setUtilityWindow only stored a field before; nothing reached the port");
+        w.dispose();
+    }
+
+    @FormTest
+    void anIconifiedWindowStopsBeingPainted() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("iconified", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.show();
+        assertTrue(w.isWindowShowing());
+
+        // What a port reports when the platform minimizes the window. Container's
+        // implementation is inert, which would leave it counted as visible: still
+        // painted, and its animations still keeping the event dispatch thread awake.
+        w.hideNotify();
+        assertFalse(w.isWindowShowing(),
+                "a minimized window must stop counting as visible");
+
+        w.showNotify();
+        assertTrue(w.isWindowShowing(), "restoring must resume painting");
+        w.dispose();
+    }
+
+    @FormTest
+    void aResizeDropsPaintWorkQueuedAgainstTheOldSize() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("resizes", new BorderLayout());
+        Label l = new Label("content");
+        w.add(BorderLayout.CENTER, l);
+        w.show();
+        w.markPainted();
+        l.repaint();
+
+        w.sizeChangedInternal(900, 700);
+
+        // Those rectangles were computed against the old geometry. A port that
+        // reallocates its buffer on resize would paint them into a fresh, larger one
+        // and leave the rest unpainted -- which is exactly what a capture caught.
+        assertFalse(w.hasPaintedOnce(),
+                "frames painted at the old size do not count once the window resized");
+        assertEquals(900, w.getWidth());
+        w.dispose();
+    }
+
+    @FormTest
     void hidingAWindowStopsItPinningPaintWork() {
         implementation.setMultiWindowSupported(true);
         Window w = new Window("hides", new BorderLayout());

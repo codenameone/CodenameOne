@@ -81,6 +81,7 @@ typedef struct {
     int height;
     int decorated;
     int resizable;
+    int ownerSlot;
     int result;
 } CN1DesktopWindowOp;
 
@@ -387,12 +388,20 @@ static void cn1WinDesktopCreateOnPump(CN1DesktopWindowOp* op) {
     /* WS_CLIPCHILDREN for the same reason the main window uses it: the Direct2D
      * present must not paint over native child controls overlaid on the form
      * (the WebView2 peer and the EDIT control used for native text editing). */
-    w->hwnd = CreateWindowExW(0, L"CodenameOneDesktopWindow", wTitle,
-            style | WS_CLIPCHILDREN,
-            op->x >= 0 ? op->x : CW_USEDEFAULT,
-            op->y >= 0 ? op->y : CW_USEDEFAULT,
-            op->width, op->height,
-            NULL, NULL, GetModuleHandleW(NULL), w);
+    /* An owned window stays above its owner and is minimized with it, which is
+     * exactly what setOwnerWindow() promises; passing the owner HWND is the only way
+     * Windows establishes that. Falling back to the main window keeps a window opened
+     * from the main form on top of it, which is what a user expects of a tool window. */
+    {
+        CN1DesktopWindow* owner = slotAt(op->ownerSlot);
+        HWND ownerHwnd = owner != NULL ? owner->hwnd : cn1Win.hwnd;
+        w->hwnd = CreateWindowExW(0, L"CodenameOneDesktopWindow", wTitle,
+                style | WS_CLIPCHILDREN,
+                op->x >= 0 ? op->x : CW_USEDEFAULT,
+                op->y >= 0 ? op->y : CW_USEDEFAULT,
+                op->width, op->height,
+                ownerHwnd, NULL, GetModuleHandleW(NULL), w);
+    }
     free(wTitle);
 
     if (w->hwnd == NULL) {
@@ -495,10 +504,10 @@ extern "C" void cn1WinDesktopApplyPendingResize(int slot) {
 
 extern "C" {
 
-JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_R_int(
+JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
-        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable) {
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot) {
     CN1DesktopWindowOp op;
     int slot = -1;
     int iter;
@@ -522,6 +531,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java
     op.height = height;
     op.decorated = decorated == JAVA_TRUE ? 1 : 0;
     op.resizable = resizable == JAVA_TRUE ? 1 : 0;
+    op.ownerSlot = ownerSlot;
     /* Blocking send: the window must be created on the thread that owns the pump,
      * and the caller needs the slot back before it can use it. */
     SendMessageW(cn1Win.hwnd, WM_CN1_DESKTOPWINDOW, 0, (LPARAM) &op);
@@ -641,6 +651,26 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetAlwaysOnTop__
     if (w != NULL) {
         SetWindowPos(w->hwnd, onTop == JAVA_TRUE ? HWND_TOPMOST : HWND_NOTOPMOST,
                 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+
+JAVA_VOID com_codename1_impl_windows_WindowsNative_desktopWindowSetUtility___int_boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_INT slot, JAVA_BOOLEAN utility) {
+    CN1DesktopWindow* w = slotAt(slot);
+    if (w != NULL) {
+        /* WS_EX_TOOLWINDOW is what keeps a palette out of the task bar and the
+         * Alt-Tab switcher, and gives it the narrower title bar users expect. The
+         * frame has to be recalculated for the change to show. */
+        LONG_PTR ex = GetWindowLongPtrW(w->hwnd, GWL_EXSTYLE);
+        if (utility == JAVA_TRUE) {
+            ex |= WS_EX_TOOLWINDOW;
+            ex &= ~WS_EX_APPWINDOW;
+        } else {
+            ex &= ~WS_EX_TOOLWINDOW;
+        }
+        SetWindowLongPtrW(w->hwnd, GWL_EXSTYLE, ex);
+        SetWindowPos(w->hwnd, NULL, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
     }
 }
 

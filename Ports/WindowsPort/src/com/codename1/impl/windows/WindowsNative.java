@@ -156,7 +156,7 @@ public final class WindowsNative {
 
     /** Creates a hidden native window; returns its slot, or -1 on failure. */
     public static native int desktopWindowCreate(int windowId, String title, int x, int y,
-            int width, int height, boolean decorated, boolean resizable);
+            int width, int height, boolean decorated, boolean resizable, int ownerSlot);
 
     /** Destroys a native window and releases its render target. */
     public static native void desktopWindowDestroy(int slot);
@@ -186,6 +186,9 @@ public final class WindowsNative {
     public static native void desktopWindowSetResizable(int slot, boolean resizable);
 
     public static native void desktopWindowSetAlwaysOnTop(int slot, boolean onTop);
+
+    /** Applies WS_EX_TOOLWINDOW, keeping a palette out of the task bar and Alt-Tab. */
+    public static native void desktopWindowSetUtility(int slot, boolean utility);
 
     /** Enables or disables input, which is how native modality is applied. */
     public static native void desktopWindowSetEnabled(int slot, boolean enabled);

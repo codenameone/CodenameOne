@@ -892,6 +892,9 @@ public class Window extends Container implements TopLevelContainer {
     /// - `utility`: true for a utility window
     public void setUtilityWindow(boolean utility) {
         this.utilityWindow = utility;
+        if (nativePeer != null) {
+            manager().setUtilityWindow(nativePeer, utility);
+        }
     }
 
     /// Indicates whether this is a utility window.
@@ -1150,6 +1153,9 @@ public class Window extends Container implements TopLevelContainer {
             if (alwaysOnTop) {
                 wm.setAlwaysOnTop(nativePeer, true);
             }
+            if (utilityWindow) {
+                wm.setUtilityWindow(nativePeer, true);
+            }
             if (minimumWindowSize != null) {
                 wm.setMinimumSize(nativePeer, minimumWindowSize.getWidth(),
                         minimumWindowSize.getHeight());
@@ -1202,9 +1208,12 @@ public class Window extends Container implements TopLevelContainer {
             Display.getInstance().invokeAndBlock(new Runnable() {
                 @Override
                 public void run() {
-                    while (!isWindowDisposed()) {
+                    // Hidden counts as over, not only disposed: HIDE_ON_CLOSE means the
+                    // user closed the window without destroying it, and parking the
+                    // caller for a window nobody can see again is a hang.
+                    while (!isModalFinished()) {
                         synchronized (Display.lock) {
-                            if (isWindowDisposed()) {
+                            if (isModalFinished()) {
                                 break;
                             }
                             try {
@@ -1220,6 +1229,12 @@ public class Window extends Container implements TopLevelContainer {
         } finally {
             releaseModal();
         }
+    }
+
+    /// True once a modal window has stopped being modal, either because it was
+    /// disposed or because it was hidden.
+    private boolean isModalFinished() {
+        return isWindowDisposed() || !nativeVisible;
     }
 
     /// Takes this window's modal blocker, both the framework one and the native flag.
@@ -1238,7 +1253,15 @@ public class Window extends Container implements TopLevelContainer {
         }
         modalRegistered = true;
         Display.getInstance().pushModalWindow(this);
-        manager().setModal(nativePeer, true);
+        manager().setModal(nativePeer, true,
+                modalityType == MODALITY_APPLICATION, ownerPeer());
+    }
+
+    /// The native peer of the window this one blocks, or null when it blocks the
+    /// application's main window. A port implements modality by disabling that
+    /// window, so it has to be told which one.
+    private Object ownerPeer() {
+        return ownerWindow instanceof Window ? ((Window) ownerWindow).nativePeer : null;
     }
 
     /// Drops this window's modal blocker, both the framework one and the native flag.
@@ -1252,7 +1275,8 @@ public class Window extends Container implements TopLevelContainer {
         modalRegistered = false;
         Display.getInstance().popModalWindow(this);
         if (nativePeer != null) {
-            manager().setModal(nativePeer, false);
+            manager().setModal(nativePeer, false,
+                    modalityType == MODALITY_APPLICATION, ownerPeer());
         }
     }
 
@@ -1283,6 +1307,11 @@ public class Window extends Container implements TopLevelContainer {
     public void hide() {
         if (nativePeer != null && nativeVisible) {
             nativeVisible = false;
+            // A window the user can no longer reach must not go on blocking the ones
+            // behind it. Without this a modal hidden through HIDE_ON_CLOSE stays at the
+            // top of the modal stack -- and where the platform implements modality
+            // natively, keeps the owner's native input disabled too.
+            releaseModal();
             // A hidden window is not painted, so anything its components queue would
             // sit on its surface forever -- and hasPendingPaints() seeing that queue
             // keeps the event dispatch thread awake spinning on work it will never
@@ -1627,6 +1656,15 @@ public class Window extends Container implements TopLevelContainer {
         }
         doLayout();
         if (oldWidth != w || oldHeight != h) {
+            // Anything already queued was computed against the old geometry, and a
+            // port that reallocates its buffer on resize would paint those stale
+            // rectangles into a fresh one -- leaving the rest of the new, larger
+            // surface unpainted. Drop them and repaint the whole window instead.
+            Display.impl.clearPaintSurface(paintSurface);
+            // The frames painted so far were painted at the old size, so anything
+            // waiting on hasPaintedOnce() has to wait again rather than capture a
+            // surface that is half old content and half unpainted.
+            paintedOnce = false;
             sizeChangedListeners.fireActionEvent(new ActionEvent(this, w, h));
             fireWindowEvent(WindowEvent.Type.Resized);
         }
@@ -1753,6 +1791,151 @@ public class Window extends Container implements TopLevelContainer {
             if (first != null) {
                 setFocused(first);
             }
+        }
+    }
+
+    // ---- native visibility ----------------------------------------------------------
+
+    /// {@inheritDoc}
+    ///
+    /// The platform telling us the window is no longer on screen -- minimized, or
+    /// hidden by the window manager. `Container`'s implementation is inert, which
+    /// would leave the window counted as visible: it would keep being painted, its
+    /// animations would keep the event dispatch thread awake, and a minimized window
+    /// that animates would spin the thread forever.
+    @Override
+    void hideNotify() {
+        super.hideNotify();
+        if (nativeVisible) {
+            nativeVisible = false;
+            // Nothing paints a window that is not on screen, so anything queued on its
+            // surface would sit there keeping hasPendingPaints() true.
+            Display.impl.clearPaintSurface(paintSurface);
+            fireWindowEvent(WindowEvent.Type.Minimized);
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// The platform telling us the window is on screen again. Painting resumes from
+    /// here, so the window is repainted in full rather than waiting for something to
+    /// dirty it.
+    @Override
+    void showNotify() {
+        super.showNotify();
+        if (!nativeVisible && !disposing && nativePeer != null) {
+            nativeVisible = true;
+            fireWindowEvent(WindowEvent.Type.Restored);
+            repaint();
+            Display.getInstance().wakeEdt();
+        }
+    }
+
+    // ---- key dispatch --------------------------------------------------------------
+
+    /// {@inheritDoc}
+    ///
+    /// A window dispatches keys itself, exactly as `Form` does. Inheriting
+    /// `Container`'s handler instead only forwards to a lead component, so the focused
+    /// component would never see a key, arrow traversal would not work and nothing
+    /// registered through `#addKeyListener(int, ActionListener)` would ever fire.
+    ///
+    /// This is the same shape as `Form#keyPressed(int)` minus the menu bar, which a
+    /// window does not have: commands reach the desktop menu instead.
+    @Override
+    public void keyPressed(int keyCode) {
+        int game = Display.getInstance().getGameAction(keyCode);
+        if (focused != null) {
+            if (focused.isEnabled()) {
+                focused.keyPressed(keyCode);
+            }
+            if (focused.handlesInput()) {
+                return;
+            }
+            if (focused.getTopLevelContainer() == this) { //NOPMD CompareObjectsWithEquals
+                updateWindowFocus(game);
+            } else {
+                focused = null;
+                initFocused();
+            }
+        } else {
+            initFocused();
+            if (focused == null) {
+                getContentPane().moveScrollTowards(game, null);
+            }
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+        if (focused != null && focused.getTopLevelContainer() == this //NOPMD CompareObjectsWithEquals
+                && focused.isEnabled()) {
+            focused.keyReleased(keyCode);
+        }
+        fireKeyEvent(keyCode);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void keyRepeated(int keyCode) {
+        if (focused == null) {
+            keyPressed(keyCode);
+            keyReleased(keyCode);
+            return;
+        }
+        if (focused.isEnabled()) {
+            focused.keyRepeated(keyCode);
+        }
+        int game = Display.getInstance().getGameAction(keyCode);
+        if (!focused.handlesInput()
+                && (game == Display.GAME_DOWN || game == Display.GAME_UP
+                    || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
+            keyPressed(keyCode);
+            keyReleased(keyCode);
+        }
+    }
+
+    private void fireKeyEvent(int keyCode) {
+        if (keyListeners == null) {
+            return;
+        }
+        ArrayList<ActionListener> listeners = keyListeners.get(Integer.valueOf(keyCode));
+        if (listeners == null) {
+            return;
+        }
+        ActionEvent evt = new ActionEvent(this, keyCode);
+        int len = listeners.size();
+        for (int iter = 0; iter < len; iter++) {
+            listeners.get(iter).actionPerformed(evt);
+            if (evt.isConsumed()) {
+                return;
+            }
+        }
+    }
+
+    /// Moves focus in the direction of an arrow key, mirroring `Form`'s traversal.
+    private void updateWindowFocus(int gameAction) {
+        Component next = null;
+        switch (gameAction) {
+            case Display.GAME_DOWN:
+                next = findNextFocusDown();
+                break;
+            case Display.GAME_UP:
+                next = findNextFocusUp();
+                break;
+            case Display.GAME_RIGHT:
+                next = findNextFocusRight();
+                break;
+            case Display.GAME_LEFT:
+                next = findNextFocusLeft();
+                break;
+            default:
+                return;
+        }
+        if (next != null) {
+            setFocused(next);
+            scrollComponentToVisible(next);
         }
     }
 

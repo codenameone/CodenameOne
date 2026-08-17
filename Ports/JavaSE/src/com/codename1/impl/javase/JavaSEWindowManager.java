@@ -71,10 +71,25 @@ public class JavaSEWindowManager extends WindowManager {
      * the framework tags this window's input events with.
      */
     static final class Peer {
-        JFrame frame;
+        /**
+         * Typed as the AWT base class rather than JFrame because an owned window has
+         * to be a JDialog: Swing expresses ownership through the owner passed at
+         * construction, and JFrame has no owned form. Everything here works against
+         * java.awt.Window; the few Frame-only operations go through {@link #asFrame()}.
+         */
+        java.awt.Window frame;
         JavaSEPort.C canvas;
         int windowId;
         int monitorIndex;
+
+        /**
+         * The frame operations that only exist on a top level window. An owned window
+         * is a dialog and answers null, which is also the right behaviour: a dialog is
+         * iconified and restored with its owner rather than on its own.
+         */
+        java.awt.Frame asFrame() {
+            return frame instanceof java.awt.Frame ? (java.awt.Frame) frame : null;
+        }
     }
 
     private static Peer peer(Object p) {
@@ -95,10 +110,32 @@ public class JavaSEWindowManager extends WindowManager {
         runOnAwtAndWait(new Runnable() {
             @Override
             public void run() {
-                JFrame frame = new JFrame(title == null ? "" : title);
-                frame.setUndecorated(!decorated);
-                frame.setResizable(resizable);
-                frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+                // An owned window stays above its owner and is iconified with it,
+                // which is what setOwnerWindow() promises. Swing expresses that through
+                // the owner passed at construction, and JFrame has no owned form, so an
+                // owned window is a JDialog. Both are java.awt.Window subclasses and
+                // everything below only uses that surface -- except the JFrame typed
+                // field, which keeps its meaning for the unowned case.
+                // An owned window stays above its owner and is iconified with it,
+                // which is what setOwnerWindow() promises. Swing establishes that only
+                // through the owner passed at construction, and JFrame has no owned
+                // form, so an owned window is a JDialog.
+                Peer owner = peer(parentPeer);
+                java.awt.Window frame;
+                if (owner != null && owner.frame != null) {
+                    javax.swing.JDialog dlg =
+                            new javax.swing.JDialog(owner.frame, title == null ? "" : title);
+                    dlg.setDefaultCloseOperation(javax.swing.JDialog.DO_NOTHING_ON_CLOSE);
+                    dlg.setUndecorated(!decorated);
+                    dlg.setResizable(resizable);
+                    frame = dlg;
+                } else {
+                    JFrame f = new JFrame(title == null ? "" : title);
+                    f.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+                    f.setUndecorated(!decorated);
+                    f.setResizable(resizable);
+                    frame = f;
+                }
                 frame.setLayout(new BorderLayout());
 
                 JavaSEPort.C canvas = port.createWindowCanvas(windowId);
@@ -222,7 +259,12 @@ public class JavaSEWindowManager extends WindowManager {
             runOnAwt(new Runnable() {
                 @Override
                 public void run() {
-                    p.frame.setTitle(title == null ? "" : title);
+                    String text = title == null ? "" : title;
+                    if (p.frame instanceof java.awt.Frame) {
+                        ((java.awt.Frame) p.frame).setTitle(text);
+                    } else if (p.frame instanceof java.awt.Dialog) {
+                        ((java.awt.Dialog) p.frame).setTitle(text);
+                    }
                 }
             });
         }
@@ -280,7 +322,11 @@ public class JavaSEWindowManager extends WindowManager {
             runOnAwt(new Runnable() {
                 @Override
                 public void run() {
-                    p.frame.setResizable(resizable);
+                    if (p.frame instanceof java.awt.Frame) {
+                        ((java.awt.Frame) p.frame).setResizable(resizable);
+                    } else if (p.frame instanceof java.awt.Dialog) {
+                        ((java.awt.Dialog) p.frame).setResizable(resizable);
+                    }
                 }
             });
         }
@@ -318,7 +364,11 @@ public class JavaSEWindowManager extends WindowManager {
                     p.frame.setVisible(false);
                 }
                 p.frame.dispose();
-                p.frame.setUndecorated(!decorated);
+                if (p.frame instanceof java.awt.Frame) {
+                    ((java.awt.Frame) p.frame).setUndecorated(!decorated);
+                } else if (p.frame instanceof java.awt.Dialog) {
+                    ((java.awt.Dialog) p.frame).setUndecorated(!decorated);
+                }
                 if (wasVisible) {
                     p.frame.setVisible(true);
                 }
@@ -340,11 +390,34 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     @Override
-    public void setModal(Object peerObj, final boolean modal) {
+    public void setModal(Object peerObj, final boolean modal, boolean applicationWide,
+            Object ownerPeer) {
         // Codename One blocks the input itself, so nothing is required here for
         // correctness. Floating a modal window keeps the platform's own stacking
-        // consistent with that.
+        // consistent with that; the scope does not change that, because the frame is
+        // only being floated rather than anything being disabled.
         setAlwaysOnTop(peerObj, modal);
+    }
+
+    @Override
+    public void setUtilityWindow(Object peerObj, final boolean utility) {
+        final Peer p = peer(peerObj);
+        if (p != null) {
+            runOnAwt(new Runnable() {
+                @Override
+                public void run() {
+                    // UTILITY is the Swing window type that keeps a palette out of the
+                    // task bar and gives it lighter chrome. It can only be set while the
+                    // frame is undisplayable, so an already shown window is left alone
+                    // rather than being flickered through a dispose/recreate cycle.
+                    if (!p.frame.isDisplayable()) {
+                        p.frame.setType(utility
+                                ? java.awt.Window.Type.UTILITY
+                                : java.awt.Window.Type.NORMAL);
+                    }
+                }
+            });
+        }
     }
 
     @Override
@@ -360,7 +433,11 @@ public class JavaSEWindowManager extends WindowManager {
         runOnAwt(new Runnable() {
             @Override
             public void run() {
-                p.frame.setIconImage((java.awt.Image) nativeImage);
+                // Only a top level window carries an icon; an owned dialog shows its
+                // owner's.
+                if (p.asFrame() != null) {
+                    p.asFrame().setIconImage((java.awt.Image) nativeImage);
+                }
             }
         });
     }
@@ -387,7 +464,11 @@ public class JavaSEWindowManager extends WindowManager {
             runOnAwt(new Runnable() {
                 @Override
                 public void run() {
-                    p.frame.setState(JFrame.ICONIFIED);
+                    // An owned dialog has no independent iconified state; it minimizes
+                    // with its owner, which is the platform's own behaviour.
+                    if (p.asFrame() != null) {
+                        p.asFrame().setState(java.awt.Frame.ICONIFIED);
+                    }
                 }
             });
         }
@@ -400,7 +481,9 @@ public class JavaSEWindowManager extends WindowManager {
             runOnAwt(new Runnable() {
                 @Override
                 public void run() {
-                    p.frame.setState(JFrame.NORMAL);
+                    if (p.asFrame() != null) {
+                        p.asFrame().setState(java.awt.Frame.NORMAL);
+                    }
                 }
             });
         }
@@ -413,10 +496,14 @@ public class JavaSEWindowManager extends WindowManager {
             runOnAwt(new Runnable() {
                 @Override
                 public void run() {
-                    if ((p.frame.getExtendedState() & JFrame.MAXIMIZED_BOTH) == JFrame.MAXIMIZED_BOTH) {
-                        p.frame.setExtendedState(JFrame.NORMAL);
+                    if (p.asFrame() == null) {
+                        return;
+                    }
+                    if ((p.asFrame().getExtendedState() & java.awt.Frame.MAXIMIZED_BOTH)
+                            == java.awt.Frame.MAXIMIZED_BOTH) {
+                        p.asFrame().setExtendedState(java.awt.Frame.NORMAL);
                     } else {
-                        p.frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+                        p.asFrame().setExtendedState(java.awt.Frame.MAXIMIZED_BOTH);
                     }
                 }
             });

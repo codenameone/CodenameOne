@@ -209,18 +209,40 @@ public abstract class WindowManager {
     public void setAlwaysOnTop(Object peer, boolean alwaysOnTop) {
     }
 
+    /// Marks the window as a tool or palette window, which the platform keeps out of
+    /// the task bar and window switcher and typically gives lighter chrome.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window peer
+    ///
+    /// - `utility`: true for a utility window
+    public void setUtilityWindow(Object peer, boolean utility) {
+    }
+
     /// Applies the platform's own modality to the window.
     ///
     /// Codename One blocks input to the windows behind a modal window itself, so a
     /// port that cannot do this stays correct. Implementing it still gives the user
     /// the focus, dimming and taskbar behaviour the platform expects.
     ///
+    /// The scope matters, because a port typically implements this by disabling
+    /// another window: an application modal blocks everything, while a window modal
+    /// blocks only the window that owns it, and disabling the main window for the
+    /// latter would make an unrelated part of the application unusable.
+    ///
     /// #### Parameters
     ///
     /// - `peer`: the window peer
     ///
     /// - `modal`: true to make the window modal
-    public void setModal(Object peer, boolean modal) {
+    ///
+    /// - `applicationWide`: true for `com.codename1.ui.Window#MODALITY_APPLICATION`,
+    ///   false for `com.codename1.ui.Window#MODALITY_WINDOW`
+    ///
+    /// - `ownerPeer`: the peer of the window this one blocks, or null when it blocks
+    ///   the application's main window
+    public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
     }
 
     /// Sets the window icon where the platform shows one.

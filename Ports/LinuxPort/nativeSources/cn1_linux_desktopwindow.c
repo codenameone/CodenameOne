@@ -282,6 +282,7 @@ typedef struct {
     int height;
     int decorated;
     int resizable;
+    int ownerSlot;
     int result;
 } CN1DesktopCreateOp;
 
@@ -296,6 +297,18 @@ static void cn1DesktopCreateOnMain(void* arg) {
     w->inUse = 1;
 
     w->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    {
+        /* An owned window stays above its owner and is minimized with it, which is
+         * what setOwnerWindow() promises; the transient parent is how GTK expresses
+         * that, and it is also what scopes gtk_window_set_modal to the right window.
+         * Falling back to the main window keeps a window opened from the main form
+         * above it, which is what a user expects of a tool window. */
+        CN1LinuxWindow* owner = slotAt(op->ownerSlot);
+        GtkWidget* ownerWidget = owner != 0 ? owner->window : cn1LinuxWindowWidget();
+        if (ownerWidget != 0) {
+            gtk_window_set_transient_for(GTK_WINDOW(w->window), GTK_WINDOW(ownerWidget));
+        }
+    }
     gtk_window_set_title(GTK_WINDOW(w->window), op->title != 0 ? op->title : "");
     gtk_window_set_default_size(GTK_WINDOW(w->window), w->width, w->height);
     gtk_window_set_decorated(GTK_WINDOW(w->window), op->decorated ? TRUE : FALSE);
@@ -429,6 +442,13 @@ static void cn1DesktopFlagOnMain(void* arg) {
         case 3:
             gtk_window_set_decorated(GTK_WINDOW(w->window), op->b ? TRUE : FALSE);
             break;
+        case 4:
+            /* GTK_WINDOW_TYPE_HINT_UTILITY is what keeps a palette off the task bar
+             * and gives it the lighter frame a tool window is expected to have. */
+            gtk_window_set_type_hint(GTK_WINDOW(w->window),
+                    op->b ? GDK_WINDOW_TYPE_HINT_UTILITY : GDK_WINDOW_TYPE_HINT_NORMAL);
+            gtk_window_set_skip_taskbar_hint(GTK_WINDOW(w->window), op->b ? TRUE : FALSE);
+            break;
         default:
             break;
     }
@@ -466,10 +486,10 @@ static void cn1DesktopFlushOnMain(void* arg) {
 
 /* ------------------------------------------------------ LinuxNative bridge */
 
-JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_R_int(
+JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
-        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable) {
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot) {
     CN1DesktopCreateOp op;
     char* utf8 = 0;
     int slot = -1;
@@ -488,6 +508,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lan
     }
     memset(&op, 0, sizeof(op));
     op.slot = slot;
+    op.ownerSlot = ownerSlot;
     op.windowId = windowId;
     op.title = utf8 != 0 ? utf8 : "";
     op.x = x;

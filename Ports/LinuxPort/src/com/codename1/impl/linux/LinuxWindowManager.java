@@ -43,6 +43,7 @@ public class LinuxWindowManager extends WindowManager {
     private static final int FLAG_ALWAYS_ON_TOP = 1;
     private static final int FLAG_MODAL = 2;
     private static final int FLAG_DECORATED = 3;
+    private static final int FLAG_UTILITY = 4;
 
     /** State selectors matching {@code cn1DesktopStateOnMain}. */
     private static final int STATE_RESTORE = 0;
@@ -70,8 +71,10 @@ public class LinuxWindowManager extends WindowManager {
     @Override
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, Object parentPeer) {
+        // The transient parent is what makes an owned window stay above its owner and
+        // is also what scopes GTK's modality; -1 means the application's main window.
         int s = LinuxNative.desktopWindowCreate(windowId, title == null ? "" : title,
-                x, y, width, height, decorated, resizable);
+                x, y, width, height, decorated, resizable, slot(parentPeer));
         if (s < 0) {
             return null;
         }
@@ -166,9 +169,19 @@ public class LinuxWindowManager extends WindowManager {
     }
 
     @Override
-    public void setModal(Object peer, boolean modal) {
+    public void setUtilityWindow(Object peer, boolean utility) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetFlag(s, FLAG_UTILITY, utility);
+        }
+    }
+
+    @Override
+    public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
         // Codename One blocks input itself; this only gives the window manager the
-        // hint it needs for correct stacking and focus.
+        // hint it needs for correct stacking and focus. GTK modality is relative to the
+        // transient parent set at creation, so the scope is already expressed there and
+        // nothing else is disabled here.
         int s = slot(peer);
         if (s >= 0) {
             LinuxNative.desktopWindowSetFlag(s, FLAG_MODAL, modal);

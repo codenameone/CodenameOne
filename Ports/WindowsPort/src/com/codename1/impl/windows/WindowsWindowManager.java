@@ -64,8 +64,10 @@ public class WindowsWindowManager extends WindowManager {
     @Override
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
             boolean decorated, boolean resizable, Object parentPeer) {
+        // The owner HWND is what makes an owned window stay above its owner and
+        // minimize with it; -1 means "the application's main window".
         int slot = WindowsNative.desktopWindowCreate(windowId, title == null ? "" : title,
-                x, y, width, height, decorated, resizable);
+                x, y, width, height, decorated, resizable, slot(parentPeer));
         if (slot < 0) {
             return null;
         }
@@ -152,12 +154,28 @@ public class WindowsWindowManager extends WindowManager {
     }
 
     @Override
-    public void setModal(Object peerObj, boolean modal) {
+    public void setUtilityWindow(Object peerObj, boolean utility) {
+        int s = slot(peerObj);
+        if (s >= 0) {
+            WindowsNative.desktopWindowSetUtility(s, utility);
+        }
+    }
+
+    @Override
+    public void setModal(Object peerObj, boolean modal, boolean applicationWide, Object ownerPeer) {
         // Codename One blocks the input itself, so this is not required for
-        // correctness. Disabling the main window on top of that gives the platform's
-        // own modal feel -- the title bar flashes rather than the click being
-        // silently swallowed.
+        // correctness. Disabling the blocked window on top of that gives the platform's
+        // own modal feel -- the title bar flashes rather than the click being silently
+        // swallowed.
         //
+        // Only the window this one actually blocks is disabled. A window modal owned by
+        // another desktop window blocks its owner, so disabling the main window there
+        // would make an unrelated part of the application unusable.
+        int ownerSlot = slot(ownerPeer);
+        if (!applicationWide && ownerSlot >= 0) {
+            WindowsNative.desktopWindowSetEnabled(ownerSlot, !modal);
+            return;
+        }
         // Counted rather than a flag: nesting one modal window inside another is
         // ordinary, and re-enabling the main window when the inner one closes would
         // leave the outer modal not blocking. A leaked disable is much worse than a
@@ -176,7 +194,8 @@ public class WindowsWindowManager extends WindowManager {
         }
     }
 
-    /// How many modal windows are currently up. See `#setModal(Object, boolean)`.
+    /// How many application modal windows are currently up. See
+    /// `#setModal(Object, boolean, boolean, Object)`.
     private int modalDepth;
 
     @Override

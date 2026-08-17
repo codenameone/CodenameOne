@@ -60,6 +60,10 @@ public class TestWindowManager extends WindowManager {
         private int monitor;
         private int paintCount;
         private int modalCalls;
+        private boolean modalApplicationWide;
+        private FakeWindow modalOwner;
+        private boolean utility;
+        private FakeWindow owner;
         private int minimumWidth;
         private int minimumHeight;
 
@@ -102,6 +106,26 @@ public class TestWindowManager extends WindowManager {
          */
         public int getModalCalls() {
             return modalCalls;
+        }
+
+        /** True when the last modal call declared application wide scope. */
+        public boolean isModalApplicationWide() {
+            return modalApplicationWide;
+        }
+
+        /** The window the last modal call named as blocked, or null for the main one. */
+        public FakeWindow getModalOwner() {
+            return modalOwner;
+        }
+
+        /** True when the framework asked for a tool/palette window. */
+        public boolean isUtility() {
+            return utility;
+        }
+
+        /** The owning window handed to createWindow(), or null when there was none. */
+        public FakeWindow getOwner() {
+            return owner;
         }
 
         /** The minimum size the framework forwarded, or zero when none was set. */
@@ -246,6 +270,7 @@ public class TestWindowManager extends WindowManager {
             return null;
         }
         FakeWindow w = new FakeWindow();
+        w.owner = win(parentPeer);
         w.windowId = windowId;
         w.title = title;
         w.x = x;
@@ -353,11 +378,21 @@ public class TestWindowManager extends WindowManager {
     }
 
     @Override
-    public void setModal(Object peer, boolean modal) {
+    public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
         FakeWindow w = win(peer);
         if (w != null) {
             w.modal = modal;
             w.modalCalls++;
+            w.modalApplicationWide = applicationWide;
+            w.modalOwner = win(ownerPeer);
+        }
+    }
+
+    @Override
+    public void setUtilityWindow(Object peer, boolean utility) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.utility = utility;
         }
     }
 
