@@ -765,6 +765,9 @@ public class SEDatabase extends Database {
     @Override
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its
+        // file in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
         requireSingleStatement(sql);
         PreparedStatement s = null;
         try {
@@ -810,6 +813,9 @@ public class SEDatabase extends Database {
             return;
         }
         checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its file
+        // in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
         requireSingleStatement(sql);
         PreparedStatement s = null;
         try {

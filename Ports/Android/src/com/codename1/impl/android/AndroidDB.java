@@ -341,6 +341,9 @@ public class AndroidDB extends Database {
     @Override
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its
+        // file in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
         requireSingleStatement(sql);
         checkParameterCount(sql, params == null ? 0 : params.length);
         SQLiteStatement s = null;
@@ -382,6 +385,9 @@ public class AndroidDB extends Database {
             return;
         }
         checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its file
+        // in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
         requireSingleStatement(sql);
         checkParameterCount(sql, params.length);
         SQLiteStatement s = null;

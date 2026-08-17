@@ -988,7 +988,10 @@ public abstract class Database {
     /// Whether a script could have changed what is attached, cheaply enough to ask every time.
     private static boolean mentionsAttachment(String sql) {
         String upper = sql.toUpperCase();
-        return upper.indexOf("ATTACH") >= 0;
+        // Both words, because one is not a substring of the other: a standalone DETACH left the
+        // reservation in place until the connection closed, and every delete, conversion and key
+        // change on that database was refused in the meantime.
+        return upper.indexOf("ATTACH") >= 0 || upper.indexOf("DETACH") >= 0;
     }
 
     /// The databases this connection has attached, by the schema name they were attached as.
@@ -1026,9 +1029,8 @@ public abstract class Database {
             if (!trimmed.toUpperCase().startsWith("ATTACH")) {
                 continue;
             }
-            String schema = attachmentSchemaOf(trimmed, false);
             String file = attachmentFileOf(trimmed);
-            if (schema == null || file == null || file.length() == 0 || ":memory:".equals(file)) {
+            if (file == null || file.length() == 0 || ":memory:".equals(file)) {
                 continue;
             }
             String key;
@@ -1040,23 +1042,68 @@ public abstract class Database {
             if (key == null) {
                 continue;
             }
-            String held = attachments == null ? null : (String) attachments.get(schema.toUpperCase());
-            if (key.equals(held)) {
-                // Already reserved under this schema for this same file.
+            if (attachments != null && attachments.containsKey(key)) {
                 continue;
             }
             registerOpenDatabase(key);
             if (attachments == null) {
                 attachments = new java.util.Hashtable();
             }
-            // A script can reuse a schema -- attach a, detach it, attach b under the same name --
-            // and skipping the second one left b unprotected. The new file is reserved and the
-            // one it replaces given back, and the reconciliation after the script settles whatever
-            // the engine really ended up with.
-            attachments.put(schema.toUpperCase(), key);
-            if (held != null) {
-                releaseOpenDatabase(held);
+            // Held per file, and nothing is released here. A script can name one schema twice --
+            // "ATTACH a AS aux; DETACH aux; ATTACH b AS aux" -- and letting b replace a would
+            // unprotect a before the script has run, while the engine still has it attached and
+            // may never reach that detach. Both are held, and the reconciliation afterwards
+            // decides which the engine really ended up with.
+            attachments.put(key, key);
+        }
+    }
+
+    /// Reserves what a parameterized script is about to attach, including the bound values.
+    ///
+    /// `ATTACH DATABASE ? AS aux` names its file in the parameters, so the statement text alone
+    /// cannot say what is about to be attached -- and the reservation has to exist before the
+    /// engine attaches it, because a reservation refused afterwards cannot undo an attach.
+    ///
+    /// Every parameter that resolves to a database identity is reserved, not just the one the
+    /// placeholder stands for. Working out which parameter belongs to the ATTACH would mean
+    /// counting placeholders through quoting and comments for no gain: an over-reservation costs
+    /// a delete refused until the reconciliation gives it back, moments later.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sql`: the script about to run
+    /// - `params`: the values bound to it, any of which may be the file
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: if a database it may attach is being deleted or converted
+    protected void reserveAttachments(String sql, Object[] params) throws IOException {
+        reserveAttachments(sql);
+        if (params == null || params.length == 0 || sql == null || !mentionsAttachment(sql)) {
+            return;
+        }
+        for (Object param : params) {
+            if (!(param instanceof String)) {
+                continue;
             }
+            String value = (String) param;
+            if (value.length() == 0 || ":memory:".equals(value)) {
+                continue;
+            }
+            String key;
+            try {
+                key = Display.getInstance().databaseManagedKeyIdentity(asDatabaseArgument(value));
+            } catch (RuntimeException cannotResolve) {
+                continue;
+            }
+            if (key == null || (attachments != null && attachments.containsKey(key))) {
+                continue;
+            }
+            registerOpenDatabase(key);
+            if (attachments == null) {
+                attachments = new java.util.Hashtable();
+            }
+            attachments.put(key, key);
         }
     }
 
@@ -1092,12 +1139,12 @@ public abstract class Database {
                     continue;
                 }
                 if (file == null || file.length() == 0) {
-                    // An attached in-memory or temporary database, which has no file to protect.
+                    // Attached in memory, so there is no file for anything to delete.
                     continue;
                 }
-                String key = Display.getInstance().databaseManagedKeyIdentity("file://" + file);
+                String key = Display.getInstance().databaseIdentityForEngineFile(file);
                 if (key != null) {
-                    live.put(schema.toUpperCase(), key);
+                    live.put(key, key);
                 }
             }
         } catch (IOException cannotAsk) {
@@ -1109,69 +1156,47 @@ public abstract class Database {
                 try {
                     cursor.close();
                 } catch (IOException ignored) {
-                    // The reconciliation below is what matters.
+                    // The reconciliation is what matters.
                 }
             }
         }
         if (attachments != null) {
-            java.util.Enumeration held = attachments.keys();
             java.util.Vector gone = new java.util.Vector();
+            java.util.Enumeration held = attachments.keys();
             while (held.hasMoreElements()) {
-                String schema = (String) held.nextElement();
-                String key = (String) attachments.get(schema);
-                String stillThere = (String) live.get(schema);
-                if (!key.equals(stillThere)) {
-                    gone.addElement(schema);
+                String key = (String) held.nextElement();
+                if (!live.containsKey(key)) {
+                    gone.addElement(key);
                 }
             }
             java.util.Enumeration removing = gone.elements();
             while (removing.hasMoreElements()) {
-                String schema = (String) removing.nextElement();
-                releaseOpenDatabase((String) attachments.remove(schema));
+                String key = (String) removing.nextElement();
+                attachments.remove(key);
+                releaseOpenDatabase(key);
             }
         }
-        java.util.Enumeration schemas = live.keys();
-        while (schemas.hasMoreElements()) {
-            String schema = (String) schemas.nextElement();
-            String key = (String) live.get(schema);
-            if (attachments != null && key.equals(attachments.get(schema))) {
+        java.util.Enumeration attached = live.keys();
+        while (attached.hasMoreElements()) {
+            String key = (String) attached.nextElement();
+            if (attachments != null && attachments.containsKey(key)) {
                 continue;
             }
             try {
                 registerOpenDatabase(key);
             } catch (IOException beingDeleted) {
-                // Attached already, and something else has claimed the file. Nothing here can
-                // undo the attach -- that is why the reservation is also taken before the
-                // statement runs, which is where a refusal can still stop it.
+                // Attached already, and something else has claimed the file. Nothing here can undo
+                // the attach -- which is why a reservation is also taken before the statement
+                // runs, where a refusal can still stop it.
                 continue;
             }
             if (attachments == null) {
                 attachments = new java.util.Hashtable();
             }
-            attachments.put(schema, key);
+            attachments.put(key, key);
         }
     }
 
-    /// The schema name an ATTACH or DETACH statement names, or null if it cannot be read.
-    private static String attachmentSchemaOf(String statement, boolean detach) {
-        String[] words = splitWords(statement);
-        if (detach) {
-            // DETACH [DATABASE] schema
-            for (int iter = 1; iter < words.length; iter++) {
-                if (!"DATABASE".equals(words[iter].toUpperCase())) {
-                    return unquote(words[iter]);
-                }
-            }
-            return null;
-        }
-        // ATTACH [DATABASE] file AS schema
-        for (int iter = 0; iter < words.length - 1; iter++) {
-            if ("AS".equals(words[iter].toUpperCase())) {
-                return unquote(words[iter + 1]);
-            }
-        }
-        return null;
-    }
 
     /// The file an ATTACH statement names, or null when the statement does not name one outright.
     ///
@@ -1214,9 +1239,22 @@ public abstract class Database {
         if (file.length() == 0) {
             return null;
         }
-        // An absolute path is a custom database to every port, and they resolve one only when it
-        // arrives as a file URL. A bare name is left as it is, which is what a port expects for a
-        // database in its own directory.
+        return asDatabaseArgument(file);
+    }
+
+    /// The form of a file name a port resolves, for a name an ATTACH names either way.
+    ///
+    /// An absolute path is a custom database to every port, and they resolve one only when it
+    /// arrives as a file URL. A bare name is left as it is, which is what a port expects for a
+    /// database in its own directory. Both the quoted literal and the bound parameter go through
+    /// here, so the same file keys the same whichever way the script named it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: a file name read from a statement or bound to one
+    ///
+    /// the name to resolve an identity from
+    private static String asDatabaseArgument(String file) {
         if (file.charAt(0) == '/' || file.charAt(0) == '\\'
                 || (file.length() > 1 && file.charAt(1) == ':')) {
             return "file://" + file;
@@ -1288,17 +1326,6 @@ public abstract class Database {
             at = next + find.length();
         }
         return out.toString();
-    }
-
-    /// Strips one layer of SQL quoting.
-    private static String unquote(String word) {
-        if (word.length() > 1) {
-            char first = word.charAt(0);
-            if ((first == '\'' || first == '"' || first == '`') && word.charAt(word.length() - 1) == first) {
-                return word.substring(1, word.length() - 1);
-            }
-        }
-        return word;
     }
 
     /// Releases what this connection held besides its own file.

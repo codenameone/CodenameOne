@@ -6132,6 +6132,19 @@ public final class Display extends CN1Constants {
         return impl.databaseManagedKeyIdentity(databaseName);
     }
 
+    /// See `com.codename1.impl.CodenameOneImplementation#databaseIdentityForEngineFile(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `engineFile`: the filename the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the registry identity for it
+    public String databaseIdentityForEngineFile(String engineFile) {
+        return impl.databaseIdentityForEngineFile(engineFile);
+    }
+
     /// See `com.codename1.impl.CodenameOneImplementation#openDatabaseConnections(String)`.
     ///
     /// #### Parameters

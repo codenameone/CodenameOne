@@ -9676,6 +9676,28 @@ public abstract class CodenameOneImplementation {
         return databaseName;
     }
 
+    /// The registry identity for a file the engine reported, as `PRAGMA database_list` gives it.
+    ///
+    /// Not the same question as `#databaseManagedKeyIdentity(String)`, which takes a name an
+    /// application supplied. What comes back from the engine is whatever that engine calls the
+    /// file it opened: an absolute path on the ports backed by a filesystem, and a pool entry on
+    /// the browser, where dressing it up as a file URL produces a name the pool has never heard
+    /// of -- so the reconciliation released the right reservation and took one on nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `engineFile`: the filename the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the key connections on that file are registered under, or null if it cannot be worked out
+    public String databaseIdentityForEngineFile(String engineFile) {
+        if (engineFile == null || engineFile.length() == 0) {
+            return null;
+        }
+        return databaseManagedKeyIdentity("file://" + engineFile);
+    }
+
     /// How many connections this port has open on a database.
     ///
     /// `Database#delete(String)` asks before unlinking, because deleting a file something still

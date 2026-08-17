@@ -11521,6 +11521,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public String databaseIdentityForEngineFile(String engineFile) {
+        // The engine here is SQLite compiled to wasm over a storage pool, so what it reports is a
+        // pool entry rather than a path. Dressing it as a file URL, which is right on every port
+        // backed by a filesystem, produced a name the pool has never held -- so the reservation
+        // for the database that really was attached got released and one was taken on nothing.
+        if (engineFile == null || engineFile.length() == 0) {
+            return null;
+        }
+        return com.codename1.impl.html5.database.DatabaseImpl.poolKeyFor(engineFile);
+    }
+
+    @Override
     public void deleteDB(String databaseName) throws IOException {
         // A failed init is not "nothing to delete". The engine is unavailable - another tab
         // holding the storage, most likely - and the database is still there, so returning

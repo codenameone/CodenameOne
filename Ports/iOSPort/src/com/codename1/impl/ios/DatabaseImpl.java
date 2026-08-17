@@ -295,6 +295,9 @@ class DatabaseImpl extends Database {
     @Override
     public void execute(String sql, String[] params) throws IOException {
         checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its
+        // file in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
         requireSingleStatement(sql);
         // Bind through the statement API rather than the older sqlDbExec, which binds only the
         // values it is given and ignores the placeholder count: too few left placeholders bound to
@@ -324,6 +327,9 @@ class DatabaseImpl extends Database {
             return;
         }
         checkOpen();
+        // Before the engine runs it, and with the parameters: an ATTACH names its file
+        // in them, and a reservation taken afterwards cannot undo an attach.
+        reserveAttachments(sql, params);
         requireSingleStatement(sql);
         if (isLegacyBehavior()) {
             // Everything used to be stringified here, which stored an Integer as TEXT.
