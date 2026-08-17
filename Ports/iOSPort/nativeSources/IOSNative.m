@@ -2066,6 +2066,10 @@ void CN1MacWindowDeliverResize(int windowId, int width, int height) {
 void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y) {
     com_codename1_impl_ios_IOSImplementation_windowPointerCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
 }
+
+void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed) {
+    com_codename1_impl_ios_IOSImplementation_windowKeyCallback___int_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, keyCode, pressed ? JAVA_TRUE : JAVA_FALSE);
+}
 #endif
 
 void pointerPressed(int* x, int* y, int length) {

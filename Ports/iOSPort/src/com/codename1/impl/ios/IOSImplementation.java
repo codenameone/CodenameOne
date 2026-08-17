@@ -1859,6 +1859,19 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
+    /// Invoked for a hardware keyboard event inside a window. Pressed is true for a
+    /// key down and false for a key up.
+    public static void windowKeyCallback(int windowId, int keyCode, boolean pressed) {
+        if (dropEvents) {
+            return;
+        }
+        if (pressed) {
+            Display.getInstance().windowKeyPressed(windowId, keyCode);
+        } else {
+            Display.getInstance().windowKeyReleased(windowId, keyCode);
+        }
+    }
+
     public static void pointerPressedCallback(int x, int y) {
         if(dropEvents) {
             return;

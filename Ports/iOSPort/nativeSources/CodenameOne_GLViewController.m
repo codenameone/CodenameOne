@@ -584,7 +584,9 @@ static int cn1MapUIPressTypeToKeyCode(UIPressType type) {
 // expects: a negative sentinel for non-printable keys, a unicode codepoint for
 // printable characters, or 0 if we don't recognize the key.
 #if !TARGET_OS_WATCH
-static int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
+/* Not static: the Mac Catalyst window controller needs the same mapping, and
+ * duplicating a hundred-case switch would let the two drift apart. */
+int cn1MapUIKeyToKeyCode(UIKey *key) API_AVAILABLE(ios(13.4)) {
     switch (key.keyCode) {
         case UIKeyboardHIDUsageKeyboardReturnOrEnter:
         case UIKeyboardHIDUsageKeypadEnter:

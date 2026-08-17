@@ -14233,6 +14233,59 @@ public class JavaSEPort extends CodenameOneImplementation {
     
     
     public static class CN1JPanel extends JPanel {
+
+        /**
+         * The canvas belonging to the window this peer is in. A peer placed inside a
+         * desktop {@code Window} lives in that window's frame, so hit testing,
+         * coordinate conversion and event forwarding against the primary canvas all
+         * resolve outside it -- and the peer silently stops responding to the mouse.
+         *
+         * Resolved from this panel's own Swing ancestry rather than from the Codename
+         * One hierarchy, because these run on the AWT thread during event dispatch.
+         * Cached because they run for every mouse move, and dropped whenever the panel
+         * is re-parented.
+         */
+        private C ownerCanvas() {
+            if (cachedOwnerCanvas == null) {
+                java.awt.Container top = getTopLevelAncestor();
+                cachedOwnerCanvas = top == null ? null : findCanvas(top);
+                if (cachedOwnerCanvas == null) {
+                    cachedOwnerCanvas = instance == null ? null : instance.canvas;
+                }
+            }
+            return cachedOwnerCanvas;
+        }
+
+        private static C findCanvas(java.awt.Container parent) {
+            java.awt.Component[] children = parent.getComponents();
+            for (int iter = 0; iter < children.length; iter++) {
+                if (children[iter] instanceof C) {
+                    return (C) children[iter];
+                }
+                if (children[iter] instanceof java.awt.Container) {
+                    C found = findCanvas((java.awt.Container) children[iter]);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private C cachedOwnerCanvas;
+
+        @Override
+        public void addNotify() {
+            super.addNotify();
+            cachedOwnerCanvas = null;
+        }
+
+        @Override
+        public void removeNotify() {
+            super.removeNotify();
+            cachedOwnerCanvas = null;
+        }
+
         
         double zoom_;
 
@@ -14268,8 +14321,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         public boolean contains(int x, int y) {
-            Point p = SwingUtilities.convertPoint(this, new Point(x, y), instance.canvas);
-            return instance.canvas.getVisibleRect().contains(p);
+            Point p = SwingUtilities.convertPoint(this, new Point(x, y), ownerCanvas());
+            return ownerCanvas().getVisibleRect().contains(p);
         }
 
         @Override
@@ -14293,8 +14346,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
 
         private boolean isOnCanvas(MouseEvent e) {
-            Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), instance.canvas);
-            return instance.canvas.getVisibleRect().contains(p);
+            Point p = SwingUtilities.convertPoint(e.getComponent(), e.getPoint(), ownerCanvas());
+            return ownerCanvas().getVisibleRect().contains(p);
 
         }
         
@@ -14311,30 +14364,30 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Component cmp = f.getComponentAt(cn1X, cn1Y);
                     //if (!(cmp instanceof PeerComponent) || cn1GrabbedDrag) {
                         // It's not a peer component, so we should pass the event to the canvas
-                        e = SwingUtilities.convertMouseEvent(this, e, instance.canvas);
+                        e = SwingUtilities.convertMouseEvent(this, e, ownerCanvas());
                         switch (e.getID()) {
                             case MouseEvent.MOUSE_CLICKED:
-                                instance.canvas.mouseClicked(e);
+                                ownerCanvas().mouseClicked(e);
                                 break;
                             case MouseEvent.MOUSE_DRAGGED:
-                                instance.canvas.mouseDragged(e);
+                                ownerCanvas().mouseDragged(e);
                                 break;
                             case MouseEvent.MOUSE_MOVED:
-                                instance.canvas.mouseMoved(e);
+                                ownerCanvas().mouseMoved(e);
                                 break;
                             case MouseEvent.MOUSE_PRESSED:
                                 // Mouse pressed in native component - passed to lightweight cmp
                                 if (!(cmp instanceof PeerComponent)) {
                                     instance.cn1GrabbedDrag = true;
                                 }
-                                instance.canvas.mousePressed(e);
+                                ownerCanvas().mousePressed(e);
                                 break;
                             case MouseEvent.MOUSE_RELEASED:
                                 instance.cn1GrabbedDrag = false;
-                                instance.canvas.mouseReleased(e);
+                                ownerCanvas().mouseReleased(e);
                                 break;
                             case MouseEvent.MOUSE_WHEEL:
-                                instance.canvas.mouseWheelMoved((MouseWheelEvent)e);
+                                ownerCanvas().mouseWheelMoved((MouseWheelEvent)e);
                                 break;
                                 
                         }
@@ -14359,7 +14412,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         
         private int getCN1X(MouseEvent e) {
-            if (instance.canvas == null) {
+            if (ownerCanvas() == null) {
                 int out = e.getXOnScreen();
                 if (out == 0) {
                     // For some reason the web browser would return 0 for screen coordinates
@@ -14396,11 +14449,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            return (int)((x - instance.canvas.getLocationOnScreen().x - (instance.canvas.x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
+            return (int)((x - ownerCanvas().getLocationOnScreen().x - (ownerCanvas().x + screenCoords.x) * zoom / retinaScale) / zoom * retinaScale);
         }
 
         private int getCN1Y(MouseEvent e) {
-            if (instance.canvas == null) {
+            if (ownerCanvas() == null) {
                 int out = e.getYOnScreen();
                 if (out == 0) {
                     // For some reason the web browser would return 0 for screen coordinates
@@ -14436,7 +14489,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             double zoom = zoom_ > 0 ? zoom_ : instance.zoomLevel;
-            return (int)((y - instance.canvas.getLocationOnScreen().y - (instance.canvas.y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
+            return (int)((y - ownerCanvas().getLocationOnScreen().y - (ownerCanvas().y + screenCoords.y) * zoom / retinaScale) / zoom * retinaScale);
 
         }
         

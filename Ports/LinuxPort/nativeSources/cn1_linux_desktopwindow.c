@@ -243,9 +243,19 @@ static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data
     if (w == 0) {
         return FALSE;
     }
-    cn1LinuxPushWindowEvent(w->windowId,
-            e->type == GDK_KEY_PRESS ? CN1_EVENT_KEY_PRESSED : CN1_EVENT_KEY_RELEASED,
-            0, 0, (int) e->keyval);
+    /* Same mapping the main window uses: GDK encodes many Unicode keyvals
+     * differently from their code point, so a raw keyval gives the wrong key code
+     * for anything outside ASCII. Navigation keys have no Unicode mapping and fall
+     * back to the keyval, which is what the event loop recognises for them. */
+    {
+        int code = (int) gdk_keyval_to_unicode(e->keyval);
+        if (code == 0) {
+            code = (int) e->keyval;
+        }
+        cn1LinuxPushWindowEvent(w->windowId,
+                e->type == GDK_KEY_PRESS ? CN1_EVENT_KEY_PRESSED : CN1_EVENT_KEY_RELEASED,
+                0, 0, code);
+    }
     return FALSE;
 }
 

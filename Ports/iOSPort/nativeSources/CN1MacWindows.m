@@ -38,6 +38,10 @@ extern void CN1MacWindowDeliverClose(int windowId);
 extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
+extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
+
+/* The main view controller's UIKey mapping, shared so the two cannot drift. */
+extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
 
 #define CN1_MAC_MAX_WINDOWS 32
 
@@ -74,8 +78,14 @@ extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
     if (t == nil) {
         return;
     }
+    /* UIKit reports the location in points while the window is laid out in device
+     * pixels -- the resize path multiplies by the screen scale -- so an unscaled
+     * coordinate arrives at half its rendered position on a Retina display and only
+     * the top left corner of the window is clickable where it looks like it is. */
     CGPoint p = [t locationInView:self];
-    CN1MacWindowDeliverPointer(self.windowId, type, (int) p.x, (int) p.y);
+    CGFloat scale = self.window != nil ? self.window.screen.scale : 1.0;
+    CN1MacWindowDeliverPointer(self.windowId, type,
+            (int) (p.x * scale), (int) (p.y * scale));
 }
 
 - (void)touchesBegan:(NSSet<UITouch*>*)touches withEvent:(UIEvent*)event {
@@ -103,6 +113,49 @@ extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 @end
 
 @implementation CN1MacWindowController
+
+/*
+ * Hardware keyboard. A secondary scene is rooted at this controller rather than at
+ * CodenameOne_GLViewController, so without these the window's focused component
+ * never receives a key: UIKit delivers presses up the responder chain of the window
+ * that has focus, and only the main controller implements them.
+ */
+- (void)deliverPresses:(NSSet<UIPress*>*)presses pressed:(BOOL)pressed
+                 event:(UIPressesEvent*)event {
+    if (@available(iOS 13.4, *)) {
+        BOOL handled = NO;
+        for (UIPress* press in presses) {
+            UIKey* key = press.key;
+            int code = key != nil ? cn1MapUIKeyToKeyCode(key) : 0;
+            if (code != 0) {
+                CN1MacWindowDeliverKey(self.windowId, code, pressed);
+                handled = YES;
+            }
+        }
+        if (handled) {
+            return;
+        }
+    }
+    if (pressed) {
+        [super pressesBegan:presses withEvent:event];
+    } else {
+        [super pressesEnded:presses withEvent:event];
+    }
+}
+
+- (void)pressesBegan:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    [self deliverPresses:presses pressed:YES event:event];
+}
+
+- (void)pressesEnded:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    [self deliverPresses:presses pressed:NO event:event];
+}
+
+- (void)pressesCancelled:(NSSet<UIPress*>*)presses withEvent:(UIPressesEvent*)event {
+    /* Treated as a release: leaving a key latched down in the framework is worse
+     * than an extra release the focused component ignores. */
+    [self deliverPresses:presses pressed:NO event:event];
+}
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
