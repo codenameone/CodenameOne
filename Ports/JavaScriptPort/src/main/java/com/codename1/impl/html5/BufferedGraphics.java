@@ -197,8 +197,14 @@ public class BufferedGraphics extends HTML5Graphics {
         if (layer == null || w <= 0 || h <= 0) {
             return;
         }
+        // A draw that changes no pixels covers nothing. An empty clip culls the draw entirely
+        // -- addOp drops it -- and a fully transparent one leaves what is underneath exactly as
+        // it was, so neither is a reason to take text off the layer.
+        if (clipEmpty || getAlpha() <= 0) {
+            return;
+        }
         if (transform == null || transform.isIdentity()) {
-            layer.noteCanvasCover(x, y, w, h);
+            reportCover(x, y, w, h);
             return;
         }
         // Where the image lands, not where it was asked for: text is only promoted under an
@@ -227,8 +233,32 @@ public class BufferedGraphics extends HTML5Graphics {
             maxX = Math.max(maxX, out[0]);
             maxY = Math.max(maxY, out[1]);
         }
-        layer.noteCanvasCover((int) Math.floor(minX), (int) Math.floor(minY),
+        reportCover((int) Math.floor(minX), (int) Math.floor(minY),
                 (int) Math.ceil(maxX - minX), (int) Math.ceil(maxY - minY));
+    }
+
+    /**
+     * Reports the part of a draw that can actually reach the canvas.
+     *
+     * <p>Clipped to what the graphics is clipped to: a draw whose bounds cross a promoted run
+     * but whose clip excludes it changes nothing there, and taking that run off the layer would
+     * lose the only copy of the text for the frame and its promotion for good.</p>
+     */
+    private void reportCover(int x, int y, int w, int h) {
+        JavaScriptTextLayer layer = impl == null ? null : impl.textLayer;
+        if (layer == null) {
+            return;
+        }
+        int clipLeft = clipBoundsTracker.getX();
+        int clipTop = clipBoundsTracker.getY();
+        int left = Math.max(x, clipLeft);
+        int top = Math.max(y, clipTop);
+        int right = Math.min(x + w, clipLeft + clipBoundsTracker.getWidth());
+        int bottom = Math.min(y + h, clipTop + clipBoundsTracker.getHeight());
+        if (right <= left || bottom <= top) {
+            return;
+        }
+        layer.noteCanvasCover(left, top, right - left, bottom - top);
     }
 
     /// Buffers a blit of a raw canvas (an offscreen WebGL render target) into the

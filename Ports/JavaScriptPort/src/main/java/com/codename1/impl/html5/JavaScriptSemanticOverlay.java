@@ -535,7 +535,13 @@ public final class JavaScriptSemanticOverlay {
     private void applyFocus(Entry entry, AccessibilityNodeSnapshot node) {
         if (!node.isFocused()) {
             if (focusedNodeId == entry.id) {
+                // The framework has taken focus off this node -- an application calling
+                // setFocused(null), or an editor closing. Letting the browser keep focus here
+                // would leave assistive technology announcing a focus the application does not
+                // have, and Enter, Space or an arrow key would still reach this element's
+                // listeners and act on a component the framework considers unfocused.
                 focusedNodeId = -1;
+                entry.element.blur();
             }
             return;
         }
@@ -809,6 +815,15 @@ public final class JavaScriptSemanticOverlay {
         Map<String, String> out = new LinkedHashMap<String, String>();
         out.put(ATTRIBUTE_NODE_ID, String.valueOf(node.getId()));
         String role = ariaRole(node.getRole());
+        // A list whose items carry a selection is a listbox, and its items are options: a
+        // listitem has no selected state in ARIA, and a list has no multi-selectable state, so a
+        // framework list projected as a plain list reaches a screen reader as structure with no
+        // indication of what is chosen.
+        if (node.getRole() == AccessibilityRole.LIST && isSelectableCollection(node)) {
+            role = "listbox";
+        } else if (node.getRole() == AccessibilityRole.LIST_ITEM && node.getSelected() != null) {
+            role = "option";
+        }
         if (role != null) {
             out.put("role", role);
         }
@@ -976,6 +991,22 @@ public final class JavaScriptSemanticOverlay {
         }
         Component owner = node.getComponent();
         return owner instanceof TextArea && label.equals(((TextArea) owner).getText());
+    }
+
+    /**
+     * True when a collection reports a selection mode, or holds an item that knows whether it is
+     * selected -- either way the user picks from it rather than merely reading it.
+     *
+     * @param node the collection node
+     * @return true when the collection is one the user selects within
+     */
+    private boolean isSelectableCollection(AccessibilityNodeSnapshot node) {
+        AccessibilityCollectionInfo collection = node.getCollectionInfo();
+        if (collection != null
+                && collection.getSelectionMode() != AccessibilityCollectionInfo.SELECTION_NONE) {
+            return true;
+        }
+        return node.getSelected() != null;
     }
 
     private String ariaRole(AccessibilityRole role) {

@@ -1622,15 +1622,14 @@ public final class Display extends CN1Constants {
         if (edt == null) {
             throw new IllegalStateException("Initialize must be invoked before setCurrent!");
         }
-        if (newForm != null) {
-            newForm.setShownWithReverse(reverse);
-        }
-
         if (!isEdt()) {
             // when not running callSerially executes synchronously and would recurse here forever (#4811)
             if (!codenameOneRunning) {
                 throw new IllegalStateException("Display.setCurrent must be invoked after Codename One has started running. Call it from start() or via callSerially.");
             }
+            // The direction is not recorded here: this call comes back round on the EDT and
+            // records it there. Doing it in both places would leave one entry behind for a
+            // later navigation to the same form to take.
             callSerially(new RunnableWrapper(newForm, null, reverse));
             return;
         }
@@ -1660,12 +1659,19 @@ public final class Display extends CN1Constants {
                 case SHOW_DURING_EDIT_IGNORE:
                     return;
                 case SHOW_DURING_EDIT_SET_AS_NEXT:
+                    newForm.setShownWithReverse(reverse);
                     impl.setCurrentForm(newForm);
                     return;
                 default:
                     break;
             }
         }
+
+        // Recorded once the call is known to be going through: on the EDT, with the form
+        // changing, and past the cases that decline to show anything while text is being
+        // edited. Recording it any earlier would queue a direction that no arrival takes, and a
+        // later navigation to the same form would take that stale one instead of its own.
+        newForm.setShownWithReverse(reverse);
 
         if (current != null) {
             if (current.isInitialized()) {

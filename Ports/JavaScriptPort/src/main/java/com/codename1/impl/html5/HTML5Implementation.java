@@ -9414,10 +9414,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
     /**
      * How much a font is scaled for the display's density.
      *
-     * <p>Font heights are kept in device pixels, so the factor in force when a font was made is
-     * part of what its height means. It is read back when a font is used, because the display's
-     * density can change under a running application -- a browser zoom, or a window dragged to
-     * another screen.</p>
+     * <p>Font heights are kept in device pixels, and this is the band the base size is scaled
+     * by when a font is created. Keeping an existing font current as the display changes is a
+     * different question, answered by the pixel ratio rather than the band -- see
+     * {@code NativeFont.syncDensity()}.</p>
      *
      * @return the multiplier applied to the base font size
      */
@@ -11878,9 +11878,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         double height;
         String fileName;
         String fontName;
-        // The density this font's height was measured against. A height is in device pixels,
-        // so it only means anything alongside the density in force when it was worked out.
-        double densityFactor = fontDensityFactor();
+        // The display's pixel ratio when this font's height was worked out. A height is in
+        // device pixels and everything drawn with it is divided by the ratio to reach CSS
+        // pixels, so the height only means anything alongside the ratio it was sized against.
+        double ratioBasis = getDevicePixelRatio();
         
         String cssCached_, cssFontFamilyCached__;
 
@@ -11895,14 +11896,18 @@ public class HTML5Implementation extends CodenameOneImplementation {
          * single place to recreate them: each brings itself up to date as it is used.</p>
          */
         void syncDensity() {
-            double current = fontDensityFactor();
-            if (current <= 0 || densityFactor <= 0 || current == densityFactor) {
+            double current = getDevicePixelRatio();
+            if (current <= 0 || ratioBasis <= 0 || current == ratioBasis) {
                 return;
             }
-            double scale = current / densityFactor;
+            // Scaled by the ratio itself rather than by the density band it falls in. A ratio
+            // can change without changing bands -- a desktop window moved to a 1.5x display --
+            // and the band would then report no change while every coordinate drawn with this
+            // font is divided by the new ratio: text would come out two thirds of its size.
+            double scale = current / ratioBasis;
             height = height * scale;
             ascent = (int) Math.round(ascent * scale);
-            densityFactor = current;
+            ratioBasis = current;
             cssCached_ = null;
         }
         

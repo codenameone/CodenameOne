@@ -127,6 +127,28 @@ class DialogTest extends UITestBase {
     }
 
     @FormTest
+    void refreshThemeKeepsFocusInsideTheDialog() {
+        Dialog dialog = new Dialog("Focus", new BorderLayout());
+        dialog.setTitleCentered(true);
+        Button inside = new Button("Inside");
+        dialog.getContentPane().addComponent(BorderLayout.CENTER, inside);
+        dialog.showModeless();
+
+        Form form = Display.getInstance().getCurrent();
+        form.getAnimationManager().flush();
+        inside.requestFocus();
+        assertSame(inside, dialog.getFocused(), "the button starts focused");
+
+        // Nothing is displaced, so nothing is rebuilt: removing and re-adding the content pane
+        // would deinitialize it and take the form's focus with it.
+        dialog.refreshTheme(false);
+
+        assertSame(inside, dialog.getFocused(),
+                "refreshing the theme must not take focus out of the dialog");
+        dialog.dispose();
+    }
+
+    @FormTest
     void disposeWhenPointerOutOfBoundsClosesDialog() {
         implementation.setBuiltinSoundsEnabled(false);
         Form form = Display.getInstance().getCurrent();

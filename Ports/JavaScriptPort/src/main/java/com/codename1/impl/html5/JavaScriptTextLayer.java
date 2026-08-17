@@ -87,6 +87,13 @@ public final class JavaScriptTextLayer {
         private boolean everAttached;
         private int lastY = Integer.MIN_VALUE;
         private int lastX = Integer.MIN_VALUE;
+        // The clip this run was last given, in Codename One pixels. A repaint of part of the
+        // screen hands the same run a clip narrowed to the dirty region, which is not the clip
+        // the run is subject to -- see promote().
+        private int clipX = Integer.MIN_VALUE;
+        private int clipY;
+        private int clipW;
+        private int clipH;
         private int claimedPass;
         // Where the run landed, in Codename One pixels, and the draw order it was promoted at.
         // Both are needed to tell whether something drawn on the canvas afterwards covers it.
@@ -343,15 +350,38 @@ public final class JavaScriptTextLayer {
         frame.sequence++;
 
         double scale = ratio <= 0 ? 1 : ratio;
+        // A repaint of part of the screen redraws whatever the dirty region touches, through a
+        // clip narrowed to that region. The run is not subject to that clip -- it is subject to
+        // whatever its container imposes -- and narrowing the element to the dirty rectangle
+        // would cut off every glyph outside it, in an area nothing repainted. So a clip that
+        // sits inside the one this run already has is only taken when the run has moved: a
+        // component scrolling out of view narrows its clip for real, and that always moves it.
+        int useClipX = clipX;
+        int useClipY = clipY;
+        int useClipW = clipW;
+        int useClipH = clipH;
+        if (run.clipX != Integer.MIN_VALUE && run.lastX == x && run.lastY == y
+                && clipX >= run.clipX && clipY >= run.clipY
+                && clipX + clipW <= run.clipX + run.clipW
+                && clipY + clipH <= run.clipY + run.clipH) {
+            useClipX = run.clipX;
+            useClipY = run.clipY;
+            useClipW = run.clipW;
+            useClipH = run.clipH;
+        }
+        run.clipX = useClipX;
+        run.clipY = useClipY;
+        run.clipW = useClipW;
+        run.clipH = useClipH;
         // pointer-events stays off so the layer cannot intercept input destined for the canvas,
         // which still owns all hit testing. Find-in-page and assistive technology do not depend
         // on hit testing; drag-selection does, and is deliberately not enabled here.
         StringBuilder clipCss = new StringBuilder(
                 "position:absolute;overflow:hidden;pointer-events:none;");
-        clipCss.append("left:").append(clipX / scale).append("px;");
-        clipCss.append("top:").append(clipY / scale).append("px;");
-        clipCss.append("width:").append(clipW / scale).append("px;");
-        clipCss.append("height:").append(clipH / scale).append("px;");
+        clipCss.append("left:").append(useClipX / scale).append("px;");
+        clipCss.append("top:").append(useClipY / scale).append("px;");
+        clipCss.append("width:").append(useClipW / scale).append("px;");
+        clipCss.append("height:").append(useClipH / scale).append("px;");
         // Stacking follows draw order rather than DOM insertion order, so a run that is hidden
         // and shown again does not jump to the top of the stack.
         //
@@ -377,8 +407,8 @@ public final class JavaScriptTextLayer {
         // The run is positioned relative to its clip element, so the two move together and a
         // scroll only has to rewrite coordinates rather than restructure anything.
         StringBuilder textCss = new StringBuilder("position:absolute;white-space:pre;");
-        textCss.append("left:").append((x - clipX) / scale).append("px;");
-        textCss.append("top:").append((y - clipY) / scale).append("px;");
+        textCss.append("left:").append((x - useClipX) / scale).append("px;");
+        textCss.append("top:").append((y - useClipY) / scale).append("px;");
         // The font shorthand carries its own line-height ("18.9px/1.0"), so it has to be
         // written before the explicit line-height or it would reset it.
         textCss.append("font:").append(font.getScaledCSS()).append(";");
@@ -410,10 +440,10 @@ public final class JavaScriptTextLayer {
         // asking costs nothing on the bridge.
         int textWidth = font.stringWidth(str);
         int textHeight = font.fontHeight();
-        int coverLeft = Math.max(x, clipX);
-        int coverTop = Math.max(y, clipY);
-        int coverRight = Math.min(x + textWidth, clipX + clipW);
-        int coverBottom = Math.min(y + textHeight, clipY + clipH);
+        int coverLeft = Math.max(x, useClipX);
+        int coverTop = Math.max(y, useClipY);
+        int coverRight = Math.min(x + textWidth, useClipX + useClipW);
+        int coverBottom = Math.min(y + textHeight, useClipY + useClipH);
         run.coverX = coverLeft;
         run.coverY = coverTop;
         run.coverW = Math.max(0, coverRight - coverLeft);
@@ -508,7 +538,13 @@ public final class JavaScriptTextLayer {
                 // Promoted by the paint that is drawing right now, so this draw really does come
                 // after it -- a component covering its own text, which the canvas would have
                 // shown and the DOM cannot.
-                boolean drawnThisPaint = painterPass >= 0 && run.claimedPass == painterPass;
+                // At or after the painter's own pass: either the painter drew this text itself
+                // and is now drawing over it, or a child of it did during this same paint and the
+                // painter has come back to draw on top -- a container that calls super.paint(g)
+                // and then paints over its children. Both are covered on the canvas, so both
+                // have to be here. A run from an earlier pass predates this paint and will be
+                // drawn again by it.
+                boolean drawnThisPaint = painterPass >= 0 && run.claimedPass >= painterPass;
                 if (!drawnThisPaint && painter != null
                         && isSelfOrDescendant(entry.getKey(), painter)) {
                     continue;
