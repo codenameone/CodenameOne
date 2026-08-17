@@ -5037,12 +5037,46 @@
     // The hook is awaited inside this host call, and the worker is blocked on the call, so the
     // suite cannot advance to the next test while the screenshot is being taken. Driving it
     // from a console marker instead would race the next test's form onto the screen.
+    // A frame reaches the canvas as a batch of commands replayed on the main thread, and the
+    // page screenshot below reads whatever is on it at that instant -- including a frame that
+    // is only half replayed. That is how a tab lens came out as the plain rectangle of its
+    // backdrop, captured after the rectangle was drawn and before the rounded shape that masks
+    // it. Waiting for the canvas to go quiet puts the capture on a frame boundary. It is
+    // bounded: a screen that never stops drawing is still captured, as it was before.
+    function awaitQuietCanvas() {
+      return new Promise(function(resolve) {
+        if (typeof global.requestAnimationFrame !== 'function') {
+          resolve();
+          return;
+        }
+        var seen = -1;
+        var quiet = 0;
+        var frames = 0;
+        function tick() {
+          var seq = canvasOpSeq | 0;
+          if (seq === seen) {
+            quiet++;
+          } else {
+            quiet = 0;
+            seen = seq;
+          }
+          frames++;
+          if (quiet >= 2 || frames >= 30) {
+            resolve();
+            return;
+          }
+          global.requestAnimationFrame(tick);
+        }
+        global.requestAnimationFrame(tick);
+      });
+    }
+
     function withCompositedCapture(makeResult) {
       var hook = global.__cn1CompositeCapture;
       if (typeof hook !== 'function') {
         return makeResult(null);
       }
-      return Promise.resolve(hook()).then(function(dataUrl) {
+      return awaitQuietCanvas().then(hook).then(function(dataUrl) {
         var composited = (typeof dataUrl === 'string'
             && dataUrl.indexOf('data:image/') === 0) ? dataUrl : null;
         return makeResult(composited);
