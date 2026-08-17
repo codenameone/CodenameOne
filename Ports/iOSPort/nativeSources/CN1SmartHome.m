@@ -880,6 +880,31 @@ static NSString *cn1homeReadingKey(NSString *accessoryId, NSString *serviceId,
 }
 
 /// Encodes one reading the way HomeWire.decodeReading reads it.
+/// Whether a trait has no value on this service right now, whatever its
+/// characteristic says.
+///
+/// One case, and it is in the trait's own contract: a thermostat in AUTO has
+/// two setpoints and no single target, so TARGET_TEMPERATURE reports nothing.
+/// HomeKit still keeps a TargetTemperature characteristic and still answers
+/// with a number, and passing that number on is how a one-number thermostat
+/// UI shows a target the accessory is not aiming for.
+static BOOL cn1homeHasNoValueNow(HMService *service, NSString *traitId) {
+    if (![traitId isEqualToString:@"target_temperature"]) {
+        return NO;
+    }
+    HMCharacteristic *mode = cn1homeFindCharacteristic(
+        service, @"target_heating_cooling");
+    if (mode == nil) {
+        return NO;
+    }
+    id value = [mode value];
+    // 3 is HomeKit's auto. Read from whatever it last saw: this is a
+    // question about what the thermostat is doing, and a stale answer here
+    // is the same staleness the mode's own reading carries.
+    return [value isKindOfClass:[NSNumber class]]
+            && [value intValue] == 3;
+}
+
 static NSString *cn1homeEncodeReading(NSString *accessoryId,
                                       NSString *serviceId, NSString *traitId,
                                       id value, NSString *errorName,
@@ -1357,7 +1382,9 @@ static void cn1homeAttachDelegates(void) {
     NSString *serviceId = cn1homeUuid([service uniqueIdentifier]);
     NSString *key = cn1homeReadingKey(accessoryId, serviceId, traitId);
     NSString *record = cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                            [characteristic value], nil, nil);
+        cn1homeHasNoValueNow(service, traitId) ? nil
+                                               : [characteristic value],
+        nil, nil);
     for (NSString *subscriptionId in cn1homeWatches) {
         NSSet *keys = [cn1homeWatches objectForKey:subscriptionId];
         if (![keys containsObject:key]) {
@@ -1763,6 +1790,12 @@ com_codename1_impl_ios_IOSNative_homeReadTraits___int_java_lang_String_java_lang
                                          "trait")];
                 continue;
             }
+            if (cn1homeHasNoValueNow(service, traitId)) {
+                [records replaceObjectAtIndex:i withObject:
+                    cn1homeEncodeReading(accessoryId, serviceId, traitId, nil,
+                                         nil, nil)];
+                continue;
+            }
             if (cached) {
                 // HomeKit keeps the last value it saw, and answering from it
                 // is instant and costs a battery-powered accessory nothing.
@@ -1795,7 +1828,9 @@ com_codename1_impl_ios_IOSNative_homeReadTraits___int_java_lang_String_java_lang
                 } else {
                     [records replaceObjectAtIndex:index withObject:
                         cn1homeEncodeReading(accessoryId, serviceId, traitId,
-                                             [c value], nil, nil)];
+                            cn1homeHasNoValueNow(service, traitId) ? nil
+                                                                   : [c value],
+                            nil, nil)];
                 }
                 finished++;
                 if (finished == outstanding) {
