@@ -349,6 +349,34 @@ class HomeContractTest {
     }
 
     /**
+     * A read by identifier works on a cold start, without a refresh first.
+     *
+     * <p>The identifier-taking overloads exist so an app can act on ids it
+     * persisted. On iOS the native side knows no accessory until the manager
+     * has loaded, so dispatching straight to the bridge answered
+     * ACCESSORY_NOT_FOUND on every launch -- the documented use failing in
+     * exactly the situation it was documented for.</p>
+     */
+    @Test
+    void aReadByIdentifierStartsTheBackendFirst() {
+        CapturingBridge bridge = new CapturingBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+
+        // No refresh() first, deliberately.
+        TraitReadRequest request = new TraitReadRequest();
+        request.add("lamp-living", "1", Trait.ON_OFF);
+        List<TraitReading> readings =
+                HomeAwait.settled(home.read(request)).get();
+
+        assertEquals(1, readings.size());
+        assertNull(readings.get(0).getError(),
+                "a cold read by id must reach the accessory, not fail: "
+                        + readings.get(0).getError());
+    }
+
+    /**
      * A read is lined up against what was sent, not against a request the
      * caller has gone on editing.
      */

@@ -718,8 +718,8 @@ public final class SmartHome {
         for (int i = 0; i < traits.size(); i++) {
             traitIds[i] = traits.get(i).getId();
         }
-        b.readTraits(id, toArray(accessoryIds), toArray(serviceIds), traitIds,
-                sent.isAllowCached());
+        afterStart(new IssueRead(b, id, toArray(accessoryIds),
+                toArray(serviceIds), traitIds, sent.isAllowCached()));
         return result;
     }
 
@@ -867,8 +867,8 @@ public final class SmartHome {
         synchronized (this) {
             writeRequests.put(Integer.valueOf(id), copy);
         }
-        b.writeTraits(id, accessoryIds, serviceIds, traitIds, kinds, numeric,
-                text, units, authorization);
+        afterStart(new IssueWrite(b, id, accessoryIds, serviceIds, traitIds,
+                kinds, numeric, text, units, authorization));
         return result;
     }
 
@@ -967,12 +967,154 @@ public final class SmartHome {
         for (int i = 0; i < traits.size(); i++) {
             traitIds[i] = traits.get(i).getId();
         }
-        b.subscribe(nextRequestId(), subscriptionId, toArray(accessoryIds),
-                toArray(serviceIds), traitIds);
+        afterStart(new IssueSubscribe(b, nextRequestId(), subscriptionId,
+                toArray(accessoryIds), toArray(serviceIds), traitIds));
         if (request.isDeliverInitialValues()) {
             deliverInitialValues(state, request);
         }
         return handle;
+    }
+
+    /// Runs a platform operation once the backend is connected.
+    ///
+    /// The identifier-taking overloads of read, write and subscribe exist so
+    /// an app can act on ids it persisted, without re-fetching the graph
+    /// first -- and on iOS the native side knows no accessory at all until
+    /// the manager has loaded, so those calls answered ACCESSORY_NOT_FOUND on
+    /// every cold launch. Starting first is what makes that documented use
+    /// work.
+    ///
+    /// Already-started is the overwhelmingly common case and costs nothing:
+    /// the operation is issued inline, on the caller's thread, exactly as
+    /// before.
+    ///
+    /// #### Parameters
+    ///
+    /// - `operation`: the bridge call to issue
+    private void afterStart(Runnable operation) {
+        boolean ready;
+        synchronized (this) {
+            ready = started;
+        }
+        if (ready) {
+            operation.run();
+            return;
+        }
+        refresh().onResult(new RunAfterStart(operation));
+    }
+
+    /// Issues a deferred operation once the start has answered.
+    ///
+    /// Runs whether the start succeeded or failed: the operation has its own
+    /// answer to give the caller, and the platform's own error for a read of
+    /// an accessory it cannot reach says more than a start failure would.
+    private static final class RunAfterStart
+            implements com.codename1.util.AsyncResult<List<HomeStructure>> {
+
+        private final Runnable operation;
+
+        RunAfterStart(Runnable operation) {
+            this.operation = operation;
+        }
+
+        @Override
+        public void onReady(List<HomeStructure> value, Throwable error) {
+            operation.run();
+        }
+    }
+
+    /// A read waiting for the backend. Named rather than anonymous so it
+    /// carries no synthetic reference to the enclosing instance (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class IssueRead implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+        private final boolean allowCached;
+
+        IssueRead(HomeBridge bridge, int id, String[] accessoryIds,
+                String[] serviceIds, String[] traitIds, boolean allowCached) {
+            this.bridge = bridge;
+            this.id = id;
+            this.accessoryIds = accessoryIds;
+            this.serviceIds = serviceIds;
+            this.traitIds = traitIds;
+            this.allowCached = allowCached;
+        }
+
+        @Override
+        public void run() {
+            bridge.readTraits(id, accessoryIds, serviceIds, traitIds,
+                    allowCached);
+        }
+    }
+
+    /// A write waiting for the backend.
+    private static final class IssueWrite implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int id;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+        private final int[] kinds;
+        private final double[] numeric;
+        private final String[] text;
+        private final int[] units;
+        private final String[] authorization;
+
+        IssueWrite(HomeBridge bridge, int id, String[] accessoryIds,
+                String[] serviceIds, String[] traitIds, int[] kinds,
+                double[] numeric, String[] text, int[] units,
+                String[] authorization) {
+            this.bridge = bridge;
+            this.id = id;
+            this.accessoryIds = accessoryIds;
+            this.serviceIds = serviceIds;
+            this.traitIds = traitIds;
+            this.kinds = kinds;
+            this.numeric = numeric;
+            this.text = text;
+            this.units = units;
+            this.authorization = authorization;
+        }
+
+        @Override
+        public void run() {
+            bridge.writeTraits(id, accessoryIds, serviceIds, traitIds, kinds,
+                    numeric, text, units, authorization);
+        }
+    }
+
+    /// A subscription waiting for the backend.
+    private static final class IssueSubscribe implements Runnable {
+
+        private final HomeBridge bridge;
+        private final int requestId;
+        private final String subscriptionId;
+        private final String[] accessoryIds;
+        private final String[] serviceIds;
+        private final String[] traitIds;
+
+        IssueSubscribe(HomeBridge bridge, int requestId, String subscriptionId,
+                String[] accessoryIds, String[] serviceIds,
+                String[] traitIds) {
+            this.bridge = bridge;
+            this.requestId = requestId;
+            this.subscriptionId = subscriptionId;
+            this.accessoryIds = accessoryIds;
+            this.serviceIds = serviceIds;
+            this.traitIds = traitIds;
+        }
+
+        @Override
+        public void run() {
+            bridge.subscribe(requestId, subscriptionId, accessoryIds,
+                    serviceIds, traitIds);
+        }
     }
 
     /// Whether every trait in a request reports its own changes.
