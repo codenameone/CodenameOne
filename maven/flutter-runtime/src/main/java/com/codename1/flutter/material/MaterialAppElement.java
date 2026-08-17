@@ -23,6 +23,29 @@ public class MaterialAppElement extends StatelessElement {
     /** The prop table last installed, for change detection. */
     private Map<String, Object> installedProps;
 
+    /**
+     * The widget the initial route resolved to, kept for the life of this element.
+     *
+     * <p>{@code MaterialApp.build} resolves {@code initialRoute} through
+     * {@code onGenerateRoute}. Doing that on EVERY build means any rebuild of the app -
+     * and an app-wide model sitting above MaterialApp causes one on every settings change -
+     * re-runs the route builder and hands back a brand new page, discarding whatever the
+     * user was looking at. Flutter does not re-resolve, because the route stack is
+     * Navigator STATE rather than something recomputed from the widget.</p>
+     *
+     * <p>Resolved once and reused, so a rebuild updates the existing page in place. Routes
+     * pushed later are their own Forms and are unaffected.</p>
+     */
+    private Widget routeContent;
+
+    public Widget routeContent() {
+        return routeContent;
+    }
+
+    public void routeContent(Widget v) {
+        this.routeContent = v;
+    }
+
     public MaterialAppElement(MaterialApp widget) {
         super(widget);
     }

@@ -110,13 +110,17 @@ public class InheritedElement extends StatelessElement {
                     + (widget() == null ? "?" : widget().getClass().getSimpleName())
                     + ": " + who);
         }
-        // GATED OFF by default. Rebuilding the readers is what this class is for, and it
-        // is correct in every headless test - but on a device it empties the settings page,
-        // both when run inline and when deferred past the flush. Something about rebuilding
-        // one of these particular readers tears the page down, and shipping a blank page is
-        // worse than shipping a stale switch. Flip cn1.flutter.inheritedNotify to work on
-        // it; cn1.flutter.inheritedCensus above reports who the readers actually are, which
-        // is the missing piece.
+        // STILL GATED OFF. Three orderings have been tried - inline in update(), deferred
+        // to a serial call, and deferred with MaterialApp no longer re-resolving its
+        // initial route on every build - and every one of them empties the settings page on
+        // a device while all 204 headless tests pass. A blank page is worse than a stale
+        // switch, so this stays off until the teardown is understood.
+        //
+        // What is known: ModelBindingScope has 14 readers and the first is the top-level
+        // Builder that returns the MaterialApp, so any notification rebuilds the entire app.
+        // The census (cn1.flutter.inheritedCensus) lists them. What is NOT known is which
+        // reader's rebuild does the damage - that is the next thing to find out, by
+        // notifying them one at a time.
         if ("true".equals(com.codename1.ui.Display.getInstance()
                 .getProperty("cn1.flutter.inheritedNotify", "false"))) {
             com.codename1.ui.CN.callSerially(mark);

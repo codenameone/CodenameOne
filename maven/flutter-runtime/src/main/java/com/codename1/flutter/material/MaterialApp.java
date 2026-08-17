@@ -281,13 +281,28 @@ public class MaterialApp extends StatelessWidget {
         // A routing-based app (no home widget) renders its initial route — Flutter
         // calls onGenerateRoute with the initialRoute (default "/") and mounts the
         // resulting route's page. new_gallery relies on this entirely.
+        //
+        // Resolved ONCE per element, not per build. An app-wide model above MaterialApp
+        // rebuilds it whenever a setting changes, and re-running the route builder each
+        // time hands back a brand new page, throwing away what the user was looking at.
+        // Flutter does not re-resolve either: its route stack is Navigator state, not
+        // something recomputed from the widget on every build.
         if (content == null) {
-            Route route = com.codename1.flutter.navigation.Navigator.resolveRoute(
-                    initialRoute != null ? initialRoute : "/", null);
-            if (route instanceof MaterialPageRoute) {
-                Funcs.Func1<BuildContext, Widget> b = ((MaterialPageRoute) route).getBuilder();
-                if (b != null) {
-                    content = b.call(context);
+            MaterialAppElement self = context instanceof MaterialAppElement
+                    ? (MaterialAppElement) context : null;
+            content = self == null ? null : self.routeContent();
+            if (content == null) {
+                Route route = com.codename1.flutter.navigation.Navigator.resolveRoute(
+                        initialRoute != null ? initialRoute : "/", null);
+                if (route instanceof MaterialPageRoute) {
+                    Funcs.Func1<BuildContext, Widget> b =
+                            ((MaterialPageRoute) route).getBuilder();
+                    if (b != null) {
+                        content = b.call(context);
+                    }
+                }
+                if (self != null) {
+                    self.routeContent(content);
                 }
             }
         }
