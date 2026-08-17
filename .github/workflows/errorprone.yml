@@ -53,7 +53,9 @@ jobs:
         # which Maven does not treat as a build-time dependency, so the
         # reactor would otherwise schedule core first and fail to resolve
         # com.codenameone:errorprone-checks:8.0-SNAPSHOT.
-        run: mvn -B -Perrorprone -pl errorprone-checks -am install -DskipTests
+        # Retried: this step resolves plugins from Central cold, and Central has been
+        # answering 502/403 today. Maven treats that as permanent. See scripts/ci-mvn-retry.sh.
+        run: ../scripts/ci-mvn-retry.sh -B -Perrorprone -pl errorprone-checks -am install -DskipTests
 
       - name: Run Error Prone over the core module
         working-directory: maven
