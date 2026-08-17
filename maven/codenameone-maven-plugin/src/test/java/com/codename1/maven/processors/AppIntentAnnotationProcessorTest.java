@@ -237,8 +237,9 @@ public class AppIntentAnnotationProcessorTest {
             // Optional on purpose: an unparseable value has to become "absent" rather than
             // "some date", and only an optional parameter can show that. A required one fails
             // the invocation instead, which is the other half of the same rule.
-            assertNull("text that is not a date must not become some date",
-                    read(invoke, registry, seen, "next tuesday"));
+            // Supplied and unreadable is rejected rather than silently becoming absent: the
+            // caller sent something, and optionality is about presence, not validity.
+            assertRejected(invoke, registry, "log_workout", "when", "next tuesday", "not a date");
         } finally {
             loader.close();
         }
@@ -272,11 +273,11 @@ public class AppIntentAnnotationProcessorTest {
             java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
                     .getField("seen");
 
-            assertNull("month 13 is not a month", read(invoke, registry, seen, "2026-13-01"));
-            assertNull("nor is the 40th", read(invoke, registry, seen, "2026-03-40"));
-            assertNull("nor hour 25", read(invoke, registry, seen, "2026-03-14T25:00:00Z"));
-            assertNull("nor a leap day in a common year",
-                    read(invoke, registry, seen, "2026-02-29"));
+            assertRejected(invoke, registry, "log_workout", "when", "2026-13-01", "not a date");
+            assertRejected(invoke, registry, "log_workout", "when", "2026-03-40", "not a date");
+            assertRejected(invoke, registry, "log_workout", "when", "2026-03-14T25:00:00Z",
+                    "not a date");
+            assertRejected(invoke, registry, "log_workout", "when", "2026-02-29", "not a date");
         } finally {
             loader.close();
         }
@@ -428,12 +429,12 @@ public class AppIntentAnnotationProcessorTest {
             java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
                     .getField("seen");
 
-            assertNull("99 is not a count of minutes",
-                    read(invoke, registry, seen, "2026-03-14T12:00:00+01:99"));
-            assertNull("nor is 25 a count of hours",
-                    read(invoke, registry, seen, "2026-03-14T12:00:00+25:00"));
-            assertNull("ZoneOffset's own bound is 18 hours",
-                    read(invoke, registry, seen, "2026-03-14T12:00:00+19:00"));
+            assertRejected(invoke, registry, "log_workout", "when",
+                    "2026-03-14T12:00:00+01:99", "not a date");
+            assertRejected(invoke, registry, "log_workout", "when",
+                    "2026-03-14T12:00:00+25:00", "not a date");
+            assertRejected(invoke, registry, "log_workout", "when",
+                    "2026-03-14T12:00:00+19:00", "not a date");
             assertEquals("a legitimate offset still applies",
                     new java.util.Date(1773489600000L - 3600000L),
                     read(invoke, registry, seen, "2026-03-14T12:00:00+01:00"));
@@ -508,14 +509,14 @@ public class AppIntentAnnotationProcessorTest {
             java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
                     .getField("seen");
 
-            assertNull("trailing text after HH:mm", read(invoke, registry, seen,
-                    "2026-03-14T12:34junk"));
-            assertNull("trailing text after seconds", read(invoke, registry, seen,
-                    "2026-03-14T12:34:56junk"));
-            assertNull("a dot with no digits", read(invoke, registry, seen,
-                    "2026-03-14T12:34:56."));
-            assertNull("non-digits in the fraction", read(invoke, registry, seen,
-                    "2026-03-14T12:34:56.1x2"));
+            assertRejected(invoke, registry, "log_workout", "when", "2026-03-14T12:34junk",
+                    "not a date");
+            assertRejected(invoke, registry, "log_workout", "when", "2026-03-14T12:34:56junk",
+                    "not a date");
+            assertRejected(invoke, registry, "log_workout", "when", "2026-03-14T12:34:56.",
+                    "not a date");
+            assertRejected(invoke, registry, "log_workout", "when", "2026-03-14T12:34:56.1x2",
+                    "not a date");
 
             // The forms that are real still parse, so this bounds the grammar rather than
             // shrinking it.
@@ -808,10 +809,10 @@ public class AppIntentAnnotationProcessorTest {
             java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
                     .getField("seen");
 
-            assertNull("a fraction of a millisecond is not a moment anyone named",
-                    read(invoke, registry, seen, Double.valueOf(1.5)));
-            assertNull("nor is a value past what a long can hold",
-                    read(invoke, registry, seen, Double.valueOf(1e20)));
+            assertRejected(invoke, registry, "log_workout", "when", Double.valueOf(1.5),
+                    "not a moment in time");
+            assertRejected(invoke, registry, "log_workout", "when", Double.valueOf(1e20),
+                    "not a moment in time");
             assertEquals("a real epoch value still works",
                     new java.util.Date(1773446400000L),
                     read(invoke, registry, seen, Long.valueOf(1773446400000L)));

@@ -321,6 +321,14 @@ public final class IntentSerializer {
             return value;
         }
         if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            if (Double.isNaN(d) || Double.isInfinite(d)) {
+                // JSONWriter would emit a bare NaN or Infinity token, which is not JSON. The
+                // iOS decoder rejects the whole document and reports an empty success, so the
+                // dialog and the snippet go with it -- one unrepresentable number costing the
+                // entire result. Dropped instead: everything else in the document survives.
+                return null;
+            }
             return value;
         }
         if (value instanceof Date) {

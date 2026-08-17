@@ -281,11 +281,22 @@ class SimulatorIntents {
             return new ChoiceEditor(new JComboBox(new DefaultComboBoxModel(opts)), opts);
         }
         if (p.getType() == IntentParameterType.BOOLEAN) {
-            return new BooleanEditor(new JCheckBox());
+            // Seeded from the declaration. An unchecked box always submits false, and because
+            // the key is then present the generated coercion never applies the declared
+            // default -- so pressing Run without touching the form exercised the opposite value
+            // from the same invocation on a device, which is the one thing this window exists
+            // to reproduce faithfully. Read the same way the runtime reads it.
+            return new BooleanEditor(new JCheckBox("", isTrue(p.getDefaultValue())));
         }
         JTextField field = new JTextField(
                 p.getDefaultValue() == null ? "" : p.getDefaultValue());
         return new TextEditor(field);
+    }
+
+    /// A declared boolean default, read the way the generated coercion reads a supplied one.
+    private static boolean isTrue(String declared) {
+        String v = declared == null ? "" : declared.trim();
+        return "true".equalsIgnoreCase(v) || "1".equals(v);
     }
 
     private Map<String, Object> collectParameters(IntentDeclaration d) {

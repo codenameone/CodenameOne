@@ -1040,7 +1040,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "entity_" + p.entityType + "(params, " + key + ", null)";
         }
         if ("date".equals(p.kind)) {
-            return "asDate(params, " + key + ", null)";
+            return "requiredDate(params, " + key + ")";
         }
         if ("boolean".equals(p.kind)) {
             return "requiredBoolean(params, " + key + ")";
@@ -1226,6 +1226,14 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         // The strict counterparts of asLong/asDouble/asBoolean, used only for a required
         // parameter with no default. They reject a present-but-unconvertible value instead of
         // substituting a fallback the declaration never offered.
+        sb.append("    private static java.util.Date requiredDate(Map<String, Object> p, String k) {\n");
+        sb.append("        Object o = p == null ? null : p.get(k);\n");
+        sb.append("        if (o == null) {\n");
+        sb.append("            throw new IllegalArgumentException(\"Missing required value for \" + k);\n");
+        sb.append("        }\n");
+        sb.append("        return toDate(o, k);\n");
+        sb.append("    }\n\n");
+
         sb.append("    private static long requiredLong(Map<String, Object> p, String k) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
         // 1.5 is a Number, and longValue() would quietly make it 1. A caller that sent a
@@ -1331,10 +1339,21 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        return value;\n");
         sb.append("    }\n\n");
 
+        // Absent means the declared default, which the build has already validated. A value
+        // that is present and unreadable is a different thing entirely and is rejected, the
+        // same way every other supplied-but-invalid value now is: optionality is about
+        // presence, never about validity.
         sb.append("    private static java.util.Date asDate(Map<String, Object> p, String k,\n");
         sb.append("                                          String def) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
-        sb.append("        if (o == null) { o = def; }\n");
+        sb.append("        if (o == null) {\n");
+        sb.append("            return def == null ? null : toDate(def, k);\n");
+        sb.append("        }\n");
+        sb.append("        return toDate(o, k);\n");
+        sb.append("    }\n\n");
+
+        sb.append("    /// Reads a supplied date value, or fails saying why.\n");
+        sb.append("    private static java.util.Date toDate(Object o, String k) {\n");
         sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
         // Epoch millis are a number like any other: longValue() would truncate 1.5 and
         // saturate 1e20, handing the handler a moment nobody named.
@@ -1342,7 +1361,8 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("            double d = ((Number) o).doubleValue();\n");
         sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)\n");
         sb.append("                    || d < -9223372036854775808.0 || d >= 9223372036854775808.0) {\n");
-        sb.append("                return null;\n");
+        sb.append("                throw new IllegalArgumentException(o\n");
+        sb.append("                        + \" is not a moment in time for \" + k);\n");
         sb.append("            }\n");
         sb.append("            return new java.util.Date(((Number) o).longValue());\n");
         sb.append("        }\n");
@@ -1352,11 +1372,19 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         // formatting, which is not a failure worth having.
         sb.append("        if (o instanceof String) {\n");
         sb.append("            String s = ((String) o).trim();\n");
-        sb.append("            if (s.length() == 0) { return null; }\n");
-        sb.append("            try { return new java.util.Date(Long.parseLong(s)); }\n");
-        sb.append("            catch (NumberFormatException e) { return parseIso8601(s); }\n");
+        sb.append("            java.util.Date parsed = null;\n");
+        sb.append("            if (s.length() > 0) {\n");
+        sb.append("                try { parsed = new java.util.Date(Long.parseLong(s)); }\n");
+        sb.append("                catch (NumberFormatException e) { parsed = parseIso8601(s); }\n");
+        sb.append("            }\n");
+        sb.append("            if (parsed == null) {\n");
+        sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                        + \"\\\" is not a date for \" + k\n");
+        sb.append("                        + \"; use ISO-8601 or epoch milliseconds\");\n");
+        sb.append("            }\n");
+        sb.append("            return parsed;\n");
         sb.append("        }\n");
-        sb.append("        return null;\n");
+        sb.append("        throw new IllegalArgumentException(o + \" is not a date for \" + k);\n");
         sb.append("    }\n\n");
 
         // Hand-rolled rather than SimpleDateFormat: this has to be exact about what it accepts
