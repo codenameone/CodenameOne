@@ -10447,7 +10447,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         } else {
             setText(tf, text);
         }
-        canvas.add(tf);
+        // The owning window's canvas, like the Swing editor path: an editor added to
+        // the primary canvas would appear on the main window.
+        final C editorCanvas = editorCanvasFor(cmp);
+        editorCanvas.add(tf);
         if (getSkin() != null) {
             tf.setBounds((int) ((cmp.getAbsoluteX() + getScreenCoordinates().x + canvas.x) * zoomLevel),
                     (int) ((cmp.getAbsoluteY() + getScreenCoordinates().y + canvas.y) * zoomLevel),
@@ -10482,11 +10485,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 ((TextComponent) tf).removeTextListener(this);
                 tf.removeFocusListener(this);
-                canvas.remove(tf);
+                editorCanvas.remove(tf);
                 synchronized (this) {
                     notify();
                 }
-                canvas.repaint();
+                editorCanvas.repaint();
             }
 
             public void focusGained(FocusEvent e) {
@@ -11033,13 +11036,25 @@ public class JavaSEPort extends CodenameOneImplementation {
                 ((JTextComponent) tf).getDocument().removeDocumentListener(this);
                 
                 tf.removeFocusListener(this);
-                canvas.remove(swingComponentToRemove);
+                // Removed from whatever actually holds it, not from the primary canvas.
+                // An editor opened in a desktop window is attached to that window's
+                // canvas, so removing from the primary one is a no-op that leaves the
+                // native editor on screen swallowing input, and every further edit
+                // stacks another one on top.
+                java.awt.Container editorParent = swingComponentToRemove.getParent();
+                if (editorParent != null) {
+                    editorParent.remove(swingComponentToRemove);
+                }
                 editingInProgress = null;
                 currentlyEditingField = null;
                 synchronized (this) {
                     notify();
                 }
-                canvas.repaint();
+                if (editorParent != null) {
+                    editorParent.repaint();
+                } else {
+                    canvas.repaint();
+                }
                 if (invokeAfter != null) {
                     for (Runnable r : invokeAfter) {
                         r.run();

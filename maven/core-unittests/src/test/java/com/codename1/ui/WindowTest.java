@@ -471,6 +471,27 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void minimizingAModalWindowDoesNotEndItsModality() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window w = new Window("modal");
+        w.setModalityType(Window.MODALITY_APPLICATION);
+        w.show();
+        TestWindowManager.FakeWindow peer = wm.getLastWindow();
+
+        // The platform minimizing the window also clears nativeVisible. Reading that
+        // as "the modal is over" would end the wait and drop the block, so restoring
+        // the window would put a modal back on screen with input flowing behind it.
+        w.hideNotify();
+        assertTrue(peer.isModal(), "a minimized modal window is still modal");
+
+        w.showNotify();
+        assertTrue(w.isWindowShowing());
+        assertTrue(peer.isModal());
+        w.dispose();
+        assertFalse(peer.isModal());
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

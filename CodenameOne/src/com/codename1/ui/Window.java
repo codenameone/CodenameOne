@@ -100,6 +100,9 @@ public class Window extends Container implements TopLevelContainer {
     private boolean nativeVisible;
     /// Set while this window holds a modal blocker, so it is pushed and popped once.
     private boolean modalRegistered;
+    /// Set while the platform has the window minimized, which is not the same as
+    /// hidden: it is still open, and still modal if it was.
+    private boolean iconified;
 
     private final Container contentPane;
     private final Container titleArea = new Container(new BorderLayout());
@@ -1247,8 +1250,13 @@ public class Window extends Container implements TopLevelContainer {
 
     /// True once a modal window has stopped being modal, either because it was
     /// disposed or because it was hidden.
+    ///
+    /// Minimizing is deliberately not either of those. It also clears `nativeVisible`,
+    /// but the window is still open and still modal, and treating it as finished would
+    /// end the wait and drop the blocker -- so restoring the window would leave a modal
+    /// window on screen with input flowing to the windows behind it.
     private boolean isModalFinished() {
-        return isWindowDisposed() || !nativeVisible;
+        return isWindowDisposed() || (!nativeVisible && !iconified);
     }
 
     /// Takes this window's modal blocker, both the framework one and the native flag.
@@ -1323,8 +1331,22 @@ public class Window extends Container implements TopLevelContainer {
 
     /// Hides this window without destroying it, so it can be shown again.
     public void hide() {
+        if (!Display.getInstance().isEdt()) {
+            // Marshalled exactly as show() and dispose() are: changing visibility,
+            // mutating the modal and paint registries and firing listeners from a
+            // background thread would race the event dispatch thread while it is
+            // painting this window or dispatching input to it.
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    hide();
+                }
+            });
+            return;
+        }
         if (nativePeer != null && nativeVisible) {
             nativeVisible = false;
+            iconified = false;
             // A window the user can no longer reach must not go on blocking the ones
             // behind it. Without this a modal hidden through HIDE_ON_CLOSE stays at the
             // top of the modal stack -- and where the platform implements modality
@@ -1889,6 +1911,10 @@ public class Window extends Container implements TopLevelContainer {
         super.hideNotify();
         if (nativeVisible) {
             nativeVisible = false;
+            // Recorded separately from an explicit hide(): a minimized window is still
+            // open, and still modal if it was, so this must not read as "the modal is
+            // over" -- see isModalFinished().
+            iconified = true;
             // Nothing paints a window that is not on screen, so anything queued on its
             // surface would sit there keeping hasPendingPaints() true.
             Display.impl.clearPaintSurface(paintSurface);
@@ -1906,6 +1932,7 @@ public class Window extends Container implements TopLevelContainer {
         super.showNotify();
         if (!nativeVisible && !disposing && nativePeer != null) {
             nativeVisible = true;
+            iconified = false;
             fireWindowEvent(WindowEvent.Type.Restored);
             repaint();
             Display.getInstance().wakeEdt();
