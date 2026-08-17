@@ -408,10 +408,20 @@ public final class JavaScriptTextLayer {
             run.content = str;
         }
         run.lastY = y;
-        run.coverX = clipX;
-        run.coverY = clipY;
-        run.coverW = clipW;
-        run.coverH = clipH;
+        // The glyphs, not the clip: a component that draws text and then an image somewhere
+        // else inside the same clip would otherwise look like it had covered its own text, and
+        // the text would be dropped for nothing. The font measures worker-side from a cache, so
+        // asking costs nothing on the bridge.
+        int textWidth = font.stringWidth(str);
+        int textHeight = font.fontHeight();
+        int coverLeft = Math.max(x, clipX);
+        int coverTop = Math.max(y, clipY);
+        int coverRight = Math.min(x + textWidth, clipX + clipW);
+        int coverBottom = Math.min(y + textHeight, clipY + clipH);
+        run.coverX = coverLeft;
+        run.coverY = coverTop;
+        run.coverW = Math.max(0, coverRight - coverLeft);
+        run.coverH = Math.max(0, coverBottom - coverTop);
         run.promotedAt = drawSequence;
         if (!run.attached) {
             container.appendChild(run.clip);
@@ -454,6 +464,16 @@ public final class JavaScriptTextLayer {
             releaseFrom(entry.getValue(), 0);
             it.remove();
         }
+        // The ban outlives the runs, so it has to be let go of here as well: a component that
+        // has left the form will never paint again, and holding it would keep its whole subtree
+        // alive for as long as the layer exists.
+        for (Iterator<Component> it = canvasOnly.iterator(); it.hasNext();) {
+            Component component = it.next();
+            if (component.getComponentForm() != form || form == null
+                    || !com.codename1.ui.Accessor.isDisplayable(component)) {
+                it.remove();
+            }
+        }
     }
 
     /**
@@ -487,7 +507,8 @@ public final class JavaScriptTextLayer {
                     // a frame that painted this run as well -- it is not covering anything.
                     continue;
                 }
-                if (run.coverX + run.coverW <= x || x + w <= run.coverX
+                if (run.coverW <= 0 || run.coverH <= 0
+                        || run.coverX + run.coverW <= x || x + w <= run.coverX
                         || run.coverY + run.coverH <= y || y + h <= run.coverY) {
                     continue;
                 }

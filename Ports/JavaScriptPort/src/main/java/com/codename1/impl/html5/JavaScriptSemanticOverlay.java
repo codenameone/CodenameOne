@@ -134,14 +134,7 @@ public final class JavaScriptSemanticOverlay {
     private HTMLElement actionsContainer;
     private boolean textContentEnabled = true;
     private long focusedNodeId = -1;
-    /**
-     * True while this overlay is putting browser focus where the framework already has it. The
-     * browser answers a focus() call with a focus event, and reporting that back as the user
-     * focusing the node would have the framework act on its own state -- which moves focus for
-     * real, and a component that draws itself differently when focused changes on screen for no
-     * reason the application asked for.
-     */
-    private boolean applyingFocus;
+
     private Entry pendingFocus;
 
     /**
@@ -200,18 +193,14 @@ public final class JavaScriptSemanticOverlay {
         reconcileChildOrder(container, rootOrder, roots, live);
 
         if (pendingFocus != null) {
+            // Recorded before the call, and that record is what tells the focus event apart
+            // afterwards. A guard held only for the duration of the call would be useless: a
+            // void call across the bridge is queued for the main thread, so it returns long
+            // before the browser dispatches the event it causes.
             focusedNodeId = pendingFocus.id;
             HTMLElement target = pendingFocus.element;
             pendingFocus = null;
-            applyingFocus = true;
-            try {
-                target.focus();
-            } finally {
-                // The event is dispatched inside the call, so the guard is spent by the time
-                // this returns -- and a browser that dispatches it later would only see focus
-                // it already agrees with.
-                applyingFocus = false;
-            }
+            target.focus();
         }
     }
 
@@ -491,10 +480,11 @@ public final class JavaScriptSemanticOverlay {
         entry.element.addEventListener("focus", new EventListener() {
             @Override
             public void handleEvent(Event event) {
-                if (applyingFocus || focusedNodeId == nodeId) {
-                    // Focus this overlay put there itself, mirroring what the framework already
-                    // reported. Telling the framework about it would be asking it to act on its
-                    // own state.
+                if (focusedNodeId == nodeId) {
+                    // The framework already has focus here -- either it reported this node as
+                    // focused and this overlay mirrored it, or the user focused a node the
+                    // framework was already on. Either way, telling the framework about it
+                    // would be asking it to act on its own state.
                     return;
                 }
                 focusedNodeId = nodeId;
