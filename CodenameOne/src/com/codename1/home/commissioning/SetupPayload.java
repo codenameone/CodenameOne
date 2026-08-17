@@ -235,7 +235,20 @@ public final class SetupPayload {
         int discriminator = (int) readBits(bytes, offset, DISCRIMINATOR_BITS);
         offset += DISCRIMINATOR_BITS;
         int passcode = (int) readBits(bytes, offset, PASSCODE_BITS);
+        offset += PASSCODE_BITS;
         validatePasscode(passcode);
+        // The declared fields fill 84 of the payload's 88 bits and the
+        // specification requires the remaining four to be zero. Reading them
+        // is what makes the parser's answer mean something: without it two
+        // codes that differ only up there are both accepted, and the one that
+        // is malformed is accepted here and rejected by the platform sheet.
+        int bits = QR_PAYLOAD_BYTES * 8;
+        if (offset < bits && readBits(bytes, offset, bits - offset) != 0) {
+            throw new IllegalArgumentException(
+                    "this setup code is malformed: the " + (bits - offset)
+                            + " padding bits at the end of a Matter payload"
+                            + " must be zero");
+        }
         return new SetupPayload(text, version, vendorId, productId, customFlow,
                 discovery, discriminator, passcode, true, false);
     }

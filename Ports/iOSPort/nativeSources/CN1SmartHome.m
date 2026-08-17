@@ -424,6 +424,27 @@ static NSDictionary *cn1homeTraitByCharacteristic(void) {
                 [m setObject:traitId forKey:ct];
             }
         }
+        // The alternates cn1homeFindCharacteristic accepts when the primary
+        // characteristic is absent, so a service that spells power as Active
+        // -- fan v2, air purifier, heater-cooler -- or carries only the
+        // vertical half of a covering's tilt is described in the graph the
+        // same way it can be written. Without them the trait is reachable and
+        // invisible: a caller who reads the graph to build its UI sees no
+        // ON_OFF constraint and treats a supported control as absent.
+        //
+        // Added after the primary pass, so a service carrying both keeps the
+        // primary's answer.
+        if ([m objectForKey:HMCharacteristicTypeActive] == nil) {
+            [m setObject:@"on_off" forKey:HMCharacteristicTypeActive];
+        }
+        if ([m objectForKey:HMCharacteristicTypeCurrentVerticalTilt] == nil) {
+            [m setObject:@"covering_tilt"
+                  forKey:HMCharacteristicTypeCurrentVerticalTilt];
+        }
+        if ([m objectForKey:HMCharacteristicTypeTargetVerticalTilt] == nil) {
+            [m setObject:@"target_covering_tilt"
+                  forKey:HMCharacteristicTypeTargetVerticalTilt];
+        }
         reverse = [[NSDictionary dictionaryWithDictionary:m] retain];
     });
     return reverse;
@@ -577,9 +598,20 @@ static id cn1homeToHomeKit(int conversion, double numeric) {
         case CN1_HC_TILT:
             return [NSNumber numberWithDouble:
                     (numeric * 180.0 / 100.0) - 90.0];
-        case CN1_HC_LOCK_TARGET:
+        case CN1_HC_LOCK_TARGET: {
             // Portable SECURED=0 -> HomeKit 1, UNSECURED=1 -> HomeKit 0.
-            return [NSNumber numberWithInt:((int) numeric) == 0 ? 1 : 0];
+            //
+            // Anything else is refused rather than folded into one of the
+            // two. LockState.isWritable() already says only those two may be
+            // written, but a value that gets past it must not open a door:
+            // "not SECURED, so unlock" is the single worst reading of a bad
+            // request this API can make.
+            int portable = (int) numeric;
+            if (portable != 0 && portable != 1) {
+                return nil;
+            }
+            return [NSNumber numberWithInt:portable == 0 ? 1 : 0];
+        }
         case CN1_HC_HEATCOOL: {
             int portable = (int) numeric;
             // OTHER is a value this API can report and cannot ask for -- it
@@ -602,7 +634,9 @@ static id cn1homeToHomeKit(int conversion, double numeric) {
             int portable = (int) numeric;
             // AUTO and SMART both ask HomeKit for auto; everything else is
             // manual. The speed half of LOW/MEDIUM/HIGH is applied separately
-            // by the write path, which has the service in hand.
+            // by the write path, which has the service in hand, and OFF never
+            // reaches here at all -- that path writes the fan's power
+            // characteristic instead, because no mode value means "stopped".
             return [NSNumber numberWithInt:(portable >= 5) ? 1 : 0];
         }
         case CN1_HC_LOCK_CURRENT:
@@ -1805,6 +1839,28 @@ com_codename1_impl_ios_IOSNative_homeWriteTraits___int_java_lang_String_java_lan
             int conversion = [[entry objectAtIndex:3] intValue];
             double numeric = i < [numbers count]
                     ? [[numbers objectAtIndex:i] doubleValue] : 0;
+            // FanMode.OFF means not running, and HomeKit's mode
+            // characteristic cannot say that -- "manual" is still on. The
+            // power characteristic is the write, then, not a side effect of
+            // one: done the other way the fan keeps running and the caller is
+            // told it stopped, which is the one outcome they cannot detect.
+            if (conversion == CN1_HC_FAN_MODE && (int) numeric == 0) {
+                HMCharacteristic *power = cn1homeFindCharacteristic(
+                    service, @"on_off");
+                if (power == nil) {
+                    [records replaceObjectAtIndex:i
+                                       withObject:cn1homeJoinFields(
+                        [base arrayByAddingObjectsFromArray:
+                         [NSArray arrayWithObjects:@"0",
+                          @"TRAIT_NOT_SUPPORTED",
+                          @"this fan cannot be switched off", nil]])];
+                    outstanding--;
+                    continue;
+                }
+                c = power;
+                conversion = CN1_HC_BOOL;
+                numeric = 0;
+            }
             id target = cn1homeToHomeKit(conversion, numeric);
             if (target == nil) {
                 [records replaceObjectAtIndex:i withObject:cn1homeJoinFields(

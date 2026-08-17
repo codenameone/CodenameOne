@@ -136,6 +136,38 @@ class SetupPayloadTest {
                         + " decoded length: " + e.getMessage());
     }
 
+    /**
+     * A well-formed compact payload reads back exactly what went in.
+     *
+     * <p>The counterpart to the rejection tests: a parser that refuses
+     * everything passes those and is useless.</p>
+     */
+    @Test
+    void aWellFormedQrPayloadRoundTrips() {
+        SetupPayload p = SetupPayload.parse(
+                qrCode(0, 0xFFF1, 0x8000, 0, 4, 3840, 20202021, 0));
+        assertEquals(0xFFF1, p.getVendorId());
+        assertEquals(0x8000, p.getProductId());
+        assertEquals(3840, p.getDiscriminator());
+        assertEquals(20202021, p.getPasscode());
+        assertTrue(p.isFromQrCode());
+        assertFalse(p.isShortDiscriminator(),
+                "a scanned code carries all twelve discriminator bits");
+    }
+
+    /**
+     * The declared fields fill 84 of the payload's 88 bits, and the four left
+     * over must be zero. Without reading them two codes that differ only up
+     * there both parse, and the malformed one is accepted here and refused by
+     * the platform sheet -- the exact failure this parser is here to catch.
+     */
+    @Test
+    void aQrPayloadWithPaddingBitsSetIsRejected() {
+        assertThrows(IllegalArgumentException.class,
+                () -> SetupPayload.parse(
+                        qrCode(0, 0xFFF1, 0x8000, 0, 4, 3840, 20202021, 1)));
+    }
+
     @Test
     void nonDigitsAreRejected() {
         assertThrows(IllegalArgumentException.class,
@@ -263,6 +295,57 @@ class SetupPayloadTest {
     };
 
     private static final int[] INV = {0, 4, 3, 2, 1, 5, 6, 7, 8, 9};
+
+    private static final String BASE38 =
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-.";
+
+    /**
+     * The compact QR payload the parser reads, built here rather than
+     * hard-coded so a test can put one bit where it does not belong.
+     *
+     * @param paddingBits the four bits above the declared fields, which the
+     *                    specification requires to be zero
+     */
+    private static String qrCode(int version, int vendorId, int productId,
+            int customFlow, int discovery, int discriminator, int passcode,
+            int paddingBits) {
+        byte[] bytes = new byte[11];
+        int at = 0;
+        at = writeBits(bytes, at, version, 3);
+        at = writeBits(bytes, at, vendorId, 16);
+        at = writeBits(bytes, at, productId, 16);
+        at = writeBits(bytes, at, customFlow, 2);
+        at = writeBits(bytes, at, discovery, 8);
+        at = writeBits(bytes, at, discriminator, 12);
+        at = writeBits(bytes, at, passcode, 27);
+        writeBits(bytes, at, paddingBits, 4);
+
+        StringBuilder out = new StringBuilder("MT:");
+        for (int i = 0; i < bytes.length; i += 3) {
+            int left = bytes.length - i;
+            int width = left >= 3 ? 3 : left;
+            long value = 0;
+            for (int b = 0; b < width; b++) {
+                value |= ((long) (bytes[i + b] & 0xFF)) << (8 * b);
+            }
+            int chars = width == 3 ? 5 : (width == 2 ? 4 : 2);
+            for (int c = 0; c < chars; c++) {
+                out.append(BASE38.charAt((int) (value % 38)));
+                value /= 38;
+            }
+        }
+        return out.toString();
+    }
+
+    private static int writeBits(byte[] bytes, int offset, int value,
+            int count) {
+        for (int i = 0; i < count; i++) {
+            if (((value >> i) & 1) != 0) {
+                bytes[(offset + i) >> 3] |= (byte) (1 << ((offset + i) & 7));
+            }
+        }
+        return offset + count;
+    }
 
     /** The 11-digit code whose first ten digits are given, checksum appended. */
     private static String manualCode(String firstTen) {
