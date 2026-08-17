@@ -1185,9 +1185,18 @@ public abstract class Database {
                 }
                 String key = Display.getInstance().databaseIdentityForEngineFile(file);
                 if (key != null) {
-                    // The schema is kept, not just the key: it is the only handle a DETACH can be
-                    // written against if this attachment turns out to be one that cannot be held.
-                    live.put(key, schema);
+                    // Every schema on the file, not just the last one seen. The schemas are the
+                    // only handles a DETACH can be written against, and SQLite lets one file be
+                    // attached under several names at once -- "ATTACH 'x.db' AS a; ATTACH 'x.db'
+                    // AS b" gives two rows here with one path between them. Keeping one name
+                    // detached one of them and left the other live and unregistered, which is
+                    // the whole failure this exists to prevent.
+                    java.util.Vector schemas = (java.util.Vector) live.get(key);
+                    if (schemas == null) {
+                        schemas = new java.util.Vector();
+                        live.put(key, schemas);
+                    }
+                    schemas.addElement(schema);
                 }
             }
         } catch (IOException cannotAsk) {
@@ -1241,7 +1250,7 @@ public abstract class Database {
                 // transaction or while another connection holds the file -- the throw happens
                 // either way, since a caller that is told nothing carries on writing through an
                 // attachment whose file is about to be unlinked.
-                detachQuietly((String) live.get(key));
+                detachEveryQuietly((java.util.Vector) live.get(key));
                 attachmentRefusal = new IOException("An ATTACH named a database that is being "
                         + "deleted or converted, so it could not be attached: " + key + ". The "
                         + "attachment has been undone. Complete the delete or the key change "
@@ -1280,6 +1289,24 @@ public abstract class Database {
         if (refusal != null) {
             attachmentRefusal = null;
             throw refusal;
+        }
+    }
+
+    /// Detaches every schema the engine reported for one file.
+    ///
+    /// All of them, because the file is what is being protected and one file can be attached
+    /// under several schema names at once. Leaving any of them attached leaves the file open to
+    /// SQLite, which is the state this is undoing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `schemas`: the schema names `PRAGMA database_list` gave for that file
+    private void detachEveryQuietly(java.util.Vector schemas) {
+        if (schemas == null) {
+            return;
+        }
+        for (int iter = 0; iter < schemas.size(); iter++) {
+            detachQuietly((String) schemas.elementAt(iter));
         }
     }
 

@@ -337,6 +337,10 @@ it or changing its key is refused while it's attached, the same as for the datab
 directly. That's the protection you want: unlinking a file SQLite still has open loses everything
 written through it.
 
+SQLite lets you attach one file under several schema names at once. The file stays protected until
+the last of them is detached, so a `DETACH` of one name doesn't release a database the connection
+still holds under another.
+
 Run `ATTACH` and `DETACH` through `execute()`. `executeQuery()` refuses them, because a cursor runs
 its statement when it's stepped -- so the attachment would happen after the bookkeeping, and the
 file could then be deleted while SQLite still holds it.

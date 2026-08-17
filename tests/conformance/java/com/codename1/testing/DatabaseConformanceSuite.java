@@ -361,6 +361,31 @@ public final class DatabaseConformanceSuite {
                         deleted = false;
                     }
                     r.check(deleted, "and deletable again once it has been detached");
+
+                    // The same file, attached twice at once. SQLite allows it -- two schema names
+                    // over one path -- and the reservation is held per file, so detaching one of
+                    // them must not hand the file back while the other still has it open.
+                    Database recreated = Database.openOrCreate(attachedName);
+                    recreated.close();
+                    db2.execute("ATTACH DATABASE '" + base + ".attached' AS cn1twiceA");
+                    db2.execute("ATTACH DATABASE '" + base + ".attached' AS cn1twiceB");
+                    db2.execute("DETACH DATABASE cn1twiceA");
+                    boolean stillHeld = false;
+                    try {
+                        Database.delete(attachedName);
+                    } catch (IOException expected) {
+                        stillHeld = true;
+                    }
+                    r.check(stillHeld, "a file attached under two schemas stays protected when "
+                            + "one of them is detached");
+                    db2.execute("DETACH DATABASE cn1twiceB");
+                    boolean freed = true;
+                    try {
+                        Database.delete(attachedName);
+                    } catch (IOException stillRefused) {
+                        freed = false;
+                    }
+                    r.check(freed, "and is given back when the last schema on it goes");
                 }
             } catch (IOException attachUnsupported) {
                 r.info("this engine would not attach a second database: "
