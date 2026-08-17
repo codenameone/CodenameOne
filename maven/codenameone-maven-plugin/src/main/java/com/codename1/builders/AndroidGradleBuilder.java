@@ -7420,6 +7420,10 @@ public class AndroidGradleBuilder extends Executor {
         StringBuilder xml = new StringBuilder();
         xml.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
         xml.append("<shortcuts xmlns:android=\"http://schemas.android.com/apk/res/android\">\n");
+        // shortcutShortLabel is defined as a resource reference, so a literal string is rejected
+        // by AAPT during resource linking rather than merely looking wrong.
+        StringBuilder strings = new StringBuilder();
+        strings.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<resources>\n");
         int count = 0;
         for (Object o : declared) {
             if (!(o instanceof Map)) {
@@ -7433,6 +7437,11 @@ public class AndroidGradleBuilder extends Executor {
             if (!(id instanceof String) || !offered) {
                 continue;
             }
+            // exposure says which consumers an intent opted into. One that only offered itself
+            // to a language model must not appear on the launcher.
+            if (!isExposedToAssistant(intent)) {
+                continue;
+            }
             if (count == 5) {
                 // Android shows at most five static shortcuts. Truncating quietly would look
                 // like the later ones failing at random.
@@ -7440,8 +7449,21 @@ public class AndroidGradleBuilder extends Executor {
                         + "the static list. The rest remain invocable and can be donated.");
                 break;
             }
+            // A static shortcut carries no parameters and Android has no picker on this path,
+            // so an intent with a required parameter would be invoked with a null or zero and
+            // quietly do the wrong thing. Only intents that can run as declared are offered;
+            // the rest stay invocable and donatable, they simply are not launcher shortcuts.
+            if (!isLaunchableWithoutParameters(intent)) {
+                log("Not offering \"" + id + "\" as a launcher shortcut: it has a required "
+                        + "parameter and a static shortcut cannot supply one. It remains "
+                        + "invocable and can be donated with its values bound.");
+                continue;
+            }
             String label = intent.get("title") instanceof String
                     ? (String) intent.get("title") : (String) id;
+            String labelRes = "cn1_shortcut_" + ((String) id);
+            strings.append("    <string name=\"").append(labelRes).append("\">")
+                    .append(xmlEscape(label)).append("</string>\n");
             // The headless flag rides in the URI so the trampoline can route a cold-start tap
             // without the declaration table, which is not installed yet at that point.
             Object headlessValue = intent.get("headless");
@@ -7450,8 +7472,8 @@ public class AndroidGradleBuilder extends Executor {
             xml.append("    <shortcut android:shortcutId=\"").append(xmlEscape((String) id))
                     .append("\"\n")
                     .append("              android:enabled=\"true\"\n")
-                    .append("              android:shortcutShortLabel=\"")
-                    .append(xmlEscape(label)).append("\">\n")
+                    .append("              android:shortcutShortLabel=\"@string/")
+                    .append(labelRes).append("\">\n")
                     .append("        <intent android:action=\"android.intent.action.VIEW\"\n")
                     .append("                android:targetPackage=\"${applicationId}\"\n")
                     .append("                android:targetClass=\"com.codename1.impl.android.intents.CN1IntentTrampolineActivity\"\n")
@@ -7461,11 +7483,16 @@ public class AndroidGradleBuilder extends Executor {
             count++;
         }
         xml.append("</shortcuts>\n");
+        strings.append("</resources>\n");
 
         if (count > 0) {
             File xmlValues = new File(resDir, "xml");
             xmlValues.mkdirs();
+            File values = new File(resDir, "values");
+            values.mkdirs();
             try {
+                createFile(new File(values, "cn1_shortcuts_strings.xml"),
+                        strings.toString().getBytes("UTF-8"));
                 createFile(new File(xmlValues, "cn1_shortcuts.xml"),
                         xml.toString().getBytes("UTF-8"));
             } catch (IOException ex) {
@@ -7479,6 +7506,53 @@ public class AndroidGradleBuilder extends Executor {
                     + "                       android:resource=\"@xml/cn1_shortcuts\" />\n";
         }
         return entries.toString();
+    }
+
+    /// True when the intent offered itself to the platform. An absent list means the default,
+    /// which is platform exposure.
+    @SuppressWarnings("unchecked")
+    private static boolean isExposedToAssistant(Map<String, Object> intent) {
+        Object exposure = intent.get("exposure");
+        if (!(exposure instanceof java.util.List)) {
+            return true;
+        }
+        java.util.List<Object> list = (java.util.List<Object>) exposure;
+        if (list.isEmpty()) {
+            return true;
+        }
+        for (Object o : list) {
+            if ("ASSISTANT".equals(o)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// True when every declared parameter can be satisfied without asking the user: either the
+    /// intent takes none, or each required one carries a default.
+    @SuppressWarnings("unchecked")
+    private static boolean isLaunchableWithoutParameters(Map<String, Object> intent) {
+        Object params = intent.get("params");
+        if (!(params instanceof java.util.List)) {
+            return true;
+        }
+        for (Object o : (java.util.List<Object>) params) {
+            if (!(o instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> p = (Map<String, Object>) o;
+            Object required = p.get("required");
+            boolean isRequired = required == null || Boolean.TRUE.equals(required)
+                    || "true".equals(required);
+            if (!isRequired) {
+                continue;
+            }
+            Object def = p.get("default");
+            if (!(def instanceof String) || ((String) def).length() == 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String xmlEscape(String s) {

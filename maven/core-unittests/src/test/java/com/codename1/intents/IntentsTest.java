@@ -114,6 +114,7 @@ class IntentsTest {
     /** A dispatcher standing in for the build-time generated one. */
     private static final class FakeDispatcher implements IntentDispatcher {
         final List<String> invoked = new ArrayList<String>();
+        Map<String, Object> lastParams = Collections.emptyMap();
         final List<IntentDeclaration> declarations = new ArrayList<IntentDeclaration>();
         IntentResult next = IntentResult.ok();
         RuntimeException throwOnInvoke;
@@ -128,6 +129,7 @@ class IntentsTest {
         public IntentResult invoke(String intentId, Map<String, Object> params,
                                     IntentContext ctx) {
             invoked.add(intentId);
+            lastParams = params;
             if (throwOnInvoke != null) {
                 throw throwOnInvoke;
             }
@@ -381,16 +383,100 @@ class IntentsTest {
     @Test
     void declarationsMergeGeneratedAndRuntimeSources() {
         FakeDispatcher d = new FakeDispatcher();
-        d.declarations.add(declaration("built_in"));
+        d.declarations.add(declaration("known"));
         Intents.setDispatcher(d);
-        Intents.registerDynamicIntent(declaration("at_runtime"));
+        Intents.registerDynamicIntent(new DynamicIntent("at_runtime", "known", "My usual"));
 
         List<IntentDeclaration> all = Intents.getDeclarations();
 
         assertEquals(2, all.size());
-        assertNotNull(Intents.getDeclaration("built_in"));
+        assertNotNull(Intents.getDeclaration("known"));
         assertNotNull(Intents.getDeclaration("at_runtime"));
         assertNull(Intents.getDeclaration("never_declared"));
+    }
+
+    @Test
+    void aParameterizationRunsItsBaseIntent() {
+        // Registering one used to add an id nothing could run: the dispatcher only knows
+        // build-time ids, so invoking it reported an unknown intent.
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        d.next = IntentResult.spoken("ran");
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("my_usual", "known", "My usual")
+                .bind("size", "large"));
+
+        IntentResult r = Intents.invoke("my_usual", null);
+
+        assertFalse(r.isFailed(), "a registered parameterization must be invokable");
+        assertEquals(Arrays.asList("known"), d.invoked, "it runs the intent it names");
+        assertEquals("large", d.lastParams.get("size"), "bound values are supplied");
+    }
+
+    @Test
+    void aSuppliedValueOverridesABoundOne() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("my_usual", "known", "My usual")
+                .bind("size", "large"));
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("size", "small");
+        Intents.invoke("my_usual", params);
+
+        assertEquals("small", d.lastParams.get("size"),
+                "a binding is a default, not a lock");
+    }
+
+    @Test
+    void aParameterizationOfAnUndeclaredIntentIsRejected() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        Intents.registerDynamicIntent(new DynamicIntent("orphan", "never_declared", "Orphan"));
+
+        assertNull(Intents.getDeclaration("orphan"),
+                "registering it would advertise something nothing can run");
+    }
+
+    @Test
+    void aParameterizationCannotShadowADeclaredIntent() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        Intents.setDispatcher(d);
+
+        Intents.registerDynamicIntent(new DynamicIntent("known", "known", "Impostor"));
+
+        assertEquals(1, Intents.getDeclarations().size());
+        assertEquals("Title of known", Intents.getDeclaration("known").getTitle());
+    }
+
+    @Test
+    void aBoundParameterIsNoLongerSomethingTheCallerSupplies() {
+        IntentParameterInfo size = new IntentParameterInfo("size", "Size",
+                IntentParameterType.STRING, true, null, null, null);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                "", 5, Collections.<String>emptyList(), Arrays.asList(size),
+                Arrays.asList(Exposure.ASSISTANT)));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("my_usual", "known", "My usual")
+                .bind("size", "large"));
+
+        assertTrue(Intents.getDeclaration("my_usual").getParameters().isEmpty(),
+                "the platform must not ask for a value that is already bound");
+    }
+
+    @Test
+    void aDynamicIntentRequiresABaseIntent() {
+        try {
+            new DynamicIntent("my_usual", null, "My usual");
+            org.junit.jupiter.api.Assertions.fail("a base intent is required");
+        } catch (IllegalArgumentException expected) {
+            assertNotNull(expected.getMessage());
+        }
     }
 
     @Test

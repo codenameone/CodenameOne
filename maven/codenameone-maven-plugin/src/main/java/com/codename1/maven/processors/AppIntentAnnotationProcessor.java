@@ -688,6 +688,13 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
 
     private String argumentExpression(ParamDef p) {
         String key = quote(p.name);
+        if (!p.options.isEmpty() && "string".equals(p.kind)) {
+            // The declaration promises a closed vocabulary, so the framework has to enforce it
+            // rather than trusting whatever the platform or an in-app caller supplied.
+            return "oneOf(params, " + key + ", "
+                    + (p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue)) + ", "
+                    + stringArrayExpr(p.options) + ")";
+        }
         if ("entity".equals(p.kind)) {
             return "entity_" + p.entityType + "(params, " + key + ")";
         }
@@ -854,6 +861,19 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        return def;\n");
         sb.append("    }\n\n");
 
+        sb.append("    private static String oneOf(Map<String, Object> p, String k, String def,\n");
+        sb.append("                                String[] options) {\n");
+        sb.append("        String v = asString(p, k, def);\n");
+        sb.append("        if (v == null) { return null; }\n");
+        sb.append("        for (int i = 0; i < options.length; i++) {\n");
+        sb.append("            if (options[i].equals(v)) { return v; }\n");
+        sb.append("        }\n");
+        // A value outside the vocabulary is not silently coerced to the default: that would run
+        // the handler with something the caller did not ask for.
+        sb.append("        throw new IllegalArgumentException(\"\\\"\" + v\n");
+        sb.append("                + \"\\\" is not an accepted value for \" + k);\n");
+        sb.append("    }\n\n");
+
         sb.append("    private static java.util.Date asDate(Map<String, Object> p, String k) {\n");
         sb.append("        Object o = p == null ? null : p.get(k);\n");
         sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
@@ -888,6 +908,9 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             sb.append(", \"opensRoute\": ").append(json(d.opensRoute));
             sb.append(", \"timeoutSeconds\": ").append(d.timeoutSeconds);
             sb.append(", \"phrases\": ").append(jsonArray(d.phrases));
+            // The native builders need this: without it a MODEL-only intent still becomes an
+            // App Intent and a launcher shortcut, which is the opposite of what it declared.
+            sb.append(", \"exposure\": ").append(jsonArray(d.exposure));
             sb.append(", \"params\": [");
             for (int j = 0; j < d.params.size(); j++) {
                 ParamDef p = d.params.get(j);
@@ -986,6 +1009,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return (List<Object>) value;
         }
         return Collections.emptyList();
+    }
+
+    private static String stringArrayExpr(List<String> values) {
+        StringBuilder sb = new StringBuilder("new String[]{");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(quote(values.get(i)));
+        }
+        return sb.append("}").toString();
     }
 
     private static String stringListExpr(List<String> values) {

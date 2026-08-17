@@ -125,7 +125,7 @@ class AndroidIntentShortcutsTest {
 
         String xml = shortcutsXml(dir);
         assertTrue(xml.contains("android:shortcutId=\"log_workout\""));
-        assertTrue(xml.contains("android:shortcutShortLabel=\"Log a workout\""));
+        assertTrue(xml.contains("android:shortcutShortLabel=\"@string/cn1_shortcut_log_workout\""));
         assertTrue(xml.contains("cn1intent://run?id=log_workout"));
         assertTrue(xml.contains("CN1IntentTrampolineActivity"));
     }
@@ -196,13 +196,80 @@ class AndroidIntentShortcutsTest {
     }
 
     @Test
+    void shortcutLabelsAreResourceBackedBecauseAaptDemandsIt(@TempDir Path dir) throws Exception {
+        // android:shortcutShortLabel is defined as a resource reference; a literal is rejected
+        // by AAPT during resource linking, so the whole Android build fails.
+        entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
+                + "\"title\":\"Log a workout\",\"discoverable\":true}]}");
+
+        String xml = shortcutsXml(dir);
+        assertTrue(xml.contains("android:shortcutShortLabel=\"@string/cn1_shortcut_log_workout\""),
+                xml);
+
+        File strings = new File(new File(dir.toFile(), "res"), "values/cn1_shortcuts_strings.xml");
+        assertTrue(strings.exists(), "the referenced string resource was not written");
+        String body = new String(Files.readAllBytes(strings.toPath()), Charset.forName("UTF-8"));
+        assertTrue(body.contains("<string name=\"cn1_shortcut_log_workout\">Log a workout</string>"),
+                body);
+    }
+
+    @Test
+    void anIntentNeedingAParameterIsNotOfferedAsAStaticShortcut(@TempDir Path dir)
+            throws Exception {
+        // A static shortcut carries no parameters and Android has no picker on this path, so
+        // offering one would invoke the handler with a null or a zero and do the wrong thing.
+        entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
+                + "\"title\":\"Log\",\"discoverable\":true,\"params\":["
+                + "{\"name\":\"kind\",\"type\":\"string\",\"required\":true}]}]}");
+
+        assertFalse(new File(new File(dir.toFile(), "res"), "xml/cn1_shortcuts.xml").exists(),
+                "no launchable intent means no shortcut resource at all");
+    }
+
+    @Test
+    void aRequiredParameterWithADefaultIsStillLaunchable(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
+                + "\"title\":\"Log\",\"discoverable\":true,\"params\":["
+                + "{\"name\":\"kind\",\"type\":\"string\",\"required\":true,"
+                + "\"default\":\"run\"}]}]}");
+
+        assertTrue(shortcutsXml(dir).contains("log_workout"));
+    }
+
+    @Test
+    void anOptionalParameterDoesNotBlockAShortcut(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
+                + "\"title\":\"Log\",\"discoverable\":true,\"params\":["
+                + "{\"name\":\"note\",\"type\":\"string\",\"required\":false}]}]}");
+
+        assertTrue(shortcutsXml(dir).contains("log_workout"));
+    }
+
+    @Test
+    void aModelOnlyIntentIsNotPutOnTheLauncher(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"schema\":1,\"intents\":["
+                + "{\"id\":\"public_one\",\"title\":\"Public\",\"discoverable\":true,"
+                + "\"exposure\":[\"ASSISTANT\"]},"
+                + "{\"id\":\"model_one\",\"title\":\"Model\",\"discoverable\":true,"
+                + "\"exposure\":[\"MODEL\"]}]}");
+
+        String xml = shortcutsXml(dir);
+        assertTrue(xml.contains("public_one"));
+        assertFalse(xml.contains("model_one"),
+                "exposure is a restriction: a model-only capability is not a launcher action");
+    }
+
+    @Test
     void aTitleWithMarkupCannotBreakTheResource(@TempDir Path dir) throws Exception {
         entriesFor(dir, "{\"schema\":1,\"intents\":[{\"id\":\"log_workout\","
                 + "\"title\":\"Log <b>a</b> \\\"workout\\\" & more\",\"discoverable\":true}]}");
 
-        String xml = shortcutsXml(dir);
-        assertTrue(xml.contains("&lt;b&gt;"), xml);
-        assertTrue(xml.contains("&quot;"), xml);
-        assertTrue(xml.contains("&amp;"), xml);
+        // The title now lives in the string resource the shortcut references, so that is where
+        // unescaped markup would break the build.
+        File strings = new File(new File(dir.toFile(), "res"), "values/cn1_shortcuts_strings.xml");
+        String body = new String(Files.readAllBytes(strings.toPath()), Charset.forName("UTF-8"));
+        assertTrue(body.contains("&lt;b&gt;"), body);
+        assertTrue(body.contains("&quot;"), body);
+        assertTrue(body.contains("&amp;"), body);
     }
 }

@@ -51,7 +51,7 @@ public final class IntentDeclaration {
     private final List<Exposure> exposure;
 
     /// Framework entry point: builds a declaration. Called by generated code and
-    /// by [Intents#registerDynamicIntent]; applications do not construct these.
+    /// for a [DynamicIntent]; applications do not construct these.
     public IntentDeclaration(String id, String title, String description,
                              boolean headless, boolean discoverable, boolean destructive,
                              String opensRoute, int timeoutSeconds,

@@ -88,7 +88,11 @@ public final class IOSAppIntentsBuilder {
         sb.append("import Foundation\n\n");
 
         for (Map<String, Object> intent : intents) {
-            appendIntent(sb, intent);
+            // An intent that only offered itself to a language model must not become an App
+            // Intent; exposure is a restriction, not a hint.
+            if (isExposedToAssistant(intent)) {
+                appendIntent(sb, intent);
+            }
         }
         appendShortcutsProvider(sb);
         sb.append("#endif\n");
@@ -190,7 +194,8 @@ public final class IOSAppIntentsBuilder {
     private void appendShortcutsProvider(StringBuilder sb) {
         List<Map<String, Object>> withPhrases = new ArrayList<Map<String, Object>>();
         for (Map<String, Object> intent : intents) {
-            if (!phrases(intent).isEmpty() && bool(intent, "discoverable")) {
+            if (!phrases(intent).isEmpty() && bool(intent, "discoverable")
+                    && isExposedToAssistant(intent)) {
                 withPhrases.add(intent);
             }
         }
@@ -379,6 +384,26 @@ public final class IOSAppIntentsBuilder {
     // ------------------------------------------------------------------
     // Manifest access
     // ------------------------------------------------------------------
+
+    /// True when the intent offered itself to the platform. An absent list means the default,
+    /// which is platform exposure.
+    @SuppressWarnings("unchecked")
+    static boolean isExposedToAssistant(Map<String, Object> intent) {
+        Object exposure = intent.get("exposure");
+        if (!(exposure instanceof List)) {
+            return true;
+        }
+        List<Object> list = (List<Object>) exposure;
+        if (list.isEmpty()) {
+            return true;
+        }
+        for (Object o : list) {
+            if ("ASSISTANT".equals(o)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static String str(Map<String, Object> m, String key) {
         Object o = m.get(key);

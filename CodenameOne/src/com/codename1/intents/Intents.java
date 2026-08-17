@@ -83,8 +83,8 @@ public final class Intents {
     /// Intents declared at runtime rather than by the build. Kept separate from
     /// the generated table so [#getDeclarations()] can present one list without
     /// either source being able to corrupt the other.
-    private static final Map<String, IntentDeclaration> dynamic =
-            new LinkedHashMap<String, IntentDeclaration>();
+    private static final Map<String, DynamicIntent> dynamic =
+            new LinkedHashMap<String, DynamicIntent>();
 
     /// Invocations that arrived before the generated dispatcher installed
     /// itself -- the cold start where a tap on a shortcut is what launched the
@@ -165,7 +165,12 @@ public final class Intents {
             }
         }
         synchronized (dynamic) {
-            out.addAll(dynamic.values());
+            for (DynamicIntent dyn : dynamic.values()) {
+                IntentDeclaration base = findById(out, dyn.getBaseIntentId());
+                if (base != null) {
+                    out.add(describeDynamic(dyn, base));
+                }
+            }
         }
         return Collections.unmodifiableList(out);
     }
@@ -187,26 +192,67 @@ public final class Intents {
         return null;
     }
 
-    /// Declares a parameterization of an existing intent at runtime -- a
-    /// specific shortcut such as "reorder my usual", built from data only known
-    /// once the app is running.
+    /// Declares a parameterization of an intent the application already declares -- a specific
+    /// shortcut such as "reorder my usual", built from data only known once the app is running.
     ///
-    /// This cannot introduce a new capability. The native catalogue is compiled
-    /// into the app, so a genuinely new verb could never reach the platform, and
-    /// pretending otherwise would produce an API that works in the simulator and
-    /// silently does nothing on a device.
+    /// It runs by running the intent it names, with the bound values filled in, which is what
+    /// makes it invokable at all. It cannot introduce a new capability: the native catalogue is
+    /// compiled into the app, so a genuinely new verb could never reach the platform.
+    ///
+    /// Ignored when the base intent is not declared, or when the id would shadow a declared one.
     ///
     /// #### Parameters
     ///
-    /// - `declaration`: the runtime declaration; its id must not collide with a
-    ///   build-time one
-    public static void registerDynamicIntent(IntentDeclaration declaration) {
-        if (declaration == null) {
+    /// - `intent`: the parameterization
+    public static void registerDynamicIntent(DynamicIntent intent) {
+        if (intent == null) {
+            return;
+        }
+        if (declaredById(intent.getId()) != null) {
+            logError(new IllegalArgumentException("A dynamic intent cannot take the id of a "
+                    + "declared one: \"" + intent.getId() + "\""));
+            return;
+        }
+        if (declaredById(intent.getBaseIntentId()) == null) {
+            logError(new IllegalArgumentException("Dynamic intent \"" + intent.getId()
+                    + "\" names base intent \"" + intent.getBaseIntentId()
+                    + "\", which this application does not declare"));
             return;
         }
         synchronized (dynamic) {
-            dynamic.put(declaration.getId(), declaration);
+            dynamic.put(intent.getId(), intent);
         }
+    }
+
+    /// The declaration for a build-time intent id, or null. Deliberately does not consult the
+    /// dynamic table, so registration can check for collisions against the real catalogue.
+    private static IntentDeclaration declaredById(String intentId) {
+        IntentDispatcher d;
+        synchronized (pending) {
+            d = dispatcher;
+        }
+        if (d == null || intentId == null) {
+            return null;
+        }
+        List<IntentDeclaration> declared;
+        try {
+            declared = d.describe();
+        } catch (Throwable t) {
+            logError(t);
+            return null;
+        }
+        // The walk stays outside the catch. A for-each over a typed list compiles to a
+        // CHECKCAST, and ParparVM expands that to nothing -- so a catch around it would be
+        // guarding against something that can never fire on the platform that matters most.
+        if (declared == null) {
+            return null;
+        }
+        for (IntentDeclaration decl : declared) {
+            if (intentId.equals(decl.getId())) {
+                return decl;
+            }
+        }
+        return null;
     }
 
     // ------------------------------------------------------------------
@@ -623,6 +669,31 @@ public final class Intents {
     // Internals
     // ------------------------------------------------------------------
 
+    private static IntentDeclaration findById(List<IntentDeclaration> all, String id) {
+        for (IntentDeclaration d : all) {
+            if (d.getId().equals(id)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    /// Presents a parameterization as a declaration in its own right, inheriting the base
+    /// intent's behaviour and dropping the parameters it has already bound -- those are no
+    /// longer anything a caller has to supply.
+    private static IntentDeclaration describeDynamic(DynamicIntent dyn, IntentDeclaration base) {
+        List<IntentParameterInfo> remaining = new ArrayList<IntentParameterInfo>();
+        for (IntentParameterInfo p : base.getParameters()) {
+            if (!dyn.getBoundParameters().containsKey(p.getName())) {
+                remaining.add(p);
+            }
+        }
+        return new IntentDeclaration(dyn.getId(), dyn.getTitle(), base.getDescription(),
+                base.isHeadless(), base.isDiscoverable(), base.isDestructive(),
+                base.getOpensRoute(), base.getTimeoutSeconds(),
+                Collections.<String>emptyList(), remaining, base.getExposure());
+    }
+
     /// Navigates when a result names a route.
     ///
     /// The framework does this rather than each port, because the route table is Java and the
@@ -684,11 +755,23 @@ public final class Intents {
         if (d == null) {
             return IntentResult.failed("No intents are declared in this application");
         }
-        Map<String, Object> safe = params == null
-                ? Collections.<String, Object>emptyMap()
-                : new HashMap<String, Object>(params);
+        String targetId = intentId;
+        Map<String, Object> safe = new HashMap<String, Object>();
+        DynamicIntent dyn;
+        synchronized (dynamic) {
+            dyn = dynamic.get(intentId);
+        }
+        if (dyn != null) {
+            // A parameterization runs its base intent. Bound values go in first so anything
+            // supplied at invocation time overrides them -- a binding is a default, not a lock.
+            targetId = dyn.getBaseIntentId();
+            safe.putAll(dyn.getBoundParameters());
+        }
+        if (params != null) {
+            safe.putAll(params);
+        }
         try {
-            IntentResult r = d.invoke(intentId, safe, ctx);
+            IntentResult r = d.invoke(targetId, safe, ctx);
             if (r == null) {
                 return IntentResult.failed("Unknown intent \"" + intentId + "\"");
             }

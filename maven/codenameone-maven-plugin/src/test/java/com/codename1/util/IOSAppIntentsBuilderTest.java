@@ -285,6 +285,32 @@ class IOSAppIntentsBuilderTest {
     }
 
     @Test
+    void aModelOnlyIntentDoesNotBecomeAnAppIntent() {
+        Map<String, Object> modelOnly = intent("model_one", "Model");
+        modelOnly.put("exposure", Arrays.asList("MODEL"));
+        Map<String, Object> normal = intent("public_one", "Public");
+        normal.put("exposure", Arrays.asList("ASSISTANT"));
+
+        String swift = intentsSwift(Arrays.asList(modelOnly, normal),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("CN1Intent_public_one"));
+        assertFalse(swift.contains("CN1Intent_model_one"),
+                "exposure is a restriction, not a hint");
+    }
+
+    @Test
+    void anIntentWithNoExposureListedKeepsTheDefault() {
+        // An absent list is the default, which is platform exposure; treating it as "no
+        // consumers" would silently drop every intent built before the field existed.
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout")),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("CN1Intent_log_workout"));
+    }
+
+    @Test
     void aSwiftKeywordParameterIsEscaped() {
         // Parameter names come from application code, so a Swift keyword is reachable rather
         // than theoretical, and an unescaped one is a compile error on a Mac only.
