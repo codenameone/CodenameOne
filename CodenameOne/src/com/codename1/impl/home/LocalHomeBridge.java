@@ -431,7 +431,19 @@ public class LocalHomeBridge implements HomeBridge {
 
     @Override
     public boolean areIdsPersistent() {
-        return true;
+        // False, and deliberately so. The synthetic house is rebuilt on every
+        // launch and nothing about a commissioned accessory outlives the
+        // process, so a favourite persisted by id points at nothing after a
+        // restart -- and the id counter starts over, which is worse: the next
+        // accessory commissioned takes the id the favourite was saved under
+        // and the app quietly retargets the user's state onto a different
+        // device.
+        //
+        // Answering false is also what the flag is for. An app tested against
+        // this backend learns to key its state off something it controls,
+        // which is the habit that survives a backend where ids really are
+        // stable.
+        return false;
     }
 
     @Override
@@ -697,6 +709,17 @@ public class LocalHomeBridge implements HomeBridge {
             return refusal(f, HomeError.VALUE_OUT_OF_RANGE,
                     "this accessory accepts " + c.getMinimum() + " to "
                             + c.getMaximum());
+        }
+        // A constraint with no explicit ordinal list accepts the whole domain,
+        // which includes the states a target enum only ever reports -- a door
+        // that is OPENING, a thermostat mode HomeKit cannot express. Refused
+        // here as well as in the facade, because this is the store the
+        // simulator and the desktop run against and a developer testing there
+        // should see the same refusal a phone gives them.
+        if (!trait.acceptsEnumWrite(value)) {
+            return refusal(f, HomeError.INVALID_ARGUMENT,
+                    "that is a state an accessory reports rather than one it"
+                            + " can be asked for");
         }
         values.put(key(accessoryId, serviceId, traitId), value);
         changed.add(TraitReading.of(accessoryId, serviceId, trait, value,

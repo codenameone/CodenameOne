@@ -739,7 +739,15 @@ static int cn1homeServiceTypeOrdinal(NSString *t) {
     if ([t isEqualToString:HMServiceTypeGarageDoorOpener]) return 6;
     if ([t isEqualToString:HMServiceTypeWindowCovering]) return 7;
     if ([t isEqualToString:HMServiceTypeWindow]) return 7;
+    // Both fan services. HomeKit spells the modern one -- the "fan v2"
+    // profile, the service that carries Active rather than PowerState --
+    // HMServiceTypeVentilationFan; there is no HMServiceTypeFanV2 to look
+    // for. Falling through to OTHER left such a fan controllable and
+    // unrecognizable at the same time: the trait code handles its Active
+    // characteristic, but a UI grouping or picking icons by service type
+    // could not see it was a fan.
     if ([t isEqualToString:HMServiceTypeFan]) return 8;
+    if ([t isEqualToString:HMServiceTypeVentilationFan]) return 8;
     if ([t isEqualToString:HMServiceTypeAirPurifier]) return 9;
     if ([t isEqualToString:HMServiceTypeMotionSensor]) return 10;
     if ([t isEqualToString:HMServiceTypeOccupancySensor]) return 11;

@@ -2036,7 +2036,18 @@ public final class SmartHome {
     private static void requireEnumDomain(Trait trait, TraitValue value,
             String what) {
         if (trait.acceptsEnumValue(value)) {
-            return;
+            if (trait.acceptsEnumWrite(value)) {
+                return;
+            }
+            // In the domain, but one of the states an accessory reports and
+            // cannot be asked for -- a door that is OPENING. The enum's own
+            // isWritable() says so; a backend that stored it anyway would
+            // report success for a request no accessory can carry out.
+            throw new IllegalArgumentException("this " + what + " gives "
+                    + trait.getId() + " the value " + value.getEnumName()
+                    + ", which is a state an accessory reports rather than"
+                    + " one it can be asked for; see the constant's"
+                    + " isWritable()");
         }
         throw new IllegalArgumentException("this " + what + " gives "
                 + trait.getId() + " the value " + value.getEnumName()

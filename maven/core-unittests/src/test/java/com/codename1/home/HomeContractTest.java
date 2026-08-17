@@ -375,6 +375,40 @@ class HomeContractTest {
     }
 
     /**
+     * A state an accessory only reports is refused as a write.
+     *
+     * <p>Every target enum has some -- a door that is OPENING, a thermostat
+     * mode HomeKit cannot express -- and each says so with its own
+     * isWritable(). Stored and reported successful, the app believes it asked
+     * for something no accessory can carry out.</p>
+     */
+    @Test
+    void aReportOnlyEnumStateIsRefusedAsAWrite() {
+        LocalHomeBridge bridge = new LocalHomeBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory thermostat = home.findAccessory("thermostat");
+        final TraitWrite reportOnly = new TraitWrite(thermostat,
+                thermostat.getPrimaryService(), Trait.TARGET_HEATING_COOLING,
+                TraitValue.ofEnum(HeatingCoolingMode.OTHER));
+        assertThrows(IllegalArgumentException.class, new Executable() {
+            @Override
+            public void execute() {
+                SmartHome.getInstance().write(reportOnly);
+            }
+        });
+
+        // And the mode the thermostat is actually in is untouched.
+        assertSame(HeatingCoolingMode.AUTO, HeatingCoolingMode.of(
+                HomeAwait.settled(home.read(thermostat,
+                        thermostat.getPrimaryService(),
+                        Trait.TARGET_HEATING_COOLING)).get().getValue()));
+    }
+
+    /**
      * A change that lands while the up-front read is in flight arrives
      * after it, not before.
      *

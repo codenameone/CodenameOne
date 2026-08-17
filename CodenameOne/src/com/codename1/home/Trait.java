@@ -91,10 +91,20 @@ public final class Trait {
     /// obvious way would pass everywhere and let anything through on iOS,
     /// which is where the doors are.
     private final String[] enumNames;
+    /// The names of the constants that may be WRITTEN, when that is narrower
+    /// than the domain. `null` when every constant may be.
+    ///
+    /// A target enum carries states an accessory reports and cannot be asked
+    /// for -- a door that is OPENING, a thermostat mode HomeKit cannot
+    /// express -- and each enum says so with its own `isWritable()`. Recorded
+    /// here so a write can be refused rather than stored and reported
+    /// successful by whichever backend happens to accept anything.
+    private final String[] writableEnumNames;
 
     private Trait(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double nominalMin, double nominalMax,
-            boolean hasNominalRange, String[] enumNames) {
+            boolean hasNominalRange, String[] enumNames,
+            String[] writableEnumNames) {
         this.id = id;
         this.kind = kind;
         this.unit = unit;
@@ -103,18 +113,19 @@ public final class Trait {
         this.nominalMax = nominalMax;
         this.hasNominalRange = hasNominalRange;
         this.enumNames = enumNames;
+        this.writableEnumNames = writableEnumNames;
     }
 
     private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double min, double max, boolean ranged) {
-        return define(id, kind, unit, readOnly, min, max, ranged, null);
+        return define(id, kind, unit, readOnly, min, max, ranged, null, null);
     }
 
     private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double min, double max, boolean ranged,
-            String[] enumNames) {
+            String[] enumNames, String[] writableEnumNames) {
         Trait t = new Trait(id, kind, unit, readOnly, min, max, ranged,
-                enumNames);
+                enumNames, writableEnumNames);
         BY_ID.put(id, t);
         ALL.add(t);
         return t;
@@ -135,12 +146,28 @@ public final class Trait {
     /// an alarm state opens the door.
     private static Trait choice(String id, boolean readOnly,
             Enum<?>[] domain) {
-        String[] names = new String[domain.length];
-        for (int i = 0; i < domain.length; i++) {
-            names[i] = domain[i].name();
-        }
+        return choice(id, readOnly, domain, domain);
+    }
+
+    /// A choice whose writable constants are narrower than its domain.
+    ///
+    /// Every target enum has some: a door reports OPENING and cannot be asked
+    /// for it, a thermostat reports a mode HomeKit cannot express. The enums
+    /// say so themselves with `isWritable()`; this is the same fact in a form
+    /// the write path can check without a constant in hand.
+    private static Trait choice(String id, boolean readOnly, Enum<?>[] domain,
+            Enum<?>[] writable) {
         return define(id, TraitValueKind.ENUM, TraitUnit.NONE, readOnly, 0, 0,
-                false, names);
+                false, namesOf(domain),
+                writable == domain ? null : namesOf(writable));
+    }
+
+    private static String[] namesOf(Enum<?>[] constants) {
+        String[] names = new String[constants.length];
+        for (int i = 0; i < constants.length; i++) {
+            names[i] = constants[i].name();
+        }
+        return names;
     }
 
     /// A proportion, 0 to 100 percent.
@@ -327,7 +354,10 @@ public final class Trait {
     /// [HeatingCoolingMode#OFF]. Writing `OTHER` is refused.
     public static final Trait TARGET_HEATING_COOLING =
             choice("target_heating_cooling", false,
-                    HeatingCoolingMode.values());
+                    HeatingCoolingMode.values(),
+                    new HeatingCoolingMode[] {HeatingCoolingMode.OFF,
+                        HeatingCoolingMode.HEAT, HeatingCoolingMode.COOL,
+                        HeatingCoolingMode.AUTO});
 
     /// The relative humidity an accessory is measuring, as a percentage.
     ///
@@ -375,7 +405,8 @@ public final class Trait {
     /// [TraitWrite#setAuthorizationData(java.lang.String)]. HomeKit never
     /// takes a PIN and ignores the field.
     public static final Trait TARGET_LOCK_STATE = choice("target_lock_state",
-            false, LockState.values());
+            false, LockState.values(),
+            new LockState[] {LockState.SECURED, LockState.UNSECURED});
 
     // ------------------------------------------------------------------
     // doors and garage
@@ -394,7 +425,8 @@ public final class Trait {
     /// HomeKit: `TargetDoorState`. Same backend availability as
     /// [#DOOR_STATE].
     public static final Trait TARGET_DOOR_STATE = choice("target_door_state",
-            false, DoorState.values());
+            false, DoorState.values(),
+            new DoorState[] {DoorState.OPEN, DoorState.CLOSED});
 
     /// Whether something is blocking a door or covering.
     ///
@@ -733,6 +765,43 @@ public final class Trait {
                 // The ordinal has to agree too. A constant of the right name
                 // in the wrong enum would otherwise carry the wrong number.
                 return i == value.getEnumOrdinal();
+            }
+        }
+        return false;
+    }
+
+    /// Whether a value may be WRITTEN to this trait.
+    ///
+    /// Narrower than [#acceptsEnumValue(TraitValue)] for a target enum that
+    /// carries states an accessory reports and cannot be asked for: a door
+    /// that is OPENING, a thermostat mode HomeKit cannot express. Each enum
+    /// says the same thing with its own `isWritable()`; this is the form the
+    /// write path can check when it has an ordinal rather than a constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to check, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when this is not a choice trait, or the value may be written
+    public boolean acceptsEnumWrite(TraitValue value) {
+        if (!acceptsEnumValue(value)) {
+            return false;
+        }
+        if (writableEnumNames == null || value == null
+                || value.getKind() != TraitValueKind.ENUM) {
+            return true;
+        }
+        String name = value.getEnumName();
+        if (name == null) {
+            // From the wire, with no constant in hand. Resolved through the
+            // domain, which acceptsEnumValue has already bounds-checked.
+            name = enumNames[value.getEnumOrdinal()];
+        }
+        for (int i = 0; i < writableEnumNames.length; i++) {
+            if (writableEnumNames[i].equals(name)) {
+                return true;
             }
         }
         return false;
