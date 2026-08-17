@@ -11021,8 +11021,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // would look like an ordinary showBack() and traverse the entry this gesture had
         // already spent.
         handlingPopState = true;
+        // Read before the command runs. With transitions off the form changes inside
+        // dispatchCommand, and the count is drawn down before this line -- so reading it
+        // afterwards would report nothing outstanding and the wait would take the change for a
+        // form it was not unwinding towards.
+        int outstanding = pendingTraversalEntries;
         current.dispatchCommand(back, new ActionEvent(back));
-        awaitBackOutcome(current, pendingTraversalEntries,
+        awaitBackOutcome(current, outstanding,
                 System.currentTimeMillis() + BACK_OUTCOME_TIMEOUT_MILLIS);
         // Nothing is pushed to replace the entry that was just popped. Every form show pushes
         // one, so the history depth already tracks the navigation depth: popping one entry and
@@ -11034,8 +11039,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Waits for a back command to either navigate or turn out to have been refused.
      *
      * @param before the form that was displayed when the command was dispatched
-     * @param outstanding entries still owed when the command was dispatched
-     * @param attempt how many times this has already looked
+     * @param outstanding entries owed when the command was dispatched, read before it ran
+     * @param deadline when to stop waiting and take the command as refused
      */
     private void awaitBackOutcome(final Form before, final int outstanding, final long deadline) {
         callSerially(new Runnable() {
@@ -11046,8 +11051,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     if (pendingTraversalEntries >= outstanding) {
                         // The form that appeared was not one this traversal was unwinding
                         // towards, so nothing was drawn down. Count the step anyway: the
-                        // application has moved and the replay has to end somewhere.
-                        pendingTraversalEntries = outstanding - 1;
+                        // application has moved and the replay has to end somewhere. Never below
+                        // nothing owed -- a negative count would have to be climbed back through
+                        // before the next Back was replayed at all.
+                        pendingTraversalEntries = Math.max(0, outstanding - 1);
                     }
                     replayTraversal();
                     return;
