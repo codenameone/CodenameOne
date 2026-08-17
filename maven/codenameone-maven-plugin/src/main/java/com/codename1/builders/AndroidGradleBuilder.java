@@ -2477,6 +2477,15 @@ public class AndroidGradleBuilder extends Executor {
             // The delegate, and the onCreate snippet that registers it. Here
             // rather than beside the maps injection above, because that runs
             // before the scan that sets this flag.
+            //
+            // The play-services-home dependency the injected file imports is
+            // NOT added here: it comes from the com/codename1/home/ entry in
+            // PlatformFeatureCatalog, which the loop above turns into an
+            // `implementation` line in the generated build.gradle for every
+            // catalog hit. Said out loud because grepping this builder for
+            // the artifact finds nothing and the file looks uncompilable.
+            log("Smart home: play-services-home comes from the feature "
+                    + "catalog entry for com/codename1/home/");
             smartHomeSupport = SmartHomeInjector.injectAndroid(this, srcDir);
             if (targetSDKVersionInt >= 30) {
                 // Package visibility. Without this

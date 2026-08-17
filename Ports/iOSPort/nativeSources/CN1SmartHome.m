@@ -2430,7 +2430,17 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
             NSString *subscriptionId = [pollSubs objectAtIndex:i];
             NSString *key = [pollKeys objectAtIndex:i];
             [c readValueWithCompletionHandler:^(NSError *error) {
-                if (error == nil) {
+                NSString *stateKey = [NSString stringWithFormat:@"%@\t%@",
+                                      subscriptionId, key];
+                if (error != nil) {
+                    // Polling is this subscription's only update path, so a
+                    // failed poll is not nothing: the listener is now sitting
+                    // on a value that may have moved, with no way to know.
+                    // The resync flag is exactly that statement.
+                    com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
+                        getThreadLocalData(),
+                        fromNSString(getThreadLocalData(), subscriptionId));
+                } else {
                     NSArray *parts =
                             [key componentsSeparatedByString:@"\t"];
                     NSString *record = cn1homeEncodeReading(
@@ -2439,13 +2449,20 @@ void com_codename1_impl_ios_IOSNative_homeDrainChanges___int(
                     // Compared without the timestamp, which is the last
                     // field and moves on every read: comparing whole records
                     // would report every poll as a change.
-                    NSString *stateKey = [NSString stringWithFormat:@"%@\t%@",
-                                          subscriptionId, key];
                     NSString *previous = [cn1homeLastPolled
                                           objectForKey:stateKey];
                     NSString *current = cn1homeReadingWithoutTimestamp(record);
-                    if (previous == nil
-                            || ![previous isEqualToString:current]) {
+                    if (previous == nil) {
+                        // The first poll of this characteristic establishes
+                        // the baseline and reports nothing. A subscription
+                        // asks to hear about CHANGES, and
+                        // setDeliverInitialValues(false) -- the default --
+                        // says the caller does not want the current value; a
+                        // first poll that announced it would deliver exactly
+                        // what they declined, or a second copy of what the
+                        // initial delivery just gave them.
+                        [cn1homeLastPolled setObject:current forKey:stateKey];
+                    } else if (![previous isEqualToString:current]) {
                         [cn1homeLastPolled setObject:current forKey:stateKey];
                         polled++;
                         com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
