@@ -1255,8 +1255,9 @@ public final class SmartHome {
             String error) {
         SmartHome home = getInstance();
         EdtResult<List<TraitReading>> result = home.pendingReads.take(requestId);
+        TraitReadRequest asked;
         synchronized (home) {
-            home.readRequests.remove(Integer.valueOf(requestId));
+            asked = home.readRequests.remove(Integer.valueOf(requestId));
         }
         if (result == null) {
             return;
@@ -1266,7 +1267,7 @@ public final class SmartHome {
             result.error(failure);
             return;
         }
-        result.complete(decodeReadings(lines));
+        result.complete(decodeReadings(lines, asked));
     }
 
     /// Answers [#write(java.util.List)]. Called by the ports from any thread.
@@ -1687,6 +1688,8 @@ public final class SmartHome {
         return out;
     }
 
+    /// Decodes changed readings, where there is nothing to line them up
+    /// against and a record that will not decode is simply not a change.
     private static List<TraitReading> decodeReadings(String[] lines) {
         if (lines == null || lines.length == 0) {
             return Collections.emptyList();
@@ -1697,6 +1700,50 @@ public final class SmartHome {
             if (reading != null) {
                 out.add(reading);
             }
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    /// Decodes a read's answer, one reading per trait asked for, in the order
+    /// they were asked for.
+    ///
+    /// A record that will not decode -- a port a version ahead, a truncated
+    /// line -- becomes a failed reading in its own position rather than
+    /// disappearing. Dropping it shifts every later reading up one, and
+    /// `read()` promises positional correspondence, so a caller lining values
+    /// up with the controls that asked for them puts the humidity on the
+    /// thermostat dial.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lines`: the encoded readings
+    ///
+    /// - `asked`: what was requested, or `null` when it is no longer known
+    ///
+    /// #### Returns
+    ///
+    /// the readings, immutable
+    private static List<TraitReading> decodeReadings(String[] lines,
+            TraitReadRequest asked) {
+        if (asked == null) {
+            return decodeReadings(lines);
+        }
+        List<String> accessoryIds = asked.getAccessoryIds();
+        List<String> serviceIds = asked.getServiceIds();
+        List<Trait> traits = asked.getTraits();
+        int count = traits.size();
+        List<TraitReading> out = new ArrayList<TraitReading>(count);
+        for (int i = 0; i < count; i++) {
+            TraitReading reading = lines != null && i < lines.length
+                    ? HomeWire.decodeReading(lines[i]) : null;
+            if (reading == null) {
+                reading = TraitReading.failed(accessoryIds.get(i),
+                        serviceIds.get(i), traits.get(i),
+                        HomeError.INVALID_DATA,
+                        "the platform's answer for this trait could not be"
+                                + " read");
+            }
+            out.add(reading);
         }
         return Collections.unmodifiableList(out);
     }

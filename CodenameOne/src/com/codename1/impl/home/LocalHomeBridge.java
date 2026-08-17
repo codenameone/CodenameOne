@@ -110,6 +110,10 @@ public class LocalHomeBridge implements HomeBridge {
     private HomeAuthorizationStatus authorization =
             HomeAuthorizationStatus.AUTHORIZED;
     private int nextCommissionedIndex = 1;
+    /// Never reused, and never reset. Shared across homes so an id is unique
+    /// in this process, which is stronger than it needs to be and cheaper
+    /// than being careful.
+    private int nextSceneId;
 
     // ------------------------------------------------------------------
     // model building, for the simulator and for tests
@@ -842,7 +846,13 @@ public class LocalHomeBridge implements HomeBridge {
                         HomeError.INVALID_ARGUMENT.name() + "\tno such home"));
                 return;
             }
-            String sceneId = "scene-" + (s.scenes.size() + 1);
+            // A counter, not the map's size. Delete a scene that is not the
+            // last one and the size repeats an id that is still in use, and
+            // the put() below replaces somebody's scene without a word.
+            String sceneId;
+            do {
+                sceneId = "scene-" + (++nextSceneId);
+            } while (s.scenes.containsKey(sceneId));
             SceneRecord scene = new SceneRecord(sceneId, name,
                     com.codename1.home.SceneType.USER_DEFINED.ordinal());
             for (int i = 0; i < traitIds.length; i++) {

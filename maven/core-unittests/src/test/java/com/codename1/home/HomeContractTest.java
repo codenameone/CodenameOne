@@ -22,6 +22,7 @@
  */
 package com.codename1.home;
 
+import com.codename1.impl.home.HomeWire;
 import com.codename1.impl.home.LocalHomeBridge;
 import com.codename1.impl.home.SubscriptionState;
 import com.codename1.impl.home.SyntheticHome;
@@ -279,6 +280,43 @@ class HomeContractTest {
     }
 
     /**
+     * A record the codec cannot read keeps its place.
+     *
+     * <p>read() promises one reading per requested trait, in order. Dropping
+     * an unreadable record shifts every later one up, and a caller lining
+     * values up with the controls that asked for them puts the humidity on
+     * the thermostat dial.</p>
+     */
+    @Test
+    void anUnreadableRecordKeepsItsPlaceInTheAnswer() {
+        CapturingBridge bridge = new CapturingBridge();
+        bridge.corruptSecondReading = true;
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory thermostat = home.findAccessory("thermostat");
+        AccessoryService svc = thermostat.getPrimaryService();
+        TraitReadRequest request = new TraitReadRequest();
+        request.add(thermostat, svc, Trait.CURRENT_TEMPERATURE);
+        request.add(thermostat, svc, Trait.CURRENT_HUMIDITY);
+        request.add(thermostat, svc, Trait.TARGET_HEATING_TEMPERATURE);
+        List<TraitReading> readings =
+                HomeAwait.settled(home.read(request)).get();
+
+        assertEquals(3, readings.size(),
+                "one reading per trait asked for");
+        assertSame(Trait.CURRENT_HUMIDITY, readings.get(1).getTrait(),
+                "the unreadable one holds its own position");
+        assertSame(HomeError.INVALID_DATA, readings.get(1).getError(),
+                "and says why it has no value");
+        assertSame(Trait.TARGET_HEATING_TEMPERATURE,
+                readings.get(2).getTrait(),
+                "so the ones after it are not shifted up");
+    }
+
+    /**
      * A change that lands while the up-front read is in flight arrives
      * after it, not before.
      *
@@ -385,6 +423,7 @@ class HomeContractTest {
         private boolean holdStart;
         private int heldStartId;
         private int readBatchLimit;
+        private boolean corruptSecondReading;
         private final List<Integer> readBatches = new ArrayList<Integer>();
 
         @Override
@@ -396,8 +435,24 @@ class HomeContractTest {
         public void readTraits(int requestId, String[] accessoryIds,
                 String[] serviceIds, String[] traitIds, boolean allowCached) {
             readBatches.add(Integer.valueOf(traitIds.length));
-            super.readTraits(requestId, accessoryIds, serviceIds, traitIds,
-                    allowCached);
+            if (!corruptSecondReading) {
+                super.readTraits(requestId, accessoryIds, serviceIds, traitIds,
+                        allowCached);
+                return;
+            }
+            // A port a version ahead, or one that truncated a line. Answered
+            // straight rather than through the local store, because the
+            // record has to be broken on the wire and that is where the wire
+            // is.
+            String[] lines = new String[traitIds.length];
+            for (int i = 0; i < traitIds.length; i++) {
+                lines[i] = i == 1 ? "not a record"
+                        : HomeWire.encodeReading(TraitReading.of(
+                                accessoryIds[i], serviceIds[i],
+                                Trait.forId(traitIds[i]),
+                                TraitValue.of(1, TraitUnit.PERCENT), 1L));
+            }
+            SmartHome.deliverReadings(requestId, lines, null);
         }
 
         @Override

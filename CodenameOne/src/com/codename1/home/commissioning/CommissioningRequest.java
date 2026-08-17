@@ -68,9 +68,12 @@ public final class CommissioningRequest {
     /// this request, for chaining
     public CommissioningRequest setSetupPayload(SetupPayload setupPayload) {
         this.setupPayload = setupPayload;
-        if (setupPayload != null) {
-            this.rawSetupPayload = setupPayload.getRaw();
-        }
+        // Cleared together, because commission() forwards the raw form.
+        // Leaving the old code behind means clearing the payload silently
+        // commissions with it on the next use, instead of opening the
+        // platform's scanner as asked.
+        this.rawSetupPayload =
+                setupPayload == null ? null : setupPayload.getRaw();
         return this;
     }
 
