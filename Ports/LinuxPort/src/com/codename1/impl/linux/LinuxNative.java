@@ -177,7 +177,8 @@ public final class LinuxNative {
 
     /** Creates a hidden GtkWindow; returns its slot, or -1 on failure. */
     public static native int desktopWindowCreate(int windowId, String title, int x, int y,
-            int width, int height, boolean decorated, boolean resizable, int ownerSlot);
+            int width, int height, boolean decorated, boolean resizable, int ownerSlot,
+            boolean positionSet);
 
     public static native void desktopWindowDestroy(int slot);
 

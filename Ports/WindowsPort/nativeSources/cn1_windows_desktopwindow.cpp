@@ -60,6 +60,7 @@ typedef struct {
     volatile LONG pendingH;
     int windowId;      /* framework assigned; 0 marks a free slot */
     int monitorIndex;
+    int minimized;
     int inUse;
 } CN1DesktopWindow;
 
@@ -82,6 +83,7 @@ typedef struct {
     int decorated;
     int resizable;
     int ownerSlot;
+    int positionSet;
     int result;
 } CN1DesktopWindowOp;
 
@@ -289,6 +291,20 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_KEY_RELEASED, 0, 0, (int) wParam);
             return 0;
         case WM_SIZE:
+            /* A minimize arrives as a resize to zero. Reporting only that leaves the
+             * framework thinking the window is still on screen: it keeps painting it
+             * and an animation in it keeps the event dispatch thread awake. */
+            if (wParam == SIZE_MINIMIZED) {
+                if (!w->minimized) {
+                    w->minimized = 1;
+                    cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_HIDDEN, 0, 0, 0);
+                }
+                return 0;
+            }
+            if (wParam == SIZE_RESTORED && w->minimized) {
+                w->minimized = 0;
+                cn1WinPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_SHOWN, 0, 0, 0);
+            }
             w->width = LOWORD(lParam);
             w->height = HIWORD(lParam);
             /* The Direct2D Resize has to happen on the drawing thread between
@@ -395,12 +411,16 @@ static void cn1WinDesktopCreateOnPump(CN1DesktopWindowOp* op) {
      * Windows establishes that. Falling back to the main window keeps a window opened
      * from the main form on top of it, which is what a user expects of a tool window. */
     {
-        CN1DesktopWindow* owner = slotAt(op->ownerSlot);
-        HWND ownerHwnd = owner != NULL ? owner->hwnd : cn1Win.hwnd;
+        /* ownerSlot: >= 0 another Codename One window, -2 the application's main
+         * window, anything else unowned. An unowned window must not be silently
+         * parented to the main one -- that would minimize it with the main window. */
+        CN1DesktopWindow* owner = op->ownerSlot >= 0 ? slotAt(op->ownerSlot) : NULL;
+        HWND ownerHwnd = owner != NULL ? owner->hwnd
+                : (op->ownerSlot == -2 ? cn1Win.hwnd : NULL);
         w->hwnd = CreateWindowExW(0, L"CodenameOneDesktopWindow", wTitle,
                 style | WS_CLIPCHILDREN,
-                op->x >= 0 ? op->x : CW_USEDEFAULT,
-                op->y >= 0 ? op->y : CW_USEDEFAULT,
+                op->positionSet ? op->x : CW_USEDEFAULT,
+                op->positionSet ? op->y : CW_USEDEFAULT,
                 op->width, op->height,
                 ownerHwnd, NULL, GetModuleHandleW(NULL), w);
     }
@@ -506,10 +526,11 @@ extern "C" void cn1WinDesktopApplyPendingResize(int slot) {
 
 extern "C" {
 
-JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_R_int(
+JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_boolean_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
-        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot) {
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot,
+        JAVA_BOOLEAN positionSet) {
     CN1DesktopWindowOp op;
     int slot = -1;
     int iter;
@@ -534,6 +555,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_desktopWindowCreate___int_java
     op.decorated = decorated == JAVA_TRUE ? 1 : 0;
     op.resizable = resizable == JAVA_TRUE ? 1 : 0;
     op.ownerSlot = ownerSlot;
+    op.positionSet = positionSet == JAVA_TRUE ? 1 : 0;
     /* Blocking send: the window must be created on the thread that owns the pump,
      * and the caller needs the slot back before it can use it. */
     SendMessageW(cn1Win.hwnd, WM_CN1_DESKTOPWINDOW, 0, (LPARAM) &op);

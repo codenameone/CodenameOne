@@ -516,6 +516,45 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void thePortIsToldWhetherAPositionWasChosen() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window placed = new Window("placed");
+        // Negative is an ordinary coordinate: a monitor left of or above the primary
+        // display has a negative origin, so it cannot double as "no position given".
+        placed.setWindowBounds(new com.codename1.ui.geom.Rectangle(-1400, -200, 300, 200));
+        placed.show();
+        assertTrue(wm.getLastWindow().isPositionSet());
+        assertEquals(-1400, wm.getLastWindow().getX());
+        placed.dispose();
+
+        Window unplaced = new Window("unplaced");
+        unplaced.show();
+        assertFalse(wm.getLastWindow().isPositionSet(),
+                "a window that named no position must be placed by the platform");
+        unplaced.dispose();
+    }
+
+    @FormTest
+    void aFormOwnedWindowIsNotConfusedWithAnUnownedOne() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window unowned = new Window("unowned");
+        unowned.show();
+        assertNull(wm.getLastWindow().getOwner());
+        assertFalse(wm.getLastWindow().isOwnedByMainWindow(),
+                "an unowned window must not become a child of the main window");
+        unowned.dispose();
+
+        Window ownedByForm = new Window("owned by the form");
+        ownedByForm.setOwnerWindow(Display.getInstance().getCurrent());
+        ownedByForm.show();
+        assertNull(wm.getLastWindow().getOwner(),
+                "the main form has no window peer");
+        assertTrue(wm.getLastWindow().isOwnedByMainWindow(),
+                "but the port still has to be told it owns this window");
+        ownedByForm.dispose();
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

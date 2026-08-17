@@ -70,11 +70,14 @@ public class LinuxWindowManager extends WindowManager {
 
     @Override
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
-            boolean decorated, boolean resizable, Object parentPeer) {
+            boolean decorated, boolean resizable, Object parentPeer, boolean positionSet,
+            boolean ownedByMainWindow) {
         // The transient parent is what makes an owned window stay above its owner and
-        // is also what scopes GTK's modality; -1 means the application's main window.
+        // is also what scopes GTK's modality. -2 asks for the application's main
+        // window; -1 leaves the window unowned rather than silently parenting it.
+        int ownerSlot = parentPeer != null ? slot(parentPeer) : (ownedByMainWindow ? -2 : -1);
         int s = LinuxNative.desktopWindowCreate(windowId, title == null ? "" : title,
-                x, y, width, height, decorated, resizable, slot(parentPeer));
+                x, y, width, height, decorated, resizable, ownerSlot, positionSet);
         if (s < 0) {
             return null;
         }

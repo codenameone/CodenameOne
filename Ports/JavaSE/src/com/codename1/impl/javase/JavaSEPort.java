@@ -329,7 +329,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         fullScreen = aFullScreen;
     }
 
-    private JFrame findTopFrame() {
+    /* Package private rather than private: the window manager needs it to own a
+     * window to the application's main frame. */
+    JFrame findTopFrame() {
         java.awt.Component c = canvas;
         return (JFrame)canvas.getTopLevelAncestor();
         /*

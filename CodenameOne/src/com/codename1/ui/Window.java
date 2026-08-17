@@ -140,8 +140,13 @@ public class Window extends Container implements TopLevelContainer {
     private final EventDispatcher windowListeners = new EventDispatcher();
 
     private String pendingTitle = "";
-    private int pendingX = -1;
-    private int pendingY = -1;
+    private int pendingX;
+    private int pendingY;
+    /// Whether the application chose a position. A negative coordinate is a perfectly
+    /// ordinary one -- a monitor to the left of or above the primary display has a
+    /// negative origin -- so it cannot double as "no position was asked for", or a
+    /// window restored onto such a monitor would be centred on the primary one instead.
+    private boolean pendingPositionSet;
     private int pendingWidth = 400;
     private int pendingHeight = 300;
     private boolean decorated = true;
@@ -961,6 +966,7 @@ public class Window extends Container implements TopLevelContainer {
     private void setWindowBounds(int x, int y, int w, int h) {
         pendingX = x;
         pendingY = y;
+        pendingPositionSet = true;
         pendingWidth = w;
         pendingHeight = h;
         if (nativePeer != null) {
@@ -1145,8 +1151,13 @@ public class Window extends Container implements TopLevelContainer {
         if (nativePeer == null) {
             Object parentPeer = ownerWindow instanceof Window
                     ? ((Window) ownerWindow).nativePeer : null;
+            // A null peer means two different things -- no owner at all, or an owner
+            // that is the application's main form -- and a port has to tell them
+            // apart: one is a top level window, the other is a child of the main one.
+            boolean ownedByMainWindow = parentPeer == null && ownerWindow != null;
             Object peer = wm.createWindow(windowId, pendingTitle, pendingX, pendingY,
-                    pendingWidth, pendingHeight, decorated, resizable, parentPeer);
+                    pendingWidth, pendingHeight, decorated, resizable, parentPeer,
+                    pendingPositionSet, ownedByMainWindow);
             if (peer == null) {
                 // Every port has a bounded native window table. Continuing here would
                 // register a window that paints through null graphics forever, which
@@ -1351,7 +1362,10 @@ public class Window extends Container implements TopLevelContainer {
             });
             return;
         }
-        if (nativePeer != null && nativeVisible) {
+        // iconified counts as still shown here: the platform took the window off
+        // screen, but the application asking to hide it still has to release the
+        // native window, drop the modal blocker and unpark showModal().
+        if (nativePeer != null && (nativeVisible || iconified)) {
             nativeVisible = false;
             iconified = false;
             // A window the user can no longer reach must not go on blocking the ones

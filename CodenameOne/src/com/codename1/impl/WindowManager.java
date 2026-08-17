@@ -73,13 +73,26 @@ public abstract class WindowManager {
     ///
     /// - `resizable`: true if the user may resize it
     ///
-    /// - `parentPeer`: the owning window's peer, or null when there is no owner
+    /// - `parentPeer`: the owning window's peer, or null when the owner is the
+    ///   application's main window or there is no owner at all -- see
+    ///   `ownedByMainWindow`
+    ///
+    /// - `positionSet`: true when `x` and `y` are a position the application chose.
+    ///   When false the platform places the window. A negative coordinate cannot
+    ///   serve as the "unspecified" marker, because a monitor left of or above the
+    ///   primary display has a negative origin and a window can legitimately be
+    ///   restored onto it.
+    ///
+    /// - `ownedByMainWindow`: true when the owner is the application's main window,
+    ///   which has no peer here. With `parentPeer` null this is what separates an
+    ///   owned window from an unowned top level one.
     ///
     /// #### Returns
     ///
     /// the opaque peer identifying the new window
     public abstract Object createWindow(int windowId, String title, int x, int y,
-            int width, int height, boolean decorated, boolean resizable, Object parentPeer);
+            int width, int height, boolean decorated, boolean resizable, Object parentPeer,
+            boolean positionSet, boolean ownedByMainWindow);
 
     /// Maps the window onto the screen.
     ///

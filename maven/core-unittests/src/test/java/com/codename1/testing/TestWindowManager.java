@@ -64,6 +64,8 @@ public class TestWindowManager extends WindowManager {
         private FakeWindow modalOwner;
         private boolean utility;
         private FakeWindow owner;
+        private boolean positionSet;
+        private boolean ownedByMainWindow;
         private int minimumWidth;
         private int minimumHeight;
 
@@ -126,6 +128,16 @@ public class TestWindowManager extends WindowManager {
         /** The owning window handed to createWindow(), or null when there was none. */
         public FakeWindow getOwner() {
             return owner;
+        }
+
+        /** True when the application chose the window's position. */
+        public boolean isPositionSet() {
+            return positionSet;
+        }
+
+        /** True when the owner is the application's main window, which has no peer. */
+        public boolean isOwnedByMainWindow() {
+            return ownedByMainWindow;
         }
 
         /** The minimum size the framework forwarded, or zero when none was set. */
@@ -265,12 +277,15 @@ public class TestWindowManager extends WindowManager {
 
     @Override
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
-            boolean decorated, boolean resizable, Object parentPeer) {
+            boolean decorated, boolean resizable, Object parentPeer, boolean positionSet,
+            boolean ownedByMainWindow) {
         if (createFails) {
             return null;
         }
         FakeWindow w = new FakeWindow();
         w.owner = win(parentPeer);
+        w.positionSet = positionSet;
+        w.ownedByMainWindow = ownedByMainWindow;
         w.windowId = windowId;
         w.title = title;
         w.x = x;

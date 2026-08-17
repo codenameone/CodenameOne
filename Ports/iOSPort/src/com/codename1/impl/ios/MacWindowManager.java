@@ -83,7 +83,10 @@ public class MacWindowManager extends WindowManager {
 
     @Override
     public Object createWindow(int windowId, String title, int x, int y, int width, int height,
-            boolean decorated, boolean resizable, Object parentPeer) {
+            boolean decorated, boolean resizable, Object parentPeer, boolean positionSet,
+            boolean ownedByMainWindow) {
+        // Catalyst scenes have no owner relation and the window server places them,
+        // so both of the new hints are deliberately unused here.
         int s = IOSImplementation.nativeInstance.macWindowCreate(windowId,
                 title == null ? "" : title, x, y, width, height, decorated, resizable);
         if (s < 0) {

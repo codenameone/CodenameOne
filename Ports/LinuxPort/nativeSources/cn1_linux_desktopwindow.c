@@ -266,6 +266,24 @@ static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data
     return FALSE;
 }
 
+/* Minimize and restore. Without this the framework goes on treating a minimized
+ * window as displayed: it keeps painting it, and an animation in it keeps the event
+ * dispatch thread awake indefinitely. */
+static gboolean cn1DesktopOnWindowState(GtkWidget* widget, GdkEventWindowState* e,
+        gpointer data) {
+    CN1LinuxWindow* w = (CN1LinuxWindow*) data;
+    (void) widget;
+    if (w == 0 || (e->changed_mask & GDK_WINDOW_STATE_ICONIFIED) == 0) {
+        return FALSE;
+    }
+    if (e->new_window_state & GDK_WINDOW_STATE_ICONIFIED) {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_HIDDEN, 0, 0, 0);
+    } else {
+        cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_WINDOW_SHOWN, 0, 0, 0);
+    }
+    return FALSE;
+}
+
 static gboolean cn1DesktopOnDelete(GtkWidget* widget, GdkEvent* e, gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     (void) widget;
@@ -300,6 +318,7 @@ typedef struct {
     int decorated;
     int resizable;
     int ownerSlot;
+    int positionSet;
     int result;
 } CN1DesktopCreateOp;
 
@@ -320,8 +339,12 @@ static void cn1DesktopCreateOnMain(void* arg) {
          * that, and it is also what scopes gtk_window_set_modal to the right window.
          * Falling back to the main window keeps a window opened from the main form
          * above it, which is what a user expects of a tool window. */
-        CN1LinuxWindow* owner = slotAt(op->ownerSlot);
-        GtkWidget* ownerWidget = owner != 0 ? owner->window : cn1LinuxWindowWidget();
+        /* ownerSlot: >= 0 another Codename One window, -2 the application's main
+         * window, anything else unowned -- an unowned window must not be silently
+         * made transient for the main one. */
+        CN1LinuxWindow* owner = op->ownerSlot >= 0 ? slotAt(op->ownerSlot) : 0;
+        GtkWidget* ownerWidget = owner != 0 ? owner->window
+                : (op->ownerSlot == -2 ? cn1LinuxWindowWidget() : 0);
         if (ownerWidget != 0) {
             gtk_window_set_transient_for(GTK_WINDOW(w->window), GTK_WINDOW(ownerWidget));
         }
@@ -330,7 +353,9 @@ static void cn1DesktopCreateOnMain(void* arg) {
     gtk_window_set_default_size(GTK_WINDOW(w->window), w->width, w->height);
     gtk_window_set_decorated(GTK_WINDOW(w->window), op->decorated ? TRUE : FALSE);
     gtk_window_set_resizable(GTK_WINDOW(w->window), op->resizable ? TRUE : FALSE);
-    if (op->x >= 0 && op->y >= 0) {
+    if (op->positionSet) {
+        /* Moved whatever the sign: a monitor left of or above the primary display
+         * has a negative origin and a restored window belongs there. */
         gtk_window_move(GTK_WINDOW(w->window), op->x, op->y);
     }
 
@@ -360,6 +385,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
     g_signal_connect(w->window, "key-press-event", G_CALLBACK(cn1DesktopOnKey), w);
     g_signal_connect(w->window, "key-release-event", G_CALLBACK(cn1DesktopOnKey), w);
+    g_signal_connect(w->window, "window-state-event", G_CALLBACK(cn1DesktopOnWindowState), w);
     g_signal_connect(w->window, "delete-event", G_CALLBACK(cn1DesktopOnDelete), w);
     g_signal_connect(w->window, "focus-in-event", G_CALLBACK(cn1DesktopOnFocus), w);
     g_signal_connect(w->window, "focus-out-event", G_CALLBACK(cn1DesktopOnFocus), w);
@@ -503,10 +529,11 @@ static void cn1DesktopFlushOnMain(void* arg) {
 
 /* ------------------------------------------------------ LinuxNative bridge */
 
-JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_R_int(
+JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lang_String_int_int_int_int_boolean_boolean_int_boolean_R_int(
         CODENAME_ONE_THREAD_STATE, JAVA_INT windowId, JAVA_OBJECT title,
         JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
-        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot) {
+        JAVA_BOOLEAN decorated, JAVA_BOOLEAN resizable, JAVA_INT ownerSlot,
+        JAVA_BOOLEAN positionSet) {
     CN1DesktopCreateOp op;
     char* utf8 = 0;
     int slot = -1;
@@ -526,6 +553,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_desktopWindowCreate___int_java_lan
     memset(&op, 0, sizeof(op));
     op.slot = slot;
     op.ownerSlot = ownerSlot;
+    op.positionSet = positionSet == JAVA_TRUE ? 1 : 0;
     op.windowId = windowId;
     op.title = utf8 != 0 ? utf8 : "";
     op.x = x;

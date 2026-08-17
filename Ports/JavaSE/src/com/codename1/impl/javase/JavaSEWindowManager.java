@@ -108,7 +108,8 @@ public class JavaSEWindowManager extends WindowManager {
     @Override
     public Object createWindow(final int windowId, final String title, final int x, final int y,
             final int width, final int height, final boolean decorated, final boolean resizable,
-            final Object parentPeer) {
+            final Object parentPeer, final boolean positionSet,
+            final boolean ownedByMainWindow) {
         final Peer p = new Peer();
         p.windowId = windowId;
         runOnAwtAndWait(new Runnable() {
@@ -124,11 +125,15 @@ public class JavaSEWindowManager extends WindowManager {
                 // which is what setOwnerWindow() promises. Swing establishes that only
                 // through the owner passed at construction, and JFrame has no owned
                 // form, so an owned window is a JDialog.
+                // An owner with no peer is the application's main window, which is
+                // the port's own frame rather than one of ours.
                 Peer owner = peer(parentPeer);
+                java.awt.Window ownerWindow = owner != null ? owner.frame
+                        : (ownedByMainWindow ? port.findTopFrame() : null);
                 java.awt.Window frame;
-                if (owner != null && owner.frame != null) {
+                if (ownerWindow != null) {
                     javax.swing.JDialog dlg =
-                            new javax.swing.JDialog(owner.frame, title == null ? "" : title);
+                            new javax.swing.JDialog(ownerWindow, title == null ? "" : title);
                     dlg.setDefaultCloseOperation(javax.swing.JDialog.DO_NOTHING_ON_CLOSE);
                     dlg.setUndecorated(!decorated);
                     dlg.setResizable(resizable);
@@ -145,7 +150,10 @@ public class JavaSEWindowManager extends WindowManager {
                 JavaSEPort.C canvas = port.createWindowCanvas(windowId);
                 frame.add(BorderLayout.CENTER, canvas);
                 frame.setSize(new Dimension(width, height));
-                if (x >= 0 && y >= 0) {
+                if (positionSet) {
+                    // Applied whatever the sign: a monitor left of or above the
+                    // primary display has a negative origin, and a window restored
+                    // onto it must not be re-centred on the primary one.
                     frame.setLocation(x, y);
                 } else {
                     frame.setLocationRelativeTo(null);

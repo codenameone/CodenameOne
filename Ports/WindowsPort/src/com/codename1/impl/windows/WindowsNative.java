@@ -156,7 +156,8 @@ public final class WindowsNative {
 
     /** Creates a hidden native window; returns its slot, or -1 on failure. */
     public static native int desktopWindowCreate(int windowId, String title, int x, int y,
-            int width, int height, boolean decorated, boolean resizable, int ownerSlot);
+            int width, int height, boolean decorated, boolean resizable, int ownerSlot,
+            boolean positionSet);
 
     /** Destroys a native window and releases its render target. */
     public static native void desktopWindowDestroy(int slot);
