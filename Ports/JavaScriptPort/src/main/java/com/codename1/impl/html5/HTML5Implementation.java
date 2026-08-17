@@ -10650,7 +10650,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         try {
             historyIndex++;
-            window.getHistory().pushState(String.valueOf(historyIndex), "");
+            window.getHistory().pushState(HISTORY_STATE_PREFIX + historyIndex, "");
             historyEntriesPushed++;
         } catch (Throwable ignored) {
             // A sandboxed or file:// document can refuse pushState. Back simply stays inert.
@@ -10710,15 +10710,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     /**
+     * Marks a history entry as this port's. A page can be running its own navigation before
+     * Codename One starts -- a host application embedding the canvas, for instance -- and its
+     * states are commonly plain numbers too. Without something to tell them apart, returning to
+     * one of those entries would read as a Codename One id and be taken for a Forward, which
+     * bounces the browser straight back out again without ever running the form's back command.
+     */
+    private static final String HISTORY_STATE_PREFIX = "cn1-history:";
+
+    /**
      * Reads the id stamped into a history entry. Entries this port did not push -- the document
-     * entry the app started on -- carry no id and read as being before everything.
+     * entry the app started on, or anything the host page pushed -- carry no id of ours and
+     * read as being before everything.
      */
     private int parseHistoryIndex(String state) {
-        if (state == null || state.length() == 0) {
+        if (state == null || !state.startsWith(HISTORY_STATE_PREFIX)) {
             return 0;
         }
         try {
-            return Integer.parseInt(state);
+            return Integer.parseInt(state.substring(HISTORY_STATE_PREFIX.length()));
         } catch (NumberFormatException e) {
             return 0;
         }
