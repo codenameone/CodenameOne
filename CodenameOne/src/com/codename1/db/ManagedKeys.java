@@ -22,6 +22,7 @@
  */
 package com.codename1.db;
 
+import com.codename1.security.CryptoException;
 import com.codename1.security.SecureRandom;
 import com.codename1.security.SecureStorage;
 
@@ -94,7 +95,24 @@ final class ManagedKeys {
                     + "available, or supply a passphrase with DatabaseConfig.passphrase().");
         }
 
-        byte[] generated = SecureRandom.bytes(KEY_LENGTH);
+        byte[] generated;
+        try {
+            generated = SecureRandom.bytes(KEY_LENGTH);
+        } catch (CryptoException noRandomness) {
+            // Same failure as a store that will not hold the key, and it has to arrive the same
+            // way. SecureRandom reports an unavailable or failing platform RNG by throwing an
+            // unchecked CryptoException, which walked straight out of this method past its
+            // declared contract: on Android the reflective open handler read it as
+            // NOT_SUPPORTED -- "this platform has no cipher", which is the wrong thing to tell
+            // anyone, since the cipher is fine and the randomness is not -- and the other ports
+            // let it out unchecked at a caller that is only prepared for an IOException. There
+            // is nothing to fall back to: a key from a broken RNG is the one outcome worse than
+            // no key at all.
+            throw new DatabaseEncryptionException(DatabaseEncryptionException.KEY_UNAVAILABLE,
+                    "This platform could not produce the randomness a managed database key needs."
+                    + " Supply a passphrase with DatabaseConfig.passphrase() instead.",
+                    noRandomness);
+        }
         if (!storage.set(account, toHex(generated))) {
             // Deliberately fatal. Carrying on with a key we cannot persist would
             // produce a database that can never be reopened, and falling back to a

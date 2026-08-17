@@ -358,7 +358,10 @@ class AndroidCipherDB extends Database {
      *
      * sqlcipher_export copies schema and rows but not the header pragmas, so user_version and
      * application_id are carried across explicitly; an application using either for schema
-     * versioning or file identification would otherwise silently come back at zero.
+     * versioning or file identification would otherwise silently come back at zero. auto_vacuum
+     * is carried too, and before the export rather than after it: SQLite fixes that one in the
+     * header when the first table is created, so a database that vacuumed itself would come back
+     * never doing so again, retaining every page it deleted.
      *
      * The new database is built beside the old one and swapped in only once it is complete. The
      * original is renamed aside rather than deleted, so a complete database exists under one of
@@ -470,8 +473,18 @@ class AndroidCipherDB extends Database {
         try {
             userVersion = readHeaderPragma("PRAGMA user_version");
             applicationId = readHeaderPragma("PRAGMA application_id");
+            int autoVacuum = readHeaderPragma("PRAGMA auto_vacuum");
             db.execSQL("ATTACH DATABASE " + toPragmaLiteral(target.getPath())
                     + " AS cn1migrate KEY " + toPragmaLiteral(targetKey));
+            // Before the export, unlike the two pragmas below, because this one cannot be set
+            // afterwards: SQLite fixes auto_vacuum in the header when the first table is created
+            // and a later PRAGMA is accepted and ignored. The target is created NONE by default,
+            // so a database converted without this comes back with incremental vacuum silently
+            // stopped, or -- worse for a FULL database -- holding on to every page it deletes
+            // from then on. A conversion is not supposed to change how the database behaves.
+            if (autoVacuum != 0) {
+                db.execSQL("PRAGMA cn1migrate.auto_vacuum = " + autoVacuum);
+            }
             android.database.Cursor exported = db.rawQuery("SELECT sqlcipher_export('cn1migrate')",
                     null);
             try {
