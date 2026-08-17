@@ -578,6 +578,17 @@ public class AndroidIntentBridge implements IntentBridge {
         if (manager == null) {
             return;
         }
+        // Re-publishing does not undo a disable. removeFromIndex disables the id so a cached
+        // long-lived or pinned copy stops being surfaced, and Android keeps it disabled until
+        // something says otherwise -- so an entity that is removed and later indexed again
+        // would come back inert, or be refused outright. Harmless when the id was never
+        // disabled, which is the ordinary case.
+        try {
+            manager.enableShortcuts(Arrays.asList(id));
+        } catch (Throwable t) {
+            // An id the system has never seen is not an error worth reporting.
+        }
+
         Intent intent = new Intent(Intent.ACTION_VIEW, data);
         intent.setClass(ctx, CN1IntentTrampolineActivity.class);
 

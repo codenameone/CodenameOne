@@ -931,6 +931,26 @@ class IntentsTest {
         assertTrue(b.indexedImages.isEmpty());
     }
 
+    /// Both sides of an index removal are addressed by `uid`, which is `type:id`. The ports
+    /// match on it -- the JavaSE bridge keys its whole index by it -- so this pins the contract
+    /// they rely on. Matching a bare id instead made removing order:42 also hide customer:42.
+    @Test
+    void indexedEntitiesAndRemovalsAgreeOnACompositeUid() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+
+        Intents.index(Arrays.asList(new AppEntity("order", "42").setTitle("Two coffees"),
+                new AppEntity("customer", "42").setTitle("Ada")));
+        Intents.removeFromIndex("order", "42");
+
+        assertTrue(b.indexedJson.contains("\"order:42\""));
+        assertTrue(b.indexedJson.contains("\"customer:42\""),
+                "a batch publishes every entity, each with its own identity");
+        assertTrue(b.removedJson.contains("\"order:42\""));
+        assertFalse(b.removedJson.contains("\"customer:42\""),
+                "a removal names one entity, and the type is half of what names it");
+    }
+
     @Test
     void indexingAnEmptyListDoesNotCallThePlatform() {
         FakeBridge b = new FakeBridge();

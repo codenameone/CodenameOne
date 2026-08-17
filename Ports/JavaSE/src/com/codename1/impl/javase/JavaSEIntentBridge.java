@@ -23,6 +23,8 @@
 package com.codename1.impl.javase;
 
 import com.codename1.intents.spi.IntentBridge;
+import com.codename1.io.JSONParser;
+import com.codename1.io.JSONWriter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -102,15 +104,25 @@ public class JavaSEIntentBridge implements IntentBridge {
         }
     }
 
+    /// Records one entry per entity, keyed by the `type:id` uid the platforms use as an
+    /// index identity.
+    ///
+    /// One `Intents.index(List)` call publishes a single document carrying many entities, and
+    /// storing it whole meant a removal took every sibling with it -- the simulator hiding
+    /// entities a device would still be showing. The unit of storage has to be the unit the
+    /// platform addresses, which is the entity.
     public void index(String entitiesJson, Map<String, byte[]> images) {
         synchronized (lock) {
-            // Stored by the raw document rather than parsed apart: the simulator
-            // window presents what was published, and re-deriving the entities
-            // here would let the preview drift from the wire format the device
-            // actually receives.
-            Map<String, String> published = new LinkedHashMap<String, String>();
-            published.put("json", entitiesJson);
-            index.put(String.valueOf(index.size()), published);
+            for (Map<String, Object> entity : entitiesIn(entitiesJson)) {
+                Object uid = entity.get("uid");
+                if (uid == null) {
+                    continue;
+                }
+                Map<String, String> published = new LinkedHashMap<String, String>();
+                published.put("json", JSONWriter.toJson(entity));
+                published.put("type", String.valueOf(entity.get("type")));
+                index.put(String.valueOf(uid), published);
+            }
             if (images != null) {
                 indexImages.putAll(images);
             }
@@ -119,11 +131,8 @@ public class JavaSEIntentBridge implements IntentBridge {
 
     public void removeFromIndex(String idsJson) {
         synchronized (lock) {
-            for (Map.Entry<String, Map<String, String>> e : index.entrySet()) {
-                String json = e.getValue().get("json");
-                if (json != null && idsJson != null && overlaps(json, idsJson)) {
-                    e.getValue().put("removed", "true");
-                }
+            for (String uid : uidsIn(idsJson)) {
+                index.remove(uid);
             }
         }
     }
@@ -137,14 +146,59 @@ public class JavaSEIntentBridge implements IntentBridge {
             }
             List<String> drop = new ArrayList<String>();
             for (Map.Entry<String, Map<String, String>> e : index.entrySet()) {
-                String json = e.getValue().get("json");
-                if (json != null && json.contains("\"" + entityType + "\"")) {
+                if (entityType.equals(e.getValue().get("type"))) {
                     drop.add(e.getKey());
                 }
             }
             for (int i = 0; i < drop.size(); i++) {
                 index.remove(drop.get(i));
             }
+        }
+    }
+
+    /// The entity objects inside a published document, or empty when it cannot be read.
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> entitiesIn(String entitiesJson) {
+        List<Map<String, Object>> out = new ArrayList<Map<String, Object>>();
+        Map<String, Object> doc = parse(entitiesJson);
+        Object list = doc == null ? null : doc.get("entities");
+        if (list instanceof List) {
+            for (Object o : (List<Object>) list) {
+                if (o instanceof Map) {
+                    out.add((Map<String, Object>) o);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// The uids named by a removal request.
+    @SuppressWarnings("unchecked")
+    private static List<String> uidsIn(String idsJson) {
+        List<String> out = new ArrayList<String>();
+        Map<String, Object> doc = parse(idsJson);
+        Object list = doc == null ? null : doc.get("refs");
+        if (list instanceof List) {
+            for (Object o : (List<Object>) list) {
+                if (o instanceof Map) {
+                    Object uid = ((Map<String, Object>) o).get("uid");
+                    if (uid != null) {
+                        out.add(String.valueOf(uid));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static Map<String, Object> parse(String json) {
+        if (json == null || json.length() == 0) {
+            return null;
+        }
+        try {
+            return new JSONParser().parseJSON(new java.io.StringReader(json));
+        } catch (Throwable t) {
+            return null;
         }
     }
 
@@ -172,14 +226,15 @@ public class JavaSEIntentBridge implements IntentBridge {
         }
     }
 
-    /// Every entity document published to the index this session.
+    /// Every entity currently in the index, one JSON object each, in publication order.
+    ///
+    /// A removed entity is gone rather than flagged, which is what a device index looks like:
+    /// there is no state in which an entry is both indexed and not.
     public List<String> getIndexedDocuments() {
         synchronized (lock) {
             List<String> out = new ArrayList<String>();
             for (Map<String, String> e : index.values()) {
-                if (!"true".equals(e.get("removed"))) {
-                    out.add(e.get("json"));
-                }
+                out.add(e.get("json"));
             }
             return Collections.unmodifiableList(out);
         }
@@ -204,41 +259,4 @@ public class JavaSEIntentBridge implements IntentBridge {
         }
     }
 
-    /// True when a published document names the `{type, id}` pair a removal request names.
-    ///
-    /// Matched on `uid`, which the serializer writes as `type:id` on both sides, because that
-    /// is the identity the platform indexes use. Matching the bare id made removing `order:42`
-    /// also hide `customer:42` -- the simulator disagreeing with a device about which entry a
-    /// removal refers to, which is exactly the kind of divergence that makes a preview
-    /// worthless for testing.
-    private static boolean overlaps(String publishedJson, String refsJson) {
-        String uid = quotedValue(refsJson, "uid");
-        if (uid == null) {
-            return false;
-        }
-        return publishedJson.contains("\"" + uid + "\"");
-    }
-
-    /// The string value of a quoted JSON field, or null. Crude on purpose -- this is a preview,
-    /// not an index -- but it reads the field it was asked for rather than the first one it
-    /// finds.
-    private static String quotedValue(String json, String field) {
-        int at = json.indexOf("\"" + field + "\"");
-        if (at < 0) {
-            return null;
-        }
-        int colon = json.indexOf(':', at);
-        if (colon < 0) {
-            return null;
-        }
-        int quote = json.indexOf('"', colon + 1);
-        if (quote < 0) {
-            return null;
-        }
-        int end = json.indexOf('"', quote + 1);
-        if (end < 0) {
-            return null;
-        }
-        return json.substring(quote + 1, end);
-    }
 }

@@ -564,6 +564,18 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         }
     }
 
+    /// A declared boolean default, read the way the generated `requiredBoolean` reads a
+    /// supplied one.
+    ///
+    /// `Boolean.parseBoolean("1")` is false, so emitting it directly gave an intent declaring
+    /// defaultValue="1" the opposite of what it asked for -- and validation accepts "1"
+    /// precisely because the runtime treats it as true. The declaration and the runtime have to
+    /// read the same string the same way.
+    private static boolean booleanDefault(String v) {
+        String trimmed = v == null ? "" : v.trim();
+        return "true".equalsIgnoreCase(trimmed) || "1".equals(trimmed);
+    }
+
     private static boolean isLong(String v) {
         try {
             Long.parseLong(v.trim());
@@ -906,7 +918,7 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
             return "asDate(params, " + key + ", " + fallback + ")";
         }
         if ("boolean".equals(p.kind)) {
-            return "asBoolean(params, " + key + ", " + Boolean.parseBoolean(p.defaultValue) + ")";
+            return "asBoolean(params, " + key + ", " + booleanDefault(p.defaultValue) + ")";
         }
         String fallback = def == null ? "0" : def;
         if ("int".equals(p.kind)) {
