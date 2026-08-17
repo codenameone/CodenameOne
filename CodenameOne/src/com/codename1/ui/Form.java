@@ -1406,14 +1406,14 @@ public class Form extends Container {
     /// first. A transition defers a form change, so two navigations to the same form can be in
     /// flight at once -- showBack() to it, then show() while the first is still animating -- and
     /// a single field would give both arrivals the direction of the later one.
-    private java.util.ArrayList<Boolean> pendingReverse;
+    private ArrayList<Boolean> pendingReverse;
 
     /// The direction of the last arrival, for a form change with nothing queued behind it.
     private boolean lastShownWithReverse;
 
     void setShownWithReverse(boolean value) {
         if (pendingReverse == null) {
-            pendingReverse = new java.util.ArrayList<Boolean>();
+            pendingReverse = new ArrayList<Boolean>();
         }
         // A setCurrent() can turn out not to change anything -- the form is already showing --
         // and then nothing takes the direction it queued. Keeping the queue short means such an
