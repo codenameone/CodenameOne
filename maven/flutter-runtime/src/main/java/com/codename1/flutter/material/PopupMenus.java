@@ -96,14 +96,9 @@ public final class PopupMenus {
      */
     private static void stripPopupChrome(com.codename1.ui.Dialog d) {
         try {
-            d.setDialogUIID("Container");
-            d.getDialogStyle().setBorder(com.codename1.ui.plaf.Border.createEmpty());
-            d.getDialogStyle().setBgTransparency(0);
-            d.getDialogStyle().setPadding(0, 0, 0, 0);
-            d.getDialogStyle().setMargin(0, 0, 0, 0);
-            // The dim comes from the dialog FORM's own background, not the surface.
-            d.getAllStyles().setBgTransparency(0);
-            d.getContentPane().getAllStyles().setBgTransparency(0);
+            // The UIID is deliberately left alone: showPopupDialog derives the popup's
+            // surface from it, and renaming it away takes the card with the arrow.
+            d.setBlurBackgroundRadius(-1);
             d.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);
             d.getContentPane().getAllStyles().setMargin(0, 0, 0, 0);
         } catch (Throwable t) {
