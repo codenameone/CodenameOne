@@ -204,6 +204,9 @@ public final class LinuxNative {
     /** 0 resizable, 1 always on top, 2 modal, 3 decorated. */
     public static native void desktopWindowSetFlag(int slot, int flag, boolean value);
 
+    /** Enables or disables input for the application's main window. */
+    public static native void mainWindowSetSensitive(boolean sensitive);
+
     /** 0 restore, 1 minimize, 2 toggle maximize, 3 present (raise and focus). */
     public static native void desktopWindowSetState(int slot, int state);
 

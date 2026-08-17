@@ -254,8 +254,36 @@ public abstract class WindowManager {
     ///   false for `com.codename1.ui.Window#MODALITY_WINDOW`
     ///
     /// - `ownerPeer`: the peer of the window this one blocks, or null when it blocks
-    ///   the application's main window
+    ///   the application's main window or nothing at all
     public void setModal(Object peer, boolean modal, boolean applicationWide, Object ownerPeer) {
+    }
+
+    /// Enables or disables native input for one window.
+    ///
+    /// The framework calls this for every open window whenever the modal stack
+    /// changes, having already worked out which of them are blocked -- that answer
+    /// depends on the whole stack, on each window's modality scope and on who owns it,
+    /// so a port must not try to derive it from `#setModal`.
+    ///
+    /// Worth implementing even though the framework filters input itself, because a
+    /// blocked window's own title bar is outside that filter: its close button still
+    /// reaches the application.
+    ///
+    /// #### Parameters
+    ///
+    /// - `peer`: the window peer
+    ///
+    /// - `enabled`: false while the window is blocked by a modal window
+    public void setInputEnabled(Object peer, boolean enabled) {
+    }
+
+    /// Enables or disables native input for the application's main window, which has
+    /// no peer. See `#setInputEnabled(Object, boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: false while the main window is blocked by a modal window
+    public void setMainWindowInputEnabled(boolean enabled) {
     }
 
     /// Sets the window icon where the platform shows one.

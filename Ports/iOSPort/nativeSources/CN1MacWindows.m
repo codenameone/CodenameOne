@@ -182,6 +182,10 @@ typedef struct {
     CN1MacWindowController* controller;
     CN1MacWindowView* content;
     int windowId;
+    /* Bumped every time the slot is taken. A block queued on the main thread
+     * captures the value it saw, so a request left over from a window that was
+     * disposed cannot enqueue or adopt a scene for whoever took the slot next. */
+    int generation;
     int inUse;
     int pendingWidth;
     int pendingHeight;
@@ -197,6 +201,7 @@ typedef struct {
      * sizes are suppressed until one matches what was asked for. */
     int awaitingWidth;
     int awaitingHeight;
+    int staleLayoutDropped;
     NSString* pendingTitle;
 } CN1MacWindow;
 
@@ -231,10 +236,21 @@ static void CN1MacWindowReportLayout(int windowId, int width, int height) {
         }
         if (w->awaitingWidth > 0 && w->awaitingHeight > 0) {
             if (width != w->awaitingWidth || height != w->awaitingHeight) {
-                return;
+                /* Only the first differing layout is dropped -- that is the
+                 * recycled scene reporting the previous window's size before the
+                 * request lands. A second one is the system's settled answer, which
+                 * may legitimately differ from what was asked for (an oversized
+                 * window, or one the window manager constrained), and discarding it
+                 * forever would leave the framework laying out at a size the window
+                 * does not have. */
+                if (!w->staleLayoutDropped) {
+                    w->staleLayoutDropped = 1;
+                    return;
+                }
             }
             w->awaitingWidth = 0;
             w->awaitingHeight = 0;
+            w->staleLayoutDropped = 0;
         }
         break;
     }
@@ -348,14 +364,24 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
     if (slot < 0) {
         return -1;
     }
-    memset(&g_macWindows[slot], 0, sizeof(CN1MacWindow));
+    {
+        int generation = g_macWindows[slot].generation + 1;
+        memset(&g_macWindows[slot], 0, sizeof(CN1MacWindow));
+        g_macWindows[slot].generation = generation;
+    }
     g_macWindows[slot].inUse = 1;
     g_macWindows[slot].windowId = windowId;
     g_macWindows[slot].pendingWidth = width;
     g_macWindows[slot].pendingHeight = height;
     g_macWindows[slot].pendingTitle = [title retain];
 
+    const int generation = g_macWindows[slot].generation;
     dispatch_async(dispatch_get_main_queue(), ^{
+        if (!g_macWindows[slot].inUse || g_macWindows[slot].generation != generation) {
+            /* The window was disposed before this ran; the slot may already belong to
+             * another one, and requesting a scene for it would leave an orphan. */
+            return;
+        }
         UIWindowScene* recycled = takeFreeScene();
         if (recycled != nil) {
             /* Adopt it straight away rather than going through the pending queue:
@@ -396,6 +422,34 @@ BOOL CN1MacWindowAdoptScene(UIWindowScene* scene) {
     }
     CN1MacWindowSceneConnected(scene);
     return YES;
+}
+
+/*
+ * The window a scene belongs to, or -1 for the application's main scene. Lets the
+ * scene delegate route activation and disconnection without knowing about slots.
+ */
+int CN1MacWindowIdForScene(UIWindowScene* scene) {
+    int slot = slotForScene(scene);
+    return slot < 0 ? -1 : g_macWindows[slot].windowId;
+}
+
+/*
+ * The user closed the window with the native close control, so the scene is going
+ * away. Reported as a close request rather than acted on: the application may veto
+ * it from a close listener, and setCloseOperation decides what happens otherwise.
+ */
+void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
+    int slot = slotForScene(scene);
+    if (slot < 0) {
+        return;
+    }
+    {
+        CN1MacWindow* w = &g_macWindows[slot];
+        /* The scene is gone, so it must not be recycled or presented into. */
+        [w->scene release];
+        w->scene = nil;
+        CN1MacWindowDeliverClose(w->windowId);
+    }
 }
 
 void CN1MacWindowSceneConnected(UIWindowScene* scene) {
@@ -447,6 +501,7 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
          * CN1MacWindowReportLayout. */
         w->awaitingWidth = w->pendingWidth;
         w->awaitingHeight = w->pendingHeight;
+        w->staleLayoutDropped = 0;
         if (scene.sizeRestrictions != nil) {
             scene.sizeRestrictions.minimumSize =
                     CGSizeMake(MIN(pointWidth, 120), MIN(pointHeight, 120));
@@ -467,7 +522,11 @@ void CN1MacWindowDestroy(int slot) {
     CN1MacWindowController* controller = w->controller;
     CN1MacWindowView* content = w->content;
     NSString* title = w->pendingTitle;
+    /* Bumped across the clear, so a request still queued for this window sees a
+     * different generation and does nothing. */
+    int generation = w->generation + 1;
     memset(w, 0, sizeof(CN1MacWindow));
+    w->generation = generation;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         if (window != nil) {
@@ -542,6 +601,7 @@ void CN1MacWindowSetBounds(int slot, int x, int y, int width, int height) {
     w->pendingHeight = height;
     w->awaitingWidth = width;
     w->awaitingHeight = height;
+    w->staleLayoutDropped = 0;
     UIWindowScene* scene = w->scene;
     UIWindow* window = w->window;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -743,10 +803,15 @@ void CN1MacMonitorBounds(int monitor, BOOL workArea, int* out) {
      * a Catalyst app's usable area by the window server rather than reported, so
      * the bounds are the best available answer for both. */
     (void) workArea;
-    out[0] = (int) r.origin.x;
-    out[1] = (int) r.origin.y;
-    out[2] = (int) r.size.width;
-    out[3] = (int) r.size.height;
+    /* In pixels, like CN1MacWindowGetBounds. Monitor and window rectangles are
+     * combined by centerOnDesktop() and compared when a position is persisted, so
+     * two coordinate systems would silently place windows wrong on a Retina
+     * display. */
+    CGFloat scale = screen.scale;
+    out[0] = (int) (r.origin.x * scale);
+    out[1] = (int) (r.origin.y * scale);
+    out[2] = (int) (r.size.width * scale);
+    out[3] = (int) (r.size.height * scale);
 }
 
 double CN1MacMonitorScale(int monitor) {

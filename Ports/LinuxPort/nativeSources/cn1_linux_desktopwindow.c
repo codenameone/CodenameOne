@@ -492,6 +492,11 @@ static void cn1DesktopFlagOnMain(void* arg) {
                     op->b ? GDK_WINDOW_TYPE_HINT_UTILITY : GDK_WINDOW_TYPE_HINT_NORMAL);
             gtk_window_set_skip_taskbar_hint(GTK_WINDOW(w->window), op->b ? TRUE : FALSE);
             break;
+        case 5:
+            /* Insensitive is GTK's "blocked": the window is still on screen but the
+             * whole frame, title bar included, stops accepting input. */
+            gtk_widget_set_sensitive(w->window, op->b ? TRUE : FALSE);
+            break;
         default:
             break;
     }
@@ -667,6 +672,22 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowSetFlag___int_int_bo
     op.a = flag;
     op.b = value == JAVA_TRUE ? 1 : 0;
     cn1LinuxRunOnMainAndWait(cn1DesktopFlagOnMain, &op);
+}
+
+static void cn1MainWindowSensitiveOnMain(void* arg) {
+    CN1DesktopOp* op = (CN1DesktopOp*) arg;
+    GtkWidget* main = cn1LinuxWindowWidget();
+    if (main != 0) {
+        gtk_widget_set_sensitive(main, op->a ? TRUE : FALSE);
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_mainWindowSetSensitive___boolean(
+        CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN sensitive) {
+    CN1DesktopOp op;
+    memset(&op, 0, sizeof(op));
+    op.a = sensitive == JAVA_TRUE ? 1 : 0;
+    cn1LinuxRunOnMainAndWait(cn1MainWindowSensitiveOnMain, &op);
 }
 
 JAVA_VOID com_codename1_impl_linux_LinuxNative_desktopWindowSetState___int_int(

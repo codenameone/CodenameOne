@@ -44,6 +44,7 @@ public class LinuxWindowManager extends WindowManager {
     private static final int FLAG_MODAL = 2;
     private static final int FLAG_DECORATED = 3;
     private static final int FLAG_UTILITY = 4;
+    private static final int FLAG_SENSITIVE = 5;
 
     /** State selectors matching {@code cn1DesktopStateOnMain}. */
     private static final int STATE_RESTORE = 0;
@@ -189,6 +190,19 @@ public class LinuxWindowManager extends WindowManager {
         if (s >= 0) {
             LinuxNative.desktopWindowSetFlag(s, FLAG_MODAL, modal);
         }
+    }
+
+    @Override
+    public void setInputEnabled(Object peer, boolean enabled) {
+        int s = slot(peer);
+        if (s >= 0) {
+            LinuxNative.desktopWindowSetFlag(s, FLAG_SENSITIVE, enabled);
+        }
+    }
+
+    @Override
+    public void setMainWindowInputEnabled(boolean enabled) {
+        LinuxNative.mainWindowSetSensitive(enabled);
     }
 
     @Override

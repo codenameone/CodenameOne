@@ -29,6 +29,9 @@
 #import "CN1MacWindows.h"
 /* True when the scene was claimed by a Codename One Window. */
 extern BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
+extern int CN1MacWindowIdForScene(UIWindowScene* scene);
+extern void CN1MacWindowSceneDisconnected(UIWindowScene* scene);
+extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 #endif
 
 #ifdef CN1_USE_UI_SCENE
@@ -98,14 +101,46 @@ extern BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
 
 - (void)sceneDidBecomeActive:(UIScene *)scene API_AVAILABLE(ios(13.0))
 {
+#if TARGET_OS_MACCATALYST
+    // A Codename One window's scene: report the focus rather than treating it as the
+    // application becoming active, which would run the main form's resume path.
+    if ([scene isKindOfClass:[UIWindowScene class]]) {
+        int windowId = CN1MacWindowIdForScene((UIWindowScene *)scene);
+        if (windowId >= 0) {
+            CN1MacWindowDeliverFocus(windowId, YES);
+            return;
+        }
+    }
+#endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationDidBecomeActive];
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene API_AVAILABLE(ios(13.0))
 {
+#if TARGET_OS_MACCATALYST
+    if ([scene isKindOfClass:[UIWindowScene class]]) {
+        int windowId = CN1MacWindowIdForScene((UIWindowScene *)scene);
+        if (windowId >= 0) {
+            CN1MacWindowDeliverFocus(windowId, NO);
+            return;
+        }
+    }
+#endif
     CodenameOne_GLAppDelegate *appDelegate = (CodenameOne_GLAppDelegate *)[UIApplication sharedApplication].delegate;
     [appDelegate cn1ApplicationWillResignActive];
+}
+
+- (void)sceneDidDisconnect:(UIScene *)scene API_AVAILABLE(ios(13.0))
+{
+#if TARGET_OS_MACCATALYST
+    // The user closed a Codename One window with the native close control. Without
+    // this the framework never learns: close listeners and setCloseOperation are
+    // skipped and the window stays registered and painted with no scene behind it.
+    if ([scene isKindOfClass:[UIWindowScene class]]) {
+        CN1MacWindowSceneDisconnected((UIWindowScene *)scene);
+    }
+#endif
 }
 
 - (void)sceneWillEnterForeground:(UIScene *)scene API_AVAILABLE(ios(13.0))

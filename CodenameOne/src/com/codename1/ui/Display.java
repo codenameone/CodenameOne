@@ -3444,14 +3444,44 @@ public final class Display extends CN1Constants {
 
     void pushModalWindow(Window w) {
         modalWindows.add(w);
+        syncNativeModalBlocking();
     }
 
     void popModalWindow(Window w) {
         modalWindows.remove(w);
+        syncNativeModalBlocking();
+    }
+
+    /// Tells every native window whether input to it is currently blocked.
+    ///
+    /// The framework already decides this, in `#isBlockedByModal(int)`, and it is the
+    /// only place that can: the answer depends on the whole modal stack, on each
+    /// window's scope and on who owns it. A port that tried to derive it from a single
+    /// "this window became modal" call has to reinvent nesting and ownership, and gets
+    /// them wrong -- releasing an inner modal re-enabled everything the outer one was
+    /// still blocking, application modality left the other secondary windows enabled,
+    /// and an unowned window modal disabled a main window it never claimed.
+    ///
+    /// This matters beyond appearances, because a blocked window's own title bar is
+    /// outside the framework's input filter: its close button still reaches the
+    /// application.
+    void syncNativeModalBlocking() {
+        com.codename1.impl.WindowManager wm = impl.getWindowManager();
+        if (wm == null) {
+            return;
+        }
+        wm.setMainWindowInputEnabled(!isBlockedByModal(0));
+        for (Window each : Desktop.getInstance().getWindows()) {
+            Object peer = each.getNativePeer();
+            if (peer != null) {
+                wm.setInputEnabled(peer, !isBlockedByModal(each.getWindowId()));
+            }
+        }
     }
 
     void windowDisposed(Window w) {
         modalWindows.remove(w);
+        syncNativeModalBlocking();
         if (eventForm == w) { //NOPMD CompareObjectsWithEquals
             eventForm = null;
         }

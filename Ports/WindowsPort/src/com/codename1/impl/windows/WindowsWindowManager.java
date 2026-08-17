@@ -167,40 +167,25 @@ public class WindowsWindowManager extends WindowManager {
 
     @Override
     public void setModal(Object peerObj, boolean modal, boolean applicationWide, Object ownerPeer) {
-        // Codename One blocks the input itself, so this is not required for
-        // correctness. Disabling the blocked window on top of that gives the platform's
-        // own modal feel -- the title bar flashes rather than the click being silently
-        // swallowed.
-        //
-        // Only the window this one actually blocks is disabled. A window modal owned by
-        // another desktop window blocks its owner, so disabling the main window there
-        // would make an unrelated part of the application unusable.
-        int ownerSlot = slot(ownerPeer);
-        if (!applicationWide && ownerSlot >= 0) {
-            WindowsNative.desktopWindowSetEnabled(ownerSlot, !modal);
-            return;
-        }
-        // Counted rather than a flag: nesting one modal window inside another is
-        // ordinary, and re-enabling the main window when the inner one closes would
-        // leave the outer modal not blocking. A leaked disable is much worse than a
-        // leaked enable -- it makes the application unusable -- so the count never
-        // goes below zero.
-        if (modal) {
-            modalDepth++;
-            if (modalDepth == 1) {
-                WindowsNative.mainWindowSetEnabled(false);
-            }
-        } else if (modalDepth > 0) {
-            modalDepth--;
-            if (modalDepth == 0) {
-                WindowsNative.mainWindowSetEnabled(true);
-            }
+        // Nothing to do: which windows are blocked is decided by the framework and
+        // delivered through setInputEnabled/setMainWindowInputEnabled. Deriving it
+        // here from one call cannot express nesting, scope or ownership -- it left
+        // the other secondary windows enabled under application modality and
+        // re-enabled everything an outer modal was still blocking.
+    }
+
+    @Override
+    public void setInputEnabled(Object peerObj, boolean enabled) {
+        int s = slot(peerObj);
+        if (s >= 0) {
+            WindowsNative.desktopWindowSetEnabled(s, enabled);
         }
     }
 
-    /// How many application modal windows are currently up. See
-    /// `#setModal(Object, boolean, boolean, Object)`.
-    private int modalDepth;
+    @Override
+    public void setMainWindowInputEnabled(boolean enabled) {
+        WindowsNative.mainWindowSetEnabled(enabled);
+    }
 
     @Override
     public void setIcon(Object peerObj, Image icon) {

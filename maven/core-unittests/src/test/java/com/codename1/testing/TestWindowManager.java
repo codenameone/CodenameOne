@@ -63,6 +63,7 @@ public class TestWindowManager extends WindowManager {
         private boolean modalApplicationWide;
         private FakeWindow modalOwner;
         private boolean utility;
+        private boolean inputEnabled = true;
         private FakeWindow owner;
         private boolean positionSet;
         private boolean ownedByMainWindow;
@@ -123,6 +124,11 @@ public class TestWindowManager extends WindowManager {
         /** True when the framework asked for a tool/palette window. */
         public boolean isUtility() {
             return utility;
+        }
+
+        /** Whether the framework currently allows native input to this window. */
+        public boolean isInputEnabled() {
+            return inputEnabled;
         }
 
         /** The owning window handed to createWindow(), or null when there was none. */
@@ -263,6 +269,7 @@ public class TestWindowManager extends WindowManager {
 
     public void reset() {
         createFails = false;
+        mainWindowInputEnabled = true;
         windows.clear();
         monitors.clear();
         monitors.add(new FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
@@ -402,6 +409,26 @@ public class TestWindowManager extends WindowManager {
             w.modalOwner = win(ownerPeer);
         }
     }
+
+    @Override
+    public void setInputEnabled(Object peer, boolean enabled) {
+        FakeWindow w = win(peer);
+        if (w != null) {
+            w.inputEnabled = enabled;
+        }
+    }
+
+    @Override
+    public void setMainWindowInputEnabled(boolean enabled) {
+        mainWindowInputEnabled = enabled;
+    }
+
+    /** Whether the framework currently allows native input to the main window. */
+    public boolean isMainWindowInputEnabled() {
+        return mainWindowInputEnabled;
+    }
+
+    private boolean mainWindowInputEnabled = true;
 
     @Override
     public void setUtilityWindow(Object peer, boolean utility) {

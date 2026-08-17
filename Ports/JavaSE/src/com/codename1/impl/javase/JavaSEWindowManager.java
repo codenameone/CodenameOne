@@ -400,59 +400,44 @@ public class JavaSEWindowManager extends WindowManager {
     }
 
     @Override
-    public void setModal(Object peerObj, final boolean modal, final boolean applicationWide,
+    public void setModal(Object peerObj, final boolean modal, boolean applicationWide,
             Object ownerPeer) {
-        // Codename One blocks the input itself, so nothing is required here for
-        // correctness. Floating a modal window keeps the platform's own stacking
-        // consistent with that; the scope does not change that, because the frame is
-        // only being floated rather than anything being disabled.
-        //
-        // Releasing modality must not clear an always-on-top the application asked
-        // for: the framework does not reapply it, since the native window already
-        // exists, so the window would silently stop honouring it.
+        // Elevation only. Which windows are actually blocked is decided by the
+        // framework and delivered through setInputEnabled/setMainWindowInputEnabled,
+        // because that answer depends on the whole modal stack rather than on this
+        // one call.
         final Peer p = peer(peerObj);
         if (p == null) {
             return;
         }
         p.modalElevated = modal;
         applyAlwaysOnTop(p);
+    }
 
-        // Elevation alone is not enough. The framework filters canvas input, but the
-        // native title bar is outside that filter: closing a blocked secondary frame
-        // would still fire a close request, and closing the enabled main frame would
-        // exit the application. Disable the frames this window blocks.
-        final Peer owner = peer(ownerPeer);
-        final boolean enable = !modal;
+    @Override
+    public void setInputEnabled(Object peerObj, final boolean enabled) {
+        final Peer p = peer(peerObj);
+        if (p != null) {
+            runOnAwt(new Runnable() {
+                @Override
+                public void run() {
+                    p.frame.setEnabled(enabled);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void setMainWindowInputEnabled(final boolean enabled) {
         runOnAwt(new Runnable() {
             @Override
             public void run() {
-                if (applicationWide) {
-                    java.awt.Window main = port.findTopFrame();
-                    if (main != null) {
-                        main.setEnabled(enable);
-                    }
-                    for (Peer each : snapshotPeers()) {
-                        if (each != p) { //NOPMD CompareObjectsWithEquals
-                            each.frame.setEnabled(enable);
-                        }
-                    }
-                } else if (owner != null) {
-                    owner.frame.setEnabled(enable);
-                } else {
-                    java.awt.Window main = port.findTopFrame();
-                    if (main != null) {
-                        main.setEnabled(enable);
-                    }
+                java.awt.Window main = port.findTopFrame();
+                if (main != null) {
+                    main.setEnabled(enabled);
                 }
             }
         });
-    }
-
-    /// A copy of the peer list, so the AWT thread never walks the live one.
-    private Peer[] snapshotPeers() {
-        synchronized (peers) {
-            return peers.toArray(new Peer[peers.size()]);
-        }
     }
 
     /// Floats the frame when the application asked for it or while it is modal.

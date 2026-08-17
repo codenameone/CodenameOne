@@ -633,6 +633,42 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void nativeBlockingFollowsTheWholeModalStack() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        Window plain = new Window("plain");
+        plain.show();
+        TestWindowManager.FakeWindow plainPeer = wm.getLastWindow();
+
+        Window appModal = new Window("application modal");
+        appModal.setModalityType(Window.MODALITY_APPLICATION);
+        appModal.show();
+        TestWindowManager.FakeWindow appPeer = wm.getLastWindow();
+
+        // Application modality blocks every other window natively, not just the main
+        // one: a blocked window's own title bar is outside the framework's filter.
+        assertFalse(wm.isMainWindowInputEnabled());
+        assertFalse(plainPeer.isInputEnabled());
+        assertTrue(appPeer.isInputEnabled(), "the modal window itself stays usable");
+
+        Window inner = new Window("window modal");
+        inner.setOwnerWindow(appModal);
+        inner.setModalityType(Window.MODALITY_WINDOW);
+        inner.show();
+        inner.dispose();
+
+        // Releasing the inner modal must not re-enable what the outer one still
+        // blocks. A port counting its own depth got this wrong.
+        assertFalse(wm.isMainWindowInputEnabled(),
+                "the application modal is still up");
+        assertFalse(plainPeer.isInputEnabled());
+
+        appModal.dispose();
+        assertTrue(wm.isMainWindowInputEnabled(), "nothing blocks any more");
+        assertTrue(plainPeer.isInputEnabled());
+        plain.dispose();
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

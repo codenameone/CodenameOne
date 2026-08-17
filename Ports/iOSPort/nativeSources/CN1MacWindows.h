@@ -96,6 +96,12 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene);
  * it. Returns NO when the scene belongs to the application's main form. */
 BOOL CN1MacWindowAdoptScene(UIWindowScene* scene);
 
+/** The window id a scene belongs to, or -1 for the application's main scene. */
+int CN1MacWindowIdForScene(UIWindowScene* scene);
+
+/** The scene of a Codename One window disconnected; reported as a close request. */
+void CN1MacWindowSceneDisconnected(UIWindowScene* scene);
+
 #endif /* TARGET_OS_MACCATALYST */
 
 #endif /* CN1_MAC_WINDOWS_H */
