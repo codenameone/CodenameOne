@@ -685,6 +685,15 @@ public final class SmartHome {
             return failed(HomeError.NOT_SUPPORTED,
                     "this platform has no smart-home support");
         }
+        int max = b.getMaxReadBatchSize();
+        if (max > 0 && request.size() > max) {
+            // The limit is the backend's, and honouring it is this class's
+            // job: a caller reading forty traits should not have to know that
+            // one platform takes thirty at a time. Split here, recombined in
+            // order below, so the answer is indistinguishable from the
+            // unsplit one.
+            return readInChunks(request, max);
+        }
         int id = nextRequestId();
         EdtResult<List<TraitReading>> result = pendingReads.open(id);
         synchronized (this) {
@@ -785,6 +794,10 @@ public final class SmartHome {
             return failed(HomeError.NOT_SUPPORTED,
                     "this platform has no smart-home support");
         }
+        int maxWrites = b.getMaxWriteBatchSize();
+        if (maxWrites > 0 && writes.size() > maxWrites) {
+            return writeInChunks(writes, maxWrites);
+        }
         int count = writes.size();
         String[] accessoryIds = new String[count];
         String[] serviceIds = new String[count];
@@ -805,6 +818,7 @@ public final class SmartHome {
             }
             copy.add(w);
             TraitValue v = w.getValue();
+            requireEnumDomain(w.getTrait(), v, "write");
             accessoryIds[i] = w.getAccessoryId();
             serviceIds[i] = w.getServiceId();
             traitIds[i] = w.getTrait().getId();
@@ -1120,6 +1134,7 @@ public final class SmartHome {
                         "actions cannot contain a null at index " + i);
             }
             TraitValue v = a.getValue();
+            requireEnumDomain(a.getTrait(), v, "scene action");
             accessoryIds[i] = a.getAccessoryId();
             serviceIds[i] = a.getServiceId();
             traitIds[i] = a.getTrait().getId();
@@ -1751,6 +1766,196 @@ public final class SmartHome {
             out[i] = list.get(i);
         }
         return out;
+    }
+
+    /// Reads a request too large for the backend, in pieces.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the whole request
+    ///
+    /// - `max`: the backend's limit
+    ///
+    /// #### Returns
+    ///
+    /// the readings of every piece, in the order they were asked for
+    private AsyncResource<List<TraitReading>> readInChunks(
+            TraitReadRequest request, int max) {
+        List<String> accessoryIds = request.getAccessoryIds();
+        List<String> serviceIds = request.getServiceIds();
+        List<Trait> traits = request.getTraits();
+        int total = traits.size();
+        int parts = (total + max - 1) / max;
+        EdtResult<List<TraitReading>> combined =
+                new EdtResult<List<TraitReading>>();
+        ChunkJoin<TraitReading> join =
+                new ChunkJoin<TraitReading>(combined, parts);
+        for (int part = 0; part < parts; part++) {
+            TraitReadRequest piece = new TraitReadRequest();
+            piece.setAllowCached(request.isAllowCached());
+            int from = part * max;
+            int to = Math.min(from + max, total);
+            for (int i = from; i < to; i++) {
+                piece.add(accessoryIds.get(i), serviceIds.get(i),
+                        traits.get(i));
+            }
+            read(piece).onResult(new ChunkPart<TraitReading>(join, part));
+        }
+        return combined;
+    }
+
+    /// Writes a batch too large for the backend, in pieces.
+    ///
+    /// Not atomic across the pieces, and it never was: the SPI has no
+    /// transaction and a batch that fails halfway leaves what it applied
+    /// applied. That is why every write reports its own outcome.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writes`: the whole batch
+    ///
+    /// - `max`: the backend's limit
+    ///
+    /// #### Returns
+    ///
+    /// the outcome of every write, in the order they were given
+    private AsyncResource<List<TraitWriteResult>> writeInChunks(
+            List<TraitWrite> writes, int max) {
+        int total = writes.size();
+        int parts = (total + max - 1) / max;
+        EdtResult<List<TraitWriteResult>> combined =
+                new EdtResult<List<TraitWriteResult>>();
+        ChunkJoin<TraitWriteResult> join =
+                new ChunkJoin<TraitWriteResult>(combined, parts);
+        for (int part = 0; part < parts; part++) {
+            int from = part * max;
+            int to = Math.min(from + max, total);
+            List<TraitWrite> piece =
+                    new ArrayList<TraitWrite>(writes.subList(from, to));
+            write(piece).onResult(new ChunkPart<TraitWriteResult>(join, part));
+        }
+        return combined;
+    }
+
+    /// Collects the pieces of a split request and completes the caller once
+    /// they are all in, in the order they were asked for.
+    ///
+    /// #### Parameters
+    ///
+    /// - `<T>`: what each piece returns a list of
+    private static final class ChunkJoin<T> {
+
+        private final EdtResult<List<T>> combined;
+        private final List<List<T>> parts;
+        private int outstanding;
+        private Throwable failure;
+        private boolean answered;
+
+        ChunkJoin(EdtResult<List<T>> combined, int parts) {
+            this.combined = combined;
+            this.outstanding = parts;
+            this.parts = new ArrayList<List<T>>(parts);
+            for (int i = 0; i < parts; i++) {
+                this.parts.add(null);
+            }
+        }
+
+        void part(int index, List<T> values, Throwable error) {
+            // Everything the answer needs is taken under the lock and read
+            // outside it. Completing a resource runs the caller's callbacks,
+            // and one that starts another request would otherwise be doing it
+            // while this monitor is held.
+            boolean done;
+            Throwable failed;
+            List<T> all = null;
+            synchronized (this) {
+                if (answered) {
+                    return;
+                }
+                if (error != null && failure == null) {
+                    failure = error;
+                }
+                parts.set(index, values);
+                outstanding--;
+                done = outstanding <= 0;
+                failed = failure;
+                if (done) {
+                    answered = true;
+                    if (failed == null) {
+                        all = new ArrayList<T>();
+                        for (List<T> piece : parts) {
+                            if (piece != null) {
+                                all.addAll(piece);
+                            }
+                        }
+                    }
+                }
+            }
+            if (!done) {
+                return;
+            }
+            if (failed != null) {
+                // One piece failing fails the whole request. The alternative
+                // is a short list the caller has no way to line up with what
+                // they asked for.
+                combined.error(failed);
+                return;
+            }
+            combined.complete(Collections.unmodifiableList(all));
+        }
+    }
+
+    /// One piece's answer. Named rather than anonymous so it carries no
+    /// synthetic reference to anything enclosing (SpotBugs
+    /// `SIC_INNER_SHOULD_BE_STATIC_ANON`).
+    private static final class ChunkPart<T>
+            implements com.codename1.util.AsyncResult<List<T>> {
+
+        private final ChunkJoin<T> join;
+        private final int index;
+
+        ChunkPart(ChunkJoin<T> join, int index) {
+            this.join = join;
+            this.index = index;
+        }
+
+        @Override
+        public void onReady(List<T> values, Throwable error) {
+            join.part(index, values, error);
+        }
+    }
+
+    /// Refuses a value out of the wrong domain enum.
+    ///
+    /// Every enum crosses the wire as an ordinal, and an ordinal out of the
+    /// wrong enum is a perfectly good number: `AlarmState.WARNING` is 1, and
+    /// 1 in `LockState` is `UNSECURED`. The kind check that guards the rest
+    /// of the value cannot see the difference, so unguarded this is a way to
+    /// open a door by asking a lock for an alarm state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `trait`: the trait being written
+    ///
+    /// - `value`: the value supplied
+    ///
+    /// - `what`: what is being built, for the message
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value is out of the trait's
+    ///   domain
+    private static void requireEnumDomain(Trait trait, TraitValue value,
+            String what) {
+        if (trait.acceptsEnumValue(value)) {
+            return;
+        }
+        throw new IllegalArgumentException("this " + what + " gives "
+                + trait.getId() + " the value " + value.getEnumName()
+                + ", which is not one of its own; every enum crosses to the"
+                + " platform as an ordinal, so a constant from another enum"
+                + " would be applied as whichever of this trait's constants"
+                + " shares its number");
     }
 
     /// A written value's numeric component, in the trait's own unit.

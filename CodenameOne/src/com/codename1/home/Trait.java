@@ -83,10 +83,18 @@ public final class Trait {
     private final double nominalMin;
     private final double nominalMax;
     private final boolean hasNominalRange;
+    /// The names of the constants of this trait's domain enum, or `null` for
+    /// a trait that is not a choice.
+    ///
+    /// Names rather than the enum type, because ParparVM's
+    /// `Enum.getDeclaringClass()` returns `null` -- a type check written the
+    /// obvious way would pass everywhere and let anything through on iOS,
+    /// which is where the doors are.
+    private final String[] enumNames;
 
     private Trait(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double nominalMin, double nominalMax,
-            boolean hasNominalRange) {
+            boolean hasNominalRange, String[] enumNames) {
         this.id = id;
         this.kind = kind;
         this.unit = unit;
@@ -94,11 +102,19 @@ public final class Trait {
         this.nominalMin = nominalMin;
         this.nominalMax = nominalMax;
         this.hasNominalRange = hasNominalRange;
+        this.enumNames = enumNames;
     }
 
     private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
             boolean readOnly, double min, double max, boolean ranged) {
-        Trait t = new Trait(id, kind, unit, readOnly, min, max, ranged);
+        return define(id, kind, unit, readOnly, min, max, ranged, null);
+    }
+
+    private static Trait define(String id, TraitValueKind kind, TraitUnit unit,
+            boolean readOnly, double min, double max, boolean ranged,
+            String[] enumNames) {
+        Trait t = new Trait(id, kind, unit, readOnly, min, max, ranged,
+                enumNames);
         BY_ID.put(id, t);
         ALL.add(t);
         return t;
@@ -111,9 +127,20 @@ public final class Trait {
     }
 
     /// A read-only or writable member of one of this package's domain enums.
-    private static Trait choice(String id, boolean readOnly) {
+    ///
+    /// The domain is recorded so a write can be checked against it. Every
+    /// enum value on the wire is an ordinal, and an ordinal out of the wrong
+    /// enum is a perfectly valid number: `AlarmState.WARNING` is 1, and 1 in
+    /// [LockState] is `UNSECURED`. Without the domain, asking a door lock for
+    /// an alarm state opens the door.
+    private static Trait choice(String id, boolean readOnly,
+            Enum<?>[] domain) {
+        String[] names = new String[domain.length];
+        for (int i = 0; i < domain.length; i++) {
+            names[i] = domain[i].name();
+        }
         return define(id, TraitValueKind.ENUM, TraitUnit.NONE, readOnly, 0, 0,
-                false);
+                false, names);
     }
 
     /// A proportion, 0 to 100 percent.
@@ -285,7 +312,8 @@ public final class Trait {
     /// heating, cooling or idle. Auto is a policy, and it lives on
     /// [#TARGET_HEATING_COOLING].
     public static final Trait CURRENT_HEATING_COOLING =
-            choice("current_heating_cooling", true);
+            choice("current_heating_cooling", true,
+                    HeatingCoolingMode.values());
 
     /// What the thermostat has been asked to do, as a [HeatingCoolingMode].
     ///
@@ -298,7 +326,8 @@ public final class Trait {
     /// [TraitValue#getRawPlatformValue()], rather than being flattened into
     /// [HeatingCoolingMode#OFF]. Writing `OTHER` is refused.
     public static final Trait TARGET_HEATING_COOLING =
-            choice("target_heating_cooling", false);
+            choice("target_heating_cooling", false,
+                    HeatingCoolingMode.values());
 
     /// The relative humidity an accessory is measuring, as a percentage.
     ///
@@ -330,7 +359,7 @@ public final class Trait {
     /// Note [LockState#JAMMED] is unreachable outside HomeKit and
     /// [LockState#PARTIALLY_LOCKED] is unreachable on HomeKit; the enum
     /// explains both.
-    public static final Trait LOCK_STATE = choice("lock_state", true);
+    public static final Trait LOCK_STATE = choice("lock_state", true, LockState.values());
 
     /// Lock or unlock a door lock. Only [LockState#SECURED] and
     /// [LockState#UNSECURED] may be written.
@@ -346,7 +375,7 @@ public final class Trait {
     /// [TraitWrite#setAuthorizationData(java.lang.String)]. HomeKit never
     /// takes a PIN and ignores the field.
     public static final Trait TARGET_LOCK_STATE = choice("target_lock_state",
-            false);
+            false, LockState.values());
 
     // ------------------------------------------------------------------
     // doors and garage
@@ -357,7 +386,7 @@ public final class Trait {
     /// HomeKit: `CurrentDoorState`. Google Home: its own garage-door trait.
     /// **Matter has no standard garage cluster**, so this is unavailable on an
     /// Android build limited to [HomeAvailability#COMMISSIONING_ONLY].
-    public static final Trait DOOR_STATE = choice("door_state", true);
+    public static final Trait DOOR_STATE = choice("door_state", true, DoorState.values());
 
     /// Open or close a door. Only [DoorState#OPEN] and [DoorState#CLOSED] may
     /// be written.
@@ -365,7 +394,7 @@ public final class Trait {
     /// HomeKit: `TargetDoorState`. Same backend availability as
     /// [#DOOR_STATE].
     public static final Trait TARGET_DOOR_STATE = choice("target_door_state",
-            false);
+            false, DoorState.values());
 
     /// Whether something is blocking a door or covering.
     ///
@@ -441,7 +470,7 @@ public final class Trait {
     /// rising or falling, because the two backends disagree about which
     /// direction that number runs.
     public static final Trait COVERING_MOTION = choice("covering_motion",
-            true);
+            true, PositionState.values());
 
     // ------------------------------------------------------------------
     // sensors
@@ -500,14 +529,14 @@ public final class Trait {
     ///
     /// Read [AlarmState]'s note before building anything on this. It is not a
     /// fire-alarm channel.
-    public static final Trait SMOKE_DETECTED = choice("smoke_detected", true);
+    public static final Trait SMOKE_DETECTED = choice("smoke_detected", true, AlarmState.values());
 
     /// Whether carbon monoxide is being detected, as an [AlarmState].
     ///
     /// HomeKit: `CarbonMonoxideDetected`, two-state. Matter: Smoke CO Alarm
     /// `0x005C`, `COState`, three-state. Same asymmetry as
     /// [#SMOKE_DETECTED], and the same warning.
-    public static final Trait CO_DETECTED = choice("co_detected", true);
+    public static final Trait CO_DETECTED = choice("co_detected", true, AlarmState.values());
 
     /// Measured carbon monoxide, in parts per million.
     ///
@@ -535,7 +564,7 @@ public final class Trait {
     /// The enum documents how they are reconciled and which constant HomeKit
     /// can never produce. Do not hard-code thresholds against it and expect
     /// them to describe the same air on both platforms.
-    public static final Trait AIR_QUALITY = choice("air_quality", true);
+    public static final Trait AIR_QUALITY = choice("air_quality", true, AirQualityLevel.values());
 
     /// Fine particulate matter, in micrograms per cubic metre.
     ///
@@ -580,7 +609,7 @@ public final class Trait {
     /// never produce -- notably that HomeKit cannot tell a full battery on a
     /// charger from one that is running down.
     public static final Trait BATTERY_CHARGING = choice("battery_charging",
-            true);
+            true, ChargingState.values());
 
     /// Whether the battery is low enough to want attention.
     ///
@@ -612,7 +641,7 @@ public final class Trait {
     /// that low, medium and high are written as speeds on iOS and never read
     /// back. If your UI shows a speed, read [#FAN_SPEED] instead; it behaves
     /// the same everywhere.
-    public static final Trait FAN_MODE = choice("fan_mode", false);
+    public static final Trait FAN_MODE = choice("fan_mode", false, FanMode.values());
 
     // ------------------------------------------------------------------
     // speakers
@@ -671,6 +700,44 @@ public final class Trait {
 
     /// Whether this trait can only ever be read.
     ///
+    /// Whether a value belongs to this trait's domain enum.
+    ///
+    /// Checked by constant name where the value has one, which is every value
+    /// an application builds, and by ordinal range otherwise -- the codec
+    /// decodes a wire ordinal with no constant in hand.
+    ///
+    /// A value out of the wrong enum is not a curiosity: every enum crosses
+    /// the wire as an ordinal, and `AlarmState.WARNING` and
+    /// `LockState.UNSECURED` are both 1. Asking a door lock for an alarm
+    /// state, unguarded, unlocks the door.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to check, or `null`
+    ///
+    /// #### Returns
+    ///
+    /// `true` when this is not a choice trait, or the value fits its domain
+    public boolean acceptsEnumValue(TraitValue value) {
+        if (enumNames == null || value == null
+                || value.getKind() != TraitValueKind.ENUM) {
+            return true;
+        }
+        String name = value.getEnumName();
+        if (name == null) {
+            int ordinal = value.getEnumOrdinal();
+            return ordinal >= 0 && ordinal < enumNames.length;
+        }
+        for (int i = 0; i < enumNames.length; i++) {
+            if (enumNames[i].equals(name)) {
+                // The ordinal has to agree too. A constant of the right name
+                // in the wrong enum would otherwise carry the wrong number.
+                return i == value.getEnumOrdinal();
+            }
+        }
+        return false;
+    }
+
     /// A trait that is writable in principle may still be read-only on a
     /// particular accessory; that is a property of the
     /// [TraitConstraint], not of the trait. This answers the stronger

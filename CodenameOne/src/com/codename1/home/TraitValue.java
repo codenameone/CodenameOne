@@ -290,6 +290,26 @@ public final class TraitValue {
         return (int) numeric;
     }
 
+    /// The name of the enum constant this value was built from.
+    ///
+    /// `null` for a value the codec decoded from a wire ordinal, which has no
+    /// constant in hand. Present for every value an application builds, which
+    /// is what lets [Trait#acceptsEnumValue(TraitValue)] tell one domain enum
+    /// from another -- ParparVM's `Enum.getDeclaringClass()` returns `null`,
+    /// so the type itself is not available to check.
+    ///
+    /// #### Returns
+    ///
+    /// the constant's name, or `null`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when this is not an [TraitValueKind#ENUM]
+    public String getEnumName() {
+        require(TraitValueKind.ENUM);
+        return text;
+    }
+
     /// The quantity, converted into the unit you name.
     ///
     /// #### Parameters

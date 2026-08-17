@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -206,6 +207,78 @@ class HomeContractTest {
     }
 
     /**
+     * A value out of the wrong domain enum is refused rather than applied by
+     * ordinal.
+     *
+     * <p>Every enum crosses the wire as an ordinal, and an ordinal from the
+     * wrong enum is a perfectly good number: AlarmState.WARNING is 1, and 1
+     * in LockState is UNSECURED. Unguarded, asking a door lock for an alarm
+     * state opens the door.</p>
+     */
+    @Test
+    void aValueFromTheWrongEnumIsRefusedRatherThanUnlockingTheDoor() {
+        CapturingBridge bridge = new CapturingBridge();
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory lock = home.findAccessory("lock-front");
+        final TraitWrite wrong = new TraitWrite(lock,
+                lock.getPrimaryService(), Trait.TARGET_LOCK_STATE,
+                TraitValue.ofEnum(AlarmState.WARNING));
+        assertEquals(LockState.UNSECURED.ordinal(),
+                AlarmState.WARNING.ordinal(),
+                "the test is only meaningful while the two ordinals collide");
+        assertThrows(IllegalArgumentException.class, new Executable() {
+            @Override
+            public void execute() {
+                SmartHome.getInstance().write(wrong);
+            }
+        });
+        assertNull(bridge.authorization,
+                "and nothing may reach the bridge");
+    }
+
+    /**
+     * A backend that advertises a batch limit gets batches within it, and the
+     * caller still gets one answer covering everything it asked for.
+     */
+    @Test
+    void aReadLargerThanTheBackendsLimitIsSplitAndRecombined() {
+        CapturingBridge bridge = new CapturingBridge();
+        bridge.readBatchLimit = 2;
+        SyntheticHome.populate(bridge);
+        SmartHome.resetForTest(bridge);
+        SmartHome home = SmartHome.getInstance();
+        HomeAwait.settled(home.refresh());
+
+        Accessory thermostat = home.findAccessory("thermostat");
+        AccessoryService svc = thermostat.getPrimaryService();
+        TraitReadRequest request = new TraitReadRequest();
+        request.add(thermostat, svc, Trait.CURRENT_TEMPERATURE);
+        request.add(thermostat, svc, Trait.CURRENT_HUMIDITY);
+        request.add(thermostat, svc, Trait.TARGET_HEATING_TEMPERATURE);
+        request.add(thermostat, svc, Trait.TARGET_COOLING_TEMPERATURE);
+        request.add(thermostat, svc, Trait.TARGET_HEATING_COOLING);
+        AsyncResource<List<TraitReading>> r =
+                HomeAwait.settled(home.read(request));
+
+        assertEquals(3, bridge.readBatches.size(),
+                "five traits at two per call is three calls: "
+                        + bridge.readBatches);
+        for (Integer size : bridge.readBatches) {
+            assertTrue(size.intValue() <= 2,
+                    "no call may exceed the advertised limit: " + size);
+        }
+        assertEquals(5, r.get().size(),
+                "and the caller gets one answer covering all five");
+        assertSame(Trait.CURRENT_TEMPERATURE, r.get().get(0).getTrait(),
+                "in the order they were asked for");
+        assertSame(Trait.TARGET_HEATING_COOLING, r.get().get(4).getTrait());
+    }
+
+    /**
      * A change that lands while the up-front read is in flight arrives
      * after it, not before.
      *
@@ -311,6 +384,21 @@ class HomeContractTest {
         /// bridge is otherwise far too quick to be in it.
         private boolean holdStart;
         private int heldStartId;
+        private int readBatchLimit;
+        private final List<Integer> readBatches = new ArrayList<Integer>();
+
+        @Override
+        public int getMaxReadBatchSize() {
+            return readBatchLimit;
+        }
+
+        @Override
+        public void readTraits(int requestId, String[] accessoryIds,
+                String[] serviceIds, String[] traitIds, boolean allowCached) {
+            readBatches.add(Integer.valueOf(traitIds.length));
+            super.readTraits(requestId, accessoryIds, serviceIds, traitIds,
+                    allowCached);
+        }
 
         @Override
         public void start(int requestId) {
