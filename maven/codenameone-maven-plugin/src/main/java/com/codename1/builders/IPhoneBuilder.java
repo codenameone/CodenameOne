@@ -3237,6 +3237,19 @@ public class IPhoneBuilder extends Executor {
                             "Failed to enable CN1_INCLUDE_HOMEKIT", ex);
                 }
 
+                // openEcosystemApp() asks canOpenURL: whether the Apple Home
+                // app is there, and iOS answers false for any scheme the app
+                // has not declared -- so without this the fallback every
+                // unsupported platform points at reports Home missing on a
+                // device that has it.
+                String queries = request.getArg(
+                        "ios.applicationQueriesSchemes", "");
+                if (queries.indexOf("com.apple.Home") < 0) {
+                    request.putArgument("ios.applicationQueriesSchemes",
+                            queries.trim().length() == 0 ? "com.apple.Home"
+                                    : queries.trim() + ",com.apple.Home");
+                }
+
                 // iOS TERMINATES an app that creates HMHomeManager without a
                 // usage description -- it does not fail gracefully, it kills
                 // the process on launch. So this is a hard failure rather
@@ -3321,6 +3334,12 @@ public class IPhoneBuilder extends Executor {
                     && !"false".equals(request.getArg(
                             "ios.home.commissioning", "true"));
             if (matterExtensionEnabled) {
+                // The floor MatterSupport needs, raised here rather than in
+                // the feature catalog: the catalog matches on a package
+                // prefix and cannot see ios.home.commissioning=false, so an
+                // app that deliberately excludes the framework would have
+                // lost every iOS below 16.1 for nothing.
+                addMinDeploymentTarget(MatterExtensionBuilder.DEPLOYMENT_TARGET);
                 String ms = "MatterSupport.framework";
                 if (addLibs == null || addLibs.length() == 0) {
                     addLibs = ms;

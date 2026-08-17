@@ -193,7 +193,10 @@ public class SmartHomeScannerParityTest {
     private static void assertGatedBy(String src, String needle, String gate) {
         int at = src.indexOf(needle);
         assertTrue(at > 0, "expected the linkage " + needle);
-        String before = src.substring(Math.max(0, at - 400), at);
+        // Wide enough to clear the comment that explains each gate. The
+        // window is a heuristic either way; what it must not do is pass
+        // because the gate happened to be near.
+        String before = src.substring(Math.max(0, at - 1200), at);
         assertTrue(before.contains(gate),
                 needle + " must be linked under " + gate + ", got: " + before);
     }

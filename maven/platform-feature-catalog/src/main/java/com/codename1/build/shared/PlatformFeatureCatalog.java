@@ -499,8 +499,12 @@ public final class PlatformFeatureCatalog {
         //
         // The deployment floor is real: MatterSupport arrived in iOS 16.1 and
         // linking it below that fails at launch rather than at build time.
+        // And no iosMinimumDeploymentTarget either, for the same reason as
+        // the frameworks above: raising the app's floor to what MatterSupport
+        // needs is only right when MatterSupport is actually being linked,
+        // and ios.home.commissioning=false is invisible from here.
+        // IPhoneBuilder raises it inside that gate.
         e.add(new Entry("com/codename1/home/commissioning/")
-                .iosMinimumDeploymentTarget("16.1")
                 .description("Matter accessory commissioning"));
 
         // On-device Stable Diffusion: bundled Core ML model on iOS,

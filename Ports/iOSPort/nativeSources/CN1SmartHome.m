@@ -1516,6 +1516,13 @@ com_codename1_impl_ios_IOSNative_homeOpenEcosystemApp___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     NSURL *url = [NSURL URLWithString:@"com.apple.Home://"];
+    // canOpenURL: answers false for any scheme the app has not declared in
+    // LSApplicationQueriesSchemes, so this is only a real answer because the
+    // builder injects com.apple.Home for a smart-home build. A build made any
+    // other way reports the Home app missing on a device that has it -- and
+    // this is the documented fallback for every platform where commissioning
+    // is unsupported, so getting it wrong takes away the last thing the user
+    // could have done.
     BOOL canOpen = url != nil
             && [[UIApplication sharedApplication] canOpenURL:url];
     if (canOpen) {
@@ -2304,9 +2311,16 @@ void com_codename1_impl_ios_IOSNative_homeIdentify___int_java_lang_String(
     // way to learn about it: HMHomeManagerDelegate does fire, but only once
     // the home database has caught up, and an app that refreshed on the
     // result alone would find nothing.
-    cn1homeRebuildSnapshot();
-    cn1homeNotifyStructure(CN1_HOME_CHANGE_ACCESSORY_ADDED, structureId,
-                           accessoryId);
+    //
+    // Only on success. A cancelled sheet -- by far the most common outcome --
+    // changes nothing, and announcing ACCESSORY_ADDED for it makes every
+    // structure listener refresh, and some of them show a device that was
+    // never added.
+    if (error == nil) {
+        cn1homeRebuildSnapshot();
+        cn1homeNotifyStructure(CN1_HOME_CHANGE_ACCESSORY_ADDED, structureId,
+                               accessoryId);
+    }
     POOL_END();
 }
 

@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The parts of the contract that are invisible from the happy path: what
@@ -202,6 +203,70 @@ class HomeContractTest {
         state.offer(readings, false);
         assertNull(seen.get(),
                 "nor must an ordinary one");
+    }
+
+    /**
+     * A change that lands while the up-front read is in flight arrives
+     * after it, not before.
+     *
+     * <p>The read snapshots its values when it starts. A change delivered
+     * before it finishes would be overwritten on screen by that older
+     * snapshot -- a light that turns on and then shows itself off, from the
+     * subscription whose job is to keep the screen true.</p>
+     */
+    @Test
+    void aChangeDuringTheInitialReadIsDeliveredAfterIt() {
+        final List<TraitChangeBatch> seen = new ArrayList<TraitChangeBatch>();
+        SubscriptionState state = new SubscriptionState("sub-3",
+                new HomeChangeListener() {
+                    @Override
+                    public void traitsChanged(TraitChangeBatch batch) {
+                        seen.add(batch);
+                    }
+                }, 0, true);
+
+        state.offer(readingOf(true, 2L), false);
+        assertEquals(0, seen.size(),
+                "a live change must wait for the read it would race");
+
+        state.offer(readingOf(false, 1L), true);
+        assertEquals(2, seen.size(), "both batches must arrive");
+        assertTrue(seen.get(0).isInitialDelivery(),
+                "the snapshot first");
+        assertFalse(seen.get(1).isInitialDelivery(),
+                "then the change that outdates it");
+        assertTrue(seen.get(1).getReadings().get(0).getValue().getBoolean(),
+                "and the value the screen keeps is the newer one");
+        state.dispose();
+    }
+
+    /**
+     * And a read that comes back with nothing must not hold them forever.
+     */
+    @Test
+    void aFailedInitialReadReleasesWhatItWasHolding() {
+        final List<TraitChangeBatch> seen = new ArrayList<TraitChangeBatch>();
+        SubscriptionState state = new SubscriptionState("sub-4",
+                new HomeChangeListener() {
+                    @Override
+                    public void traitsChanged(TraitChangeBatch batch) {
+                        seen.add(batch);
+                    }
+                }, 0, true);
+
+        state.offer(readingOf(true, 2L), false);
+        assertEquals(0, seen.size());
+        state.initialDeliveryUnavailable();
+        assertEquals(1, seen.size(),
+                "the held change must be released, not lost");
+        state.dispose();
+    }
+
+    private static List<TraitReading> readingOf(boolean on, long at) {
+        List<TraitReading> readings = new ArrayList<TraitReading>();
+        readings.add(TraitReading.of("lamp-living", "1", Trait.ON_OFF,
+                TraitValue.of(on), at));
+        return readings;
     }
 
     /**

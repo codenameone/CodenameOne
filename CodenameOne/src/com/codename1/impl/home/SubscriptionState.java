@@ -74,6 +74,15 @@ public final class SubscriptionState {
     private boolean flushArmed;
     private boolean resyncRequired;
     private boolean disposed;
+    /// True while the up-front read of current values is still in flight.
+    ///
+    /// Live changes are held rather than delivered during that window. The
+    /// read snapshots its values when it starts, so a change that happens
+    /// after it started but is delivered before it finishes would be
+    /// overwritten on screen by the older snapshot -- a light that turns on
+    /// and then shows itself off, from a subscription whose whole job is to
+    /// keep the screen true.
+    private boolean awaitingInitial;
 
     /// Creates a subscription's state and claims a share of the timer.
     ///
@@ -86,9 +95,27 @@ public final class SubscriptionState {
     /// - `windowMillis`: the coalescing window; zero to deliver everything
     public SubscriptionState(String id, HomeChangeListener listener,
             int windowMillis) {
+        this(id, listener, windowMillis, false);
+    }
+
+    /// Creates a subscription's state, claims a share of the timer, and says
+    /// whether an up-front read is coming.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the subscription identifier
+    ///
+    /// - `listener`: where batches are delivered
+    ///
+    /// - `windowMillis`: the coalescing window; zero to deliver everything
+    ///
+    /// - `expectsInitial`: whether current values will be delivered up front
+    public SubscriptionState(String id, HomeChangeListener listener,
+            int windowMillis, boolean expectsInitial) {
         this.id = id;
         this.listener = listener;
         this.windowMillis = windowMillis;
+        this.awaitingInitial = expectsInitial;
         if (windowMillis > 0) {
             acquireTimer();
         }
@@ -150,15 +177,26 @@ public final class SubscriptionState {
             // the initial values is in flight while the caller is free to
             // stop(), and a form torn down in between would otherwise still
             // be handed a batch after the subscription said it had stopped.
+            boolean held;
             synchronized (this) {
                 if (disposed) {
                     return;
                 }
+                awaitingInitial = false;
+                held = !pending.isEmpty();
             }
             dispatch(new TraitChangeBatch(id, readings, true, false));
+            if (held) {
+                // Changes that arrived while the read was in flight. They are
+                // newer than what it snapshotted, so they go out immediately
+                // after it rather than waiting for the window -- otherwise
+                // the older values are the last thing the screen sees.
+                flush();
+            }
             return;
         }
         boolean arm = false;
+        boolean hold;
         synchronized (this) {
             if (disposed) {
                 return;
@@ -166,12 +204,17 @@ public final class SubscriptionState {
             for (TraitReading r : readings) {
                 pending.put(keyOf(r), r);
             }
-            if (windowMillis <= 0) {
+            hold = awaitingInitial;
+            if (hold || windowMillis <= 0) {
                 arm = false;
             } else if (!flushArmed) {
                 flushArmed = true;
                 arm = true;
             }
+        }
+        if (hold) {
+            // Held, not dropped: the initial delivery flushes them.
+            return;
         }
         if (windowMillis <= 0) {
             flush();
@@ -196,6 +239,26 @@ public final class SubscriptionState {
         }
     }
 
+    /// Says the up-front read produced nothing, so nothing is coming.
+    ///
+    /// Whatever is being held for it is released now. Without this, a read
+    /// that failed -- an accessory unreachable at exactly the wrong moment --
+    /// would hold every live change for the life of the subscription, which
+    /// is a far worse outcome than the missing initial values.
+    public void initialDeliveryUnavailable() {
+        boolean release;
+        synchronized (this) {
+            if (disposed || !awaitingInitial) {
+                return;
+            }
+            awaitingInitial = false;
+            release = !pending.isEmpty() || resyncRequired;
+        }
+        if (release) {
+            flush();
+        }
+    }
+
     /// Records that the platform lost its notification stream, so the next
     /// batch tells the listener its values are stale.
     public void markResyncRequired() {
@@ -205,7 +268,7 @@ public final class SubscriptionState {
                 return;
             }
             resyncRequired = true;
-            deliverNow = !flushArmed && pending.isEmpty();
+            deliverNow = !flushArmed && pending.isEmpty() && !awaitingInitial;
         }
         if (deliverNow) {
             // Nothing was pending, so no flush is coming to carry the flag.

@@ -908,7 +908,8 @@ public final class SmartHome {
         TraitSubscription handle =
                 new TraitSubscription(subscriptionId, this, push);
         SubscriptionState state = new SubscriptionState(subscriptionId,
-                listener, request.getMinIntervalMillis());
+                listener, request.getMinIntervalMillis(),
+                request.isDeliverInitialValues());
         synchronized (this) {
             subscriptions.put(subscriptionId, state);
         }
@@ -1972,6 +1973,11 @@ public final class SmartHome {
                 // subscription itself is registered and live, and failing it
                 // over an unavailable initial value would take the live
                 // updates down with it.
+                //
+                // The state still has to be told the read is over, or the
+                // live changes it is holding back for this delivery would
+                // never be released.
+                state.initialDeliveryUnavailable();
                 return;
             }
             state.offer(readings, true);
