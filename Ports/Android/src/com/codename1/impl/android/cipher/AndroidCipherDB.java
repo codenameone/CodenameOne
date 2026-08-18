@@ -670,6 +670,42 @@ class AndroidCipherDB extends Database {
         // Before anything is exported or swapped, while this is still the connection the caller
         // configured.
         connectionSettings = captureConnectionSettings();
+        // Off for the duration, and put back by whichever connection this ends on. The export
+        // writes into the attached target, and SQLite refuses a write to any attached database
+        // while query_only is set -- so a caller that had made its handle read-only could not
+        // convert at all: the export failed with "attempt to write a readonly database" and the
+        // key change reported that rather than doing it. The captured value goes back on the
+        // replacement connection through openAt, and on this one in the finally below if the
+        // conversion never gets that far.
+        boolean readOnlyHandle = wasQueryOnly();
+        if (readOnlyHandle) {
+            runPragma(db, "PRAGMA query_only = 0");
+        }
+        try {
+            migrateThroughExportBody(targetKey, path);
+        } finally {
+            if (readOnlyHandle) {
+                // Only when this is still the connection that was made writable. A conversion
+                // that succeeded replaced it, and that one already had every captured setting
+                // put back by openAt -- setting it again here would be harmless, but reading
+                // "db" as the original when it is not is the kind of thing that stops being
+                // harmless later.
+                try {
+                    runPragma(db, "PRAGMA query_only = 1");
+                } catch (RuntimeException alreadyGone) {
+                    // The connection this was toggling has been replaced or closed, which is
+                    // the successful path: the new one carries the setting already.
+                }
+            }
+        }
+    }
+
+    /// Whether the connection this conversion starts on was made read-only by its caller.
+    private boolean wasQueryOnly() {
+        return connectionSettings != null && connectionSettings.contains("PRAGMA query_only = 1");
+    }
+
+    private void migrateThroughExportBody(String targetKey, String path) throws IOException {
         String name = new File(path).getName();
         File dir = AndroidImplementation.databaseMigrationDir(path);
         if (dir == null) {

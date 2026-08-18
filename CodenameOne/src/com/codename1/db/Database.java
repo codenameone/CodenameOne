@@ -273,7 +273,7 @@ public abstract class Database {
             // reported to an application: a custom "file://" name is handed back unchanged by
             // getDatabasePath, while the connection was registered under the native path it
             // resolves to. Checking the URL would find nothing and unlink the file anyway.
-            key = Display.getInstance().databaseManagedKeyIdentity(databaseName);
+            key = Display.getInstance().databaseRegistryIdentity(databaseName);
         } catch (RuntimeException cannotResolve) {
             // A port that will not resolve a name cannot be checked this way; its own delete
             // answers for it. The JavaScript port is the one that does this, and it counts its
@@ -376,7 +376,7 @@ public abstract class Database {
     private static synchronized String claimForConversion(String databaseName) throws IOException {
         String key;
         try {
-            key = Display.getInstance().databaseManagedKeyIdentity(databaseName);
+            key = Display.getInstance().databaseRegistryIdentity(databaseName);
         } catch (RuntimeException cannotResolve) {
             return null;
         }
@@ -1066,8 +1066,9 @@ public abstract class Database {
                 // Not gated on the file being claimed, because that cannot be known either. The
                 // statement is one this API cannot account for, whoever else is holding the file.
                 throw new IOException("The file an ATTACH names has to be a single quoted "
-                        + "literal ('name.db') or a bound parameter, so that a database being "
-                        + "deleted or re-keyed can be recognized before the attach happens: "
+                        + "literal ('name.db') or a bound parameter, and a name this resolves "
+                        + "to the same file SQLite does, so that a database being deleted or "
+                        + "re-keyed can be recognized before the attach happens: "
                         + statement.trim() + ". An expression is evaluated by the engine, and a "
                         + "double quoted name is an identifier that SQLite reads as a filename "
                         + "only when no column answers to it -- neither can be resolved here. "
@@ -1098,7 +1099,7 @@ public abstract class Database {
             }
             String key;
             try {
-                key = Display.getInstance().databaseManagedKeyIdentity(file);
+                key = Display.getInstance().databaseRegistryIdentity(file);
             } catch (RuntimeException cannotResolve) {
                 continue;
             }
@@ -1179,7 +1180,7 @@ public abstract class Database {
             }
             String key;
             try {
-                key = Display.getInstance().databaseManagedKeyIdentity(asDatabaseArgument(value));
+                key = Display.getInstance().databaseRegistryIdentity(asDatabaseArgument(value));
             } catch (RuntimeException cannotResolve) {
                 continue;
             }
@@ -1211,6 +1212,14 @@ public abstract class Database {
         if (value.length() == 0 || ":memory:".equals(value)) {
             return;
         }
+        if (!isLegacyBehavior() && isAmbiguousUriFilename(value)) {
+            // Same refusal as a literal URI, and for the same reason: the engine resolves it and
+            // this cannot, while the string looks exactly like a path this had already resolved.
+            throw new IOException("This file: URI does not name the same file to SQLite as it "
+                    + "does here -- the engine strips a query and percent-decodes the rest, so "
+                    + "the database protected would not be the database attached: " + value
+                    + ". Pass the path, or the plain file:// form of it.");
+        }
         String file = asDatabaseArgument(value);
         if (!isLegacyBehavior() && !file.startsWith("file://")
                 && !Display.getInstance().isRelativeAttachmentNameResolvable()) {
@@ -1222,7 +1231,7 @@ public abstract class Database {
         }
         String key;
         try {
-            key = Display.getInstance().databaseManagedKeyIdentity(file);
+            key = Display.getInstance().databaseRegistryIdentity(file);
         } catch (RuntimeException cannotResolve) {
             return;
         }
@@ -1489,7 +1498,7 @@ public abstract class Database {
             return null;
         }
         // Unescaped, so the name this resolves is the name the engine opened.
-        String file = replaceAll(found.substring(1, found.length() - 1), "''", "'");
+        String file = unquoteLiteral(found);
         if (file.length() == 0) {
             return null;
         }
@@ -1529,6 +1538,15 @@ public abstract class Database {
             }
             target.addElement(word);
         }
+        // "ATTACH ('x.db') AS aux" is the same attachment as without the brackets, so a target
+        // wrapped in balanced ones is unwrapped rather than counted as three tokens and refused.
+        // Only when they are the outermost pair: "('a' || 'b')" still has an operator inside and
+        // stays an expression this cannot resolve.
+        while (target.size() > 2 && "(".equals(target.elementAt(0))
+                && ")".equals(target.elementAt(target.size() - 1))) {
+            target.removeElementAt(target.size() - 1);
+            target.removeElementAt(0);
+        }
         String[] out = new String[target.size()];
         target.copyInto(out);
         return out;
@@ -1560,7 +1578,7 @@ public abstract class Database {
         String only = target[0];
         if (only.length() > 1 && only.charAt(0) == '\''
                 && only.charAt(only.length() - 1) == '\'') {
-            return true;
+            return !isAmbiguousUriFilename(unquoteLiteral(only));
         }
         return isParameterPlaceholder(only);
     }
@@ -1599,6 +1617,48 @@ public abstract class Database {
         return slot;
     }
 
+    /// Whether a name is a URI whose meaning to SQLite differs from what this resolves it to.
+    ///
+    /// The collision is unavoidable: "file://" + an absolute path is this framework's own way of
+    /// naming a database outside the database directory -- `#getDatabasePath(String)` hands one
+    /// back for exactly that case -- and it is also the prefix of a SQLite URI. Refusing every
+    /// name that begins with it would refuse the string this API tells applications to pass.
+    ///
+    /// They only disagree in specific shapes, and those are what this catches. SQLite strips a
+    /// `?query` -- where `vfs=` can even choose something that is not a filesystem -- and
+    /// percent-decodes what is left, while resolving "file://" here is a plain prefix strip. So
+    /// `file:///data/x.db` means the same file either way and is allowed through, while
+    /// `file:///data/x.db?mode=ro` and `file:///data/my%20db.sqlite` do not: the engine opens
+    /// `/data/x.db` and `/data/my db.sqlite`, and the reservation would have been keyed on the
+    /// query string and the escape. A guard that reports success on the wrong file is worse than
+    /// one that refuses, so those are refused.
+    ///
+    /// A `file:` with anything other than two slashes after it -- `file:/data/x.db`, which SQLite
+    /// also accepts -- is refused for the same reason: it is not the form this resolves.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the unquoted name an ATTACH gave
+    ///
+    /// #### Returns
+    ///
+    /// whether the engine would open something other than what this would key on
+    private static boolean isAmbiguousUriFilename(String file) {
+        if (file.length() < 5 || !"FILE:".equals(upperAscii(file.substring(0, 5)))) {
+            return false;
+        }
+        if (!file.startsWith("file://")) {
+            // Any other number of slashes is a URI spelling this does not resolve.
+            return true;
+        }
+        return file.indexOf('?') >= 0 || file.indexOf('#') >= 0 || file.indexOf('%') >= 0;
+    }
+
+    /// Strips the single quotes from a literal and unescapes the doubled ones inside it.
+    private static String unquoteLiteral(String token) {
+        return replaceAll(token.substring(1, token.length() - 1), "''", "'");
+    }
+
     /// Whether a token is a bound parameter in any of the spellings SQLite accepts.
     private static boolean isParameterPlaceholder(String token) {
         if (token.length() == 0) {
@@ -1631,11 +1691,30 @@ public abstract class Database {
     ///
     /// the name to resolve an identity from
     private static String asDatabaseArgument(String file) {
-        if (file.charAt(0) == '/' || file.charAt(0) == '\\'
-                || (file.length() > 1 && file.charAt(1) == ':')) {
+        if (file.charAt(0) == '/' || file.charAt(0) == '\\' || isDriveAbsolute(file)) {
             return "file://" + file;
         }
         return file;
+    }
+
+    /// Whether a Windows drive letter is followed by a root, rather than by a relative name.
+    ///
+    /// "C:\\db.sqlite" names one file; "C:db.sqlite" names whatever is beside the current
+    /// directory *of drive C*, which is per-drive state the process carries and this API neither
+    /// sees nor controls. Reading the second as absolute made it look resolvable, so the
+    /// reservation was keyed on the literal while SQLite opened something else -- the same trap
+    /// as an ordinary relative name, wearing a drive letter. Treating it as relative is what
+    /// hands it to the check that refuses those.
+    private static boolean isDriveAbsolute(String file) {
+        if (file.length() < 3 || file.charAt(1) != ':') {
+            return false;
+        }
+        char drive = file.charAt(0);
+        if (!((drive >= 'a' && drive <= 'z') || (drive >= 'A' && drive <= 'Z'))) {
+            return false;
+        }
+        char after = file.charAt(2);
+        return after == '/' || after == '\\';
     }
 
     /// Splits a statement into words, keeping quoted runs together.
@@ -1680,10 +1759,22 @@ public abstract class Database {
                 at = end + 1;
                 continue;
             }
+            if (c == '(' || c == ')' || c == ',') {
+                // Punctuation is a token of its own. SQL does not need whitespace around it, so
+                // reading words alone kept "('x.db')AS" together as one -- and a filename glued
+                // to a bracket matches nothing this can resolve, which turned a statement SQLite
+                // runs perfectly well into one this refused.
+                words.addElement(statement.substring(at, at + 1));
+                at++;
+                continue;
+            }
             int end = at;
             while (end < length) {
                 char e = statement.charAt(end);
                 if (e == ' ' || e == '\t' || e == '\n' || e == '\r' || e == ';') {
+                    break;
+                }
+                if (e == '(' || e == ')' || e == ',') {
                     break;
                 }
                 // A comment ends a word without any space around it: DATABASE/*c*/'x.db' is three

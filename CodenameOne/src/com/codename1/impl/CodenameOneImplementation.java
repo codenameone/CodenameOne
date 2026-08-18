@@ -9692,6 +9692,29 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// the key connections on that file are registered under, or null if it cannot be worked out
+    /// The key open connections, attachments and claims on a database are registered under.
+    ///
+    /// Distinct from `#databaseManagedKeyIdentity(String)`, which answers a different question:
+    /// where a managed KEY for this database is filed. The two need different properties and one
+    /// hook cannot have both. An alias has to survive the file being deleted and made again, or
+    /// the key is lost with it -- so it is derived from the name. A registry key has to say
+    /// whether two handles are the same open FILE, which on a platform where several names reach
+    /// one file (a short name, a junction, a hard link) the name cannot answer.
+    ///
+    /// Answering with the alias, as the default does, is right for every port whose names and
+    /// files correspond one to one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the database, as an application named it
+    ///
+    /// #### Returns
+    ///
+    /// the key it is registered under, or null when this port cannot say
+    public String databaseRegistryIdentity(String databaseName) {
+        return databaseManagedKeyIdentity(databaseName);
+    }
+
     /// Whether a relative name in an ATTACH means the same database to this port and its engine.
     ///
     /// It does not on a port backed by a filesystem. SQLite resolves a relative name against the

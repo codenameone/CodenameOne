@@ -331,10 +331,19 @@ class AttachmentReconciliationTest extends UITestBase {
             "ATTACH '/data/' || 'b.db' AS aux",
             "ATTACH DATABASE replace('/data/XXX.db','XXX','b') AS aux",
             "ATTACH some_column AS aux",
+            // URIs the engine reads differently from this: it strips the query and
+            // percent-decodes the rest, so the file protected would not be the file attached.
+            // Checked against the engine -- file:///x?mode=ro opens /x, and %20 opens a space.
+            "ATTACH 'file:///data/b.db?mode=ro' AS aux",
+            "ATTACH 'file:///data/my%20db.sqlite' AS aux",
+            "ATTACH 'file:///data/b.db#frag' AS aux",
+            // One slash, which is a URI spelling this does not resolve.
+            "ATTACH 'file:/data/b.db' AS aux",
             // A double quoted name is an identifier to SQLite, read as a filename only when no
             // column answers to it -- which cannot be known from here either.
             "ATTACH \"/data/b.db\" AS aux",
-            // No whitespace anywhere, which SQLite attaches perfectly well.
+            // No whitespace anywhere, which SQLite attaches perfectly well -- and still an
+            // expression inside the brackets, so still refused.
             "ATTACH('/data/' || 'b.db')AS aux",
             // The reviewer's script, where the attach sits between other statements.
             "BEGIN; ATTACH '/data/' || 'b.db' AS aux; CREATE TABLE aux.t(x);",
@@ -360,6 +369,14 @@ class AttachmentReconciliationTest extends UITestBase {
             "ATTACH #name AS aux",
             "ATTACH '/data/it''s.db' AS aux",
             "ATTACH ':memory:' AS aux",
+            // Bracketed and with no whitespace at all: SQLite runs it, and it names one literal,
+            // so it resolves rather than being refused for its punctuation.
+            "ATTACH('/data/plain.db')AS aux",
+            "ATTACH ( '/data/plain.db' ) AS aux",
+            // The plain file:// form is this framework's own way of naming a database outside
+            // the database directory -- getDatabasePath hands one back -- and SQLite resolves it
+            // to the same file, so refusing it would refuse what this API tells callers to pass.
+            "ATTACH 'file:///data/plain.db' AS aux",
         };
         for (String statement : allowed) {
             new ReconcilingDatabase().about(statement);
@@ -377,6 +394,9 @@ class AttachmentReconciliationTest extends UITestBase {
         String[] relative = {
             "ATTACH 'aux.db' AS aux",
             "ATTACH DATABASE './aux.db' AS aux",
+            // Drive relative, not absolute: C:aux.db names whatever sits beside the current
+            // directory of drive C, which is per-drive state this API does not control.
+            "ATTACH 'C:aux.db' AS aux",
             "BEGIN; ATTACH 'aux.db' AS aux; CREATE TABLE aux.t(x);",
         };
         for (String script : relative) {
@@ -395,8 +415,17 @@ class AttachmentReconciliationTest extends UITestBase {
                 () -> bound.about("ATTACH ? AS aux", new Object[] {"aux.db"}),
                 "and so does a relative name bound to the placeholder");
 
+        // And a URI bound to the placeholder, which the engine would resolve and this cannot.
+        final ReconcilingDatabase boundUri = new ReconcilingDatabase();
+        assertThrows(IOException.class,
+                () -> boundUri.about("ATTACH ? AS aux",
+                        new Object[] {"file:///data/b.db?mode=ro"}),
+                "a URI bound to the placeholder is refused like a literal one");
+
         // An absolute one is what the message asks for, and it goes through.
         new ReconcilingDatabase().about("ATTACH '/data/aux.db' AS aux");
+        new ReconcilingDatabase().about("ATTACH 'C:\\\\data\\\\aux.db' AS aux");
+        new ReconcilingDatabase().about("ATTACH 'C:/data/aux.db' AS aux");
         new ReconcilingDatabase().about("ATTACH ? AS aux", new Object[] {"/data/aux.db"});
 
         // A second parameter is not a path. "ATTACH ? AS aux KEY ?" binds a key there, and

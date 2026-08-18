@@ -77,7 +77,7 @@ class WindowsDatabase extends Database {
      */
     private final String aliasKey;
 
-    /// What the filesystem says this open file IS, as opposed to what it was called.
+    /// The identity of a file this connection had to create before it could be identified.
     ///
     /// Two names can reach one file on Windows -- an 8.3 short name, a junction, a hard link --
     /// and the path key cannot tell: it folds case and separators, which leaves two spellings of
@@ -99,34 +99,20 @@ class WindowsDatabase extends Database {
         this.databaseName = databaseName;
         // Normalized, so two spellings of one path are one registry entry: the claim a key
         // change takes is worth nothing if the other connection is filed under "/a/./b".
-        this.openKey = windowsPathKey(path);
-        this.aliasKey = openKey;
-        String identity = null;
-        try {
-            identity = WindowsNative.fileIdentity(path);
-        } catch (RuntimeException cannotAsk) {
-            // No identity, so the path key carries the registration on its own.
-        }
-        this.identityKey = identity != null && identity.length() > 0 && !identity.equals(openKey)
-                ? "winfile:" + identity : null;
+        // The registry key and the alias are different questions on this platform, and this is
+        // where they part: the alias stays derived from the name so it survives the file being
+        // deleted and made again, while everything that asks "is anyone else holding this open
+        // file" goes through the identity when there is a file to identify.
+        this.aliasKey = windowsPathKey(path);
+        this.openKey = openFileKeyFor(path);
+        // Held only when the file did not exist yet: openKey is the path key in that case, and
+        // the identity is adopted after the open makes the file. Otherwise openKey already is
+        // the identity and there is nothing second to register.
+        this.identityKey = null;
         // Registration first, because it is also the refusal: a key change in progress is rewriting
         // this file, and opening it before asking would touch it mid-rewrite and leave the handle
         // behind when the refusal arrived.
         registerOpenDatabase(openKey);
-        boolean identityRegistered = false;
-        try {
-            if (identityKey != null) {
-                registerOpenDatabase(identityKey);
-                identityRegistered = true;
-            }
-        } finally {
-            if (identityKey != null && !identityRegistered) {
-                // The identity is claimed by a delete or a key change already. The path key was
-                // taken a line ago and has to go back, or this file is unopenable until the
-                // process ends.
-                releaseOpenDatabase(openKey);
-            }
-        }
         boolean opened = false;
         try {
             peer = WindowsNative.sqlDbOpen(path);
@@ -188,16 +174,7 @@ class WindowsDatabase extends Database {
     ///
     /// - `IOException`: if something else has claimed the file this turned out to be
     private void adoptIdentityAfterOpen(String path) throws IOException {
-        String identity;
-        try {
-            identity = WindowsNative.fileIdentity(path);
-        } catch (RuntimeException cannotAsk) {
-            return;
-        }
-        if (identity == null || identity.length() == 0) {
-            return;
-        }
-        String candidate = "winfile:" + identity;
+        String candidate = openFileKeyFor(path);
         if (candidate.equals(openKey)) {
             return;
         }
@@ -231,6 +208,39 @@ class WindowsDatabase extends Database {
     /// not survive that.
     static String registryKeyFor(String path) {
         return windowsPathKey(path);
+    }
+
+    /// The key an open file is registered under, which is its identity when the filesystem will
+    /// give one.
+    ///
+    /// Two names reach one file often enough on Windows -- an 8.3 short name, a junction, a hard
+    /// link -- that the path alone cannot answer "is anyone else holding this". A connection
+    /// registers both; an attachment, which the engine reports by whatever name it opened, has
+    /// only this to go on, so it has to land on the same string a connection did or the counts
+    /// never meet.
+    ///
+    /// Falls back to the path key when there is no file to ask about, which is also what a
+    /// database that has not been created yet looks like.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: the file, as the engine or the port named it
+    ///
+    /// #### Returns
+    ///
+    /// the identity key, or the path key when the file cannot be identified
+    static String openFileKeyFor(String path) {
+        if (path == null || path.length() == 0) {
+            return registryKeyFor(path);
+        }
+        String identity;
+        try {
+            identity = WindowsNative.fileIdentity(path);
+        } catch (RuntimeException cannotAsk) {
+            return registryKeyFor(path);
+        }
+        return identity != null && identity.length() > 0
+                ? "winfile:" + identity : registryKeyFor(path);
     }
 
     private static String windowsPathKey(String path) {

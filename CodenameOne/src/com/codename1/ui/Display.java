@@ -6186,6 +6186,19 @@ public final class Display extends CN1Constants {
         return impl.databaseManagedKeyIdentity(databaseName);
     }
 
+    /// See `com.codename1.impl.CodenameOneImplementation#databaseRegistryIdentity(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the database, as an application named it
+    ///
+    /// #### Returns
+    ///
+    /// the key it is registered under
+    public String databaseRegistryIdentity(String databaseName) {
+        return impl.databaseRegistryIdentity(databaseName);
+    }
+
     /// See `com.codename1.impl.CodenameOneImplementation#isRelativeAttachmentNameResolvable()`.
     ///
     /// #### Returns

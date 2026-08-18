@@ -3249,6 +3249,56 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return WindowsDatabase.registryKeyFor(resolveDatabasePath(databaseName));
     }
 
+    /// The key open connections, attachments and claims on a database are registered under.
+    ///
+    /// The filesystem's own answer when there is a file to ask, because on this platform several
+    /// names reach one file -- an 8.3 short name, a junction, a hard link -- and a delete or a
+    /// key change asked for by one name has to see a handle opened under another. The path key
+    /// when there is no file yet, which is what a database about to be created looks like.
+    ///
+    /// Deliberately not the managed key alias, which stays derived from the name: an alias has
+    /// to survive the file being deleted and made again, and an identity is reused by Windows
+    /// for whatever is created next.
+    ///
+    /// #### Parameters
+    ///
+    /// - `databaseName`: the database, as an application named it
+    ///
+    /// #### Returns
+    ///
+    /// the key it is registered under
+    @Override
+    public String databaseRegistryIdentity(String databaseName) {
+        return WindowsDatabase.openFileKeyFor(resolveDatabasePath(databaseName));
+    }
+
+    /// The key an attached database is registered under.
+    ///
+    /// The engine reports whatever name it opened the file by, and on this platform two names
+    /// reach one file often enough that the name alone cannot say whether a connection already
+    /// holds it. Connections register the filesystem's identity as well as their path; an
+    /// attachment has only this hook, so without the override it registered a path key nobody
+    /// else shared -- and a key change through another alias then found itself sole and rewrote
+    /// the file underneath the attachment.
+    ///
+    /// The managed key alias is deliberately not this: an alias has to survive the file being
+    /// deleted and made again, and an identity does not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `engineFile`: the filename the engine reported
+    ///
+    /// #### Returns
+    ///
+    /// the key connections on that file are registered under
+    @Override
+    public String databaseIdentityForEngineFile(String engineFile) {
+        if (engineFile == null || engineFile.length() == 0) {
+            return null;
+        }
+        return WindowsDatabase.openFileKeyFor(engineFile);
+    }
+
     @Override
     public boolean isDatabaseEncryptionSupported() {
         return WindowsNative.sqlDbIsCipherAvailable();
