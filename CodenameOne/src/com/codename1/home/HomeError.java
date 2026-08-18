@@ -53,7 +53,8 @@ public enum HomeError {
     TRAIT_NOT_SUPPORTED,
 
     /// No accessory with the supplied id is in the graph. Usually means the
-    /// snapshot the caller is holding is stale; re-fetch it.
+    /// snapshot the caller is holding is stale; call [SmartHome#refresh()] and
+    /// wait for it before reading [SmartHome#getStructures()] again.
     ACCESSORY_NOT_FOUND,
 
     /// The accessory is in the graph but the platform could not talk to it --

@@ -24,10 +24,13 @@ package com.codename1.home;
 
 /// What moved in the home, for [HomeStructureEvent].
 ///
-/// These say the graph snapshot you are holding is out of date; re-fetch with
-/// [SmartHome#getStructures()]. They never carry trait values -- those arrive
-/// through a [TraitSubscription], which is a separate mechanism with separate
-/// delivery guarantees.
+/// These say the graph snapshot you are holding is out of date. Call
+/// [SmartHome#refresh()] and wait for it to complete before reading the graph
+/// again: [SmartHome#getStructures()] answers from the last refresh, so on its
+/// own it hands back the same stale snapshot the event just told you about.
+/// They never carry trait values -- those arrive through a
+/// [TraitSubscription], which is a separate mechanism with separate delivery
+/// guarantees.
 public enum StructureChangeKind {
 
     /// A home was added or removed, or the set of homes the user has granted

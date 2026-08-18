@@ -12,7 +12,7 @@ A `HomeStructure` holds rooms (`HomeRoom`) and accessories (`Accessory`). An acc
 
 A trait is a canonical capability, not a platform identifier. `Trait.BRIGHTNESS` is the same constant whether the accessory is behind HomeKit or Matter, and the port maps it to `HMCharacteristicTypeBrightness` or to Level Control's `CurrentLevel` for you. No HomeKit characteristic string and no Matter cluster id ever reaches your code.
 
-Graph objects are immutable snapshots. Nothing on an `Accessory` calls into the platform when you read a getter; when the topology moves, a `HomeStructureListener` tells you to fetch it again.
+Graph objects are immutable snapshots. Nothing on an `Accessory` calls into the platform when you read a getter; when the topology moves, a `HomeStructureListener` tells you to call `refresh()` and read the graph again once it completes.
 
 [options="header"]
 |===
