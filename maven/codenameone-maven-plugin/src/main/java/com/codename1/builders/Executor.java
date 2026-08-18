@@ -974,8 +974,11 @@ public abstract class Executor {
             new ClassReader(bytes).accept(new DatabaseUsageVisitor(hit),
                     ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
         } catch (RuntimeException cannotRead) {
-            // Truncated, obfuscated past recognition, or a class file newer than this ASM knows.
-            // None of those is a reason to decide the application does not encrypt.
+            // Truncated or obfuscated past recognition, and not a reason to decide the application
+            // does not encrypt. This stays a rare case only while the ASM here keeps up with the
+            // bytecode the toolchain emits: read no class file at all and every application would
+            // be charged the cipher, and on Android an API 23 floor. The daemon, pinned to an ASM
+            // that stops at Java 8, reads the constant pool directly instead for that reason.
             hit[0] = true;
             hit[1] = true;
         }

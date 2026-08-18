@@ -150,11 +150,17 @@ class DatabaseUsageScanTest {
 
     /** A real class carrying the given text as a constant, and referring to nothing. */
     private void writeClassWithStringLiteral(String path, String literal) throws IOException {
+        writeClassWithStringLiteral(org.objectweb.asm.Opcodes.V1_8, path, literal);
+    }
+
+    /** The same class, in a class file of the given version. */
+    private void writeClassWithStringLiteral(int version, String path, String literal)
+            throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
         String internalName = path.substring(0, path.length() - ".class".length());
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
-        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+        w.visit(version, org.objectweb.asm.Opcodes.ACC_PUBLIC,
                 internalName, null, "java/lang/Object", null);
         org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
                 "describe", "()Ljava/lang/String;", null, null);
@@ -174,11 +180,16 @@ class DatabaseUsageScanTest {
 
     /** Writes {@link #classCalling} to a file, for the cases that scan a directory. */
     private void writeClassCalling(String path, String factory) throws IOException {
+        writeClassCalling(org.objectweb.asm.Opcodes.V1_8, path, factory);
+    }
+
+    /** The same file, in a class file of the given version. */
+    private void writeClassCalling(int version, String path, String factory) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
         OutputStream raw = new FileOutputStream(f);
         try {
-            raw.write(classCalling(factory));
+            raw.write(classCalling(version, factory));
         } finally {
             raw.close();
         }
@@ -193,8 +204,13 @@ class DatabaseUsageScanTest {
      * put the identical class name there.
      */
     private byte[] classCalling(String factory) throws IOException {
+        return classCalling(org.objectweb.asm.Opcodes.V1_8, factory);
+    }
+
+    /** The same call site, in a class file of the given version. */
+    private byte[] classCalling(int version, String factory) throws IOException {
         org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
-        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+        w.visit(version, org.objectweb.asm.Opcodes.ACC_PUBLIC,
                 "com/example/Caller", null, "java/lang/Object", null);
         org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
                 "configure", "()V", null, null);
@@ -527,4 +543,33 @@ class DatabaseUsageScanTest {
         assertFalse(executor.scanForDatabaseUsage(new File(root, "nope")).usesDatabase());
         assertFalse(executor.scanForDatabaseUsage(null).usesDatabase());
     }
+    /**
+     * Java 17 bytecode, which applications are routinely compiled to.
+     *
+     * The answers must not depend on the class file version. They do the moment the ASM in use
+     * stops short of what the toolchain emits, because an unreadable class counts as encrypting --
+     * so this is the test that says this ASM has not fallen behind.
+     */
+    private static final int MODERN_CLASS_FILE = 61;
+
+    @Test
+    void aModernClassIsReadLikeAnyOther() throws IOException {
+        writeClassCalling(MODERN_CLASS_FILE, "com/example/App.class", "passphrase");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "it opens a database");
+        assertTrue(usage.usesDatabaseCipher(), "and it configures a key");
+    }
+
+    @Test
+    void aModernClassThatNeverTouchesTheDatabaseGetsNothing() throws IOException {
+        writeFramework();
+        writeClassWithStringLiteral(MODERN_CLASS_FILE, "com/example/Chatty.class",
+                "see com/codename1/db/DatabaseConfig for details");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesDatabase(), "a mention in a string is not a use");
+        assertFalse(usage.usesDatabaseCipher(), "and certainly not encryption");
+    }
+
 }
