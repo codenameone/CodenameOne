@@ -371,6 +371,47 @@ public class AppIntentAnnotationProcessorTest {
         }
     }
 
+    /// parsePayload keeps whole numbers as Long precisely so large ids survive the wire; the
+    /// range check then routed them through double, rounding Long.MAX_VALUE to 2^63 and
+    /// rejecting a value the declared type holds exactly.
+    @Test
+    public void aLongAtItsBoundaryIsAccepted() throws Exception {
+        File classes = compile(source(
+                "public static long seen;\n"
+                        + "@AppIntent(value = \"set_id\", title = \"Set\")\n"
+                        + "public static IntentResult set(@IntentParam(\"id\") long id) {\n"
+                        + "    seen = id;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.lang.reflect.Method invoke = registry.getClass().getMethod("invoke",
+                    String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"));
+            java.lang.reflect.Field seen = loader.loadClass("com.example.Handlers")
+                    .getField("seen");
+
+            for (long v : new long[]{Long.MAX_VALUE, Long.MIN_VALUE, 9007199254740993L}) {
+                Map<String, Object> params = new LinkedHashMap<String, Object>();
+                params.put("id", Long.valueOf(v));
+                invoke.invoke(registry, "set_id", params, null);
+                assertEquals(v, seen.getLong(null));
+            }
+
+            // A genuinely fractional value is still rejected: this widened what is exact, not
+            // what is accepted.
+            assertRejected(invoke, registry, "set_id", "id", Double.valueOf(1.5), "whole number");
+        } finally {
+            loader.close();
+        }
+    }
+
     @Test
     public void aRequiredFloatRejectsAValueThatWouldBecomeInfinity() throws Exception {
         File classes = compile(source(

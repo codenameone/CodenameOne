@@ -1326,6 +1326,13 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         // 1.5 is a Number, and longValue() would quietly make it 1. A caller that sent a
         // fraction meant something this parameter cannot express, so it is a rejection rather
         // than a rounding decision the framework gets to make on their behalf.
+        // An integral box is already exact: routing Long.MAX_VALUE through double rounds it to
+        // 2^63 and the range check below then rejects a value the declared type holds perfectly.
+        // That also wasted parsePayload's work, which exists to keep whole numbers whole.
+        sb.append("        if (o instanceof Long || o instanceof Integer || o instanceof Short\n");
+        sb.append("                || o instanceof Byte) {\n");
+        sb.append("            return ((Number) o).longValue();\n");
+        sb.append("        }\n");
         sb.append("        if (o instanceof Number) {\n");
         sb.append("            double d = ((Number) o).doubleValue();\n");
         sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)) {\n");
@@ -1453,6 +1460,10 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
         // Epoch millis are a number like any other: longValue() would truncate 1.5 and
         // saturate 1e20, handing the handler a moment nobody named.
+        sb.append("        if (o instanceof Long || o instanceof Integer || o instanceof Short\n");
+        sb.append("                || o instanceof Byte) {\n");
+        sb.append("            return new java.util.Date(((Number) o).longValue());\n");
+        sb.append("        }\n");
         sb.append("        if (o instanceof Number) {\n");
         sb.append("            double d = ((Number) o).doubleValue();\n");
         sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)\n");

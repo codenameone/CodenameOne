@@ -14,8 +14,13 @@
 # **The retry is conditional on purpose.** Re-running any failed Maven command would retry a
 # genuine compile or test failure three more times -- slow, and worse, it could let a flaky test
 # pass on a later attempt and report green. A red build here is meant to be a bug someone fixes,
-# not something a wrapper grinds away at. So the output is inspected, and anything that is not
-# recognisably a transport failure fails immediately with its original exit code.
+# not something a wrapper grinds away at.
+#
+# Two rules keep that honest, and the second exists because the first was not enough. A compile
+# or test failure anywhere in the log vetoes the retry outright. Otherwise the decision is made
+# on the *terminal* failure -- the part after the last BUILD FAILURE -- rather than on any
+# matching text in the whole log, because Maven retries some transfers internally and a warning
+# it recovered from can share a log with a real failure. Matching anywhere would rerun that.
 #
 # The backoff grows because a flat retry lands inside the window a rate limit is still in force.
 #
@@ -32,6 +37,13 @@ MVN_BIN="${MAVEN_HOME:+$MAVEN_HOME/bin/}mvn"
 # Markers that mean "the network or the repository misbehaved", never "your code is wrong".
 TRANSIENT='Could not transfer artifact|Unresolveable build extension|Failed to read artifact descriptor|Non-resolvable import POM|Could not resolve dependencies|Connection reset|Premature EOF|Connection timed out|status: 4[0-9][0-9]|status code: 5[0-9][0-9]|Bad Gateway|Service Unavailable|Too Many Requests'
 
+# Markers that mean the build itself failed. Any of these vetoes a retry outright, however the
+# log started: Maven retries some transfers internally, so an early warning that it recovered
+# from can sit in the same log as a genuine compile or test failure. Matching anywhere would
+# then rerun that failure -- and a flaky test passing on attempt three is precisely the outcome
+# this wrapper must never produce.
+DEFINITE='COMPILATION ERROR|There are test failures|Tests run:.*Failures: [1-9]|Tests run:.*Errors: [1-9]|BUILD FAILURE.*\n.*Compilation failure'
+
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 
@@ -42,7 +54,21 @@ for delay in 30 120 300 0; do
   if [ "$status" -eq 0 ]; then
     exit 0
   fi
-  if ! grep -Eq "$TRANSIENT" "$log"; then
+
+  if grep -Eq "$DEFINITE" "$log"; then
+    echo "[ci-mvn-retry] the build failed on its own merits; not retrying" >&2
+    exit "$status"
+  fi
+
+  # Classify on the failure Maven actually stopped for, not on anything it printed along the
+  # way. Everything from the last "BUILD FAILURE" (or the last failing goal) to the end is the
+  # part that explains the exit code.
+  terminal="$(awk '/BUILD FAILURE|Failed to execute goal/ { buf = "" } { buf = buf $0 "\n" } END { print buf }' "$log")"
+  if [ -z "$terminal" ]; then
+    terminal="$(tail -50 "$log")"
+  fi
+
+  if ! printf '%s' "$terminal" | grep -Eq "$TRANSIENT"; then
     echo "[ci-mvn-retry] failure does not look like a repository problem; not retrying" >&2
     exit "$status"
   fi

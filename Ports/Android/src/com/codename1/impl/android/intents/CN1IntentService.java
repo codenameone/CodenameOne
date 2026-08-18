@@ -118,6 +118,10 @@ public class CN1IntentService extends IntentService {
             wakeRuntime();
             return;
         }
+        // An IntentService reuses one instance for every queued start, so a flag left true by
+        // an earlier request would make a later one tear down a context it never started --
+        // deinitializing the Activity's runtime if the app came forward in between.
+        shouldStopContext = false;
         if (!Display.isInitialized()) {
             shouldStopContext = true;
             AndroidImplementation.startContext(this);
@@ -191,6 +195,7 @@ public class CN1IntentService extends IntentService {
     /// The wait is on the parked work actually leaving the queue rather than on a fixed sleep,
     /// with a bound for the case where the request is refused and nothing ever runs.
     private void wakeRuntime() {
+        shouldStopContext = false;
         if (Display.isInitialized()) {
             // Already up, so registerIntents has already run; nothing was waiting on this.
             return;
