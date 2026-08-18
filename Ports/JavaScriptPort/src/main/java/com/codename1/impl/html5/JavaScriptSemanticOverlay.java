@@ -797,10 +797,20 @@ public final class JavaScriptSemanticOverlay {
                 control.setAttribute(ATTRIBUTE_EDITING, "1");
             }
         });
+        final boolean masked = obscured;
         control.addEventListener("blur", new EventListener() {
             @Override
             public void handleEvent(Event event) {
                 control.removeAttribute(ATTRIBUTE_EDITING);
+                if (masked || control.getAttribute(ATTRIBUTE_OBSCURED) != null) {
+                    // Every keystroke has already reached the framework, so the control has
+                    // nothing left to hold -- and what it holds is a secret. type="password"
+                    // only stops it being read off the screen; the value is still in the
+                    // document for a script or an inspector, so it does not stay there past
+                    // the edit. The sync pass will not do it: it leaves a masked field alone
+                    // precisely so it never writes the secret back.
+                    setControlValue(control, "");
+                }
             }
         });
         actionsContainer().appendChild(control);
