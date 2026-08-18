@@ -97,6 +97,17 @@ public class ButtonRenderElement extends RenderElement {
                     cur = ((com.codename1.flutter.widgets.HasChild) cur).getChild();
                 } else if (cur instanceof com.codename1.flutter.StatelessWidget) {
                     cur = ((com.codename1.flutter.StatelessWidget) cur).build(this);
+                } else if (cur instanceof com.codename1.flutter.StatefulWidget) {
+                    // A stateful wrapper is built through a THROWAWAY state, purely to see
+                    // what it renders. The gallery wraps a demo page's options icon in a
+                    // FeatureDiscovery, which is stateful, and without this the button drew
+                    // the class name instead of the glyph.
+                    com.codename1.flutter.State<?> s =
+                            ((com.codename1.flutter.StatefulWidget) cur).createState();
+                    if (s == null) {
+                        return content;
+                    }
+                    cur = s.build(this);
                 } else {
                     return content;
                 }
@@ -132,11 +143,15 @@ public class ButtonRenderElement extends RenderElement {
         try {
             Log.p("Flutter runtime: " + widget().getClass().getSimpleName()
                     + " child " + c.getClass().getSimpleName()
-                    + " is not a Text or Icon; using its toString() as the label");
+                    + " is neither a Text nor an Icon and could not be resolved to one;"
+                    + " the button renders no label");
         } catch (Throwable t) {
             // headless: Log has no storage backend
         }
-        return String.valueOf(c);
+        // Deliberately NOT the widget's toString(). A Java class name is never a label
+        // anyone meant to show, and printing one puts "com.codename1.flutter…" in the middle
+        // of the app bar - which is exactly how this failure used to present.
+        return null;
     }
 
     /**

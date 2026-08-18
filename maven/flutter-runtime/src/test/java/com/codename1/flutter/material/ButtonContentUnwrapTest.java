@@ -103,6 +103,46 @@ class ButtonContentUnwrapTest {
         assertEquals("Go back", e.consumedLabel());
     }
 
+    /** A stateful wrapper around an icon — the shape of the gallery's FeatureDiscovery. */
+    static class StatefulIcon extends com.codename1.flutter.StatefulWidget {
+        @Override
+        public com.codename1.flutter.State<?> createState() {
+            return new com.codename1.flutter.State<StatefulIcon>() {
+                @Override
+                public Widget build(BuildContext context) {
+                    return new Icon(Icons.tune);
+                }
+            };
+        }
+    }
+
+    @Test
+    @DisplayName("a STATEFUL wrapper is built to find the icon it produces")
+    void aStatefulIconIsResolved() {
+        ButtonRenderElement e = mount(new StatefulIcon());
+
+        assertEquals(Icons.tune.codePoint(), e.consumedIconChar(),
+                "FeatureDiscovery-shaped content must resolve to its glyph");
+        assertEquals(null, e.consumedLabel());
+    }
+
+    @Test
+    @DisplayName("unresolvable content NEVER becomes a toString() label")
+    void unresolvableContentIsNeverStringified() {
+        // A widget the walk cannot see through. Printing its class name put
+        // "com.codename1.flutter..." across the app bar; no label is the only honest answer.
+        Widget opaque = new Widget() {
+            @Override
+            public com.codename1.flutter.Element createElement() {
+                return new com.codename1.flutter.widgets.PassThroughRenderElement(this);
+            }
+        };
+        ButtonRenderElement e = mount(opaque);
+
+        assertEquals(null, e.consumedLabel(), "no label beats a class name");
+        assertEquals(0, e.consumedIconChar());
+    }
+
     @Test
     @DisplayName("content that resolves to nothing renders no glyph and no label text")
     void unresolvableContentIsNotStringified() {

@@ -69,14 +69,20 @@ class ButtonConsumptionTest {
         assertEquals(Icons.settings.codePoint(), el.consumedIconChar());
     }
 
+    /**
+     * Unresolvable content yields NO label — it used to yield the widget's toString().
+     *
+     * <p>This test asserted that fallback, and the fallback was the bug: a button whose
+     * content was neither a Text nor an Icon drew its Java class name, which is how the
+     * gallery's back button came out as "com.codename1.flutter.material.BackButtonIcon@…"
+     * across the app bar. A class name is never a label anyone meant to show.</p>
+     */
     @Test
-    void unsupportedChildFallsBackToItsToString() {
+    void unsupportedChildYieldsNoLabelRatherThanAClassName() {
         ElevatedButton b = new ElevatedButton();
         b.child(new ProbeBox(1, 1));
         ButtonRenderElement el = mount(b);
-        String label = el.consumedLabel();
-        assertNotNull(label);
-        assertTrue(label.contains("ProbeBox"), "toString fallback expected, got: " + label);
+        assertNull(el.consumedLabel(), "no label beats a class name");
     }
 
     @Test
