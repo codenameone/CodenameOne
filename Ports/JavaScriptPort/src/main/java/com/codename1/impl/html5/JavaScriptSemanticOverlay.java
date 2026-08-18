@@ -907,6 +907,11 @@ public final class JavaScriptSemanticOverlay {
         if (!AccessibilityAction.SET_TEXT.equals(actionId)) {
             return;
         }
+        // Before anything that returns early. The limit belongs to every control, masked or
+        // mid-edit: an application that lowers setMaxSize() while a password field is on screen
+        // would otherwise leave this one accepting the old length, and a value typed past the
+        // new limit raises it again on the way in.
+        applyMaxLength(element, node);
         boolean obscured = node.getObscured() != null && node.getObscured().booleanValue();
         if (obscured != (element.getAttribute(ATTRIBUTE_OBSCURED) != null)
                 && element.getAttribute(ATTRIBUTE_MULTILINE) == null) {
@@ -928,7 +933,6 @@ public final class JavaScriptSemanticOverlay {
             // to set a new value, not to carry the old one.
             return;
         }
-        applyMaxLength(element, node);
         if (element.getAttribute(ATTRIBUTE_EDITING) != null) {
             return;
         }
