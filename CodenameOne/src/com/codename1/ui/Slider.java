@@ -174,7 +174,7 @@ public class Slider extends Label implements ActionSource {
     @Override
     public void initComponent() {
         if (infinite) {
-            getComponentForm().registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(this, this);
             if (thumbImage == null) {
                 thumbImage = UIManager.getInstance().getThemeImageConstant("sliderThumbImage");
             }
@@ -240,9 +240,9 @@ public class Slider extends Label implements ActionSource {
             infinite = i;
             if (isInitialized()) {
                 if (i) {
-                    getComponentForm().registerAnimatedInternal(this);
+                    TopLevelSupport.registerAnimatedInternal(this, this);
                 } else {
-                    getComponentForm().deregisterAnimatedInternal(this);
+                    TopLevelSupport.deregisterAnimatedInternal(this, this);
                 }
             }
         }

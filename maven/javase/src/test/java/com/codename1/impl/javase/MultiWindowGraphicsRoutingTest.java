@@ -218,4 +218,55 @@ class MultiWindowGraphicsRoutingTest {
             canvas.disposeGestureListeners();
         }
     }
+
+    @Test
+    void theUtilityWindowTypeStillChangesAfterTheWindowIsShown() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+
+        // Swing only allows the window type to change while the frame is
+        // undisplayable, and the setter used to skip the change outright once the
+        // window was up. Window.isUtilityWindow() reported the requested value while
+        // the platform stayed on the old taskbar behaviour, so the setter silently did
+        // nothing for the only case that matters -- a palette toggled at runtime.
+        JavaSEWindowManager wm = new JavaSEWindowManager(port);
+        Object peerObj = wm.createWindow(31, "utility", 40, 40, 300, 200,
+                true, true, null, false, false);
+        assertNotNull(peerObj);
+        try {
+            wm.show(peerObj);
+            flushAwt();
+
+            wm.setUtilityWindow(peerObj, true);
+            flushAwt();
+            assertEquals(java.awt.Window.Type.UTILITY, frameOf(peerObj).getType(),
+                    "a shown window must still be able to become a utility window");
+            assertTrue(frameOf(peerObj).isVisible(),
+                    "and must still be on screen afterwards");
+
+            wm.setUtilityWindow(peerObj, false);
+            flushAwt();
+            assertEquals(java.awt.Window.Type.NORMAL, frameOf(peerObj).getType(),
+                    "and must be able to change back");
+        } finally {
+            wm.dispose(peerObj);
+            flushAwt();
+        }
+    }
+
+    private static java.awt.Window frameOf(Object peerObj) throws Exception {
+        java.lang.reflect.Field f =
+                JavaSEWindowManager.Peer.class.getDeclaredField("frame");
+        f.setAccessible(true);
+        return (java.awt.Window) f.get(peerObj);
+    }
+
+    private static void flushAwt() throws Exception {
+        javax.swing.SwingUtilities.invokeAndWait(new Runnable() {
+            @Override
+            public void run() {
+            }
+        });
+    }
 }

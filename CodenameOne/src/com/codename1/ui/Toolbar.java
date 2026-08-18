@@ -2838,7 +2838,13 @@ public class Toolbar extends Container {
             }
         }
         hideShowMotion = Motion.createSplineMotion(getY(), -getHeight(), 300);
-        getComponentForm().registerAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(this);
+        }
         hideShowMotion.start();
     }
 
@@ -2852,7 +2858,13 @@ public class Toolbar extends Container {
             return;
         }
         hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);
-        getComponentForm().registerAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(this);
+        }
         hideShowMotion.start();
     }
 

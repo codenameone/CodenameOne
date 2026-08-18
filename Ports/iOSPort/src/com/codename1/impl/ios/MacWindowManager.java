@@ -81,6 +81,11 @@ public class MacWindowManager extends WindowManager {
         Object mutableImage;
         int rasterWidth;
         int rasterHeight;
+        /// Reused frame transfer buffer. A fresh int[] per flush allocated the whole
+        /// window's raster every repaint -- about 33MB for a 4K window, so roughly
+        /// 2GB/s at 60fps -- which is enough garbage to stall an animating window or
+        /// have the system kill the app. Reallocated only when the raster resizes.
+        int[] frameBuffer;
 
         Peer(int slot, int windowId) {
             this.slot = slot;
@@ -143,6 +148,9 @@ public class MacWindowManager extends WindowManager {
             return;
         }
         w.mutableImage = null;
+        // Released with the raster it belongs to; a disposed window has no frames left
+        // to present, and on a large display this is a few tens of megabytes.
+        w.frameBuffer = null;
         IOSImplementation.nativeInstance.macWindowDestroy(w.slot);
     }
 
@@ -253,7 +261,11 @@ public class MacWindowManager extends WindowManager {
         // Read the finished frame back and hand it to the scene's view. The whole
         // raster is presented rather than the dirty rect because the view holds one
         // image; the dirty region still bounds what was actually redrawn into it.
-        int[] argb = new int[w.rasterWidth * w.rasterHeight];
+        int needed = w.rasterWidth * w.rasterHeight;
+        if (w.frameBuffer == null || w.frameBuffer.length < needed) {
+            w.frameBuffer = new int[needed];
+        }
+        int[] argb = w.frameBuffer;
         impl.getRGB(w.mutableImage, argb, 0, 0, 0, w.rasterWidth, w.rasterHeight);
         IOSImplementation.nativeInstance.macWindowPresent(w.slot, argb,
                 w.rasterWidth, w.rasterHeight);

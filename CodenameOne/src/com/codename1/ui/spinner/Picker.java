@@ -918,7 +918,7 @@ public class Picker extends Button {
                 dlg.setRepositionAnimation(false);
                 registerAsInputDevice(dlg, spinner);
                 if (Display.getInstance().isTablet()) {
-                    getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
+                    getTopLevelContainer().getAnimationManager().flushAnimation(new Runnable() {
 
                         @Override
                         public void run() {
@@ -928,7 +928,7 @@ public class Picker extends Button {
                     });
 
                 } else {
-                    getComponentForm().getAnimationManager().flushAnimation(new Runnable() {
+                    getTopLevelContainer().getAnimationManager().flushAnimation(new Runnable() {
 
                         @Override
                         public void run() {

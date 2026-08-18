@@ -36,6 +36,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.TopLevelContainer;
 
 /// The pure Codename One text editing surface. It renders a plain text `EditorDocument` with its own
 /// `Graphics` code, owns the caret and selection, handles pointer and keyboard interaction, and captures
@@ -1395,7 +1396,13 @@ public class EditorView extends Component implements TextInputClient {
         }
         startInput();
         if (!animRegistered && getComponentForm() != null) {
-            getComponentForm().registerAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.registerAnimated(this);
+            }
             animRegistered = true;
         }
         resetBlink();
@@ -1420,7 +1427,13 @@ public class EditorView extends Component implements TextInputClient {
         restoreMultiKeyMode();
         stopInput();
         if (animRegistered && getComponentForm() != null) {
-            getComponentForm().deregisterAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.deregisterAnimated(this);
+            }
             animRegistered = false;
         }
         repaint();

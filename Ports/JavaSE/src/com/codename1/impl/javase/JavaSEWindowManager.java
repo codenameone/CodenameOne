@@ -465,17 +465,39 @@ public class JavaSEWindowManager extends WindowManager {
         if (p == null) {
             return;
         }
+        applyWhileUndisplayable(p, new Runnable() {
+            @Override
+            public void run() {
+                if (p.frame instanceof java.awt.Frame) {
+                    ((java.awt.Frame) p.frame).setUndecorated(!decorated);
+                } else if (p.frame instanceof java.awt.Dialog) {
+                    ((java.awt.Dialog) p.frame).setUndecorated(!decorated);
+                }
+            }
+        });
+    }
+
+    /**
+     * Runs a change that Swing only permits while a window is undisplayable, taking
+     * the frame down and putting it back around it.
+     *
+     * Disposing an AWT window disposes everything it owns, so a window with open child
+     * windows would take them down with it and only put itself back. The children
+     * stayed registered and visible as far as the framework knew, painting into a
+     * hierarchy that was no longer displayable. They are remembered here and re-shown
+     * after the owner, so a child is never briefly parented to a window that is not on
+     * screen.
+     *
+     * Shared by the decoration and utility-window setters. The utility setter used to
+     * skip the change outright once the window was showing, which left the platform on
+     * the old taskbar behaviour while {@code Window.isUtilityWindow()} reported the
+     * requested value -- a setter that silently did nothing.
+     */
+    private static void applyWhileUndisplayable(final Peer p, final Runnable change) {
         runOnAwt(new Runnable() {
             @Override
             public void run() {
-                // Swing only allows this while the frame is not displayable.
                 boolean wasVisible = p.frame.isVisible();
-                // Disposing an AWT window disposes everything it owns, so a window
-                // with open child windows would take them down with it and only put
-                // itself back. The children stayed registered and visible as far as
-                // the framework knew, painting into a hierarchy that was no longer
-                // displayable. Remembered here and re-shown below; setVisible(true)
-                // recreates the native peer a dispose destroyed.
                 java.awt.Window[] owned = p.frame.getOwnedWindows();
                 java.util.List<java.awt.Window> wereVisible =
                         new java.util.ArrayList<java.awt.Window>();
@@ -488,16 +510,11 @@ public class JavaSEWindowManager extends WindowManager {
                     p.frame.setVisible(false);
                 }
                 p.frame.dispose();
-                if (p.frame instanceof java.awt.Frame) {
-                    ((java.awt.Frame) p.frame).setUndecorated(!decorated);
-                } else if (p.frame instanceof java.awt.Dialog) {
-                    ((java.awt.Dialog) p.frame).setUndecorated(!decorated);
-                }
+                change.run();
                 if (wasVisible) {
+                    // setVisible(true) recreates the native peer the dispose destroyed.
                     p.frame.setVisible(true);
                 }
-                // After the owner, so a child is never briefly parented to a window
-                // that is not on screen.
                 for (java.awt.Window each : wereVisible) {
                     each.setVisible(true);
                 }
@@ -569,18 +586,17 @@ public class JavaSEWindowManager extends WindowManager {
     public void setUtilityWindow(Object peerObj, final boolean utility) {
         final Peer p = peer(peerObj);
         if (p != null) {
-            runOnAwt(new Runnable() {
+            // UTILITY is the Swing window type that keeps a palette out of the task
+            // bar and gives it lighter chrome. Swing only allows the type to change
+            // while the frame is undisplayable, so a window that is already up is taken
+            // down and put back rather than being left on the old behaviour -- which is
+            // what it used to do, silently, while isUtilityWindow() reported otherwise.
+            applyWhileUndisplayable(p, new Runnable() {
                 @Override
                 public void run() {
-                    // UTILITY is the Swing window type that keeps a palette out of the
-                    // task bar and gives it lighter chrome. It can only be set while the
-                    // frame is undisplayable, so an already shown window is left alone
-                    // rather than being flickered through a dispose/recreate cycle.
-                    if (!p.frame.isDisplayable()) {
-                        p.frame.setType(utility
-                                ? java.awt.Window.Type.UTILITY
-                                : java.awt.Window.Type.NORMAL);
-                    }
+                    p.frame.setType(utility
+                            ? java.awt.Window.Type.UTILITY
+                            : java.awt.Window.Type.NORMAL);
                 }
             });
         }

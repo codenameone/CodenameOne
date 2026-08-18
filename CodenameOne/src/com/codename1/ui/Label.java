@@ -593,7 +593,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         // solves the case of a user starting a ticker before adding the component
         // into the container
         if (isTickerEnabled() && isTickerRunning() && !isCellRenderer()) {
-            getComponentForm().registerAnimatedInternal(this);
+            TopLevelSupport.registerAnimatedInternal(this, this);
         }
         checkAnimation();
         if (maskName != null && mask == null) {

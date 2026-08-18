@@ -193,7 +193,13 @@ public class SwipeableContainer extends Container {
 
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(topX, bottom.getWidth(), 300);
-        getComponentForm().registerAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(this);
+        }
         openCloseMotion.start();
         openedToRight = true;
         open = true;
@@ -217,7 +223,13 @@ public class SwipeableContainer extends Container {
 
         int topX = topWrapper.getX();
         openCloseMotion = Motion.createSplineMotion(-topX, bottom.getWidth(), 300);
-        getComponentForm().registerAnimated(this);
+        // The top level rather than the form: getComponentForm() is null
+        // by design inside a Window, so this both threw and left the
+        // animation unregistered there.
+        TopLevelContainer topLevel = getTopLevelContainer();
+        if (topLevel != null) {
+            topLevel.registerAnimated(this);
+        }
         openCloseMotion.start();
         openedToLeft = true;
         open = true;

@@ -22,6 +22,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.animations.Animation;
+
 /// Package private helpers shared by `Form` and `Window`.
 ///
 /// Java 5 has no default methods, so behaviour common to the two top levels lives
@@ -181,6 +183,44 @@ final class TopLevelSupport {
             return null;
         }
         return top.asContainer();
+    }
+
+    /// Registers a component for animation with the top level it lives in, using the
+    /// internal registration that skips the public bookkeeping.
+    ///
+    /// `registerAnimatedInternal` is package private on both `Form` and `Window` and so
+    /// cannot sit on the public `TopLevelContainer` interface -- an interface member
+    /// would force it public. Callers inside this package go through here instead of
+    /// `getComponentForm()`, which is null by design inside a `Window`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose top level is registered against
+    ///
+    /// - `a`: the animation to register
+    static void registerAnimatedInternal(Component c, Animation a) {
+        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
+        if (top instanceof Form) {
+            ((Form) top).registerAnimatedInternal(a);
+        } else if (top instanceof Window) {
+            ((Window) top).registerAnimatedInternal(a);
+        }
+    }
+
+    /// The counterpart to `#registerAnimatedInternal(Component, Animation)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the component whose top level is deregistered from
+    ///
+    /// - `a`: the animation to deregister
+    static void deregisterAnimatedInternal(Component c, Animation a) {
+        TopLevelContainer top = c == null ? null : c.getTopLevelContainer();
+        if (top instanceof Form) {
+            ((Form) top).deregisterAnimatedInternal(a);
+        } else if (top instanceof Window) {
+            ((Window) top).deregisterAnimatedInternal(a);
+        }
     }
 
     /// Throws when the running platform has no windowing system, so that misuse

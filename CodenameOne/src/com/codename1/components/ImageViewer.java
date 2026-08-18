@@ -40,6 +40,7 @@ import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.TopLevelContainer;
 
 /// ImageViewer allows zooming/panning an image and potentially flicking between multiple images
 /// within a list of images.
@@ -367,7 +368,13 @@ public class ImageViewer extends Component {
             image.lock();
         }
         if (image.isAnimation()) {
-            getComponentForm().registerAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.registerAnimated(this);
+            }
         }
         eagerLock();
     }
@@ -450,7 +457,7 @@ public class ImageViewer extends Component {
         delegatingDragToParent = false;
         // Resolved through the top level so this works inside a Window, where
         // getComponentForm() is null and this line threw.
-        com.codename1.ui.TopLevelContainer viewerTop = getTopLevelContainer();
+        TopLevelContainer viewerTop = getTopLevelContainer();
         if (viewerTop != null) {
             viewerTop.addComponentAwaitingRelease(this);
         }
@@ -835,7 +842,13 @@ public class ImageViewer extends Component {
             if (motion.isFinished()) {
                 zooming = false;
                 if (!result) {
-                    getComponentForm().deregisterAnimated(this);
+                    // The top level rather than the form: getComponentForm() is null
+                    // by design inside a Window, so this both threw and left the
+                    // animation unregistered there.
+                    TopLevelContainer topLevel = getTopLevelContainer();
+                    if (topLevel != null) {
+                        topLevel.deregisterAnimated(this);
+                    }
                 }
             }
             repaint();
@@ -1274,7 +1287,13 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);
             motion.start();
-            getComponentForm().registerAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.registerAnimated(this);
+            }
         } else {
             this.zoom = zoom;
             updatePositions();
@@ -1311,7 +1330,13 @@ public class ImageViewer extends Component {
             float initZoom = this.zoom;
             motion = Motion.createEaseInOutMotion((int) (initZoom * 10000), (int) (zoom * 10000), 200);
             motion.start();
-            getComponentForm().registerAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.registerAnimated(this);
+            }
         } else {
             this.zoom = zoom;
             updatePositions();

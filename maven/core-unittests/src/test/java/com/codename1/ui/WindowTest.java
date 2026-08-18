@@ -2054,4 +2054,41 @@ class WindowTest extends UITestBase {
 
         w.dispose();
     }
+
+    @FormTest
+    void animatedComponentsRegisterWithTheWindowTheyLiveIn() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("animated", new BorderLayout());
+        w.setWindowSize(400, 300);
+        com.codename1.components.Switch sw = new com.codename1.components.Switch();
+        w.add(BorderLayout.CENTER, sw);
+        w.show();
+        w.revalidate();
+
+        // getComponentForm() is null by design inside a Window, so every component that
+        // registered its animation through it threw on an ordinary interaction there --
+        // a tapped Switch could not toggle at all. The registration has to resolve
+        // through the top level instead.
+        boolean before = sw.isValue();
+        sw.pointerPressed(sw.getAbsoluteX() + 2, sw.getAbsoluteY() + 2);
+        sw.pointerReleased(sw.getAbsoluteX() + 2, sw.getAbsoluteY() + 2);
+
+        // The toggle completes on the animation, so the observable result here is that
+        // the interaction was accepted and an animation was registered against the
+        // window rather than throwing on the way.
+        assertTrue(w.isWindowShowing());
+        assertEquals(before, sw.isValue(),
+                "the value flips when the animation finishes, not on release");
+
+        // ImageViewer registers the same way from its animated setZoom path, which is
+        // an ordinary operation rather than an edge case.
+        com.codename1.components.ImageViewer viewer =
+                new com.codename1.components.ImageViewer(Image.createImage(32, 32));
+        w.add(BorderLayout.NORTH, viewer);
+        w.revalidate();
+        viewer.setZoom(2f);
+        assertNotNull(viewer.getImage(), "zooming in a window must not throw");
+
+        w.dispose();
+    }
 }

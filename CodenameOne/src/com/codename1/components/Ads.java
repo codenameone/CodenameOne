@@ -42,6 +42,7 @@ import com.codename1.ui.html.HTMLComponent;
 import com.codename1.ui.html.HTMLElement;
 import com.codename1.ui.html.IOCallback;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.TopLevelContainer;
 
 import java.util.Vector;
 
@@ -127,7 +128,13 @@ public class Ads extends Container implements HTMLCallback {
             });
 
             if (refreshAd) {
-                getComponentForm().registerAnimated(this);
+                // The top level rather than the form: getComponentForm() is null
+                // by design inside a Window, so this both threw and left the
+                // animation unregistered there.
+                TopLevelContainer topLevel = getTopLevelContainer();
+                if (topLevel != null) {
+                    topLevel.registerAnimated(this);
+                }
             } else {
                 requestAd();
             }
@@ -138,7 +145,13 @@ public class Ads extends Container implements HTMLCallback {
     @Override
     protected void deinitialize() {
         if (refreshAd) {
-            getComponentForm().deregisterAnimated(this);
+            // The top level rather than the form: getComponentForm() is null
+            // by design inside a Window, so this both threw and left the
+            // animation unregistered there.
+            TopLevelContainer topLevel = getTopLevelContainer();
+            if (topLevel != null) {
+                topLevel.deregisterAnimated(this);
+            }
         }
     }
 

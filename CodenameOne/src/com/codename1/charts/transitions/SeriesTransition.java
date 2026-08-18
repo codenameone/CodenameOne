@@ -119,7 +119,10 @@ public abstract class SeriesTransition implements Animation {
     public boolean animate() {
         if (finished) {
             cleanup();
-            chart.getComponentForm().deregisterAnimated(this);
+            com.codename1.ui.TopLevelContainer top = chart.getTopLevelContainer();
+            if (top != null) {
+                top.deregisterAnimated(this);
+            }
             return false;
         } else if (motion.isFinished()) {
             finished = true;
@@ -194,7 +197,12 @@ public abstract class SeriesTransition implements Animation {
     /// current animation settings.
     public void animateChart() {
         initTransition();
-        chart.getComponentForm().registerAnimated(this);
+        // The chart's top level rather than its form: getComponentForm() is null by
+        // design inside a Window, so a chart transition threw there.
+        com.codename1.ui.TopLevelContainer top = chart.getTopLevelContainer();
+        if (top != null) {
+            top.registerAnimated(this);
+        }
 
     }
 
