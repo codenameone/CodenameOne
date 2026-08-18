@@ -303,9 +303,11 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     private static float[][] rectOutline(int x, int y, int width, int height) {
+        // The first point again at the end: a rectangle is closed, and that is how a closed
+        // outline says so now that the tests no longer close one for it.
         return new float[][] {
-            new float[] { x, x + width, x + width, x },
-            new float[] { y, y, y + height, y + height }
+            new float[] { x, x + width, x + width, x, x },
+            new float[] { y, y, y + height, y + height, y }
         };
     }
 
@@ -347,7 +349,9 @@ public class BufferedGraphics extends HTML5Graphics {
             return null;
         }
         int perCorner = 6;
-        int points = 4 * (perCorner + 1);
+        // One more than the corners produce, for the first point repeated at the end: the
+        // perimeter closes, and a closed outline now says so rather than being closed for it.
+        int points = 4 * (perCorner + 1) + 1;
         float[][] outline = new float[][] { new float[points], new float[points] };
         int at = 0;
         int[][] corners = new int[][] {
@@ -369,6 +373,8 @@ public class BufferedGraphics extends HTML5Graphics {
                 at++;
             }
         }
+        outline[0][at] = outline[0][0];
+        outline[1][at] = outline[1][0];
         return outline;
     }
 
@@ -377,11 +383,15 @@ public class BufferedGraphics extends HTML5Graphics {
             return null;
         }
         int count = Math.min(nPoints, Math.min(xPoints.length, yPoints.length));
-        float[][] outline = new float[][] { new float[count], new float[count] };
+        // Closed, with the first point repeated: drawPolygon joins the last vertex back to the
+        // first, so that edge is one the draw really has.
+        float[][] outline = new float[][] { new float[count + 1], new float[count + 1] };
         for (int i = 0; i < count; i++) {
             outline[0][i] = xPoints[i];
             outline[1][i] = yPoints[i];
         }
+        outline[0][count] = xPoints[0];
+        outline[1][count] = yPoints[0];
         return outline;
     }
 
@@ -428,7 +438,11 @@ public class BufferedGraphics extends HTML5Graphics {
         int steps = Math.max(8, span / 4);
         boolean whole = span >= 360;
         boolean centre = wedge && !whole;
-        int points = steps + 1 + (centre ? 1 : 0);
+        // Closed when it comes back to where it started -- a wedge returns to its centre and a
+        // whole ellipse to its first point -- and open otherwise, which is what a partial
+        // drawArc paints: the curve, and nothing across its ends.
+        boolean closed = centre || whole;
+        int points = steps + 1 + (centre ? 1 : 0) + (closed ? 1 : 0);
         float[][] outline = new float[][] { new float[points], new float[points] };
         int at = 0;
         if (centre) {
@@ -445,6 +459,10 @@ public class BufferedGraphics extends HTML5Graphics {
             outline[0][at] = (float) (cx + rx * Math.cos(radians));
             outline[1][at] = (float) (cy - ry * Math.sin(radians));
             at++;
+        }
+        if (closed) {
+            outline[0][at] = outline[0][0];
+            outline[1][at] = outline[1][0];
         }
         return outline;
     }
@@ -481,6 +499,12 @@ public class BufferedGraphics extends HTML5Graphics {
             } else if (type == com.codename1.ui.geom.PathIterator.SEG_LINETO) {
                 curX.add(Float.valueOf(coords[0]));
                 curY.add(Float.valueOf(coords[1]));
+            } else if (type == com.codename1.ui.geom.PathIterator.SEG_CLOSE
+                    && !curX.isEmpty()) {
+                // The subpath returns to where it began, and a stroke really does paint that
+                // edge. A subpath without it stays open, so no chord is tested across its ends.
+                curX.add(curX.get(0));
+                curY.add(curY.get(0));
             } else if (type == com.codename1.ui.geom.PathIterator.SEG_QUADTO
                     && !curX.isEmpty()) {
                 float fromX = curX.get(curX.size() - 1).floatValue();
@@ -581,10 +605,20 @@ public class BufferedGraphics extends HTML5Graphics {
                     return true;
                 }
             }
-            for (int i = 0, j = px.length - 1; i < px.length; j = i++) {
-                if (segmentMeetsRect(px[j], py[j], px[i], py[i], x, y, right, bottom)) {
+            for (int i = 1; i < px.length; i++) {
+                if (segmentMeetsRect(px[i - 1], py[i - 1], px[i], py[i], x, y, right, bottom)) {
                     return true;
                 }
+            }
+            // A fill closes what it is given: context.fill() joins the last point back to the
+            // first and paints that edge, so it is tested. A stroke does not -- drawArc over a
+            // 90-degree sweep paints the curve and nothing across its ends -- so an outline that
+            // ends where it started says so by repeating its first point, and one that does not
+            // is left open. Testing a chord no stroke draws would detach text beside the curve
+            // and cost its component the DOM for the rest of the form.
+            if (filled && px.length > 2 && segmentMeetsRect(px[px.length - 1], py[px.length - 1],
+                    px[0], py[0], x, y, right, bottom)) {
+                return true;
             }
         }
         if (!filled) {
