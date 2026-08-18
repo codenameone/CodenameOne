@@ -519,4 +519,23 @@ public abstract class WindowManager {
     ///
     /// the monitor offset
     public abstract int getMonitorForWindow(Object peer);
+
+    /// Returns the monitor the application's main window currently sits on.
+    ///
+    /// This is not answerable through `#getMonitorForWindow(Object)`, which takes a
+    /// secondary window's peer; the main window has none. Without it, asking for the
+    /// monitor of the main `Form` reported the primary monitor even when the
+    /// application had been dragged to a second display, so an application
+    /// positioning a window against the main form got the wrong work area, scale and
+    /// density.
+    ///
+    /// The default answers the primary monitor, which is correct for a port whose
+    /// main window cannot move between displays.
+    ///
+    /// #### Returns
+    ///
+    /// the monitor offset
+    public int getMonitorForMainWindow() {
+        return getPrimaryMonitor();
+    }
 }

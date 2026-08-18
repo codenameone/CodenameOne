@@ -850,4 +850,17 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_monitorForWindow___int_R_int(
     return cn1WinMonitorIndexForHwnd(w->hwnd);
 }
 
+/* The application's main window has no desktop-window slot, so its monitor cannot
+ * be asked for through monitorForWindow. Without this, everything positioned
+ * against the main form reported the primary monitor even after the application
+ * had been dragged to a second display. */
+JAVA_INT com_codename1_impl_windows_WindowsNative_monitorForMainWindow___R_int(
+        CODENAME_ONE_THREAD_STATE) {
+    if (cn1Win.hwnd == NULL) {
+        cn1WinRefreshMonitors();
+        return g_monitors.primary;
+    }
+    return cn1WinMonitorIndexForHwnd(cn1Win.hwnd);
+}
+
 } /* extern "C" */

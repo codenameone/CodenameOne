@@ -350,4 +350,9 @@ public class LinuxWindowManager extends WindowManager {
         }
         return Math.max(0, LinuxNative.monitorForWindow(s));
     }
+
+    @Override
+    public int getMonitorForMainWindow() {
+        return Math.max(0, LinuxNative.monitorForMainWindow());
+    }
 }

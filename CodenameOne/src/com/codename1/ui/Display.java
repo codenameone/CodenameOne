@@ -361,9 +361,21 @@ public final class Display extends CN1Constants {
     /// `#monitorsChanged()`.
     private boolean monitorsChangedPending;
 
-    /// The top level that received the last key press. See `#pointerEventTarget`.
-    @SuppressWarnings("PMD.SingularField")
-    private Container keyEventTarget;
+    /// How many simultaneously held keys have their press target remembered. Well
+    /// past what a keyboard reports at once; a press beyond this is not tracked and
+    /// its release is dropped, exactly as an unmatched release always was.
+    private static final int TRACKED_KEY_PRESSES = 8;
+
+    /// Key codes currently held, paired with `#keyPressTargets` by index.
+    private final int[] keyPressCodes = new int[TRACKED_KEY_PRESSES];
+
+    /// The top level that received the press of each held key.
+    ///
+    /// One field per key rather than one for the keyboard: hold a key in window A,
+    /// focus window B and press another key there, and a single field names B, so
+    /// A's release matches nothing and is dropped while clearing the field -- which
+    /// then drops B's release too, latching a component in each window.
+    private final Container[] keyPressTargets = new Container[TRACKED_KEY_PRESSES];
 
     /// Window ids remembered so a key repeat or long press started in a window is
     /// delivered back to that window rather than to the main form.
@@ -2927,6 +2939,40 @@ public final class Display extends CN1Constants {
         callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
     }
 
+    /// Records which top level saw a key press, so its release can be matched to it.
+    /// Called on the event dispatch thread only.
+    private void rememberKeyPress(int keyCode, Container target) {
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
+                // Auto-repeat, or a press the matching release never arrived for.
+                keyPressTargets[iter] = target;
+                return;
+            }
+            if (free < 0 && keyPressTargets[iter] == null) {
+                free = iter;
+            }
+        }
+        if (free >= 0) {
+            keyPressCodes[free] = keyCode;
+            keyPressTargets[free] = target;
+        }
+    }
+
+    /// Returns and forgets the top level that saw this key's press, or null when
+    /// there is no record of one.
+    private Container takeKeyPressTarget(int keyCode) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] != null && keyPressCodes[iter] == keyCode) {
+                Container out = keyPressTargets[iter];
+                keyPressTargets[iter] = null;
+                keyPressCodes[iter] = 0;
+                return out;
+            }
+        }
+        return null;
+    }
+
     /// Lets the queued notification re-arm the coalescing guard. See
     /// `#monitorsChanged()`.
     void clearMonitorsChangedPending() {
@@ -3111,20 +3157,18 @@ public final class Display extends CN1Constants {
 
         switch (type) {
             case KEY_PRESSED:
+                rememberKeyPress(inputEventStackTmp[offset], f);
                 f.keyPressed(inputEventStackTmp[offset]);
                 offset++;
-                keyEventTarget = f;
                 break;
             case KEY_RELEASED:
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container xf = keyEventTarget;
-                keyEventTarget = null;
-
                 //make sure the released event is sent to the same Form who got a
                 //pressed event
                 int releasedKey = inputEventStackTmp[offset];
+                Container xf = takeKeyPressTarget(releasedKey);
                 offset++;
                 if (xf == f || multiKeyMode) { //NOPMD CompareObjectsWithEquals
                     f.keyReleased(releasedKey);
@@ -3623,8 +3667,11 @@ public final class Display extends CN1Constants {
         if (pointerEventTarget == w) { //NOPMD CompareObjectsWithEquals
             pointerEventTarget = null;
         }
-        if (keyEventTarget == w) { //NOPMD CompareObjectsWithEquals
-            keyEventTarget = null;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
+                keyPressTargets[iter] = null;
+                keyPressCodes[iter] = 0;
+            }
         }
         if (keyRepeatWindowId == w.getWindowId()) {
             keyRepeatCharged = false;

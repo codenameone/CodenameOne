@@ -231,6 +231,20 @@ public class TestWindowManager extends WindowManager {
         monitors.addAll(replacement);
     }
 
+    /// Which monitor the application's main window sits on. Scriptable because a
+    /// `Form` has no window peer, so this is the only way to describe a main window
+    /// that has been dragged to a second display.
+    private int mainWindowMonitor;
+
+    public void setMainWindowMonitor(int index) {
+        mainWindowMonitor = index;
+    }
+
+    @Override
+    public int getMonitorForMainWindow() {
+        return mainWindowMonitor;
+    }
+
     public void setPrimaryMonitor(int index) {
         primaryMonitor = index;
     }
@@ -274,6 +288,7 @@ public class TestWindowManager extends WindowManager {
         monitors.clear();
         monitors.add(new FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
         primaryMonitor = 0;
+        mainWindowMonitor = 0;
     }
 
     private static FakeWindow win(Object peer) {

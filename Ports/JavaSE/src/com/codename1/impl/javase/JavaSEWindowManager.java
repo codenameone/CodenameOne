@@ -768,6 +768,18 @@ public class JavaSEWindowManager extends WindowManager {
         return monitorIndexOf(p);
     }
 
+    @Override
+    public int getMonitorForMainWindow() {
+        // The simulator's own frame, which is the window a Form is displayed in.
+        // It moves between displays like any other, so reporting the primary
+        // monitor for it was wrong the moment the user dragged it.
+        java.awt.Window main = port.findTopFrame();
+        if (main == null) {
+            return getPrimaryMonitor();
+        }
+        return monitorIndexOfWindow(main);
+    }
+
     private static GraphicsDevice device(int monitor) {
         try {
             GraphicsDevice[] all = devices();
@@ -787,8 +799,14 @@ public class JavaSEWindowManager extends WindowManager {
         if (p.frame == null) {
             return getPrimaryMonitor();
         }
+        return monitorIndexOfWindow(p.frame);
+    }
+
+    /// Which display the given AWT window is on, shared by the secondary windows
+    /// and the application's main frame.
+    private int monitorIndexOfWindow(java.awt.Window frame) {
         try {
-            GraphicsConfiguration cfg = p.frame.getGraphicsConfiguration();
+            GraphicsConfiguration cfg = frame.getGraphicsConfiguration();
             if (cfg != null) {
                 GraphicsDevice[] all = devices();
                 for (int iter = 0; iter < all.length; iter++) {

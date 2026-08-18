@@ -334,4 +334,9 @@ public class WindowsWindowManager extends WindowManager {
         }
         return Math.max(0, WindowsNative.monitorForWindow(s));
     }
+
+    @Override
+    public int getMonitorForMainWindow() {
+        return Math.max(0, WindowsNative.monitorForMainWindow());
+    }
 }

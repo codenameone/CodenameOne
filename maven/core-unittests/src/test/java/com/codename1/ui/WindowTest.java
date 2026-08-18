@@ -885,6 +885,63 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void overlappingKeyPressesAcrossWindowsEachReachTheirOwnTarget() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        final KeyCountingComponent windowKeys = new KeyCountingComponent();
+        w.add(BorderLayout.CENTER, windowKeys);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(windowKeys);
+
+        // Hold a key on the main form, press a different key in the window before
+        // releasing it, then release both. One target for the whole keyboard is not
+        // enough: the second press overwrote the first, so the first release matched
+        // nothing and cleared the field, and the second release then matched nothing
+        // either -- latching a component in each window.
+        Display.getInstance().keyPressed(-91);
+        Display.getInstance().windowKeyPressed(w.getWindowId(), -92);
+        Display.getInstance().keyReleased(-91);
+        Display.getInstance().windowKeyReleased(w.getWindowId(), -92);
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertEquals(1, mainKeys.pressed);
+        assertEquals(1, windowKeys.pressed);
+        assertEquals(1, mainKeys.released,
+                "the main form's release must survive a press in another window");
+        assertEquals(1, windowKeys.released,
+                "and so must the window's own");
+    }
+
+    @FormTest
+    void theMainFormReportsTheMonitorItIsActuallyOn() {
+        TestWindowManager wm = implementation.setMultiWindowSupported(true);
+        // Two displays, with the application's main window on the second one.
+        java.util.List<TestWindowManager.FakeMonitor> two =
+                new java.util.ArrayList<TestWindowManager.FakeMonitor>();
+        two.add(new TestWindowManager.FakeMonitor(0, 0, 1440, 900, 1.0, 96, "primary"));
+        two.add(new TestWindowManager.FakeMonitor(1440, 0, 2560, 1440, 2.0, 192, "second"));
+        wm.setMonitors(two);
+        wm.setMainWindowMonitor(1);
+
+        Form main = new Form("main");
+        main.show();
+
+        Monitor m = Desktop.getInstance().getMonitorFor(main);
+        assertEquals(1, m.getIndex(),
+                "a Form has no window peer, but its monitor is still answerable");
+        assertFalse(m.isPrimary(),
+                "reporting the primary monitor here gave the wrong work area and scale");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

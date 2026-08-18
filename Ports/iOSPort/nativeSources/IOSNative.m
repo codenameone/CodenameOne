@@ -2059,28 +2059,9 @@ void CN1MacWindowDeliverClosed(int windowId) {
     com_codename1_impl_ios_IOSImplementation_windowClosedNativelyCallback___int(CN1_THREAD_GET_STATE_PASS_ARG windowId);
 }
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT slot) {
-#if TARGET_OS_MACCATALYST
-    return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
-#else
-    return JAVA_FALSE;
-#endif
-}
-
-JAVA_VOID com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT slot, JAVA_BOOLEAN enabled) {
-#if TARGET_OS_MACCATALYST
-    CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
-#endif
-}
-
-JAVA_VOID com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {
-#if TARGET_OS_MACCATALYST
-    CN1MacWindowWatchScreens();
-#endif
-}
 
 void CN1MacWindowDeliverMonitorsChanged(void) {
-    com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE);
+    com_codename1_impl_ios_IOSImplementation_monitorsChangedCallback__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
 }
 
 void CN1MacWindowDeliverFocus(int windowId, BOOL gained) {
@@ -2390,6 +2371,26 @@ void com_codename1_impl_ios_IOSNative_macWindowDestroy___int(CN1_THREAD_STATE_MU
 void com_codename1_impl_ios_IOSNative_macWindowShow___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN visible) {
 #if TARGET_OS_MACCATALYST
     CN1MacWindowShow(slot, visible ? YES : NO);
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_macWindowReopen___int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacWindowReopen(slot) ? JAVA_TRUE : JAVA_FALSE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowSetInputEnabled___int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT slot, JAVA_BOOLEAN enabled) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowSetInputEnabled(slot, enabled == JAVA_TRUE);
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_macWindowWatchScreens__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    CN1MacWindowWatchScreens();
 #endif
 }
 

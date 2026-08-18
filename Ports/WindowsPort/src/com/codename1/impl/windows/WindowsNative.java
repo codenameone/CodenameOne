@@ -219,6 +219,10 @@ public final class WindowsNative {
     /** The monitor a window currently sits on. */
     public static native int monitorForWindow(int slot);
 
+    /// The monitor the application's main window sits on. The main window has no
+    /// desktop-window slot, so `#monitorForWindow(int)` cannot answer for it.
+    public static native int monitorForMainWindow();
+
     /** Rebuilds the Windows UI Automation virtual fragment tree. */
     public static native void accessibilityBegin();
     public static native void accessibilityNode(long id, long parentId, String role, String label,

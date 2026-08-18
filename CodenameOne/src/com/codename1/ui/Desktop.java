@@ -157,10 +157,19 @@ public final class Desktop {
     /// the monitor it sits on, or the primary monitor when that cannot be determined
     public Monitor getMonitorFor(TopLevelContainer topLevel) {
         WindowManager wm = manager();
-        if (wm != null && topLevel instanceof Window) {
-            Object peer = ((Window) topLevel).getNativePeer();
-            if (peer != null) {
-                return readMonitor(wm, wm.getMonitorForWindow(peer), wm.getPrimaryMonitor());
+        if (wm != null) {
+            if (topLevel instanceof Window) {
+                Object peer = ((Window) topLevel).getNativePeer();
+                if (peer != null) {
+                    return readMonitor(wm, wm.getMonitorForWindow(peer), wm.getPrimaryMonitor());
+                }
+            } else if (topLevel != null) {
+                // A Form lives in the application's main window, which has no peer to
+                // ask about. Reporting the primary monitor was wrong as soon as the
+                // application had been dragged to a second display: everything
+                // positioned against the main form got another monitor's work area,
+                // scale and density.
+                return readMonitor(wm, wm.getMonitorForMainWindow(), wm.getPrimaryMonitor());
             }
         }
         return getPrimaryMonitor();

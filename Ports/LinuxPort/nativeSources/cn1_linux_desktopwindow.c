@@ -43,6 +43,7 @@
 #include "cn1_linux_gfx.h"
 #include <gtk/gtk.h>
 #include <string.h>
+#include <pthread.h>
 
 typedef struct {
     GtkWidget* window;
@@ -61,6 +62,17 @@ typedef struct {
      * cumulatively from the gesture's BEGIN, so the previous value is what turns
      * it into the incremental multiplier Codename One dispatches. */
     double pinchLastScale;
+    /* Back-buffer replacement is deferred to the drawing thread, mirroring the
+     * Windows port's pendingResize: GTK reports a resize on its own thread while
+     * the event dispatch thread may be painting through g.cr, and freeing the
+     * context or surface underneath it crashes or corrupts the frame. */
+    int pendingResize;
+    int pendingW;
+    int pendingH;
+    /* Held while GTK reads the surface to blit it, and while the drawing thread
+     * swaps it. Those are the only two places one thread can destroy what the
+     * other is using. */
+    pthread_mutex_t bufferLock;
 } CN1LinuxWindow;
 
 static CN1LinuxWindow cn1DesktopWindows[CN1_MAX_DESKTOP_WINDOWS];
@@ -75,9 +87,26 @@ static CN1LinuxWindow* slotAt(int slot) {
     return &cn1DesktopWindows[slot];
 }
 
+static void cn1DesktopResizeBuffer(CN1LinuxWindow* w, int width, int height);
+
+/* Called by the port at the start of a frame, on the drawing thread, which is
+ * what makes it the safe point to swap the back buffer. */
 CN1Graphics* cn1LinuxDesktopGraphics(int slot) {
     CN1LinuxWindow* w = slotAt(slot);
-    return w == 0 ? 0 : &w->g;
+    if (w == 0) {
+        return 0;
+    }
+    if (w->pendingResize) {
+        pthread_mutex_lock(&w->bufferLock);
+        /* Re-checked under the lock: GTK can report another resize between the
+         * test above and here. */
+        if (w->pendingResize) {
+            cn1DesktopResizeBuffer(w, w->pendingW, w->pendingH);
+            w->pendingResize = 0;
+        }
+        pthread_mutex_unlock(&w->bufferLock);
+    }
+    return &w->g;
 }
 
 GtkWidget* cn1LinuxDesktopWidget(int slot) {
@@ -149,9 +178,15 @@ static int cn1DesktopMonitorIndexFor(GtkWidget* window) {
 static gboolean cn1DesktopOnDraw(GtkWidget* widget, cairo_t* cr, gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     (void) widget;
-    if (w != 0 && w->g.surface) {
-        cairo_set_source_surface(cr, w->g.surface, 0, 0);
-        cairo_paint(cr);
+    if (w != 0) {
+        /* Locked so the drawing thread cannot swap the surface out from under
+         * this blit. */
+        pthread_mutex_lock(&w->bufferLock);
+        if (w->g.surface) {
+            cairo_set_source_surface(cr, w->g.surface, 0, 0);
+            cairo_paint(cr);
+        }
+        pthread_mutex_unlock(&w->bufferLock);
     }
     return FALSE;
 }
@@ -165,7 +200,12 @@ static gboolean cn1DesktopOnConfigure(GtkWidget* widget, GdkEventConfigure* e, g
     if (e->width != w->width || e->height != w->height) {
         w->width = e->width;
         w->height = e->height;
-        cn1DesktopResizeBuffer(w, w->width, w->height);
+        /* Recorded, not applied: this runs on the GTK thread and the event
+         * dispatch thread may be part way through a frame on the current buffer.
+         * cn1LinuxDesktopGraphics applies it between frames. */
+        w->pendingW = w->width;
+        w->pendingH = w->height;
+        w->pendingResize = 1;
         cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
     }
     if (e->x != w->x || e->y != w->y) {
@@ -441,6 +481,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     /* memset above zeroed it, and a zero baseline would divide the first pinch
      * update by nothing. */
     w->pinchLastScale = 1.0;
+    pthread_mutex_init(&w->bufferLock, 0);
     w->width = op->width > 0 ? op->width : 1;
     w->height = op->height > 0 ? op->height : 1;
     w->inUse = 1;
@@ -519,6 +560,10 @@ static void cn1DesktopDestroyOnMain(void* arg) {
     if (w == 0) {
         return;
     }
+    /* Under the lock for the same reason the swap is: GTK's draw handler blits
+     * from this surface, and this runs on the GTK thread only for the widget
+     * teardown below. */
+    pthread_mutex_lock(&w->bufferLock);
     if (w->g.cr) {
         cairo_destroy(w->g.cr);
         w->g.cr = 0;
@@ -527,12 +572,15 @@ static void cn1DesktopDestroyOnMain(void* arg) {
         cairo_surface_destroy(w->g.surface);
         w->g.surface = 0;
     }
+    w->pendingResize = 0;
+    pthread_mutex_unlock(&w->bufferLock);
     if (w->window != 0) {
         gtk_widget_destroy(w->window);
         w->window = 0;
     }
     w->inUse = 0;
     w->windowId = 0;
+    pthread_mutex_destroy(&w->bufferLock);
 }
 
 typedef struct {
@@ -1023,4 +1071,17 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_monitorForWindow___int_R_int(
         return 0;
     }
     return w->monitorIndex;
+}
+
+/* The application's main window has no desktop-window slot, so its monitor cannot
+ * be asked for through monitorForWindow. Without this, everything positioned
+ * against the main form reported monitor 0 even after the application had been
+ * dragged to a second display. */
+JAVA_INT com_codename1_impl_linux_LinuxNative_monitorForMainWindow___R_int(
+        CODENAME_ONE_THREAD_STATE) {
+    GtkWidget* main = cn1LinuxWindowWidget();
+    if (main == 0) {
+        return 0;
+    }
+    return cn1DesktopMonitorIndexFor(main);
 }

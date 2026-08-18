@@ -230,6 +230,10 @@ public final class LinuxNative {
 
     public static native int monitorForWindow(int slot);
 
+    /// The monitor the application's main window sits on. The main window has no
+    /// desktop-window slot, so `#monitorForWindow(int)` cannot answer for it.
+    public static native int monitorForMainWindow();
+
     /** Rebuilds the GTK/ATK virtual accessibility hierarchy. */
     public static native void accessibilityBegin();
     public static native void accessibilityNode(long id, long parentId, String role, String label,
