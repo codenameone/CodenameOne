@@ -873,8 +873,8 @@ public final class GenerateInterpShims {
         }
         w.println("    public " + typeName(ret) + " " + m.getName() + "(" + sig + ")"
                 + throwsClause(m) + " {");
-        w.println("        Object $r = $runtime.dispatch($interp, \"" + m.getName() + "\", \""
-                + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "});");
+        emitDispatch(w, m, "$runtime.dispatch($interp, \"" + m.getName() + "\", \""
+                + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "})");
         if (!m.isDefault()) {
             // A stopped program's peer is still held by whatever registered it.
             // Answering nothing is the point of detaching; throwing here would
@@ -1636,9 +1636,9 @@ public final class GenerateInterpShims {
         // and Form's constructor calls overridable methods. Deferring to super
         // in that window is not a workaround -- the interpreted object genuinely
         // has no state yet, so the base behaviour is the correct one.
-        w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
-        w.println("                : $runtime.dispatch($interp, \"" + m.getName() + "\", \""
-                + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "});");
+        emitDispatch(w, m, "$runtime == null ? InterpRuntime.NOT_OVERRIDDEN\n"
+                + "                : $runtime.dispatch($interp, \"" + m.getName() + "\", \""
+                + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "})");
         if (abstractMethod) {
             // See zero(): a callback for a program that has been stopped.
             w.println("        if ($r == InterpRuntime.DETACHED) {");
@@ -1758,6 +1758,45 @@ public final class GenerateInterpShims {
      * <p>Narrowing is legal, dropping a checked exception the body can still
      * raise is not -- and the body here calls {@code super}.</p>
      */
+    /**
+     * Emits the dispatch call, preserving the checked exceptions the method
+     * declares.
+     *
+     * <p>The interpreter cannot throw a checked exception through its own
+     * signature, so it wraps one in an InterpThrowable. The shim, on the other
+     * hand, declares exactly what the framework method declares -- so an
+     * interpreted implementation of {@code Row.getString()} that throws
+     * IOException should reach the caller's {@code catch (IOException)} rather
+     * than arriving as an unexpected runtime exception. Each declared type is
+     * unwrapped by an instanceof-guarded cast; anything else keeps travelling
+     * as it was.</p>
+     */
+    private static void emitDispatch(PrintWriter w, Method m, String call) {
+        Class<?>[] declared = m.getExceptionTypes();
+        java.util.List<Class<?>> checked = new java.util.ArrayList<Class<?>>();
+        for (Class<?> e : declared) {
+            if (!RuntimeException.class.isAssignableFrom(e) && !Error.class.isAssignableFrom(e)) {
+                checked.add(e);
+            }
+        }
+        if (checked.isEmpty()) {
+            w.println("        Object $r = " + call + ";");
+            return;
+        }
+        w.println("        Object $r;");
+        w.println("        try {");
+        w.println("            $r = " + call + ";");
+        w.println("        } catch (com.codename1.impl.interp.InterpThrowable $t) {");
+        w.println("            Object $thrown = $t.getThrown();");
+        for (Class<?> e : checked) {
+            w.println("            if ($thrown instanceof " + typeName(e) + ") {");
+            w.println("                throw (" + typeName(e) + ") $thrown;");
+            w.println("            }");
+        }
+        w.println("            throw $t;");
+        w.println("        }");
+    }
+
     private static String throwsClause(Method m) {
         Class<?>[] ex = m.getExceptionTypes();
         if (ex.length == 0) {

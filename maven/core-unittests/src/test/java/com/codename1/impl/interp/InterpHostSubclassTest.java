@@ -87,6 +87,15 @@ public class InterpHostSubclassTest {
         }
 
         /**
+         * Declares a checked exception, as framework methods routinely do --
+         * {@code Row.getString} throws IOException, and so does half of
+         * {@code com.codename1.io}.
+         */
+        public String risky() throws java.io.IOException {
+            return "host-risky";
+        }
+
+        /**
          * Final, so a generated shim can neither override it nor bridge it --
          * the generator skips final methods, since neither is possible. A
          * pushed subclass may still write {@code super.stamp()}, and that is
@@ -129,6 +138,32 @@ public class InterpHostSubclassTest {
 
         public String super_render() {
             return super.render();
+        }
+
+        /**
+         * Written the way the generator emits a method with a throws clause:
+         * the interpreter cannot throw a checked exception through its own
+         * signature, so it wraps one, and the shim -- which declares exactly
+         * what the framework declares -- unwraps it again.
+         */
+        @Override
+        public String risky() throws java.io.IOException {
+            Object r;
+            try {
+                r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN
+                        : $runtime.dispatch($interp, "risky", "()Ljava/lang/String;",
+                                new Object[]{});
+            } catch (InterpThrowable t) {
+                Object thrown = t.getThrown();
+                if (thrown instanceof java.io.IOException) {
+                    throw (java.io.IOException) thrown;
+                }
+                throw t;
+            }
+            if (r == InterpRuntime.NOT_OVERRIDDEN || r == InterpRuntime.DETACHED) {
+                return super.risky();
+            }
+            return (String) r;
         }
     }
 
@@ -284,6 +319,37 @@ public class InterpHostSubclassTest {
         assertNotNull(o.toString());
         o.hashCode();
         assertTrue(o.equals(o), "identity survives detaching");
+    }
+
+    /**
+     * An interpreted implementation that throws what the framework method
+     * declares has to arrive as that exception. Wrapped in the interpreter's
+     * own carrier it bypasses {@code catch (IOException)} entirely, and the
+     * caller sees an unexpected runtime exception from a method whose contract
+     * says it throws IOException.
+     */
+    @Test
+    @DisplayName("a declared checked exception crosses back to host code intact")
+    void checkedExceptionsSurviveTheShimBoundary() throws Throwable {
+        InterpRuntime rt = load("Risky",
+                "public class Risky extends com.codename1.impl.interp.InterpHostSubclassTest.HostBase {\n"
+              + "  public String risky() throws java.io.IOException {\n"
+              + "    throw new java.io.IOException(\"boom\");\n"
+              + "  }\n"
+              + "  public static Object make() { return new Risky(); }\n"
+              + "  public static void main(String[] a) {}\n"
+              + "}\n");
+        HostBase peer = (HostBase) rt.invoke(rt.getBundle().findClass("Risky")
+                .declaredMethod("make", "()Ljava/lang/Object;"), null, new Object[0]);
+
+        java.io.IOException caught = null;
+        try {
+            peer.risky();
+        } catch (java.io.IOException e) {
+            caught = e;
+        }
+        assertNotNull(caught, "the declared exception should reach its own catch clause");
+        assertEquals("boom", caught.getMessage());
     }
 
     private static final String SUBCLASS_SOURCE =

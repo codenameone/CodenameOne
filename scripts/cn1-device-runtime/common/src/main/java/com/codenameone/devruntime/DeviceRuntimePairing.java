@@ -189,11 +189,25 @@ public final class DeviceRuntimePairing {
         return true;
     }
 
+    /**
+     * Guards the stored pairings and the index that makes them removable.
+     *
+     * <p>Two computers can pair at once -- each connection is served on its own
+     * thread -- and recording a pairing is a read-modify-write of one shared
+     * key. Interleaved, the later write drops the earlier peer from the index,
+     * and "forget all paired computers" then never finds it: its name, its
+     * secret and any Always approval stay behind, so a computer the user
+     * revoked is still authenticated.</p>
+     */
+    private static final Object PAIRING_LOCK = new Object();
+
     /** Records a computer as paired, with the secret both ends derived. */
     static void completePairing(String peerId, String peerName, byte[] secret) {
-        Preferences.set(PREF_PAIRED + peerId, peerName);
-        Preferences.set(PREF_SECRET + peerId, InterpPairingSecret.hex(secret));
-        remember(peerId);
+        synchronized (PAIRING_LOCK) {
+            Preferences.set(PREF_PAIRED + peerId, peerName);
+            Preferences.set(PREF_SECRET + peerId, InterpPairingSecret.hex(secret));
+            remember(peerId);
+        }
     }
 
     /**
@@ -301,6 +315,12 @@ public final class DeviceRuntimePairing {
 
     /** Drops every pairing, so the next push has to go through pairing again. */
     public static void forgetAll() {
+        synchronized (PAIRING_LOCK) {
+            forgetAllLocked();
+        }
+    }
+
+    private static void forgetAllLocked() {
         // Preferences has no key enumeration, so the peer ids have to be
         // recorded to be removable. The index is a single key holding a
         // tab-separated list, written whenever a peer pairs.
@@ -325,7 +345,7 @@ public final class DeviceRuntimePairing {
         Preferences.delete(PREF_PAIRED + "index");
     }
 
-    /** Records a peer id in the removable index. */
+    /** Records a peer id in the removable index. Call with PAIRING_LOCK held. */
     static void remember(String peerId) {
         String index = Preferences.get(PREF_PAIRED + "index", "");
         // Whole entries, not a substring search. Ids are variable-length hex,
