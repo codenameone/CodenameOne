@@ -2121,6 +2121,12 @@ public final class InterpRuntime {
             // instead quietly corrupts any sorted collection the two ended up
             // in together.
             Object other = args[0];
+            if (other == null) {
+                // Enum.compareTo(null) is a NullPointerException, not a
+                // ClassCastException: code that tells the two apart is code
+                // that would see the difference.
+                throw new NullPointerException("compareTo(null)");
+            }
             boolean comparable = other instanceof InterpObject
                     && ((InterpObject) other).enumOrdinal >= 0
                     && sameEnum(io, (InterpObject) other);

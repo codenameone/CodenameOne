@@ -71,9 +71,16 @@ public final class DeviceRuntimeMocks implements InterpHostInterceptor {
         return NOT_INTERCEPTED;
     }
 
-    /// Forgets what has been announced, so the next pushed program is told too.
+    /// Forgets what the last program did, so the next one starts clean.
+    ///
+    /// The warnings, so it is told about the mocks too, and the social
+    /// providers, which are framework singletons that would otherwise carry a
+    /// token and a callback across from a program that is no longer running.
+    /// The purchase mock needs nothing: it belongs to the runtime that is being
+    /// replaced.
     public static void reset() {
         ANNOUNCED.clear();
+        com.codename1.social.DeviceRuntimeSocialMocks.reset();
     }
 
     /**

@@ -280,34 +280,53 @@ public class DeviceRuntimeService {
     /// Dials one address and serves whatever it finds. Returns whether anybody
     /// was there.
     private boolean dial(final String host, final int port) {
-        final boolean[] served = new boolean[1];
+        // Three separate facts, and conflating any two of them is a bug this
+        // has already had. "Somebody answered" is what stops the timeout;
+        // "the exchange finished" is what ends the wait; and "the peer spoke
+        // our protocol" is the answer -- something else listening on 18234
+        // would otherwise hold the dial loop and stop the sweep from ever
+        // looking for the real desktop.
+        final boolean[] started = new boolean[1];
+        final boolean[] finished = new boolean[1];
+        final boolean[] spoke = new boolean[1];
         SocketConnection sc = new SocketConnection() {
             public void connectionEstablished(InputStream is, OutputStream os) {
-                // Only when the peer actually spoke the push protocol.
-                // Something else listening on this port -- and 18234 on
-                // loopback is not ours by right -- would otherwise count as a
-                // successful dial, and the loop would keep going back to it
-                // instead of falling back to the sweep that finds the desktop.
-                served[0] = handle(is, os, isLoopback(host));
+                try {
+                    spoke[0] = handle(is, os, isLoopback(host), started);
+                } finally {
+                    finished[0] = true;
+                }
             }
 
             public void connectionError(int errorCode, String message) {
                 // Nobody listening: the ordinary case between pushes.
+                finished[0] = true;
             }
         };
         sc.setConnectTimeout(CONNECT_TIMEOUT_MS);
         Socket.connect(host, port, sc);
         // Socket.connect runs on its own thread, so wait for the attempt rather
-        // than racing past it and calling everything unreachable.
+        // than racing past it and calling everything unreachable. Once the
+        // exchange has begun -- the magic read, not merely a connection
+        // accepted -- wait for it however long it takes: a pairing code is
+        // typed by a human, a bundle takes as long as it takes, and a program's
+        // entry point runs before the handler returns. Timing out there would
+        // start the loopback fallback and the subnet sweep against a live
+        // connection, and let the sweep's status overwrite "running".
+        //
+        // The distinction matters on Android: `adb reverse` accepts a
+        // connection whether or not the push tool is listening behind it, and
+        // then says nothing. Waiting on *that* forever wedges the dial loop and
+        // the device never calls again.
         long deadline = System.currentTimeMillis() + CONNECT_TIMEOUT_MS + 500;
-        while (!served[0] && System.currentTimeMillis() < deadline) {
+        while (!finished[0] && (started[0] || System.currentTimeMillis() < deadline)) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
-                return served[0];
+                return spoke[0];
             }
         }
-        return served[0];
+        return spoke[0];
     }
 
     /// How long to wait for one address. Short: most of the subnet is nothing.
@@ -487,6 +506,20 @@ public class DeviceRuntimeService {
      * its life.</p>
      */
     boolean handle(InputStream is, OutputStream os, boolean loopback) {
+        return handle(is, os, loopback, new boolean[1]);
+    }
+
+    /**
+     * Serves one connection, reporting when the exchange actually began.
+     *
+     * <p>{@code started[0]} goes true once the magic has been read, which is
+     * the moment a caller can stop applying a connect timeout: everything after
+     * it -- a human typing a pairing code, a bundle crossing, an entry point
+     * running -- takes as long as it takes. Before it, a connection that
+     * accepts and then says nothing (an `adb reverse` with no listener behind
+     * it does exactly that) must not be waited on forever.</p>
+     */
+    boolean handle(InputStream is, OutputStream os, boolean loopback, boolean[] started) {
         firstContact();
         DataInputStream in = new DataInputStream(is);
         DataOutputStream out = new DataOutputStream(os);
@@ -496,6 +529,7 @@ public class DeviceRuntimeService {
             if (in.readInt() != MAGIC) {
                 reject = "bad magic";
             } else {
+                started[0] = true;
                 int version = in.readInt();
                 if (version == PROTOCOL_V1) {
                     if (!loopback) {
@@ -750,6 +784,11 @@ public class DeviceRuntimeService {
                 applyPushedTheme(null);
             }
             status = "failed to start";
+            // And put the runtime's own screen back. The entry point may have
+            // shown a form before it threw, and leaving it up strands the user
+            // on a half-built screen whose callbacks are all detached --
+            // exactly what stopProgram avoids by doing the same thing.
+            DeviceRuntimeForm.showIt();
             throw failure[0];
         }
         // Form.show() queues the switch rather than performing it inline, so the

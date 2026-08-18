@@ -59,6 +59,42 @@ public final class DeviceRuntimeSocialMocks {
         GoogleConnect.setImplClass(Google.class);
     }
 
+    /**
+     * Forgets what the last pushed program did.
+     *
+     * <p>A provider is a singleton and the framework caches it, so without this
+     * the next program starts already logged in as the previous one -- and
+     * holds a callback belonging to a runtime that has since been detached, so
+     * a later login would call into a dead program before reaching the live
+     * one. {@code doLogout()} is the API's own way to clear it: token, native
+     * state and the preference it was persisted under.</p>
+     */
+    public static void reset() {
+        reset(FacebookConnect.getInstance());
+        reset(GoogleConnect.getInstance());
+    }
+
+    private static void reset(Login login) {
+        if (login instanceof Facebook) {
+            ((Facebook) login).remember(null);
+        } else if (login instanceof Google) {
+            ((Google) login).remember(null);
+        }
+        try {
+            login.doLogout();
+        } catch (Throwable alreadyGone) {
+            // Nothing was logged in, which is the outcome either way.
+        }
+        login.setAccessToken(null);
+        // And the persisted copy. getAccessToken() re-reads from Storage
+        // whenever its field is null, so clearing the field alone hands the
+        // next program the previous one's token back -- doLogout deletes the
+        // Preferences entry but not this one.
+        com.codename1.io.Storage.getInstance()
+                .deleteStorageFile(login.getClass().getName() + "AccessToken");
+        login.setCallback(null);
+    }
+
     /// A token that reads as fake, including in a log somebody pastes later.
     static AccessToken token(String provider) {
         return new AccessToken("mock-" + provider.toLowerCase() + "-token-not-valid-anywhere",
@@ -76,7 +112,13 @@ public final class DeviceRuntimeSocialMocks {
         DeviceRuntimeMocks.warnOnce(provider + " login");
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
-                login.setAccessToken(token(provider));
+                AccessToken issued = token(provider);
+                if (login instanceof Facebook) {
+                    ((Facebook) login).remember(issued);
+                } else if (login instanceof Google) {
+                    ((Google) login).remember(issued);
+                }
+                login.setAccessToken(issued);
                 login.callback.loginSuccessful();
             }
         });
@@ -100,19 +142,53 @@ public final class DeviceRuntimeSocialMocks {
             succeed(this, "Facebook");
         }
 
-        public void nativeLogout() {
-            setAccessToken(null);
-        }
+    /**
+     * What a provider mock has to answer once it claims native login.
+     *
+     * <p>Claiming it is not free: {@code FacebookConnect.getAccessToken()} falls
+     * through to {@code getToken()} when no token is stored, and the base
+     * class's {@code getToken()} and {@code nativeIsLoggedIn()} both throw. A
+     * mock that overrode only the login methods therefore worked until the
+     * first logged-out call and then failed inside the framework, which is a
+     * confusing place for a mock to fail.</p>
+     *
+     * <p>The token is held here rather than read back through the provider,
+     * because reading it means calling the provider's own
+     * {@code getAccessToken()} -- the method this exists to keep honest.</p>
+     */
+    private AccessToken current;
 
-        public boolean isUserLoggedIn() {
-            return getAccessToken() != null;
-        }
+    void remember(AccessToken token) {
+        current = token;
+    }
 
-        protected boolean validateToken(String token) {
-            // Valid for this session and no longer: saying otherwise would send
-            // pushed code round a refresh loop it cannot win.
-            return token != null && token.startsWith("mock-");
-        }
+    public AccessToken getAccessToken() {
+        return current;
+    }
+
+    public String getToken() {
+        return current == null ? null : current.getToken();
+    }
+
+    public boolean nativeIsLoggedIn() {
+        return current != null;
+    }
+
+    public boolean isUserLoggedIn() {
+        return current != null;
+    }
+
+    public void nativeLogout() {
+        current = null;
+        setAccessToken(null);
+    }
+
+    protected boolean validateToken(String token) {
+        // Valid for this session and no longer: saying otherwise would send
+        // pushed code round a refresh loop it cannot win.
+        return token != null && token.startsWith("mock-");
+    }
+
     }
 
     /** Google, the same way. */
@@ -129,16 +205,52 @@ public final class DeviceRuntimeSocialMocks {
             succeed(this, "Google");
         }
 
-        public void nativeLogout() {
-            setAccessToken(null);
-        }
+    /**
+     * What a provider mock has to answer once it claims native login.
+     *
+     * <p>Claiming it is not free: {@code FacebookConnect.getAccessToken()} falls
+     * through to {@code getToken()} when no token is stored, and the base
+     * class's {@code getToken()} and {@code nativeIsLoggedIn()} both throw. A
+     * mock that overrode only the login methods therefore worked until the
+     * first logged-out call and then failed inside the framework, which is a
+     * confusing place for a mock to fail.</p>
+     *
+     * <p>The token is held here rather than read back through the provider,
+     * because reading it means calling the provider's own
+     * {@code getAccessToken()} -- the method this exists to keep honest.</p>
+     */
+    private AccessToken current;
 
-        public boolean isUserLoggedIn() {
-            return getAccessToken() != null;
-        }
+    void remember(AccessToken token) {
+        current = token;
+    }
 
-        protected boolean validateToken(String token) {
-            return token != null && token.startsWith("mock-");
-        }
+    public AccessToken getAccessToken() {
+        return current;
+    }
+
+    public String getToken() {
+        return current == null ? null : current.getToken();
+    }
+
+    public boolean nativeIsLoggedIn() {
+        return current != null;
+    }
+
+    public boolean isUserLoggedIn() {
+        return current != null;
+    }
+
+    public void nativeLogout() {
+        current = null;
+        setAccessToken(null);
+    }
+
+    protected boolean validateToken(String token) {
+        // Valid for this session and no longer: saying otherwise would send
+        // pushed code round a refresh loop it cannot win.
+        return token != null && token.startsWith("mock-");
+    }
+
     }
 }
