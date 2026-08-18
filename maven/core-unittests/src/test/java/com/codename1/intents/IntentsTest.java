@@ -2004,6 +2004,61 @@ class IntentsTest {
                         + schemas.get("ratio_double"));
     }
 
+    /// The deadline has to survive navigation. claim() runs before the route is dispatched,
+    /// and dispatchExternalUrl waits on the event dispatch thread -- so a busy or stalled EDT
+    /// left the platform with no answer at all while the watchdog had already gone home.
+    @Test
+    void aStalledNavigationStillAnswersThePlatform() throws Exception {
+        final java.util.concurrent.CountDownLatch released =
+                new java.util.concurrent.CountDownLatch(1);
+        com.codename1.router.Navigation.setDispatcher(new com.codename1.router.RouteDispatcher() {
+            public com.codename1.ui.Form dispatch(String url) {
+                try {
+                    // Stands in for an event dispatch thread that is not answering. Bounded so
+                    // a regression cannot hang the suite.
+                    released.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return null;
+            }
+        });
+        try {
+            FakeDispatcher d = new FakeDispatcher();
+            d.declarations.add(new IntentDeclaration("known", "Known", "", true, true, false,
+                    "", 1, Collections.<String>emptyList(),
+                    Collections.<IntentParameterInfo>emptyList(),
+                    Arrays.asList(Exposure.ASSISTANT)));
+            d.next = IntentResult.opens("/orders/42");
+            Intents.setDispatcher(d);
+
+            final java.util.concurrent.CountDownLatch answered =
+                    new java.util.concurrent.CountDownLatch(1);
+            final List<IntentResult> reported = new ArrayList<IntentResult>();
+            Thread caller = new Thread(new Runnable() {
+                public void run() {
+                    Intents.dispatchInvocation("known", null, IntentSource.SHORTCUT, true,
+                            new IntentCompletion() {
+                                public void onIntentResult(IntentResult r) {
+                                    reported.add(r);
+                                    answered.countDown();
+                                }
+                            });
+                }
+            });
+            caller.start();
+
+            assertTrue(answered.await(6, java.util.concurrent.TimeUnit.SECONDS),
+                    "the platform must be told even while navigation is stuck");
+            assertTrue(reported.get(0).isFailed(),
+                    "and told that it took too long, rather than nothing at all");
+            released.countDown();
+            caller.join(10000);
+        } finally {
+            com.codename1.router.Navigation.setDispatcher(null);
+        }
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

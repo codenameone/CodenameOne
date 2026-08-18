@@ -1888,7 +1888,7 @@ public final class Intents {
                     return;
                 }
                 ctx.cancel();
-                guard.complete(IntentResult.failed(
+                guard.deliverTimeout(IntentResult.failed(
                         "The action took too long and was stopped"));
             }
         };
@@ -1923,18 +1923,29 @@ public final class Intents {
     /// it, so the check has to be atomic rather than a plain flag test.
     private static final class CompletionGuard {
         private final IntentCompletion completion;
-        private boolean done;
+        /// Set by whoever won the right to decide the outcome.
+        private boolean claimed;
+        /// Set once the platform has actually been told. Separate from `claimed` because the
+        /// gap between them is real work -- route navigation -- and the platform is owed an
+        /// answer whether or not that work finishes.
+        private boolean delivered;
 
         CompletionGuard(IntentCompletion completion) {
             this.completion = completion;
         }
 
-        /// Blocks until the handler completes or the budget runs out. Returns
-        /// true when it completed in time.
+        /// Blocks until the platform has been told, or the budget runs out. Returns true when
+        /// it was told in time.
+        ///
+        /// Waits on delivery rather than on the claim, and that is the whole point. Claiming
+        /// happens before navigation, and navigation reaches Navigation.dispatchExternalUrl,
+        /// which waits on the event dispatch thread -- so a busy or stalled EDT left the
+        /// platform with no answer at all while the watchdog had already gone home, with a
+        /// deadline this method exists to enforce.
         boolean awaitCompletion(long millis) {
             long giveUpAt = System.currentTimeMillis() + millis;
             synchronized (this) {
-                while (!done) {
+                while (!delivered) {
                     long left = giveUpAt - System.currentTimeMillis();
                     if (left <= 0) {
                         return false;
@@ -1942,7 +1953,7 @@ public final class Intents {
                     try {
                         wait(left);
                     } catch (InterruptedException e) {
-                        return done;
+                        return delivered;
                     }
                 }
                 return true;
@@ -1958,17 +1969,27 @@ public final class Intents {
         /// Claiming first still stops the timeout thread from reporting a failure underneath us.
         boolean claim() {
             synchronized (this) {
-                if (done) {
+                if (claimed) {
                     return false;
                 }
-                done = true;
-                notifyAll();
+                claimed = true;
                 return true;
             }
         }
 
-        /// Reports an outcome this caller has already claimed.
+        /// Reports an outcome this caller has already claimed, if nobody has reported yet.
+        ///
+        /// Once-only on its own account rather than on the claim's: the deadline may have
+        /// answered the platform while this caller was still navigating, and resuming a Swift
+        /// continuation twice is a hard crash.
         void deliver(IntentResult result) {
+            synchronized (this) {
+                if (delivered) {
+                    return;
+                }
+                delivered = true;
+                notifyAll();
+            }
             if (completion != null) {
                 try {
                     completion.onIntentResult(result == null ? IntentResult.ok() : result);
@@ -1978,15 +1999,20 @@ public final class Intents {
             }
         }
 
-        /// Reports the outcome exactly once. Returns true when this caller is the one that
-        /// did, which is also what decides whether it may act on the result.
-        boolean complete(IntentResult result) {
-            if (!claim()) {
-                return false;
+        /// Answers the platform for a deadline that expired, whoever holds the claim.
+        ///
+        /// Deliberately not gated on claiming. The ordinary case is that nothing has claimed
+        /// and this both claims and answers. The case that matters is the other one: a handler
+        /// claimed, started navigating, and navigation is waiting on an event dispatch thread
+        /// that is not answering. The claim is not worth honouring past the deadline when
+        /// honouring it means the platform is told nothing at all.
+        void deliverTimeout(IntentResult result) {
+            synchronized (this) {
+                claimed = true;
             }
             deliver(result);
-            return true;
         }
+
     }
 
     private static final class PendingActivity {
