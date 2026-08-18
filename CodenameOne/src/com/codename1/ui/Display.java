@@ -341,17 +341,18 @@ public final class Display extends CN1Constants {
     private boolean pendingHideOverlayWindows;
 
     // huge false positive from PMD...
-    /// The top level that received the last pointer press, so its release can be
-    /// matched to it.
+    /// Ids of the windows with a pointer press in flight, paired with
+    /// `#pointerPressTargets` by index.
+    private final int[] pointerPressWindows = new int[TRACKED_KEY_PRESSES];
+
+    /// The top level that received each in-flight pointer press.
     ///
-    /// Keyboard and pointer sequences track their targets separately. They shared one
-    /// field while there was one form, where interleaving them was impossible. With
-    /// several native windows it is ordinary: press a key in window A, click window B
-    /// before releasing, and a shared field would name B when the key release arrived,
-    /// so the release was delivered to the wrong window or dropped -- leaving the
-    /// component in A stuck in its pressed state.
-    @SuppressWarnings("PMD.SingularField")
-    private Container pointerEventTarget;
+    /// One entry per window rather than one for the pointer, for the same reason the
+    /// key targets are per key: two touchscreen contacts can be down in two windows
+    /// at once -- the Linux handlers deliberately track a sequence per window -- and
+    /// a single field made the second press erase the first, so both releases were
+    /// dropped and both components stayed latched down.
+    private final Container[] pointerPressTargets = new Container[TRACKED_KEY_PRESSES];
 
     /// Guards `#monitorsChangedPending`, which is set from the port's native event
     /// thread and cleared on the event dispatch thread.
@@ -2981,14 +2982,14 @@ public final class Display extends CN1Constants {
     ///
     /// Only a release with a recorded press passes. A press that was itself filtered
     /// leaves no record, so clicking a blocked window still does nothing.
-    private boolean completesAcceptedPress(int type, int offset, int[] stack) {
+    private boolean completesAcceptedPress(int type, int windowId, int offset, int[] stack) {
         switch (type) {
             case KEY_RELEASED:
                 // The key code is the packet's first argument.
                 return hasKeyPressTarget(stack[offset + 1]);
             case POINTER_RELEASED:
             case POINTER_RELEASED_MULTI:
-                return pointerEventTarget != null;
+                return hasPointerPressTarget(windowId);
             default:
                 return false;
         }
@@ -3030,6 +3031,47 @@ public final class Display extends CN1Constants {
                 // reporting what it did, not the user reaching the window.
                 return false;
         }
+    }
+
+    /// Records which top level saw a pointer press in the given window.
+    private void rememberPointerPress(int windowId, Container target) {
+        int free = -1;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (pointerPressTargets[iter] != null && pointerPressWindows[iter] == windowId) {
+                pointerPressTargets[iter] = target;
+                return;
+            }
+            if (free < 0 && pointerPressTargets[iter] == null) {
+                free = iter;
+            }
+        }
+        if (free >= 0) {
+            pointerPressWindows[free] = windowId;
+            pointerPressTargets[free] = target;
+        }
+    }
+
+    /// Returns and forgets the top level that saw this window's pointer press.
+    private Container takePointerPressTarget(int windowId) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (pointerPressTargets[iter] != null && pointerPressWindows[iter] == windowId) {
+                Container out = pointerPressTargets[iter];
+                pointerPressTargets[iter] = null;
+                pointerPressWindows[iter] = 0;
+                return out;
+            }
+        }
+        return null;
+    }
+
+    /// Whether a pointer press is recorded for the window, without consuming it.
+    private boolean hasPointerPressTarget(int windowId) {
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (pointerPressTargets[iter] != null && pointerPressWindows[iter] == windowId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Records which top level saw a key press, so its release can be matched to it.
@@ -3238,7 +3280,7 @@ public final class Display extends CN1Constants {
         // might happen when returning from a deinitialized version of Codename One,
         // or when a window was disposed while its events were still in flight
         if (f == null || (isUserInputEvent(type) && isBlockedByModal(windowId)
-                && !completesAcceptedPress(type, offset, inputEventStackTmp))) {
+                && !completesAcceptedPress(type, windowId, offset, inputEventStackTmp))) {
             // NOTE: drain the packet rather than returning offset unchanged. The
             // caller loops while (offset < end), so returning it unchanged spins the
             // EDT forever, and returning a sentinel would drop the rest of the batch
@@ -3293,7 +3335,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
                 f.pointerPressed(xArray1, yArray1);
-                pointerEventTarget = f;
+                rememberPointerPress(windowId, f);
                 break;
             case POINTER_PRESSED_MULTI: {
                 if (recursivePointerReleaseA) {
@@ -3308,7 +3350,7 @@ public final class Display extends CN1Constants {
                 offset += array2.length + 1;
                 currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
                 f.pointerPressed(array1, array2);
-                pointerEventTarget = f;
+                rememberPointerPress(windowId, f);
                 break;
             }
             case POINTER_RELEASED:
@@ -3318,8 +3360,7 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container x = pointerEventTarget;
-                pointerEventTarget = null;
+                Container x = takePointerPressTarget(windowId);
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
@@ -3343,8 +3384,7 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container xy = pointerEventTarget;
-                pointerEventTarget = null;
+                Container xy = takePointerPressTarget(windowId);
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
@@ -3770,8 +3810,11 @@ public final class Display extends CN1Constants {
     void windowDisposed(Window w) {
         modalWindows.remove(w);
         syncNativeModalBlocking();
-        if (pointerEventTarget == w) { //NOPMD CompareObjectsWithEquals
-            pointerEventTarget = null;
+        for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
+            if (pointerPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals
+                pointerPressTargets[iter] = null;
+                pointerPressWindows[iter] = 0;
+            }
         }
         for (int iter = 0; iter < TRACKED_KEY_PRESSES; iter++) {
             if (keyPressTargets[iter] == w) { //NOPMD CompareObjectsWithEquals

@@ -306,6 +306,23 @@ static gboolean cn1DesktopOnKey(GtkWidget* widget, GdkEventKey* e, gpointer data
     if (w == 0) {
         return FALSE;
     }
+    /* When a native peer inside this window holds the focus -- the text editor's
+     * GtkEntry/GtkTextView, a WebKit view, an application @NativeInterface widget --
+     * the keystroke belongs to that widget, not to the Codename One hierarchy.
+     * Returning FALSE without queueing lets GtkWindow's default handler forward it
+     * to the focused widget and nowhere else; queueing first meant typing into a
+     * native editor *also* reached the window's focused component and its key
+     * listeners, firing shortcuts while the user was typing. The main window has
+     * had this guard from the start.
+     *
+     * Once the peer is torn down GTK clears the toplevel focus, so Codename One
+     * keys resume by themselves. */
+    if (w->window != 0) {
+        GtkWidget* focus = gtk_window_get_focus(GTK_WINDOW(w->window));
+        if (focus != 0 && focus != w->drawingArea) {
+            return FALSE;
+        }
+    }
     /* Same mapping the main window uses: GDK encodes many Unicode keyvals
      * differently from their code point, so a raw keyval gives the wrong key code
      * for anything outside ASCII. Navigation keys have no Unicode mapping and fall

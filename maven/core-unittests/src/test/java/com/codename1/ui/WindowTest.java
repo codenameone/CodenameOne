@@ -1179,6 +1179,51 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void overlappingPointerPressesInTwoWindowsEachGetTheirRelease() {
+        implementation.setMultiWindowSupported(true);
+        Window a = new Window("a", new BorderLayout());
+        final PressCountingComponent ca = new PressCountingComponent();
+        a.add(BorderLayout.CENTER, ca);
+        a.setWindowSize(300, 200);
+        a.show();
+
+        Window b = new Window("b", new BorderLayout());
+        final PressCountingComponent cb = new PressCountingComponent();
+        b.add(BorderLayout.CENTER, cb);
+        b.setWindowSize(300, 200);
+        b.show();
+
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        // Two contacts down in two windows at once -- the Linux port deliberately
+        // tracks a touch sequence per window, so this is reachable on a touchscreen.
+        // A single shared target let B's press erase A's, after which both releases
+        // were dropped and both components stayed latched.
+        Display.getInstance().windowPointerPressed(a.getWindowId(), px, py);
+        Display.getInstance().windowPointerPressed(b.getWindowId(), px, py);
+        Display.getInstance().windowPointerReleased(a.getWindowId(), px, py);
+        Display.getInstance().windowPointerReleased(b.getWindowId(), px, py);
+        DisplayTest.flushEdt();
+        int ra = ca.released;
+        int rb = cb.released;
+        b.dispose();
+        a.dispose();
+
+        assertEquals(1, ra, "the first window's release must reach its component");
+        assertEquals(1, rb, "and so must the second window's");
+    }
+
+    /// Counts pointer releases, so a test can prove each window's press was matched.
+    private static final class PressCountingComponent extends Component {
+        private int released;
+
+        @Override
+        public void pointerReleased(int x, int y) {
+            released++;
+        }
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
