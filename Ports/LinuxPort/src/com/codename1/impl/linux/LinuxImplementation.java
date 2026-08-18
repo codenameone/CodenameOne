@@ -2018,9 +2018,13 @@ public class LinuxImplementation extends CodenameOneImplementation {
         }
         editPeer = peer;
         editCmp = cmp;
-        com.codename1.ui.Form form = cmp.getComponentForm();
-        if (form != null) {
-            editPoller = com.codename1.ui.util.UITimer.timer(30, true, form, new Runnable() {
+        // The top level, not the Form: getComponentForm() is null inside a Window, so
+        // binding the poller to it meant no timer ran at all there -- the native
+        // control's text was never streamed back into the field and the edit never
+        // auto-committed.
+        com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top != null) {
+            editPoller = com.codename1.ui.util.UITimer.timer(30, true, top, new Runnable() {
                 public void run() {
                     if (editPeer == 0) {
                         return;

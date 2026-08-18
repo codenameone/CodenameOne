@@ -54,6 +54,19 @@ public class WindowsWindowManager extends WindowManager {
         return p instanceof Peer ? (Peer) p : null;
     }
 
+    /// Slot of the desktop window hosting the given component, or
+    /// `WindowsImplementation#MAIN_WINDOW_SLOT` when it lives in the application's
+    /// main window. The native editor needs this to parent its EDIT control to the
+    /// right window rather than always to the main one.
+    static int slotForComponent(com.codename1.ui.Component cmp) {
+        Object peer = com.codename1.ui.Display.getInstance().getWindowPeerForComponent(cmp);
+        if (peer == null) {
+            return WindowsImplementation.MAIN_WINDOW_SLOT;
+        }
+        int s = slot(peer);
+        return s < 0 ? WindowsImplementation.MAIN_WINDOW_SLOT : s;
+    }
+
     private static int slot(Object p) {
         Peer w = peer(p);
         return w == null ? -1 : w.slot;

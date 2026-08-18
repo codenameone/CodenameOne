@@ -67,6 +67,11 @@ import java.util.Set;
  */
 public class WindowsImplementation extends CodenameOneImplementation {
 
+    /// Slot value meaning "the application's main window" for the native editor.
+    /// Matches the -1 the native side tests for.
+    static final int MAIN_WINDOW_SLOT = -1;
+
+
     @Override
     public boolean isHighContrastEnabled() {
         return WindowsNative.isHighContrastEnabled();
@@ -2013,8 +2018,12 @@ public class WindowsImplementation extends CodenameOneImplementation {
             fontPeer = ((Long) f.getNativeFont()).longValue();
         }
 
+        // The editor is parented to the window the field lives in; without the slot
+        // the EDIT control appeared over the main window while the user typed into a
+        // secondary one.
         long peer = WindowsNative.editStringAt(x, y, w, h, text == null ? "" : text,
-                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0);
+                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0,
+                WindowsWindowManager.slotForComponent(cmp));
         if (peer == 0) {
             // No native window (headless) -> nothing to edit; complete with the
             // existing text so a caller awaiting the callback still proceeds.
@@ -2023,9 +2032,13 @@ public class WindowsImplementation extends CodenameOneImplementation {
         }
         editPeer = peer;
         editCmp = cmp;
-        com.codename1.ui.Form form = cmp.getComponentForm();
-        if (form != null) {
-            editPoller = com.codename1.ui.util.UITimer.timer(30, true, form, new Runnable() {
+        // The top level, not the Form: getComponentForm() is null inside a Window, so
+        // binding the poller to it meant no timer ran at all there -- the native
+        // control's text was never streamed back into the field and the edit never
+        // auto-committed.
+        com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+        if (top != null) {
+            editPoller = com.codename1.ui.util.UITimer.timer(30, true, top, new Runnable() {
                 public void run() {
                     if (editPeer == 0) {
                         return;

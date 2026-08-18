@@ -24,6 +24,7 @@ package com.codename1.ui.util;
 
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.TopLevelContainer;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.animations.Animation;
 
@@ -35,7 +36,7 @@ import com.codename1.ui.animations.Animation;
 public class UITimer {
     private final Internal i = new Internal();
     private Runnable internalRunnable;
-    private Form bound;
+    private TopLevelContainer bound;
     private long lastEllapse;
     private int ms;
     private boolean repeat;
@@ -74,6 +75,30 @@ public class UITimer {
         return uit;
     }
 
+    /// Schedules a timer bound to any top level, so a component inside a `Window` can
+    /// have one. `Component#getComponentForm()` is null there, and a port that bound
+    /// its timer to the form silently ran no timer at all inside a window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeMillis`: the timer interval in milliseconds
+    ///
+    /// - `repeat`: whether the timer repeats
+    ///
+    /// - `parent`: the top level the timer is bound to
+    ///
+    /// - `r`: the task to run
+    ///
+    /// #### Returns
+    ///
+    /// the scheduled timer
+    public static UITimer timer(int timeMillis, boolean repeat, TopLevelContainer parent,
+            Runnable r) {
+        UITimer uit = new UITimer(r);
+        uit.schedule(timeMillis, repeat, parent);
+        return uit;
+    }
+
     /// Convenience method to schedule a UITimer more easily on the current form
     ///
     /// #### Parameters
@@ -103,6 +128,20 @@ public class UITimer {
     ///
     /// - `bound`: the form to which the timer is bound
     public void schedule(int timeMillis, boolean repeat, Form bound) {
+        schedule(timeMillis, repeat, (TopLevelContainer) bound);
+    }
+
+    /// Schedules this timer against any top level; see
+    /// `#timer(int, boolean, TopLevelContainer, Runnable)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeMillis`: the timer interval in milliseconds
+    ///
+    /// - `repeat`: whether the timer repeats
+    ///
+    /// - `bound`: the top level the timer is bound to
+    public void schedule(int timeMillis, boolean repeat, TopLevelContainer bound) {
         lastEllapse = System.currentTimeMillis();
         ms = timeMillis;
         this.repeat = repeat;

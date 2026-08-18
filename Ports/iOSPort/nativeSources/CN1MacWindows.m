@@ -1284,6 +1284,12 @@ void CN1MacWindowSetMinimumSize(int slot, int width, int height) {
         CGFloat scale = scene.screen != nil ? scene.screen.scale : 1.0;
         if (width > 0 && height > 0) {
             scene.sizeRestrictions.minimumSize = CGSizeMake(width / scale, height / scale);
+        } else {
+            /* The SPI expresses "no minimum" as non-positive dimensions. Skipping the
+             * update left the previous native minimum in force while the getter
+             * reported no constraint, so a cleared minimum silently kept applying.
+             * CGSizeZero is what a scene starts with. */
+            scene.sizeRestrictions.minimumSize = CGSizeZero;
         }
     });
 }

@@ -750,8 +750,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     private static void updateNativeTextEditorFrame(boolean requestFocus) {
         if (instance.currentEditing != null) {
             TextArea cmp = instance.currentEditing;
-            Form form = cmp.getComponentForm();
-            if (form == null || form != CN.getCurrentForm() ) {
+            // A field in a Window has no Form; the equivalent check is that its top
+            // level is still the one being displayed.
+            com.codename1.ui.TopLevelContainer top = cmp.getTopLevelContainer();
+            if (top == null
+                    || (top instanceof Form && top != CN.getCurrentForm())) { //NOPMD CompareObjectsWithEquals
                 instance.stopTextEditing();
                 return;
             }
@@ -808,9 +811,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
             */
-            Container contentPane = form.getContentPane();
+            Container contentPane = top.getContentPane();
             if (!contentPane.contains(cmp)) {
-                contentPane = form;
+                contentPane = top.asContainer();
             }
             Style contentPaneStyle = contentPane.getStyle();
 
@@ -1190,11 +1193,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             
            // Check if the form has any setting for asyncEditing that should override
            // the application defaults.
-            Form parentForm = cmp.getComponentForm();
-            if (parentForm == null) {
-                //Log.p("Attempt to edit text area that is not on a form.  This is not supported");
+            // The top level, not the Form. getComponentForm() is null for a component
+            // in a Window, and returning here meant a Catalyst window -- which this
+            // port advertises as supporting windows -- could not edit any text field
+            // at all.
+            com.codename1.ui.TopLevelContainer parentTop = cmp.getTopLevelContainer();
+            if (parentTop == null) {
+                //Log.p("Attempt to edit text area that is not on a top level.  This is not supported");
                 return;
             }
+            Container parentForm = parentTop.asContainer();
             if (parentForm.getClientProperty("asyncEditing") != null) {
                 Object async = parentForm.getClientProperty("asyncEditing");
                 if (async instanceof Boolean) {
@@ -1216,7 +1224,11 @@ public class IOSImplementation extends CodenameOneImplementation {
             // the form to make sure that it is scrollable.  If it is not 
             // scrollable, then this field should default to Non-async
             // editing - and should instead revert to legacy editing mode.
-            if(asyncEdit && !parentForm.isFormBottomPaddingEditingMode()) {
+            // Bottom padding editing mode is a Form concept tied to the virtual
+            // keyboard; a desktop Window has neither, so it reads as false there.
+            boolean bottomPaddingMode = parentTop instanceof Form
+                    && ((Form) parentTop).isFormBottomPaddingEditingMode();
+            if(asyncEdit && !bottomPaddingMode) {
                 Container p = cmp.getParent();
                 
                 // A crude estimate of how far the component needs to be able to scroll to make 
@@ -1233,7 +1245,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 asyncEdit = p != null;
                 //Log.p("Overriding asyncEdit due to form scrollability: "+asyncEdit);
                 
-            } else if (parentForm.isFormBottomPaddingEditingMode()){
+            } else if (bottomPaddingMode){
                 // If form uses bottom padding mode, then we will always
                 // use async edit (unless the field explicitly overrides it).
                 asyncEdit = true;
@@ -1391,9 +1403,9 @@ public class IOSImplementation extends CodenameOneImplementation {
             });
             
             if(cmp instanceof TextArea && !((TextArea)cmp).isSingleLineTextArea()) {
-                Form form = cmp.getComponentForm();
-                if (form != null) {
-                    form.revalidate();
+                com.codename1.ui.TopLevelContainer revalidateTop = cmp.getTopLevelContainer();
+                if (revalidateTop != null) {
+                    revalidateTop.asContainer().revalidate();
                 }
             }
             if(editNext) {

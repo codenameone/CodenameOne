@@ -464,7 +464,8 @@ public final class WindowsNative {
      * {@link #editIsDone(long)}.
      */
     public static native long editStringAt(int x, int y, int w, int h, String text,
-            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align);
+            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align,
+            int slot);
 
     /** True once the user has committed the native edit (Enter / focus loss). */
     public static native boolean editIsDone(long peer);
