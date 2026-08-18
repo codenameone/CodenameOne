@@ -190,24 +190,30 @@ public class BufferedGraphics extends HTML5Graphics {
         if (rx <= 0 || ry <= 0) {
             return null;
         }
-        // Traced clockwise from the top-left corner's end, with each corner approximated by a
-        // quarter ellipse.
+        // Traced once round the perimeter, clockwise on screen, each corner a quarter ellipse
+        // that ends where the next one begins: top-right from its top point to its right point,
+        // down the right side, and so on. The straight sides are the lines between one corner's
+        // last point and the next corner's first. Walking the corners in any other order joins
+        // points that are not neighbours and folds the outline across itself, which would then
+        // report a draw as missing text it lands squarely on.
         int perCorner = 6;
         int points = 4 * (perCorner + 1);
         final float[][] outline = new float[][] { new float[points], new float[points] };
         int at = 0;
         int[][] corners = new int[][] {
-            { x + width - rx, y + ry, 0 },
-            { x + width - rx, y + height - ry, 270 },
-            { x + rx, y + height - ry, 180 },
-            { x + rx, y + ry, 90 }
+            { x + width - rx, y + ry, 90 },
+            { x + width - rx, y + height - ry, 0 },
+            { x + rx, y + height - ry, -90 },
+            { x + rx, y + ry, -180 }
         };
         for (int c = 0; c < corners.length; c++) {
             double cx = corners[c][0];
             double cy = corners[c][1];
             double from = corners[c][2];
             for (int i = 0; i <= perCorner; i++) {
-                double radians = Math.toRadians(from + (90.0 * i) / perCorner);
+                // Angles run counter-clockwise from three o'clock while y grows downwards, so
+                // sweeping the angle down walks the perimeter clockwise on screen.
+                double radians = Math.toRadians(from - (90.0 * i) / perCorner);
                 outline[0][at] = (float) (cx + rx * Math.cos(radians));
                 outline[1][at] = (float) (cy - ry * Math.sin(radians));
                 at++;
