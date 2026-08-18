@@ -1512,6 +1512,38 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void anActivatedDragIsFinishedWhenReleasedInAWindow() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("dnd release", new BorderLayout());
+        final int[] finished = new int[1];
+        Label draggable = new Label("drag me") {
+            @Override
+            protected void dragFinishedImpl(int x, int y) {
+                super.dragFinishedImpl(x, y);
+                finished[0]++;
+            }
+        };
+        draggable.setDraggable(true);
+        w.add(BorderLayout.CENTER, draggable);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        // Enough movement to activate the drag rather than merely scroll.
+        w.pointerDragged(150, 121);
+        w.pointerDragged(160, 140);
+        w.pointerDragged(170, 160);
+        w.pointerReleased(170, 160);
+        int count = finished[0];
+        w.dispose();
+
+        // Component hides the component when the drag activates and only
+        // dragFinishedImpl restores it and runs the drop, so releasing through the
+        // ordinary path left it invisible with the drop unfinished.
+        assertEquals(1, count, "an activated drag must be finished, not merely released");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

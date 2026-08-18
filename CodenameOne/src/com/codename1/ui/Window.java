@@ -2096,19 +2096,41 @@ public class Window extends Container implements TopLevelContainer {
         // same window before the handler returns; tearing down unconditionally then
         // erases the replacement gesture's target rather than this one's.
         final Object releasing = currentPointerPress;
+        // Captured before the listeners run, not after. A listener can enter
+        // invokeAndBlock, whose nested loop dispatches a fresh press in this window
+        // and replaces these fields; resolving the target afterwards released the
+        // *replacement* gesture's component, activating it with no native release of
+        // its own.
+        final Component releasingDragged = dragged;
+        final Component releasingPressed = pressedCmp;
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(e);
             if (e.isConsumed()) {
+                // A drag that was actually activated still has to be finished, or the
+                // component stays hidden and the drop never runs -- Form does the
+                // same on its consumed path.
+                if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
+                    LeadUtil.dragFinished(releasingDragged, x, y);
+                }
                 // Still cleared: the gesture is over regardless of who handled it,
                 // and leaving these set would strand the next press.
                 endGesture(releasing);
                 return;
             }
         }
-        Component target = dragged != null ? dragged : pressedCmp;
+        Component target = releasingDragged != null ? releasingDragged : releasingPressed;
         if (target != null) {
-            LeadUtil.pointerReleased(target, x, y);
+            if (releasingDragged != null && releasingDragged.isDragAndDropInitialized()) {
+                // An activated drag ends with dragFinished, not pointerReleased.
+                // Component hides the component when the drag activates and only
+                // dragFinishedImpl restores it, clears the top level's dragged
+                // component and runs the drop callbacks -- so releasing through the
+                // ordinary path left the component invisible and the drop unfinished.
+                LeadUtil.dragFinished(releasingDragged, x, y);
+            } else {
+                LeadUtil.pointerReleased(target, x, y);
+            }
         }
         endGesture(releasing);
     }
