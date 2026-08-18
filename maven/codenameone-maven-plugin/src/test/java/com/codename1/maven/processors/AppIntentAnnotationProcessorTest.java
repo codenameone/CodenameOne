@@ -1203,6 +1203,55 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// A parameter name may hold anything, and the placeholder pattern only matched
+    /// [A-Za-z0-9_] -- so a phrase naming two such parameters passed a check that exists
+    /// because Apple rejects exactly that, as a halting error producing no metadata at all.
+    @Test
+    public void aPhraseWithTwoAwkwardlyNamedParametersIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"ship_it\", title = \"Ship\",\n"
+                        + "        phrases = {\"Ship ${ship-to} and ${ship from} "
+                        + "in ${applicationName}\"})\n"
+                        + "public static IntentResult ship(\n"
+                        + "        @IntentParam(\"ship-to\") String to,\n"
+                        + "        @IntentParam(\"ship from\") String from) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        assertError(classes, "at most one parameter per phrase");
+    }
+
+    /// And a single awkwardly named one still has to be an entity, for the same reason.
+    @Test
+    public void anAwkwardlyNamedNonEntityPhraseParameterIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"ship_it\", title = \"Ship\",\n"
+                        + "        phrases = {\"Ship ${ship-to} in ${applicationName}\"})\n"
+                        + "public static IntentResult ship(\n"
+                        + "        @IntentParam(\"ship-to\") String to) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        assertError(classes, "Only an entity can be a spoken phrase parameter");
+    }
+
+    /// A ${token} that names no parameter is left in the phrase literally by the generator, so
+    /// it is not a parameter reference and must not be counted as one.
+    @Test
+    public void aLiteralPlaceholderIsNotAParameterReference() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"ship_it\", title = \"Ship\",\n"
+                        + "        phrases = {\"Ship ${a-token} ${b-token} "
+                        + "in ${applicationName}\"})\n"
+                        + "public static IntentResult ship() {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        assertTrue(new File(classes, REGISTRY_PATH).exists());
+    }
+
     /// The generated iOS AppEnum maps each option to a case whose raw value is the option, and
     /// Swift rejects two cases sharing a raw value -- so a vocabulary listing one twice fails
     /// the app's compile rather than merely offering it twice. A sanitized collision the

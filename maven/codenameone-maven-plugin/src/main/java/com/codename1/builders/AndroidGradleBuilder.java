@@ -7462,11 +7462,18 @@ public class AndroidGradleBuilder extends Executor {
             if (!isExposedToAssistant(intent)) {
                 continue;
             }
-            if (count == 5) {
-                // Android shows at most five static shortcuts. Truncating quietly would look
-                // like the later ones failing at random.
-                log("Only the first 5 intents become static launcher shortcuts; Android caps "
-                        + "the static list. The rest remain invocable and can be donated.");
+            if (count == MAX_STATIC_SHORTCUTS) {
+                // Deliberately below the platform's own cap. getMaxShortcutCountPerActivity()
+                // returns 5 on plenty of devices, and that is the *combined* static and dynamic
+                // quota for the launcher activity -- so filling it here left index() and
+                // donate() nothing to publish into, and both went silently inert on exactly the
+                // apps that declare the most intents. pushDynamicShortcut cannot rescue them
+                // either: it evicts a dynamic shortcut to make room, and cannot evict a
+                // manifest one. Reserving is the only thing the build can do about it.
+                log("Only the first " + MAX_STATIC_SHORTCUTS + " intents become static launcher "
+                        + "shortcuts. The rest remain invocable and can be donated, and the "
+                        + "reserved slots are what lets Intents.index() and Intents.donate() "
+                        + "publish at all on a device whose shortcut quota is 5.");
                 break;
             }
             // A static shortcut carries no parameters and Android has no picker on this path,
@@ -7609,6 +7616,13 @@ public class AndroidGradleBuilder extends Executor {
     /// xmlEscape turns a double quote into `&quot;`, so escaping afterwards would never see one
     /// and the bare quote would reach AAPT, where a lone quote is a string-trimming directive
     /// rather than a character. Backslash goes first for the same reason within this method.
+    /// How many static launcher shortcuts the build will emit.
+    ///
+    /// Three rather than five: five is the whole quota on a device where
+    /// getMaxShortcutCountPerActivity() returns it, and that quota covers dynamic shortcuts
+    /// too. Two slots are left for the runtime to publish indexed content and donations into.
+    private static final int MAX_STATIC_SHORTCUTS = 3;
+
     private static String androidStringValue(String s) {
         if (s == null) {
             return "";

@@ -639,11 +639,30 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     /// message says so, so nobody reads a framework limit as a platform one.
     private void checkPhraseParameters(AnnotatedClass cls, ProcessorContext ctx, String where,
                                         String phrase, IntentDef def) {
+        // Scanned the way the generator scans, not with PLACEHOLDER. A parameter name is
+        // application text and may hold anything -- "ship-to", "ship to" -- and that pattern
+        // only matches [A-Za-z0-9_], so those placeholders were invisible here while the
+        // generator interpolated them regardless. A phrase could then carry two of them, or a
+        // non-entity one, and pass a check whose whole purpose is that Apple rejects exactly
+        // that: as a *halting* error, producing no metadata at all for the app.
+        //
+        // Only placeholders naming a declared parameter count, which is again what the
+        // generator does: it leaves anything else in the phrase literally, so a literal
+        // ${token} is not a parameter reference and must not be counted as one.
         List<String> referenced = new ArrayList<String>();
-        java.util.regex.Matcher matcher = PLACEHOLDER.matcher(phrase);
-        while (matcher.find()) {
-            String name = matcher.group(1);
-            if ("applicationName".equals(name)) {
+        int i = 0;
+        while (true) {
+            int open = phrase.indexOf("${", i);
+            if (open < 0) {
+                break;
+            }
+            int close = phrase.indexOf('}', open + 2);
+            if (close < 0) {
+                break;
+            }
+            String name = phrase.substring(open + 2, close);
+            i = close + 1;
+            if ("applicationName".equals(name) || def.param(name) == null) {
                 continue;
             }
             if (!referenced.contains(name)) {

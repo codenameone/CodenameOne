@@ -1703,6 +1703,36 @@ class IntentsTest {
         assertNull(Intents.getDeclaration("remind_z").getParameter("when"));
     }
 
+    /// A declaration collapses int and long into INTEGER, so the two callers of the value
+    /// check want opposite strictness: hiding a parameter wrongly is unrecoverable, while
+    /// refusing a donation wrongly just loses a shortcut that would have dispatched.
+    @Test
+    void aWideValueIsDonatableEvenThoughItStillSurfacesItsParameter() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> wide = new HashMap<String, Object>();
+        wide.put("count", Long.valueOf(5000000000L));
+        Intents.donate("count_it", wide);
+        assertEquals("count_it", b.donatedId,
+                "5000000000 is an ordinary value for a long, and this may be one");
+
+        Intents.registerDynamicIntent(new DynamicIntent("count_wide2", "count_it", "Wide")
+                .bind("count", Long.valueOf(5000000000L)));
+        assertNotNull(Intents.getDeclaration("count_wide2").getParameter("count"),
+                "but it must still stay correctable, since this may be an int");
+
+        // What no width can hold is refused by both.
+        b.donatedId = null;
+        Map<String, Object> impossible = new HashMap<String, Object>();
+        impossible.put("count", Double.valueOf(1e20));
+        Intents.donate("count_it", impossible);
+        assertNull(b.donatedId);
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

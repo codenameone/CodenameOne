@@ -214,7 +214,7 @@ class AndroidIntentShortcutsTest {
     }
 
     @Test
-    void theStaticShortcutListIsCappedAtWhatAndroidWillShow(@TempDir Path dir) throws Exception {
+    void theStaticShortcutListLeavesRoomForRuntimePublications(@TempDir Path dir) throws Exception {
         StringBuilder json = new StringBuilder("{\"schema\":1,\"intents\":[");
         for (int i = 0; i < 9; i++) {
             json.append(i == 0 ? "" : ",");
@@ -227,7 +227,12 @@ class AndroidIntentShortcutsTest {
 
         String xml = shortcutsXml(dir);
         int count = xml.split("<shortcut ").length - 1;
-        assertEquals(5, count, "Android shows at most five static shortcuts");
+        assertEquals(3, count,
+                "getMaxShortcutCountPerActivity() returns 5 on plenty of devices and that is "
+                        + "the combined static and dynamic quota, so filling it here left "
+                        + "Intents.index() and Intents.donate() nothing to publish into -- and "
+                        + "pushDynamicShortcut cannot evict a manifest shortcut to make room. "
+                        + "The reserved slots are the only thing the build can do about it.");
     }
 
     @Test

@@ -1122,7 +1122,8 @@ public final class Intents {
             // nothing on either side saying why. A binding that cannot be honoured leaves the
             // parameter visible, where it can be supplied -- and a supplied value wins over a
             // bound one, so surfacing it is also the repair.
-            if (!bound.containsKey(p.getName()) || !satisfies(p, bound.get(p.getName()))) {
+            if (!bound.containsKey(p.getName())
+                    || !satisfies(p, bound.get(p.getName()), true)) {
                 remaining.add(p);
             }
         }
@@ -1198,7 +1199,7 @@ public final class Intents {
                 }
                 continue;
             }
-            if (!satisfies(p, supplied)) {
+            if (!satisfies(p, supplied, false)) {
                 return "the value given for \"" + p.getName() + "\" is not one that parameter "
                         + "accepts, so every tap on the shortcut would fail.";
             }
@@ -1212,22 +1213,24 @@ public final class Intents {
     /// number or as text, a boolean accepts only the four spellings the coercion accepts, and a
     /// closed vocabulary is matched as text because that is how the coercion matches it.
     ///
-    /// #### Why the numeric checks use the narrowest width
+    /// #### Why the numeric width is the caller's choice
     ///
     /// A declaration records `INTEGER` for both `int` and `long`, and `NUMBER` for both `float`
-    /// and `double`, so this cannot know which width the handler actually declared -- while the
-    /// generated coercion checks the real one and rejects anything that does not fit. The two
-    /// failure modes are not symmetric. Checking too loosely hides a binding that can never run
-    /// behind a parameter nobody can see, which is unrecoverable: the simulator and a model
-    /// schema offer no way to override it. Checking too strictly surfaces a parameter that was
-    /// in fact already satisfied -- visible, harmless, and still correct at dispatch, because
-    /// the bound value is merged in regardless. So the narrow width wins both.
+    /// and `double`, so this cannot know which width the handler declared -- while the generated
+    /// coercion checks the real one. Neither guess is safe for both callers, because their
+    /// failure modes are opposites.
     ///
-    /// A `DATE` supplied as text is the one case answered optimistically. The ISO-8601 grammar
-    /// lives in the generated coercion, and duplicating it in core would give two parsers to
-    /// keep in agreement -- a worse bug than the one it would catch. Such a value is rejected
-    /// at dispatch as before.
-    private static boolean satisfies(IntentParameterInfo p, Object value) {
+    /// Deciding whether a parameterization may *hide* a parameter, too loose is unrecoverable:
+    /// a binding that can never run sits behind a parameter nobody can see, and neither the
+    /// simulator nor a model schema offers any way to override it. Too strict merely surfaces a
+    /// parameter that was already satisfied -- visible, and still correct at dispatch, since the
+    /// bound value is merged in regardless. That caller asks for `narrow`.
+    ///
+    /// Deciding whether a donation *could run*, the asymmetry reverses: too strict refuses to
+    /// publish a shortcut that would have dispatched perfectly well, and 5000000000 is an
+    /// ordinary value for a `long`. So that caller asks for the widest the type could mean, and
+    /// refuses only what no width could hold.
+    private static boolean satisfies(IntentParameterInfo p, Object value, boolean narrow) {
         if (value == null) {
             return false;
         }
@@ -1256,11 +1259,11 @@ public final class Intents {
         }
         if (type == IntentParameterType.INTEGER) {
             if (value instanceof Number) {
-                return isWholeAndFitsInt(((Number) value).doubleValue());
+                return isWhole(((Number) value).doubleValue(), narrow);
             }
             if (value instanceof String) {
                 try {
-                    return isWholeAndFitsInt(Long.parseLong(((String) value).trim()));
+                    return isWhole(Long.parseLong(((String) value).trim()), narrow);
                 } catch (NumberFormatException e) {
                     return false;
                 }
@@ -1269,11 +1272,11 @@ public final class Intents {
         }
         if (type == IntentParameterType.NUMBER) {
             if (value instanceof Number) {
-                return isFiniteAndFitsFloat(((Number) value).doubleValue());
+                return isFinite(((Number) value).doubleValue(), narrow);
             }
             if (value instanceof String) {
                 try {
-                    return isFiniteAndFitsFloat(Double.parseDouble(((String) value).trim()));
+                    return isFinite(Double.parseDouble(((String) value).trim()), narrow);
                 } catch (NumberFormatException e) {
                     return false;
                 }
@@ -1298,23 +1301,36 @@ public final class Intents {
         return value instanceof String;
     }
 
-    /// A whole number an `int` parameter could hold, which is the narrowest an `INTEGER` may be.
+    /// A whole number an `INTEGER` parameter could hold, at `int` width or at `long` width.
     ///
     /// The generated coercion rejects a fraction rather than rounding it, and rejects a value
     /// past the declared width rather than letting longValue() saturate it into a number the
-    /// caller never sent. Both rejections are mirrored here.
-    private static boolean isWholeAndFitsInt(double d) {
-        return !Double.isNaN(d) && !Double.isInfinite(d) && d == Math.floor(d)
-                && d >= Integer.MIN_VALUE && d <= Integer.MAX_VALUE;
+    /// caller never sent. Both rejections are mirrored here; only the width varies.
+    private static boolean isWhole(double d, boolean narrow) {
+        if (Double.isNaN(d) || Double.isInfinite(d) || d != Math.floor(d)) {
+            return false;
+        }
+        if (narrow) {
+            return d >= Integer.MIN_VALUE && d <= Integer.MAX_VALUE;
+        }
+        // The upper bound is exclusive because (double) Long.MAX_VALUE rounds up to 2^63
+        // exactly, which is the same reason the generated coercion writes it that way.
+        return d >= -9223372036854775808.0 && d < 9223372036854775808.0;
     }
 
-    /// A number a `float` parameter could hold, which is the narrowest a `NUMBER` may be.
+    /// A number a `NUMBER` parameter could hold, at `float` width or at `double` width.
     ///
-    /// Both ends, as the coercion checks both: past Float.MAX_VALUE becomes Infinity, and a
-    /// non-zero value too small to represent becomes exactly zero -- a value nobody supplied.
-    private static boolean isFiniteAndFitsFloat(double d) {
-        if (Double.isNaN(d) || Double.isInfinite(d)
-                || d < -Float.MAX_VALUE || d > Float.MAX_VALUE) {
+    /// At float width both ends matter, as they do in the coercion: past Float.MAX_VALUE
+    /// becomes Infinity, and a non-zero value too small to represent becomes exactly zero -- a
+    /// value nobody supplied. A double holds any finite value, so there being finite is all.
+    private static boolean isFinite(double d, boolean narrow) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return false;
+        }
+        if (!narrow) {
+            return true;
+        }
+        if (d < -Float.MAX_VALUE || d > Float.MAX_VALUE) {
             return false;
         }
         return d == 0.0d || (float) d != 0.0f;

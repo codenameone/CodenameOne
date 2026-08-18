@@ -541,12 +541,13 @@ public class AndroidIntentBridge implements IntentBridge {
         // Deliberately shallow parsing: the payload is a known shape produced by the framework's
         // own serializer, and pulling in a JSON dependency for the port would cost every app.
         List<String[]> entries = CN1IntentJson.entities(entitiesJson);
+        int budget = indexingBudget(ctx);
         int published = 0;
         for (String[] entry : entries) {
-            if (published >= MAX_SHORTCUTS) {
+            if (published >= budget) {
                 // The launcher caps how many it will show. Truncating silently would look like
                 // indexing randomly failing, so it is reported once.
-                Log.i(TAG, "Indexed the first " + MAX_SHORTCUTS
+                Log.i(TAG, "Indexed the first " + budget
                         + " items; Android limits how many shortcuts an app may publish");
                 break;
             }
@@ -684,6 +685,41 @@ public class AndroidIntentBridge implements IntentBridge {
     private static void addAll(List<ShortcutInfo> out, List<ShortcutInfo> in) {
         if (in != null) {
             out.addAll(in);
+        }
+    }
+
+    /// How many entities this app may still publish as shortcuts.
+    ///
+    /// Asked of the platform rather than assumed. getMaxShortcutCountPerActivity() is the
+    /// *combined* static and dynamic quota, and the manifest shortcuts the build wrote are
+    /// already spending part of it -- so a fixed ten was simply wrong on a device that allows
+    /// five, and the surplus pushes were rejected one at a time with nothing said. The build
+    /// reserves room by emitting fewer static shortcuts than the smallest quota; this is the
+    /// other half, spending only what is actually left.
+    @TargetApi(Build.VERSION_CODES.N_MR1)
+    private static int indexingBudget(Context ctx) {
+        // The cast stays outside the guard, as it does in publishedIds: a cast inside a
+        // catch(Throwable) block reads as relying on ClassCastException, which ParparVM does
+        // not throw -- and the repo's gate rejects the shape wherever it appears.
+        ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
+        if (manager == null) {
+            return MAX_SHORTCUTS;
+        }
+        try {
+            int quota = manager.getMaxShortcutCountPerActivity();
+            int manifest = manager.getManifestShortcuts() == null
+                    ? 0 : manager.getManifestShortcuts().size();
+            int left = quota - manifest;
+            if (left < 1) {
+                // Nothing to publish into. One is better than none: pushDynamicShortcut evicts
+                // a dynamic shortcut to make room, so the most recently indexed content still
+                // reaches the launcher rather than the whole call going quiet.
+                left = 1;
+            }
+            return left < MAX_SHORTCUTS ? left : MAX_SHORTCUTS;
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not read the shortcut quota", t);
+            return MAX_SHORTCUTS;
         }
     }
 
