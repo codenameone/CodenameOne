@@ -32,6 +32,7 @@ import java.awt.GraphicsEnvironment;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -160,5 +161,61 @@ class MultiWindowGraphicsRoutingTest {
         assertEquals(-1, width.getInt(secondary),
                 "a secondary canvas must not stage a main-surface resize; its own size "
                         + "is reported window-tagged through componentResized");
+    }
+
+    @Test
+    void aPeerIsScaledForItsOwnWindowsMonitorNotTheMainDisplay() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+
+        // A peer inside a secondary window used the global retinaScale -- the main
+        // display's -- while everything positioning it around it used the owning
+        // canvas's scale. On a desktop whose monitors have different backing scales
+        // the peer was then offset and sized by the ratio between the two, so a
+        // browser or a native editor drifted away from the component it belongs to.
+        //
+        // A single-monitor CI machine cannot show that by itself: every monitor has
+        // the same scale, so the two agree by accident. Forcing the global scale to a
+        // value the canvas's monitor does not have is what makes the difference
+        // observable here, and it is exactly the disagreement a second monitor
+        // produces on a real desktop.
+        JavaSEPort.C canvas = port.createWindowCanvas(21);
+        javax.swing.JFrame frame = new javax.swing.JFrame("peer scale");
+        frame.getContentPane().add(canvas);
+        frame.setSize(320, 240);
+        // Displayable, so the canvas resolves a real GraphicsConfiguration and
+        // canvasScale() answers from its monitor rather than falling back.
+        frame.addNotify();
+
+        double monitorScale = canvas.canvasScale();
+        double originalRetina = JavaSEPort.retinaScale;
+        try {
+            JavaSEPort.retinaScale = monitorScale + 3.0;
+
+            javax.swing.JPanel native1 = new javax.swing.JPanel();
+            native1.setPreferredSize(new java.awt.Dimension(100, 50));
+            JavaSEPort.Peer peer = new JavaSEPort.Peer(frame, native1);
+
+            java.lang.reflect.Field owning =
+                    JavaSEPort.Peer.class.getDeclaredField("owningCanvas");
+            owning.setAccessible(true);
+            owning.set(peer, canvas);
+
+            com.codename1.ui.geom.Dimension pref = peer.calcPreferredSize();
+
+            int expected = (int) (100 * monitorScale / port.zoomLevel);
+            int ifItUsedTheMainDisplay = (int) (100 * (monitorScale + 3.0) / port.zoomLevel);
+            assertNotEquals(expected, ifItUsedTheMainDisplay,
+                    "the two scales have to differ or this test proves nothing");
+            assertEquals(expected, pref.getWidth(),
+                    "a peer must be sized by its own window's monitor scale; sizing it "
+                            + "by the main display's stretches it by the ratio between "
+                            + "the two monitors");
+        } finally {
+            JavaSEPort.retinaScale = originalRetina;
+            frame.dispose();
+            canvas.disposeGestureListeners();
+        }
     }
 }

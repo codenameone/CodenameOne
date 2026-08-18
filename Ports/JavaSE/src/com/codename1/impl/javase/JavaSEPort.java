@@ -19066,9 +19066,9 @@ public class JavaSEPort extends CodenameOneImplementation {
          * @see #drawNativePeer(java.lang.Object, com.codename1.ui.PeerComponent, javax.swing.JComponent) 
          */
         private BufferedImage getBuffer() {
-            if (buf == null || buf.getWidth() != cnt.getWidth() * retinaScale / instance.zoomLevel || buf.getHeight() != cnt.getHeight() * retinaScale / instance.zoomLevel) {
+            if (buf == null || buf.getWidth() != cnt.getWidth() * peerScale() / instance.zoomLevel || buf.getHeight() != cnt.getHeight() * peerScale() / instance.zoomLevel) {
 
-                buf = new BufferedImage((int)(cnt.getWidth() * retinaScale / instance.zoomLevel), (int)(cnt.getHeight() * retinaScale / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
+                buf = new BufferedImage((int)(cnt.getWidth() * peerScale() / instance.zoomLevel), (int)(cnt.getHeight() * peerScale() / instance.zoomLevel), BufferedImage.TYPE_INT_ARGB);
             }
             return buf;
         }
@@ -19238,7 +19238,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         private void paintOnBufferImpl() {
             final BufferedImage buf = getBuffer();
             Graphics2D g2d = buf.createGraphics();
-            g2d.scale(retinaScale / instance.zoomLevel, retinaScale / instance.zoomLevel);
+            g2d.scale(peerScale() / instance.zoomLevel, peerScale() / instance.zoomLevel);
 
             cmp.paintAll(g2d);
             g2d.dispose();
@@ -19430,6 +19430,20 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
 
         /**
+         * The backing scale of the display this peer's window is on.
+         *
+         * Peer geometry used the global retinaScale -- the <em>main</em> display's --
+         * while the hierarchy and pointer coordinates around it use the owning
+         * canvas's. On a mixed-scale desktop the peer was then offset and sized by the
+         * ratio between the two monitors, so a browser or a native editor drifted away
+         * from the component it belongs to.
+         */
+        private double peerScale() {
+            C c = owningCanvas();
+            return c == null ? retinaScale : c.canvasScale();
+        }
+
+        /**
          * The canvas this peer's coordinates are relative to. A peer inside a desktop
          * Window is positioned against that window's canvas; using the main one offsets
          * it by the two frames' on-screen distance.
@@ -19532,8 +19546,8 @@ public class JavaSEPort extends CodenameOneImplementation {
 
         @Override
         protected com.codename1.ui.geom.Dimension calcPreferredSize() {
-            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* retinaScale / instance.zoomLevel), 
-                    (int)(cmp.getPreferredSize().getHeight() * retinaScale / instance.zoomLevel));
+            return new com.codename1.ui.geom.Dimension((int)(cmp.getPreferredSize().getWidth()* peerScale() / instance.zoomLevel), 
+                    (int)(cmp.getPreferredSize().getHeight() * peerScale() / instance.zoomLevel));
         }
 
         
@@ -19623,7 +19637,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     if (cnt.getParent() == null) return;
                     Point absCanvasLocation = SwingUtilities.convertPoint(owningCanvas(), new Point(0, 0), cnt.getParent());
                     if (peerBuffer == null) {
-                        double scale = zoom/retinaScale;
+                        double scale = zoom / peerScale();
 
                         setCntBounds(
                                 (int) ((x + screenX + owningCanvas().x) * scale) + absCanvasLocation.x,
@@ -19632,7 +19646,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                                 (int) (h * scale)
                         );
                     } else {
-                        double scale = zoom/retinaScale;
+                        double scale = zoom / peerScale();
                         setCntBounds(
                                 (int) ((x + screenX + owningCanvas().x) * scale) + absCanvasLocation.x,
                                 (int) ((y + screenY + owningCanvas().y) * scale) + absCanvasLocation.y,
