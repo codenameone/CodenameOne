@@ -367,10 +367,14 @@ public final class Display extends CN1Constants {
     /// `#monitorsChanged()`.
     private boolean monitorsChangedPending;
 
-    /// How many simultaneously held keys have their press target remembered. Well
-    /// past what a keyboard reports at once; a press beyond this is not tracked and
-    /// its release is dropped, exactly as an unmatched release always was.
-    private static final int TRACKED_KEY_PRESSES = 8;
+    /// How many entries the per-key and per-window input tables hold.
+    ///
+    /// Matches CN1_MAX_DESKTOP_WINDOWS in the native ports, which is what bounds the
+    /// number of windows that can be open at once. It was 8, chosen for simultaneous
+    /// keys, which silently starved the window-keyed tables: with the table full an
+    /// extra window could record neither drag state nor velocity, so a completed drag
+    /// there read as a click. Well past what a keyboard reports at once either way.
+    private static final int TRACKED_KEY_PRESSES = 32;
 
     /// Key codes currently held, paired with `#keyPressTargets` by index.
     private final int[] keyPressCodes = new int[TRACKED_KEY_PRESSES];
@@ -3675,6 +3679,12 @@ public final class Display extends CN1Constants {
                 }
                 recursivePointerReleaseA = false;
                 recursivePointerReleaseB = false;
+                // The gesture is over, so hand the ring back. Reclaimed here rather
+                // than only on disposal: entries were held for the life of the
+                // window, so a handful of long-lived windows could exhaust the table
+                // and leave a later window unable to record drag state at all.
+                // After the dispatch, since the release handlers read it.
+                releaseDragHistory(windowId);
                 break;
             case POINTER_RELEASED_MULTI:
                 recursivePointerReleaseA = true;
@@ -3697,6 +3707,12 @@ public final class Display extends CN1Constants {
                 }
                 recursivePointerReleaseA = false;
                 recursivePointerReleaseB = false;
+                // The gesture is over, so hand the ring back. Reclaimed here rather
+                // than only on disposal: entries were held for the life of the
+                // window, so a handful of long-lived windows could exhaust the table
+                // and leave a later window unable to record drag state at all.
+                // After the dispatch, since the release handlers read it.
+                releaseDragHistory(windowId);
                 break;
             case POINTER_DRAGGED: {
                 setDragOccured(windowId, true);

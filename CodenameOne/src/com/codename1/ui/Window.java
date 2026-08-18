@@ -1949,17 +1949,6 @@ public class Window extends Container implements TopLevelContainer {
     /// window has no equivalent of.
     @Override
     public void pointerPressed(int x, int y) {
-        // Listeners registered on the window itself run first and can consume the
-        // event, the same order Form uses. Without this, addPointerPressedListener on
-        // a Window never fired -- and material pull to refresh broke with it, since
-        // Component installs its refresh listeners on the top level.
-        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
-            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
-            pointerPressedListeners.fireActionEvent(e);
-            if (e.isConsumed()) {
-                return;
-            }
-        }
         // A secondary (right / stylus barrel) press is a context menu request first,
         // exactly as on a Form. Without this a right click in a window never reached
         // the component's context menu listener, and an unconsumed right press could
@@ -1968,6 +1957,19 @@ public class Window extends Container implements TopLevelContainer {
                 == com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY) {
             Component ctxCmp = resolveComponentAt(x, y);
             if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
+                return;
+            }
+        }
+        // Listeners registered on the window itself can consume the event. They run
+        // *after* the context menu check above, which is Form's order: a consuming
+        // pressed listener must not be able to suppress a right click's context menu.
+        // Without this block at all, addPointerPressedListener on a Window never
+        // fired -- and material pull to refresh broke with it, since Component
+        // installs its refresh listeners on the top level.
+        if (pointerPressedListeners != null && pointerPressedListeners.hasListeners()) {
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y);
+            pointerPressedListeners.fireActionEvent(e);
+            if (e.isConsumed()) {
                 return;
             }
         }

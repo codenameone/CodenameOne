@@ -1447,6 +1447,43 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void dragHistorySlotsAreReclaimedAfterEachGesture() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        // Far more gestures than the table has entries. Slots were released only on
+        // disposal, so a handful of long-lived windows exhausted it and a later
+        // window could record neither drag state nor velocity.
+        Window[] windows = new Window[10];
+        for (int iter = 0; iter < windows.length; iter++) {
+            windows[iter] = new Window("w" + iter, new BorderLayout());
+            windows[iter].add(BorderLayout.CENTER, new Label("c"));
+            windows[iter].setWindowSize(300, 200);
+            windows[iter].show();
+            int[] px = new int[]{150};
+            int[] py = new int[]{120};
+            Display.getInstance().windowPointerPressed(windows[iter].getWindowId(), px, py);
+            Display.getInstance().windowPointerReleased(windows[iter].getWindowId(), px, py);
+            DisplayTest.flushEdt();
+        }
+
+        java.lang.reflect.Field f = Display.class.getDeclaredField("dragHistoryWindows");
+        f.setAccessible(true);
+        int[] table = (int[]) f.get(Display.getInstance());
+        int used = 0;
+        for (int entry : table) {
+            if (entry != 0) {
+                used++;
+            }
+        }
+        for (Window w : windows) {
+            w.dispose();
+        }
+
+        // Only the main surface's permanent entry should remain held.
+        assertEquals(1, used,
+                "a finished gesture must hand its drag-history slot back");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
