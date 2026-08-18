@@ -1744,6 +1744,22 @@ static void cn1homeRebindWatches(NSString *accessoryId) {
     }
 }
 
+/// Tries the notification registration again, and forgets the polling state
+/// once it takes.
+///
+/// Separated out so the caller can order it after a live read: the two
+/// completions ran concurrently once, and clearing the baseline out from
+/// under an in-flight read is how a change went missing.
+static void cn1homeRetryNotification(HMCharacteristic *c, NSString *stateKey) {
+    [c enableNotification:YES completionHandler:^(NSError *error) {
+        if (error != nil) {
+            return;
+        }
+        [cn1homeNotifyFailed removeObject:stateKey];
+        [cn1homeLastPolled removeObjectForKey:stateKey];
+    }];
+}
+
 /// Polls and re-registers the characteristics whose notification failed.
 ///
 /// enableNotification: failing is not rare -- a bridge that is busy, an
@@ -1791,32 +1807,32 @@ static void cn1homeRunRecovery(void) {
             // exactly when it is worth looking again.
             continue;
         }
-        if ([[c properties] containsObject:HMCharacteristicPropertyReadable]) {
-            [c readValueWithCompletionHandler:^(NSError *error) {
-                if (error != nil) {
-                    return;
-                }
+        if (![[c properties] containsObject:HMCharacteristicPropertyReadable]) {
+            cn1homeRetryNotification(c, stateKey);
+            continue;
+        }
+        // The read first, and the retry only once it has answered. Issued
+        // side by side they raced: a registration that succeeded before the
+        // read came back dropped the baseline, the read then found none to
+        // compare against, and the change that happened while notifications
+        // were off was swallowed -- leaving the listener on a stale value
+        // until the accessory happened to move again.
+        [c readValueWithCompletionHandler:^(NSError *error) {
+            if (error == nil) {
                 NSString *record = cn1homeEncodeReading(accessoryId, serviceId,
                                                         traitId, [c value],
                                                         nil, nil);
                 NSString *current = cn1homeReadingWithoutTimestamp(record);
                 NSString *previous = [cn1homeLastPolled objectForKey:stateKey];
                 [cn1homeLastPolled setObject:current forKey:stateKey];
-                if (previous == nil || [previous isEqualToString:current]) {
-                    return;
+                if (previous != nil && ![previous isEqualToString:current]) {
+                    com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
+                        getThreadLocalData(),
+                        fromNSString(getThreadLocalData(), subscriptionId),
+                        fromNSString(getThreadLocalData(), record));
                 }
-                com_codename1_impl_ios_IOSHomeCallbacks_changes___java_lang_String_java_lang_String(
-                    getThreadLocalData(),
-                    fromNSString(getThreadLocalData(), subscriptionId),
-                    fromNSString(getThreadLocalData(), record));
-            }];
-        }
-        [c enableNotification:YES completionHandler:^(NSError *error) {
-            if (error != nil) {
-                return;
             }
-            [cn1homeNotifyFailed removeObject:stateKey];
-            [cn1homeLastPolled removeObjectForKey:stateKey];
+            cn1homeRetryNotification(c, stateKey);
         }];
     }
     cn1homeArmRecovery();
