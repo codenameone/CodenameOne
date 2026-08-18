@@ -178,6 +178,48 @@ public class SecureStorage {
     }
 
     /// The entry is there.
+    /// A name unique to this application, for a store the platform shares between applications.
+    ///
+    /// The mobile ports do not need this: an OS sandbox already separates one application's
+    /// keychain or keystore from another's. A native desktop build has no sandbox -- its storage
+    /// is a plain directory under the user account -- so two applications that ask for the same
+    /// account name reach the same entry. For a managed database key that means one application
+    /// reading another's key, and forgetting it in either one removing the other's only copy.
+    ///
+    /// The package is what the installer, the store and the build all treat as the application's
+    /// identity. A display name is the fallback because a build without a package still has one,
+    /// though it is weaker: two vendors can both ship "Notes".
+    ///
+    /// #### Returns
+    ///
+    /// an identifier safe to embed in a storage name, never null and never empty
+    protected static String applicationNamespace() {
+        String id = null;
+        try {
+            id = Display.getInstance().getProperty("package_name", null);
+            if (id == null || id.length() == 0) {
+                id = Display.getInstance().getProperty("AppName", null);
+            }
+        } catch (RuntimeException tooEarly) {
+            // Asked before Display is ready, which is not a reason to fail an entry lookup.
+            id = null;
+        }
+        if (id == null || id.length() == 0) {
+            // A build that stamped neither. A constant rather than something that looks unique
+            // and is not: sharing one namespace is the thing this exists to fix, and a name that
+            // pretended otherwise would hide it.
+            return "cn1app";
+        }
+        StringBuilder b = new StringBuilder(id.length());
+        for (int iter = 0; iter < id.length(); iter++) {
+            char c = id.charAt(iter);
+            boolean safe = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '-';
+            b.append(safe ? c : '_');
+        }
+        return b.toString();
+    }
+
     public static final int ENTRY_PRESENT = 1;
 
     /// The store answered, and there is nothing under that account.

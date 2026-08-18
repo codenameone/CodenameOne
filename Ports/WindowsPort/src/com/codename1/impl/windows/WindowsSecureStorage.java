@@ -44,8 +44,54 @@ import com.codename1.util.AsyncResource;
  * gate can layer on top once biometric support lands.)</p>
  */
 public class WindowsSecureStorage extends SecureStorage {
+    /// The storage name this account's ciphertext lives under.
+    ///
+    /// Namespaced by the application, because Storage on this platform is not. Entries land in
+    /// the Codename One directory shared by every native desktop application under this user
+    /// account, so two applications that both asked for a managed key under the same alias
+    /// derived the same account name and read each other's key -- and forgetting it in either one
+    /// removed the other's only copy, leaving a database that nothing can open. The application
+    /// home directory is keyed by package for exactly this reason; this is the same boundary, in
+    /// the one namespace that did not have it.
     private static String key(String account) {
+        return "cn1securestorage_" + applicationNamespace() + "_" + account;
+    }
+
+    /// The name an entry was written under before the namespace existed.
+    ///
+    /// Read from, never written to. What is sitting here is an earlier build's data, and for a
+    /// managed database key it is the only copy there is.
+    private static String legacyKey(String account) {
         return "cn1securestorage_" + account;
+    }
+
+    /// Moves an entry an earlier build wrote into the namespaced name, and reports what it found.
+    ///
+    /// The stored bytes are DPAPI ciphertext bound to this Windows user, so moving them is a copy
+    /// rather than a re-encryption. Copied before the old name is dropped: a delete that ran first
+    /// and then failed to write would destroy a key that cannot be regenerated.
+    private static Object adoptLegacyEntry(String account) {
+        Storage storage = Storage.getInstance();
+        Object stored;
+        try {
+            if (!storage.exists(legacyKey(account))) {
+                return null;
+            }
+            stored = storage.readObject(legacyKey(account));
+        } catch (Throwable cannotRead) {
+            return null;
+        }
+        if (!(stored instanceof byte[])) {
+            return null;
+        }
+        try {
+            if (storage.writeObject(key(account), stored)) {
+                storage.deleteStorageFile(legacyKey(account));
+            }
+        } catch (Throwable cannotMove) {
+            // The value is still readable under its old name, which is what the caller is given.
+        }
+        return stored;
     }
 
     /* -------------------------------------------------- non-prompting API */
@@ -60,7 +106,13 @@ public class WindowsSecureStorage extends SecureStorage {
             if (enc == null) {
                 return false;
             }
-            return Storage.getInstance().writeObject(key(account), enc);
+            if (!Storage.getInstance().writeObject(key(account), enc)) {
+                return false;
+            }
+            // Only after the new one is stored. A stale entry left under the old name would be
+            // read back by adoptLegacyEntry the moment the namespaced one went missing.
+            Storage.getInstance().deleteStorageFile(legacyKey(account));
+            return true;
         } catch (Throwable t) {
             return false;
         }
@@ -75,7 +127,14 @@ public class WindowsSecureStorage extends SecureStorage {
             // Whether the token is stored, not whether the secret behind it can be fetched. A
             // keyring that is briefly unavailable leaves the token exactly where it was, and
             // reporting the entry absent then is what would let a caller overwrite the key.
-            return Storage.getInstance().exists(key(account)) ? ENTRY_PRESENT : ENTRY_ABSENT;
+            Storage storage = Storage.getInstance();
+            if (storage.exists(key(account))) {
+                return ENTRY_PRESENT;
+            }
+            // Absent under the namespaced name is not absent: an earlier build wrote it without
+            // one, and reporting nothing here is what would have ManagedKeys generate a second
+            // key over a database the first one encrypted.
+            return storage.exists(legacyKey(account)) ? ENTRY_PRESENT : ENTRY_ABSENT;
         } catch (Throwable cannotAsk) {
             return ENTRY_UNKNOWN;
         }
@@ -88,6 +147,9 @@ public class WindowsSecureStorage extends SecureStorage {
         }
         try {
             Object o = Storage.getInstance().readObject(key(account));
+            if (!(o instanceof byte[])) {
+                o = adoptLegacyEntry(account);
+            }
             if (!(o instanceof byte[])) {
                 return null;
             }
@@ -114,7 +176,11 @@ public class WindowsSecureStorage extends SecureStorage {
         // is the only answer available here, and an entry that is still there is a failure.
         Storage storage = Storage.getInstance();
         storage.deleteStorageFile(key(account));
-        return !storage.exists(key(account));
+        // The unnamespaced entry as well, or a caller that was told the key was forgotten would
+        // still have it on disk under the name an earlier build used -- and get() would read it
+        // back.
+        storage.deleteStorageFile(legacyKey(account));
+        return !storage.exists(key(account)) && !storage.exists(legacyKey(account));
     }
 
     /* ----------------------------------------- prompting (AsyncResource) API

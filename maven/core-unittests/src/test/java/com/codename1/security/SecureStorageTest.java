@@ -23,6 +23,7 @@
 package com.codename1.security;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.Test;
@@ -93,4 +94,41 @@ class SecureStorageTest extends UITestBase {
         SecureStorage.getInstance().setKeychainAccessGroup("ABCDE12345.group.com.example.app");
         SecureStorage.getInstance().setKeychainAccessGroup(null);
     }
+    /**
+     * A named subclass so the test can reach the protected helper the desktop ports call. Naming
+     * it here rather than testing through a port keeps the rule where both ports share it.
+     */
+    private static final class NamespaceProbe extends SecureStorage {
+        static String namespace() {
+            return applicationNamespace();
+        }
+    }
+
+    @Test
+    void theApplicationNamespaceComesFromThePackage() {
+        // What separates two native desktop applications. Their Storage is one directory under the
+        // user account, so without this both reach the same entry: one reads the other's managed
+        // database key, and forgetting it in either removes the other's only copy.
+        CN.setProperty("package_name", "com.example.notes");
+        CN.setProperty("AppName", "Notes");
+        assertEquals("com.example.notes", NamespaceProbe.namespace(),
+                "the package is the identity the installer and the store agree on");
+
+        // A build with no package still has to be separated from other applications, so the
+        // display name stands in.
+        CN.setProperty("package_name", null);
+        assertEquals("Notes", NamespaceProbe.namespace(), "the display name is the fallback");
+
+        // Whatever it is has to survive being part of a storage name.
+        CN.setProperty("package_name", "com.example/notes v2");
+        assertEquals("com.example_notes_v2", NamespaceProbe.namespace(),
+                "anything a storage name cannot carry is replaced rather than dropped");
+
+        // Neither stamped. A constant, rather than a name that looks unique and is not.
+        CN.setProperty("package_name", null);
+        CN.setProperty("AppName", null);
+        assertEquals("cn1app", NamespaceProbe.namespace(),
+                "a build that stamped neither still gets a stable answer");
+    }
+
 }

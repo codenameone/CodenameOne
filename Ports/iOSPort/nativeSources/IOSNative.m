@@ -15841,6 +15841,38 @@ static NSString *cn1_secureStorageServiceName(NSString *appName) {
     return appName;
 }
 
+// The keychain service the non-prompting entries are written under.
+//
+// The bundle identifier, because it is the one name that does not change with the application.
+// cn1_getAppName reads the AppName property, which IPhoneBuilder sets from the build's display
+// name -- so renaming an application moved its keychain service, its managed database key became
+// unreachable, and ManagedKeys, seeing nothing under the new service, generated a replacement.
+// The database was then encrypted with a key nobody had. A display name is a label; the bundle
+// identifier is the identity, and the App Store enforces that it does not change.
+static NSString *cn1_secureStoragePlainService(CN1_THREAD_STATE_SINGLE_ARG) {
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    if (bundleId != nil && [bundleId length] > 0) {
+        return bundleId;
+    }
+    // No bundle identifier is not a state a real application is in, but the answer still has to be
+    // stable rather than absent, so this falls back to what was used before.
+    return cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
+}
+
+// The service the same entries were written under before, which is the display name.
+//
+// Read from, never written to. Entries stored by an earlier build are still sitting here, and for
+// a managed database key that entry is the only copy in existence: reading it is what keeps an
+// application that upgrades from finding its own database unreadable.
+static NSString *cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_SINGLE_ARG) {
+    return cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
+}
+
+// Whether the two are the same string, in which case there is no legacy anything to look at.
+static BOOL cn1_secureStorageHasLegacyService(NSString *current, NSString *legacy) {
+    return legacy != nil && current != nil && ![legacy isEqualToString:current];
+}
+
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
@@ -16022,12 +16054,23 @@ JAVA_INT com_codename1_impl_ios_IOSNative_secureStorageEntryStatePlain___java_la
     JAVA_INT result;
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     [q setObject:@NO forKey:(__bridge id)kSecReturnData];
     [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
 
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, NULL);
+    if (status == errSecItemNotFound && cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Nothing under the stable service, so ask under the name an earlier build used. Absence
+        // there is the only thing that means absence: reporting it from the first query alone
+        // would have ManagedKeys generate a second key over a database the first one encrypted.
+        NSMutableDictionary *legacyQuery =
+                cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        [legacyQuery setObject:@NO forKey:(__bridge id)kSecReturnData];
+        [legacyQuery setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+        status = SecItemCopyMatching((__bridge CFDictionaryRef)legacyQuery, NULL);
+    }
     if (status == errSecSuccess || status == errSecInteractionNotAllowed) {
         // The second one is an item that is there but locked, which is presence, not absence.
         result = 1;
@@ -16051,18 +16094,48 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_S
     JAVA_OBJECT result = JAVA_NULL;
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     [q setObject:@YES forKey:(__bridge id)kSecReturnData];
     [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
 
     CFTypeRef dataRef = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &dataRef);
+    BOOL fromLegacy = NO;
+    if (status == errSecItemNotFound && cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Written by a build that keyed these by display name. Read it rather than reporting
+        // nothing: for a managed database key this entry is the only copy there is.
+        NSMutableDictionary *legacyQuery =
+                cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        [legacyQuery setObject:@YES forKey:(__bridge id)kSecReturnData];
+        [legacyQuery setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+        status = SecItemCopyMatching((__bridge CFDictionaryRef)legacyQuery, &dataRef);
+        fromLegacy = (status == errSecSuccess);
+    }
     if (status == errSecSuccess && dataRef != NULL) {
         NSData *d = (__bridge NSData *)dataRef;
         NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
         if (value != nil) {
             result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+            if (fromLegacy) {
+                // Moved to the stable service as it is read, so the next rename does not have to
+                // find it again. Copy first and only then delete: a delete that ran before the
+                // copy landed would destroy the one copy of a key that cannot be regenerated.
+                NSMutableDictionary *moved =
+                        cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
+                [moved setObject:d forKey:(__bridge id)kSecValueData];
+                [moved setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock
+                          forKey:(__bridge id)kSecAttrAccessible];
+                OSStatus copied = SecItemAdd((__bridge CFDictionaryRef)moved, NULL);
+                if (copied == errSecSuccess || copied == errSecDuplicateItem) {
+                    NSMutableDictionary *old =
+                            cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+                    SecItemDelete((__bridge CFDictionaryRef)old);
+                }
+                // A failed copy is not an error to report: the value was read, and the entry it
+                // came from is still there to be read again next time.
+            }
         }
         CFRelease(dataRef);
     }
@@ -16078,18 +16151,25 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageSetPlain___java_lang_
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
     NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
     NSData *data = [nsValue dataUsingEncoding:NSUTF8StringEncoding];
 
-    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     [item setObject:data forKey:(__bridge id)kSecValueData];
     [item setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock forKey:(__bridge id)kSecAttrAccessible];
 
     OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, nil);
     if (status == errSecDuplicateItem) {
-        NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+        NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
         NSDictionary *changes = [NSDictionary dictionaryWithObject:data forKey:(__bridge id)kSecValueData];
         status = SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)changes);
+    }
+    if (status == errSecSuccess && cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Only once the new value is stored. Leaving the old entry behind would have a later read
+        // find a stale value under the legacy name if the stable one were ever removed.
+        NSMutableDictionary *old = cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        SecItemDelete((__bridge CFDictionaryRef)old);
     }
     result = (status == errSecSuccess) ? JAVA_TRUE : JAVA_FALSE;
     POOL_END();
@@ -16103,9 +16183,19 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_la
     JAVA_BOOLEAN result = JAVA_FALSE;
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    NSString *service = cn1_secureStoragePlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *legacy = cn1_secureStorageLegacyPlainService(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, service, cn1_keychainAccessGroup);
     OSStatus status = SecItemDelete((__bridge CFDictionaryRef)q);
+    if (cn1_secureStorageHasLegacyService(service, legacy)) {
+        // Both, or a remove would leave the entry an earlier build wrote to be read back later --
+        // and for a managed key that is a key the caller believes it has destroyed.
+        NSMutableDictionary *old = cn1_secureStoragePlainQuery(nsAccount, legacy, cn1_keychainAccessGroup);
+        OSStatus legacyStatus = SecItemDelete((__bridge CFDictionaryRef)old);
+        if (status == errSecItemNotFound) {
+            status = legacyStatus;
+        }
+    }
     result = (status == errSecSuccess || status == errSecItemNotFound) ? JAVA_TRUE : JAVA_FALSE;
     POOL_END();
     return result;
