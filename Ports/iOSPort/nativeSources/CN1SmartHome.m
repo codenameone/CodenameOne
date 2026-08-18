@@ -1376,6 +1376,10 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
     }
 }
 
+// Defined with the recovery machinery it shares state with, below the
+// delegate that calls it.
+static void cn1homeRebindWatches(NSString *accessoryId);
+
 @implementation CN1HomeDelegate
 
 - (void)homeManagerDidUpdateHomes:(HMHomeManager *)manager {
@@ -1580,6 +1584,10 @@ static void cn1homeDeliverChange(NSString *accessoryId, NSString *serviceId,
 - (void)accessoryDidUpdateServices:(HMAccessory *)accessory {
     cn1homeRebuildSnapshot();
     cn1homeAttachDelegates();
+    // And the watches, because an update can hand back a different
+    // HMCharacteristic object under the same identifier and a notification
+    // registration belongs to the object -- see cn1homeRebindWatches.
+    cn1homeRebindWatches(cn1homeUuid([accessory uniqueIdentifier]));
     cn1homeNotifyStructure(CN1_HOME_CHANGE_STRUCTURES, nil,
                            cn1homeUuid([accessory uniqueIdentifier]));
 }
@@ -1667,6 +1675,74 @@ static void cn1homeOnMain(void (^block)(void)) {
 }
 
 static void cn1homeArmRecovery(void);
+
+/// Re-registers every live watch that names `accessoryId`.
+///
+/// A firmware update can replace an accessory's HMCharacteristic objects
+/// while keeping their identifiers, and a registration belongs to the object,
+/// not to the id. The watch key still matches, so nothing looks wrong: the
+/// replacement is not in cn1homeNotifyFailed, and drainChanges() skips it
+/// because it advertises SupportsEventNotification. That subscription then
+/// delivers nothing at all, for as long as the screen is open.
+///
+/// So the registration is made again against whatever object is in the graph
+/// now. A failure here lands on the recovery path like any other, and the
+/// caller is told to resync either way -- the swap itself may have moved the
+/// value, and no notification could have reported that.
+static void cn1homeRebindWatches(NSString *accessoryId) {
+    for (NSString *subscriptionId in [cn1homeWatches allKeys]) {
+        NSSet *keys = [cn1homeWatches objectForKey:subscriptionId];
+        BOOL touched = NO;
+        for (NSString *key in keys) {
+            NSArray *parts = [key componentsSeparatedByString:@"\t"];
+            if ([parts count] != 3
+                    || ![[parts objectAtIndex:0] isEqualToString:accessoryId]) {
+                continue;
+            }
+            touched = YES;
+            NSString *serviceId = [parts objectAtIndex:1];
+            NSString *traitId = [parts objectAtIndex:2];
+            HMService *service = cn1homeFindService(accessoryId, serviceId);
+            HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
+            if (c == nil) {
+                continue;
+            }
+            NSString *stateKey = [NSString stringWithFormat:@"%@\t%@",
+                                  subscriptionId, key];
+            if (![[c properties] containsObject:
+                  HMCharacteristicPropertySupportsEventNotification]) {
+                // Polled rather than pushed, now or still. Its baseline
+                // belongs to the object that is gone, so it is taken again
+                // here -- keeping the old one would report the swap itself
+                // as a change on the next drain.
+                [cn1homeNotifyFailed removeObject:stateKey];
+                [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
+                     cn1homeEncodeReading(accessoryId, serviceId, traitId,
+                                          [c value], nil, nil))
+                                      forKey:stateKey];
+                continue;
+            }
+            [c enableNotification:YES completionHandler:^(NSError *error) {
+                if (error == nil) {
+                    [cn1homeNotifyFailed removeObject:stateKey];
+                    [cn1homeLastPolled removeObjectForKey:stateKey];
+                    return;
+                }
+                [cn1homeNotifyFailed addObject:stateKey];
+                [cn1homeLastPolled setObject:cn1homeReadingWithoutTimestamp(
+                     cn1homeEncodeReading(accessoryId, serviceId, traitId,
+                                          [c value], nil, nil))
+                                      forKey:stateKey];
+                cn1homeArmRecovery();
+            }];
+        }
+        if (touched) {
+            com_codename1_impl_ios_IOSHomeCallbacks_resyncRequired___java_lang_String(
+                getThreadLocalData(),
+                fromNSString(getThreadLocalData(), subscriptionId));
+        }
+    }
+}
 
 /// Polls and re-registers the characteristics whose notification failed.
 ///

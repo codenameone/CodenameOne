@@ -3547,6 +3547,37 @@ public class IPhoneBuilder extends Executor {
                 // _matter._tcp. to talk to it afterwards -- and a project
                 // that already declared one used to suppress the other, so
                 // the accessory was discovered and then unreachable.
+                // A project that declares the array through ios.plistInject
+                // owns it: the plist renderer emits the generated array only
+                // when the injected fragment has no NSBonjourServices key,
+                // because a plist with the key twice keeps neither value
+                // reliably. So the hint below would be written and then
+                // silently dropped, and the build would ship a commissioning
+                // app that cannot see a new accessory -- iOS 14 and later
+                // drop mDNS traffic for a service type the plist does not
+                // list. Refused instead, naming the service to add: the
+                // fragment is the developer's own XML and rewriting it here
+                // would be guessing at their formatting.
+                String injected = request.getArg("ios.plistInject", "");
+                if (injected.contains("NSBonjourServices")) {
+                    for (String service : new String[] {"_matter._tcp",
+                            "_matterc._udp"}) {
+                        if (!injected.contains(service)) {
+                            throw new BuildException(
+                                    "This app adds Matter accessories and "
+                                    + "declares NSBonjourServices through "
+                                    + "ios.plistInject, but that array does "
+                                    + "not list " + service + ". iOS drops "
+                                    + "mDNS traffic for a service type the "
+                                    + "plist does not name, so commissioning "
+                                    + "would never find an accessory. Add "
+                                    + service + ". to the array in "
+                                    + "ios.plistInject, or remove the key "
+                                    + "from it and let the build declare the "
+                                    + "array through ios.NSBonjourServices.");
+                        }
+                    }
+                }
                 String bonjour = request.getArg("ios.NSBonjourServices", "");
                 for (String service : new String[] {"_matter._tcp.",
                         "_matterc._udp."}) {
