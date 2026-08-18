@@ -80,7 +80,9 @@ The default is `false`, and that costs something worth knowing: an intent that d
 
 A headless handler *may* use `Storage`, `Preferences`, `Database`, `NetworkManager`, `Log`, surfaces publishing and `Intents.index`. It *must not* touch `Form`, `Dialog`, `Component`, `Display.getCurrent()`, the camera, capture, or anything else that needs a window: there is no window. It must also not call `Display.callSeriallyAndWait`, which can deadlock against a foregrounded event dispatch thread.
 
-Handlers never run on the event dispatch thread, on any platform and from any source. An invocation can arrive while your app is visible -- a widget button, a search result tapped on a running app -- and a handler blocking the event thread there is a visible freeze.
+A platform-dispatched invocation never runs its handler on the event dispatch thread, whatever the platform and whatever the source. One can arrive while your app is visible -- a widget button, a search result tapped on a running app -- and a handler blocking the event thread there is a visible freeze.
+
+`Intents.invoke` is the exception, by construction: it's synchronous, so it runs the handler on whatever thread called it and hands the result back to that caller. Call it from the event dispatch thread and you block the UI for as long as the handler runs, exactly as any other synchronous call from there would -- pass it to `Display.startThread` if the work isn't instant.
 
 Every invocation carries a deadline, and `IntentContext.isCancelled()` flips when it passes. Cancellation is cooperative: nothing interrupts a running handler, and anything a platform invocation returns afterward is discarded, so commit durable work to storage as you go rather than only at the end. `Intents.invoke` is the one exception, by design: you are blocked in that call waiting for the result and nothing else will report it, so a late one is still returned to you rather than thrown away.
 

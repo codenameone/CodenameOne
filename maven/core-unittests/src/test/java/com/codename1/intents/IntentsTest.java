@@ -1335,6 +1335,36 @@ class IntentsTest {
         assertEquals("/orders/42", doc.get("openUrl"));
     }
 
+    /// Reducing arguments to wire types must not turn "invalid" into "absent": an optional
+    /// parameter would then quietly run on its default instead of the coercion rejecting what
+    /// the caller actually passed. Only a genuine null means absent.
+    @Test
+    void anUnrepresentableArgumentStaysPresent() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declaration("known"));
+        d.next = IntentResult.ok();
+        Intents.setDispatcher(d);
+
+        Map<String, Object> params = new HashMap<String, Object>();
+        params.put("ratio", Double.valueOf(Double.NaN));
+        Intents.invoke("known", params);
+
+        assertTrue(d.lastParams.containsKey("ratio"),
+                "a value the wire cannot carry is still a value the caller supplied");
+    }
+
+    /// A title of spaces is not a title: Android forwards them to ShortcutInfo.Builder and iOS
+    /// puts them in the Spotlight title, which is the unusable result the check exists to stop.
+    @Test
+    void aWhitespaceOnlyTitleIsNotIndexed() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+
+        Intents.index(new AppEntity("order", "42").setTitle("   "));
+
+        assertNull(b.indexedJson);
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

@@ -487,7 +487,7 @@ public final class Intents {
             if (e == null) {
                 continue;
             }
-            if (e.getTitle() == null || e.getTitle().length() == 0) {
+            if (e.getTitle() == null || e.getTitle().trim().length() == 0) {
                 logDiagnostic("Not indexing " + e.getType() + ":" + e.getId()
                         + " because it has no title. A search result with nothing written on it "
                         + "is not something a user can act on; call setTitle before indexing.");
@@ -1377,10 +1377,14 @@ public final class Intents {
     /// the least debuggable shape a difference can take.
     private static void reduceInto(Map<String, Object> target, Map<String, Object> source) {
         for (Map.Entry<String, Object> e : source.entrySet()) {
-            Object wire = IntentSerializer.toWire(e.getValue());
-            if (wire != null) {
-                target.put(e.getKey(), wire);
-            }
+            Object value = e.getValue();
+            Object wire = IntentSerializer.toWire(value);
+            // A value the wire format cannot carry -- NaN, an infinity, an object of no declared
+            // type -- is still a value the caller supplied. Dropping it would turn "invalid"
+            // into "absent", and an optional parameter would then quietly run on its default
+            // instead of the coercion rejecting what was actually passed. Only a genuine null
+            // means absent.
+            target.put(e.getKey(), wire != null ? wire : value);
         }
     }
 

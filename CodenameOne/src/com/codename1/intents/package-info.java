@@ -86,11 +86,19 @@
 /// `Display#callSeriallyAndWait`, which can deadlock against a foregrounded
 /// event dispatch thread.
 ///
-/// Handlers never run on the event dispatch thread, on any platform and from any
-/// source. An invocation can arrive while your app is visible -- a widget button,
-/// a search result tapped on a running app -- and a handler blocking the event
-/// thread there is a visible freeze. Since handlers are forbidden from touching
-/// UI, they do not need that thread.
+/// A platform-dispatched invocation never runs its handler on the event dispatch
+/// thread, whatever the platform and whatever the source. One can arrive while
+/// your app is visible -- a widget button, a search result tapped on a running
+/// app -- and a handler blocking the event thread there is a visible freeze.
+/// Since handlers are forbidden from touching UI, they do not need that thread.
+///
+/// `Intents#invoke` is the exception, and by construction rather than oversight:
+/// it is synchronous, so it runs the handler on whatever thread called it and
+/// returns the result to that caller. Calling it from the event dispatch thread
+/// therefore blocks the UI for as long as the handler runs. That is the same
+/// contract as any other synchronous call you make from there, and the same
+/// remedy applies -- hand it to `Display#startThread` if the work is not
+/// instant.
 ///
 /// #### Time
 ///
