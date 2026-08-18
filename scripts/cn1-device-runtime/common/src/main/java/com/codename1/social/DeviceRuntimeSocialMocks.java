@@ -70,6 +70,7 @@ public final class DeviceRuntimeSocialMocks {
      * state and the preference it was persisted under.</p>
      */
     public static void reset() {
+        generation++;
         reset(FacebookConnect.getInstance());
         reset(GoogleConnect.getInstance());
     }
@@ -95,6 +96,17 @@ public final class DeviceRuntimeSocialMocks {
         login.setCallback(null);
     }
 
+    /**
+     * Which pushed program the current logins belong to.
+     *
+     * <p>A login completes on a later pass of the event thread, so a program
+     * can be replaced between asking and being answered. Without this the
+     * queued completion issues and stores a token *after* the reset, and the
+     * new program starts logged in as the old one -- the very thing the reset
+     * exists to prevent.</p>
+     */
+    private static int generation;
+
     /// A token that reads as fake, including in a log somebody pastes later.
     static AccessToken token(String provider) {
         return new AccessToken("mock-" + provider.toLowerCase() + "-token-not-valid-anywhere",
@@ -110,8 +122,15 @@ public final class DeviceRuntimeSocialMocks {
      */
     static void succeed(final Login login, final String provider) {
         DeviceRuntimeMocks.warnOnce(provider + " login");
+        final int asked = generation;
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                if (asked != generation) {
+                    // The program that asked is gone. Answering it now would
+                    // log the *next* program in, and call a callback the
+                    // detached runtime owns.
+                    return;
+                }
                 AccessToken issued = token(provider);
                 if (login instanceof Facebook) {
                     ((Facebook) login).remember(issued);

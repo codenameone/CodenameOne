@@ -289,12 +289,20 @@ public class DeviceRuntimeService {
         final boolean[] started = new boolean[1];
         final boolean[] finished = new boolean[1];
         final boolean[] spoke = new boolean[1];
+        // The streams, so a connection that accepts and then says nothing can
+        // be closed rather than left behind. Socket.connect gives the callback
+        // its own thread and closes nothing when the caller gives up, so
+        // without this every dial past a silent listener leaks a thread parked
+        // in readInt and the socket under it, for the life of the app.
+        final InputStream[] open = new InputStream[1];
         SocketConnection sc = new SocketConnection() {
             public void connectionEstablished(InputStream is, OutputStream os) {
+                open[0] = is;
                 try {
                     spoke[0] = handle(is, os, isLoopback(host), started);
                 } finally {
                     finished[0] = true;
+                    open[0] = null;
                 }
             }
 
@@ -326,7 +334,25 @@ public class DeviceRuntimeService {
                 return spoke[0];
             }
         }
+        if (!finished[0]) {
+            // Gave up on a peer that never said anything. Closing the stream is
+            // what unblocks the read the handler is parked in, so its thread
+            // ends rather than accumulating one per dial.
+            closeQuietly(open[0]);
+        }
         return spoke[0];
+    }
+
+    private static void closeQuietly(InputStream is) {
+        if (is == null) {
+            return;
+        }
+        try {
+            is.close();
+        } catch (Throwable alreadyGone) {
+            // Closing to unblock a reader; whether it was already shut is not
+            // something this can act on.
+        }
     }
 
     /// How long to wait for one address. Short: most of the subnet is nothing.

@@ -1315,14 +1315,21 @@ public final class InterpRuntime {
                         findStaticHolder(ic, name).staticValue(name));
                 return;
             }
-            // Inherited from the host superclass. Reading it from the
-            // interpreted class would answer null for a field that class never
-            // declared.
-            String hostOwner = hostOwnerOf(ic);
-            if (hostOwner != null) {
-                pushBoxed(f, InterpValues.kindOf(desc),
-                        linker.getStatic(hostOwner, name, desc));
-                return;
+            // Inherited from a host supertype -- a superclass, or an
+            // interface whose constant is read through the implementing class.
+            // Reading it from the interpreted class would answer null for a
+            // field that class never declared.
+            String[] hostOwners = hostStaticOwners(ic);
+            for (int i = 0; i < hostOwners.length; i++) {
+                try {
+                    pushBoxed(f, InterpValues.kindOf(desc),
+                            linker.getStatic(hostOwners[i], name, desc));
+                    return;
+                } catch (Throwable notThere) {
+                    if (i == hostOwners.length - 1) {
+                        throw notThere;
+                    }
+                }
             }
             pushBoxed(f, InterpValues.kindOf(desc), findStaticHolder(ic, name).staticValue(name));
             return;
@@ -1344,11 +1351,20 @@ public final class InterpRuntime {
                 return;
             }
             // As above: writing it here would create a private copy the host
-            // never sees, and leave the real field unchanged.
-            String hostOwner = hostOwnerOf(ic);
-            if (hostOwner != null) {
-                linker.setStatic(hostOwner, name, desc, value);
-                return;
+            // never sees, and leave the real field unchanged. An interface's
+            // fields are final, so only the superclass chain can be written --
+            // but the same lookup is used so a wrong owner fails loudly rather
+            // than silently writing somewhere else.
+            String[] hostOwners = hostStaticOwners(ic);
+            for (int i = 0; i < hostOwners.length; i++) {
+                try {
+                    linker.setStatic(hostOwners[i], name, desc, value);
+                    return;
+                } catch (Throwable notThere) {
+                    if (i == hostOwners.length - 1) {
+                        throw notThere;
+                    }
+                }
             }
             findStaticHolder(ic, name).setStaticValue(name, value);
             return;
@@ -1390,6 +1406,34 @@ public final class InterpRuntime {
         return null;
     }
 
+    /// Where a static the interpreted hierarchy does not declare might live.
+    ///
+    /// The host superclass chain first, then the host interfaces -- a constant
+    /// on an implemented interface is read as `PushedClass.FIELD`, and the
+    /// superclass walk answers `java/lang/Object`, which does not have it.
+    /// Every candidate is tried in turn because only the linker can say which
+    /// one actually declares it.
+    private String[] hostStaticOwners(InterpClass c) {
+        Vector out = new Vector();
+        String superOwner = hostOwnerOf(c);
+        if (superOwner != null) {
+            out.addElement(superOwner);
+        }
+        InterpClass k = c;
+        while (k != null) {
+            for (int i = 0; i < k.hostInterfaces.length; i++) {
+                String iface = externOwnerName(k.hostInterfaces[i]);
+                if (!out.contains(iface)) {
+                    out.addElement(iface);
+                }
+            }
+            k = k.superInterp;
+        }
+        String[] owners = new String[out.size()];
+        out.copyInto(owners);
+        return owners;
+    }
+
     /// Whether any interpreted class in the chain declares this static.
     private boolean declaredByInterpreted(InterpClass c, String name) throws Throwable {
         InterpClass k = c;
@@ -1400,6 +1444,19 @@ public final class InterpRuntime {
             k = k.superInterp;
         }
         return false;
+    }
+
+    /// The class a host instance field really belongs to.
+    ///
+    /// The call site names the interpreted class -- javac records the type it
+    /// saw -- and the installed app has never heard of it, so the nearest host
+    /// ancestor is the name the linker can resolve.
+    private String hostFieldOwner(InterpObject io, String owner) {
+        if (bundle.findClass(owner) == null) {
+            return owner;
+        }
+        String hostOwner = hostOwnerOf(io.type);
+        return hostOwner == null ? owner : hostOwner;
     }
 
     private InterpClass findStaticHolder(InterpClass c, String name) throws Throwable {
@@ -1476,9 +1533,12 @@ public final class InterpRuntime {
                 pushBoxed(f, InterpValues.kindOf(desc), io.fields[idx]);
                 return;
             }
-            // Declared by a host superclass, so it lives on the peer.
+            // Declared by a host superclass, so it lives on the peer -- and
+            // under that class's name, not the interpreted subclass javac
+            // recorded. A pushed Form subclass reading `focusScrolling` names
+            // itself as the owner, and no linker has ever heard of it.
             pushBoxed(f, InterpValues.kindOf(desc),
-                    linker.getField(io.hostPeer, owner, name, desc));
+                    linker.getField(io.hostPeer, hostFieldOwner(io, owner), name, desc));
             return;
         }
         pushBoxed(f, InterpValues.kindOf(desc), linker.getField(target, owner, name, desc));
@@ -1501,7 +1561,7 @@ public final class InterpRuntime {
                 io.fields[idx] = value;
                 return;
             }
-            linker.setField(io.hostPeer, owner, name, desc, value);
+            linker.setField(io.hostPeer, hostFieldOwner(io, owner), name, desc, value);
             return;
         }
         linker.setField(target, owner, name, desc, value);
