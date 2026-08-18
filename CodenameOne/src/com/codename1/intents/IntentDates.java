@@ -160,7 +160,16 @@ public final class IntentDates {
                 if (hour > 23 || minute > 59 || second > 59) {
                     return null;
                 }
-                if (tz.length() > 0 && tz.charAt(0) != 'Z' && tz.charAt(0) != 'z') {
+                if (tz.length() > 0 && (tz.charAt(0) == 'Z' || tz.charAt(0) == 'z')) {
+                    // Zulu is the whole suffix or the string is not a date. Taking the Z and
+                    // ignoring what followed accepted "...T12:00:00Zjunk", and worse
+                    // "...Z+05:00", as UTC -- so a value that names two different moments, or
+                    // none, reached a handler looking valid. Every caller shares this parser,
+                    // so that reached declared defaults, donations and dispatch alike.
+                    if (tz.length() != 1) {
+                        return null;
+                    }
+                } else if (tz.length() > 0) {
                     // Built by hand: this runtime's String has replace(char,char) and not the
                     // CharSequence overload, and an offset may be written +0200 or +02:00.
                     StringBuilder buf = new StringBuilder();

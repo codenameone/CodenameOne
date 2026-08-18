@@ -273,12 +273,20 @@ static NSUserActivity *cn1PendingLaunchActivity = nil;
     // behaviour must be bit-identical whether or not intents are in play.
     if (userActivity != nil) {
         if ([CSSearchableItemActionType isEqualToString:userActivity.activityType]) {
-            NSString *uid = [userActivity.userInfo objectForKey:CSSearchableItemActivityIdentifier];
+            NSString *identifier = [userActivity.userInfo objectForKey:CSSearchableItemActivityIdentifier];
+            // Declared rather than redefined: the prefix has one definition, in IOSNative.m
+            // beside the indexing that writes it, so the two cannot drift apart.
+            extern NSString *cn1IntentUidFromItemId(NSString *identifier);
+            NSString *uid = cn1IntentUidFromItemId(identifier);
             if (uid != nil) {
                 JAVA_OBJECT juid = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG uid);
                 com_codename1_impl_ios_IOSIntentCallbacks_nativeSpotlightItemSelected___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG juid);
                 return YES;
             }
+            // Not one of ours. A Spotlight item the application indexed itself reaches here
+            // too, and handing its identifier to the framework would send it looking for an
+            // entity that does not exist -- so the activity falls through to the general
+            // branch below, where the app decides what to do with it.
         }
         // Any other activity type: hand it to Java and return Java's answer. Claiming
         // everything would swallow handoff and third-party activities this app never

@@ -84,6 +84,10 @@ public class AndroidIntentBridge implements IntentBridge {
     /// framework's rows from the application's own without guessing.
     private static final String INDEXED_PREFIX = "cn1entity:";
 
+    /// Stamped on a donated shortcut, so it cannot collide with the immutable manifest shortcut
+    /// the build published for the same intent.
+    private static final String DONATED_PREFIX = "cn1donated:";
+
     private static final long FOREGROUND_POLL_MILLIS = 50L;
 
     /// How long requestForeground waits for the Activity it launched. Deliberately shorter than
@@ -497,8 +501,22 @@ public class AndroidIntentBridge implements IntentBridge {
                         com.codename1.intents.Intents.getDeclaration(targetId);
                 label = decl == null ? intentId : decl.getTitle();
             }
-            // A donation is the app saying the user just did this, so it reports usage.
-            pushShortcut(ctx, intentId, label, label,
+            // A donation carrying no values of its own has nothing to publish that is not
+            // already on the launcher: the build's static shortcut for this intent runs exactly
+            // the same thing. Publishing a second entry under another id would put one label
+            // there twice. What the donation is actually saying -- the user just did this --
+            // is the usage report, and that works on a manifest shortcut.
+            if (dyn == null && !carriesValues(effectiveParams)) {
+                reportUsage(ctx, intentId);
+                return;
+            }
+            // Anything else is published under an id this framework owns. The raw intent id is
+            // the *manifest* shortcut's id, and Android does not let a runtime API modify an
+            // immutable manifest shortcut -- so this used to be rejected outright, silently,
+            // leaving the parameterless static shortcut in place. For an intent with optional
+            // parameters that meant the tap ran the declared defaults instead of the values
+            // the user had actually chosen, which is the whole content of a donation.
+            pushShortcut(ctx, DONATED_PREFIX + intentId, label, label,
                     uriFor(targetId, effectiveParams, ctx), null, true);
         } catch (Throwable t) {
             Log.w(TAG, "Could not donate " + intentId, t);
@@ -666,6 +684,32 @@ public class AndroidIntentBridge implements IntentBridge {
     private static void addAll(List<ShortcutInfo> out, List<ShortcutInfo> in) {
         if (in != null) {
             out.addAll(in);
+        }
+    }
+
+    /// Whether a donation payload names any value at all.
+    private static boolean carriesValues(String paramsJson) {
+        if (paramsJson == null) {
+            return false;
+        }
+        String trimmed = paramsJson.trim();
+        return trimmed.length() > 0 && !"{}".equals(trimmed);
+    }
+
+    /// Reports that a shortcut was used, without publishing anything.
+    ///
+    /// The ranking signal is the part of a donation that applies to a shortcut the build
+    /// already published, and reportShortcutUsed accepts a manifest shortcut's id.
+    @TargetApi(Build.VERSION_CODES.N_MR1)
+    private static void reportUsage(Context ctx, String shortcutId) {
+        ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
+        if (manager == null) {
+            return;
+        }
+        try {
+            manager.reportShortcutUsed(shortcutId);
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not report usage for " + shortcutId, t);
         }
     }
 

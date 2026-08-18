@@ -1679,6 +1679,30 @@ class IntentsTest {
                 "a value the coercion accepts satisfies the parameter");
     }
 
+    /// Taking the Z and ignoring what followed accepted "...T12:00:00Zjunk" -- and worse
+    /// "...Z+05:00", which names two different moments -- as UTC. Every caller shares this
+    /// parser, so that reached declared defaults, donations and dispatch alike.
+    @Test
+    void trailingTextAfterAUtcSuffixIsNotADate() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithDateParam("remind_me", "when"));
+        Intents.setDispatcher(d);
+
+        Intents.registerDynamicIntent(new DynamicIntent("remind_junk", "remind_me", "Junk")
+                .bind("when", "2026-03-14T12:00:00Zjunk"));
+        assertNotNull(Intents.getDeclaration("remind_junk").getParameter("when"));
+
+        Intents.registerDynamicIntent(new DynamicIntent("remind_two", "remind_me", "Two")
+                .bind("when", "2026-03-14T12:00:00Z+05:00"));
+        assertNotNull(Intents.getDeclaration("remind_two").getParameter("when"),
+                "a value naming two zones names no moment");
+
+        // A bare Z is still the whole suffix, and still UTC.
+        Intents.registerDynamicIntent(new DynamicIntent("remind_z", "remind_me", "Z")
+                .bind("when", "2026-03-14T12:00:00Z"));
+        assertNull(Intents.getDeclaration("remind_z").getParameter("when"));
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

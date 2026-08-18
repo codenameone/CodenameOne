@@ -15221,6 +15221,31 @@ static NSString *cn1IntentDomain(NSString *entityType) {
     return [NSString stringWithFormat:@"%@.%@", CN1_INTENT_DOMAIN_ROOT, escaped];
 }
 
+/// The prefix every Spotlight item this framework indexes carries.
+///
+/// A CSSearchableItem's uniqueIdentifier is scoped to the application, not to the domain -- the
+/// domain namespaces *deletion by domain*, and nothing else. So an entity indexed here as
+/// "order:42" and an item the application indexed itself under that same string are one item:
+/// indexing through Intents would replace the app's row, and removeFromIndex would delete it.
+/// Ownership has to be stamped on the identifier as well.
+#define CN1_INTENT_UID_PREFIX @"cn1entity:"
+
+/// The Spotlight identifier for an entity uid.
+NSString *cn1IntentItemId(NSString *uid) {
+    return [CN1_INTENT_UID_PREFIX stringByAppendingString:uid];
+}
+
+/// The entity uid behind a Spotlight identifier, or nil when the item is not ours.
+///
+/// nil matters: a selection may arrive for an item the application indexed itself, and handing
+/// its raw identifier to the framework would have it look for an entity that does not exist.
+NSString *cn1IntentUidFromItemId(NSString *identifier) {
+    if (identifier == nil || ![identifier hasPrefix:CN1_INTENT_UID_PREFIX]) {
+        return nil;
+    }
+    return [identifier substringFromIndex:[CN1_INTENT_UID_PREFIX length]];
+}
+
 /// The generated Swift bridge, present only when the app declares an @AppIntent. Absent is a
 /// normal state (an app may only index content), so callers must tolerate nil.
 static Class cn1IntentBridgeClass() {
@@ -15450,7 +15475,7 @@ void com_codename1_impl_ios_IOSNative_intentsIndex___java_lang_String(CN1_THREAD
             // rather than this framework's part of it.
             NSString *domain = cn1IntentDomain([e objectForKey:@"type"]);
             CSSearchableItem *item = [[[CSSearchableItem alloc]
-                    initWithUniqueIdentifier:uid
+                    initWithUniqueIdentifier:cn1IntentItemId(uid)
                             domainIdentifier:domain
                                 attributeSet:attrs] autorelease];
             [items addObject:item];
@@ -15483,7 +15508,9 @@ void com_codename1_impl_ios_IOSNative_intentsRemoveFromIndex___java_lang_String(
             if ([raw isKindOfClass:[NSDictionary class]]) {
                 NSString *uid = [(NSDictionary *)raw objectForKey:@"uid"];
                 if (uid != nil) {
-                    [uids addObject:uid];
+                    // The same stamp indexing applied. Deleting the raw uid would delete an
+                    // item the application indexed itself under that string, and leave ours.
+                    [uids addObject:cn1IntentItemId(uid)];
                 }
             }
         }
