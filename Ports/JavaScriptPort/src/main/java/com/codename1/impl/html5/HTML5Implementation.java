@@ -6711,6 +6711,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void flushGraphics(int x, int y, int width, int height) {
+        displayFlushes++;
         JavaScriptRenderQueueCoordinator.waitUntilFlushable(new JavaScriptRenderQueueCoordinator.FlushBarrier() {
             @Override
             public boolean isGraphicsLocked() {
@@ -6784,8 +6785,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // breaks rendering -- graphics-draw-gradient-stops came back with its gradients
         // unpainted, reproducibly and across a re-run, while every other golden was unchanged.
         // The repaint is requested and the read deferred instead, which this API can do because
-        // it answers through a callback. Two hops: the event thread runs queued work before it
-        // paints, so the first lands before the repaint and the second after it.
+        // it answers through a callback. The read then waits for the painting to actually stop
+        // rather than for a fixed number of event-thread hops: a form whose paint takes more
+        // than one flush -- this application's image grid does -- can be caught between them,
+        // and what comes back is a frame with the last panels still unpainted.
         if (readbackRepaintPending) {
             // A capture is already waiting for the frame that puts the text back on the canvas.
             // Reading now would hand this caller the canvas as it stands, which is the one
@@ -6806,10 +6809,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
             if (current != null) {
                 current.repaint();
             }
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    Display.getInstance().callSerially(new Runnable() {
+            awaitPaintedFrame(new Runnable() {
                         @Override
                         public void run() {
                             readbackRepaintPending = false;
@@ -6829,8 +6829,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         }
                     });
-                }
-            });
             return;
         }
         readDisplaySurface(callback);
@@ -6851,6 +6849,44 @@ public class HTML5Implementation extends CodenameOneImplementation {
             Log.e(t);
         }
     }
+
+    /**
+     * Runs the given work once the display has stopped painting.
+     *
+     * <p>Counts flushes rather than event-thread hops. A repaint is not one flush: a form can
+     * paint over several, and a read taken between them returns a frame whose last components
+     * were never drawn -- blank where the application had put something. Two consecutive checks
+     * with no flush in between mean the frame is finished.</p>
+     *
+     * <p>Bounded, because a form that animates never stops flushing and a capture still has to
+     * be answered: after enough checks the read goes ahead with whatever is on the canvas, which
+     * is what it would have done immediately before.</p>
+     *
+     * @param work what to run once the frame has settled
+     */
+    private void awaitPaintedFrame(final Runnable work) {
+        final int[] state = new int[] { displayFlushes, 0, 0 };
+        Display.getInstance().callSerially(new Runnable() {
+            @Override
+            public void run() {
+                boolean flushed = displayFlushes != state[0];
+                state[0] = displayFlushes;
+                state[1] = flushed ? 0 : state[1] + 1;
+                state[2]++;
+                if (state[1] >= 2 || state[2] >= 60) {
+                    work.run();
+                    return;
+                }
+                Display.getInstance().callSerially(this);
+            }
+        });
+    }
+
+    /**
+     * How many times the display surface has been flushed. Only ever compared with itself, to
+     * tell a frame that is still being painted from one that has settled.
+     */
+    private int displayFlushes;
 
     /**
      * True while a capture is waiting for the frame that rasterizes the text the layer had
