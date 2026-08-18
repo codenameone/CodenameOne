@@ -2186,6 +2186,36 @@ class IntentsTest {
         }
     }
 
+    /// The queue exists because the activity arrived before the dispatcher did, so an update
+    /// that changed the declaration lands exactly here: the request was judged against what a
+    /// previous launch recorded, and what runs it is what the app declares now.
+    @Test
+    void aQueuedActivityIsRejudgedAgainstTheDeclarationThatArrives() {
+        // A previous launch recorded both ids, so both are claimed while the table is empty.
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher first = new FakeDispatcher();
+        first.declarations.add(declaration("known"));
+        first.declarations.add(declaration("wipe_all"));
+        Intents.setDispatcher(first);
+        Intents.setDispatcher(null);
+
+        assertTrue(Intents.dispatchUserActivity("wipe_all", null));
+        assertTrue(Intents.dispatchUserActivity("known", null));
+
+        // The app has since been updated: the same intent is destructive now.
+        FakeDispatcher updated = new FakeDispatcher();
+        updated.declarations.add(new IntentDeclaration("wipe_all", "Wipe", "", true, true, true,
+                "", 5, Collections.<String>emptyList(),
+                Collections.<IntentParameterInfo>emptyList(),
+                Arrays.asList(Exposure.ASSISTANT)));
+        updated.declarations.add(declaration("known"));
+        Intents.setDispatcher(updated);
+
+        assertEquals(Arrays.asList("known"), updated.invoked,
+                "a suggestion cannot outlive the policy that allowed it, cold start included");
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

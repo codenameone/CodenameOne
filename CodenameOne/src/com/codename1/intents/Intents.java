@@ -982,14 +982,11 @@ public final class Intents {
             // performs and past the check donate() applies to every new donation. The
             // declaration in front of us is the authority, not the one that minted the
             // suggestion.
-            if (declared.isDestructive() || !declared.isExposedTo(Exposure.ASSISTANT)) {
+            if (!allowsSuggestedInvocation(declared)) {
                 // Claimed rather than declined: the activity type is this application's, and
                 // saying otherwise would have the system look for another handler for something
                 // that is ours to refuse.
-                logDiagnostic("Not running \"" + activityType + "\" from a suggested activity: "
-                        + "the declaration no longer allows it to run without confirmation. A "
-                        + "suggestion donated by an earlier version can outlive the policy that "
-                        + "allowed it.");
+                logDiagnostic(suggestionRefusedMessage(activityType));
                 return true;
             }
             dispatchInvocation(activityType, params, IntentSource.SHORTCUT, false, null);
@@ -1496,10 +1493,42 @@ public final class Intents {
             return;
         }
         for (PendingActivity a : queued) {
-            if (getDeclaration(a.activityType) != null) {
-                dispatchInvocation(a.activityType, a.params, IntentSource.SHORTCUT, false, null);
+            IntentDeclaration decl = getDeclaration(a.activityType);
+            if (decl == null) {
+                continue;
             }
+            // Judged against the declarations that exist now, not the ones that were recorded
+            // when this was queued. That gap is the whole reason this queue exists -- the
+            // activity arrived before the dispatcher did -- so an update that made the intent
+            // destructive, or took the assistant out of its exposure, lands exactly here. The
+            // warm path has checked this since the persisted-donation fix; this one had not,
+            // so a stale suggestion still ran on one tap after a cold start.
+            if (!allowsSuggestedInvocation(decl)) {
+                logDiagnostic(suggestionRefusedMessage(a.activityType));
+                continue;
+            }
+            dispatchInvocation(a.activityType, a.params, IntentSource.SHORTCUT, false, null);
         }
+    }
+
+    /// Whether the current declaration still allows this intent to run from a suggestion.
+    ///
+    /// A suggestion is a one-tap surface: the system kept it, and a tap reaches the handler
+    /// with the donated values and nothing in between. That is fine for what the app donated,
+    /// and not fine once the app has changed its mind -- a donation made before an update that
+    /// marked the intent destructive is still out there being offered.
+    ///
+    /// One definition because there are two doors: the activity that arrives while the
+    /// declarations exist, and the one queued before they did.
+    private static boolean allowsSuggestedInvocation(IntentDeclaration decl) {
+        return !decl.isDestructive() && decl.isExposedTo(Exposure.ASSISTANT);
+    }
+
+    /// What to say when a suggestion outlived the policy that allowed it.
+    private static String suggestionRefusedMessage(String activityType) {
+        return "Not running \"" + activityType + "\" from a suggested activity: the declaration "
+                + "no longer allows it to run without confirmation. A suggestion donated by an "
+                + "earlier version can outlive the policy that allowed it.";
     }
 
     /// Navigates when a result names a route.
