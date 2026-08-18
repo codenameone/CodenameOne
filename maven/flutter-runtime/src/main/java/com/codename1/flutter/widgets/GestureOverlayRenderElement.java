@@ -147,7 +147,25 @@ public class GestureOverlayRenderElement extends RenderElement {
     private static boolean isInteractive(Component c) {
         return c instanceof com.codename1.ui.Button
                 || c instanceof com.codename1.ui.TextArea
-                || c instanceof OverlayComponent;
+                || c instanceof OverlayComponent
+                || isScrollPane(c);
+    }
+
+    /**
+     * A pane that scrolls on its own axis.
+     *
+     * <p>These matter because a DRAG over them is theirs, not ours. CN1 routes a drag from
+     * whichever component took the press to the nearest scrollable ancestor, so an overlay
+     * stretched across the page handed every horizontal drag to the page's VERTICAL scroll
+     * and the inner pane never moved — a data table wide enough to need scrolling simply
+     * would not.</p>
+     */
+    private static boolean isScrollPane(Component c) {
+        if (!(c instanceof com.codename1.ui.Container)) {
+            return false;
+        }
+        com.codename1.ui.Container container = (com.codename1.ui.Container) c;
+        return container.isScrollableX() || container.isScrollableY();
     }
 
     class OverlayComponent extends Component {
@@ -183,6 +201,17 @@ public class GestureOverlayRenderElement extends RenderElement {
             }
             ink.press(this, x - getAbsoluteX(), y - getAbsoluteY(), inkResponse());
             super.pointerPressed(x, y);
+        }
+
+        @Override
+        public void pointerDragged(int x, int y) {
+            // Only a scrollable target gets the drag: handing one to a button would start a
+            // press it never finishes, and CN1 already treats our own drag as a scroll.
+            if (forwardTo != null && isScrollPane(forwardTo)) {
+                forwardTo.pointerDragged(x, y);
+                return;
+            }
+            super.pointerDragged(x, y);
         }
 
         @Override

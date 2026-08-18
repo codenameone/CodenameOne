@@ -266,7 +266,7 @@ class GridView extends Widget {
 
 @JavaName('com.codename1.flutter.widgets.SingleChildScrollView')
 class SingleChildScrollView extends Widget {
-  external SingleChildScrollView({Key? key, EdgeInsets? padding, Widget? child});
+  external SingleChildScrollView({Key? key, EdgeInsets? padding, Axis? scrollDirection, Widget? child});
 }
 
 @JavaName('com.codename1.flutter.widgets.Image')

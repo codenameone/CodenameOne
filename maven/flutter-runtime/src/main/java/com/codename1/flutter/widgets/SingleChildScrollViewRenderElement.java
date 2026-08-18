@@ -1,5 +1,6 @@
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.Axis;
 import com.codename1.flutter.Widget;
 
 /**
@@ -10,6 +11,11 @@ public class SingleChildScrollViewRenderElement extends ScrollRenderElement {
 
     public SingleChildScrollViewRenderElement(SingleChildScrollView widget) {
         super(widget);
+    }
+
+    @Override
+    protected boolean horizontal() {
+        return ((SingleChildScrollView) widget()).getScrollDirection() == Axis.horizontal;
     }
 
     @Override

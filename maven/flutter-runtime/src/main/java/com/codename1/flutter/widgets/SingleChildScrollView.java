@@ -1,15 +1,18 @@
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.Axis;
 import com.codename1.flutter.Clip;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
 /**
- * Makes its child scrollable along the vertical axis: the child subtree
- * becomes a real CN1 scrollable container boundary laid out with an
- * unbounded main axis inside. Horizontal scrolling is a later milestone
- * (the stub declares no scrollDirection yet).
+ * Makes its child scrollable: the child subtree becomes a real CN1 scrollable container
+ * boundary laid out with an unbounded main axis inside.
+ *
+ * <p>{@code scrollDirection} picks the axis. It defaults to vertical, as in Flutter, and
+ * the horizontal case is what lets wide content — a data table with more columns than fit
+ * a phone — be reached rather than crushed into the available width.</p>
  */
 public class SingleChildScrollView extends Widget {
 
@@ -17,6 +20,7 @@ public class SingleChildScrollView extends Widget {
     private Widget child;
     private String restorationId;
     private Clip clipBehavior;
+    private Axis scrollDirection = Axis.vertical;
 
     public void restorationId(String v) {
         this.restorationId = v;
@@ -24,6 +28,14 @@ public class SingleChildScrollView extends Widget {
 
     public void clipBehavior(Clip v) {
         this.clipBehavior = v;
+    }
+
+    public void scrollDirection(Axis v) {
+        this.scrollDirection = v == null ? Axis.vertical : v;
+    }
+
+    public Axis getScrollDirection() {
+        return scrollDirection;
     }
 
     public void padding(EdgeInsets v) {

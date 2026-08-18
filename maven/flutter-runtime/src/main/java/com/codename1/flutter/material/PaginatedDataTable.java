@@ -108,6 +108,10 @@ public class PaginatedDataTable extends StatelessWidget {
     private static final double HEADING_HEIGHT_LP = 56;
     private static final double ROW_HEIGHT_LP = 48;
     private static final double CELL_SPACING_LP = 12;
+    /** What a numeric column needs before its values start wrapping. */
+    private static final double MIN_NUMERIC_COLUMN_LP = 64;
+    /** What the label column needs before the names start wrapping. */
+    private static final double MIN_LABEL_COLUMN_LP = 160;
 
     /**
      * One table row.
@@ -132,7 +136,7 @@ public class PaginatedDataTable extends StatelessWidget {
             // The first column is the label column and gets the room; Flutter sizes the
             // numeric ones to content, and a 3:1 split is the same shape without needing
             // intrinsic widths.
-            e.flex(i == 0 ? 3 : 1);
+            e.flex(i == 0 ? 4 : 1);
             e.child(cell);
             flexed.add(e);
         }
@@ -141,8 +145,15 @@ public class PaginatedDataTable extends StatelessWidget {
         r.children(flexed);
         com.codename1.flutter.widgets.Container box =
                 new com.codename1.flutter.widgets.Container();
-        box.height(height);
-        box.padding(com.codename1.flutter.EdgeInsets.symmetric(0, CELL_SPACING_LP));
+        // A MINIMUM height, not a fixed one. Material's row is 48lp, but a label that wraps
+        // to two lines needs more, and pinning the height cut those rows through the middle
+        // of the second line - the dessert names came out sliced in half.
+        com.codename1.flutter.rendering.BoxConstraints rowBox =
+                new com.codename1.flutter.rendering.BoxConstraints(
+                        0, Double.POSITIVE_INFINITY, height, Double.POSITIVE_INFINITY);
+        box.constraints(rowBox);
+        box.padding(com.codename1.flutter.EdgeInsets.symmetric(CELL_SPACING_LP / 2,
+                CELL_SPACING_LP));
         box.child(r);
         return rowOfBox(box);
     }
@@ -282,12 +293,42 @@ public class PaginatedDataTable extends StatelessWidget {
                 body.add(rowOf(cellWidgets, ROW_HEIGHT_LP));
             }
         }
-        body.add(footer(total));
-
         Column col = new Column();
         col.crossAxisAlignment(CrossAxisAlignment.stretch);
         col.mainAxisSize(MainAxisSize.min);
         col.children(body);
-        return col;
+
+        // Wide tables SCROLL rather than squeeze. Eight columns do not fit a phone, and
+        // dividing the width between them regardless turned "16.0" into "16." over "0" and
+        // stacked every row two lines high. Flutter scrolls its table for the same reason.
+        com.codename1.flutter.widgets.Container wide =
+                new com.codename1.flutter.widgets.Container();
+        wide.width(minimumWidthLp());
+        wide.child(col);
+        com.codename1.flutter.widgets.SingleChildScrollView across =
+                new com.codename1.flutter.widgets.SingleChildScrollView();
+        across.scrollDirection(com.codename1.flutter.Axis.horizontal);
+        across.child(wide);
+
+        // The header and the pager belong to the table, not to the scrolled area, so they
+        // stay put while the columns move under them - as they do in Flutter.
+        DartList<Widget> outer = new DartList<Widget>();
+        outer.add(across);
+        outer.add(footer(total));
+        Column framed = new Column();
+        framed.crossAxisAlignment(CrossAxisAlignment.stretch);
+        framed.mainAxisSize(MainAxisSize.min);
+        framed.children(outer);
+        return framed;
+    }
+
+    /** The width the columns need before anything has to wrap. */
+    private double minimumWidthLp() {
+        int count = columns == null ? 0 : columns.size();
+        if (count == 0) {
+            return MIN_LABEL_COLUMN_LP;
+        }
+        return MIN_LABEL_COLUMN_LP + (count - 1) * MIN_NUMERIC_COLUMN_LP
+                + count * CELL_SPACING_LP;
     }
 }
