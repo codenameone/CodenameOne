@@ -42,6 +42,10 @@ extern void CN1MacWindowDeliverFocus(int windowId, BOOL gained);
 extern void CN1MacWindowDeliverResize(int windowId, int width, int height);
 extern void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y);
 extern void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed);
+extern void CN1MacWindowDeliverHover(int windowId, int type, int x, int y);
+extern void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY);
+extern void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y);
+extern void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y);
 
 /* The main view controller's UIKey mapping, shared so the two cannot drift. */
 extern int cn1MapUIKeyToKeyCode(UIKey* key) API_AVAILABLE(ios(13.4));
@@ -118,6 +122,126 @@ static void CN1MacWindowReportLayout(int windowId, int width, int height);
 @end
 
 @implementation CN1MacWindowController
+
+/*
+ * Hover, indirect scroll, magnify and rotate. A secondary scene is rooted at this
+ * controller rather than at CodenameOne_GLViewController, and every one of these is
+ * delivered by a gesture recognizer installed on that controller's view -- none of
+ * them arrive as touches. Without the same recognizers here, a mouse hover, a wheel
+ * or trackpad scroll and a trackpad pinch or rotation over a secondary window
+ * produced no Codename One event at all. Each one is the main controller's handler
+ * with the window id carried through, so the two cannot disagree about what a
+ * gesture means.
+ *
+ * Codename One geometry is in device pixels and UIKit reports points, hence the
+ * screen scale, exactly as the touch path does.
+ */
+- (CGFloat)cn1Scale {
+    return self.view.window != nil ? self.view.window.screen.scale : 1.0;
+}
+
+- (void)cn1InstallWindowRecognizers {
+    if (@available(macCatalyst 13.0, *)) {
+        UIHoverGestureRecognizer* hover = [[UIHoverGestureRecognizer alloc]
+                initWithTarget:self action:@selector(cn1WindowHover:)];
+        /* Hover is independent of touch and must not preempt a tap, the same
+         * reasoning as the main controller's. */
+        hover.cancelsTouchesInView = NO;
+        hover.delaysTouchesBegan = NO;
+        hover.delaysTouchesEnded = NO;
+        [self.view addGestureRecognizer:hover];
+        [hover release];
+    }
+    if (@available(macCatalyst 13.4, *)) {
+        /* maximumNumberOfTouches 0 restricts this to indirect-pointer scrolling, so
+         * it never competes with the touch recognizers. */
+        UIPanGestureRecognizer* scroll = [[UIPanGestureRecognizer alloc]
+                initWithTarget:self action:@selector(cn1WindowScroll:)];
+        scroll.allowedScrollTypesMask = UIScrollTypeMaskAll;
+        scroll.maximumNumberOfTouches = 0;
+        scroll.cancelsTouchesInView = NO;
+        scroll.delaysTouchesBegan = NO;
+        scroll.delaysTouchesEnded = NO;
+        [self.view addGestureRecognizer:scroll];
+        [scroll release];
+    }
+    UIPinchGestureRecognizer* pinch = [[UIPinchGestureRecognizer alloc]
+            initWithTarget:self action:@selector(cn1WindowPinch:)];
+    pinch.cancelsTouchesInView = NO;
+    pinch.delaysTouchesBegan = NO;
+    pinch.delaysTouchesEnded = NO;
+    [self.view addGestureRecognizer:pinch];
+    [pinch release];
+
+    UIRotationGestureRecognizer* rotate = [[UIRotationGestureRecognizer alloc]
+            initWithTarget:self action:@selector(cn1WindowRotate:)];
+    rotate.cancelsTouchesInView = NO;
+    rotate.delaysTouchesBegan = NO;
+    rotate.delaysTouchesEnded = NO;
+    [self.view addGestureRecognizer:rotate];
+    [rotate release];
+}
+
+- (void)cn1WindowHover:(UIGestureRecognizer*)recognizer {
+    CGPoint p = [recognizer locationInView:self.view];
+    CGFloat scale = [self cn1Scale];
+    int x = (int) (p.x * scale);
+    int y = (int) (p.y * scale);
+    switch (recognizer.state) {
+        case UIGestureRecognizerStateBegan:
+            CN1MacWindowDeliverHover(self.windowId, 1, x, y);
+            break;
+        case UIGestureRecognizerStateChanged:
+            CN1MacWindowDeliverHover(self.windowId, 3, x, y);
+            break;
+        case UIGestureRecognizerStateEnded:
+        case UIGestureRecognizerStateCancelled:
+        case UIGestureRecognizerStateFailed:
+            CN1MacWindowDeliverHover(self.windowId, 2, x, y);
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)cn1WindowScroll:(UIPanGestureRecognizer*)recognizer {
+    if (recognizer.state != UIGestureRecognizerStateBegan
+            && recognizer.state != UIGestureRecognizerStateChanged) {
+        return;
+    }
+    CGPoint loc = [recognizer locationInView:self.view];
+    CGPoint t = [recognizer translationInView:self.view];
+    CGFloat scale = [self cn1Scale];
+    int dx = (int) (t.x * scale);
+    int dy = (int) (t.y * scale);
+    if (dx != 0 || dy != 0) {
+        CN1MacWindowDeliverWheel(self.windowId, (int) (loc.x * scale),
+                (int) (loc.y * scale), dx, dy);
+        /* Reset so each callback carries an incremental delta. */
+        [recognizer setTranslation:CGPointZero inView:self.view];
+    }
+}
+
+- (void)cn1WindowPinch:(UIPinchGestureRecognizer*)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateChanged && recognizer.scale > 0) {
+        CGPoint loc = [recognizer locationInView:self.view];
+        CGFloat scale = [self cn1Scale];
+        CN1MacWindowDeliverPinch(self.windowId, (float) recognizer.scale,
+                (int) (loc.x * scale), (int) (loc.y * scale));
+        /* Incremental relative to 1.0, as the main controller does it. */
+        recognizer.scale = 1.0;
+    }
+}
+
+- (void)cn1WindowRotate:(UIRotationGestureRecognizer*)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateChanged && recognizer.rotation != 0) {
+        CGPoint loc = [recognizer locationInView:self.view];
+        CGFloat scale = [self cn1Scale];
+        CN1MacWindowDeliverRotation(self.windowId, (float) recognizer.rotation,
+                (int) (loc.x * scale), (int) (loc.y * scale));
+        recognizer.rotation = 0;
+    }
+}
 
 /*
  * Hardware keyboard. A secondary scene is rooted at this controller rather than at
@@ -535,6 +659,8 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
     w->controller.view.backgroundColor = [UIColor blackColor];
     [w->controller.view addSubview:w->content];
     w->controller.content = w->content;
+    /* After the view exists, since every recognizer attaches to it. */
+    [w->controller cn1InstallWindowRecognizers];
 
     w->window.rootViewController = w->controller;
     /* Honour the visibility last asked for rather than always showing: a window

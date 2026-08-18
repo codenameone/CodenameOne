@@ -448,7 +448,12 @@ public class ImageViewer extends Component {
         pointerPressedThumbnailIndex = getThumbnailIndexAt(x, y);
         currentZoom = zoom;
         delegatingDragToParent = false;
-        getComponentForm().addComponentAwaitingRelease(this);
+        // Resolved through the top level so this works inside a Window, where
+        // getComponentForm() is null and this line threw.
+        com.codename1.ui.TopLevelContainer viewerTop = getTopLevelContainer();
+        if (viewerTop != null) {
+            viewerTop.addComponentAwaitingRelease(this);
+        }
     }
 
     private Container findScrollableYAncestor() {

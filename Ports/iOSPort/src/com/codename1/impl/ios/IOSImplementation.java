@@ -1839,6 +1839,52 @@ public class IOSImplementation extends CodenameOneImplementation {
         Display.getInstance().monitorsChanged();
     }
 
+    /// Invoked for a mouse or trackpad hover over a secondary window. Catalyst
+    /// delivers hover through a gesture recognizer rather than as a touch, so a
+    /// secondary scene reports nothing without one installed on its own controller.
+    public static void windowHoverCallback(int windowId, int type, int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
+        switch (type) {
+            case 1:
+                Display.getInstance().windowPointerHoverPressed(windowId, xs, ys);
+                break;
+            case 2:
+                Display.getInstance().windowPointerHoverReleased(windowId, xs, ys);
+                break;
+            default:
+                Display.getInstance().windowPointerHover(windowId, xs, ys);
+                break;
+        }
+    }
+
+    /// Invoked for an indirect scroll (wheel or trackpad) over a secondary window.
+    public static void windowWheelCallback(int windowId, int x, int y, int scrollX, int scrollY) {
+        if (dropEvents) {
+            return;
+        }
+        instance.windowPointerWheelMoved(windowId, x, y, scrollX, scrollY, false, 0);
+    }
+
+    /// Invoked for a trackpad magnify over a secondary window.
+    public static void windowPinchCallback(int windowId, float scale, int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        Display.getInstance().windowMagnifyGesture(windowId, x, y, scale);
+    }
+
+    /// Invoked for a trackpad rotation over a secondary window.
+    public static void windowRotationCallback(int windowId, float radians, int x, int y) {
+        if (dropEvents) {
+            return;
+        }
+        Display.getInstance().windowRotationGesture(windowId, x, y, radians);
+    }
+
     /// Invoked when a window gains or loses keyboard focus.
     public static void windowFocusCallback(int windowId, boolean gained) {
         Display.getInstance().windowFocusChanged(windowId, gained);

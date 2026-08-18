@@ -1872,18 +1872,28 @@ public class Window extends Container implements TopLevelContainer {
         currentPointerPress = new Object();
         dragged = null;
         Component cmp = resolveComponentAt(x, y);
-        pressedCmp = cmp;
-        if (cmp != null) {
+        // Gated exactly as Form.pointerPressed gates it. Many components -- Button
+        // among them -- override pointerPressed without checking isEnabled
+        // themselves, relying on the top level never to call them, so dispatching
+        // unconditionally left a disabled button entering its pressed state and
+        // firing its action on release. Leaving pressedCmp null for a disabled
+        // component also keeps the drag and release paths off it, since both start
+        // from pressedCmp.
+        if (cmp != null && cmp.isEnabled()) {
+            pressedCmp = cmp;
             LeadUtil.pointerPressed(cmp, x, y);
             if (cmp.isFocusable()) {
                 setFocused(cmp);
             }
+        } else {
+            pressedCmp = null;
         }
     }
 
     /// {@inheritDoc}
     @Override
     public void pointerDragged(int x, int y) {
+        autoRelease(x, y);
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {
             LeadUtil.pointerDragged(target, x, y);
@@ -1898,6 +1908,7 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed child gets an ordinary one-finger drag and never its `pinch` callbacks.
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        autoRelease(x[0], y[0]);
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {
             LeadUtil.pointerDragged(target, x, y);
@@ -1915,6 +1926,51 @@ public class Window extends Container implements TopLevelContainer {
         pressedCmp = null;
         dragged = null;
         currentPointerPress = null;
+    }
+
+    /// Cancels a press once the pointer leaves the pressed component's release
+    /// radius, the same way `Form` does it.
+    ///
+    /// Without this a button pressed in a window, dragged outside it and released
+    /// still fired its action: the window kept forwarding to the pressed component
+    /// and nothing ever cancelled the press. The list this consumes was here from
+    /// the start but nothing filled it, because `Button` registered through
+    /// `Component#getComponentForm()`, which is null inside a window.
+    private void autoRelease(int x, int y) {
+        if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
+            // special case allowing drag within a button
+            Component atXY = LeadUtil.leadParentImpl(getComponentAt(x, y));
+            Component pendingC = componentsAwaitingRelease.get(0);
+            if (pendingC != null) {
+                pendingC = LeadUtil.leadParentImpl(pendingC);
+            }
+            Component pendingCLead = LeadUtil.leadComponentImpl(pendingC);
+            if (atXY != pendingC) { //NOPMD CompareObjectsWithEquals
+                if (pendingCLead instanceof ReleasableComponent) {
+                    ReleasableComponent rc = (ReleasableComponent) pendingCLead;
+                    int relRadius = rc.getReleaseRadius();
+                    if (relRadius > 0) {
+                        Rectangle r = new Rectangle(
+                                pendingC.getAbsoluteX() - relRadius,
+                                pendingC.getAbsoluteY() - relRadius,
+                                pendingC.getWidth() + relRadius * 2,
+                                pendingC.getHeight() + relRadius * 2
+                        );
+                        if (!r.contains(x, y)) {
+                            componentsAwaitingRelease = null;
+                            LeadUtil.dragInitiated(pendingC);
+                        }
+                        return;
+                    }
+                    componentsAwaitingRelease = null;
+                    LeadUtil.dragInitiated(pendingC);
+                }
+            } else if (pendingCLead instanceof ReleasableComponent
+                    && ((ReleasableComponent) pendingCLead).isAutoRelease()) {
+                componentsAwaitingRelease = null;
+                LeadUtil.dragInitiated(pendingC);
+            }
+        }
     }
 
     private Component resolveComponentAt(int x, int y) {

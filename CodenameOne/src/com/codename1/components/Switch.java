@@ -172,9 +172,11 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private final ActionListener pointerPressed = new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent evt) {
-            Form f = getComponentForm();
-            if (f != null) {
-                f.addComponentAwaitingRelease(Switch.this);
+            // The top level rather than the Form, so this still registers inside a
+            // Window where getComponentForm() is null.
+            com.codename1.ui.TopLevelContainer t = getTopLevelContainer();
+            if (t != null) {
+                t.addComponentAwaitingRelease(Switch.this);
             }
             dragged = false;
             dragStartTime = System.currentTimeMillis();

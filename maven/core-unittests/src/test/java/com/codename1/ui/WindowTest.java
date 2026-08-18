@@ -972,6 +972,65 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aDisabledComponentInAWindowIsNotActivatable() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("disabled", new BorderLayout());
+        final int[] fired = new int[1];
+        Button b = new Button("nope");
+        b.setEnabled(false);
+        b.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Button.pointerPressed has no enabled check of its own -- it relies on the
+        // top level never calling it -- so dispatching unconditionally let a disabled
+        // button enter its pressed state and fire on release.
+        w.pointerPressed(150, 120);
+        w.pointerReleased(150, 120);
+        int firedCount = fired[0];
+        boolean stillReleased = b.getState() == Button.STATE_DEFAULT;
+        w.dispose();
+
+        assertEquals(0, firedCount, "a disabled button must not fire inside a window");
+        assertTrue(stillReleased, "and must not be left in a pressed state");
+    }
+
+    @FormTest
+    void aPressDraggedOutOfAButtonInAWindowIsCancelled() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drag out", new BorderLayout());
+        final int[] fired = new int[1];
+        Button b = new Button("press me");
+        b.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Press on the button, drag well clear of it, release there. Form cancels the
+        // press through its awaiting-release list; the window never consumed that list
+        // because Button registered through getComponentForm(), which is null here.
+        w.pointerPressed(150, 120);
+        w.pointerDragged(2, 2);
+        w.pointerReleased(2, 2);
+        int firedCount = fired[0];
+        w.dispose();
+
+        assertEquals(0, firedCount,
+                "releasing outside the button must not fire its action");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

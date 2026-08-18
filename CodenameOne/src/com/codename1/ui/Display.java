@@ -2648,6 +2648,38 @@ public final class Display extends CN1Constants {
         addPointerEvent(POINTER_HOVER_RELEASED, x[0], y[0]);
     }
 
+    /// Pushes a hover press aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverPressed(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
+            addPointerEvent(POINTER_HOVER_PRESSED | (windowId << 8), x[0], y[0]);
+        }
+    }
+
+    /// Pushes a hover release aimed at one native window into Codename One. Invoked by
+    /// the implementation, off the event dispatch thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `windowId`: the id the port was given when the window was created
+    ///
+    /// - `x`: the x position of the pointer, in window coordinates
+    ///
+    /// - `y`: the y position of the pointer, in window coordinates
+    public void windowPointerHoverReleased(int windowId, final int[] x, final int[] y) {
+        if (windowId > 0 && Desktop.getInstance().windowById(windowId) != null) {
+            addPointerEvent(POINTER_HOVER_RELEASED | (windowId << 8), x[0], y[0]);
+        }
+    }
+
     /// Pushes a pointer press event with the given coordinates into Codename One
     ///
     /// #### Parameters
@@ -2939,6 +2971,34 @@ public final class Display extends CN1Constants {
         callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
     }
 
+    /// Whether this packet is user input, and so subject to modal blocking.
+    ///
+    /// Modality blocks what the user does to a window, not what the platform tells the
+    /// framework about it. A blocked window is still resized, hidden and shown by the
+    /// window system, and dropping those left the hierarchy at stale dimensions once
+    /// the modal closed -- painting and hit testing then disagreed with the native
+    /// canvas until something else forced a resize.
+    private static boolean isUserInputEvent(int type) {
+        switch (type) {
+            case POINTER_PRESSED:
+            case POINTER_RELEASED:
+            case POINTER_DRAGGED:
+            case POINTER_PRESSED_MULTI:
+            case POINTER_RELEASED_MULTI:
+            case POINTER_DRAGGED_MULTI:
+            case POINTER_HOVER:
+            case POINTER_HOVER_PRESSED:
+            case POINTER_HOVER_RELEASED:
+            case KEY_PRESSED:
+            case KEY_RELEASED:
+                return true;
+            default:
+                // SIZE_CHANGED, HIDE_NOTIFY and SHOW_NOTIFY are the platform
+                // reporting what it did, not the user reaching the window.
+                return false;
+        }
+    }
+
     /// Records which top level saw a key press, so its release can be matched to it.
     /// Called on the event dispatch thread only.
     private void rememberKeyPress(int keyCode, Container target) {
@@ -3144,7 +3204,7 @@ public final class Display extends CN1Constants {
 
         // might happen when returning from a deinitialized version of Codename One,
         // or when a window was disposed while its events were still in flight
-        if (f == null || isBlockedByModal(windowId)) {
+        if (f == null || (isUserInputEvent(type) && isBlockedByModal(windowId))) {
             // NOTE: drain the packet rather than returning offset unchanged. The
             // caller loops while (offset < end), so returning it unchanged spins the
             // EDT forever, and returning a sentinel would drop the rest of the batch

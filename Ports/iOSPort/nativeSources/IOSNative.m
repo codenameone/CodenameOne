@@ -2076,6 +2076,22 @@ void CN1MacWindowDeliverPointer(int windowId, int type, int x, int y) {
     com_codename1_impl_ios_IOSImplementation_windowPointerCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
 }
 
+void CN1MacWindowDeliverHover(int windowId, int type, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowHoverCallback___int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, type, x, y);
+}
+
+void CN1MacWindowDeliverWheel(int windowId, int x, int y, int scrollX, int scrollY) {
+    com_codename1_impl_ios_IOSImplementation_windowWheelCallback___int_int_int_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, x, y, scrollX, scrollY);
+}
+
+void CN1MacWindowDeliverPinch(int windowId, float scale, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowPinchCallback___int_float_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, scale, x, y);
+}
+
+void CN1MacWindowDeliverRotation(int windowId, float radians, int x, int y) {
+    com_codename1_impl_ios_IOSImplementation_windowRotationCallback___int_float_int_int(CN1_THREAD_GET_STATE_PASS_ARG windowId, radians, x, y);
+}
+
 void CN1MacWindowDeliverKey(int windowId, int keyCode, BOOL pressed) {
     com_codename1_impl_ios_IOSImplementation_windowKeyCallback___int_int_boolean(CN1_THREAD_GET_STATE_PASS_ARG windowId, keyCode, pressed ? JAVA_TRUE : JAVA_FALSE);
 }

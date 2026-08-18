@@ -837,10 +837,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             pointerPressedListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));
         }
         pressed();
-        Form f = getComponentForm();
+        // The top level, not the Form: getComponentForm() is null inside a Window, so
+        // registering through it left the window's awaiting-release list empty and a
+        // press dragged out of the button was never cancelled -- releasing outside it
+        // still fired the action.
+        TopLevelContainer t = getTopLevelContainer();
         // might happen when programmatically triggering press
-        if (f != null) {
-            f.addComponentAwaitingRelease(this);
+        if (t != null) {
+            t.addComponentAwaitingRelease(this);
         }
     }
 
@@ -854,10 +858,10 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
                 return;
             }
         }
-        Form f = getComponentForm();
+        TopLevelContainer t = getTopLevelContainer();
         // might happen when programmatically triggering press
-        if (f != null) {
-            f.removeComponentAwaitingRelease(this);
+        if (t != null) {
+            t.removeComponentAwaitingRelease(this);
         }
 
         // button shouldn't fire an event when a pointer is dragged into it
