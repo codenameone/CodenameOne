@@ -1001,6 +1001,28 @@ class WatchNativeBuilderTest {
     }
 
     /**
+     * A key's value is the element that follows it, not the next string in the fragment.
+     *
+     * <p>Scanning forward for the next {@code <string>} anywhere after the key, a key given
+     * {@code <false/>} answered with an unrelated later key's string -- so the HomeKit
+     * purpose-string check passed on a value the plist renderer keeps as the boolean false, and
+     * the app was terminated on the device for a disclosure the build had just approved.</p>
+     */
+    @Test
+    void aKeysValueIsItsOwnElement() {
+        BuildRequest req = request();
+        req.putArgument("ios.plistInject",
+                "<key>NSHomeKitUsageDescription</key><false/>"
+                + "<key>NSLocalNetworkUsageDescription</key><string>find them</string>");
+
+        assertNull(WatchNativeBuilder.injectedPlistString(req, "NSHomeKitUsageDescription"),
+                "<false/> is not a purpose string, and neither is the next key's value");
+        assertEquals("find them",
+                WatchNativeBuilder.injectedPlistString(req, "NSLocalNetworkUsageDescription"),
+                "a key whose own value is a string still resolves");
+    }
+
+    /**
      * A key inside an XML comment is not a key.
      *
      * <p>A plist fragment routinely carries an example in a comment, and the phone's parser ignores

@@ -111,9 +111,16 @@ static BOOL cn1homeRecoveryArmed = NO;
 // homeManagerDidUpdateHomes:. Zero when nothing is waiting.
 static JAVA_INT cn1homePendingStart = 0;
 
-// The request id of a requestAuthorization() that is waiting for the user to
-// answer the system prompt. Zero when nothing is waiting.
-static JAVA_INT cn1homePendingAuth = 0;
+// The request ids of every requestAuthorization() waiting for the user to
+// answer the system prompt, in the order they asked. Empty when nothing is
+// waiting.
+//
+// All of them, because creating the manager is what prompts and HomeKit shows
+// that prompt once: a caller who arrives while it is on screen has no second
+// prompt to wait for. Answered UNKNOWN on the spot, an app whose startup and
+// whose first screen both ask -- which is the ordinary shape -- had one of
+// them react to a refusal moments before the user granted it.
+static NSMutableArray *cn1homePendingAuth = nil;
 
 static BOOL cn1homeHomesLoaded = NO;
 
@@ -1405,17 +1412,23 @@ static JAVA_INT cn1homeAuthStatus(void) {
 /// because the database only finishes loading once that decision is made, and
 /// on a build too old for the status bits it is the only signal there is.
 static void cn1homeResolvePendingAuth(BOOL force) {
-    JAVA_INT pending = cn1homePendingAuth;
-    if (pending == 0) {
+    if ([cn1homePendingAuth count] == 0) {
         return;
     }
     JAVA_INT status = cn1homeAuthStatus();
     if (!force && status == CN1_HOME_AUTH_NOT_DETERMINED) {
         return;
     }
-    cn1homePendingAuth = 0;
-    com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
-        getThreadLocalData(), pending, status, JAVA_NULL);
+    // Copied and cleared before anything is delivered: a callback runs Java,
+    // and Java can call back in here -- requestAuthorization() again, or
+    // stop() -- while this is still walking the list.
+    NSArray *waiting = [[cn1homePendingAuth copy] autorelease];
+    [cn1homePendingAuth removeAllObjects];
+    for (NSNumber *pending in waiting) {
+        com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
+            getThreadLocalData(), (JAVA_INT) [pending intValue], status,
+            JAVA_NULL);
+    }
 }
 
 /// Re-attaches this bridge as the delegate of every accessory in every home.
@@ -1728,6 +1741,7 @@ static void cn1homeInit(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         cn1homeSnapshotLock = [[NSLock alloc] init];
+        cn1homePendingAuth = [[NSMutableArray alloc] init];
         cn1homeWatches = [[NSMutableDictionary alloc] init];
         cn1homeUndelivered = [[NSMutableDictionary alloc] init];
         cn1homeLastPolled = [[NSMutableDictionary alloc] init];
@@ -2209,7 +2223,7 @@ void com_codename1_impl_ios_IOSNative_homeStop__(
         }
         cn1homeHomesLoaded = NO;
         cn1homePendingStart = 0;
-        cn1homePendingAuth = 0;
+        [cn1homePendingAuth removeAllObjects];
         [cn1homeWatches removeAllObjects];
         [cn1homeUndelivered removeAllObjects];
         [cn1homeLastPolled removeAllObjects];
@@ -2237,15 +2251,18 @@ void com_codename1_impl_ios_IOSNative_homeRequestAuthorization___int(
                 return;
             }
         }
-        if (cn1homePendingAuth != 0) {
-            // A second request while the first is still on screen. Answered
-            // as UNKNOWN rather than left hanging: only one of the two can be
-            // held, and a caller waiting forever is the worse failure.
-            com_codename1_impl_ios_IOSHomeCallbacks_authorization___int_int_java_lang_String(
-                getThreadLocalData(), rid, CN1_HOME_AUTH_UNKNOWN, JAVA_NULL);
+        BOOL alreadyPrompting = [cn1homePendingAuth count] > 0;
+        [cn1homePendingAuth addObject:[NSNumber numberWithInt:(int) rid]];
+        if (alreadyPrompting) {
+            // A second request while the first prompt is still on screen.
+            // Queued behind it and answered with the user's decision when it
+            // arrives: there is no second prompt to wait for, and answering
+            // UNKNOWN here reported a failure at a moment when the user had
+            // not yet been asked -- so an app that asks from startup and
+            // again from its first screen showed one of them the wrong thing
+            // moments before the grant.
             return;
         }
-        cn1homePendingAuth = rid;
         if (cn1homeManager == nil) {
             cn1homeManager = [[HMHomeManager alloc] init];
             [cn1homeManager setDelegate:cn1homeDelegate];

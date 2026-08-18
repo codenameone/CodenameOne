@@ -998,30 +998,22 @@ class WatchNativeBuilder {
         // is what the phone's plist does. Matching the serialized form here meant the phone
         // suppressed its default for a key the watch then failed to find, and the pair shipped with
         // different marketing versions, which archive validation rejects.
-        int at = 0;
-        while (true) {
-            int content = contentAfterOpenTag(inject, "key", at);
-            if (content < 0) {
-                return null;
-            }
-            int close = closeOfElement(inject, content, "</key>");
-            if (close < 0) {
-                return null;
-            }
-            at = close + 1;
-            if (!key.equals(plistStringContent(inject.substring(content, close)).trim())) {
-                continue;
-            }
-            int valueContent = contentAfterOpenTag(inject, "string", at);
-            if (valueContent < 0) {
-                return null;
-            }
-            int valueClose = closeOfString(inject, valueContent);
-            if (valueClose < 0) {
-                return null;
-            }
-            return plistStringContent(inject.substring(valueContent, valueClose));
+        //
+        // And the key's OWN value. Scanning forward for the next <string> ANYWHERE after the key,
+        // a key given <false/> answered with an unrelated later key's string -- so a purpose-string
+        // check passed on a value the plist renderer keeps as the boolean false, and the app was
+        // terminated on the device for a disclosure the build had just approved.
+        int value = injectedValueAt(inject, key);
+        int element = value < 0 ? -1 : nextElementAt(inject, value);
+        if (element < 0 || !"string".equals(tagAt(inject, element))) {
+            return null;
         }
+        int content = contentAfterOpenTag(inject, "string", element);
+        int close = content < 0 ? -1 : closeOfString(inject, content);
+        if (close < 0) {
+            return null;
+        }
+        return plistStringContent(inject.substring(content, close));
     }
 
     /// The {@code </string>} that closes the element, skipping over CDATA sections.
