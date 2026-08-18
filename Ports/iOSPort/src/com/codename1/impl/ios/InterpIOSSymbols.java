@@ -248,7 +248,7 @@ class InterpIOSSymbols {
             }
             // Interfaces of this class before moving up, because that is where
             // a default method lives and no superclass declares it.
-            int fromInterface = interfaceMethodId(currentOwner, name, descriptor, 0);
+            int fromInterface = interfaceMethodId(currentOwner, name, descriptor, new Hashtable());
             if (fromInterface >= 0) {
                 return fromInterface;
             }
@@ -258,10 +258,15 @@ class InterpIOSSymbols {
     }
 
     /** Searches a class's interfaces, and theirs, for a method. */
-    private int interfaceMethodId(String owner, String name, String descriptor, int depth) {
-        if (depth > 16) {
+    private int interfaceMethodId(String owner, String name, String descriptor,
+                                  Hashtable visited) {
+        // A visited set rather than a depth limit: interfaces form a directed
+        // acyclic graph, so this terminates on its own, and a cap would answer
+        // "no such method" for a hierarchy that merely happens to be deep.
+        if (visited.get(owner) != null) {
             return -1;
         }
+        visited.put(owner, Boolean.TRUE);
         Integer ownerId = (Integer)classIds.get(owner);
         if (ownerId == null) {
             return -1;
@@ -279,7 +284,7 @@ class InterpIOSSymbols {
             if (id != null) {
                 return id.intValue();
             }
-            int deeper = interfaceMethodId(ifaceName, name, descriptor, depth + 1);
+            int deeper = interfaceMethodId(ifaceName, name, descriptor, visited);
             if (deeper >= 0) {
                 return deeper;
             }
@@ -325,7 +330,7 @@ class InterpIOSSymbols {
             // interface is read through whatever implements it, and an
             // interface reached through another interface is ordinary Java.
             // A superclass-only walk answers -1 for a field the app has.
-            int fromInterface = interfaceFieldId(table, currentOwner, name, 0);
+            int fromInterface = interfaceFieldId(table, currentOwner, name, new Hashtable());
             if (fromInterface >= 0) {
                 return fromInterface;
             }
@@ -335,10 +340,14 @@ class InterpIOSSymbols {
     }
 
     /** Searches a class's interfaces, and theirs, for a field. */
-    private int interfaceFieldId(Hashtable table, String owner, String name, int depth) {
-        if (depth > 16) {
+    private int interfaceFieldId(Hashtable table, String owner, String name,
+                                 Hashtable visited) {
+        // As with methods: a visited set terminates without inventing a maximum
+        // depth for somebody else's interface hierarchy.
+        if (visited.get(owner) != null) {
             return -1;
         }
+        visited.put(owner, Boolean.TRUE);
         Integer ownerId = (Integer)classIds.get(owner);
         if (ownerId == null) {
             return -1;
@@ -356,7 +365,7 @@ class InterpIOSSymbols {
             if (id != null) {
                 return id.intValue();
             }
-            int deeper = interfaceFieldId(table, ifaceName, name, depth + 1);
+            int deeper = interfaceFieldId(table, ifaceName, name, visited);
             if (deeper >= 0) {
                 return deeper;
             }

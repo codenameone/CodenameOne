@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Enumeration;
+import java.util.Vector;
 
 /**
  * Listens for a pushed program and runs it.
@@ -343,6 +344,16 @@ public class DeviceRuntimeService {
         return spoke[0];
     }
 
+    /// Closes everything a sweep batch left open, unblocking the readers.
+    private static void closeAll(Vector streams) {
+        synchronized (streams) {
+            for (int i = 0; i < streams.size(); i++) {
+                closeQuietly((InputStream) streams.elementAt(i));
+            }
+            streams.removeAllElements();
+        }
+    }
+
     private static void closeQuietly(InputStream is) {
         if (is == null) {
             return;
@@ -387,6 +398,11 @@ public class DeviceRuntimeService {
         String selfSuffix = self.substring(self.lastIndexOf('.') + 1);
         status = "looking for a computer on " + prefix + "*";
 
+        // Streams the sweep has open, so an address that accepts and then says
+        // nothing can be closed rather than left with a thread parked in
+        // readInt. A sweep is 254 addresses; leaking one thread each would end
+        // the app.
+        final Vector openStreams = new Vector();
         for (int base = 1; base <= 254; base += SWEEP_BATCH) {
             final boolean[] found = new boolean[1];
             final String[] foundAt = new String[1];
@@ -404,7 +420,17 @@ public class DeviceRuntimeService {
                         // first unrelated service on the subnet becomes "the
                         // desktop" and every later dial goes to it while the
                         // real one is never contacted.
+                        //
+                        // Held so the sweep can close it: an address that
+                        // accepts and then says nothing parks this thread in
+                        // readInt forever, and a sweep is 254 of them.
+                        synchronized (openStreams) {
+                            openStreams.addElement(is);
+                        }
                         boolean spoke = handle(is, os, false);
+                        synchronized (openStreams) {
+                            openStreams.removeElement(is);
+                        }
                         if (spoke) {
                             synchronized (found) {
                                 if (!found[0]) {
@@ -427,9 +453,12 @@ public class DeviceRuntimeService {
                 try {
                     Thread.sleep(50);
                 } catch (InterruptedException e) {
+                    closeAll(openStreams);
                     return false;
                 }
             }
+            // Whatever this batch left parked on a silent address.
+            closeAll(openStreams);
             if (found[0]) {
                 setHost(foundAt[0]);
                 status = "found " + foundAt[0] + ":" + port;

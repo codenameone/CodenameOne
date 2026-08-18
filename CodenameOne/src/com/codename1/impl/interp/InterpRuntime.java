@@ -1421,8 +1421,14 @@ public final class InterpRuntime {
     /// class initializer that threw is a real failure and belongs to the
     /// caller; only absence is a reason to keep looking.
     private static boolean isAbsent(Throwable t) {
-        if (t instanceof NoSuchFieldError || t instanceof NoClassDefFoundError
-                || t instanceof ClassNotFoundException) {
+        // NoClassDefFoundError is deliberately not here. It is what a class
+        // whose initializer already failed throws on every later touch, and
+        // treating that as "this candidate does not have the field" would move
+        // on and report the next one's NoSuchFieldError -- hiding the failure
+        // this whole distinction exists to preserve. A class the app genuinely
+        // lacks arrives as ClassNotFoundException from the reflective linker
+        // and as NoSuchFieldError from the symbol-table one.
+        if (t instanceof NoSuchFieldError || t instanceof ClassNotFoundException) {
             return true;
         }
         // NoSuchFieldException is a reflection type, and the device's java.lang
