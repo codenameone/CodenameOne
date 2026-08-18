@@ -225,6 +225,36 @@ public class InterpHostSubclassTest {
                         null, new Object[0]));
     }
 
+    /**
+     * A stopped program's peers stay alive: a timer, a network response or a
+     * listener the framework still holds will call one, and the runtime answers
+     * that it is detached. A generated interface shim has nothing to defer to
+     * for an abstract method, and reading that answer as "not implemented" made
+     * it throw AbstractMethodError on the event thread -- a failure raised by
+     * stopping a program cleanly. The sentinel is distinct so a shim can tell
+     * the two apart.
+     */
+    @Test
+    @DisplayName("a callback after detach is answered, not turned into an error")
+    void detachAnswersWithItsOwnSentinel() throws Throwable {
+        InterpRuntime rt = load("Sub", SUBCLASS_SOURCE);
+        InterpObject o = (InterpObject) ((InterpBacked) rt.invoke(
+                rt.getBundle().findClass("Sub")
+                        .declaredMethod("make", "()Ljava/lang/Object;"), null, new Object[0]))
+                .getInterpObject();
+
+        assertEquals("interp+host:pushed",
+                rt.dispatch(o, "render", "()Ljava/lang/String;", new Object[0]),
+                "before detaching, the override answers");
+
+        rt.detach();
+        Object answer = rt.dispatch(o, "render", "()Ljava/lang/String;", new Object[0]);
+        assertTrue(answer == InterpRuntime.DETACHED,
+                "a detached runtime should say so, got " + answer);
+        assertTrue(answer != InterpRuntime.NOT_OVERRIDDEN,
+                "and must not be mistaken for a missing implementation");
+    }
+
     private static final String SUBCLASS_SOURCE =
             "public class Sub extends com.codename1.impl.interp.InterpHostSubclassTest.HostBase {\n"
           + "  public Sub() { super(\"pushed\"); }\n"

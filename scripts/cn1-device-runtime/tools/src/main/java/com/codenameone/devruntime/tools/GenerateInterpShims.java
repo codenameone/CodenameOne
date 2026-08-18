@@ -875,7 +875,17 @@ public final class GenerateInterpShims {
                 + throwsClause(m) + " {");
         w.println("        Object $r = $runtime.dispatch($interp, \"" + m.getName() + "\", \""
                 + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "});");
-        w.println("        if ($r == InterpRuntime.NOT_OVERRIDDEN) {");
+        if (!m.isDefault()) {
+            // A stopped program's peer is still held by whatever registered it.
+            // Answering nothing is the point of detaching; throwing here would
+            // turn an expected late callback into an event-thread failure.
+            w.println("        if ($r == InterpRuntime.DETACHED) {");
+            w.println(ret == Void.TYPE ? "            return;"
+                    : "            return " + zero(ret) + ";");
+            w.println("        }");
+        }
+        w.println("        if (" + (m.isDefault() ? MISS : "$r == InterpRuntime.NOT_OVERRIDDEN")
+                + ") {");
         if (m.isDefault()) {
             // The interface's own default implementation. A pushed class that
             // implements a host interface and does not override a default
@@ -895,6 +905,43 @@ public final class GenerateInterpShims {
         w.println("        }");
         if (ret != Void.TYPE) {
             w.println("        return " + unbox(ret, "$r") + ";");
+        }
+        w.println("    }");
+        w.println();
+        if (m.isDefault()) {
+            emitInterfaceSuperBridge(w, m, target, params, ret);
+        }
+    }
+
+    /**
+     * The bridge {@code HostInterface.super.method(...)} needs.
+     *
+     * <p>Interpreted code writing that produces an invokespecial, which the
+     * runtime serves by calling {@code super_method} on the peer. Without a
+     * bridge the fallback calls the method itself, and on a reflective linker
+     * {@code Method.invoke} dispatches virtually -- straight back into the
+     * shim's override, which asks the interpreter, which calls super again,
+     * until the stack gives out.</p>
+     */
+    private static void emitInterfaceSuperBridge(PrintWriter w, Method m, Class<?> target,
+                                                 Class<?>[] params, Class<?> ret) {
+        StringBuilder sig = new StringBuilder();
+        StringBuilder call = new StringBuilder();
+        for (int i = 0; i < params.length; i++) {
+            if (i > 0) {
+                sig.append(", ");
+                call.append(", ");
+            }
+            sig.append(typeName(params[i])).append(" a").append(i);
+            call.append("a").append(i);
+        }
+        w.println("    public " + typeName(ret) + " super_" + m.getName() + "(" + sig + ")"
+                + throwsClause(m) + " {");
+        String invocation = target.getName() + ".super." + m.getName() + "(" + call + ")";
+        if (ret == Void.TYPE) {
+            w.println("        " + invocation + ";");
+        } else {
+            w.println("        return " + invocation + ";");
         }
         w.println("    }");
         w.println();
@@ -1494,7 +1541,7 @@ public final class GenerateInterpShims {
             w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
             w.println("                : $runtime.dispatch($interp, \"toString\", "
                     + "\"()Ljava/lang/String;\", new Object[]{});");
-            w.println("        if ($r == InterpRuntime.NOT_OVERRIDDEN) {");
+            w.println("        if (" + MISS + ") {");
             w.println("            return super.toString();");
             w.println("        }");
             w.println("        return (String)$r;");
@@ -1507,7 +1554,7 @@ public final class GenerateInterpShims {
             w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
             w.println("                : $runtime.dispatch($interp, \"hashCode\", \"()I\", "
                     + "new Object[]{});");
-            w.println("        if ($r == InterpRuntime.NOT_OVERRIDDEN) {");
+            w.println("        if (" + MISS + ") {");
             w.println("            return super.hashCode();");
             w.println("        }");
             w.println("        return $r == null ? 0 : ((Number)$r).intValue();");
@@ -1521,7 +1568,7 @@ public final class GenerateInterpShims {
             w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
             w.println("                : $runtime.dispatch($interp, \"equals\", "
                     + "\"(Ljava/lang/Object;)Z\", new Object[]{a0});");
-            w.println("        if ($r == InterpRuntime.NOT_OVERRIDDEN) {");
+            w.println("        if (" + MISS + ") {");
             w.println("            return super.equals(a0);");
             w.println("        }");
             w.println("        return $r != null && ((Boolean)$r).booleanValue();");
@@ -1592,7 +1639,15 @@ public final class GenerateInterpShims {
         w.println("        Object $r = $runtime == null ? InterpRuntime.NOT_OVERRIDDEN");
         w.println("                : $runtime.dispatch($interp, \"" + m.getName() + "\", \""
                 + descriptorOf(params, ret) + "\", new Object[]{" + boxed + "});");
-        w.println("        if ($r == InterpRuntime.NOT_OVERRIDDEN) {");
+        if (abstractMethod) {
+            // See zero(): a callback for a program that has been stopped.
+            w.println("        if ($r == InterpRuntime.DETACHED) {");
+            w.println(ret == Void.TYPE ? "            return;"
+                    : "            return " + zero(ret) + ";");
+            w.println("        }");
+        }
+        w.println("        if (" + (abstractMethod ? "$r == InterpRuntime.NOT_OVERRIDDEN" : MISS)
+                + ") {");
         if (abstractMethod) {
             w.println("            throw new AbstractMethodError(\"" + typeName(m.getDeclaringClass())
                     + "." + m.getName() + "\");");
@@ -1623,6 +1678,37 @@ public final class GenerateInterpShims {
             w.println("    }");
             w.println();
         }
+    }
+
+    /**
+     * The test a generated method uses for "the interpreter did not answer".
+     *
+     * <p>Two sentinels, one branch: NOT_OVERRIDDEN means the pushed class does
+     * not provide the method, DETACHED means the program that did has been
+     * stopped. Both are handled by doing what the framework class would do on
+     * its own, which for anything with a body is calling it.</p>
+     */
+    private static final String MISS =
+            "$r == InterpRuntime.NOT_OVERRIDDEN || $r == InterpRuntime.DETACHED";
+
+    /**
+     * The value a method returns when a callback arrives for a program that has
+     * been stopped, and there is no implementation to defer to.
+     *
+     * <p>A timer or a global listener still holds the old peer, and a late
+     * callback must not become an AbstractMethodError on the event thread: the
+     * program is gone, so the method quietly answers nothing.</p>
+     */
+    private static String zero(Class<?> t) {
+        if (t == Boolean.TYPE) return "false";
+        if (t == Byte.TYPE) return "(byte)0";
+        if (t == Character.TYPE) return "(char)0";
+        if (t == Short.TYPE) return "(short)0";
+        if (t == Integer.TYPE) return "0";
+        if (t == Long.TYPE) return "0L";
+        if (t == Float.TYPE) return "0f";
+        if (t == Double.TYPE) return "0d";
+        return "null";
     }
 
     private static String unbox(Class<?> t, String expr) {

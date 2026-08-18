@@ -251,6 +251,19 @@ public final class InterpRuntime {
     /// value for a method the interpreted class *does* override.
     public static final Object NOT_OVERRIDDEN = new Object();
 
+    /// Returned by [#dispatch] when the program that owned the object has been
+    /// stopped.
+    ///
+    /// Distinct from [#NOT_OVERRIDDEN] because the two mean different things to
+    /// a shim that has nothing to defer to. A class shim answers both by
+    /// calling the framework's own implementation, but an interface shim over
+    /// an abstract method has none -- and it used to throw AbstractMethodError,
+    /// which turned an expected late callback (a timer, a network response, a
+    /// listener the framework still holds) into an event-thread failure long
+    /// after the user stopped the program. On this sentinel a generated method
+    /// quietly answers nothing instead.
+    public static final Object DETACHED = new Object();
+
     /// Entry point for a generated shim: run the interpreted override of this
     /// method if there is one, otherwise report that there is not.
     ///
@@ -260,11 +273,14 @@ public final class InterpRuntime {
     /// own hot paths -- which is why the miss returns immediately rather than
     /// raising anything.
     public Object dispatch(InterpObject object, String name, String descriptor, Object[] args) {
-        if (object == null || detached) {
-            // Detached: the program was stopped. Its peers are still held by
-            // framework listeners and timers, and cancellation only stops code
-            // that is currently running -- so a short callback arriving now
-            // would execute happily against a program the user has ended.
+        if (detached) {
+            // The program was stopped. Its peers are still held by framework
+            // listeners and timers, and cancellation only stops code that is
+            // currently running -- so a short callback arriving now would
+            // execute happily against a program the user has ended.
+            return DETACHED;
+        }
+        if (object == null) {
             return NOT_OVERRIDDEN;
         }
         InterpMethod m = object.getType().resolve(name, descriptor);
