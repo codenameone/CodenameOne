@@ -1835,6 +1835,68 @@ public final class DatabaseConformanceSuite {
         r.check(oldKeyRejected, "the previous passphrase no longer opens the database");
         deleteQuietly(databaseName);
 
+        // ---- re-keying a connection that was opened plaintext
+        //
+        // Two answers are allowed and a third is not. A port whose engine can encrypt in place
+        // converts the database and keeps serving it; a port whose plaintext connection runs on an
+        // engine with no cipher -- Android opens one through android.database.sqlite, which can
+        // neither write encrypted pages nor read them back -- has no handle to hand back
+        // afterwards and has to say so. What is not allowed is the third: reporting a key change
+        // that did not happen, which leaves an application believing plaintext is encrypted.
+        //
+        // The refusal is held to its word. It is not enough to fail cleanly here: encryption is
+        // documented as available on that platform, so the route that does work is asserted right
+        // after, against this same database.
+        String plainFirstName = databaseName + "-plainfirst";
+        deleteQuietly(plainFirstName);
+        Database plainFirst = Database.openOrCreate(plainFirstName);
+        try {
+            plainFirst.execute("CREATE TABLE p (id INTEGER PRIMARY KEY, v TEXT)");
+            plainFirst.execute("INSERT INTO p (id, v) VALUES (1, 'was plaintext')");
+        } finally {
+            closeQuietly(plainFirst);
+        }
+        boolean convertedInPlace = false;
+        boolean refusedAsUnsupported = false;
+        plainFirst = Database.openOrCreate(plainFirstName);
+        try {
+            plainFirst.changeKey(DatabaseConfig.passphrase(passphrase));
+            convertedInPlace = true;
+        } catch (DatabaseEncryptionException err) {
+            refusedAsUnsupported = err.getErrorCode() == DatabaseEncryptionException.NOT_SUPPORTED;
+            if (!refusedAsUnsupported) {
+                r.info("changeKey on a plaintext connection reported code " + err.getErrorCode()
+                        + ": " + err.getMessage());
+            }
+        } catch (IOException err) {
+            r.info("changeKey on a plaintext connection raised a plain IOException: "
+                    + err.getMessage());
+        } finally {
+            closeQuietly(plainFirst);
+        }
+        r.check(convertedInPlace || refusedAsUnsupported,
+                "changeKey on a plaintext connection either converts it or reports NOT_SUPPORTED");
+        if (refusedAsUnsupported) {
+            // The route the refusal names, on the same database. A port that cannot re-key an open
+            // plaintext connection must still be able to encrypt the database it belongs to, or
+            // isEncryptionSupported() is answering for a capability applications cannot reach.
+            Database.encrypt(plainFirstName, DatabaseConfig.passphrase(passphrase));
+        }
+        Database converted = null;
+        cur = null;
+        try {
+            converted = Database.openOrCreate(plainFirstName, DatabaseConfig.passphrase(passphrase));
+            cur = converted.executeQuery("SELECT v FROM p WHERE id = 1");
+            r.check(cur.next() && "was plaintext".equals(cur.getRow().getString(0)),
+                    "the converted database opens with the passphrase and kept its rows");
+        } finally {
+            closeQuietly(cur);
+            closeQuietly(converted);
+        }
+        checkStoredBytes(r, storedBytesVisible, plainFirstName, false,
+                "the converted database no longer begins with a plaintext SQLite header");
+        deleteQuietly(plainFirstName);
+
         // ---- managed keys
         String managedName = databaseName + "-managed";
         deleteQuietly(managedName);

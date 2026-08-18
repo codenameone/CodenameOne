@@ -319,7 +319,21 @@ class AndroidCipherDB extends Database {
                 ? "" : config.resolveKeyMaterial(
                         AndroidImplementation.canonicalDatabaseKey(openPath));
         if (currentKey.length() == 0 || targetKey.length() == 0) {
-            // One side is plaintext, which rekey refuses outright.
+            // One side is plaintext, which rekey refuses outright. That route replaces the
+            // connection rather than re-keying it, and SQLite drops every attachment when the old
+            // one closes -- so an attachment live here would come back as a handle that looks
+            // open and answers "no such table" for the attached schema, with the reservation for
+            // that file still held. Re-attaching is not available: an encrypted attachment was
+            // opened with a key this connection does not keep. So the conversion is refused while
+            // one is live, which the caller can act on, rather than performed into a handle that
+            // has quietly lost half of what it had.
+            if (hasAttachments()) {
+                throw new DatabaseEncryptionException(DatabaseEncryptionException.MIGRATION_FAILED,
+                        "This database has another database attached, and converting between "
+                        + "encrypted and plaintext on this platform replaces the connection, "
+                        + "which would drop the attachment. DETACH before converting, and attach "
+                        + "again afterwards.");
+            }
             migrateThroughExport(targetKey);
             return;
         }

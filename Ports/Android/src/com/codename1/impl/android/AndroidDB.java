@@ -31,6 +31,8 @@ import android.database.sqlite.SQLiteStatement;
 
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
+import com.codename1.db.DatabaseConfig;
+import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.SQLStatementSplitter;
 
 import java.io.IOException;
@@ -271,6 +273,30 @@ public class AndroidDB extends Database {
             throw new IOException(err.getMessage(), err);
         }
         markTransactionEnded();
+    }
+
+    /**
+     * Reports that this connection cannot re-key itself, and says what can.
+     *
+     * The base implementation would report NOT_SUPPORTED here, which reads as "this platform
+     * cannot encrypt" -- and on Android that is wrong: {@link Database#isEncryptionSupported()}
+     * is true, and {@link Database#encrypt(String, DatabaseConfig)} really does convert this
+     * database. What cannot happen is the conversion of a connection that is already open through
+     * the stock android.database.sqlite engine, which has no cipher: it cannot write encrypted
+     * pages, and it could not read the file afterwards either, so there is no handle to hand back.
+     *
+     * The routes that do work are named in the message rather than left to be discovered.
+     *
+     * @param config the key that cannot be applied here
+     * @throws IOException always, as a DatabaseEncryptionException with NOT_SUPPORTED
+     */
+    @Override
+    public void changeKey(DatabaseConfig config) throws IOException {
+        throw new DatabaseEncryptionException(DatabaseEncryptionException.NOT_SUPPORTED,
+                "This connection was opened through the platform SQLite engine, which has no "
+                + "cipher, so it cannot re-key itself. Close it and call Database.encrypt(name, "
+                + "config) or Database.decrypt(name, config), or open the database with "
+                + "Database.openOrCreate(name, config) to work with it encrypted from the start.");
     }
 
     @Override

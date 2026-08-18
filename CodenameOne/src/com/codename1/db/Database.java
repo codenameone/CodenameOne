@@ -1015,6 +1015,26 @@ public abstract class Database {
     /// place that can throw it.
     private IOException attachmentRefusal;
 
+    /// Whether this connection currently holds any attached database.
+    ///
+    /// For a port whose key change is not performed in place. Re-keying through `PRAGMA rekey`
+    /// keeps the connection, and its attachments with it; converting through an export does not --
+    /// the old connection closes, and SQLite drops every attachment when it does. A replacement
+    /// handle that restores only pragmas looks alive and answers "no such table" for every
+    /// attached schema, and the reservations taken for those files stay held, so the file nobody
+    /// is attached to any more still cannot be deleted.
+    ///
+    /// Re-attaching is not an answer this layer can give: an encrypted attachment was opened with
+    /// a key this connection did not keep, and there is nowhere honest to get it from. So a port
+    /// in that position refuses the conversion and says what to detach.
+    ///
+    /// #### Returns
+    ///
+    /// true if at least one ATTACH is live on this connection
+    protected boolean hasAttachments() {
+        return attachments != null && !attachments.isEmpty();
+    }
+
     /// Reserves the databases a script is about to attach, before the engine attaches them.
     ///
     /// Called by every port at the top of `#execute(String)`. Reserving first is what makes this
