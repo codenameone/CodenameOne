@@ -389,6 +389,19 @@ public class AndroidIntentBridge implements IntentBridge {
         }
         for (String[] request : drained) {
             try {
+                // Judged now rather than when it was queued. A request parked on a cold start
+                // was queued before the declarations existed, so nothing could yet say whether
+                // the shortcut that produced it still describes something safe to run on one
+                // tap -- and a donation outlives the policy it was made under.
+                com.codename1.intents.IntentDeclaration decl =
+                        Intents.getDeclaration(request[0]);
+                if (decl != null
+                        && !CN1IntentTrampolineActivity.isStillPermittedOnOneTap(decl)) {
+                    Log.w(TAG, "Refusing \"" + request[0] + "\": the shortcut predates a "
+                            + "declaration change that no longer allows it to run on a single "
+                            + "tap");
+                    continue;
+                }
                 Intents.dispatchInvocation(request[0], CN1IntentService.parse(request[1]),
                         IntentSource.SHORTCUT, false, null);
             } catch (Throwable t) {

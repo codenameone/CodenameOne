@@ -758,7 +758,10 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 return false;
             }
             if (!"float".equals(p.kind)) {
-                return true;
+                // A double holds any finite value, but "1e-400" is not one of them: it parses
+                // to 0.0, which is a different number from the one written, and javac refuses
+                // the literal outright. Refusing it here names the declaration instead.
+                return !underflowsToZero(v.trim(), d);
             }
             // Both ends, for the same reason the generated requiredFloat checks both: too large
             // becomes Infinity and too small becomes zero, and a default of 1e-100 that reaches
@@ -1183,15 +1186,15 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         }
         String fallback = def == null ? "0" : def;
         if ("int".equals(p.kind)) {
-            return "asInt(params, " + key + ", " + numeric(fallback, "0") + ")";
+            return "asInt(params, " + key + ", " + numeric(fallback, "0", "int") + ")";
         }
         if ("long".equals(p.kind)) {
-            return "asLong(params, " + key + ", " + numeric(fallback, "0") + "L)";
+            return "asLong(params, " + key + ", " + numeric(fallback, "0", "long") + "L)";
         }
         if ("float".equals(p.kind)) {
-            return "asFloat(params, " + key + ", " + numeric(fallback, "0") + "f)";
+            return "asFloat(params, " + key + ", " + numeric(fallback, "0", "float") + "f)";
         }
-        return "asDouble(params, " + key + ", " + numeric(fallback, "0") + "d)";
+        return "asDouble(params, " + key + ", " + numeric(fallback, "0", "double") + "d)";
     }
 
     /// The reader used once a required value is known to be present.
@@ -1694,13 +1697,46 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         return "NUMBER";
     }
 
-    private static String numeric(String value, String fallback) {
+    /// A declared numeric default, written as a literal the generated source can compile.
+    ///
+    /// The text was emitted verbatim, and text that parses is not the same as text that is a
+    /// legal Java literal in the position it lands in. "08" parses as eight and is an illegal
+    /// octal literal; "1D" parses as one and becomes `1Dd`; each of those failed the build
+    /// while compiling generated source, which is the worst place to discover a typo in an
+    /// annotation. Emitting the parsed number instead cannot produce any of them.
+    private static String numeric(String value, String fallback, String kind) {
+        String trimmed = value.trim();
         try {
-            Double.parseDouble(value.trim());
-            return value.trim();
+            if ("int".equals(kind) || "long".equals(kind)) {
+                return Long.toString(Long.parseLong(trimmed));
+            }
+            return Double.toString(Double.parseDouble(trimmed));
         } catch (NumberFormatException e) {
             return fallback;
         }
+    }
+
+    /// Whether a literal names a non-zero number that the type rounds to zero.
+    ///
+    /// Checked on the text rather than by re-parsing at another width: the parse already
+    /// happened and produced zero, so the only question left is whether zero is what was
+    /// written. Any digit other than zero before the exponent means it was not.
+    private static boolean underflowsToZero(String text, double parsed) {
+        if (parsed != 0.0d) {
+            return false;
+        }
+        int end = text.indexOf('e');
+        if (end < 0) {
+            end = text.indexOf('E');
+        }
+        String mantissa = end < 0 ? text : text.substring(0, end);
+        for (int i = 0; i < mantissa.length(); i++) {
+            char c = mantissa.charAt(i);
+            if (c >= '1' && c <= '9') {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// Turns a JVM binary name into one that is legal in generated Java source.

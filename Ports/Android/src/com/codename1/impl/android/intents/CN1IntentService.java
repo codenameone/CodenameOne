@@ -133,6 +133,18 @@ public class CN1IntentService extends IntentService {
         // and running that handler here gives it no Activity and no visible Form. Hand it to
         // the foreground path instead of honouring a flag the app no longer agrees with.
         IntentDeclaration decl = Intents.getDeclaration(id);
+        // The trampoline applies this too, but it cannot on a cold start: the declarations are
+        // not installed yet when a tap arrives, so a trusted shortcut minted before an update
+        // that marked the intent destructive passed a check that had nothing to check against.
+        // Here they exist. A donation is durable and the policy it was made under is not.
+        if (decl != null && !CN1IntentTrampolineActivity.isStillPermittedOnOneTap(decl)) {
+            Log.w(TAG, "Refusing \"" + id + "\": the shortcut predates a declaration change "
+                    + "that no longer allows it to run on a single tap");
+            if (shouldStopContext && AndroidImplementation.getActivity() == null) {
+                AndroidImplementation.stopContext(this);
+            }
+            return;
+        }
         if (decl != null && !decl.runsHeadless()) {
             Log.w(TAG, "Shortcut for \"" + id + "\" asked for headless, but the declaration is "
                     + "not; running it in the foreground instead");

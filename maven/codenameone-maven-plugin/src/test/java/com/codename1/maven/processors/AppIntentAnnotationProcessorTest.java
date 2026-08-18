@@ -1258,6 +1258,59 @@ public class AppIntentAnnotationProcessorTest {
         assertError(classes, "declares no parameter with that name");
     }
 
+    /// Text that parses is not text that is a legal Java literal where it lands. "08" parses
+    /// as eight and is an illegal octal literal; "1D" parses as one and becomes 1Dd. Each
+    /// failed the build while compiling generated source, which is the worst place to discover
+    /// a typo in an annotation.
+    @Test
+    public void aNumericDefaultThatIsNotALegalLiteralStillCompiles() throws Exception {
+        File classes = compile(source(
+                "public static int seenInt = -1;\n"
+                        + "public static double seenDouble = -1;\n"
+                        + "@AppIntent(value = \"defaults\", title = \"D\")\n"
+                        + "public static IntentResult go(\n"
+                        + "        @IntentParam(value = \"i\", required = false,\n"
+                        + "                defaultValue = \"08\") int i,\n"
+                        + "        @IntentParam(value = \"d\", required = false,\n"
+                        + "                defaultValue = \"1D\") double d) {\n"
+                        + "    seenInt = i;\n"
+                        + "    seenDouble = d;\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            registry.getClass().getMethod("invoke", String.class, Map.class,
+                    loader.loadClass("com.codename1.intents.IntentContext"))
+                    .invoke(registry, "defaults", new LinkedHashMap<String, Object>(), null);
+
+            Class<?> handlers = loader.loadClass("com.example.Handlers");
+            assertEquals("08 is eight, not an octal literal",
+                    8, handlers.getField("seenInt").getInt(null));
+            assertEquals("1D is one", 1.0, handlers.getField("seenDouble").getDouble(null), 0d);
+        } finally {
+            loader.close();
+        }
+    }
+
+    /// javac refuses 1e-400 as a literal because it is not the number that was written: it
+    /// rounds to zero. Refusing it here names the declaration rather than failing inside
+    /// generated source.
+    @Test
+    public void aDoubleDefaultThatUnderflowsToZeroIsRejected() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"defaults\", title = \"D\")\n"
+                        + "public static void go(@IntentParam(value = \"d\",\n"
+                        + "        required = false, defaultValue = \"1e-400\") double d) { }\n"));
+
+        assertError(classes, "not a valid double");
+    }
+
     /// A parameter name may hold anything, and the placeholder pattern only matched
     /// [A-Za-z0-9_] -- so a phrase naming two such parameters passed a check that exists
     /// because Apple rejects exactly that, as a halting error producing no metadata at all.
