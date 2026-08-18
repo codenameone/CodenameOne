@@ -125,6 +125,28 @@ class ProcessBudgetPacingIntegrationTest {
     private static final long SIMULATED_LIMIT_BYTES = SIMULATED_LIMIT_MB * 1024 * 1024;
     private static final long SIMULATED_LIMIT_KB = SIMULATED_LIMIT_MB * 1024;
 
+    /**
+     * A second, deliberately tight budget whose only job is to prove the treatment path
+     * actually runs. The peak assertion alone cannot: on a runner whose collector keeps
+     * up unaided, a bounded run reaches neither the cap nor a single park, and would
+     * report green with the clamp and the legacy backpressure both removed.
+     *
+     * <p>This budget is barely above the process's own structural floor -- about 98MB
+     * of arena and mapped pages that no amount of pacing can move -- so the remaining
+     * headroom is a few MB and the cap is half of that. The workload churns 768MB
+     * through it, and the collector's own scheduling trigger is 24MB, so uncollected
+     * volume cannot stay under a single-digit-MB cap for the length of the run: pacing
+     * has to engage. Tightening it further only makes engagement more certain, because
+     * headroom at or below zero drives the cap to zero.</p>
+     *
+     * <p>Its PEAK is deliberately not asserted. Below the structural floor there is
+     * nothing left for backpressure to buy, and a peak assertion there would only be
+     * checking that an already-doomed process stays doomed.</p>
+     */
+    private static final long TIGHT_LIMIT_MB = 120;
+
+    private static final long TIGHT_LIMIT_BYTES = TIGHT_LIMIT_MB * 1024 * 1024;
+
     @Test
     void anAllocatingThreadStaysInsideTheProcessMemoryBudget() throws Exception {
         Parser.cleanup();
@@ -267,6 +289,37 @@ class ProcessBudgetPacingIntegrationTest {
         assertEquals(0, parsePacing(controlOutput, "bibopParks="),
                 "No process budget was declared, so the BiBOP path must not pace either."
                         + "\n--- control ---\n" + controlOutput);
+
+        // AND THAT THE TREATMENT PATH ACTUALLY RUNS. Everything above is consistent with
+        // a collector that simply kept up and a fix that does nothing, so the guard needs
+        // one run where pacing cannot be avoided. See TIGHT_LIMIT_MB.
+        Map<String, String> tightEnv = new HashMap<String, String>();
+        tightEnv.put("CN1_LOG_PACING_PARKS", "1");
+        tightEnv.put("CN1_SIMULATE_PROC_MEMORY_LIMIT", Long.toString(TIGHT_LIMIT_BYTES));
+        String tightOutput = runVm(executable, buildDir, tightEnv);
+        long tightParks = parsePacing(tightOutput, "legacyParks=");
+        System.err.println("[ProcessBudgetPacingIntegrationTest] tightLimitMb=" + TIGHT_LIMIT_MB
+                + " " + pacing(tightOutput)
+                + " peakKb=" + parseValue(tightOutput, "PEAK_FOOTPRINT_KB="));
+
+        assertTrue(tightParks > 0,
+                "A " + TIGHT_LIMIT_MB + "MB budget leaves a cap of a few MB, and this"
+                        + " workload churns 768MB through it, so the legacy path must have"
+                        + " paced at least once. Zero parks means the backpressure never"
+                        + " engaged, which makes every other assertion here vacuous -- they"
+                        + " would all pass with the fix removed.\n--- tight ---\n"
+                        + tightOutput);
+
+        // Backpressure must produce reclamation, not just delay. A park waits for the
+        // cycle boundary that resets the volume counter, so if nothing schedules a cycle
+        // the thread spins out its whole safety budget and resumes having achieved
+        // nothing -- once per check, which at this cap is most of the run. That failure
+        // shows up here as a run that does not finish rather than as a bad number.
+        assertTrue(tightOutput.contains("PROCESS_BUDGET_PACING_DONE"),
+                "The load must still finish under a budget tight enough to pace it on"
+                        + " nearly every check. Not finishing is the signature of a park"
+                        + " that waits on a collection nobody scheduled.\n--- tight ---\n"
+                        + tightOutput);
     }
 
     private long parsePacing(String output, String key) {

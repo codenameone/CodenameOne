@@ -3177,18 +3177,23 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_PACING_MIN_CAP
 #define CN1_PACING_MIN_CAP (4*1024*1024)
 #endif
-// How much legacy allocation one thread may do between two pacing evaluations. This
+// How much legacy allocation the PROCESS may do between two pacing evaluations. This
 // bounds the overshoot past the cap, so it has to stay well under the smallest cap the
 // clamp can produce; it is deliberately independent of CN1_LEGACY_GC_TRIGGER_BYTES,
 // which sizes when to SCHEDULE a cycle rather than when to stop running ahead of one.
-#ifndef CN1_PACING_CHECK_INTERVAL_BYTES
-#define CN1_PACING_CHECK_INTERVAL_BYTES (1024*1024)
+//
+// Process-wide, NOT per-thread. A thread-local interval bounds nothing on a machine
+// with several allocators: sixteen workers can each allocate and dirty just under the
+// interval without a single one of them reaching a check, while the shared counter and
+// the footprint grow by sixteen times it. Crossings are detected on the GLOBAL counter
+// instead, using the pre-add value the trigger below already computes -- so a crossing
+// is attributed to exactly the one allocation that passed the boundary, whichever
+// thread made it, and the bound holds however many threads are allocating. It also
+// needs no per-thread state at all: a shift and a compare on a value already in hand.
+#ifndef CN1_PACING_CHECK_INTERVAL_SHIFT
+#define CN1_PACING_CHECK_INTERVAL_SHIFT 20
 #endif
-
-// This thread's legacy allocation since its last pacing evaluation. __thread rather
-// than a ThreadLocalData field, matching cn1LowMemoryParkStampMs: zero-initialized per
-// thread with no malloc'd-not-zeroed trap to remember.
-static __thread long long cn1LegacyBytesSinceCheck = 0;
+#define CN1_PACING_CHECK_INTERVAL_BYTES (1LL << CN1_PACING_CHECK_INTERVAL_SHIFT)
 
 // Cached free-memory reading, refreshed once per GC cycle (cn1RefreshFreeMemCache, called from
 // codenameOneGCMark) so the dynamic pacing cap costs no per-page-acquire syscall.
@@ -3337,6 +3342,21 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which) {
         atomic_fetch_add_explicit(which == CN1_PACE_LEGACY ? &cn1PacingParksLegacy
                                                            : &cn1PacingParksBibop,
                                   1, memory_order_relaxed);
+    }
+    // A park waits for the CYCLE BOUNDARY that resets the volume counter, so there has
+    // to be a cycle coming or the wait is just a stall. The callers' own triggers fire
+    // at CN1_LEGACY_GC_TRIGGER_BYTES / bibopGcTriggerBytes, and under a tight budget the
+    // cap drops well below those -- which is precisely the near-ceiling case this exists
+    // for. Without this, a thread with a 4MB cap and 3MB of uncollected volume would
+    // find nothing scheduled, spin out its whole 10s safety budget, and resume with no
+    // reclamation even begun, once per check. Requesting a cycle here is cheap (a lock
+    // and a notify, guarded so it happens only when we are actually about to wait) and
+    // is what makes the backpressure produce reclamation rather than just delay.
+    if(!gcCurrentlyRunning) {
+        JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
+        threadStateData->nativeAllocationMode = JAVA_TRUE;
+        java_lang_System_gc__(threadStateData);
+        threadStateData->nativeAllocationMode = wasNam;
     }
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     threadStateData->threadActive = JAVA_FALSE;
@@ -5972,18 +5992,21 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // churning board arrays could take the process past the iOS ceiling with a live
     // set of almost nothing.
     //
-    // Evaluated on a fixed BYTE INTERVAL of this thread's own legacy allocation, not
-    // on the 24MB scheduling trigger above. Reusing that trigger looks free -- the
-    // crossing is already computed -- but it is the wrong threshold and fails exactly
-    // where this matters most: near the ceiling the cap can be a few MB, and a
-    // workload that dirties each block before requesting the next could spend the
+    // Evaluated every CN1_PACING_CHECK_INTERVAL_BYTES of PROCESS-WIDE legacy
+    // allocation, not on the 24MB scheduling trigger above. Reusing that trigger looks
+    // free -- the crossing is already computed -- but it is the wrong threshold and
+    // fails exactly where this matters most: near the ceiling the cap can be a few MB,
+    // and a workload that dirties each block before requesting the next could spend the
     // whole remaining budget and be killed while legacy volume was still climbing
     // toward 24MB. The interval is unconditional, so the cap is consulted long before
     // any scheduling threshold, and it bounds the overshoot between two evaluations to
-    // CN1_PACING_CHECK_INTERVAL_BYTES whatever the cap turns out to be. Cost is one
-    // thread-local add and one compare per legacy allocation.
-    cn1LegacyBytesSinceCheck += (long long)size;
-    if(cn1LegacyBytesSinceCheck >= CN1_PACING_CHECK_INTERVAL_BYTES
+    // one interval whatever the cap turns out to be -- and, because the crossing is
+    // detected on the shared counter rather than a per-thread tally, that bound is the
+    // same however many threads are allocating. Cost is a shift and a compare on
+    // prevLegacyBytes, which the trigger above already had to compute.
+    if(((unsigned long long)prevLegacyBytes >> CN1_PACING_CHECK_INTERVAL_SHIFT)
+            != ((unsigned long long)(prevLegacyBytes + (long long)size)
+                    >> CN1_PACING_CHECK_INTERVAL_SHIFT)
        && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        // Same bracket gate as the trigger: without conservative roots a thread inside
@@ -5992,7 +6015,6 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
        && !threadStateData->nativeAllocationMode
 #endif
        ) {
-        cn1LegacyBytesSinceCheck = 0;
         cn1PacingPark(threadStateData, CN1_PACE_LEGACY);
     }
 #endif
