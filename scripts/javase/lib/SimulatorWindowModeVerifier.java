@@ -146,7 +146,7 @@ public class SimulatorWindowModeVerifier {
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
             while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image)
-                        || isComponentInspectorDetailsMissing(parsed, image))
+                        || isComponentInspectorDetailsUnsettled(parsed, image))
                     && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
                 image = captureDesktop();
@@ -214,8 +214,8 @@ public class SimulatorWindowModeVerifier {
             throw new AssertionError("Single-window simulator device content did not appear before capture; darkPixels="
                     + darkPixels);
         }
-        if (isComponentInspectorDetailsMissing(args, image)) {
-            throw new AssertionError("Component inspector details form did not appear before capture; textPixels="
+        if (isComponentInspectorDetailsUnsettled(args, image)) {
+            throw new AssertionError("Component inspector details panel had not settled before capture; textPixels="
                     + countComponentDetailsPixels(image));
         }
     }
@@ -255,25 +255,26 @@ public class SimulatorWindowModeVerifier {
     }
 
     /**
-     * Whether the component inspector's details form has been laid out yet.
+     * Whether the docked Component Details panel is still showing a form that is on its way out.
      *
-     * <p>The panel is built after the inspector window itself, so the capture could land either
-     * side of it: the stored reference was taken while the panel was still empty, and a runner
-     * that got there a moment later produced the form and failed the comparison. Which side of
-     * the race a run lands on is not something the reference should encode, so the capture waits
-     * for the form and the reference now shows it.</p>
+     * <p>The inspector is created and then moved into its own window by showInFrame(), and the
+     * docked panel it leaves behind settles empty -- which is what the stored reference holds and
+     * what every run captures once it has settled. A capture taken mid-move catches the form
+     * laid out with no values in it, and fails the comparison over a state neither the simulator
+     * nor the reference is supposed to be in.</p>
      *
-     * <p>Read from the pixels, like the device check above, because this verifier drives the
+     * <p>So the capture waits for the panel to settle rather than screenshotting on a fixed
+     * timer. Read from the pixels, like the device check above, because this verifier drives the
      * simulator from another process and has no handle on its Swing tree.</p>
      */
-    private static boolean isComponentInspectorDetailsMissing(Args args, BufferedImage image) {
+    private static boolean isComponentInspectorDetailsUnsettled(Args args, BufferedImage image) {
         if (!"component-inspector".equals(args.scenario)) {
             return false;
         }
-        return countComponentDetailsPixels(image) < MIN_COMPONENT_DETAILS_PIXELS;
+        return countComponentDetailsPixels(image) >= MIN_COMPONENT_DETAILS_PIXELS;
     }
 
-    /** The label text of the details form, which is absent to the pixel until the form exists. */
+    /** The label text of the form, which the settled panel does not draw at all. */
     private static int countComponentDetailsPixels(BufferedImage image) {
         int xMin = Math.min(image.getWidth(), 20);
         int xMax = Math.min(image.getWidth(), 680);
@@ -295,9 +296,9 @@ public class SimulatorWindowModeVerifier {
     }
 
     /**
-     * Measured on both sides of the race this fixes: the populated form draws about 740 dark
-     * pixels in that band and the empty panel draws none, so anything in between is a partial
-     * paint rather than a state worth capturing.
+     * Measured on both sides of the race this fixes: the form on its way out draws about 740 dark
+     * pixels in that band and the settled panel draws none, so anything above a small margin is
+     * the form still being there.
      */
     private static final int MIN_COMPONENT_DETAILS_PIXELS = 200;
 
