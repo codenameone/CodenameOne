@@ -127,7 +127,7 @@ public final class IOSAppIntentsBuilder {
             if (!hasChoices(p)) {
                 continue;
             }
-            String name = choiceEnumName(id, str(p, "name"));
+            String name = choiceEnumName(id, paramIdentifier(intent, str(p, "name")));
             List<String> opts = options(p);
             List<String> cases = caseNames(opts);
             sb.append("@available(iOS 16.0, *)\n");
@@ -182,10 +182,7 @@ public final class IOSAppIntentsBuilder {
     /// anything; the raw value carries the real text and this only has to be a stable, legal
     /// identifier. Uniqueness is caseNames' job, since it needs the whole list to see it.
     private static String caseName(String option) {
-        String s = sanitize(option);
-        if (s.length() == 0 || !Character.isLetter(s.charAt(0))) {
-            s = "v" + s;
-        }
+        String s = legalIdentifier(sanitize(option));
         if (SWIFT_KEYWORDS.contains(s)) {
             return "`" + s + "`";
         }
@@ -230,10 +227,11 @@ public final class IOSAppIntentsBuilder {
             // prompting for a value the handler was willing to do without.
             String optional = bool(p, "required") ? "" : "?";
             String declaredType = hasChoices(p)
-                    ? choiceEnumName(str(intent, "id"), str(p, "name"))
+                    ? choiceEnumName(str(intent, "id"), paramIdentifier(intent, str(p, "name")))
                     : swiftType(type, str(p, "entityType"));
             sb.append("    @Parameter(title: \"").append(swift(str(p, "title"))).append("\")\n");
-            sb.append("    var ").append(varName(str(p, "name"))).append(": ")
+            sb.append("    var ").append(varName(paramIdentifier(intent, str(p, "name"))))
+                    .append(": ")
                     .append(declaredType).append(optional).append("\n\n");
         }
 
@@ -253,7 +251,7 @@ public final class IOSAppIntentsBuilder {
         for (Map<String, Object> p : params) {
             String name = str(p, "name");
             String type = str(p, "type");
-            String var = varName(name);
+            String var = varName(paramIdentifier(intent, name));
             boolean required = bool(p, "required");
             // An absent optional parameter must not be sent at all, so the Java side applies the
             // declared default rather than receiving a null it would have to guess about.
@@ -370,7 +368,7 @@ public final class IOSAppIntentsBuilder {
             if ("applicationName".equals(name)) {
                 out.append("\\(.applicationName)");
             } else if (declaresParameter(intent, name)) {
-                out.append("\\(\\.$").append(sanitize(name)).append(")");
+                out.append("\\(\\.$").append(paramIdentifier(intent, name)).append(")");
             } else {
                 // Not a parameter and not Apple's token: leave it alone rather than emitting an
                 // interpolation of something that does not exist, which would not compile.
@@ -479,14 +477,60 @@ public final class IOSAppIntentsBuilder {
         return "CN1Entity_" + sanitize(entityType);
     }
 
-    private static String varName(String name) {
-        String s = sanitize(name);
-        // A Swift keyword as a property name compiles only when back-quoted, and parameter
-        // names come from application code, so this is reachable rather than theoretical.
-        if (SWIFT_KEYWORDS.contains(s)) {
-            return "`" + s + "`";
+    /// Legal, unique Swift identifiers for one intent's parameters, keyed by declared name.
+    ///
+    /// Sanitizing each name where it was needed was not enough, in two ways that both end as a
+    /// compile error in generated Swift the developer never sees. A name beginning with a digit
+    /// -- "1st" -- is not an identifier at all. And two distinct names may reduce to one:
+    /// "ship-to" and "ship to" both become ship_to, which declared the property twice and, for
+    /// a parameter with a closed vocabulary, the choice enum twice as well.
+    ///
+    /// Computed for the whole intent rather than per site so every place that spells a
+    /// parameter agrees: the property, its type when that is a generated enum, the body that
+    /// reads it, and a phrase that interpolates it. Recomputed at each site rather than
+    /// threaded through, because it is a pure function of the intent and disagreement between
+    /// two copies is exactly the failure being fixed.
+    private static Map<String, String> paramIdentifiers(List<Map<String, Object>> params) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        List<String> taken = new ArrayList<String>();
+        for (Map<String, Object> p : params) {
+            String raw = str(p, "name");
+            String base = legalIdentifier(sanitize(raw));
+            String candidate = base;
+            for (int n = 2; taken.contains(candidate); n++) {
+                candidate = base + "_" + n;
+            }
+            taken.add(candidate);
+            out.put(raw, candidate);
+        }
+        return out;
+    }
+
+    /// The identifier this intent spells one of its parameters with.
+    private static String paramIdentifier(Map<String, Object> intent, String rawName) {
+        String id = paramIdentifiers(params(intent)).get(rawName);
+        return id == null ? legalIdentifier(sanitize(rawName)) : id;
+    }
+
+    /// Makes an identifier that can start a Swift name. Sanitizing leaves digits and an empty
+    /// string alone, and neither can begin one.
+    private static String legalIdentifier(String s) {
+        if (s.length() == 0 || !Character.isLetter(s.charAt(0))) {
+            return "v" + s;
         }
         return s;
+    }
+
+    /// Back-quotes an identifier that collides with a Swift keyword.
+    ///
+    /// Only the declaration needs it. A property wrapper's projected value is `$name`, which is
+    /// not the keyword, so a phrase interpolating it is written bare -- checked against the
+    /// Swift compiler rather than assumed, since guessing wrong here fails only on a Mac.
+    private static String varName(String identifier) {
+        if (SWIFT_KEYWORDS.contains(identifier)) {
+            return "`" + identifier + "`";
+        }
+        return identifier;
     }
 
     private static String sanitize(String s) {

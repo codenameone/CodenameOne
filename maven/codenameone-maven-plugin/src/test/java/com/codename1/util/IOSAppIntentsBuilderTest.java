@@ -477,6 +477,67 @@ class IOSAppIntentsBuilderTest {
         assertFalse(swift.contains(".$nonsense"), swift);
     }
 
+    /// A parameter name is application text. One beginning with a digit is not a Swift
+    /// identifier at all, and two distinct names can reduce to one -- either way the generated
+    /// iOS target fails to compile, for a file the developer never wrote.
+    @Test
+    void illegalOrCollidingParameterNamesStillProduceCompilableSwift() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("ship_it", "Ship",
+                        "params", Arrays.asList(param("1st", "int"),
+                                param("ship-to", "string"),
+                                param("ship to", "string")))),
+                new ArrayList<Map<String, Object>>());
+
+        assertFalse(swift.contains("var 1st"),
+                "a property cannot begin with a digit:\n" + swift);
+
+        List<String> declared = new ArrayList<String>();
+        String[] lines = swift.split("\n");
+        for (int i = 1; i < lines.length; i++) {
+            String t = lines[i].trim();
+            // Only the declared parameters: the body has a `var params` of its own.
+            if (lines[i - 1].trim().startsWith("@Parameter(") && t.startsWith("var ")) {
+                String name = t.substring(4, t.indexOf(": "));
+                assertTrue(Character.isLetter(name.charAt(0)) || name.charAt(0) == '`',
+                        "illegal Swift identifier \"" + name + "\":\n" + swift);
+                assertFalse(declared.contains(name),
+                        "duplicate property \"" + name + "\" would not compile:\n" + swift);
+                declared.add(name);
+            }
+        }
+        assertEquals(3, declared.size());
+
+        // Every declared name still reaches Java under the name the application declared.
+        assertTrue(swift.contains("params[\"1st\"]"));
+        assertTrue(swift.contains("params[\"ship-to\"]"));
+        assertTrue(swift.contains("params[\"ship to\"]"));
+    }
+
+    /// A closed vocabulary makes the collision worse: the enum type is named after the
+    /// parameter too, so two colliding names declared the same type twice.
+    @Test
+    void collidingParameterNamesDoNotDeclareOneChoiceEnumTwice() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("ship_it", "Ship",
+                        "params", Arrays.asList(
+                                param("ship-to", "string", "options", Arrays.asList("home")),
+                                param("ship to", "string", "options", Arrays.asList("work"))))),
+                new ArrayList<Map<String, Object>>());
+
+        List<String> enums = new ArrayList<String>();
+        for (String line : swift.split("\n")) {
+            String t = line.trim();
+            if (t.startsWith("enum ") && t.contains(":")) {
+                String name = t.substring(5, t.indexOf(":")).trim();
+                assertFalse(enums.contains(name),
+                        "duplicate enum \"" + name + "\" would not compile:\n" + swift);
+                enums.add(name);
+            }
+        }
+        assertEquals(2, enums.size());
+    }
+
     @Test
     void aSwiftKeywordParameterIsEscaped() {
         // Parameter names come from application code, so a Swift keyword is reachable rather
