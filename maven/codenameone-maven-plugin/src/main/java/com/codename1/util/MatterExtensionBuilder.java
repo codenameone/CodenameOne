@@ -171,6 +171,43 @@ public final class MatterExtensionBuilder {
      * @return the same text, once it is known to be a number
      * @throws IllegalArgumentException when it is anything else
      */
+    /**
+     * The app group, checked to be an app-group identifier and nothing else.
+     *
+     * <p>It goes into a Swift string literal the build compiles, and
+     * {@code escape()} answers for XML, not for Swift: a value carrying a
+     * quote closes the literal, and one carrying a newline walks out of the
+     * {@code //} that comments the implementation out in a build with no
+     * fabric of its own, because a comment ends at its line. Apple's own
+     * grammar is the constraint -- {@code group.} and then the characters an
+     * identifier may use.</p>
+     *
+     * @param appGroup the group the app and its extension share
+     * @return the same text, once it is known to be an identifier
+     * @throws IllegalArgumentException when it is anything else
+     */
+    public static String groupLiteral(String appGroup) {
+        String value = appGroup == null ? "" : appGroup.trim();
+        boolean ok = value.startsWith("group.")
+                && value.length() > "group.".length()
+                && value.length() <= 128;
+        for (int i = 0; ok && i < value.length(); i++) {
+            char c = value.charAt(i);
+            ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '-';
+        }
+        if (!ok) {
+            throw new IllegalArgumentException(
+                    "ios.home.appGroup must be an app group identifier --"
+                    + " 'group.' followed by letters, digits, dots or"
+                    + " hyphens -- got '" + appGroup + "'. Its value is"
+                    + " compiled into the generated commissioning extension,"
+                    + " so it is accepted only in a shape that cannot carry"
+                    + " anything else.");
+        }
+        return value;
+    }
+
     public static String vendorLiteral(String vendorId) {
         String value = vendorId == null ? "" : vendorId.trim();
         long parsed = -1;
@@ -206,7 +243,7 @@ public final class MatterExtensionBuilder {
             "    // fabric's keys have to survive the extension being torn",
             "    // down between sheets and have to be the same ones the app",
             "    // itself would see.",
-            "    static let group = \"" + escape(appGroup) + "\"",
+            "    static let group = \"" + groupLiteral(appGroup) + "\"",
             "    static let keyTag = \"" + escape(packageName)
                     + ".cn1matter.signer\"",
             "    // 0xFFF1 is the Matter test vendor. A shipping product",

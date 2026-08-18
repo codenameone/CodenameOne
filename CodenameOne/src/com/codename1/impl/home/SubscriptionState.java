@@ -191,10 +191,6 @@ public final class SubscriptionState {
                 if (disposed) {
                     return;
                 }
-                if (!heldSteps.isEmpty()) {
-                    steps = new ArrayList<TraitReading>(heldSteps);
-                    heldSteps.clear();
-                }
             }
             // Queued BEFORE the gate opens, deliberately. Clearing
             // awaitingInitial first let a push arriving on another thread --
@@ -216,6 +212,17 @@ public final class SubscriptionState {
                 // initial read delivered those values looking perfectly
                 // healthy and never said they could not be trusted.
                 held = !pending.isEmpty() || resyncRequired;
+                // Drained here rather than before the dispatch: a push
+                // landing while the initial batch was on its way to the EDT
+                // was appended to this list and then belonged to nobody --
+                // the held check below looks at pending and the resync flag,
+                // not at steps -- so it sat here until the subscription was
+                // disposed. Nothing can be added after this point, because
+                // the gate has just closed on the step path too.
+                if (!heldSteps.isEmpty()) {
+                    steps = new ArrayList<TraitReading>(heldSteps);
+                    heldSteps.clear();
+                }
             }
             // Changes that arrived while the read was in flight. They are
             // newer than what it snapshotted, so they go out immediately

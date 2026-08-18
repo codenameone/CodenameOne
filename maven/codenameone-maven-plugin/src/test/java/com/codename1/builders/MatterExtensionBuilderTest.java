@@ -179,6 +179,32 @@ public class MatterExtensionBuilderTest {
         }
     }
 
+    /**
+     * The app group is an identifier or the build stops.
+     *
+     * <p>It lands in a Swift string literal, where the XML escaper the rest
+     * of this generator uses means nothing: a quote closes the literal, and a
+     * newline walks out of the {@code //} that comments the implementation
+     * out in a build with no fabric of its own.</p>
+     */
+    @Test
+    public void theAppGroupIsAcceptedOnlyAsAnIdentifier() {
+        assertEquals(GROUP, MatterExtensionBuilder.groupLiteral(GROUP));
+        assertEquals("group.a-b.c",
+                MatterExtensionBuilder.groupLiteral(" group.a-b.c "));
+        for (String bad : new String[] {"group.x\" + run() + \"",
+                "group.x\n    exit(0)", "com.example.app", "group.", "",
+                null, "group.x y"}) {
+            try {
+                MatterExtensionBuilder.groupLiteral(bad);
+                fail("expected a refusal for '" + bad + "'");
+            } catch (IllegalArgumentException expected) {
+                assertTrue(expected.getMessage().contains("appGroup"),
+                        expected.getMessage());
+            }
+        }
+    }
+
     /** The Matter test vendor, which is what a build defaults to. */
     private static final String VENDOR = "0xFFF1";
 
