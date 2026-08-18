@@ -643,9 +643,15 @@ public class ByteCodeTranslator {
         // link. An interp-host build keeps them and the link fails.
         //
         // This mirrors what the clean target has always done correctly
-        // ("java_io_File_runtime.c", copied after writeOutput).
-        File javaIoFileM = new File(srcRoot, "java_io_File_runtime.m");
-        copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), Files.newOutputStream(javaIoFileM.toPath()));
+        // ("java_io_File_runtime.c", copied after writeOutput), including the
+        // guard: these bodies open with #import "java_io_File.h", so writing
+        // them into a translation that dropped the class is a source file that
+        // cannot compile. A watch slice is translated separately from a stub
+        // main and reaches no java.io.File at all, which is exactly that case.
+        if (new File(srcRoot, "java_io_File.h").exists()) {
+            File javaIoFileM = new File(srcRoot, "java_io_File_runtime.m");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/java_io_File.m"), Files.newOutputStream(javaIoFileM.toPath()));
+        }
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
         copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), Files.newOutputStream(templateInfoPlist.toPath()));
