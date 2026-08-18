@@ -2278,7 +2278,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame));
+                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame, null));
                 frame.revalidate();
             }
         });
@@ -2288,22 +2288,30 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
     /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
     /// Codename One EDT before invoking the command's action.
-    /// Builds a menu bar for a secondary desktop window's commands. Same builder as the
-    /// main window's, with no owning frame: the MCP menu and the frame-scoped items only
-    /// belong on the application's main frame.
+    /// Builds a menu bar for a secondary desktop window's commands.
+    ///
+    /// Same builder as the main window's, with the owning window passed through so
+    /// activation goes to `com.codename1.ui.Window#dispatchCommand` -- the command
+    /// listeners registered on the window have to see it. Passing an owner also keeps
+    /// the MCP menu off: that belongs to the application's main frame, not to every
+    /// window that happens to carry a command.
     ///
     /// #### Parameters
     ///
     /// - `commands`: the window's named commands
     ///
+    /// - `owner`: the window these commands belong to
+    ///
     /// #### Returns
     ///
     /// the menu bar to install on the window
-    JMenuBar buildWindowMenuBar(java.util.List<com.codename1.ui.Command> commands) {
-        return buildNativeMenuBar(commands, null);
+    JMenuBar buildWindowMenuBar(java.util.List<com.codename1.ui.Command> commands,
+            com.codename1.ui.Window owner) {
+        return buildNativeMenuBar(commands, null, owner);
     }
 
-    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame) {
+    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame,
+            final com.codename1.ui.Window owner) {
         JMenuBar bar = new JMenuBar();
         // preserve first-seen order of the menu groups
         java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
@@ -2330,16 +2338,30 @@ public class JavaSEPort extends CodenameOneImplementation {
                     Display.getInstance().callSerially(new Runnable() {
                         @Override
                         public void run() {
-                            cmd.actionPerformed(new com.codename1.ui.events.ActionEvent(cmd));
+                            com.codename1.ui.events.ActionEvent ev =
+                                    new com.codename1.ui.events.ActionEvent(cmd);
+                            if (owner != null) {
+                                // Through the window, not straight to the command:
+                                // TopLevelContainer says listeners registered with
+                                // addCommandListener observe activated commands, and
+                                // invoking the command directly bypasses them.
+                                owner.dispatchCommand(cmd, ev);
+                            } else {
+                                cmd.actionPerformed(ev);
+                            }
                         }
                     });
                 }
             });
             menu.add(item);
         }
-        // Every desktop Codename One tool gets the native MCP menu so it can be exposed
-        // to and driven by an LLM agent.
-        bar.add(MCPDesktopMenu.build(frame != null ? frame.getTitle() : null, frame));
+        if (owner == null) {
+            // Every desktop Codename One tool gets the native MCP menu so it can be
+            // exposed to and driven by an LLM agent -- on the application's main frame
+            // only. A secondary application window would otherwise gain development
+            // controls like "Expose This Tool To Agents" simply for carrying a command.
+            bar.add(MCPDesktopMenu.build(frame != null ? frame.getTitle() : null, frame));
+        }
         return bar;
     }
 

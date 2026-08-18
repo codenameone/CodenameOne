@@ -269,4 +269,60 @@ class MultiWindowGraphicsRoutingTest {
             }
         });
     }
+
+    @Test
+    void aWindowMenuDispatchesThroughItsWindowAndOmitsTheMcpMenu() throws Exception {
+        assumeFalse(GraphicsEnvironment.isHeadless(), "needs a display");
+        JavaSEPort port = JavaSEPort.instance;
+        assertNotNull(port);
+
+        final boolean[] listenerSaw = new boolean[1];
+        final boolean[] commandRan = new boolean[1];
+        com.codename1.ui.Command cmd = new com.codename1.ui.Command("Save") {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                commandRan[0] = true;
+            }
+        };
+
+        // A stand-in for the owning window: the builder only needs something whose
+        // dispatchCommand it can call, and building a real native window here would
+        // drag in the whole show() path for what is a menu-wiring question.
+        com.codename1.ui.Window owner = new com.codename1.ui.Window("owner");
+        owner.addCommandListener(new com.codename1.ui.events.ActionListener() {
+            @Override
+            public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+                listenerSaw[0] = true;
+            }
+        });
+
+        java.util.List<com.codename1.ui.Command> cmds =
+                new java.util.ArrayList<com.codename1.ui.Command>();
+        cmds.add(cmd);
+        javax.swing.JMenuBar bar = port.buildWindowMenuBar(cmds, owner);
+        assertNotNull(bar);
+
+        // The MCP menu carries development-only controls ("Expose This Tool To Agents",
+        // host installation). It belongs to the application's main frame, not to every
+        // window that happens to carry a command.
+        for (int iter = 0; iter < bar.getMenuCount(); iter++) {
+            assertNotEquals("MCP", bar.getMenu(iter).getText(),
+                    "a secondary window's menu must not carry the MCP tooling menu");
+        }
+
+        // Activating the item must go through the window, so listeners registered with
+        // addCommandListener see it -- invoking the command directly bypasses them.
+        javax.swing.JMenuItem item = bar.getMenu(0).getItem(0);
+        assertEquals("Save", item.getText());
+        item.doClick();
+        com.codename1.ui.Display.getInstance().callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+            }
+        });
+
+        assertTrue(commandRan[0], "the command itself must run");
+        assertTrue(listenerSaw[0],
+                "and the window's command listeners must be notified");
+    }
 }

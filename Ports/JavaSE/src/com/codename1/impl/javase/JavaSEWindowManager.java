@@ -735,6 +735,9 @@ public class JavaSEWindowManager extends WindowManager {
         if (p == null || !port.isDesktopNativeChromeMode()) {
             return;
         }
+        // Activation is routed back through this window so its command listeners see it.
+        final com.codename1.ui.Window owner =
+                com.codename1.ui.Desktop.getInstance().windowById(p.windowId);
         final java.util.ArrayList<com.codename1.ui.Command> named =
                 new java.util.ArrayList<com.codename1.ui.Command>();
         if (commands != null) {
@@ -750,7 +753,7 @@ public class JavaSEWindowManager extends WindowManager {
             @Override
             public void run() {
                 javax.swing.JMenuBar bar = named.isEmpty()
-                        ? null : port.buildWindowMenuBar(named);
+                        ? null : port.buildWindowMenuBar(named, owner);
                 if (p.frame instanceof javax.swing.JFrame) {
                     ((javax.swing.JFrame) p.frame).setJMenuBar(bar);
                 } else if (p.frame instanceof javax.swing.JDialog) {
