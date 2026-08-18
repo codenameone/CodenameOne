@@ -165,27 +165,40 @@ if (!setText || setText.fields === 0) {
 }
 
 // A reload keeps the entry it happened on, and with it any id this port stamped there before
-// the reload -- while the port's own counters start again from zero. An entry left claiming an
-// id above anything the new session pushed reads as being ahead of the app, so Back to it is
-// taken for Forward and spends entries instead of returning to the first form. The port
-// rewrites the entry as it shows its first form; this asserts it did.
+// the reload -- while the port's own counters start again from zero. An id above everything the
+// new session pushed is that entry rather than a step forward, and the port has to read it that
+// way WITHOUT rewriting the entry: the state on it belongs to whatever page hosts the canvas,
+// and a host router that finds its own state replaced loses its navigation.
 if (historyLength > initialHistoryLength) {
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  let rootState = null;
-  const stateDeadline = Date.now() + bootTimeoutMs;
-  while (Date.now() < stateDeadline) {
-    const state = await page.evaluate(() => {
+  const page2 = await browser.newPage({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 2 });
+  await page2.addInitScript(() => {
+    window.__cn1Replaced = 0;
+    const original = history.replaceState.bind(history);
+    history.replaceState = function (...args) {
+      window.__cn1Replaced++;
+      return original(...args);
+    };
+  });
+  await page2.goto(url, { waitUntil: 'domcontentloaded' });
+  let booted2 = false;
+  const bootDeadline = Date.now() + bootTimeoutMs;
+  while (Date.now() < bootDeadline) {
+    booted2 = await page2.evaluate(() => {
       const layer = document.getElementById('cn1-text-layer');
-      if (!layer || layer.childElementCount === 0) return null;
-      return String(history.state);
+      return !!layer && layer.childElementCount > 0;
     });
-    if (state !== null) { rootState = state; break; }
-    await page.waitForTimeout(200);
+    if (booted2) break;
+    await page2.waitForTimeout(200);
   }
-  check('reload claims its history entry as the root', rootState === 'cn1-history:0',
-        `history.state=${rootState}`);
+  const rewrites = await page2.evaluate(() => window.__cn1Replaced);
+  check('the port never rewrites a history entry', booted2 && rewrites === 0,
+        `replaceState calls: ${rewrites}`);
+
+  // Back is deliberately not asserted here: backing out of the root form is meant to leave the
+  // document, so "still on the page" is not a property this can hold the port to.
+  await page2.close();
 } else {
-  console.log('SKIP  reload claims its history entry as the root :: no navigation observed');
+  console.log('SKIP  history entry checks :: no navigation observed');
 }
 
 console.log('\n--- summary ---');

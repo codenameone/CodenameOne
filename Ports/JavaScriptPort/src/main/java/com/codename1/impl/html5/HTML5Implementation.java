@@ -10866,25 +10866,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private int historyIndex;
 
     /**
-     * Stamps the entry the first form appears on as this session's root.
+     * The highest id this session has pushed.
      *
-     * <p>A reload keeps the entry it happened on, including any id this port stamped into it
-     * before the reload, while these counters start again from zero. Left alone, a Back to that
-     * entry would restore an id above anything the new session has pushed, be read as a forward
-     * traversal, and spend entries instead of returning to the first form. Overwriting it makes
-     * the entry say what it now is: the one before everything this session pushes.</p>
+     * <p>An entry carrying more than this was not created by this session, whatever it says: the
+     * entry the page was loaded on keeps the id a previous life of the application left there,
+     * and a reload starts the counters again from zero. Every entry the port can traverse to
+     * carries an id it pushed, so anything above this belongs to the page rather than the
+     * application -- which is what tells a stale id apart from a genuine Forward.</p>
      */
-    private void claimHistoryRoot() {
-        if (historyUnavailable) {
-            return;
-        }
-        try {
-            window.getHistory().replaceState(HISTORY_STATE_PREFIX + historyIndex, "");
-        } catch (Throwable ignored) {
-            // A document that refuses to rewrite its own entry will refuse to push one too, and
-            // pushHistoryState is where that is noticed and acted on. Nothing was promised here.
-        }
-    }
+    private int historyHighWater;
 
     private void pushHistoryState() {
         if (handlingPopState) {
@@ -10896,6 +10886,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         try {
             historyIndex++;
             window.getHistory().pushState(HISTORY_STATE_PREFIX + historyIndex, "");
+            historyHighWater = Math.max(historyHighWater, historyIndex);
             historyEntriesPushed++;
         } catch (Throwable ignored) {
             // A sandboxed or file:// document can refuse pushState. Back stays inert from here
@@ -10989,6 +10980,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final int restored = parseHistoryIndex(((PopStateEvent) evt).getState());
         final int previous = historyIndex;
         final boolean backward = restored < previous;
+        if (restored > historyHighWater) {
+            // An id this session never pushed. The entry the page loaded on keeps whatever a
+            // previous life of the application wrote there while these counters start again at
+            // zero, so an id above everything pushed since is that entry -- not a step forward
+            // through this session's history, which can only reach entries it created. The
+            // numbering is left where it was: nothing in it has been traversed.
+            consumeSuppressedTraversal();
+            return;
+        }
         historyIndex = restored;
         if (consumeSuppressedTraversal()) {
             // The port asked for this one, to spend an entry belonging to a form an in-app back
@@ -11291,7 +11291,6 @@ public class HTML5Implementation extends CodenameOneImplementation {
             // form took two presses.
             historyRootShown = true;
             historyStack.add(f);
-            claimHistoryRoot();
             return;
         }
         int depth = historyStack.size();
