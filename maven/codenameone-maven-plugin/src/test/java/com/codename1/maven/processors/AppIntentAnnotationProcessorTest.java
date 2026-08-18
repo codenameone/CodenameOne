@@ -1203,6 +1203,45 @@ public class AppIntentAnnotationProcessorTest {
         assertTrue(new File(classes, REGISTRY_PATH).exists());
     }
 
+    /// The generated declaration has to carry the width the handler declared, or the framework
+    /// is back to guessing whether a donated 5000000000 is a value this parameter can hold --
+    /// and both guesses are wrong for half the declarations.
+    @Test
+    public void theGeneratedDeclarationCarriesTheNumericWidth() throws Exception {
+        File classes = compile(source(
+                "@AppIntent(value = \"widths\", title = \"W\")\n"
+                        + "public static IntentResult w(@IntentParam(\"i\") int i,\n"
+                        + "        @IntentParam(\"l\") long l,\n"
+                        + "        @IntentParam(\"f\") float f,\n"
+                        + "        @IntentParam(\"d\") double d,\n"
+                        + "        @IntentParam(\"s\") String s) {\n"
+                        + "    return IntentResult.ok();\n"
+                        + "}\n"));
+
+        run(classes, true);
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toURI().toURL()},
+                getClass().getClassLoader());
+        try {
+            Object registry = loader.loadClass(
+                    "com.codename1.intents.generated.IntentRegistry").newInstance();
+            java.util.List<?> declarations = (java.util.List<?>) registry.getClass()
+                    .getMethod("describe").invoke(registry);
+            Object decl = declarations.get(0);
+            java.util.List<?> params = (java.util.List<?>) decl.getClass()
+                    .getMethod("getParameters").invoke(decl);
+            int[] expected = {32, 64, 32, 64, 0};
+            for (int i = 0; i < expected.length; i++) {
+                Object info = params.get(i);
+                int bits = ((Integer) info.getClass()
+                        .getMethod("getNumericWidthBits").invoke(info)).intValue();
+                assertEquals("width of parameter " + i, expected[i], bits);
+            }
+        } finally {
+            loader.close();
+        }
+    }
+
     /// A parameter name may hold anything, and the placeholder pattern only matched
     /// [A-Za-z0-9_] -- so a phrase naming two such parameters passed a check that exists
     /// because Apple rejects exactly that, as a halting error producing no metadata at all.

@@ -38,6 +38,7 @@ public final class IntentParameterInfo {
     private final String entityType;
     private final String defaultValue;
     private final List<String> options;
+    private final int numericWidthBits;
 
     /// Framework entry point: builds a parameter description. Called by
     /// generated code.
@@ -54,6 +55,19 @@ public final class IntentParameterInfo {
     public IntentParameterInfo(String name, String title, IntentParameterType type,
                                boolean required, String entityType, String defaultValue,
                                List<String> options) {
+        this(name, title, type, required, entityType, defaultValue, options, 0);
+    }
+
+    /// The same, carrying the width the handler actually declared.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numericWidthBits`: 32 for `int` and `float`, 64 for `long` and `double`, 0 when the
+    ///   declaration does not record it
+    public IntentParameterInfo(String name, String title, IntentParameterType type,
+                               boolean required, String entityType, String defaultValue,
+                               List<String> options, int numericWidthBits) {
+        this.numericWidthBits = numericWidthBits;
         this.name = name;
         // The build normalizes a blank prompt the same way, so a declaration reads identically
         // in the simulator and on a device.
@@ -97,6 +111,19 @@ public final class IntentParameterInfo {
     /// The value substituted when an optional parameter is absent, or null.
     public String getDefaultValue() {
         return defaultValue;
+    }
+
+    /// The width the handler declared for a numeric parameter: 32 for `int` and `float`, 64
+    /// for `long` and `double`, and 0 when it is not known.
+    ///
+    /// [#getType()] collapses `int` with `long` into `INTEGER` and `float` with `double` into
+    /// `NUMBER`, which is the right granularity for a platform that has one number type -- but
+    /// it left the framework unable to tell whether 5000000000 was a value this handler could
+    /// hold. Guessing was wrong in both directions: guessing wide published donations that fail
+    /// on every tap for an `int` parameter, guessing narrow refused donations a `long` would
+    /// have run. The generated declarations record it, so there is nothing to guess.
+    public int getNumericWidthBits() {
+        return numericWidthBits;
     }
 
     /// The closed vocabulary this parameter accepts, or an empty list when any

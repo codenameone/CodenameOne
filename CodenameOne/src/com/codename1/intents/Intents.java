@@ -1286,31 +1286,27 @@ public final class Intents {
             return "true".equalsIgnoreCase(t) || "false".equalsIgnoreCase(t)
                     || "1".equals(t) || "0".equals(t);
         }
-        if (type == IntentParameterType.INTEGER) {
+        if (type == IntentParameterType.INTEGER || type == IntentParameterType.NUMBER) {
+            // The declared width when the declaration records one, which every generated
+            // declaration does. `narrow` is only the fallback for a declaration built at
+            // runtime, and it is a guess either way -- which is why the width is carried now.
+            int bits = p.getNumericWidthBits();
+            boolean small = bits == 0 ? narrow : bits == 32;
+            double d;
             if (value instanceof Number) {
-                return isWhole(((Number) value).doubleValue(), narrow);
-            }
-            if (value instanceof String) {
+                d = ((Number) value).doubleValue();
+            } else if (value instanceof String) {
                 try {
-                    return isWhole(Long.parseLong(((String) value).trim()), narrow);
+                    d = type == IntentParameterType.INTEGER
+                            ? Long.parseLong(((String) value).trim())
+                            : Double.parseDouble(((String) value).trim());
                 } catch (NumberFormatException e) {
                     return false;
                 }
+            } else {
+                return false;
             }
-            return false;
-        }
-        if (type == IntentParameterType.NUMBER) {
-            if (value instanceof Number) {
-                return isFinite(((Number) value).doubleValue(), narrow);
-            }
-            if (value instanceof String) {
-                try {
-                    return isFinite(Double.parseDouble(((String) value).trim()), narrow);
-                } catch (NumberFormatException e) {
-                    return false;
-                }
-            }
-            return false;
+            return type == IntentParameterType.INTEGER ? isWhole(d, small) : isFinite(d, small);
         }
         if (type == IntentParameterType.DATE) {
             return IntentDates.parse(value) != null;
@@ -1765,17 +1761,7 @@ public final class Intents {
             }
         };
 
-        if (!Display.isInitialized()) {
-            // No Display: unit tests and the very earliest startup. Run inline
-            // so behaviour stays deterministic rather than depending on a thread
-            // pool that does not exist yet. The deadline still applies; there is
-            // simply nobody else to enforce it.
-            body.run();
-            return;
-        }
-
-        Display.getInstance().startThread(body, "CN1 Intent " + inv.intentId).start();
-        Display.getInstance().startThread(new Runnable() {
+        final Runnable watchdog = new Runnable() {
             @Override
             public void run() {
                 // Wait on the guard rather than sleeping the whole budget, so a
@@ -1788,7 +1774,28 @@ public final class Intents {
                 guard.complete(IntentResult.failed(
                         "The action took too long and was stopped"));
             }
-        }, "CN1 Intent timeout").start();
+        };
+
+        if (!Display.isInitialized()) {
+            // No Display: unit tests and the very earliest startup. The handler still runs
+            // inline, because that is what keeps this deterministic rather than depending on a
+            // thread pool that does not exist yet.
+            //
+            // The deadline does not get to be inline with it. This used to run the body and
+            // return, so a handler that overran its budget in the cold-start window was never
+            // cancelled and the platform waited for it -- forever, if it blocked -- while
+            // dispatchInvocation promises an enforced deadline. A plain daemon thread needs
+            // nothing from Display and is the one timer available this early; it exits as soon
+            // as the guard completes, so an instant handler does not leave it parked.
+            Thread watcher = new Thread(watchdog, "CN1 Intent timeout");
+            watcher.setDaemon(true);
+            watcher.start();
+            body.run();
+            return;
+        }
+
+        Display.getInstance().startThread(body, "CN1 Intent " + inv.intentId).start();
+        Display.getInstance().startThread(watchdog, "CN1 Intent timeout").start();
     }
 
     /// Makes the one-call guarantee real. The platform side of this boundary --

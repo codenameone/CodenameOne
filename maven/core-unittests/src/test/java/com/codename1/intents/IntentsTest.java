@@ -172,6 +172,16 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration declarationWithNumericParam(String id, String param,
+                                                                 IntentParameterType type,
+                                                                 int bits) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
+                Arrays.asList(new IntentParameterInfo(param, "How many?", type, true,
+                        null, null, null, bits)),
+                Arrays.asList(Exposure.ASSISTANT));
+    }
+
     private static IntentDeclaration declarationWithBooleanParam(String id, String param) {
         return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
                 "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
@@ -1754,6 +1764,40 @@ class IntentsTest {
         impossible.put("count", Double.valueOf(1e20));
         Intents.donate("count_it", impossible);
         assertNull(b.donatedId);
+    }
+
+    /// The declaration records the width now, so neither guess is needed: an int parameter
+    /// refuses a donation that would fail on every tap, and a long parameter accepts one that
+    /// would dispatch. Both were wrong under a single guessed width, in opposite directions.
+    @Test
+    void aDonationIsCheckedAgainstTheWidthTheHandlerDeclared() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithNumericParam("count_int", "count",
+                IntentParameterType.INTEGER, 32));
+        d.declarations.add(declarationWithNumericParam("count_long", "count",
+                IntentParameterType.INTEGER, 64));
+        d.declarations.add(declarationWithNumericParam("ratio_float", "ratio",
+                IntentParameterType.NUMBER, 32));
+        d.declarations.add(declarationWithNumericParam("ratio_double", "ratio",
+                IntentParameterType.NUMBER, 64));
+        Intents.setDispatcher(d);
+
+        Map<String, Object> wide = new HashMap<String, Object>();
+        wide.put("count", Long.valueOf(5000000000L));
+        Intents.donate("count_int", wide);
+        assertNull(b.donatedId, "an int cannot hold it, so the shortcut would fail every tap");
+        Intents.donate("count_long", wide);
+        assertEquals("count_long", b.donatedId, "a long holds it perfectly well");
+
+        b.donatedId = null;
+        Map<String, Object> huge = new HashMap<String, Object>();
+        huge.put("ratio", Double.valueOf(1e100));
+        Intents.donate("ratio_float", huge);
+        assertNull(b.donatedId, "a float would arrive as Infinity");
+        Intents.donate("ratio_double", huge);
+        assertEquals("ratio_double", b.donatedId);
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id

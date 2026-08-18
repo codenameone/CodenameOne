@@ -1028,7 +1028,12 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                         .append(", ").append(p.required).append(", ")
                         .append(p.entityType == null ? "null" : quote(p.entityType)).append(", ")
                         .append(p.defaultValue.length() == 0 ? "null" : quote(p.defaultValue))
-                        .append(", ").append(stringListExpr(p.options)).append("));\n");
+                        .append(", ").append(stringListExpr(p.options))
+                        // The width the handler declared. INTEGER covers int and long and
+                        // NUMBER covers float and double, so without this the framework has to
+                        // guess whether a donated 5000000000 is a value this parameter can hold
+                        // -- and both guesses are wrong for half the declarations.
+                        .append(", ").append(numericWidthBits(p)).append("));\n");
             }
             sb.append("            out.add(new IntentDeclaration(")
                     .append(quote(d.id)).append(", ").append(quote(d.title)).append(", ")
@@ -1578,6 +1583,17 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
                 || "Ljava/lang/Float;".equals(descriptor)
                 || "Ljava/lang/Double;".equals(descriptor)
                 || "Ljava/lang/Boolean;".equals(descriptor);
+    }
+
+    /// 32 for `int` and `float`, 64 for `long` and `double`, 0 for everything else.
+    private static int numericWidthBits(ParamDef p) {
+        if ("int".equals(p.kind) || "float".equals(p.kind)) {
+            return 32;
+        }
+        if ("long".equals(p.kind) || "double".equals(p.kind)) {
+            return 64;
+        }
+        return 0;
     }
 
     private static String parameterTypeConstant(ParamDef p) {
