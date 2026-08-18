@@ -155,6 +155,32 @@ class IOSAppIntentsBuilderTest {
         assertTrue(swift.contains("openAppWhenRun: Bool = false"));
     }
 
+    /// The flag handed to Java has to describe what actually happens. openAppWhenRun is
+    /// (route || !headless), so a routed intent is opened before perform() runs -- and calling
+    /// it headless would send the handler down the no-UI path in a foregrounded app. Android
+    /// already marks routed invocations non-headless.
+    @Test
+    void aRoutedIntentIsNotReportedAsHeadless() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("show_order", "Show order", "headless", Boolean.TRUE,
+                        "opensRoute", "/orders/{id}")),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("openAppWhenRun: Bool = true"), swift);
+        assertTrue(swift.contains("headless: false"),
+                "iOS opens the app for a routed intent, so the handler must not be told "
+                        + "otherwise: " + swift);
+    }
+
+    @Test
+    void anUnroutedHeadlessIntentStillReportsHeadless() {
+        String swift = intentsSwift(
+                Arrays.asList(intent("log_workout", "Log a workout", "headless", Boolean.TRUE)),
+                new ArrayList<Map<String, Object>>());
+
+        assertTrue(swift.contains("headless: true"), swift);
+    }
+
     /// headless is what decides this, not opensRoute alone. A handler that did not declare
     /// headless is allowed to touch a Form -- that is the whole meaning of the flag -- so
     /// running it with no foreground window hands it a Display with nothing on screen, inside

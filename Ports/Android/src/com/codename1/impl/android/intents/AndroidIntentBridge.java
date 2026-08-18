@@ -281,8 +281,16 @@ public class AndroidIntentBridge implements IntentBridge {
     /// True when there is a window a non-headless handler can legitimately touch: the runtime
     /// is up, an Activity is attached, and a Form is actually showing.
     private static boolean isForegrounded() {
-        return Display.isInitialized() && Display.getInstance().getCurrent() != null
-                && AndroidImplementation.getActivity() != null;
+        if (!Display.isInitialized() || Display.getInstance().getCurrent() == null
+                || AndroidImplementation.getActivity() == null) {
+            return false;
+        }
+        // A backgrounded app still has a current Form and a non-null Activity, so those two
+        // alone said "foreground" the instant a tap arrived -- before launchMainActivity had
+        // resumed anything. The handler then ran against a window the user cannot see, which is
+        // the exact thing being non-headless is supposed to guarantee against. isMinimized is
+        // the port's own answer to that question, fed by CodenameOneActivity.onStop/onResume.
+        return !Display.getInstance().isMinimized();
     }
 
     /// Clears `waiting` and reports true only when the queue is genuinely empty, both decided

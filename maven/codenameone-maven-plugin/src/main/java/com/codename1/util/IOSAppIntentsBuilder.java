@@ -253,8 +253,14 @@ public final class IOSAppIntentsBuilder {
                 sb.append("        }\n");
             }
         }
+        // The flag reported to Java has to describe what actually happens, not what was
+        // declared. openAppWhenRun above is (route || !headless), so an intent that declares
+        // headless *and* a route is opened by iOS before perform() runs -- and telling the
+        // handler it is headless would send it down the no-UI path in a foregrounded app.
+        // Android already marks routed invocations non-headless; this is the same rule.
         sb.append("        let outcome = await CN1IntentBridge.run(id: \"").append(swift(id))
-                .append("\", params: params, headless: ").append(headless).append(")\n");
+                .append("\", params: params, headless: ").append(headless && !opensApp)
+                .append(")\n");
         // A failed handler has to fail the intent. Returning a dialog-only success made
         // Shortcuts record success and run the following actions anyway.
         sb.append("        if !outcome.ok {\n");
