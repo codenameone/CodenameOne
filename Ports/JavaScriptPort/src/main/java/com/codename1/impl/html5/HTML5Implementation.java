@@ -11514,10 +11514,23 @@ public class HTML5Implementation extends CodenameOneImplementation {
         return false;
     }
 
+    /// Whether a database of this name is in the storage pool.
+    ///
+    /// An engine that will not start is not an empty pool. The load can fail for reasons that have
+    /// nothing to do with what is stored -- another tab holding the OPFS pool is the likely one --
+    /// and answering "no such database" there says the user's data is gone. It is worse than
+    /// unhelpful: `Database#isEncrypted(String)` gives up on a database that does not exist and
+    /// reports false, so an unreachable engine would have described an encrypted database as
+    /// plaintext.
+    ///
+    /// So an unreachable engine is not reported as absence. The caller goes on to open, which
+    /// fails with what actually happened, rather than concluding the database was never there.
     @Override
     public boolean existsDB(String databaseName) {
-        return com.codename1.impl.html5.database.SQLiteNative.init()
-                && com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            return true;
+        }
+        return com.codename1.impl.html5.database.SQLiteNative.exists(databaseName);
     }
 
     /// The browser's non-prompting secure store.
@@ -11576,8 +11589,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public int isDatabaseFileEncrypted(String databaseName) {
         // Databases live in a browser storage pool, not a filesystem, so there is no header to
         // read. Ask the engine: opening without a key succeeds only for a plaintext database.
-        if (!com.codename1.impl.html5.database.SQLiteNative.init()
-                || !com.codename1.impl.html5.database.SQLiteNative.exists(databaseName)) {
+        if (!com.codename1.impl.html5.database.SQLiteNative.init()) {
+            // Unreachable, so unanswered. Reporting "not encrypted" from here would be this port
+            // asserting the one thing it must never get wrong about a database it could not open.
+            return DATABASE_ENCRYPTION_UNKNOWN;
+        }
+        if (!com.codename1.impl.html5.database.SQLiteNative.exists(databaseName)) {
             return DATABASE_NOT_ENCRYPTED;
         }
         try {

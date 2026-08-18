@@ -203,6 +203,21 @@ class DatabaseCoverageTest extends UITestBase {
                 "and ciphertext has no header at all");
     }
 
+    @FormTest
+    void adatabaseWhoseBytesCannotBeReadIsNotReportedAsPlaintext() throws IOException {
+        // The direction that matters. A port can fail to answer -- the browser's engine may not
+        // load at all when another tab holds its storage pool -- and the fallback here is a header
+        // read that then fails too. Reporting "not encrypted" from that would tell an application
+        // its encrypted database is in the clear, which is the one thing this method must never
+        // get wrong; an existing database it cannot read is reported as encrypted instead.
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.openOrCreateDB("test_is_encrypted_unreadable.db").close();
+        // Deliberately no file written, so the header read fails the way an unreachable store does.
+
+        assertTrue(Database.isEncrypted("test_is_encrypted_unreadable.db"),
+                "a database that exists but cannot be read is not called plaintext");
+    }
+
     /// Puts bytes where the implementation says this database lives.
     private void writeDatabaseFile(String databaseName, byte[] content) throws IOException {
         String path = Database.getDatabasePath(databaseName);
