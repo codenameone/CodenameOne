@@ -252,8 +252,28 @@ public final class CommissioningRequest {
     /// #### Returns
     ///
     /// the limit, or zero for the platform default
-    /// Ask that the accessory also join a Matter fabric this app owns, so it
-    /// can be reached directly rather than only through the user's home.
+    /// Ask the BUILD for a Matter fabric of this app's own, so a commissioned
+    /// accessory can be reached directly rather than only through the user's
+    /// home.
+    ///
+    /// #### This is a build-wide capability, not a per-accessory switch
+    ///
+    /// The machinery lives in an operating-system app extension that runs
+    /// outside your process, and it is generated when the build is made: one
+    /// `setCommissionToThisApp(true)` anywhere in your app turns it on for
+    /// every accessory that build commissions, whatever a particular request
+    /// says. A `false` request in such a build does not turn it back off --
+    /// nothing at run time can reach into the extension to say so.
+    ///
+    /// It is a request method rather than a build hint because a call is
+    /// something the build can SEE: the scanner reads this one and generates
+    /// the extension accordingly, so an app that asks for the capability gets
+    /// it without also having to remember a hint. Where the call is invisible
+    /// -- behind reflection, say -- `ios.home.commissioning.fabric=true` says
+    /// the same thing.
+    ///
+    /// [CommissioningResult#wasCommissionedToThisApp()] reports what actually
+    /// happened for each accessory.
     ///
     /// #### What this costs, and what it does not do
     ///
@@ -266,10 +286,7 @@ public final class CommissioningRequest {
     ///
     /// It is not free. On iOS the build ships an operating-system Matter
     /// controller inside the generated commissioning extension, and the app
-    /// carries the key material for its fabric. So it is opt-in, and the
-    /// builder switches that machinery on because it saw this call --
-    /// `ios.home.commissioning.fabric=true` says the same thing for a build
-    /// whose call the scanner cannot see, such as one behind reflection.
+    /// carries the key material for its fabric.
     ///
     /// **Codename One does not yet expose an API for talking to an accessory
     /// over that fabric.** What asking for it buys today is that the

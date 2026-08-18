@@ -33,12 +33,15 @@ package com.codename1.home.commissioning;
 ///
 /// - **iOS, MatterSupport** -- the accessory joins the user's HomeKit home and
 ///   appears in your graph on the next refresh, where you can control it like
-///   any other. **This result carries no id**, and
-///   [#wasCommissionedToThisApp()] is `false`: Apple's sheet reports that the
+///   any other. **This result carries no id**: Apple's sheet reports that the
 ///   flow finished and does not say what was added or which home it went to,
 ///   and the user is free to pick a different home than the one you asked
 ///   for. Call `com.codename1.home.SmartHome#refresh()` and look at what is
-///   new.
+///   new. [#wasCommissionedToThisApp()] is `false` unless the build asked for
+///   a fabric of its own -- see
+///   [CommissioningRequest#setCommissionToThisApp(boolean)] -- in which case a
+///   successful flow means the accessory joined it, because the extension's
+///   commissioning step failing is what would have failed the flow.
 /// - **Android, Google Home APIs** -- the accessory joins the user's Google
 ///   Home and, if the user granted your app access to that structure, appears
 ///   in your graph. You get an id and it works.

@@ -39,6 +39,7 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1041,12 +1042,20 @@ public class LocalHomeBridge implements HomeBridge {
         String accessoryId;
         String name;
         synchronized (this) {
-            if (targetStructure == null || targetStructure.length() == 0
-                    || !structures.containsKey(targetStructure)) {
-                targetStructure = structures.isEmpty() ? null
-                        : structures.keySet().iterator().next();
+            // The structure and its rooms are both wanted, so the entry is
+            // what gets looked up -- a key followed by a get is the same
+            // lookup done twice, and SpotBugs says so.
+            Structure target = structures.get(targetStructure);
+            if (target == null) {
+                Iterator<Map.Entry<String, Structure>> first =
+                        structures.entrySet().iterator();
+                if (first.hasNext()) {
+                    Map.Entry<String, Structure> only = first.next();
+                    targetStructure = only.getKey();
+                    target = only.getValue();
+                }
             }
-            if (targetStructure == null) {
+            if (target == null) {
                 answer(new Commissioned(requestId, null, null, null, false,
                         HomeError.COMMISSIONING_FAILED.name()
                                 + "\tthe simulated home has no structure to"
@@ -1056,8 +1065,15 @@ public class LocalHomeBridge implements HomeBridge {
             accessoryId = "commissioned-" + (nextCommissionedIndex++);
             name = suggestedName == null || suggestedName.length() == 0
                     ? "New Accessory" : suggestedName;
-            addAccessory(targetStructure, accessoryId, name,
-                    roomId == null || roomId.length() == 0 ? null : roomId,
+            // The room is a preference, and one the caller can get wrong:
+            // an id it kept from a home the user has since left, or a room
+            // of another structure than the one this accessory landed in.
+            // Stored anyway it names a room the structure cannot resolve,
+            // and a screen that groups by room has an accessory it cannot
+            // place -- commissioned successfully and invisible.
+            String placedIn = roomId == null || roomId.length() == 0
+                    || !target.rooms.containsKey(roomId) ? null : roomId;
+            addAccessory(targetStructure, accessoryId, name, placedIn,
                     com.codename1.home.AccessoryCategory.SWITCH.ordinal());
             addService(accessoryId, "1", name,
                     com.codename1.home.ServiceType.SWITCH.ordinal(), true);

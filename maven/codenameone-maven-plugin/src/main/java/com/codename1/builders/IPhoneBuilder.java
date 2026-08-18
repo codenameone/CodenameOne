@@ -3446,6 +3446,21 @@ public class IPhoneBuilder extends Executor {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_MATTER_SETUP", ex);
                 }
+                if (matterOwnFabric(request)) {
+                    // Same flip, for the half that decides what a successful
+                    // flow means: with a fabric of this app's, the extension
+                    // commissioned the accessory onto it or threw, and a
+                    // throw is what would have failed the flow.
+                    try {
+                        replaceInFile(new File(buildinRes,
+                                "CodenameOne_GLViewController.h"),
+                                "//#define CN1_MATTER_OWN_FABRIC",
+                                "#define CN1_MATTER_OWN_FABRIC");
+                    } catch (Exception ex) {
+                        throw new BuildException(
+                                "Failed to enable CN1_MATTER_OWN_FABRIC", ex);
+                    }
+                }
                 String setupPayloadEntitlement = request.getArg(
                         "ios.entitlements.com.apple.developer"
                         + ".matter.allow-setup-payload", null);
@@ -5190,6 +5205,22 @@ public class IPhoneBuilder extends Executor {
      * purpose string, or codesigning for want of the entitlement on its App
      * ID -- for a string parser.</p>
      */
+    /**
+     * Whether this build commissions onto a Matter fabric of the app's own.
+     *
+     * <p>Read in two places -- the define that decides what a successful flow
+     * means, and the extension generator that decides what the flow does --
+     * and they have to agree, so the decision lives in one place.</p>
+     *
+     * @param request the build request
+     * @return true when the scanner saw the call or the hint asks for it
+     */
+    private boolean matterOwnFabric(BuildRequest request) {
+        return usesHomeOwnFabric
+                || "true".equalsIgnoreCase(request.getArg(
+                        "ios.home.commissioning.fabric", "false"));
+    }
+
     private static boolean isSmartHomeSetupPayload(String cls) {
         return "com/codename1/home/commissioning/SetupPayload".equals(cls)
                 || cls.indexOf(
@@ -5658,9 +5689,7 @@ public class IPhoneBuilder extends Executor {
         // The hint is an override, not the only way in: an app whose
         // setCommissionToThisApp(true) the scanner saw needs no hint, and one
         // that reaches the API through reflection has no other way to say so.
-        boolean ownFabric = usesHomeOwnFabric
-                || "true".equalsIgnoreCase(request.getArg(
-                        "ios.home.commissioning.fabric", "false"));
+        boolean ownFabric = matterOwnFabric(request);
         if (ownFabric) {
             log("Smart home: commissioning onto this app's own Matter fabric"
                     + " -- the extension ships a Matter controller");

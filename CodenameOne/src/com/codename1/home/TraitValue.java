@@ -128,11 +128,22 @@ public final class TraitValue {
     /// - `IllegalArgumentException`: when `unit` is `null`. A quantity with
     ///   no unit is the bug this class exists to prevent, so it is refused at
     ///   construction rather than defaulted to something plausible.
+    ///
+    /// - `IllegalArgumentException`: when `value` is NaN or an infinity.
+    ///   Nothing downstream can carry one: the wire encodes a number as text
+    ///   and its decoder refuses these as INVALID_DATA, so a write that got
+    ///   this far was accepted, stored by the local backend, and then read
+    ///   back as a failure -- and on a device it would be a number no
+    ///   accessory could act on.
     public static TraitValue of(double value, TraitUnit unit) {
         if (unit == null) {
             throw new IllegalArgumentException(
                     "a measured value needs a unit; use TraitUnit.NONE only"
                             + " for a genuinely dimensionless quantity");
+        }
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            throw new IllegalArgumentException(
+                    "a measured value has to be a real number, got " + value);
         }
         return new TraitValue(TraitValueKind.DOUBLE, value, null, unit, 0,
                 false);

@@ -3542,6 +3542,16 @@ void com_codename1_impl_ios_IOSNative_homeIdentify___int_java_lang_String(
     // graph on the next refresh, so this reports "not mine" whenever the id
     // is absent -- which is what CommissioningResult.wasCommissionedToThisApp
     // exists to make un-missable.
+    //
+    // Unless this build commissions onto a fabric of its own. Then a flow
+    // that finished is one the extension's own commissioning step completed,
+    // because that step throwing is what fails perform() -- so the accessory
+    // IS this app's, even though MatterSupport still declines to name it.
+#ifdef CN1_MATTER_OWN_FABRIC
+    JAVA_INT mine = error == nil ? 1 : 0;
+#else
+    JAVA_INT mine = accessoryId == nil ? 0 : 1;
+#endif
     com_codename1_impl_ios_IOSHomeCallbacks_commissioningResult___int_java_lang_String_java_lang_String_java_lang_String_int_java_lang_String(
         getThreadLocalData(), rid,
         accessoryId == nil ? JAVA_NULL
@@ -3551,7 +3561,7 @@ void com_codename1_impl_ios_IOSNative_homeIdentify___int_java_lang_String(
                                             accessoryName),
         structureId == nil ? JAVA_NULL
                            : fromNSString(getThreadLocalData(), structureId),
-        accessoryId == nil ? 0 : 1,
+        mine,
         error == nil ? JAVA_NULL : fromNSString(getThreadLocalData(), error));
     // A commissioned accessory is a graph change, and the app has no other
     // way to learn about it: HMHomeManagerDelegate does fire, but only once

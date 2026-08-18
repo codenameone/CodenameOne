@@ -260,12 +260,21 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // its own, since the scanner matches on a prefix and cannot express an
 // exclusion.
 //#define CN1_INCLUDE_MATTER_SETUP
+// CN1_MATTER_OWN_FABRIC says the generated extension commissions the accessory
+// onto a Matter fabric this app owns, as a second administrator beside the
+// user's home. The builder uncomments it for a build whose
+// CommissioningRequest.setCommissionToThisApp(true) it saw, and it is what
+// lets a successful flow report wasCommissionedToThisApp() as true: the
+// extension's commissioning step throwing is what would have failed the flow,
+// so a flow that finished is one where the fabric gained the accessory.
+//#define CN1_MATTER_OWN_FABRIC
 // MatterSupport is iOS and iPadOS only. Undoing the define here, in the header
 // every smart-home translation unit includes first, compiles the flow out on
 // the other slices; Commissioner.getStyle() then reports NONE and the public
 // API sends the user to the Home app instead.
 #if TARGET_OS_TV || TARGET_OS_WATCH || TARGET_OS_MACCATALYST || TARGET_OS_OSX
 #undef CN1_INCLUDE_MATTER_SETUP
+#undef CN1_MATTER_OWN_FABRIC
 #endif
 
 //#define INCLUDE_CN1_BACKGROUND_FETCH
