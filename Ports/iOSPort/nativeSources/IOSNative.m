@@ -2524,6 +2524,14 @@ JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForWindow___int_R_int(CN1_TH
 #endif
 }
 
+JAVA_INT com_codename1_impl_ios_IOSNative_macMonitorForMainWindow___R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if TARGET_OS_MACCATALYST
+    return CN1MacMonitorForMainWindow();
+#else
+    return 0;
+#endif
+}
+
 JAVA_LONG com_codename1_impl_ios_IOSNative_createNSData___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT file) {
     POOL_BEGIN();
     NSString* ns = toNSString(CN1_THREAD_STATE_PASS_ARG file);

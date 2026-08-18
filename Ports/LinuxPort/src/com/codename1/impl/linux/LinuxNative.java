@@ -104,7 +104,7 @@ public final class LinuxNative {
     public static native boolean browserSupported();
 
     /** Creates a WebView2-backed browser peer; returns an opaque native handle. */
-    public static native long browserCreate(int width, int height);
+    public static native long browserCreate(int width, int height, int slot);
 
     public static native void browserSetHtml(long peer, String html);
 
@@ -453,7 +453,8 @@ public final class LinuxNative {
      * {@link #editIsDone(long)}.
      */
     public static native long editStringAt(int x, int y, int w, int h, String text,
-            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align);
+            boolean singleLine, int maxSize, long fontPeer, int fgColor, int bgColor, int align,
+            int slot);
 
     /** True once the user has committed the native edit (Enter / focus loss). */
     public static native boolean editIsDone(long peer);
@@ -869,16 +870,16 @@ public final class LinuxNative {
      * {@code @NativeInterface}; these reparent it onto the host window and
      * move/size/show it to track the lightweight {@link com.codename1.ui.PeerComponent}.
      */
-    public static native void peerInitialized(long peer, int x, int y, int w, int h);
+    public static native void peerInitialized(long peer, int x, int y, int w, int h, int slot);
 
     /** Repositions / resizes the peer HWND to the component's absolute bounds. */
-    public static native void peerSetBounds(long peer, int x, int y, int w, int h);
+    public static native void peerSetBounds(long peer, int x, int y, int w, int h, int slot);
 
     /** Shows / hides the peer HWND (transition lightweight mode). */
     public static native void peerSetVisible(long peer, boolean visible);
 
     /** Hides and detaches the peer HWND (the app still owns its lifetime). */
-    public static native void peerDeinitialized(long peer);
+    public static native void peerDeinitialized(long peer, int slot);
 
     /** Fills {@code out[0]=w, [1]=h} with the peer HWND's current size (0 if none). */
     public static native void peerCalcPreferredSize(long peer, int dispW, int dispH, int[] out);

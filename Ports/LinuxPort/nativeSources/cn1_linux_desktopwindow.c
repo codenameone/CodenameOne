@@ -66,6 +66,9 @@ typedef struct {
      * Windows port's pendingResize: GTK reports a resize on its own thread while
      * the event dispatch thread may be painting through g.cr, and freeing the
      * context or surface underneath it crashes or corrupts the frame. */
+    /* The touch sequence this window is tracking, so two windows can each follow
+     * their own contact. */
+    void* touchSeq;
     volatile int pendingResize;
     int pendingW;
     int pendingH;
@@ -88,6 +91,7 @@ static CN1LinuxWindow* slotAt(int slot) {
 }
 
 static void cn1DesktopResizeBuffer(CN1LinuxWindow* w, int width, int height);
+static int cn1DesktopIsTouchSource(GdkEvent* e);
 
 /* Called by the port at the start of a frame, on the drawing thread, which is
  * what makes it the safe point to swap the back buffer. */
@@ -237,6 +241,10 @@ static int cn1DesktopButtonMask(guint button) {
 static gboolean cn1DesktopOnButton(GtkWidget* widget, GdkEventButton* e, gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     (void) widget;
+    if (cn1DesktopIsTouchSource((GdkEvent*) e)) {
+        /* Handled by cn1DesktopOnTouch, flagged as touch. */
+        return TRUE;
+    }
     if (w == 0) {
         return FALSE;
     }
@@ -254,6 +262,10 @@ static gboolean cn1DesktopOnMotion(GtkWidget* widget, GdkEventMotion* e, gpointe
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     int mask = 0;
     (void) widget;
+    if (cn1DesktopIsTouchSource((GdkEvent*) e)) {
+        /* Synthesized from a contact cn1DesktopOnTouch already reported. */
+        return TRUE;
+    }
     if (w == 0) {
         return FALSE;
     }
@@ -411,6 +423,52 @@ static gboolean cn1DesktopOnDelete(GtkWidget* widget, GdkEvent* e, gpointer data
     return TRUE;
 }
 
+/* True when an event came from a touchscreen. GTK synthesizes button and motion
+ * events from touch for widgets that ignore touch, so those are dropped here and
+ * the touch handler drives the pointer instead -- otherwise every contact
+ * dispatches twice, once unflagged. Same rule the main window applies. */
+static int cn1DesktopIsTouchSource(GdkEvent* e) {
+    GdkDevice* dev = gdk_event_get_source_device(e);
+    return dev != NULL && gdk_device_get_source(dev) == GDK_SOURCE_TOUCHSCREEN;
+}
+
+/* Real touch sequences, mirroring the main window's cn1OnTouch with the window id
+ * carried through. Without this a touchscreen contact over a secondary window only
+ * ever arrived as a synthesized mouse event, so listeners saw it as a mouse and no
+ * touch sequence reached the window at all. */
+static gboolean cn1DesktopOnTouch(GtkWidget* widget, GdkEventTouch* e, gpointer data) {
+    CN1LinuxWindow* w = (CN1LinuxWindow*) data;
+    (void) widget;
+    if (w == 0) {
+        return FALSE;
+    }
+    switch (e->type) {
+        case GDK_TOUCH_BEGIN:
+            if (w->touchSeq == 0) {
+                w->touchSeq = e->sequence;
+                cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_PRESSED,
+                        (int) e->x, (int) e->y, CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
+            }
+            return TRUE;
+        case GDK_TOUCH_UPDATE:
+            if (e->sequence == w->touchSeq) {
+                cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_DRAGGED,
+                        (int) e->x, (int) e->y, CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
+            }
+            return TRUE;
+        case GDK_TOUCH_END:
+        case GDK_TOUCH_CANCEL:
+            if (e->sequence == w->touchSeq) {
+                w->touchSeq = 0;
+                cn1LinuxPushWindowEvent(w->windowId, CN1_EVENT_POINTER_RELEASED,
+                        (int) e->x, (int) e->y, CN1_PE_MASK_PRIMARY | CN1_PE_TOUCH_FLAG);
+            }
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
+
 static gboolean cn1DesktopOnFocus(GtkWidget* widget, GdkEventFocus* e, gpointer data) {
     CN1LinuxWindow* w = (CN1LinuxWindow*) data;
     (void) widget;
@@ -528,7 +586,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     gtk_widget_add_events(w->drawingArea,
             GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
             | GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK
-            | GDK_TOUCHPAD_GESTURE_MASK);
+            | GDK_TOUCHPAD_GESTURE_MASK | GDK_TOUCH_MASK);
 
     /* Every handler takes the window as its closure data, which is what makes
      * routing free -- no lookup, no shared state. */
@@ -538,6 +596,7 @@ static void cn1DesktopCreateOnMain(void* arg) {
     g_signal_connect(w->drawingArea, "button-release-event", G_CALLBACK(cn1DesktopOnButton), w);
     g_signal_connect(w->drawingArea, "motion-notify-event", G_CALLBACK(cn1DesktopOnMotion), w);
     g_signal_connect(w->drawingArea, "scroll-event", G_CALLBACK(cn1DesktopOnScroll), w);
+    g_signal_connect(w->drawingArea, "touch-event", G_CALLBACK(cn1DesktopOnTouch), w);
     /* Touchpad gestures arrive through the generic "event" signal rather than one
      * of their own, which is why this is connected separately. */
     g_signal_connect(w->drawingArea, "event", G_CALLBACK(cn1DesktopOnGenericEvent), w);

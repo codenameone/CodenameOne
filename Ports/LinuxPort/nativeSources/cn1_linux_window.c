@@ -133,28 +133,44 @@ CN1Graphics* cn1LinuxWindowGraphics(void) {
     return &cn1WindowG;
 }
 
+/* The GtkFixed a peer belongs in: a secondary desktop window's own overlay, or the
+ * main window's. CN1_MAIN_WINDOW_SLOT means the application's main window.
+ *
+ * Peers used to go into cn1Fixed unconditionally, so a BrowserComponent or native
+ * editor inside a Window appeared over the *main* window while the window it
+ * belonged to stayed empty. */
+static GtkWidget* cn1LinuxOverlayHost(int slot) {
+    if (slot == CN1_MAIN_WINDOW_SLOT) {
+        return cn1Fixed;
+    }
+    return cn1LinuxDesktopFixed(slot);
+}
+
 /* Native-peer overlay management (edit / browser / video / generic peers). All
  * must run on the GTK main thread (callers marshal via gdk_threads_add_idle). */
-void cn1LinuxOverlayAdd(GtkWidget* w, int x, int y, int width, int height) {
-    if (cn1Fixed == 0 || w == 0) {
+void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int height) {
+    GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (host == 0 || w == 0) {
         return;
     }
     gtk_widget_set_size_request(w, width, height);
-    gtk_fixed_put(GTK_FIXED(cn1Fixed), w, x, y);
+    gtk_fixed_put(GTK_FIXED(host), w, x, y);
     gtk_widget_show_all(w);
 }
 
-void cn1LinuxOverlayMove(GtkWidget* w, int x, int y, int width, int height) {
-    if (cn1Fixed == 0 || w == 0) {
+void cn1LinuxOverlayMove(int slot, GtkWidget* w, int x, int y, int width, int height) {
+    GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (host == 0 || w == 0) {
         return;
     }
     gtk_widget_set_size_request(w, width, height);
-    gtk_fixed_move(GTK_FIXED(cn1Fixed), w, x, y);
+    gtk_fixed_move(GTK_FIXED(host), w, x, y);
 }
 
-void cn1LinuxOverlayRemove(GtkWidget* w) {
-    if (cn1Fixed != 0 && w != 0 && gtk_widget_get_parent(w) == cn1Fixed) {
-        gtk_container_remove(GTK_CONTAINER(cn1Fixed), w);
+void cn1LinuxOverlayRemove(int slot, GtkWidget* w) {
+    GtkWidget* host = cn1LinuxOverlayHost(slot);
+    if (host != 0 && w != 0 && gtk_widget_get_parent(w) == host) {
+        gtk_container_remove(GTK_CONTAINER(host), w);
     }
 }
 

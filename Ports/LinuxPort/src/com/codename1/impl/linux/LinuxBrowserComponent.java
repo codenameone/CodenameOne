@@ -55,7 +55,10 @@ class LinuxBrowserComponent extends PeerComponent {
     LinuxBrowserComponent(BrowserComponent browser) {
         super(null);
         this.browser = browser;
-        this.peer = LinuxNative.browserCreate(800, 600);
+        // Slot resolved from the BrowserComponent, so the WebKit view is hosted by
+        // the window the component is in rather than always by the main window.
+        this.peer = LinuxNative.browserCreate(800, 600,
+                LinuxWindowManager.slotForComponent(browser));
     }
 
     long peer() {

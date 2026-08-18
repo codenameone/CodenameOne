@@ -32,7 +32,8 @@ class LinuxGenericPeer extends PeerComponent {
     @Override
     protected void initComponent() {
         super.initComponent();
-        LinuxNative.peerInitialized(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        LinuxNative.peerInitialized(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight(),
+                LinuxWindowManager.slotForComponent(this));
     }
 
     @Override
@@ -41,14 +42,15 @@ class LinuxGenericPeer extends PeerComponent {
         if (img != null) {
             setPeerImage(img);
         }
-        LinuxNative.peerDeinitialized(peer);
+        LinuxNative.peerDeinitialized(peer, LinuxWindowManager.slotForComponent(this));
         super.deinitialize();
     }
 
     @Override
     protected void onPositionSizeChange() {
         super.onPositionSizeChange();
-        LinuxNative.peerSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());
+        LinuxNative.peerSetBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight(),
+                LinuxWindowManager.slotForComponent(this));
     }
 
     @Override

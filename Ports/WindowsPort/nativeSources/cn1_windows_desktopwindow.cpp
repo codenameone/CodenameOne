@@ -258,7 +258,10 @@ static void cn1WinDesktopPushPointer(CN1DesktopWindow* w, CN1EventType type,
  * releasing capture on the first up would strand a drag started with two buttons.
  */
 static void cn1WinDesktopReleaseCaptureIfIdle(WPARAM wParam, WPARAM released) {
-    WPARAM stillDown = wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON) & ~released;
+    /* The extra buttons count as held too, or releasing one of the three main
+     * buttons would drop the capture while a back/forward drag was still going. */
+    WPARAM stillDown = wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON
+            | MK_XBUTTON1 | MK_XBUTTON2) & ~released;
     if (stillDown == 0) {
         ReleaseCapture();
     }
@@ -310,12 +313,37 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam,
                     CN1_PE_MASK_MIDDLE | cn1WinTouchFlag());
             return 0;
+        /* The extra mouse buttons, mirroring the main window procedure. Without
+         * these a back or forward click over a secondary window was silently
+         * dropped, so the same hardware worked on the main form and nowhere else.
+         * WM_XBUTTON* returns TRUE rather than 0 by contract. */
+        case WM_XBUTTONDOWN: {
+            int xmask = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1)
+                    ? CN1_PE_MASK_BACK : CN1_PE_MASK_FORWARD;
+            SetCapture(hwnd);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_PRESSED, lParam,
+                    xmask | cn1WinTouchFlag());
+            return TRUE;
+        }
+        case WM_XBUTTONUP: {
+            int xmask = (GET_XBUTTON_WPARAM(wParam) == XBUTTON1)
+                    ? CN1_PE_MASK_BACK : CN1_PE_MASK_FORWARD;
+            cn1WinDesktopReleaseCaptureIfIdle(wParam,
+                    (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) ? MK_XBUTTON1 : MK_XBUTTON2);
+            cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_RELEASED, lParam,
+                    xmask | cn1WinTouchFlag());
+            return TRUE;
+        }
         case WM_MOUSEMOVE:
-            if ((wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON)) != 0) {
+            if ((wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON
+                    | MK_XBUTTON1 | MK_XBUTTON2)) != 0) {
                 int mask = 0;
                 if (wParam & MK_LBUTTON) { mask |= CN1_PE_MASK_PRIMARY; }
                 if (wParam & MK_RBUTTON) { mask |= CN1_PE_MASK_SECONDARY; }
                 if (wParam & MK_MBUTTON) { mask |= CN1_PE_MASK_MIDDLE; }
+                /* Dragging with a held back/forward button counts as a drag too. */
+                if (wParam & MK_XBUTTON1) { mask |= CN1_PE_MASK_BACK; }
+                if (wParam & MK_XBUTTON2) { mask |= CN1_PE_MASK_FORWARD; }
                 cn1WinDesktopPushPointer(w, CN1_EVENT_POINTER_DRAGGED, lParam,
                         mask | cn1WinTouchFlag());
             }

@@ -76,6 +76,11 @@ import java.util.Set;
  */
 public class LinuxImplementation extends CodenameOneImplementation {
 
+    /// Slot value meaning "the application's main window" for the native peer,
+    /// editor and browser hosts. Matches CN1_MAIN_WINDOW_SLOT in cn1_linux_gfx.h.
+    static final int MAIN_WINDOW_SLOT = -1;
+
+
     @Override
     public boolean isHighContrastEnabled() {
         return LinuxNative.isHighContrastEnabled();
@@ -1999,8 +2004,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
             fontPeer = ((Long) f.getNativeFont()).longValue();
         }
 
+        // The editor goes into the overlay of the window the field lives in; without
+        // the slot it appeared over the main window while the window being typed into
+        // showed nothing.
         long peer = LinuxNative.editStringAt(x, y, w, h, text == null ? "" : text,
-                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0);
+                singleLine, maxSize, fontPeer, s.getFgColor(), s.getBgColor(), 0,
+                LinuxWindowManager.slotForComponent(cmp));
         if (peer == 0) {
             // No native window (headless) -> nothing to edit; complete with the
             // existing text so a caller awaiting the callback still proceeds.

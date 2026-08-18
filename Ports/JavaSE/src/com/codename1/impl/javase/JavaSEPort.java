@@ -2921,18 +2921,44 @@ public class JavaSEPort extends CodenameOneImplementation {
          * through the display dimensions unchanged, because those also account for a
          * loaded skin's screen coordinates.
          */
+        /// The backing scale of the display *this* canvas is on.
+        ///
+        /// The global `retinaScale` is the main display's, fixed at startup. A
+        /// secondary window can sit on a monitor with a different transform, and the
+        /// window manager already lays it out using that monitor's scale -- so
+        /// sizing the surface, the backing buffer and the pointer mapping from the
+        /// global one clipped or stretched the content and put hit testing out of
+        /// step as soon as the window was moved to another display.
+        double canvasScale() {
+            if (windowId == 0) {
+                return retinaScale;
+            }
+            try {
+                GraphicsConfiguration cfg = getGraphicsConfiguration();
+                if (cfg != null) {
+                    double sx = cfg.getDefaultTransform().getScaleX();
+                    if (sx > 0) {
+                        return sx;
+                    }
+                }
+            } catch (Throwable err) {
+                // fall through to the global scale
+            }
+            return retinaScale;
+        }
+
         int surfaceWidth() {
             if (windowId == 0) {
                 return getDisplayWidthImpl();
             }
-            return Math.max(1, (int) (getWidth() * retinaScale));
+            return Math.max(1, (int) (getWidth() * canvasScale()));
         }
 
         int surfaceHeight() {
             if (windowId == 0) {
                 return getDisplayHeightImpl();
             }
-            return Math.max(1, (int) (getHeight() * retinaScale));
+            return Math.max(1, (int) (getHeight() * canvasScale()));
         }
 
         C() {
@@ -3132,7 +3158,8 @@ public class JavaSEPort extends CodenameOneImplementation {
             BufferedImage previous = buffer;
             if (getScreenCoordinates() == null) {
                 java.awt.Dimension d = getSize();
-                if (buffer == null || buffer.getWidth() != (int)(d.width * retinaScale) || buffer.getHeight() != (int)(d.height*retinaScale)) {
+                double cs = canvasScale();
+                if (buffer == null || buffer.getWidth() != (int)(d.width * cs) || buffer.getHeight() != (int)(d.height * cs)) {
                     buffer = createBufferedImage();
                 }
             } else {
@@ -3569,7 +3596,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getScreenCoordinates() != null) {
                 return new BufferedImage(Math.max(20, (int) (getScreenCoordinates().width * zoomLevel)), Math.max(20, (int) (getScreenCoordinates().height * zoomLevel)), BufferedImage.TYPE_INT_RGB);
             }
-            return new BufferedImage(Math.max(20, (int)(getWidth() * retinaScale)), Math.max(20, (int)(getHeight() * retinaScale)), BufferedImage.TYPE_INT_RGB);
+            return new BufferedImage(Math.max(20, (int)(getWidth() * canvasScale())), Math.max(20, (int)(getHeight() * canvasScale())), BufferedImage.TYPE_INT_RGB);
         }
 
         public void validate() {
@@ -3822,14 +3849,16 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().x + x));
             }
-            return (int)(coordinate * retinaScale);
+            // canvasScale(), not retinaScale: a press has to land where the content
+            // was drawn, and the two differ on a mixed-scale desktop.
+            return (int)(coordinate * canvasScale());
         }
 
         private int scaleCoordinateY(int coordinate) {
             if (getScreenCoordinates() != null) {
                 return (int) (retinaScale * coordinate / zoomLevel - (getScreenCoordinates().y + y));
             }
-            return (int)(coordinate * retinaScale);
+            return (int)(coordinate * canvasScale());
         }
         Integer triggeredKeyCode;
         private boolean mouseDown;

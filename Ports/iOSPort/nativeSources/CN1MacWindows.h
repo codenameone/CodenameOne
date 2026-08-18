@@ -88,6 +88,9 @@ int CN1MacMonitorDpi(int monitor);
 double CN1MacMonitorScale(int monitor);
 int CN1MacMonitorForWindow(int slot);
 
+/** The screen the application's own scene is on; the main window has no slot. */
+int CN1MacMonitorForMainWindow(void);
+
 /* Invoked from the scene delegate when a Codename One window scene connects, so
  * a scene the system restored on launch is adopted rather than orphaned. */
 void CN1MacWindowSceneConnected(UIWindowScene* scene);

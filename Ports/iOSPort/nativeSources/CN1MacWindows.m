@@ -1123,4 +1123,36 @@ int CN1MacMonitorForWindow(int slot) {
     return CN1MacPrimaryMonitor();
 }
 
+/* The screen the application's own scene is on. The main window has no slot, so
+ * CN1MacMonitorForWindow cannot answer for it, and without this everything
+ * positioned against the main form reported the primary screen even after the user
+ * had dragged the application to an external display. */
+int CN1MacMonitorForMainWindow(void) {
+    NSArray<UIScreen*>* screens = [UIScreen screens];
+    UIScreen* main = nil;
+    NSUInteger iter;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        /* Skip the scenes belonging to Codename One windows; what is left is the
+         * application's own. */
+        if (CN1MacWindowIdForScene((UIWindowScene*) scene) >= 0) {
+            continue;
+        }
+        main = ((UIWindowScene*) scene).screen;
+        break;
+    }
+    if (main == nil) {
+        return CN1MacPrimaryMonitor();
+    }
+    screens = [UIScreen screens];
+    for (iter = 0; iter < screens.count; iter++) {
+        if (screens[iter] == main) {
+            return (int) iter;
+        }
+    }
+    return CN1MacPrimaryMonitor();
+}
+
 #endif /* TARGET_OS_MACCATALYST */

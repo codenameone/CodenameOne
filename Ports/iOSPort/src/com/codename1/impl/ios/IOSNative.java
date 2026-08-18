@@ -269,6 +269,10 @@ public final class IOSNative {
     native int macMonitorScaleTimes100(int monitor);
 
     native int macMonitorForWindow(int slot);
+
+    /// The monitor the application's own Catalyst scene is on. The main window has
+    /// no slot, so `#macMonitorForWindow(int)` cannot answer for it.
+    native int macMonitorForMainWindow();
     
     native void setImageName(long nativeImage, String name);
     

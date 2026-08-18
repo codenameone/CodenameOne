@@ -119,9 +119,13 @@ int cn1LinuxSurfaceToPng(cairo_surface_t* surface, unsigned char** outData, int*
  * sits in a pass-through GtkOverlay over the Cairo drawing area; these place /
  * move / remove a native widget tracking a lightweight PeerComponent. Must run
  * on the GTK main thread. */
-void cn1LinuxOverlayAdd(GtkWidget* w, int x, int y, int width, int height);
-void cn1LinuxOverlayMove(GtkWidget* w, int x, int y, int width, int height);
-void cn1LinuxOverlayRemove(GtkWidget* w);
+/* Slot of the application's main window, for the overlay calls below. A secondary
+ * desktop window passes its own slot so its peers land in its overlay. */
+#define CN1_MAIN_WINDOW_SLOT (-1)
+
+void cn1LinuxOverlayAdd(int slot, GtkWidget* w, int x, int y, int width, int height);
+void cn1LinuxOverlayMove(int slot, GtkWidget* w, int x, int y, int width, int height);
+void cn1LinuxOverlayRemove(int slot, GtkWidget* w);
 
 /* The top-level GtkWindow (NULL in headless mode). */
 GtkWidget* cn1LinuxWindowWidget(void);

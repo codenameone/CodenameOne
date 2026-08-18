@@ -315,4 +315,13 @@ public class MacWindowManager extends WindowManager {
         }
         return Math.max(0, IOSImplementation.nativeInstance.macMonitorForWindow(s));
     }
+
+    @Override
+    public int getMonitorForMainWindow() {
+        // The default answers the primary monitor, which is wrong here: the
+        // application's own scene moves between displays like any other window, so a
+        // Form positioned against reported the wrong work area, scale and density
+        // once it had been dragged to an external screen.
+        return Math.max(0, IOSImplementation.nativeInstance.macMonitorForMainWindow());
+    }
 }

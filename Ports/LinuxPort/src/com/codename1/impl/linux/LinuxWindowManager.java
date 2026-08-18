@@ -67,6 +67,20 @@ public class LinuxWindowManager extends WindowManager {
         return p instanceof Peer ? ((Peer) p).slot : -1;
     }
 
+    /// The desktop-window slot hosting the given component, or
+    /// `LinuxImplementation#MAIN_WINDOW_SLOT` when it lives in the application's main
+    /// window. Native peers, the text editor and the browser all need this to reach
+    /// the right window's overlay; without it they were placed over the main window
+    /// whatever window they belonged to.
+    static int slotForComponent(com.codename1.ui.Component cmp) {
+        Object peer = com.codename1.ui.Display.getInstance().getWindowPeerForComponent(cmp);
+        if (peer == null) {
+            return LinuxImplementation.MAIN_WINDOW_SLOT;
+        }
+        int s = slot(peer);
+        return s < 0 ? LinuxImplementation.MAIN_WINDOW_SLOT : s;
+    }
+
     // ---- lifecycle -----------------------------------------------------------
 
     @Override
