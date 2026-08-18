@@ -205,6 +205,24 @@ class IPhoneBuilderIntentsDeploymentTargetTest {
 
     /// An app that already declares a Handoff activity through ios.plistInject used to lose
     /// every intent id, because any occurrence of the key was treated as complete
+    /// An app that only indexes content declares no intent, which is a supported configuration
+    /// -- parseIntentsManifest treats a missing manifest as a warning so that app builds. Its
+    /// searchable items are still published, so without this key they are findable and dead:
+    /// iOS never continues the activity and the selection callback is never reached.
+    @Test
+    public void anIndexOnlyAppStillGetsSpotlightContinuation() {
+        assertTrue(IPhoneBuilder.withSpotlightContinuation("", true)
+                .contains("CoreSpotlightContinuation"),
+                "using the indexing API is what needs the key, not declaring an intent");
+
+        assertEquals("", IPhoneBuilder.withSpotlightContinuation("", false),
+                "an app that never touches the API pays nothing");
+
+        String already = "<key>CoreSpotlightContinuation</key><true/>";
+        assertEquals(already, IPhoneBuilder.withSpotlightContinuation(already, true),
+                "a project that declared it itself must not get a second copy");
+    }
+
     /// configuration -- and it lost CoreSpotlightContinuation too, which is a different key.
     @Test
     void intentActivityTypesMergeIntoAnExistingArray() throws Exception {

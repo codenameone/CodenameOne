@@ -1559,6 +1559,31 @@ class IntentsTest {
         assertEquals("count_3", b.donatedId);
     }
 
+    /// The synthesized declaration hides every parameter the binding satisfied, so an override
+    /// of one of those was never examined -- while both bridges merge supplied values on top of
+    /// the bindings, so the bad override is exactly what the platform would replay.
+    @Test
+    void anInvalidOverrideOfABoundValueIsRefused() {
+        FakeBridge b = new FakeBridge();
+        Intents.setBridge(b);
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithIntParam("count_it", "count"));
+        Intents.setDispatcher(d);
+        Intents.registerDynamicIntent(new DynamicIntent("count_3", "count_it", "Count three")
+                .bind("count", Integer.valueOf(3)));
+
+        Map<String, Object> override = new HashMap<String, Object>();
+        override.put("count", "abc");
+        Intents.donate("count_3", override);
+        assertNull(b.donatedId, "the override is what would run, so it is what is checked");
+
+        // A valid override still donates, and so does one that leaves the binding alone.
+        Map<String, Object> good = new HashMap<String, Object>();
+        good.put("count", Integer.valueOf(7));
+        Intents.donate("count_3", good);
+        assertEquals("count_3", b.donatedId);
+    }
+
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
     /// while in-process dispatch handed the entity itself to the generated reader, which
     /// stringified it as "type:id" and asked BY_ID to resolve that. A dynamic intent could fail

@@ -449,7 +449,7 @@ public final class Intents {
                     + "through the assistant, which confirms first.");
             return;
         }
-        String unusable = donationProblem(decl, params);
+        String unusable = donationProblem(baseOf(decl, intentId), effectiveParams(intentId, params));
         if (unusable != null) {
             // Same reasoning as the unrepresentable case below, one step earlier: a donation the
             // handler could not run is a durable, permanently broken suggestion.
@@ -1131,6 +1131,47 @@ public final class Intents {
                 base.isHeadless(), base.isDiscoverable(), base.isDestructive(),
                 base.getOpensRoute(), base.getTimeoutSeconds(),
                 Collections.<String>emptyList(), remaining, base.getExposure());
+    }
+
+    /// The declaration a donation actually has to satisfy.
+    ///
+    /// For a parameterization that is the *base* intent, not the synthesized declaration. The
+    /// synthesized one hides every parameter the binding satisfied, so a supplied value
+    /// overriding one of those was never examined -- and both bridges merge supplied values on
+    /// top of the bindings, so an override of "abc" for a bound integer replaced a valid value
+    /// with one the coercion rejects on every tap. What runs is the base intent, so what is
+    /// checked is the base intent.
+    private static IntentDeclaration baseOf(IntentDeclaration decl, String intentId) {
+        DynamicIntent dyn = getDynamicIntent(intentId);
+        if (dyn == null) {
+            return decl;
+        }
+        IntentDeclaration base = getDeclaration(dyn.getBaseIntentId());
+        return base == null ? decl : base;
+    }
+
+    /// The values a donated parameterization will actually run with.
+    ///
+    /// Mirrors IntentSerializer#mergeParams, which is what the ports apply: the bindings first,
+    /// then anything supplied at donation time on top, because a binding is a default rather
+    /// than a lock. A null supplied value is skipped rather than overriding -- the serializer
+    /// drops nulls on the way out, so on the platforms the binding survives one.
+    private static Map<String, Object> effectiveParams(String intentId,
+                                                       Map<String, Object> params) {
+        DynamicIntent dyn = getDynamicIntent(intentId);
+        if (dyn == null) {
+            return params;
+        }
+        Map<String, Object> merged =
+                new LinkedHashMap<String, Object>(dyn.getBoundParameters());
+        if (params != null) {
+            for (Map.Entry<String, Object> e : params.entrySet()) {
+                if (e.getValue() != null) {
+                    merged.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        return merged;
     }
 
     /// Why this donation could never run, or null when it could.

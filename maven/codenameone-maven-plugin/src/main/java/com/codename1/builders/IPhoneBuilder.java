@@ -5245,6 +5245,22 @@ public class IPhoneBuilder extends Executor {
     /// through `ios.intents.minDeploymentTarget`.
     static final String APP_INTENTS_MIN_IOS = "16.0";
 
+    /// Declares that a tap on a Spotlight result should continue into this app.
+    ///
+    /// Gated on using the indexing API, deliberately *not* on declaring an intent. An app that
+    /// only calls Intents.index() declares none -- parseIntentsManifest treats a missing
+    /// manifest as a warning precisely so that app builds -- while the native bridge still
+    /// publishes its searchable items. Keying this off a declaration therefore made an entire
+    /// supported configuration silently useless: the content was findable, and tapping it did
+    /// nothing, because without this key iOS never continues the activity and
+    /// nativeSpotlightItemSelected is never reached.
+    static String withSpotlightContinuation(String inject, boolean usesIntents) {
+        if (!usesIntents || inject.contains("CoreSpotlightContinuation")) {
+            return inject;
+        }
+        return inject + "\n<key>CoreSpotlightContinuation</key><true/>";
+    }
+
     /// Adds this app's intent ids to an NSUserActivityTypes array the project already declared.
     ///
     /// Returns the injection unchanged when the key's array cannot be located, because writing
@@ -6165,10 +6181,15 @@ public class IPhoneBuilder extends Executor {
                 // </array> of that key, and only ids it does not already list.
                 inject = mergeUserActivityTypes(inject, intentsManifest);
             }
-            if (!inject.contains("CoreSpotlightContinuation")) {
-                inject += "\n<key>CoreSpotlightContinuation</key><true/>";
-            }
         }
+        // CoreSpotlightContinuation is about Spotlight, not about App Intents, and gating it on
+        // a declaration made an entire supported configuration silently useless: an app that
+        // only calls Intents.index() declares no intent at all -- parseIntentsManifest treats a
+        // missing manifest as a warning precisely so that app builds -- and the native bridge
+        // still publishes its searchable items. Without this key a tap on one of those results
+        // cannot continue into the app, so nativeSpotlightItemSelected is never reached and the
+        // content is findable but dead. Emitted for anything that uses the indexing API.
+        inject = withSpotlightContinuation(inject, usesIntents);
 
         // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
         // shared App Group container through this key; the CN1Widgets extension carries its own
