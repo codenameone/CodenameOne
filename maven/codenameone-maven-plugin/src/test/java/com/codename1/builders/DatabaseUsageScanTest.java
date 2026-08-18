@@ -107,20 +107,72 @@ class DatabaseUsageScanTest {
         f.delete();
     }
 
-    /**
-     * Writes a stand-in for a compiled class carrying the given constant-pool strings.
-     *
-     * The scan is a byte search over the class file, so a file containing the internal names is
-     * indistinguishable from a real class that references them, which is the whole of what is
-     * under test here.
-     */
-    /**
-     * A class file whose constant pool holds one method reference to DatabaseConfig.
-     *
-     * Real bytes rather than a string soup, because the question the scanner asks -- which factory
-     * is being called -- can only be answered from a constant pool. Just enough of one for the
-     * reference to be found: the class, the name and type, and the method reference tying them.
-     */
+    /** A file that starts like a class and then is not one, for the unreadable case. */
+    private void writeUnreadableClass(String path) throws IOException {
+        File f = new File(root, path.replace('/', File.separatorChar));
+        assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        OutputStream out = new FileOutputStream(f);
+        try {
+            out.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE,
+                0, 0, 0, 52, 0x7F, (byte) 0xFF, 1, 2, 3});
+        } finally {
+            out.close();
+        }
+    }
+
+    @Test
+    void aStringLiteralNamingTheDatabasePackageIsNotAReference() throws IOException {
+        // What reading bytes instead of bytecode could not tell apart. A class whose only mention
+        // of com/codename1/db is inside a string -- a log line, a class name it reflects on, a
+        // help URL -- referenced nothing, and counting it shipped the engine, and on Android the
+        // cipher and an API 23 floor, to an application that never touched a database.
+        writeFramework();
+        writeClassWithStringLiteral("com/example/Chatty.class",
+                "see com/codename1/db/DatabaseConfig for details");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertFalse(usage.usesDatabase(), "a mention in a string is not a use");
+        assertFalse(usage.usesDatabaseCipher(), "and certainly not encryption");
+    }
+
+    @Test
+    void aClassThatOnlyNamesTheConfigTypeIsNotEncrypting() throws IOException {
+        // Holding a DatabaseConfig is not configuring a key: the class that decides is the one
+        // that calls a factory, and this one may well have been handed a plain() from elsewhere.
+        // It still uses the database, so the engine ships -- the cipher does not.
+        writeFramework();
+        writeClass("com/example/Holder.class", "com/codename1/db/DatabaseConfig");
+
+        Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
+        assertTrue(usage.usesDatabase(), "it names a database type");
+        assertFalse(usage.usesDatabaseCipher(), "but calls no factory that configures a key");
+    }
+
+    /** A real class carrying the given text as a constant, and referring to nothing. */
+    private void writeClassWithStringLiteral(String path, String literal) throws IOException {
+        File f = new File(root, path.replace('/', File.separatorChar));
+        assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        String internalName = path.substring(0, path.length() - ".class".length());
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internalName, null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "describe", "()Ljava/lang/String;", null, null);
+        m.visitCode();
+        m.visitLdcInsn(literal);
+        m.visitInsn(org.objectweb.asm.Opcodes.ARETURN);
+        m.visitMaxs(1, 1);
+        m.visitEnd();
+        w.visitEnd();
+        OutputStream out = new FileOutputStream(f);
+        try {
+            out.write(w.toByteArray());
+        } finally {
+            out.close();
+        }
+    }
+
+    /** Writes {@link #classCalling} to a file, for the cases that scan a directory. */
     private void writeClassCalling(String path, String factory) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
@@ -132,40 +184,30 @@ class DatabaseUsageScanTest {
         }
     }
 
-    /** The same bytes, for a caller that puts them somewhere other than a loose file. */
+    /**
+     * A real class with a real call to one of DatabaseConfig's factories.
+     *
+     * Emitted with ASM rather than by hand-writing a constant pool. The scan reads bytecode, so
+     * what it needs to see is a call site: which factory is invoked is the whole question, and a
+     * pool entry alone cannot answer it -- DatabaseConfig.plain() and DatabaseConfig.passphrase()
+     * put the identical class name there.
+     */
     private byte[] classCalling(String factory) throws IOException {
-        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
-        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
-        try {
-            out.writeInt(0xCAFEBABE);
-            out.writeShort(0);
-            out.writeShort(52);
-            out.writeShort(7);
-            out.writeByte(1);
-            out.writeUTF("com/codename1/db/DatabaseConfig");
-            out.writeByte(7);
-            out.writeShort(1);
-            out.writeByte(1);
-            out.writeUTF(factory);
-            out.writeByte(1);
-            out.writeUTF("()Lcom/codename1/db/DatabaseConfig;");
-            out.writeByte(12);
-            out.writeShort(3);
-            out.writeShort(4);
-            out.writeByte(10);
-            out.writeShort(2);
-            out.writeShort(5);
-            out.writeShort(0x0021);
-            out.writeShort(2);
-            out.writeShort(2);
-            out.writeShort(0);
-            out.writeShort(0);
-            out.writeShort(0);
-            out.writeShort(0);
-        } finally {
-            out.close();
-        }
-        return bytes.toByteArray();
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "com/example/Caller", null, "java/lang/Object", null);
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "configure", "()V", null, null);
+        m.visitCode();
+        m.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESTATIC,
+                "com/codename1/db/DatabaseConfig", factory,
+                "()Lcom/codename1/db/DatabaseConfig;", false);
+        m.visitInsn(org.objectweb.asm.Opcodes.POP);
+        m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        m.visitMaxs(1, 1);
+        m.visitEnd();
+        w.visitEnd();
+        return w.toByteArray();
     }
 
     @Test
@@ -333,21 +375,47 @@ class DatabaseUsageScanTest {
     @Test
     void anUnreadableClassIsTreatedAsEncrypting() throws IOException {
         // The safe direction: an application that encrypts must not ship without a cipher because
-        // its class file could not be walked.
-        writeClass("com/example/App.class", "com/codename1/db/DatabaseConfig");
+        // its class file could not be walked. Genuinely unreadable bytes -- a header and then
+        // nothing that parses -- since the other fixtures here now emit real classes.
+        writeUnreadableClass("com/example/App.class");
         Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
         assertTrue(usage.usesDatabaseCipher(), "unreadable means assume the cipher is needed");
     }
 
+    /**
+     * Writes a real class that refers to the given internal names.
+     *
+     * Emitted with ASM. The names go in as things the class actually uses -- a field of that
+     * type and a method that instantiates it -- because the scan reads bytecode, and a file that
+     * merely contains the characters is exactly what it must not count: a string literal
+     * mentioning com/codename1/db is not a database reference, and one of these fixtures used to
+     * be indistinguishable from one.
+     */
     private void writeClass(String path, String... references) throws IOException {
         File f = new File(root, path.replace('/', File.separatorChar));
         assertTrue(f.getParentFile().isDirectory() || f.getParentFile().mkdirs());
+        String internalName = path.substring(0, path.length() - ".class".length());
+        org.objectweb.asm.ClassWriter w = new org.objectweb.asm.ClassWriter(0);
+        w.visit(org.objectweb.asm.Opcodes.V1_8, org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                internalName, null, "java/lang/Object", null);
+        for (int iter = 0; iter < references.length; iter++) {
+            w.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE, "ref" + iter,
+                    "L" + references[iter] + ";", null, null).visitEnd();
+        }
+        org.objectweb.asm.MethodVisitor m = w.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC,
+                "use", "()V", null, null);
+        m.visitCode();
+        for (int iter = 0; iter < references.length; iter++) {
+            m.visitTypeInsn(org.objectweb.asm.Opcodes.NEW, references[iter]);
+            m.visitInsn(org.objectweb.asm.Opcodes.POP);
+        }
+        m.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        m.visitMaxs(2, 1);
+        m.visitEnd();
+        w.visitEnd();
         OutputStream out = new FileOutputStream(f);
         try {
-            out.write(new byte[] {(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE});
-            for (int iter = 0; iter < references.length; iter++) {
-                out.write(references[iter].getBytes("UTF-8"));
-            }
+            out.write(w.toByteArray());
         } finally {
             out.close();
         }
@@ -396,7 +464,7 @@ class DatabaseUsageScanTest {
     @Test
     void anApplicationThatConfiguresEncryptionGetsBoth() throws IOException {
         writeFramework();
-        writeClass("com/example/MyApp.class", "com/codename1/db/DatabaseConfig");
+        writeClassCalling("com/example/MyApp.class", "passphrase");
 
         Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
         assertTrue(usage.usesDatabase(), "DatabaseConfig is in the database package");
@@ -418,7 +486,7 @@ class DatabaseUsageScanTest {
         // skip an application or library class living under it -- leaving the engine out of a
         // build that needs it, which fails at runtime rather than here.
         writeFramework();
-        writeClass("com/codename1/ui/extensions/Dao.class", "com/codename1/db/DatabaseConfig");
+        writeClassCalling("com/codename1/ui/extensions/Dao.class", "managed");
 
         Executor.DatabaseUsage usage = executor.scanForDatabaseUsage(root);
         assertTrue(usage.usesDatabase());

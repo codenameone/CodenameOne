@@ -783,13 +783,7 @@ public abstract class Executor {
         "com/codename1/db/package-info"
     };
 
-    /// The internal name of the database package, as every reference to a class in it is stored.
-    private static final byte[] DATABASE_MARKER = toAscii("com/codename1/db/");
-
-    /// The internal name of the class that turns encryption on.
-    private static final byte[] DATABASE_CIPHER_MARKER = toAscii("com/codename1/db/DatabaseConfig");
-
-    /// The same name as the marker above, for reading method references out of a constant pool.
+    /// The class that turns encryption on.
     private static final String DATABASE_CONFIG_CLASS = "com/codename1/db/DatabaseConfig";
 
     /// Framework classes that are a database by another name.
@@ -799,19 +793,10 @@ public abstract class Executor {
     /// a reference to the database. Without this the engine would be left out of exactly the
     /// applications that took the framework's advice, and they would fail at runtime rather than
     /// at build time.
-    private static final byte[][] DATABASE_FACADE_MARKERS = {
-        toAscii("com/codename1/orm/"),
-        toAscii("com/codename1/properties/SQLMap")
+    private static final String[] DATABASE_FACADE_PREFIXES = {
+        "com/codename1/orm/",
+        "com/codename1/properties/SQLMap"
     };
-
-    /// An internal class name as the bytes a constant pool holds, which are always ASCII here.
-    private static byte[] toAscii(String s) {
-        byte[] out = new byte[s.length()];
-        for (int iter = 0; iter < s.length(); iter++) {
-            out[iter] = (byte) s.charAt(iter);
-        }
-        return out;
-    }
 
     /// Reports whether the application, as opposed to the framework, uses the database.
     ///
@@ -960,16 +945,147 @@ public abstract class Executor {
         }
     }
 
-    /// Applies both questions to one class file's bytes.
+    /// Applies both questions to one class file, through ASM.
+    ///
+    /// Read as bytecode rather than searched as bytes. Every name a class refers to sits in its
+    /// constant pool, so a substring search cannot tell a *reference* to com.codename1.db from a
+    /// string literal that happens to contain those characters -- and it cannot tell
+    /// DatabaseConfig.plain(), which says a database is not encrypted, from
+    /// DatabaseConfig.passphrase(), because the class name is identical in both. Asking the
+    /// bytecode asks the question that was meant.
+    ///
+    /// The same reader and visitor style scanClassesForPermissions already uses, on the same
+    /// files, in the same builds -- which is where this should have started rather than in a
+    /// hand written constant pool walk.
+    ///
+    /// A class this cannot read counts as using both: the alternative is an application that
+    /// encrypts shipping without a cipher.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bytes`: one class file
+    /// - `found`: the two answers so far, updated in place
     private void inspectClassForDatabaseUsage(byte[] bytes, boolean[] found) {
-        if (!found[0] && (containsBytes(bytes, DATABASE_MARKER)
-                || referencesDatabaseFacade(bytes))) {
-            found[0] = true;
+        if (found[0] && found[1]) {
+            return;
         }
-        if (!found[1] && containsBytes(bytes, DATABASE_CIPHER_MARKER)
-                && callsEncryptingConfigFactory(bytes)) {
-            found[1] = true;
+        boolean[] hit = {false, false};
+        try {
+            new ClassReader(bytes).accept(new DatabaseUsageVisitor(hit),
+                    ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+        } catch (RuntimeException cannotRead) {
+            // Truncated, obfuscated past recognition, or a class file newer than this ASM knows.
+            // None of those is a reason to decide the application does not encrypt.
+            hit[0] = true;
+            hit[1] = true;
         }
+        found[0] = found[0] || hit[0];
+        found[1] = found[1] || hit[1];
+    }
+
+    /// Answers "does this class use the database" and "does it configure encryption".
+    private static final class DatabaseUsageVisitor extends ClassVisitor {
+
+        private final boolean[] hit;
+
+        DatabaseUsageVisitor(boolean[] hit) {
+            super(Opcodes.ASM9);
+            this.hit = hit;
+        }
+
+        /// Any mention of a database type, in a name, a descriptor or a signature.
+        private void note(String name) {
+            if (name == null) {
+                return;
+            }
+            if (name.indexOf(DATABASE_PACKAGE + "/") >= 0) {
+                hit[0] = true;
+                return;
+            }
+            for (int iter = 0; iter < DATABASE_FACADE_PREFIXES.length; iter++) {
+                // An application can use SQLMap or the ORM and never mention com.codename1.db
+                // itself; those exist so that it does not have to.
+                if (name.indexOf(DATABASE_FACADE_PREFIXES[iter]) >= 0) {
+                    hit[0] = true;
+                    return;
+                }
+            }
+        }
+
+        private void noteAll(String[] names) {
+            if (names != null) {
+                for (int iter = 0; iter < names.length; iter++) {
+                    note(names[iter]);
+                }
+            }
+        }
+
+        @Override
+        public void visit(int version, int access, String name, String signature,
+                String superName, String[] interfaces) {
+            note(superName);
+            note(signature);
+            noteAll(interfaces);
+        }
+
+        @Override
+        public FieldVisitor visitField(int access, String name, String descriptor,
+                String signature, Object value) {
+            note(descriptor);
+            note(signature);
+            return null;
+        }
+
+        @Override
+        public MethodVisitor visitMethod(int access, String name, String descriptor,
+                String signature, String[] exceptions) {
+            note(descriptor);
+            note(signature);
+            noteAll(exceptions);
+            return new MethodVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitMethodInsn(int opcode, String owner, String methodName,
+                        String methodDescriptor, boolean isInterface) {
+                    note(owner);
+                    note(methodDescriptor);
+                    if (DATABASE_CONFIG_CLASS.equals(owner) && isEncryptingFactory(methodName)) {
+                        // The call, not the class. plain() is the documented way to say a
+                        // database is not encrypted, and reading it as encryption costs that
+                        // application the cipher library and, on Android, every device below 23.
+                        hit[1] = true;
+                    }
+                }
+
+                @Override
+                public void visitFieldInsn(int opcode, String owner, String fieldName,
+                        String fieldDescriptor) {
+                    note(owner);
+                    note(fieldDescriptor);
+                }
+
+                @Override
+                public void visitTypeInsn(int opcode, String type) {
+                    note(type);
+                }
+
+                @Override
+                public void visitLdcInsn(Object value) {
+                    if (value instanceof Type) {
+                        note(((Type) value).getInternalName());
+                    }
+                }
+            };
+        }
+    }
+
+    /// Whether a DatabaseConfig factory is one that configures a key.
+    private static boolean isEncryptingFactory(String name) {
+        for (int iter = 0; iter < ENCRYPTING_CONFIG_FACTORIES.length; iter++) {
+            if (ENCRYPTING_CONFIG_FACTORIES[iter].equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// The DatabaseConfig factories that mean a database is encrypted.
@@ -981,100 +1097,6 @@ public abstract class Executor {
         "passphrase", "rawKey", "managed"
     };
 
-    /// Whether a class calls one of DatabaseConfig's encrypting factories.
-    ///
-    /// Read out of the constant pool rather than by searching the bytes: the class name alone
-    /// appears for `DatabaseConfig.plain()` too, and a bare search for the method names would
-    /// match any application that happens to have a field called `passphrase`. A method reference
-    /// carries both halves, so this asks the question that was meant -- is a key being configured.
-    ///
-    /// A class file this cannot parse answers true, because the alternative is an application that
-    /// encrypts silently shipping without a cipher.
-    static boolean callsEncryptingConfigFactory(byte[] bytes) {
-        try {
-            java.io.DataInputStream in = new java.io.DataInputStream(
-                    new java.io.ByteArrayInputStream(bytes));
-            if (in.readInt() != 0xCAFEBABE) {
-                return true;
-            }
-            in.readUnsignedShort();
-            in.readUnsignedShort();
-            int count = in.readUnsignedShort();
-            String[] utf8 = new String[count];
-            int[] classNameIndex = new int[count];
-            int[] refClassIndex = new int[count];
-            int[] refNameAndType = new int[count];
-            int[] nameAndTypeName = new int[count];
-            for (int iter = 1; iter < count; iter++) {
-                int tag = in.readUnsignedByte();
-                switch (tag) {
-                    case 1:
-                        utf8[iter] = in.readUTF();
-                        break;
-                    case 7:
-                        classNameIndex[iter] = in.readUnsignedShort();
-                        break;
-                    case 9:
-                    case 10:
-                    case 11:
-                        refClassIndex[iter] = in.readUnsignedShort();
-                        refNameAndType[iter] = in.readUnsignedShort();
-                        break;
-                    case 12:
-                        nameAndTypeName[iter] = in.readUnsignedShort();
-                        in.readUnsignedShort();
-                        break;
-                    case 5:
-                    case 6:
-                        in.readLong();
-                        // A long or a double takes two entries, and the second one is unusable.
-                        iter++;
-                        break;
-                    case 3:
-                    case 4:
-                        in.readInt();
-                        break;
-                    case 8:
-                    case 16:
-                    case 19:
-                    case 20:
-                        in.readUnsignedShort();
-                        break;
-                    case 15:
-                        in.readUnsignedByte();
-                        in.readUnsignedShort();
-                        break;
-                    case 17:
-                    case 18:
-                        in.readUnsignedShort();
-                        in.readUnsignedShort();
-                        break;
-                    default:
-                        // A tag this does not know means the rest cannot be walked.
-                        return true;
-                }
-            }
-            for (int iter = 1; iter < count; iter++) {
-                if (refClassIndex[iter] == 0) {
-                    continue;
-                }
-                String owner = utf8[classNameIndex[refClassIndex[iter]]];
-                if (!DATABASE_CONFIG_CLASS.equals(owner)) {
-                    continue;
-                }
-                String method = utf8[nameAndTypeName[refNameAndType[iter]]];
-                for (int f = 0; f < ENCRYPTING_CONFIG_FACTORIES.length; f++) {
-                    if (ENCRYPTING_CONFIG_FACTORIES[f].equals(method)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        } catch (Throwable cannotRead) {
-            return true;
-        }
-    }
-
     /// Whether this class file is one of the framework's own, by exact name.
     ///
     /// The `$` test catches a nested class, which belongs to the class that declares it --
@@ -1084,16 +1106,6 @@ public abstract class Executor {
         for (int iter = 0; iter < FRAMEWORK_DATABASE_CLASSES.length; iter++) {
             String framework = FRAMEWORK_DATABASE_CLASSES[iter];
             if (name.equals(framework) || name.startsWith(framework + "$")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// Whether these bytes reach the database through one of the framework's facades.
-    private static boolean referencesDatabaseFacade(byte[] bytes) {
-        for (int iter = 0; iter < DATABASE_FACADE_MARKERS.length; iter++) {
-            if (containsBytes(bytes, DATABASE_FACADE_MARKERS[iter])) {
                 return true;
             }
         }
@@ -1129,20 +1141,6 @@ public abstract class Executor {
         }
         return out.toByteArray();
     }
-
-    private static boolean containsBytes(byte[] haystack, byte[] needle) {
-        outer:
-        for (int iter = 0; iter + needle.length <= haystack.length; iter++) {
-            for (int j = 0; j < needle.length; j++) {
-                if (haystack[iter + j] != needle[j]) {
-                    continue outer;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
     protected void scanClassesForPermissions(File directory, final ClassScanner scanner) throws IOException {
         File[] list = directory.listFiles();
         for (final File current : list) {
