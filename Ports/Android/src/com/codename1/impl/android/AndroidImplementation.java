@@ -1578,6 +1578,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         instance = this;
+        // Android has reflection, so the device runtime's linker needs nothing
+        // from the build; registering unconditionally costs one object and lets
+        // the runtime app work on a stock build.
+        com.codename1.impl.interp.InterpPlatform.register(new InterpAndroidLinker());
         if(getActivity() != null && getActivity().hasUI()){
             if (!hasActionBar()) {
                 try {

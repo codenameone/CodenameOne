@@ -48,6 +48,10 @@ public class DeviceRuntimeApp extends Lifecycle {
     @Override
     public void init(Object context) {
         super.init(context);
+        // Before anything is pushed: a provider's implementation is chosen the
+        // first time getInstance() is called, and a pushed program calling it
+        // must find the mock rather than the real provider's "unsupported".
+        com.codename1.social.DeviceRuntimeSocialMocks.install();
         try {
             DeviceRuntimeService svc = DeviceRuntimeService.getInstance();
             boolean started = svc.startDialer(PORT);

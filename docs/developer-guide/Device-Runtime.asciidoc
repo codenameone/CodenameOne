@@ -167,12 +167,19 @@ The point of running on a device is the half no simulator can imitate, so the ru
 
 That needed a second mechanism. The build decides which native SDK to link by scanning the app for references to the API that fronts one, and it reads field and method descriptors -- a class literal is invisible to it, being an LDC rather than a type instruction. Most of these types are final or have no accessible constructor (`TextRecognizer` is final), so no shim mentions them, nothing references them and the SDK was left out: the runtime reported the interesting half unsupported on the one device that supported it. The generator now also emits `InterpNativeCapabilities`, a class declaring a field of each such type and nothing else. None of it runs.
 
-Four subsystems stay out, and none of them for size:
+=== Mocked rather than missing
 
-* `com.codename1.car` -- Android Auto and CarPlay are separate surfaces with their own manifests, templates and review process, none of it drivable from a pushed program.
-* `com.codename1.payment` -- a runtime that executes somebody else's code has no business carrying a purchase flow, and the design refuses the payment APIs at the linker for the same reason.
-* `com.codename1.social` -- sign-in SDKs are bound to an application's own client ids and signing certificate, so they'd fail for pushed code even with the SDK present.
-* `com.codename1.maps` -- native maps need a Maps API key in the manifest, and the runtime has none to ship, so linking it would buy a blank map.
+Three subsystems can't be provided for real, and are answered by mocks instead of being left to report themselves unsupported. Reporting unsupported debugs nothing, and these are things developers debug constantly.
+
+*Purchases.* `Purchase.getInAppPurchase()` returns a `MockPurchase`: managed payments and item listing supported, every SKU a product priced `$0.00 (mock)`, every purchase succeeding, `restore()` returning what this session bought. What it exercises is the code around the call -- what your app does when a purchase succeeds twice, or when a restore returns something you no longer sell -- which is the part that ships broken and the part a store sandbox is slowest to reach.
+
+*Social login.* `FacebookConnect.getInstance()` and `GoogleConnect.getInstance()` return mocks that report native login supported and complete it with a fabricated token, on the event thread where a real provider would. The seam is the framework's own: a provider implementation registers itself through `implClass`, exactly as the ports' `FacebookImpl` does, so the mock arrives through the mechanism the framework already has rather than through anything bolted on. That's also why those two classes live in `com.codename1.social` in this app -- the constructors and the callback proxy are package-private.
+
+*Maps.* No mock needed. A `NativeMap` with no native provider wired in delegates to an embedded `MapView`, so a pushed program gets a real vector map with no API key.
+
+The mocks say so. The first time a pushed program touches one the runtime raises a dialog naming the subsystem, the status line records it, and the values themselves read as fake -- a price of `$0.00 (mock)`, a token of `mock-facebook-token-not-valid-anywhere`. A mock that looked real would be worse than none: somebody would ship code that only ever succeeded because nothing was.
+
+One subsystem stays out entirely: `com.codename1.car`. Android Auto and CarPlay are separate surfaces with their own manifests, templates and review process, and nothing about a car app can be driven from a pushed program.
 
 Surfaces needs one thing from the runtime rather than an exclusion: widget kinds are compiled into an app, so the build demands a `surfaces.json`. The runtime declares two generic kinds, and a pushed program can use those. It's the same bargain as the permission union -- what the host declared is what the guest gets.
 

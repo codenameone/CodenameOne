@@ -98,36 +98,25 @@ public final class GenerateInterpShims {
     };
 
     /**
-     * Subsystems this runtime deliberately does not carry.
+     * The one subsystem this runtime does not carry in any form.
      *
-     * <p>Not because they are large -- see {@link #NATIVE_CAPABILITY_PREFIXES}
-     * for the ones that are, and are carried anyway -- but because each needs
-     * per-application configuration that a runtime hosting somebody else's
-     * program cannot supply, or must not carry at all.</p>
+     * <p>Android Auto and CarPlay are a separate surface with their own
+     * manifest, templates and review process, and nothing about a car app can
+     * be driven from a pushed program -- so there is nothing to gain by
+     * carrying it and a large, awkward dependency to lose.</p>
      *
-     * <p>A shim is a compiled reference to the class it extends, and the
-     * Codename One build decides what to link by scanning for exactly such
-     * references, so leaving these unshimmed is also what keeps their SDKs
-     * out. Pushed code that calls one gets the documented answer for a native
-     * half that is absent: {@code isSupported()} false, the same as a cn1lib
-     * whose native code was not compiled in.</p>
+     * <p>Everything else that cannot be provided honestly is *mocked* instead
+     * of excluded: see {@code DeviceRuntimeMocks} in the runtime app for
+     * purchases and social login, which are the two a developer most often
+     * needs to exercise and least often can. Excluding them left pushed code
+     * facing an {@code isSupported()} that answered false, which debugs
+     * nothing.</p>
      */
     private static final String[] NATIVE_HEAVY_PREFIXES = {
             // Android Auto and CarPlay: a car app is a separate surface with
             // its own manifest, templates and review process, and none of it
             // can be driven from a pushed program.
             "com/codename1/car/",
-            // Billing. A runtime that executes code somebody else wrote has no
-            // business carrying a purchase flow, and the design refuses the
-            // payment APIs at the linker for the same reason.
-            "com/codename1/payment/",
-            // Sign-in SDKs are bound to an application's own client ids and
-            // signing certificate, so they would fail for pushed code even with
-            // the SDK present.
-            "com/codename1/social/",
-            // Native maps need a Maps API key in the manifest. The runtime has
-            // no key to ship, so linking the SDK would buy a blank map.
-            "com/codename1/maps/",
     };
 
     /**
@@ -162,6 +151,10 @@ public final class GenerateInterpShims {
             "com/codename1/bluetooth/",
             "com/codename1/vr/",
             "com/codename1/surfaces/",
+            // The vector map, which needs no key and no native provider: a
+            // NativeMap with nothing wired in delegates to an embedded MapView,
+            // so a pushed program gets a real map rather than a blank one.
+            "com/codename1/maps/",
     };
 
     private GenerateInterpShims() {
@@ -195,6 +188,20 @@ public final class GenerateInterpShims {
         File outDir = new File(args[0], "com/codenameone/devruntime/gen");
         if (!outDir.exists() && !outDir.mkdirs()) {
             throw new IllegalStateException("cannot create " + outDir);
+        }
+        // Clear what a previous run wrote. Maven does not clean a generated
+        // source directory between builds, so a class the framework has since
+        // dropped leaves its shim behind -- and the next build fails compiling
+        // a shim for a type that no longer exists, naming a symbol nobody can
+        // find. Regenerating everything from the current jar is the only state
+        // that is ever correct.
+        File[] previous = outDir.listFiles();
+        if (previous != null) {
+            for (File f : previous) {
+                if (f.getName().endsWith(".java") && !f.delete()) {
+                    throw new IllegalStateException("cannot delete stale " + f);
+                }
+            }
         }
         for (int i = 2; i + 1 < args.length; i++) {
             if ("--java-runtime".equals(args[i])) {

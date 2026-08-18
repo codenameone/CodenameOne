@@ -147,6 +147,15 @@ public final class InterpRuntime {
         return detached;
     }
 
+    /// Stands in for host subsystems this runtime only mocks. See
+    /// [InterpHostInterceptor].
+    private InterpHostInterceptor hostInterceptor;
+
+    /// Installs the interceptor consulted before a host static call.
+    public void setHostInterceptor(InterpHostInterceptor interceptor) {
+        this.hostInterceptor = interceptor;
+    }
+
     public void requestCancel() {
         cancelRequested = true;
     }
@@ -1793,6 +1802,12 @@ public final class InterpRuntime {
         st.hostCallDepth++;
         try {
             if (target == null) {
+                if (hostInterceptor != null) {
+                    Object answer = hostInterceptor.interceptStatic(owner, name, desc, args);
+                    if (answer != InterpHostInterceptor.NOT_INTERCEPTED) {  //NOPMD CompareObjectsWithEquals - a sentinel
+                        return answer;
+                    }
+                }
                 return linker.invokeStatic(owner, name, desc, args);
             }
             if (special) {

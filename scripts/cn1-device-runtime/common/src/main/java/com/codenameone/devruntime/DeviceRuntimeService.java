@@ -107,6 +107,9 @@ public class DeviceRuntimeService {
     /// The entry class of whatever is running, for the screen to name.
     private volatile String loadedName = "";
 
+    /// Mocked subsystems this program has used, for the screen to admit to.
+    private volatile String mocksUsed = "";
+
     private DeviceRuntimeService() {
     }
 
@@ -708,6 +711,12 @@ public class DeviceRuntimeService {
         ShimObjectFactory factory = new ShimObjectFactory();
         final InterpRuntime rt = new InterpRuntime(bundle, InterpPlatform.getLinker(), factory);
         factory.attach(rt);
+        // Purchases and social logins are answered by mocks: see
+        // DeviceRuntimeMocks for what this runtime cannot honestly provide and
+        // why standing in for it beats reporting it unsupported.
+        rt.setHostInterceptor(new DeviceRuntimeMocks());
+        DeviceRuntimeMocks.reset();
+        mocksUsed = "";
         runtime = rt;
 
         final Throwable[] failure = new Throwable[1];
@@ -795,6 +804,19 @@ public class DeviceRuntimeService {
 
     public String getStatus() {
         return status;
+    }
+
+    /// Records that a pushed program used a mocked subsystem.
+    void noteMockUsed(String subsystem) {
+        if (mocksUsed.indexOf(subsystem) < 0) {
+            mocksUsed = mocksUsed.length() == 0 ? subsystem : mocksUsed + ", " + subsystem;
+        }
+        status = "running (mocked: " + mocksUsed + ")";
+    }
+
+    /// The mocked subsystems this program has used, empty when it has used none.
+    public String getMocksUsed() {
+        return mocksUsed;
     }
 
     public String getLoadedSource() {
