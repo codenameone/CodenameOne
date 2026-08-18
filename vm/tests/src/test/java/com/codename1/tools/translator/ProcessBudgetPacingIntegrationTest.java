@@ -168,6 +168,20 @@ class ProcessBudgetPacingIntegrationTest {
     private static final long STATIC_CAP_FLOOR_KB = 3 * 24 * 1024;
 
     /**
+     * Keep in sync with CN1_PACING_HEADROOM_MARGIN in cn1_globals.m. A budgeted thread is
+     * admitted only while the remaining budget still covers its block plus this, so under
+     * sustained allocation the observed headroom settles just above it.
+     */
+    private static final long HEADROOM_MARGIN_KB = 64 * 1024;
+
+    /**
+     * Slack over the margin for the headroom assertion. Generous, because the assertion's
+     * job is to separate a budget-derived figure from a host-wide one -- two readings
+     * orders of magnitude apart -- not to pin down where exactly headroom bottomed out.
+     */
+    private static final long HEADROOM_MARGIN_SLACK_KB = 8 * 1024;
+
+    /**
      * Bound on a single translated-binary run. The workload takes a few seconds; this is
      * two orders of magnitude above that, so it can only be reached by a run that is not
      * progressing. Generous on purpose -- it exists to turn a stall into a failure, not
@@ -354,24 +368,40 @@ class ProcessBudgetPacingIntegrationTest {
         // cap too, and that same static cap could hold the 256MB run under its limit. The
         // cap VALUE separates them, because 72MB is a hard floor everywhere except the
         // budget clamp -- see STATIC_CAP_FLOOR_KB.
-        long tightMinCapKb = parsePacing(tightOutput, "minCapKb=");
-        assertTrue(tightMinCapKb >= 0 && tightMinCapKb < STATIC_CAP_FLOOR_KB,
-                "Under a " + TIGHT_LIMIT_MB + "MB budget the smallest pacing cap computed"
-                        + " was " + tightMinCapKb + "KB, which is not below the "
-                        + STATIC_CAP_FLOOR_KB + "KB floor that sizing WITHOUT a budget can"
-                        + " never go under. So the cap was not derived from the budget, and"
-                        + " the parks above prove nothing: on device that is the original"
-                        + " bug, where host-wide headroom yields a gigabyte-scale cap."
+        // The park counts above cannot, on their own, tell budget-driven admission from
+        // the unbudgeted volume cap -- both park. boundedChecks can, because it counts
+        // only decisions actually made against a live process budget. This is the pair of
+        // assertions that would fail if cn1ProcessHeadroom regressed to reporting
+        // host-wide memory: the control would start taking the bounded path, and the
+        // tight run's observed headroom would no longer sit inside its declared budget.
+        assertTrue(parsePacing(tightOutput, "boundedChecks=") > 0,
+                "Under a " + TIGHT_LIMIT_MB + "MB budget no admission decision was made"
+                        + " against a process budget at all, so the parks above prove"
+                        + " nothing about the fix.\n--- tight ---\n" + tightOutput);
+
+        long tightMinHeadroomKb = parsePacing(tightOutput, "minHeadroomKb=");
+        long headroomBound = HEADROOM_MARGIN_KB + HEADROOM_MARGIN_SLACK_KB;
+        assertTrue(tightMinHeadroomKb >= 0 && tightMinHeadroomKb < headroomBound,
+                "Under a " + TIGHT_LIMIT_MB + "MB budget the least remaining headroom"
+                        + " observed was " + tightMinHeadroomKb + "KB, not the ~"
+                        + HEADROOM_MARGIN_KB + "KB margin that sustained allocation against"
+                        + " a real budget settles at. The figure being metered is therefore"
+                        + " not the budget: a host-wide reading is orders of magnitude"
+                        + " larger, and on device that is the original bug."
                         + "\n--- tight ---\n" + tightOutput);
+
+        assertEquals(0, parsePacing(controlOutput, "boundedChecks="),
+                "No budget was declared, so no admission decision may be made against one."
+                        + " A non-zero count means a ceiling is being inferred where none"
+                        + " exists, which would throttle every non-iOS target.\n"
+                        + "--- control ---\n" + controlOutput);
 
         long controlMinCapKb = parsePacing(controlOutput, "minCapKb=");
         assertTrue(controlMinCapKb >= STATIC_CAP_FLOOR_KB,
-                "With no budget declared the cap must come from the host-wide reading and"
-                        + " its static floor, but the smallest computed was "
-                        + controlMinCapKb + "KB, under " + STATIC_CAP_FLOOR_KB + "KB. Some"
-                        + " budget clamp is being applied where no ceiling exists, which is"
-                        + " throttling every non-iOS target.\n--- control ---\n"
-                        + controlOutput);
+                "With no budget declared the BiBOP cap must come from the host-wide reading"
+                        + " and its static floor, but the smallest computed was "
+                        + controlMinCapKb + "KB, under " + STATIC_CAP_FLOOR_KB + "KB."
+                        + "\n--- control ---\n" + controlOutput);
     }
 
     private long parsePacing(String output, String key) {

@@ -1484,20 +1484,11 @@ extern long long totalAllocations;
 // flushing it in bulk is safe; only the trigger cadence shifts (by < nthreads*page,
 // negligible vs the 24MB trigger, and already racy today). The bump cursor / mark
 // publication ordering is UNCHANGED (those are the GC-visible fields; see report).
-// Cap on the per-thread accumulator. Deferring to page-acquire alone bounds the
-// unflushed total at roughly CN1_BIBOP_NUM_CLASSES * CN1_BIBOP_PAGE_SIZE per thread --
-// a thread holding a current page in every size class can allocate ~1MB before it
-// acquires anything -- so with several allocators megabytes of real footprint stay
-// invisible to the process-wide pacing cap that issue #5537 added. Flushing whenever the
-// accumulator reaches one page bounds that at CN1_BIBOP_PAGE_SIZE per thread instead.
-//
-// This keeps essentially all of the de-atomization it was introduced for: objects here
-// are at most CN1_BIBOP_MAX_OBJECT (512 bytes), so a 64KB threshold is still one atomic
-// per 128+ allocations rather than one per allocation.
-#ifndef CN1_BIBOP_ACCOUNT_FLUSH_BYTES
-#define CN1_BIBOP_ACCOUNT_FLUSH_BYTES CN1_BIBOP_PAGE_SIZE
-#endif
 #ifndef CN1_DISABLE_DEATOMIC_BYTES
+#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
+    (ts)->bibopBytesLocal += (JAVA_LONG)(n); \
+    (ts)->bibopEpochBytes += (JAVA_LONG)(n); \
+} while(0)
 // Flush the per-thread byte accumulator AND, in the same bulk step, the
 // isHighFrequencyGC heuristic counters (allocationsSinceLastGC/totalAllocations) --
 // which used to be two global stores per object on the hot path. Coarsening them to
@@ -1509,12 +1500,6 @@ extern long long totalAllocations;
         allocationsSinceLastGC += __bl; \
         totalAllocations += __bl; \
         (ts)->bibopBytesLocal = 0; } } while(0)
-#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
-    (ts)->bibopBytesLocal += (JAVA_LONG)(n); \
-    (ts)->bibopEpochBytes += (JAVA_LONG)(n); \
-    if((ts)->bibopBytesLocal >= (JAVA_LONG)CN1_BIBOP_ACCOUNT_FLUSH_BYTES) { \
-        CN1_BIBOP_FLUSH_BYTES(ts); } \
-} while(0)
 #else
 #define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
     (ts)->bibopEpochBytes += (JAVA_LONG)(n); \

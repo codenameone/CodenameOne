@@ -474,6 +474,12 @@ static _Atomic long cn1PacingParksLegacy = 0;
 // and every unbounded branch takes the larger of that and a fraction of host RAM. Only the
 // process-budget clamp can produce less. LONG_MAX until something computes a cap.
 static _Atomic long cn1PacingMinCap = 0x7fffffffffffffffLL;
+// Bounded-path telemetry. boundedChecks counts how often admission was decided against
+// a real process budget, which is what tells a budgeted run apart from an unbudgeted one
+// -- a park count cannot, since the unbudgeted path parks too. minHeadroom is the least
+// remaining budget ever observed; -1 means the bounded path never ran.
+static _Atomic long cn1PacingBoundedChecks = 0;
+static _Atomic long cn1PacingMinHeadroom = -1;
 static _Atomic int cn1PacingTrace = -1;
 static int cn1PacingTraceOn(void) {
     int on = atomic_load_explicit(&cn1PacingTrace, memory_order_relaxed);
@@ -489,10 +495,14 @@ static void cn1ReportPacingParks(void) {
         return;
     }
     long minCap = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
-    fprintf(stderr, "[PACING] bibopParks=%ld legacyParks=%ld minCapKb=%ld\n",
+    long minHead = atomic_load_explicit(&cn1PacingMinHeadroom, memory_order_relaxed);
+    fprintf(stderr, "[PACING] bibopParks=%ld legacyParks=%ld minCapKb=%ld"
+                    " boundedChecks=%ld minHeadroomKb=%ld\n",
             atomic_load_explicit(&cn1PacingParksBibop, memory_order_relaxed),
             atomic_load_explicit(&cn1PacingParksLegacy, memory_order_relaxed),
-            minCap == 0x7fffffffffffffffLL ? -1L : minCap / 1024);
+            minCap == 0x7fffffffffffffffLL ? -1L : minCap / 1024,
+            atomic_load_explicit(&cn1PacingBoundedChecks, memory_order_relaxed),
+            minHead < 0 ? -1L : minHead / 1024);
 }
 
 static void cn1ReportLowMemoryParks(void) {
@@ -3180,12 +3190,29 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS
 #define CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS 50000
 #endif
-// Smallest slack the process-budget clamp will pace a thread down to. Below this a
-// thread that cannot get memory back stalls for the full spin budget on every page
-// acquire, which reads as a hang rather than as memory pressure; above it, an app
-// whose live set genuinely fills the budget still makes (slow) forward progress.
-#ifndef CN1_PACING_MIN_CAP
-#define CN1_PACING_MIN_CAP (4*1024*1024)
+// How much of the process budget stays unspent. Under a ceiling a thread is admitted
+// only when the remaining budget can absorb the block it is about to dirty PLUS this,
+// so the process settles at roughly limit-minus-margin instead of riding the limit.
+//
+// It has to cover two things the pacing path cannot see. Other threads dirty memory
+// between their own checks; and native allocation -- an image buffer, a Metal texture,
+// a glyph atlas -- never passes through here at all while still spending the same
+// budget. 64MB is comfortably above both on the workloads this was measured on, and
+// small against a ceiling of roughly 1.4GB.
+#ifndef CN1_PACING_HEADROOM_MARGIN
+#define CN1_PACING_HEADROOM_MARGIN (64LL*1024*1024)
+#endif
+
+// Safety cap on a park: 200000 * 50us = 10s. A collector that is dead or wedged
+// degrades to footprint growth rather than a permanent hang.
+#ifndef CN1_PACING_MAX_SPINS
+#define CN1_PACING_MAX_SPINS 200000
+#endif
+
+// How often a parked thread re-requests collection, in spins. 4000 * 50us = 200ms,
+// which matches the collector's own high-frequency cadence.
+#ifndef CN1_PACING_GC_REQUEST_SPINS
+#define CN1_PACING_GC_REQUEST_SPINS 4000
 #endif
 // How much legacy allocation the PROCESS may do between two pacing evaluations. This
 // bounds the overshoot past the cap, so it has to stay well under the smallest cap the
@@ -3249,21 +3276,10 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
-static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOut,
-                              long long pendingBytes) {
+static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
-    // PROCESS BUDGET FIRST (issue #5537). Where the platform caps what this process
-    // may hold, that cap -- not the device's spare RAM -- is what the slack has to fit
-    // inside; see cn1ProcessHeadroom. Everywhere else this is -1 and the host-wide
-    // once-per-cycle reading is used exactly as before, so nothing off iOS changes.
-    long procHeadroom = cn1ProcessHeadroom();
-    JAVA_BOOLEAN bounded = procHeadroom >= 0;
-    if(boundedOut != 0) {
-        *boundedOut = bounded;
-    }
-    long fm = bounded ? procHeadroom
-                      : atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
+    long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
     long cap = fm / 8;                                       // baseline: 1/8 of available RAM of slack
     if(cap < base) cap = base;                              // never tighter than before
     // High-throughput threads must not be starved by the collector. The EDT (UI/render thread)
@@ -3271,56 +3287,12 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
     // legacy allocations since the last GC, reset each cycle) -- e.g. a worker decoding a heavy
     // vector-map tile. Give them up to 1/2 of AVAILABLE RAM of headroom so they keep running
     // while the concurrent GC catches up, instead of parking in the backpressure spin. Still
-    // bounded by real available memory (get_free_memory now reports reclaimable pages), so RSS
-    // stays safe and the collector reclaims the transient churn.
+    // bounded by real available memory, so RSS stays safe and the collector reclaims the churn.
     if(isEdt(threadStateData->threadId)
        || threadStateData->bibopHighThroughputUntilEpoch >= threadStateData->bibopObservedGcEpoch
        || threadStateData->heapAllocationSize > CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS) {
         long hi = fm / 2;
         if(hi > cap) cap = hi;
-    }
-    if(bounded) {
-        // Under a hard process ceiling every clause above is a THROUGHPUT preference,
-        // not a licence to exceed the budget -- and `base` is an absolute 72MB floor
-        // that would happily authorize 72MB of fresh garbage with 10MB left to live.
-        // Clamp to half the remaining budget: the mutator may spend at most half of
-        // what is left before backpressure engages, so the cap tightens geometrically
-        // as the footprint climbs and pacing slack alone can never reach the ceiling.
-        // It reopens on its own as the collector hands memory back, which for the
-        // allocate-and-drop workload in issue #5537 is essentially all of it.
-        long ceiling = fm / 2;
-        // The cap is the volume allowed BEFORE parking -- the park predicate is strictly
-        // greater -- and more can be dirtied unobserved on top of it, so BOTH have to fit
-        // in what is left.
-        //
-        // How much more is NOT simply the check interval. The pacing check runs after the
-        // allocation is registered but before its caller writes to it, and calloc'd pages
-        // cost nothing until written, so the thread is about to dirty the whole block it
-        // just took -- pendingBytes -- however small the interval is. An 8MB array against
-        // 6MB of headroom would otherwise sail through a check that reserved 1MB and then
-        // dirty all 8MB with no further check. Reserve the larger of the two.
-        //
-        // When the pending block alone exceeds the headroom this drives the cap to zero,
-        // so the thread waits out a full cycle before dirtying anything. That cannot
-        // conjure memory the process does not have, but it is the most that can be done:
-        // it gives reclamation its best chance of making the block fit.
-        long long reserve = CN1_PACING_CHECK_INTERVAL_BYTES;
-        if(pendingBytes > reserve) reserve = pendingBytes;
-        long long absoluteLL = (long long)fm - reserve;
-        long absolute = absoluteLL > 0 ? (long)absoluteLL : 0;
-        if(ceiling > absolute) ceiling = absolute;
-        if(cap > ceiling) cap = ceiling;
-        // ...but never pace so tightly that a genuinely-live heap makes no progress.
-        // A heap with nothing left to reclaim would otherwise spend the full 10s spin
-        // budget at every page acquire, turning a memory problem into an apparent hang.
-        // The floor is bounded by the ceiling just computed and never by fm itself: a
-        // floor of fm authorizes the entire remaining budget as fresh garbage, which is
-        // pacing that guarantees the death it exists to prevent. Where there is no room
-        // for the floor the cap goes to zero and the thread parks on every check, which
-        // is correct -- and the spin's own safety cap remains its escape hatch.
-        long floor = CN1_PACING_MIN_CAP;
-        if(floor > ceiling) floor = ceiling;
-        if(cap < floor) cap = floor;
     }
     if(cn1PacingTraceOn()) {
         long seen = atomic_load_explicit(&cn1PacingMinCap, memory_order_relaxed);
@@ -3328,8 +3300,7 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
               !atomic_compare_exchange_weak_explicit(&cn1PacingMinCap, &seen, cap,
                                                      memory_order_relaxed,
                                                      memory_order_relaxed)) {
-            // seen was reloaded by the failed exchange; retry only while we are still
-            // the smaller value.
+            // seen was reloaded by the failed exchange; retry only while still smaller.
         }
     }
     return cap;
@@ -3357,44 +3328,79 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE, JAVA_BOOLEAN* boundedOu
 #define CN1_PACE_BIBOP  0
 #define CN1_PACE_LEGACY 1
 
-static long long cn1PacingVolume(int which, JAVA_BOOLEAN bounded) {
-    long long bibop = (long long)atomic_load_explicit(&bibopBytesSinceGc,
-                                                      memory_order_relaxed);
-    long long legacy = atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
-    if(bounded) {
-        // Under a hard ceiling the two counters must be paced against their SUM, because
-        // the budget is a constraint on total footprint and both halves spend it. Pacing
-        // them separately against the same cap lets each path run a full cap ahead, so
-        // the process can hold 2 * cap of fresh dirty memory -- and since the clamp sets
-        // cap near fm/2, that is the entire remaining budget, which is exactly what the
-        // clamp exists to prevent.
-        return bibop + legacy;
-    }
-    // With no ceiling there is nothing to divide up, and summing here would tighten the
-    // BiBOP path everywhere off iOS -- a behaviour change this fix has no business
-    // making. Each path keeps the bound it had.
+static long long cn1PacingVolume(int which) {
     if(which == CN1_PACE_LEGACY) {
-        return legacy;
+        return atomic_load_explicit(&cn1LegacyBytesSinceGc, memory_order_relaxed);
     }
-    return bibop;
+    return (long long)atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed);
 }
 
 static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendingBytes) {
-    JAVA_BOOLEAN bounded = JAVA_FALSE;
-    long cap = cn1BibopPacingCap(threadStateData, &bounded, pendingBytes);
-    // The legacy path's backpressure is NEW, and it exists to keep a process inside a
-    // hard ceiling. Applying it where there is no ceiling would change behaviour on
-    // every other target for no benefit -- and it would engage readily, because
-    // cn1_available_memory is a flat 100MB placeholder off Apple, so the cap there is
-    // the 72MB static floor: measured, a 768MB churn parked 10 times on a Linux runner
-    // that was never in any danger. Off a budgeted platform the legacy path therefore
-    // keeps exactly the behaviour it had. The BiBOP path is unaffected either way --
-    // it was already paced against this same cap before this change.
-    if(which == CN1_PACE_LEGACY && !bounded) {
+    if(get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
         return;
     }
-    if(cn1PacingVolume(which, bounded) <= (long long)cap ||
-       get_static_java_lang_System_gcThreadInstance() == JAVA_NULL) {
+    long procHeadroom = cn1ProcessHeadroom();
+    if(procHeadroom < 0) {
+        // ---- NO PER-PROCESS CEILING -------------------------------------------------
+        // Unchanged behaviour. The legacy path is not paced at all here: its
+        // backpressure exists to keep a process inside a hard ceiling, and off Apple
+        // cn1_available_memory is a flat 100MB placeholder, so pacing against it would
+        // engage constantly on machines in no danger (measured: a 768MB churn parked 10
+        // times on a Linux runner). The BiBOP path keeps the volume cap it always had.
+        if(which == CN1_PACE_LEGACY) {
+            return;
+        }
+        long cap = cn1BibopPacingCap(threadStateData);
+        if(cn1PacingVolume(which) <= (long long)cap) {
+            return;
+        }
+        if(cn1PacingTraceOn()) {
+            atomic_fetch_add_explicit(&cn1PacingParksBibop, 1, memory_order_relaxed);
+        }
+        CN1_GC_PARK_CAPTURE(threadStateData);
+        threadStateData->threadActive = JAVA_FALSE;
+        int spins = 0;
+        while(cn1PacingVolume(which) > (long long)cap &&
+              get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
+              spins++ < CN1_PACING_MAX_SPINS) {
+            usleep(50);
+        }
+        while(threadStateData->threadBlockedByGC) {
+            usleep((JAVA_INT)(500));
+        }
+        threadStateData->threadActive = JAVA_TRUE;
+        return;
+    }
+
+    // ---- UNDER A PER-PROCESS CEILING (issue #5537) -----------------------------------
+    // Admission is decided by the LIVE remaining budget, not by an allocation-volume
+    // counter. That indirection is what made every earlier version of this wrong, and
+    // each defect was a different way for the counter to diverge from the truth: threads
+    // deferring bytes into per-thread accumulators the counter could not see; the
+    // start-of-marking reset erasing blocks that were allocated but not yet dirtied;
+    // simultaneous waiters all observing that reset before any of them re-charged; the
+    // two allocation paths each running a full cap ahead of a cap derived from the same
+    // budget. phys_footprint has none of those failure modes: the kernel maintains it,
+    // every thread and every non-Java allocation is already in it, and it is the exact
+    // figure the process is killed against. So ask it directly.
+    //
+    // A thread is admitted only when the budget can absorb the block it is about to
+    // dirty plus a margin, and it waits on REAL reclamation -- headroom rises when sweep
+    // frees memory, not when a cycle merely starts. The margin covers what other threads
+    // may dirty between their own checks and, importantly, native allocation that never
+    // passes through here at all (an image buffer, a Metal texture, a glyph atlas).
+    long long need = pendingBytes + CN1_PACING_HEADROOM_MARGIN;
+    if(cn1PacingTraceOn()) {
+        atomic_fetch_add_explicit(&cn1PacingBoundedChecks, 1, memory_order_relaxed);
+        long seen = atomic_load_explicit(&cn1PacingMinHeadroom, memory_order_relaxed);
+        while((seen < 0 || procHeadroom < seen) &&
+              !atomic_compare_exchange_weak_explicit(&cn1PacingMinHeadroom, &seen,
+                                                     procHeadroom,
+                                                     memory_order_relaxed,
+                                                     memory_order_relaxed)) {
+        }
+    }
+    if((long long)procHeadroom >= need) {
         return;
     }
     if(cn1PacingTraceOn()) {
@@ -3402,60 +3408,32 @@ static void cn1PacingPark(CODENAME_ONE_THREAD_STATE, int which, long long pendin
                                                            : &cn1PacingParksBibop,
                                   1, memory_order_relaxed);
     }
-    // A park waits for the CYCLE BOUNDARY that resets the volume counter, so there has
-    // to be a cycle coming or the wait is just a stall. The callers' own triggers fire
-    // at CN1_LEGACY_GC_TRIGGER_BYTES / bibopGcTriggerBytes, and under a tight budget the
-    // cap drops well below those -- which is precisely the near-ceiling case this exists
-    // for. Without this, a thread with a 4MB cap and 3MB of uncollected volume would
-    // find nothing scheduled, spin out its whole 10s safety budget, and resume with no
-    // reclamation even begun, once per check.
-    //
-    // UNCONDITIONAL, deliberately: a running cycle is not a cycle that will help us. The
-    // counter is reset by cn1BibopBeginGcCycle at the START of a cycle, so the bytes that
-    // brought us here were charged AFTER the running cycle's reset and only the NEXT
-    // cycle can clear them. Skipping the request while one is in flight is therefore the
-    // same stall in a different disguise, and it is the case a paced thread hits most --
-    // it parks precisely when the collector is busy. Requesting during a cycle is also
-    // exactly how a follow-up is booked: System.gc() sets forceGc, and the collector
-    // loop tests it after gcMarkSweep() returns, taking LOCK.wait(200) instead of
-    // LOCK.wait(30000). The cost is a lock and a notify on a path that is about to sleep
-    // anyway.
-    {
-        JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
-        threadStateData->nativeAllocationMode = JAVA_TRUE;
-        java_lang_System_gc__(threadStateData);
-        threadStateData->nativeAllocationMode = wasNam;
-    }
     CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
     threadStateData->threadActive = JAVA_FALSE;
     int spins = 0;
-    while(cn1PacingVolume(which, bounded) > (long long)cap &&
-          get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
-          spins++ < 200000) {
+    while(spins < CN1_PACING_MAX_SPINS &&
+          get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
+        // Keep asking for collection while we wait. Requesting once is not enough: a
+        // parked thread allocates nothing, so isHighFrequencyGC() goes false and the
+        // collector drops to its 30s idle wait -- and we would then sit out the whole
+        // spin budget waiting for reclamation nobody was doing. Re-requested on a cycle-
+        // length cadence rather than every iteration, since System.gc() only sets forceGc
+        // and notifies; the collector picks it up after its current pass.
+        if((spins % CN1_PACING_GC_REQUEST_SPINS) == 0) {
+            JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
+            threadStateData->nativeAllocationMode = JAVA_TRUE;
+            java_lang_System_gc__(threadStateData);
+            threadStateData->nativeAllocationMode = wasNam;
+        }
         usleep(50);
+        spins++;
+        if((long long)cn1ProcessHeadroom() >= need) {
+            break;
+        }
     }
-    // RE-CHARGE the block we are about to dirty. cn1BibopBeginGcCycle resets the volume
-    // counter to zero and releases every waiter at once, but our calloc'd block is still
-    // clean -- we were parked precisely so we could dirty it afterwards. Without this the
-    // reset erases it from the only figure other waiters compare against, so sixteen
-    // threads holding individually-fitting 1MB blocks all see an empty counter, all
-    // resume together and dirty 16MB into whatever headroom is left.
-    //
-    // Adding it back charges the block once (the original add was erased by the reset)
-    // and, because the counter is what every waiter tests, it serializes them: the next
-    // thread released by the same reset sees our bytes and keeps waiting until a later
-    // cycle. No new counter and no new reset path -- this reuses one whose lifecycle is
-    // already correct. Only under a budget, so nothing off iOS changes.
-    if(bounded && pendingBytes > 0) {
-        atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, pendingBytes,
-                                  memory_order_relaxed);
-    }
-    // The spin can exit via the safety cap while a mark is STILL RUNNING and the
-    // collector believes this thread is paused (it already scanned our roots).
-    // Waking mid-drain violates snapshot-at-the-beginning: we could load a grey
-    // object's field into a local and null the field -- the referent would never
-    // be marked and gets swept while reachable. Honor the GC pause before
-    // resuming, exactly like every other park in the codebase.
+    // Honour a stop-the-world before resuming, exactly like every other park here: the
+    // loop above can exit via the safety cap while a mark is still running and the
+    // collector believes this thread is paused.
     while(threadStateData->threadBlockedByGC) {
         usleep((JAVA_INT)(500));
     }
@@ -6078,18 +6056,16 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // churning board arrays could take the process past the iOS ceiling with a live
     // set of almost nothing.
     //
-    // Evaluated every CN1_PACING_CHECK_INTERVAL_BYTES of PROCESS-WIDE legacy
-    // allocation, not on the 24MB scheduling trigger above. Reusing that trigger looks
-    // free -- the crossing is already computed -- but it is the wrong threshold and
-    // fails exactly where this matters most: near the ceiling the cap can be a few MB,
-    // and a workload that dirties each block before requesting the next could spend the
-    // whole remaining budget and be killed while legacy volume was still climbing
-    // toward 24MB. The interval is unconditional, so the cap is consulted long before
-    // any scheduling threshold, and it bounds the overshoot between two evaluations to
-    // one interval whatever the cap turns out to be -- and, because the crossing is
-    // detected on the shared counter rather than a per-thread tally, that bound is the
-    // same however many threads are allocating. Cost is a shift and a compare on
-    // prevLegacyBytes, which the trigger above already had to compute.
+    // Evaluated every CN1_PACING_CHECK_INTERVAL_BYTES of process-wide legacy allocation
+    // rather than on the 24MB scheduling trigger above. That trigger sizes when to
+    // SCHEDULE a cycle, not how close to the ceiling a thread may get, and reusing it
+    // fails exactly where this matters: near the ceiling a thread could spend the whole
+    // remaining budget while legacy volume was still climbing toward 24MB. The interval
+    // only decides HOW OFTEN admission is reconsidered -- what is actually tested is the
+    // live remaining budget (see cn1PacingPark) -- so it bounds how much a thread can
+    // dirty between two consultations of the truth. Detected on the shared counter using
+    // the pre-add value the trigger already computes, so the interval is process-wide
+    // rather than per-thread, and costs a shift and a compare on a value in hand.
     if(((unsigned long long)prevLegacyBytes >> CN1_PACING_CHECK_INTERVAL_SHIFT)
             != ((unsigned long long)(prevLegacyBytes + (long long)size)
                     >> CN1_PACING_CHECK_INTERVAL_SHIFT)
