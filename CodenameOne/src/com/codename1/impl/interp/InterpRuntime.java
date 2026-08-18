@@ -1246,10 +1246,14 @@ public final class InterpRuntime {
             if (iface == null) {
                 continue;
             }
+            // Above it first, always. `ensureInitialized` on an interface
+            // deliberately initializes none of its superinterfaces -- that is
+            // the rule for initializing an interface -- so the walk on the
+            // class's behalf has to reach the ancestors itself, in the order
+            // the JVM would.
+            initializeDefaultBearingInterfaces(iface);
             if (declaresDefaultMethod(iface)) {
                 ensureInitialized(iface);
-            } else {
-                initializeDefaultBearingInterfaces(iface);
             }
         }
     }
@@ -1424,7 +1428,6 @@ public final class InterpRuntime {
         if (op == InterpOpcodes.INVOKESTATIC) {
             InterpClass ic = bundle.findClass(owner);
             if (ic != null) {
-                ensureInitialized(ic);
                 InterpMethod m = ic.declaredMethod(name, desc);
                 if (m == null) {
                     m = resolveStatic(ic, name, desc);
@@ -1432,6 +1435,11 @@ public final class InterpRuntime {
                 if (m == null) {
                     m = ic.resolve(name, desc);
                 }
+                // The declaring class, not the one the call site named. `B.m()`
+                // where only A declares m initializes A and leaves B alone, and
+                // an initializer with an observable effect makes the difference
+                // visible.
+                ensureInitialized(m != null && m.owner != null ? m.owner : ic);
                 if (m != null) {
                     pushBoxed(f, returnKind, invokeInterpreted(m, null, args));
                     return;
@@ -1554,6 +1562,14 @@ public final class InterpRuntime {
             // records MyForm -- and the host has never heard of that name. The
             // peer is a generated subclass of the real framework class, so
             // walking up from it finds the method exactly where it lives.
+            // getClass() first. The peer is a generated shim -- Interp_ui_Form
+            // -- and answering with its class would hand the program a name it
+            // has never heard of, break class identity, and pass that on to
+            // every API taking a Class.
+            if ("getClass".equals(name) && args.length == 0) {
+                pushBoxed(f, returnKind, io.type);
+                return;
+            }
             // Enum's own methods first when the receiver is a constant: an
             // interpreted enum that implements a host interface gets an
             // Object-based peer, and that peer does not inherit java.lang.Enum,

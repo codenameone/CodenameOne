@@ -123,7 +123,10 @@ public final class Pack {
             mainClass = findEntryPoint(classesDir, classes);
             System.out.println("entry point " + mainClass.replace('/', '.'));
         }
-        w.setMainClass(mainClass);
+        // Dots to slashes: the documented override is `--main com.example.Other`
+        // and every name in the bundle is an internal name, so leaving it dotted
+        // builds a bundle whose main class the device cannot find.
+        w.setMainClass(mainClass.replace('.', '/'));
         OutputStream os = new FileOutputStream(out);
         try {
             w.write(os);

@@ -785,6 +785,10 @@ public class DeviceRuntimeService {
         loadedName = "";
         loadedSource = "";
         CodenameOneImplementation.clearLocalResources();
+        // And the theme with them: a pushed program that shipped its own
+        // theme.res left the runtime's screen wearing it, until some later
+        // theme-less push happened to put it back.
+        applyPushedTheme(null);
         status = "stopped";
         DeviceRuntimeForm.showIt();
     }
