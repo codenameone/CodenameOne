@@ -424,6 +424,20 @@ public class JavaSEWindowManager extends WindowManager {
             public void run() {
                 // Swing only allows this while the frame is not displayable.
                 boolean wasVisible = p.frame.isVisible();
+                // Disposing an AWT window disposes everything it owns, so a window
+                // with open child windows would take them down with it and only put
+                // itself back. The children stayed registered and visible as far as
+                // the framework knew, painting into a hierarchy that was no longer
+                // displayable. Remembered here and re-shown below; setVisible(true)
+                // recreates the native peer a dispose destroyed.
+                java.awt.Window[] owned = p.frame.getOwnedWindows();
+                java.util.List<java.awt.Window> wereVisible =
+                        new java.util.ArrayList<java.awt.Window>();
+                for (java.awt.Window each : owned) {
+                    if (each.isVisible()) {
+                        wereVisible.add(each);
+                    }
+                }
                 if (wasVisible) {
                     p.frame.setVisible(false);
                 }
@@ -435,6 +449,11 @@ public class JavaSEWindowManager extends WindowManager {
                 }
                 if (wasVisible) {
                     p.frame.setVisible(true);
+                }
+                // After the owner, so a child is never briefly parented to a window
+                // that is not on screen.
+                for (java.awt.Window each : wereVisible) {
+                    each.setVisible(true);
                 }
             }
         });

@@ -804,6 +804,87 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void aKeyReleaseIsNotStolenByAClickInAnotherWindow() {
+        implementation.setMultiWindowSupported(true);
+        Form main = new Form("main", new BorderLayout());
+        final KeyCountingComponent mainKeys = new KeyCountingComponent();
+        main.add(BorderLayout.CENTER, mainKeys);
+        main.show();
+        main.setFocused(mainKeys);
+
+        Window w = new Window("other", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Press a key on the main form, then click the window before releasing it.
+        // The two sequences tracked one shared target while there was only ever one
+        // form; with windows this interleaving is ordinary, and the click used to
+        // overwrite the key's target so the release never arrived -- leaving the
+        // component latched in its pressed state.
+        Display.getInstance().keyPressed(-90);
+        int[] px = new int[]{150};
+        int[] py = new int[]{120};
+        Display.getInstance().windowPointerPressed(w.getWindowId(), px, py);
+        Display.getInstance().windowPointerReleased(w.getWindowId(), px, py);
+        Display.getInstance().keyReleased(-90);
+        DisplayTest.flushEdt();
+        w.dispose();
+
+        assertEquals(1, mainKeys.pressed, "the press reached the main form");
+        assertEquals(1, mainKeys.released,
+                "and so must the release, despite the click on another window");
+    }
+
+    /// Counts the key events it receives, so a test can prove a release was matched
+    /// to the component that saw the press.
+    private static final class KeyCountingComponent extends Component {
+        private int pressed;
+        private int released;
+
+        @Override
+        public void keyPressed(int code) {
+            pressed++;
+        }
+
+        @Override
+        public void keyReleased(int code) {
+            released++;
+        }
+
+        @Override
+        public boolean isFocusable() {
+            return true;
+        }
+    }
+
+    @FormTest
+    void repeatedMonitorReportsCollapseIntoOneNotification() {
+        implementation.setMultiWindowSupported(true);
+        final int[] fired = new int[1];
+        Desktop.getInstance().addMonitorListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                fired[0]++;
+            }
+        });
+
+        // One physical display change is reported many times over: Windows
+        // broadcasts WM_DISPLAYCHANGE to every top level window, and GTK fires
+        // geometry, work-area and scale-factor notifications separately per monitor.
+        for (int iter = 0; iter < 5; iter++) {
+            Display.getInstance().monitorsChanged();
+        }
+        DisplayTest.flushEdt();
+        assertEquals(1, fired[0], "five reports of one change must notify once");
+
+        // A later change is a new change, not a duplicate of the one already drained.
+        Display.getInstance().monitorsChanged();
+        DisplayTest.flushEdt();
+        assertEquals(2, fired[0]);
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

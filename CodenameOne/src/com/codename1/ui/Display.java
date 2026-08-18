@@ -341,8 +341,29 @@ public final class Display extends CN1Constants {
     private boolean pendingHideOverlayWindows;
 
     // huge false positive from PMD...
+    /// The top level that received the last pointer press, so its release can be
+    /// matched to it.
+    ///
+    /// Keyboard and pointer sequences track their targets separately. They shared one
+    /// field while there was one form, where interleaving them was impossible. With
+    /// several native windows it is ordinary: press a key in window A, click window B
+    /// before releasing, and a shared field would name B when the key release arrived,
+    /// so the release was delivered to the wrong window or dropped -- leaving the
+    /// component in A stuck in its pressed state.
     @SuppressWarnings("PMD.SingularField")
-    private Container eventForm;
+    private Container pointerEventTarget;
+
+    /// Guards `#monitorsChangedPending`, which is set from the port's native event
+    /// thread and cleared on the event dispatch thread.
+    private final Object monitorsChangedLock = new Object();
+
+    /// Whether a monitor-topology notification is already queued. See
+    /// `#monitorsChanged()`.
+    private boolean monitorsChangedPending;
+
+    /// The top level that received the last key press. See `#pointerEventTarget`.
+    @SuppressWarnings("PMD.SingularField")
+    private Container keyEventTarget;
 
     /// Window ids remembered so a key repeat or long press started in a window is
     /// delivered back to that window rather than to the main form.
@@ -2890,7 +2911,28 @@ public final class Display extends CN1Constants {
 
     /// Notifies Codename One that the set of attached monitors changed.
     public void monitorsChanged() {
+        synchronized (monitorsChangedLock) {
+            // Genuinely coalesced rather than merely documented as such. One physical
+            // display change is reported many times over: Windows broadcasts
+            // WM_DISPLAYCHANGE to every top level window, and GTK fires geometry,
+            // work-area and scale-factor notifications separately for each monitor.
+            // Each notification relays out every open window and fires every monitor
+            // listener, so without this a single resolution change did that work N
+            // times. A change arriving while one is queued is already covered by it.
+            if (monitorsChangedPending) {
+                return;
+            }
+            monitorsChangedPending = true;
+        }
         callSerially(new WindowCallback(0, WindowCallback.MONITORS_CHANGED));
+    }
+
+    /// Lets the queued notification re-arm the coalescing guard. See
+    /// `#monitorsChanged()`.
+    void clearMonitorsChangedPending() {
+        synchronized (monitorsChangedLock) {
+            monitorsChangedPending = false;
+        }
     }
 
     /// Marshals a window notification that arrived on the platform's own thread onto
@@ -2938,6 +2980,11 @@ public final class Display extends CN1Constants {
                     desktop.fireMonitorChanged();
                     break;
                 case MONITORS_CHANGED:
+                    // Cleared before the work, not after: a display change that
+                    // happens while this runs describes a topology this pass has not
+                    // read yet, so it has to queue another one rather than be
+                    // swallowed as a duplicate.
+                    Display.getInstance().clearMonitorsChangedPending();
                     for (Window each : desktop.getWindows()) {
                         each.monitorChanged();
                     }
@@ -3066,14 +3113,14 @@ public final class Display extends CN1Constants {
             case KEY_PRESSED:
                 f.keyPressed(inputEventStackTmp[offset]);
                 offset++;
-                eventForm = f;
+                keyEventTarget = f;
                 break;
             case KEY_RELEASED:
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container xf = eventForm;
-                eventForm = null;
+                Container xf = keyEventTarget;
+                keyEventTarget = null;
 
                 //make sure the released event is sent to the same Form who got a
                 //pressed event
@@ -3096,7 +3143,7 @@ public final class Display extends CN1Constants {
                 offset++;
                 currentPointerEvent = impl.buildPointerEvent(xArray1[0], yArray1[0], false);
                 f.pointerPressed(xArray1, yArray1);
-                eventForm = f;
+                pointerEventTarget = f;
                 break;
             case POINTER_PRESSED_MULTI: {
                 if (recursivePointerReleaseA) {
@@ -3111,7 +3158,7 @@ public final class Display extends CN1Constants {
                 offset += array2.length + 1;
                 currentPointerEvent = impl.buildPointerEvent(array1[0], array2[0], false);
                 f.pointerPressed(array1, array2);
-                eventForm = f;
+                pointerEventTarget = f;
                 break;
             }
             case POINTER_RELEASED:
@@ -3121,8 +3168,8 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container x = eventForm;
-                eventForm = null;
+                Container x = pointerEventTarget;
+                pointerEventTarget = null;
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
@@ -3146,8 +3193,8 @@ public final class Display extends CN1Constants {
                 // pointer release can cycle into invoke and block which will cause this method
                 // to recurse if a pointer will be released while we are in an invoke and block state
                 // this is the case in http://code.google.com/p/codenameone/issues/detail?id=265
-                Container xy = eventForm;
-                eventForm = null;
+                Container xy = pointerEventTarget;
+                pointerEventTarget = null;
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
@@ -3573,8 +3620,11 @@ public final class Display extends CN1Constants {
     void windowDisposed(Window w) {
         modalWindows.remove(w);
         syncNativeModalBlocking();
-        if (eventForm == w) { //NOPMD CompareObjectsWithEquals
-            eventForm = null;
+        if (pointerEventTarget == w) { //NOPMD CompareObjectsWithEquals
+            pointerEventTarget = null;
+        }
+        if (keyEventTarget == w) { //NOPMD CompareObjectsWithEquals
+            keyEventTarget = null;
         }
         if (keyRepeatWindowId == w.getWindowId()) {
             keyRepeatCharged = false;

@@ -348,11 +348,10 @@ static LRESULT CALLBACK cn1WinDesktopWndProc(HWND hwnd, UINT msg, WPARAM wParam,
             w->pendingResize = 1;
             cn1WinPushWindowEvent(w->windowId, CN1_EVENT_SIZE_CHANGED, w->width, w->height, 0);
             return 0;
-        case WM_DISPLAYCHANGE:
-            /* A display was attached, removed or reconfigured. Reported once per
-             * window; the framework coalesces onto a single notification. */
-            cn1WinPushWindowEvent(w->windowId, CN1_EVENT_MONITORS_CHANGED, 0, 0, 0);
-            return 0;
+        /* Deliberately no WM_DISPLAYCHANGE case. Windows broadcasts it to every top
+         * level window, and the main window -- which always exists -- already reports
+         * it. Reporting from here as well produced N+1 notifications for one physical
+         * display change, each one relaying out every open window. */
         case WM_GETMINMAXINFO:
             /* The minimum is native geometry, so it applies to the whole frame --
              * which is the window this message is about. */

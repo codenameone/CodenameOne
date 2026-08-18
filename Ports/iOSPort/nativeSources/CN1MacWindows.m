@@ -28,6 +28,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 /*
  * Delivery into the framework. Defined in IOSNative.m alongside the existing
@@ -281,13 +282,24 @@ static int slotForScene(UIWindowScene* scene) {
 static int g_pendingSlots[CN1_MAC_MAX_WINDOWS];
 static int g_pendingCount;
 
-static void pushPendingSlot(int slot) {
+/* Guards the pending queue and the slot table's lifecycle fields. Both are
+ * touched from two threads: scene requests and deliveries run on UIKit's main
+ * queue, while create and destroy are called from the Codename One event
+ * dispatch thread. Without it a dispose racing a scene delivery could pop a
+ * half-compacted queue, or adopt a scene into a slot as it was being cleared,
+ * misassigning or orphaning a native scene.
+ *
+ * The event dispatch thread never blocks on the main queue while holding this,
+ * so it cannot deadlock against UIKit. The …Locked helpers assume it is held. */
+static pthread_mutex_t g_slotLock = PTHREAD_MUTEX_INITIALIZER;
+
+static void pushPendingSlotLocked(int slot) {
     if (g_pendingCount < CN1_MAC_MAX_WINDOWS) {
         g_pendingSlots[g_pendingCount++] = slot;
     }
 }
 
-static int popPendingSlot(void) {
+static int popPendingSlotLocked(void) {
     int slot;
     int iter;
     if (g_pendingCount <= 0) {
@@ -322,7 +334,7 @@ static void CN1MacWindowRequestGeometry(UIWindowScene* scene, CGRect frame) {
     }
 }
 
-static void dropPendingSlot(int slot) {
+static void dropPendingSlotLocked(int slot) {
     int read;
     int write = 0;
     for (read = 0; read < g_pendingCount; read++) {
@@ -379,23 +391,27 @@ int CN1MacWindowCreate(int windowId, NSString* title, int x, int y, int width, i
 
     const int generation = g_macWindows[slot].generation;
     dispatch_async(dispatch_get_main_queue(), ^{
+        pthread_mutex_lock(&g_slotLock);
         if (!g_macWindows[slot].inUse || g_macWindows[slot].generation != generation) {
             /* The window was disposed before this ran; the slot may already belong to
              * another one, and requesting a scene for it would leave an orphan. */
+            pthread_mutex_unlock(&g_slotLock);
             return;
         }
         UIWindowScene* recycled = takeFreeScene();
         if (recycled != nil) {
             /* Adopt it straight away rather than going through the pending queue:
              * there is no asynchronous delivery to wait for. */
-            pushPendingSlot(slot);
+            pushPendingSlotLocked(slot);
+            pthread_mutex_unlock(&g_slotLock);
             CN1MacWindowSceneConnected(recycled);
             [recycled release];
             return;
         }
         // Enqueue and request on the same main-thread turn, so the queue order is
         // exactly the request order the system will deliver scenes in.
-        pushPendingSlot(slot);
+        pushPendingSlotLocked(slot);
+        pthread_mutex_unlock(&g_slotLock);
         if (@available(macCatalyst 13.0, *)) {
             UISceneActivationRequestOptions* options =
                     [[UISceneActivationRequestOptions alloc] init];
@@ -460,13 +476,27 @@ void CN1MacWindowSceneDisconnected(UIWindowScene* scene) {
 }
 
 void CN1MacWindowSceneConnected(UIWindowScene* scene) {
-    int slot = popPendingSlot();
+    int slot;
     CN1MacWindow* w;
+    pthread_mutex_lock(&g_slotLock);
+    slot = popPendingSlotLocked();
     if (slot < 0 || !g_macWindows[slot].inUse) {
+        /* The window this scene was requested for is already gone. Park the scene
+         * rather than dropping it on the floor: it is a live native scene, and
+         * leaking one per raced dispose eventually exhausts what the system will
+         * hand out. */
+        if (scene != nil && g_freeSceneCount < CN1_MAC_MAX_WINDOWS) {
+            scene.title = @"";
+            g_freeScenes[g_freeSceneCount++] = [scene retain];
+        }
+        pthread_mutex_unlock(&g_slotLock);
         return;
     }
     w = &g_macWindows[slot];
     w->scene = [scene retain];
+    /* Held across the rest of the adoption so a dispose cannot clear the slot
+     * from under it. Only UIKit calls follow -- nothing re-enters Codename One --
+     * so this cannot deadlock against the event dispatch thread. */
 
     w->window = [[UIWindow alloc] initWithWindowScene:scene];
     w->controller = [[CN1MacWindowController alloc] init];
@@ -516,6 +546,7 @@ void CN1MacWindowSceneConnected(UIWindowScene* scene) {
         }
         CN1MacWindowRequestGeometry(scene, CGRectMake(0, 0, pointWidth, pointHeight));
     }
+    pthread_mutex_unlock(&g_slotLock);
 }
 
 void CN1MacWindowDestroy(int slot) {
@@ -523,7 +554,13 @@ void CN1MacWindowDestroy(int slot) {
     if (w == NULL) {
         return;
     }
-    dropPendingSlot(slot);
+    /* The whole teardown is one critical section: removing the slot from the
+     * pending queue, taking ownership of the native objects and clearing the slot
+     * have to be indivisible against a scene delivery arriving on the main queue,
+     * which pops that same queue and adopts into that same slot. Splitting them
+     * let a delivery adopt a scene into a slot that was half cleared. */
+    pthread_mutex_lock(&g_slotLock);
+    dropPendingSlotLocked(slot);
     UIWindowScene* scene = w->scene;
     UIWindow* window = w->window;
     CN1MacWindowController* controller = w->controller;
@@ -534,6 +571,7 @@ void CN1MacWindowDestroy(int slot) {
     int generation = w->generation + 1;
     memset(w, 0, sizeof(CN1MacWindow));
     w->generation = generation;
+    pthread_mutex_unlock(&g_slotLock);
 
     dispatch_async(dispatch_get_main_queue(), ^{
         if (window != nil) {
@@ -576,11 +614,14 @@ BOOL CN1MacWindowReopen(int slot) {
     w->pendingVisible = 1;
     const int generation = w->generation;
     dispatch_async(dispatch_get_main_queue(), ^{
+        pthread_mutex_lock(&g_slotLock);
         if (!g_macWindows[slot].inUse || g_macWindows[slot].generation != generation) {
+            pthread_mutex_unlock(&g_slotLock);
             return;
         }
         UIWindowScene* recycled = takeFreeScene();
-        pushPendingSlot(slot);
+        pushPendingSlotLocked(slot);
+        pthread_mutex_unlock(&g_slotLock);
         if (recycled != nil) {
             CN1MacWindowSceneConnected(recycled);
             [recycled release];
