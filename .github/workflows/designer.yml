@@ -5,6 +5,8 @@ on:
     branches:
       - master
     paths:
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci-mvn-retry.sh'
       - 'CodenameOneDesigner/**'
       - 'maven/css-compiler/**'
       - 'maven/css-cli/**'
@@ -14,6 +16,8 @@ on:
     branches:
       - master
     paths:
+      - 'scripts/ci/apt-get-install.sh'
+      - 'scripts/ci-mvn-retry.sh'
       - 'CodenameOneDesigner/**'
       - 'maven/css-compiler/**'
       - 'maven/css-cli/**'

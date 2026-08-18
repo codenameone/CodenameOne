@@ -3,6 +3,7 @@ name: Build Developer Guide Docs
 on:
   pull_request:
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
       - 'scripts/developer-guide/**'

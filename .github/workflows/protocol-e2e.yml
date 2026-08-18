@@ -10,6 +10,7 @@ name: Protocol E2E (REST / GraphQL / gRPC)
 on:
   pull_request:
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'scripts/protocol-e2e/**'
       - 'CodenameOne/src/com/codename1/io/graphql/**'
       - 'CodenameOne/src/com/codename1/annotations/graphql/**'
@@ -20,6 +21,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'scripts/protocol-e2e/**'
       - 'CodenameOne/src/com/codename1/io/graphql/**'
       - 'CodenameOne/src/com/codename1/annotations/graphql/**'

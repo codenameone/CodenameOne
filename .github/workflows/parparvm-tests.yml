@@ -3,6 +3,7 @@ name: ParparVM Java Tests
 on:
   pull_request:
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/parparvm-tests.yml'
       - 'scripts/ci/retry.sh'
       - 'vm/**'
@@ -13,6 +14,7 @@ on:
   push:
     branches: [ master, main ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/parparvm-tests.yml'
       - 'scripts/ci/retry.sh'
       - 'vm/**'

@@ -31,6 +31,7 @@ on:
     - cron: '45 1 * * *'
   pull_request:
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/linux-build-run.yml'
       - 'vm/**'
       - 'Ports/LinuxPort/**'
@@ -43,6 +44,7 @@ on:
   push:
     branches: [ master, main ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/linux-build-run.yml'
       - 'vm/**'
       - 'Ports/LinuxPort/**'

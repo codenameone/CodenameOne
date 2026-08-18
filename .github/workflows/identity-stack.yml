@@ -25,6 +25,7 @@ on:
   pull_request:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'
@@ -53,6 +54,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'CodenameOne/src/com/codename1/io/oidc/**'
       - 'CodenameOne/src/com/codename1/io/webauthn/**'
       - 'CodenameOne/src/com/codename1/io/Oauth2.java'

@@ -25,6 +25,7 @@ on:
   pull_request:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'CodenameOne/src/com/codename1/payment/**'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'
@@ -44,6 +45,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'CodenameOne/src/com/codename1/payment/**'
       - 'Ports/iOSPort/nativeSources/CodenameOne_GLViewController.m'
       - 'Ports/iOSPort/src/com/codename1/impl/ios/ZoozPurchase.java'

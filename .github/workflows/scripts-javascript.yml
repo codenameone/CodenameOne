@@ -15,6 +15,7 @@ on:
     - cron: '35 1 * * *'
   pull_request:
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/scripts-javascript.yml'
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'
@@ -38,6 +39,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/scripts-javascript.yml'
       - 'scripts/run-javascript-browser-tests.sh'
       - 'scripts/run-javascript-screenshot-tests.sh'

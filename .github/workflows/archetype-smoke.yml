@@ -12,6 +12,7 @@ on:
   pull_request:
     branches: [ master ]
     paths:
+      - 'scripts/ci/apt-get-install.sh'
       - 'Ports/JavaSE/**'
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'
@@ -24,6 +25,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci/apt-get-install.sh'
       - 'Ports/JavaSE/**'
       - 'CodenameOneDesigner/**'
       - 'CodenameOne/src/com/codename1/ui/plaf/UIManager.java'

@@ -10,6 +10,11 @@ on:
       - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - '!scripts/setup-workspace.sh'
+      # Every Maven step in this workflow and a dozen others runs through this wrapper, so a
+      # change to it that nothing exercises can merge and then break the whole matrix. Named
+      # here for the same reason setup-workspace.sh is: a later negation un-ignores it.
+      - '!scripts/ci-mvn-retry.sh'
+      - '!scripts/ci/retry.sh'
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
@@ -25,6 +30,11 @@ on:
       - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - '!scripts/setup-workspace.sh'
+      # Every Maven step in this workflow and a dozen others runs through this wrapper, so a
+      # change to it that nothing exercises can merge and then break the whole matrix. Named
+      # here for the same reason setup-workspace.sh is: a later negation un-ignores it.
+      - '!scripts/ci-mvn-retry.sh'
+      - '!scripts/ci/retry.sh'
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'

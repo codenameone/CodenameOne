@@ -14,6 +14,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/windows-tooling.yml'
       - 'scripts/run-windows-tooling-tests.sh'
       - 'scripts/windows/**'
@@ -27,6 +28,7 @@ on:
   push:
     branches: [ master ]
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - '.github/workflows/windows-tooling.yml'
       - 'scripts/run-windows-tooling-tests.sh'
       - 'scripts/windows/**'

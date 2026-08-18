@@ -16,6 +16,7 @@ on:
     branches:
       - master
     paths:
+      - 'scripts/ci-mvn-retry.sh'
       - 'native-themes/**'
       - 'maven/css-compiler/**'
       - 'scripts/build-native-themes.sh'
