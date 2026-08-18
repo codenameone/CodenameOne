@@ -6813,11 +6813,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         @Override
                         public void run() {
                             readbackRepaintPending = false;
-                            readDisplaySurface(callback);
                             // Whatever else asked for a capture while this one was waiting reads
-                            // the same frame, rather than the one before the text came back.
-                            while (!pendingReadbacks.isEmpty()) {
-                                readDisplaySurface(pendingReadbacks.remove(0));
+                            // the same frame, rather than the one before the text came back. The
+                            // waiting list is taken and emptied before any of them run: a
+                            // callback that throws would otherwise leave the rest of the list
+                            // standing with nothing left to drain it -- the flag that sends a
+                            // capture to the queue is already down, so every later capture would
+                            // take the immediate path and walk straight past them.
+                            List<SuccessCallback<Image>> waiting =
+                                    new ArrayList<SuccessCallback<Image>>(pendingReadbacks);
+                            pendingReadbacks.clear();
+                            deliverReadback(callback);
+                            for (int i = 0; i < waiting.size(); i++) {
+                                deliverReadback(waiting.get(i));
                             }
                         }
                     });
@@ -6826,6 +6834,22 @@ public class HTML5Implementation extends CodenameOneImplementation {
             return;
         }
         readDisplaySurface(callback);
+    }
+
+    /**
+     * Hands one waiting capture its frame, keeping its failure to itself.
+     *
+     * <p>These callbacks belong to unrelated callers that happened to ask during the same
+     * frame, so one of them throwing is not a reason for the others to go unanswered.</p>
+     *
+     * @param callback the capture to satisfy
+     */
+    private void deliverReadback(SuccessCallback<Image> callback) {
+        try {
+            readDisplaySurface(callback);
+        } catch (Throwable t) {
+            Log.e(t);
+        }
     }
 
     /**
