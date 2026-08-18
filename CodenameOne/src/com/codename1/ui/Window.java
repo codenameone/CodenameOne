@@ -1573,23 +1573,7 @@ public class Window extends Container implements TopLevelContainer {
             // us here would go on firing into a component tree the user cannot see,
             // and keep the event dispatch thread awake. The key-up may never arrive
             // either, once the native window has lost focus.
-            // The component-level state first, then the framework records. A
-            // component that took a press -- a Button in STATE_PRESSED from the fire
-            // key, or from a pointer press -- has no way to learn the gesture ended
-            // once the records are gone, and stayed latched when the window was
-            // shown again. dragInitiated is the existing "the gesture ended without
-            // completing" primitive: it resets the pressed state without firing the
-            // action, which is right for a window the user can no longer reach.
-            if (pressedCmp != null) {
-                LeadUtil.dragInitiated(pressedCmp);
-            }
-            if (focused != null && focused != pressedCmp) { //NOPMD CompareObjectsWithEquals
-                LeadUtil.dragInitiated(focused);
-            }
-            pressedCmp = null;
-            dragged = null;
-            currentPointerPress = null;
-            Display.getInstance().windowInputCancelled(this);
+            cancelPendingInput();
             // A window the user can no longer reach must not go on blocking the ones
             // behind it. Without this a modal hidden through HIDE_ON_CLOSE stays at the
             // top of the modal stack -- and where the platform implements modality
@@ -1655,6 +1639,10 @@ public class Window extends Container implements TopLevelContainer {
             }
             currentInputDevice = null;
         }
+        // Same cleanup the hide and minimize paths owe: a window disposed mid-gesture
+        // leaves a hidden drag component and a latched pressed component behind, and
+        // windowDisposed below only forgets the framework's records.
+        cancelPendingInput();
         if (nativePeer != null) {
             WindowManager wm = manager();
             wm.hide(nativePeer);
@@ -2117,7 +2105,11 @@ public class Window extends Container implements TopLevelContainer {
                 }
             }
             LeadUtil.pointerPressed(cmp, x, y);
-            if (cmp.isFocusable()) {
+            // Not while a wheel gesture is being synthesized: dragWheelStep disables
+            // only the deepest hit component, so a focusable lead parent resolved
+            // here would still take focus and merely scrolling over a lead-based
+            // control would steal the keyboard. Form and LeadUtil both guard on this.
+            if (cmp.isFocusable() && !Display.impl.isScrollWheeling()) {
                 setFocused(cmp);
             }
             tactileTouchVibe(x, y, cmp);
@@ -2355,6 +2347,38 @@ public class Window extends Container implements TopLevelContainer {
         }
     }
 
+    /// Ends every gesture in flight because the window has left the user's reach.
+    ///
+    /// Called from every path that does that -- `#hide()`, a native minimize through
+    /// `#hideNotify()`, and `#dispose()` -- rather than from whichever one was last
+    /// reported. A window that goes away mid-gesture leaves three kinds of state
+    /// behind, and all three have to be undone together:
+    ///
+    /// an activated drag and drop, whose component `Component` has already hidden and
+    /// which only `dragFinishedImpl` restores; a pressed component, latched in its
+    /// pressed state with no release coming; and the framework's own recorded targets
+    /// and timers, which otherwise keep firing into a tree nobody can see.
+    private void cancelPendingInput() {
+        if (dragged != null && dragged.isDragAndDropInitialized()) {
+            // Finished outside the window so no drop target is found: the user never
+            // completed the drag, the window simply went away. This still restores
+            // the component's visibility and clears the drag flags.
+            LeadUtil.dragFinished(dragged, -1, -1);
+        }
+        // dragInitiated is the existing "ended without completing" primitive -- it
+        // resets the pressed state without firing the action.
+        if (pressedCmp != null) {
+            LeadUtil.dragInitiated(pressedCmp);
+        }
+        if (focused != null && focused != pressedCmp) { //NOPMD CompareObjectsWithEquals
+            LeadUtil.dragInitiated(focused);
+        }
+        pressedCmp = null;
+        dragged = null;
+        currentPointerPress = null;
+        Display.getInstance().windowInputCancelled(this);
+    }
+
     private Component resolveComponentAt(int x, int y) {
         Component cmp = getActualPane(x, y).getComponentAt(x, y);
         while (cmp != null && cmp.isIgnorePointerEvents()) {
@@ -2459,6 +2483,11 @@ public class Window extends Container implements TopLevelContainer {
         super.hideNotify();
         if (nativeVisible) {
             nativeVisible = false;
+            // Native minimization arrives here rather than through hide(), and the
+            // window stays registered either way, so the same cleanup is owed: a held
+            // key would otherwise keep repeating into the hidden tree, and the
+            // platform may never deliver the release once focus is gone.
+            cancelPendingInput();
             // Recorded separately from an explicit hide(): a minimized window is still
             // open, and still modal if it was, so this must not read as "the modal is
             // over" -- see isModalFinished().

@@ -1817,6 +1817,50 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void minimizingAWindowCancelsItsTimersToo() throws Exception {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("minimize timers", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+
+        Display.getInstance().windowKeyPressed(w.getWindowId(), 68);
+        DisplayTest.flushEdt();
+        // Native minimization arrives through hideNotify, not hide(), and bypassed
+        // the cleanup entirely -- the window stays registered either way.
+        w.hideNotify();
+        boolean armed = keyRepeatArmedFor(w.getWindowId());
+        w.dispose();
+
+        assertFalse(armed, "minimizing must cancel the timers armed for the window");
+    }
+
+    @FormTest
+    void hidingDuringADragRestoresTheDraggedComponent() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("drag hide", new BorderLayout());
+        Label draggable = new Label("drag me");
+        draggable.setDraggable(true);
+        w.add(BorderLayout.CENTER, draggable);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        w.pointerPressed(150, 120);
+        w.pointerDragged(150, 121);
+        w.pointerDragged(165, 145);
+        w.pointerDragged(175, 165);
+        // Component hides the dragged component when the drag activates; only
+        // dragFinishedImpl restores it, and dragInitiated does not.
+        w.hide();
+        boolean visible = draggable.isVisible();
+        boolean stillInitialized = draggable.isDragAndDropInitialized();
+        w.dispose();
+
+        assertTrue(visible, "hiding mid-drag must restore the dragged component");
+        assertFalse(stillInitialized, "and must clear its drag-and-drop state");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");
