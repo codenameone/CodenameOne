@@ -1275,6 +1275,20 @@ public final class InterpRuntime {
         InterpClass ic = bundle.findClass(owner);
         if (ic != null) {
             ensureInitialized(ic);
+            if (declaredByInterpreted(ic, name)) {
+                pushBoxed(f, InterpValues.kindOf(desc),
+                        findStaticHolder(ic, name).staticValue(name));
+                return;
+            }
+            // Inherited from the host superclass. Reading it from the
+            // interpreted class would answer null for a field that class never
+            // declared.
+            String hostOwner = hostOwnerOf(ic);
+            if (hostOwner != null) {
+                pushBoxed(f, InterpValues.kindOf(desc),
+                        linker.getStatic(hostOwner, name, desc));
+                return;
+            }
             pushBoxed(f, InterpValues.kindOf(desc), findStaticHolder(ic, name).staticValue(name));
             return;
         }
@@ -1290,6 +1304,17 @@ public final class InterpRuntime {
         InterpClass ic = bundle.findClass(owner);
         if (ic != null) {
             ensureInitialized(ic);
+            if (declaredByInterpreted(ic, name)) {
+                findStaticHolder(ic, name).setStaticValue(name, value);
+                return;
+            }
+            // As above: writing it here would create a private copy the host
+            // never sees, and leave the real field unchanged.
+            String hostOwner = hostOwnerOf(ic);
+            if (hostOwner != null) {
+                linker.setStatic(hostOwner, name, desc, value);
+                return;
+            }
             findStaticHolder(ic, name).setStaticValue(name, value);
             return;
         }
@@ -1311,6 +1336,35 @@ public final class InterpRuntime {
             return -1;
         }
         return io.indexOf(declaring, name);
+    }
+
+    /// The nearest host ancestor's internal name, or null when there is none.
+    ///
+    /// A static that no interpreted class in the chain declares belongs to the
+    /// host superclass: `MyForm.SOME_CONSTANT` compiles to a field reference
+    /// owned by MyForm, which the installed app has never heard of, so the
+    /// access has to be re-addressed to the class that does declare it.
+    private String hostOwnerOf(InterpClass c) {
+        InterpClass k = c;
+        while (k != null) {
+            if (k.superExtern >= 0) {
+                return externOwnerName(k.superExtern);
+            }
+            k = k.superInterp;
+        }
+        return null;
+    }
+
+    /// Whether any interpreted class in the chain declares this static.
+    private boolean declaredByInterpreted(InterpClass c, String name) throws Throwable {
+        InterpClass k = c;
+        while (k != null) {
+            if (k.declaresStatic(name) || findStaticInInterfaces(k, name) != null) {
+                return true;
+            }
+            k = k.superInterp;
+        }
+        return false;
     }
 
     private InterpClass findStaticHolder(InterpClass c, String name) throws Throwable {
@@ -1450,6 +1504,16 @@ public final class InterpRuntime {
                 ensureInitialized(m != null && m.owner != null ? m.owner : ic);
                 if (m != null) {
                     pushBoxed(f, returnKind, invokeInterpreted(m, null, args));
+                    return;
+                }
+                // Nothing interpreted declares it, so it is inherited from the
+                // host superclass -- and the call site names the interpreted
+                // subclass, which the installed app has never heard of.
+                // Re-address it to the class that does declare it.
+                String hostOwner = hostOwnerOf(ic);
+                if (hostOwner != null) {
+                    pushBoxed(f, returnKind,
+                            hostCall(hostOwner, name, desc, null, args, false));
                     return;
                 }
             }
