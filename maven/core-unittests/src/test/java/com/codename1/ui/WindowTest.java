@@ -1790,6 +1790,33 @@ class WindowTest extends UITestBase {
     }
 
     @FormTest
+    void hidingAWindowUnlatchesTheComponentThatTookThePress() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("latched", new BorderLayout());
+        Button b = new Button("fire me");
+        w.add(BorderLayout.CENTER, b);
+        w.setWindowSize(300, 200);
+        w.show();
+        w.setFocused(b);
+
+        // The scenario the hide cleanup exists for: the component takes the press and
+        // the window goes away before the release. Dropping the records without
+        // telling the component left it in STATE_PRESSED, still latched when the
+        // window was shown again.
+        // The test implementation maps a key code straight to its game action, so
+        // GAME_FIRE is the code that reaches Button.pressed().
+        b.keyPressed(Display.GAME_FIRE);
+        int pressedState = b.getState();
+        w.hide();
+        int afterHide = b.getState();
+        w.dispose();
+
+        assertEquals(Button.STATE_PRESSED, pressedState, "the press must latch it first");
+        assertTrue(afterHide != Button.STATE_PRESSED,
+                "hiding the window must unlatch the component that took the press");
+    }
+
+    @FormTest
     void theUtilityWindowFlagReachesThePort() {
         TestWindowManager wm = implementation.setMultiWindowSupported(true);
         Window w = new Window("palette");

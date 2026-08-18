@@ -1573,6 +1573,22 @@ public class Window extends Container implements TopLevelContainer {
             // us here would go on firing into a component tree the user cannot see,
             // and keep the event dispatch thread awake. The key-up may never arrive
             // either, once the native window has lost focus.
+            // The component-level state first, then the framework records. A
+            // component that took a press -- a Button in STATE_PRESSED from the fire
+            // key, or from a pointer press -- has no way to learn the gesture ended
+            // once the records are gone, and stayed latched when the window was
+            // shown again. dragInitiated is the existing "the gesture ended without
+            // completing" primitive: it resets the pressed state without firing the
+            // action, which is right for a window the user can no longer reach.
+            if (pressedCmp != null) {
+                LeadUtil.dragInitiated(pressedCmp);
+            }
+            if (focused != null && focused != pressedCmp) { //NOPMD CompareObjectsWithEquals
+                LeadUtil.dragInitiated(focused);
+            }
+            pressedCmp = null;
+            dragged = null;
+            currentPointerPress = null;
             Display.getInstance().windowInputCancelled(this);
             // A window the user can no longer reach must not go on blocking the ones
             // behind it. Without this a modal hidden through HIDE_ON_CLOSE stays at the

@@ -9263,11 +9263,20 @@ public abstract class CodenameOneImplementation {
     /// `#isScrollWheeling` reports `true`.
     private void playWheelScrollGesture(final Display d, final int windowId, final int x,
             final int y, final int scrollX, final int scrollY) {
+        // The root is resolved once, by the step that dispatches the press, and the
+        // remaining steps reuse it. Re-checking modality on every step -- which is
+        // what the previous version did -- suppressed the later steps including the
+        // only release, so a gesture whose press had already been delivered never
+        // completed and left the top level's pressed and drag bookkeeping stranded.
+        // A gesture blocked *before* its press still never starts, which is the case
+        // modality is there to stop.
+        final Container[] started = new Container[1];
         d.callSerially(new Runnable() {
             @Override
             public void run() {
                 Container f = wheelRoot(d, windowId);
                 if (f != null) {
+                    started[0] = f;
                     scrollWheeling = true;
                     dragWheelStep(f, x, y, scrollX / 4, scrollY / 4, true, false);
                 }
@@ -9276,7 +9285,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Container f = wheelRoot(d, windowId);
+                Container f = started[0];
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX / 2, scrollY / 2, false, false);
                 }
@@ -9285,7 +9294,7 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Container f = wheelRoot(d, windowId);
+                Container f = started[0];
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX * 3 / 4, scrollY * 3 / 4, false, false);
                 }
@@ -9294,7 +9303,9 @@ public abstract class CodenameOneImplementation {
         d.callSerially(new Runnable() {
             @Override
             public void run() {
-                Container f = wheelRoot(d, windowId);
+                // The release, which must reach the same root the press did -- a
+                // modal shown mid-gesture must not strand the pressed component.
+                Container f = started[0];
                 if (f != null) {
                     dragWheelStep(f, x, y, scrollX, scrollY, false, true);
                 }
