@@ -81,6 +81,18 @@ static NSMutableDictionary *cn1homeUndelivered = nil;
 // Without it a drain would report every polled trait as changed every time.
 static NSMutableDictionary *cn1homeLastPolled = nil;
 
+// Characteristics nobody subscribed to, whose notifications a subscription
+// nonetheless depends on: subscriptionId -> NSSet of
+// "accessoryId \t serviceId \t traitId". Today that is the thermostat mode
+// behind a TARGET_TEMPERATURE watch -- crossing into AUTO changes what the
+// setpoint means without touching the setpoint's own characteristic, and
+// HomeKit notifies per characteristic, so with no registration on the mode
+// the derived update below never fires and the listener keeps a number the
+// thermostat has stopped aiming for. Kept apart from cn1homeWatches because
+// these keys must NOT match a delivery: the app asked for a setpoint, not a
+// mode.
+static NSMutableDictionary *cn1homeDependencies = nil;
+
 // Watched characteristics whose enableNotification: failed, keyed
 // "subscriptionId \t accessoryId \t serviceId \t traitId". HomeKit is the
 // backend the framework reports as push, so one of these cannot simply be
@@ -1654,6 +1666,7 @@ static void cn1homeInit(void) {
         cn1homeUndelivered = [[NSMutableDictionary alloc] init];
         cn1homeLastPolled = [[NSMutableDictionary alloc] init];
         cn1homeNotifyFailed = [[NSMutableSet alloc] init];
+        cn1homeDependencies = [[NSMutableDictionary alloc] init];
         cn1homeAccessoryObjects = [[NSMutableDictionary alloc] init];
         cn1homeHomeObjects = [[NSMutableDictionary alloc] init];
         cn1homeDelegate = [[CN1HomeDelegate alloc] init];
@@ -1690,6 +1703,31 @@ static void cn1homeArmRecovery(void);
 /// caller is told to resync either way -- the swap itself may have moved the
 /// value, and no notification could have reported that.
 static void cn1homeRebindWatches(NSString *accessoryId) {
+    // The dependency registrations first, and quietly: they belong to no
+    // trait the caller named, so a failure is not its business -- but a
+    // replaced mode characteristic with no registration leaves a setpoint
+    // watch deaf to the only signal that says the setpoint stopped meaning
+    // anything.
+    for (NSString *subscriptionId in [cn1homeDependencies allKeys]) {
+        for (NSString *key in [cn1homeDependencies
+                               objectForKey:subscriptionId]) {
+            NSArray *parts = [key componentsSeparatedByString:@"\t"];
+            if ([parts count] != 3
+                    || ![[parts objectAtIndex:0] isEqualToString:accessoryId]) {
+                continue;
+            }
+            HMService *service = cn1homeFindService(accessoryId,
+                                                    [parts objectAtIndex:1]);
+            HMCharacteristic *dep = cn1homeFindCharacteristic(
+                service, [parts objectAtIndex:2]);
+            if (dep != nil
+                    && [[dep properties] containsObject:
+                        HMCharacteristicPropertySupportsEventNotification]) {
+                [dep enableNotification:YES
+                      completionHandler:^(NSError *ignored) { }];
+            }
+        }
+    }
     for (NSString *subscriptionId in [cn1homeWatches allKeys]) {
         NSSet *keys = [cn1homeWatches objectForKey:subscriptionId];
         BOOL touched = NO;
@@ -1982,6 +2020,7 @@ void com_codename1_impl_ios_IOSNative_homeStop__(
         [cn1homeUndelivered removeAllObjects];
         [cn1homeLastPolled removeAllObjects];
         [cn1homeNotifyFailed removeAllObjects];
+        [cn1homeDependencies removeAllObjects];
     });
 }
 
@@ -2556,12 +2595,22 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
         toNSString(CN1_THREAD_STATE_PASS_ARG traitIds)) retain];
     cn1homeOnMain(^{
         NSMutableSet *keys = [NSMutableSet set];
+        NSMutableSet *deps = [NSMutableSet set];
         for (NSUInteger i = 0; i < [traits count]; i++) {
             NSString *accessoryId = [accessories objectAtIndex:i];
             NSString *serviceId = [services objectAtIndex:i];
             NSString *traitId = [traits objectAtIndex:i];
             [keys addObject:cn1homeReadingKey(accessoryId, serviceId,
                                               traitId)];
+            if ([traitId isEqualToString:@"target_temperature"]) {
+                // The mode is what decides whether this setpoint means
+                // anything at all -- see cn1homeDependencies. Registered
+                // even though nobody asked for it, and kept out of the
+                // watch set so its own changes are never delivered as if
+                // they had been.
+                [deps addObject:cn1homeReadingKey(accessoryId, serviceId,
+                                                  @"target_heating_cooling")];
+            }
             HMService *service = cn1homeFindService(accessoryId, serviceId);
             HMCharacteristic *c = cn1homeFindCharacteristic(service, traitId);
             if (c == nil) {
@@ -2624,6 +2673,34 @@ com_codename1_impl_ios_IOSNative_homeSubscribe___int_java_lang_String_java_lang_
             }];
         }
         [cn1homeWatches setObject:keys forKey:subId];
+        // The dependencies, registered after the watch set exists so a
+        // failure inside the completion handler finds the subscription in
+        // place. A failure here is not reported to the caller: the trait it
+        // supports is still registered and still delivering, and the derived
+        // update it exists for is the recovery pass's business.
+        [deps minusSet:keys];
+        for (NSString *key in deps) {
+            NSArray *parts = [key componentsSeparatedByString:@"\t"];
+            if ([parts count] != 3) {
+                continue;
+            }
+            HMService *service = cn1homeFindService([parts objectAtIndex:0],
+                                                    [parts objectAtIndex:1]);
+            HMCharacteristic *c = cn1homeFindCharacteristic(
+                service, [parts objectAtIndex:2]);
+            // A mode that cannot notify is left alone: every HomeKit
+            // thermostat's TargetHeatingCoolingState reports changes, and
+            // the alternative -- pushing the setpoint onto the polling path
+            // over a presence change its encoded value does not carry --
+            // would be machinery with nothing to test it against.
+            if (c != nil
+                    && [[c properties] containsObject:
+                        HMCharacteristicPropertySupportsEventNotification]) {
+                [c enableNotification:YES
+                    completionHandler:^(NSError *ignored) { }];
+            }
+        }
+        [cn1homeDependencies setObject:deps forKey:subId];
         [subId release];
         [accessories release];
         [services release];
@@ -2638,7 +2715,13 @@ void com_codename1_impl_ios_IOSNative_homeUnsubscribe___java_lang_String(
                        retain];
     cn1homeOnMain(^{
         NSSet *keys = [cn1homeWatches objectForKey:subId];
+        NSSet *deps = [cn1homeDependencies objectForKey:subId];
+        if (deps != nil) {
+            keys = keys == nil ? deps
+                               : [keys setByAddingObjectsFromSet:deps];
+        }
         [cn1homeWatches removeObjectForKey:subId];
+        [cn1homeDependencies removeObjectForKey:subId];
         [cn1homeUndelivered removeObjectForKey:subId];
         // And this subscription's polling baselines, which are keyed by
         // subscription id and would otherwise outlive it. Subscription ids
@@ -2669,6 +2752,18 @@ void com_codename1_impl_ios_IOSNative_homeUnsubscribe___java_lang_String(
                          containsObject:key]) {
                         stillWatched = YES;
                         break;
+                    }
+                }
+                // Including as somebody else's dependency: turning the
+                // thermostat mode's notification off would leave their
+                // setpoint watch deaf to the one change that matters to it.
+                if (!stillWatched) {
+                    for (NSString *other in cn1homeDependencies) {
+                        if ([[cn1homeDependencies objectForKey:other]
+                             containsObject:key]) {
+                            stillWatched = YES;
+                            break;
+                        }
                     }
                 }
                 if (stillWatched) {

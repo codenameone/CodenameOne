@@ -24,6 +24,7 @@ package com.codename1.impl.home;
 
 import com.codename1.home.HomeAuthorizationStatus;
 import com.codename1.home.HomeAvailability;
+import com.codename1.home.HeatingCoolingMode;
 import com.codename1.home.HomeError;
 import com.codename1.home.SmartHome;
 import com.codename1.home.StructureChangeKind;
@@ -652,7 +653,9 @@ public class LocalHomeBridge implements HomeBridge {
                     HomeError.WRITE_ONLY_TRAIT,
                     "this trait can be set but not read");
         }
-        TraitValue v = values.get(key(accessoryId, serviceId, traitId));
+        TraitValue v = Trait.TARGET_TEMPERATURE.getId().equals(traitId)
+                && inAutoMode(accessoryId, serviceId)
+                ? null : values.get(key(accessoryId, serviceId, traitId));
         if (v == null) {
             return TraitReading.absent(accessoryId, serviceId, trait);
         }
@@ -736,9 +739,20 @@ public class LocalHomeBridge implements HomeBridge {
                     "that is a state an accessory reports rather than one it"
                             + " can be asked for");
         }
+        if (Trait.TARGET_TEMPERATURE.getId().equals(traitId)
+                && inAutoMode(accessoryId, serviceId)) {
+            // The read answers absent here, so accepting the write would
+            // store a number nothing can ever read back -- and a simulator
+            // test would pass on a setpoint the thermostat is not working to.
+            return refusal(f, HomeError.INVALID_ARGUMENT,
+                    "this thermostat is in AUTO, where there is no single"
+                            + " target; set the heating and cooling"
+                            + " thresholds instead");
+        }
         values.put(key(accessoryId, serviceId, traitId), value);
         changed.add(TraitReading.of(accessoryId, serviceId, trait, value,
                 System.currentTimeMillis()));
+        appendDerivedTargetChange(changed, accessoryId, serviceId, trait);
         f[3] = HomeWire.flag(true);
         f[4] = "";
         f[5] = "";
@@ -880,6 +894,8 @@ public class LocalHomeBridge implements HomeBridge {
                         a.value);
                 changed.add(TraitReading.of(a.accessoryId, a.serviceId,
                         a.trait, a.value, System.currentTimeMillis()));
+                appendDerivedTargetChange(changed, a.accessoryId, a.serviceId,
+                        a.trait);
             }
             line = HomeWire.join(new String[] {scene.id, scene.name,
                 Integer.toString(scene.typeOrdinal), HomeWire.flag(true)});
@@ -1047,6 +1063,75 @@ public class LocalHomeBridge implements HomeBridge {
     // internals
     // ------------------------------------------------------------------
 
+    /// Whether this thermostat is in AUTO, where the single target setpoint
+    /// means nothing.
+    ///
+    /// [Trait#TARGET_TEMPERATURE] is documented as "the setpoint that applies
+    /// in the current mode", and in AUTO there is no such thing -- the
+    /// accessory is working to the two thresholds instead. iOS answers a read
+    /// of it with no value there, and this store has to do the same: a
+    /// simulator that hands back a number lets a thermostat screen be built
+    /// against behaviour no backend provides, and the bug only appears on a
+    /// device.
+    ///
+    /// #### Parameters
+    ///
+    /// - `accessoryId`: the accessory
+    ///
+    /// - `serviceId`: the service on it
+    ///
+    /// #### Returns
+    ///
+    /// `true` when the mode trait on that service reads AUTO
+    private boolean inAutoMode(String accessoryId, String serviceId) {
+        TraitValue mode = values.get(key(accessoryId, serviceId,
+                Trait.TARGET_HEATING_COOLING.getId()));
+        return mode != null
+                && mode.getKind() == TraitValueKind.ENUM
+                && mode.getEnumOrdinal() == HeatingCoolingMode.AUTO.ordinal();
+    }
+
+    /// Adds the setpoint's derived change after a mode change.
+    ///
+    /// Crossing into or out of AUTO changes what
+    /// [Trait#TARGET_TEMPERATURE] reports without anything writing to it, so
+    /// a listener watching only the setpoint would keep the number the
+    /// thermostat has stopped aiming for. The iOS bridge sends the same
+    /// derived update from the mode's own notification; this is that, for the
+    /// store the simulator and the desktop run against.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changed`: the batch being built
+    ///
+    /// - `accessoryId`: the accessory
+    ///
+    /// - `serviceId`: the service on it
+    ///
+    /// - `written`: the trait that was just written
+    private void appendDerivedTargetChange(List<TraitReading> changed,
+            String accessoryId, String serviceId, Trait written) {
+        if (!Trait.TARGET_HEATING_COOLING.getId().equals(written.getId())) {
+            return;
+        }
+        Accessory a = accessories.get(accessoryId);
+        Service s = a == null ? null : a.services.get(serviceId);
+        if (s == null || s.constraintFor(Trait.TARGET_TEMPERATURE) == null) {
+            return;
+        }
+        TraitValue setpoint = inAutoMode(accessoryId, serviceId) ? null
+                : values.get(key(accessoryId, serviceId,
+                        Trait.TARGET_TEMPERATURE.getId()));
+        if (setpoint == null) {
+            changed.add(TraitReading.absent(accessoryId, serviceId,
+                    Trait.TARGET_TEMPERATURE));
+        } else {
+            changed.add(TraitReading.of(accessoryId, serviceId,
+                    Trait.TARGET_TEMPERATURE, setpoint,
+                    System.currentTimeMillis()));
+        }
+    }
+
     private void applyValue(String accessoryId, String serviceId, Trait trait,
             TraitValue value) {
         List<TraitReading> changed = new ArrayList<TraitReading>();
@@ -1061,6 +1146,7 @@ public class LocalHomeBridge implements HomeBridge {
                 changed.add(TraitReading.of(accessoryId, serviceId, trait,
                         value, System.currentTimeMillis()));
             }
+            appendDerivedTargetChange(changed, accessoryId, serviceId, trait);
         }
         recordChanges(changed);
     }
