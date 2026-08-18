@@ -204,6 +204,15 @@ You can then use the `FileSystemStorage` class to write the content of your DB f
 NOTE: In the JavaScript port databases live in a browser storage pool rather than a filesystem, so
 `getDatabasePath()` returns the name within that pool and `FileSystemStorage` can't open it.
 
+WARNING: The browser engine changed. Earlier JavaScript builds kept databases in WebSQL, which
+Chrome removed and Firefox never implemented; the current engine is SQLite compiled to WebAssembly,
+and it can't read a WebSQL store. If your application ran on a browser old enough to still have one,
+`openOrCreate` refuses to create a database whose name it finds there rather than handing you an
+empty one, because an application that writes as it goes would overwrite the user's data with an
+empty state. Export what the old store holds from a build that still reads it, or set the
+`cn1.db.ignoreLegacyWebSql` property to `true` to continue with a new empty database -- nothing
+removes the old store, so an application that has finished with it needs that property to move on.
+
 This is useful for applications that need to synchronize with a central server or applications that ship with a large database as part of their core product.
 
 Working with a database is pretty trivial, the application logic below can send arbitrary queries to the database and present the results in a `Table`. You can probably integrate this code into your app as a debugging tool:

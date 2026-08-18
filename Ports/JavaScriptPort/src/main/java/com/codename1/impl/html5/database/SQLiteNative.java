@@ -55,6 +55,16 @@ public class SQLiteNative {
 
     public static native boolean exists(String name);
 
+    /**
+     * True when a database of this name exists in the store the previous implementation used.
+     *
+     * WebSQL went out of Chrome in 119 and Firefox never had it, so this answers false on nearly
+     * every browser. It is asked only when this engine is about to create a database that is not
+     * there, which is the one moment an application that carried data in the old store would
+     * otherwise be handed an empty one instead.
+     */
+    public static native boolean legacyStoreHasData(String name);
+
     /** Deletes a database, returning false and recording {@link #lastError()} on failure. */
     public static native boolean delete(String name);
 

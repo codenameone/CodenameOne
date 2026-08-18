@@ -7005,6 +7005,80 @@ bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_open_java_lang_S
     }
   });
 
+// The store the previous implementation used, which this engine cannot read.
+//
+// WebSQL went out of Chrome in 119 and Firefox never had it, so on nearly every browser this
+// answers false without doing anything. The overlap that matters is one old enough to still hold a
+// WebSQL store and new enough for the OPFS pool this engine needs, where an application that
+// upgrades would otherwise open a new empty database and show its user an empty application.
+//
+// There is no way to ask WebSQL whether a database exists: openDatabase creates one when it does
+// not. So this asks for the smallest store it can and reads the schema, and on a browser that has
+// the API but not the data it leaves an empty legacy database behind -- a few kilobytes, once, on
+// a browser that is already carrying the old store this is looking for.
+const CN1_SQLITE_LEGACY_TABLES =
+  "SELECT count(*) c FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+
+function cn1SqliteLegacyRowCount(resultSet) {
+  return resultSet && resultSet.rows && resultSet.rows.length > 0
+      ? resultSet.rows.item(0).c > 0 : false;
+}
+
+/// A worker gets the synchronous form, which answers without the await bridge.
+function cn1SqliteLegacyHasDataSync(name) {
+  const db = openDatabaseSync(name, "", name, 1);
+  let found = false;
+  db.readTransaction(function(tx) {
+    found = cn1SqliteLegacyRowCount(tx.executeSql(CN1_SQLITE_LEGACY_TABLES, []));
+  });
+  return found;
+}
+
+/// A window has only the callback form, which is why the binding below is a generator.
+function cn1SqliteLegacyHasDataAsync(name) {
+  return new Promise(function(resolve) {
+    let db;
+    try {
+      db = openDatabase(name, "", name, 1);
+    } catch (cannotOpen) {
+      resolve(false);
+      return;
+    }
+    if (!db) {
+      resolve(false);
+      return;
+    }
+    db.readTransaction(function(tx) {
+      tx.executeSql(CN1_SQLITE_LEGACY_TABLES, [], function(ignoredTx, resultSet) {
+        resolve(cn1SqliteLegacyRowCount(resultSet));
+      }, function() {
+        resolve(false);
+        return false;
+      });
+    }, function() {
+      resolve(false);
+    });
+  });
+}
+
+bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_legacyStoreHasData_java_lang_String_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_legacyStoreHasData___java_lang_String_R_boolean"],
+  function*(name) {
+    const n = jvm.toNativeString(name);
+    try {
+      if (typeof openDatabaseSync === "function") {
+        return cn1SqliteLegacyHasDataSync(n);
+      }
+      if (typeof openDatabase === "function") {
+        return yield { op: "await", promise: cn1SqliteLegacyHasDataAsync(n) };
+      }
+    } catch (cannotAsk) {
+      // A browser that refuses the question is not one holding data this can lose: WebSQL threw
+      // for a disabled or full store, and answering true there would refuse every new database.
+      return false;
+    }
+    return false;
+  });
+
 bindNative(["cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey_R_boolean", "cn1_com_codename1_impl_html5_database_SQLiteNative_lastOpenWasWrongKey___R_boolean"],
   function() { return cn1SqliteLastOpenWrongKey; });
 

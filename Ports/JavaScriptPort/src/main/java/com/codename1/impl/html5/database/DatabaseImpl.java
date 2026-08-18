@@ -28,6 +28,7 @@ import com.codename1.db.DatabaseConfig;
 import com.codename1.db.DatabaseEncryptionException;
 import com.codename1.impl.AbstractDBCursor;
 import com.codename1.impl.SQLStatementSplitter;
+import com.codename1.ui.Display;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -76,6 +77,7 @@ public class DatabaseImpl extends Database {
         registerOpenDatabase(openKey);
         boolean opened = false;
         try {
+            refuseIfDataIsOnlyInTheLegacyStore(name);
             peer = SQLiteNative.open(name, key);
             opened = openOrFail(name);
         } finally {
@@ -86,6 +88,44 @@ public class DatabaseImpl extends Database {
             releaseOpenDatabase(openKey);
             }
         }
+    }
+
+    /**
+     * Refuses to create a database whose data is sitting in the store this engine replaced.
+     *
+     * The previous implementation kept its databases in WebSQL, which this engine cannot read.
+     * WebSQL went out of Chrome in 119 and Firefox never had it, so on nearly every browser there
+     * is nothing there and this costs one call that answers false. Where there is something there,
+     * an application that upgraded would open a database of the same name, find it empty, and
+     * carry on as though the user's rows had never existed -- which for an application that writes
+     * as it goes means overwriting them with an empty state rather than merely failing to read
+     * them.
+     *
+     * Reported rather than migrated, and reported rather than ignored. A copy would have to walk
+     * a schema through an API no browser this runs on still implements, which is untestable code
+     * on a path nobody can exercise; an application that is told instead can export through its
+     * own code, which is the only code that knows what its data means. Setting
+     * cn1.db.ignoreLegacyWebSql to true proceeds with the new empty database, which an application
+     * that has finished with the old store needs, since nothing removes it.
+     *
+     * @param name the database about to be created
+     * @throws IOException if a legacy database of this name holds tables
+     */
+    private void refuseIfDataIsOnlyInTheLegacyStore(String name) throws IOException {
+        if ("true".equals(Display.getInstance().getProperty("cn1.db.ignoreLegacyWebSql", "false"))) {
+            return;
+        }
+        // Only when this engine has nothing of its own. A database it already carries has been
+        // through this once, and asking again on every open would charge every application a
+        // storage round trip for an answer that cannot change.
+        if (SQLiteNative.exists(name) || !SQLiteNative.legacyStoreHasData(name)) {
+            return;
+        }
+        throw new IOException("The database " + name + " exists in this browser's WebSQL store, "
+                + "which this build no longer uses and cannot read, and creating it here would "
+                + "hand the application an empty database in its place. Export what the old store "
+                + "holds through a build that still reads it, or set the cn1.db.ignoreLegacyWebSql "
+                + "property to true to continue with a new empty database.");
     }
 
     /** Reports a failed open, or true when the peer is live. */
