@@ -98,12 +98,6 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
     private static final Pattern ID_PATTERN = Pattern.compile("[a-z][a-z0-9_]{2,63}");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([A-Za-z0-9_]+)\\}");
     private static final Pattern ROUTE_PLACEHOLDER = Pattern.compile("\\{([A-Za-z0-9_]+)\\}");
-    /// Mirrors the grammar the generated ISO-8601 parser accepts, for validating a declared
-    /// default at build time. The generated parser remains the authority at runtime.
-    private static final Pattern DATE_DEFAULT = Pattern.compile(
-            "\\d{4}-\\d{2}-\\d{2}([Tt ]\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?"
-                    + "([Zz]|[+-]\\d{2}:?\\d{2})?)?");
-
     /// Apple rejects an App Shortcut phrase that does not name the app.
     private static final String APP_NAME_TOKEN = "${applicationName}";
 
@@ -736,65 +730,19 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         String trimmed = v == null ? "" : v.trim();
         return "true".equalsIgnoreCase(trimmed) || "1".equals(trimmed);
     }
-
-    /// Whether the generated ISO-8601 parser would accept this literal.
+    /// Whether the runtime would accept this literal as a date.
     ///
-    /// Shape is not enough: `2026-13-01` and `2026-01-01T25:00` both match the pattern and are
-    /// both rejected at runtime, so a default that looked valid became null and the handler saw
-    /// no value at all. This applies the same bounds the generated parser applies -- a strict
-    /// Calendar for the date fields, and explicit range checks for the time and offset.
+    /// Shape is not enough: `2026-13-01` and `2026-01-01T25:00` both look like dates and are
+    /// both rejected at runtime, so a default that passed the build became null and the handler
+    /// saw no value at all.
     ///
-    /// It is a deliberate second implementation of that grammar, because the generated code
-    /// cannot be called from here. The two must move together; the tests exercise both.
+    /// This used to be a second implementation of the grammar, carrying a comment that the two
+    /// had to move together because the generated code could not be called from here. That is
+    /// no longer true of either half: the grammar lives in core now, the plugin already depends
+    /// on core, and the generated coercion calls the same method. One parser, three callers,
+    /// nothing left to keep in agreement.
     private static boolean parsesAsIso8601(String v) {
-        if (!DATE_DEFAULT.matcher(v).matches()) {
-            return false;
-        }
-        try {
-            java.util.Calendar c = java.util.Calendar.getInstance(
-                    java.util.TimeZone.getTimeZone("GMT"));
-            c.clear();
-            c.setLenient(false);
-            c.set(Integer.parseInt(v.substring(0, 4)),
-                    Integer.parseInt(v.substring(5, 7)) - 1,
-                    Integer.parseInt(v.substring(8, 10)));
-            String rest = v.length() > 10 ? v.substring(11) : "";
-            if (rest.length() > 0) {
-                String zone = "";
-                int at = -1;
-                for (int i = 0; i < rest.length(); i++) {
-                    char ch = rest.charAt(i);
-                    if (ch == 'Z' || ch == 'z' || ch == '+' || (ch == '-' && i > 0)) {
-                        at = i;
-                        break;
-                    }
-                }
-                if (at >= 0) {
-                    zone = rest.substring(at);
-                    rest = rest.substring(0, at);
-                }
-                if (Integer.parseInt(rest.substring(0, 2)) > 23
-                        || Integer.parseInt(rest.substring(3, 5)) > 59) {
-                    return false;
-                }
-                if (rest.length() >= 8 && Integer.parseInt(rest.substring(6, 8)) > 59) {
-                    return false;
-                }
-                if (zone.length() > 1) {
-                    String digits = zone.substring(1).replace(":", "");
-                    int oh = Integer.parseInt(digits.substring(0, 2));
-                    int om = Integer.parseInt(digits.substring(2));
-                    if (oh > 18 || om > 59 || oh * 60 + om > 18 * 60) {
-                        return false;
-                    }
-                }
-            }
-            // Where a strict Calendar reports an impossible day.
-            c.getTime();
-            return true;
-        } catch (RuntimeException e) {
-            return false;
-        }
+        return com.codename1.intents.IntentDates.parse(v) != null;
     }
 
     private static boolean isLong(String v) {
@@ -1506,127 +1454,26 @@ public final class AppIntentAnnotationProcessor extends AbstractAnnotationProces
         sb.append("    }\n\n");
 
         sb.append("    /// Reads a supplied date value, or fails saying why.\n");
+        // One grammar, in core, called by both this coercion and the framework's own check of
+        // whether a value could run at all. It lived only here, so that check had to accept any
+        // string or number as a date -- and a donation carrying "not-a-date" was published as a
+        // durable shortcut this then rejected on every replay.
         sb.append("    private static java.util.Date toDate(Object o, String k) {\n");
-        sb.append("        if (o instanceof java.util.Date) { return (java.util.Date) o; }\n");
-        // Epoch millis are a number like any other: longValue() would truncate 1.5 and
-        // saturate 1e20, handing the handler a moment nobody named.
-        sb.append("        if (o instanceof Long || o instanceof Integer || o instanceof Short\n");
-        sb.append("                || o instanceof Byte) {\n");
-        sb.append("            return new java.util.Date(((Number) o).longValue());\n");
+        sb.append("        java.util.Date d = com.codename1.intents.IntentDates.parse(o);\n");
+        sb.append("        if (d != null) {\n");
+        sb.append("            return d;\n");
         sb.append("        }\n");
+        // The message still depends on what was passed. Telling someone who sent 1.5 to "use
+        // ISO-8601 or epoch milliseconds" buries the actual problem, which is that their number
+        // is not a count of anything; and the ISO hint is what a caller who sent text needs.
         sb.append("        if (o instanceof Number) {\n");
-        sb.append("            double d = ((Number) o).doubleValue();\n");
-        sb.append("            if (d != Math.floor(d) || Double.isInfinite(d) || Double.isNaN(d)\n");
-        sb.append("                    || d < -9223372036854775808.0 || d >= 9223372036854775808.0) {\n");
-        sb.append("                throw new IllegalArgumentException(o\n");
-        sb.append("                        + \" is not a moment in time for \" + k);\n");
-        sb.append("            }\n");
-        sb.append("            return new java.util.Date(((Number) o).longValue());\n");
+        sb.append("            throw new IllegalArgumentException(o\n");
+        sb.append("                    + \" is not a moment in time for \" + k);\n");
         sb.append("        }\n");
-        // A string may be epoch millis or ISO-8601. Both arrive in practice: the platforms send
-        // millis, and a language model handed this parameter through asTools() writes a date the
-        // way it writes dates. Rejecting the second form would fail the invocation over
-        // formatting, which is not a failure worth having.
-        sb.append("        if (o instanceof String) {\n");
-        sb.append("            String s = ((String) o).trim();\n");
-        sb.append("            java.util.Date parsed = null;\n");
-        sb.append("            if (s.length() > 0) {\n");
-        sb.append("                try { parsed = new java.util.Date(Long.parseLong(s)); }\n");
-        sb.append("                catch (NumberFormatException e) { parsed = parseIso8601(s); }\n");
-        sb.append("            }\n");
-        sb.append("            if (parsed == null) {\n");
-        sb.append("                throw new IllegalArgumentException(\"\\\"\" + o\n");
-        sb.append("                        + \"\\\" is not a date for \" + k\n");
-        sb.append("                        + \"; use ISO-8601 or epoch milliseconds\");\n");
-        sb.append("            }\n");
-        sb.append("            return parsed;\n");
-        sb.append("        }\n");
-        sb.append("        throw new IllegalArgumentException(o + \" is not a date for \" + k);\n");
+        sb.append("        throw new IllegalArgumentException(\"\\\"\" + o\n");
+        sb.append("                + \"\\\" is not a date for \" + k\n");
+        sb.append("                + \"; use ISO-8601 or epoch milliseconds\");\n");
         sb.append("    }\n\n");
-
-        // Hand-rolled rather than SimpleDateFormat: this has to be exact about what it accepts
-        // and null about everything else, and a lenient formatter reading "not a date" as some
-        // date is the failure mode that would be hardest to see.
-        sb.append("    /// Parses yyyy-MM-dd, optionally followed by THH:mm(:ss)(.SSS) and a\n");
-        sb.append("    /// Z / +hh:mm / -hh:mm offset. Anything else is null.\n");
-        sb.append("    private static java.util.Date parseIso8601(String s) {\n");
-        sb.append("        if (s.length() < 10 || s.charAt(4) != '-' || s.charAt(7) != '-') {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("        java.util.Calendar c = java.util.Calendar.getInstance(\n");
-        sb.append("                java.util.TimeZone.getTimeZone(\"GMT\"));\n");
-        sb.append("        c.clear();\n");
-        // Without this, 2026-13-40 normalizes into a real date in 2027 and the handler acts on
-        // something nobody asked for. Strict is the only setting that can say "not a date".
-        sb.append("        c.setLenient(false);\n");
-        sb.append("        int offsetMinutes = 0;\n");
-        sb.append("        try {\n");
-        sb.append("            int year = Integer.parseInt(s.substring(0, 4));\n");
-        sb.append("            int month = Integer.parseInt(s.substring(5, 7));\n");
-        sb.append("            int day = Integer.parseInt(s.substring(8, 10));\n");
-        sb.append("            int hour = 0, minute = 0, second = 0, millis = 0;\n");
-        sb.append("            String rest = s.substring(10);\n");
-        sb.append("            if (rest.length() > 0) {\n");
-        sb.append("                char sep = rest.charAt(0);\n");
-        sb.append("                if (sep != 'T' && sep != 't' && sep != ' ') { return null; }\n");
-        sb.append("                rest = rest.substring(1);\n");
-        sb.append("                int zone = -1;\n");
-        sb.append("                for (int i = 0; i < rest.length(); i++) {\n");
-        sb.append("                    char ch = rest.charAt(i);\n");
-        sb.append("                    if (ch == 'Z' || ch == 'z' || ch == '+'\n");
-        sb.append("                            || (ch == '-' && i > 0)) { zone = i; break; }\n");
-        sb.append("                }\n");
-        sb.append("                String time = zone < 0 ? rest : rest.substring(0, zone);\n");
-        sb.append("                if (zone >= 0) {\n");
-        sb.append("                    String z = rest.substring(zone);\n");
-        sb.append("                    if (!\"Z\".equals(z) && !\"z\".equals(z)) {\n");
-        sb.append("                        String digits = z.substring(1).replace(\":\", \"\");\n");
-        sb.append("                        if (digits.length() != 4) { return null; }\n");
-        sb.append("                        int oh = Integer.parseInt(digits.substring(0, 2));\n");
-        sb.append("                        int om = Integer.parseInt(digits.substring(2));\n");
-        // +01:99 is four digits and parses fine, then shifts the instant by 159 minutes and
-        // returns a date nobody asked for. ZoneOffset's own bound is +/-18:00, so that is the
-        // bound used here rather than inventing a looser one.
-        sb.append("                        if (oh > 18 || om > 59 || oh * 60 + om > 18 * 60) {\n");
-        sb.append("                            return null;\n");
-        sb.append("                        }\n");
-        sb.append("                        offsetMinutes = oh * 60 + om;\n");
-        sb.append("                        if (z.charAt(0) == '-') { offsetMinutes = -offsetMinutes; }\n");
-        sb.append("                    }\n");
-        sb.append("                }\n");
-        // The whole time substring has to be consumed. Reading HH:mm and ignoring the rest
-        // accepted "12:34junk" as a valid moment, which is the failure this parser exists to
-        // avoid: a required date that silently becomes a timestamp nobody supplied.
-        sb.append("                if (time.length() < 5 || time.charAt(2) != ':') { return null; }\n");
-        sb.append("                hour = Integer.parseInt(time.substring(0, 2));\n");
-        sb.append("                minute = Integer.parseInt(time.substring(3, 5));\n");
-        sb.append("                if (time.length() != 5) {\n");
-        sb.append("                    if (time.length() < 8 || time.charAt(5) != ':') { return null; }\n");
-        sb.append("                    second = Integer.parseInt(time.substring(6, 8));\n");
-        sb.append("                    if (time.length() != 8) {\n");
-        sb.append("                        if (time.length() < 10 || time.charAt(8) != '.') { return null; }\n");
-        sb.append("                        String digits = time.substring(9);\n");
-        sb.append("                        for (int f = 0; f < digits.length(); f++) {\n");
-        sb.append("                            char fc = digits.charAt(f);\n");
-        sb.append("                            if (fc < '0' || fc > '9') { return null; }\n");
-        sb.append("                        }\n");
-        sb.append("                        millis = Integer.parseInt((digits + \"000\").substring(0, 3));\n");
-        sb.append("                    }\n");
-        sb.append("                }\n");
-        sb.append("            }\n");
-        sb.append("            c.set(year, month - 1, day, hour, minute, second);\n");
-        sb.append("            c.set(java.util.Calendar.MILLISECOND, millis);\n");
-        // getTime() is where a strict Calendar validates, so it has to be inside the guard.
-        sb.append("            return new java.util.Date(\n");
-        sb.append("                    c.getTime().getTime() - offsetMinutes * 60000L);\n");
-        sb.append("        } catch (NumberFormatException e) {\n");
-        sb.append("            return null;\n");
-        sb.append("        } catch (IndexOutOfBoundsException e) {\n");
-        sb.append("            return null;\n");
-        sb.append("        } catch (IllegalArgumentException e) {\n");
-        sb.append("            return null;\n");
-        sb.append("        }\n");
-        sb.append("    }\n");
     }
 
     // ------------------------------------------------------------------

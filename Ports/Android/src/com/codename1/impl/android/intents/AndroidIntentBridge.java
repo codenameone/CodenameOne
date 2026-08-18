@@ -148,6 +148,15 @@ public class AndroidIntentBridge implements IntentBridge {
             // queue exists to wait for, so it joins that queue rather than taking a shortcut
             // around it. Parameters were dropped at the door, so there are none to carry.
             parkForegroundRequest(parked, null);
+            // And something has to open a window for it. The trampoline reached the service
+            // rather than an Activity because the shortcut's URI said headless -- a cached or
+            // pinned shortcut minted before an update that made this declaration foreground, or
+            // gave it a route. The declaration is the authority and it says otherwise, so the
+            // queue this just joined is waiting for a window nobody asked for: the service
+            // finishes, the waiter polls out its bound, and the shortcut does nothing at all.
+            // The service's own migration path launches for exactly this reason; this one is
+            // the same case reached through the parked door.
+            requestForegroundStatic();
             return;
         }
         // The completion is what CN1IntentService.wakeRuntime waits on. Without it the service

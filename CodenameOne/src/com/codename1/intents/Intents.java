@@ -31,7 +31,6 @@ import com.codename1.ui.Display;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1277,11 +1276,21 @@ public final class Intents {
             return false;
         }
         if (type == IntentParameterType.DATE) {
-            return value instanceof Date || value instanceof Number || value instanceof String;
+            return IntentDates.parse(value) != null;
         }
-        // An entity binds as the entity or as the id the BY_ID query resolves; whether that id
-        // names anything is the query's answer to give, not this method's.
-        return value instanceof AppEntity || value instanceof String;
+        if (value instanceof AppEntity) {
+            // An entity of the wrong type is not a near miss. The wire keeps only the id, so a
+            // customer bound to an order parameter arrives as a bare id that the *order* BY_ID
+            // query resolves -- either finding nothing, or finding an unrelated order that
+            // happens to share the id and running the handler on it. Neither is recoverable
+            // afterwards, and neither is visible: a parameterization would also have hidden the
+            // parameter as satisfied.
+            String declared = p.getEntityType();
+            return declared == null || declared.equals(((AppEntity) value).getType());
+        }
+        // An id resolves through the BY_ID query, and whether it names anything is that query's
+        // answer to give rather than this method's.
+        return value instanceof String;
     }
 
     /// A whole number an `int` parameter could hold, which is the narrowest an `INTEGER` may be.

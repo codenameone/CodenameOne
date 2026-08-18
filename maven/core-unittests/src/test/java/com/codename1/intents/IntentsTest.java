@@ -172,6 +172,23 @@ class IntentsTest {
                 Arrays.asList(Exposure.ASSISTANT));
     }
 
+    private static IntentDeclaration declarationWithDateParam(String id, String param) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
+                Arrays.asList(new IntentParameterInfo(param, "When?",
+                        IntentParameterType.DATE, true, null, null, null)),
+                Arrays.asList(Exposure.ASSISTANT));
+    }
+
+    private static IntentDeclaration declarationWithEntityParam(String id, String param,
+                                                                 String entityType) {
+        return new IntentDeclaration(id, "Title of " + id, "", true, true, false,
+                "", 5, Arrays.asList("Do " + id + " in ${applicationName}"),
+                Arrays.asList(new IntentParameterInfo(param, "Which?",
+                        IntentParameterType.ENTITY, true, entityType, null, null)),
+                Arrays.asList(Exposure.ASSISTANT));
+    }
+
     @AfterEach
     void tearDown() {
         Intents.reset();
@@ -1582,6 +1599,55 @@ class IntentsTest {
         good.put("count", Integer.valueOf(7));
         Intents.donate("count_3", good);
         assertEquals("count_3", b.donatedId);
+    }
+
+    /// A date the coercion would reject must not be donated or hide a parameter: the platforms
+    /// replay it verbatim, so the shortcut fails on every tap. The grammar is core's now, so
+    /// this checks the same one dispatch checks rather than a second opinion about it.
+    @Test
+    void aValueThatIsNotAMomentInTimeIsNotADate() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithDateParam("remind_me", "when"));
+        Intents.setDispatcher(d);
+
+        Intents.registerDynamicIntent(new DynamicIntent("remind_bad", "remind_me", "Bad")
+                .bind("when", "not-a-date"));
+        assertNotNull(Intents.getDeclaration("remind_bad").getParameter("when"));
+
+        Intents.registerDynamicIntent(new DynamicIntent("remind_frac", "remind_me", "Fraction")
+                .bind("when", Double.valueOf(1.5)));
+        assertNotNull(Intents.getDeclaration("remind_frac").getParameter("when"),
+                "1.5 is not a count of milliseconds");
+
+        // The three forms that are moments in time still satisfy it.
+        Intents.registerDynamicIntent(new DynamicIntent("remind_iso", "remind_me", "Iso")
+                .bind("when", "2026-03-01T09:30:00Z"));
+        assertNull(Intents.getDeclaration("remind_iso").getParameter("when"));
+        Intents.registerDynamicIntent(new DynamicIntent("remind_ms", "remind_me", "Millis")
+                .bind("when", Long.valueOf(1772000000000L)));
+        assertNull(Intents.getDeclaration("remind_ms").getParameter("when"));
+        Intents.registerDynamicIntent(new DynamicIntent("remind_obj", "remind_me", "Obj")
+                .bind("when", new java.util.Date(1772000000000L)));
+        assertNull(Intents.getDeclaration("remind_obj").getParameter("when"));
+    }
+
+    /// The wire keeps only an entity's id, so an entity of the wrong type arrives as a bare id
+    /// that the *declared* type's BY_ID query resolves -- finding nothing, or finding an
+    /// unrelated object that happens to share the id and running the handler on it.
+    @Test
+    void anEntityOfAnotherTypeDoesNotSatisfyTheParameter() {
+        FakeDispatcher d = new FakeDispatcher();
+        d.declarations.add(declarationWithEntityParam("open_order", "order", "order"));
+        Intents.setDispatcher(d);
+
+        Intents.registerDynamicIntent(new DynamicIntent("open_wrong", "open_order", "Wrong")
+                .bind("order", new AppEntity("customer", "42")));
+        assertNotNull(Intents.getDeclaration("open_wrong").getParameter("order"),
+                "a customer is not an order, however alike their ids look");
+
+        Intents.registerDynamicIntent(new DynamicIntent("open_right", "open_order", "Right")
+                .bind("order", new AppEntity("order", "42")));
+        assertNull(Intents.getDeclaration("open_right").getParameter("order"));
     }
 
     /// The two routes disagreed about the same object: donation reduced an AppEntity to its id
