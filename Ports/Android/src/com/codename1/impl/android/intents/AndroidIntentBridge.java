@@ -576,19 +576,19 @@ public class AndroidIntentBridge implements IntentBridge {
             // parameters that meant the tap ran the declared defaults instead of the values
             // the user had actually chosen, which is the whole content of a donation.
             // The same capacity question indexing asks. pushDynamicShortcut evicts the least
-            // recently used dynamic shortcut once the cap is reached, and with the quota full
-            // of manifest shortcuts and ones the application published itself, the thing
-            // evicted would be one of the application's -- a launcher action removed in order
-            // to record that the user did something. A donation is a hint; it is not worth
-            // that. Slots this framework already owns are counted as available, so replacing
-            // an earlier donation of its own still works.
-            if (publishableSlots(ctx) < 1) {
-                Log.i(TAG, "Not donating \"" + intentId + "\": this app's own shortcuts already "
-                        + "fill the launcher's quota, and recording this one would evict one of "
-                        + "them");
+            // recently used dynamic shortcut once the cap is reached, and the thing evicted is
+            // whatever the user touched longest ago -- one of the application's own launcher
+            // actions, or a piece of this framework's indexed content. A donation is a hint
+            // that the user did something; it is not worth deleting either. Re-donating the
+            // same intent updates that shortcut in place and needs no free slot, which is the
+            // common case and keeps working when the launcher is full.
+            String donatedId = DONATED_PREFIX + intentId;
+            if (!capacity(ctx).admits(donatedId, 0)) {
+                Log.i(TAG, "Not donating \"" + intentId + "\": the launcher's shortcut quota is "
+                        + "full, and recording this one would evict something already there");
                 return;
             }
-            pushShortcut(ctx, DONATED_PREFIX + intentId, label, label,
+            pushShortcut(ctx, donatedId, label, label,
                     uriFor(targetId, effectiveParams, ctx), null, true);
         } catch (Throwable t) {
             Log.w(TAG, "Could not donate " + intentId, t);
@@ -613,20 +613,24 @@ public class AndroidIntentBridge implements IntentBridge {
         // Deliberately shallow parsing: the payload is a known shape produced by the framework's
         // own serializer, and pulling in a JSON dependency for the port would cost every app.
         List<String[]> entries = CN1IntentJson.entities(entitiesJson);
-        int budget = publishableSlots(ctx);
+        ShortcutCapacity capacity = capacity(ctx);
         int published = 0;
+        int slotsUsed = 0;
         for (String[] entry : entries) {
-            if (published >= budget) {
+            // Checked per entry rather than against one number up front, because an entry that
+            // re-indexes an entity already published updates it in place and takes no slot.
+            // A budget computed once would either refuse those updates when the launcher is
+            // full, or count them as room for new ids that is not there.
+            if (!capacity.admits(shortcutIdFor(entry[0]), slotsUsed)) {
                 // The launcher caps how many it will show. Truncating silently would look like
                 // indexing randomly failing, so it is reported once -- and the two reasons read
                 // differently to whoever has to act on them.
-                if (budget == 0) {
-                    Log.i(TAG, "Not indexing: this app's own shortcuts already fill the "
-                            + "launcher's quota, and publishing content here would evict one "
-                            + "of them");
+                if (capacity.getFree() == 0) {
+                    Log.i(TAG, "Not indexing: the launcher's shortcut quota is already full, "
+                            + "and publishing content here would evict something already there");
                 } else {
-                    Log.i(TAG, "Indexed the first " + budget
-                            + " items; Android limits how many shortcuts an app may publish");
+                    Log.i(TAG, "Indexed " + published
+                            + " item(s); Android limits how many shortcuts an app may publish");
                 }
                 break;
             }
@@ -648,6 +652,9 @@ public class AndroidIntentBridge implements IntentBridge {
                     if (!indexed.contains(shortcutId)) {
                         indexed.add(shortcutId);
                     }
+                }
+                if (capacity.consumesSlot(shortcutId)) {
+                    slotsUsed++;
                 }
                 published++;
             } catch (Throwable t) {
@@ -767,7 +774,7 @@ public class AndroidIntentBridge implements IntentBridge {
         }
     }
 
-    /// How many shortcuts this framework may still publish, whether indexing or donating.
+    /// The shortcut slots this framework may still fill, and the ids it may overwrite.
     ///
     /// Asked of the platform rather than assumed. getMaxShortcutCountPerActivity() is the
     /// *combined* static and dynamic quota, and the manifest shortcuts the build wrote are
@@ -775,14 +782,38 @@ public class AndroidIntentBridge implements IntentBridge {
     /// five, and the surplus pushes were rejected one at a time with nothing said. The build
     /// reserves room by emitting fewer static shortcuts than the smallest quota; this is the
     /// other half, spending only what is actually left.
+    ///
+    /// #### Why every existing dynamic shortcut counts as taken, including this framework's
+    ///
+    /// An earlier version treated any shortcut carrying either of this framework's prefixes as
+    /// reusable capacity, on the reasoning that replacing one of our own is what indexing does.
+    /// That was wrong twice over, and both faults ended the same way -- in pushDynamicShortcut
+    /// evicting the least recently used dynamic shortcut, which is whatever the user touched
+    /// longest ago rather than whatever this operation owns.
+    ///
+    /// The first: the two prefixes are different categories. With the quota full of donations,
+    /// indexing counted every one of them as free space and published over it, so recording
+    /// content the user never asked for deleted an action they had actually performed. The
+    /// reverse held too, a donation evicting indexed content.
+    ///
+    /// The second: even inside one category the slots are only reusable when the incoming ids
+    /// are the same ids. Indexing five fresh uids while five of ours already sit in the quota
+    /// is ten shortcuts, not five, so the platform evicted to make room regardless of what the
+    /// accounting claimed.
+    ///
+    /// So capacity here is the genuinely empty slots, and nothing else. Re-publishing an id
+    /// that already exists updates it in place and costs no slot, which is why the ids are
+    /// returned alongside the count -- that keeps re-indexing the same entities working
+    /// forever, while a new id waits for real room. Nothing this framework publishes can
+    /// evict anything, from the application or from itself.
     @TargetApi(Build.VERSION_CODES.N_MR1)
-    private static int publishableSlots(Context ctx) {
+    private static ShortcutCapacity capacity(Context ctx) {
         // The cast stays outside the guard, as it does in publishedIds: a cast inside a
         // catch(Throwable) block reads as relying on ClassCastException, which ParparVM does
         // not throw -- and the repo's gate rejects the shape wherever it appears.
         ShortcutManager manager = (ShortcutManager) ctx.getSystemService(ShortcutManager.class);
         if (manager == null) {
-            return MAX_SHORTCUTS;
+            return new ShortcutCapacity(MAX_SHORTCUTS, new ArrayList<String>());
         }
         int quota;
         List<ShortcutInfo> manifest;
@@ -793,40 +824,53 @@ public class AndroidIntentBridge implements IntentBridge {
             dynamic = manager.getDynamicShortcuts();
         } catch (Throwable t) {
             Log.w(TAG, "Could not read the shortcut quota", t);
-            return MAX_SHORTCUTS;
+            return new ShortcutCapacity(MAX_SHORTCUTS, new ArrayList<String>());
         }
-        // Dynamic slots the application is using for its own shortcuts count against the quota
-        // just as manifest ones do, and they are not ours to take: pushDynamicShortcut evicts
-        // the least recently used dynamic shortcut when the cap is reached, so indexing enough
-        // entities would have quietly removed a launcher action published by native code or
-        // another library. Only the slots this framework already owns are reusable, because
-        // replacing one of those is what indexing is supposed to do.
+        List<String> existing = new ArrayList<String>();
         int taken = manifest == null ? 0 : manifest.size();
         if (dynamic != null) {
             for (ShortcutInfo info : dynamic) {
-                if (!isOurShortcut(info.getId())) {
-                    taken++;
+                taken++;
+                if (info.getId() != null) {
+                    existing.add(info.getId());
                 }
             }
         }
-        // Slots this framework already holds are not in `taken`, so they are counted as
-        // available here -- publishing over one of those is what indexing does. What is left
-        // after that is genuinely nothing, and forcing a budget of one anyway would have
-        // pushShortcut evict the least recently used dynamic shortcut, which at that point can
-        // only be one belonging to the application. Publishing nothing is the correct answer:
-        // indexing content must not cost a launcher action this framework never published.
-        int left = quota - taken;
-        if (left < 0) {
-            left = 0;
+        int free = quota - taken;
+        if (free < 0) {
+            free = 0;
         }
-        return left < MAX_SHORTCUTS ? left : MAX_SHORTCUTS;
+        return new ShortcutCapacity(free < MAX_SHORTCUTS ? free : MAX_SHORTCUTS, existing);
     }
 
-    /// Whether this shortcut id is one this framework published.
+    /// What the launcher has room for: empty slots, and the ids already published.
     ///
-    /// Both stamps, because both spend the same quota: an indexed entity and a donation.
-    private static boolean isOurShortcut(String id) {
-        return id != null && (id.startsWith(INDEXED_PREFIX) || id.startsWith(DONATED_PREFIX));
+    /// A value rather than two calls, because two reads of ShortcutManager can disagree -- a
+    /// donation landing between them would have the count describe one state and the id list
+    /// another, which is how an off-by-one becomes an eviction.
+    private static final class ShortcutCapacity {
+        private final int free;
+        private final List<String> existing;
+
+        ShortcutCapacity(int free, List<String> existing) {
+            this.free = free;
+            this.existing = existing;
+        }
+
+        /// Whether this id can be published: either it is already there and is being updated
+        /// in place, or there is an empty slot for it.
+        boolean admits(String id, int alreadyUsed) {
+            return existing.contains(id) || alreadyUsed < free;
+        }
+
+        /// Whether publishing this id consumes one of the empty slots.
+        boolean consumesSlot(String id) {
+            return !existing.contains(id);
+        }
+
+        int getFree() {
+            return free;
+        }
     }
 
     /// Whether a donation payload names any value at all.

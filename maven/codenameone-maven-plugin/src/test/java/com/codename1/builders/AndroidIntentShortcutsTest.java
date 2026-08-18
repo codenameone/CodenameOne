@@ -107,6 +107,30 @@ class AndroidIntentShortcutsTest {
                         + "XML escape or there is no quote left to see:\n" + strings);
     }
 
+    /// A percent sign is ordinary text in a title, and a title is never a format string --
+    /// nothing ever passes it an argument. AAPT does not know that: it parses every <string>
+    /// as a potential format resource and rejects one carrying more than a single
+    /// non-positional token, so "Move %s to %s" failed the whole Android build and told the
+    /// developer to write positional arguments for a label that is only ever displayed.
+    @Test
+    public void aTitleCarryingFormatTokensDoesNotFailAapt(@TempDir Path dir) throws Exception {
+        entriesFor(dir, "{\"intents\":[{\"id\":\"move_item\","
+                + "\"title\":\"Move %s to %s\",\"headless\":false,"
+                + "\"discoverable\":true,\"destructive\":false,\"opensRoute\":\"\","
+                + "\"exposure\":[\"ASSISTANT\"],\"params\":[]}],\"entities\":[]}");
+
+        File values = new File(new File(dir.toFile(), "res"), "values");
+        String strings = new String(Files.readAllBytes(
+                new File(values, "cn1_shortcuts_strings.xml").toPath()),
+                Charset.forName("UTF-8"));
+
+        assertTrue(strings.contains("formatted=\"false\""),
+                "without formatted=\"false\" AAPT reads the label as a format string and "
+                        + "rejects multiple non-positional substitutions:\n" + strings);
+        assertTrue(strings.contains("Move %s to %s"),
+                "the title itself must survive verbatim:\n" + strings);
+    }
+
     /// res/xml is not processed for manifest placeholders, so ${applicationId} written there
     /// reaches the launcher literally and the explicit component cannot resolve -- every
     /// An explicitly written exposure = {} chose no platform consumer. The processor preserves
@@ -358,7 +382,9 @@ class AndroidIntentShortcutsTest {
         File strings = new File(new File(dir.toFile(), "res"), "values/cn1_shortcuts_strings.xml");
         assertTrue(strings.exists(), "the referenced string resource was not written");
         String body = new String(Files.readAllBytes(strings.toPath()), Charset.forName("UTF-8"));
-        assertTrue(body.contains("<string name=\"cn1_shortcut_log_workout\">Log a workout</string>"),
+        assertTrue(body.contains(
+                "<string formatted=\"false\" name=\"cn1_shortcut_log_workout\">"
+                        + "Log a workout</string>"),
                 body);
     }
 

@@ -7522,7 +7522,13 @@ public class AndroidGradleBuilder extends Executor {
             // loudly at AAPT rather than silently, which is the right outcome for a manifest
             // nothing generated.
             String labelRes = "cn1_shortcut_" + ((String) id);
-            strings.append("    <string name=\"").append(labelRes).append("\">")
+            // formatted="false" because a title is displayed verbatim and never formatted.
+            // Without it AAPT parses the label as a format string and rejects any title
+            // carrying more than one non-positional token -- "Move %s to %s" fails the whole
+            // build, and the developer is told to use positional arguments for a string that
+            // is never an argument to anything.
+            strings.append("    <string formatted=\"false\" name=\"").append(labelRes)
+                    .append("\">")
                     .append(androidStringValue(label)).append("</string>\n");
             // The headless flag rides in the URI so the trampoline can route a cold-start tap
             // without the declaration table, which is not installed yet at that point.
