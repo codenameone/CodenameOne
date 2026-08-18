@@ -3430,6 +3430,13 @@ public class IPhoneBuilder extends Executor {
                 // prefix and cannot see ios.home.commissioning=false, so an
                 // app that deliberately excludes the framework would have
                 // lost every iOS below 16.1 for nothing.
+                // The APP's floor stays where MatterSupport put it. Only
+                // the extension needs 16.4 for a fabric of its own, and an
+                // extension whose target is above its host's is the ordinary
+                // arrangement -- a widget extension does the same thing.
+                // Raising the app to 16.4 would cost every user on 16.1
+                // through 16.3 the whole application over an opt-in they
+                // never asked for.
                 addMinDeploymentTarget(MatterExtensionBuilder.DEPLOYMENT_TARGET);
                 String ms = "MatterSupport.framework";
                 if (addLibs == null || addLibs.length() == 0) {
@@ -5718,7 +5725,7 @@ public class IPhoneBuilder extends Executor {
         buildSettingsMap.put("INFOPLIST_FILE", name + "/Info.plist");
         buildSettingsMap.put("CODE_SIGN_ENTITLEMENTS", name + "/" + name + ".entitlements");
         buildSettingsMap.put("IPHONEOS_DEPLOYMENT_TARGET",
-                MatterExtensionBuilder.DEPLOYMENT_TARGET);
+                MatterExtensionBuilder.deploymentTarget(ownFabric));
         buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
         buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS",
                 "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
@@ -5741,7 +5748,7 @@ public class IPhoneBuilder extends Executor {
         // re-executes fix_xcode_schemes.rb after dependency integration.
         sb.append("\nif xcproj.targets.find{|e| e.name=='" + name + "'}.nil?\n"
                 + "service_target = xcproj.new_target(:app_extension, '" + name + "', :ios, '"
-                + MatterExtensionBuilder.DEPLOYMENT_TARGET + "')\n"
+                + MatterExtensionBuilder.deploymentTarget(ownFabric) + "')\n"
                 + "service_target.add_system_framework('MatterSupport')\n"
                 // Matter is Apple's own CHIP stack, and it is what the
                 // generated commissioning implementation drives. Linked

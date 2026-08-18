@@ -123,6 +123,35 @@ public class MatterExtensionBuilderTest {
                 "the vendor id is the build's, not a constant");
     }
 
+    /**
+     * An own-fabric build's extension needs the release its controller
+     * exists in.
+     *
+     * <p>MTRDeviceControllerFactory arrived in 16.4, three point releases
+     * after MatterSupport. At 16.1 the extension still builds -- the
+     * controller sits behind an availability check -- and then does nothing
+     * on 16.1 through 16.3 while the flow reports success, which is the one
+     * outcome the caller cannot detect. The extension's own floor moves; the
+     * app's does not, because an extension above its host is ordinary and
+     * raising the app would cost every user below 16.4 the whole
+     * application.</p>
+     */
+    @Test
+    public void anOwnFabricExtensionRaisesItsOwnFloorAndThrowsBelowIt()
+            throws Exception {
+        assertEquals("16.1", MatterExtensionBuilder.deploymentTarget(false));
+        assertEquals("16.4", MatterExtensionBuilder.deploymentTarget(true));
+        assertEquals(MatterExtensionBuilder.DEPLOYMENT_TARGET,
+                MatterExtensionBuilder.deploymentTarget(false));
+        String swift = text(MatterExtensionBuilder.buildFileMap(PACKAGE, GROUP,
+                "Lights", SHORT_VERSION, BUNDLE_VERSION, true, VENDOR),
+                "RequestHandler.swift");
+        assertFalse(swift.contains("guard #available(iOS 16.4, *) else { return }"),
+                "returning from the guard reports success for a fabric that"
+                        + " never gained the accessory");
+        assertTrue(swift.contains("throw NSError("), swift);
+    }
+
     /** The Matter test vendor, which is what a build defaults to. */
     private static final String VENDOR = "0xFFF1";
 

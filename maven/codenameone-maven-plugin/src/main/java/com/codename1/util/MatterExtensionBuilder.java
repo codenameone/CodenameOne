@@ -78,6 +78,29 @@ public final class MatterExtensionBuilder {
      */
     public static final String DEPLOYMENT_TARGET = "16.1";
 
+    /**
+     * The floor a build that commissions onto its own fabric needs.
+     *
+     * <p>MTRDeviceControllerFactory arrived in iOS 16.4, three point releases
+     * after MatterSupport itself. Left at 16.1 the extension still builds --
+     * the controller sits behind an availability check -- and then does
+     * nothing on 16.1 through 16.3 while the flow reports success, which is
+     * the one outcome the app cannot detect. So a build that asks for a
+     * fabric of its own raises the extension's floor to where its
+     * implementation exists.</p>
+     */
+    public static final String DEPLOYMENT_TARGET_OWN_FABRIC = "16.4";
+
+    /**
+     * The extension's deployment target for a given build.
+     *
+     * @param ownFabric whether the app asked for a fabric of its own
+     * @return the floor that build's extension needs
+     */
+    public static String deploymentTarget(boolean ownFabric) {
+        return ownFabric ? DEPLOYMENT_TARGET_OWN_FABRIC : DEPLOYMENT_TARGET;
+    }
+
     private MatterExtensionBuilder() {
     }
 
@@ -396,7 +419,20 @@ public final class MatterExtensionBuilder {
             sb.append("            in home: MatterAddDeviceRequest.Home?,\n");
             sb.append("            onboardingPayload: String,\n");
             sb.append("            commissioningID: UUID) async throws {\n");
-            sb.append("        guard #available(iOS 16.4, *) else { return }\n");
+            sb.append("        guard #available(iOS 16.4, *) else {\n");
+            sb.append("            // Unreachable in a build this generator\n");
+            sb.append("            // produced -- the target's floor is 16.4\n");
+            sb.append("            // when this code is live. Thrown rather\n");
+            sb.append("            // than returned anyway: returning is\n");
+            sb.append("            // reported as success, and a success this\n");
+            sb.append("            // app's fabric did not get is the one\n");
+            sb.append("            // outcome the caller cannot detect.\n");
+            sb.append("            throw NSError(\n");
+            sb.append("                domain: \"CN1MatterSetup\", code: 1,\n");
+            sb.append("                userInfo: [NSLocalizedDescriptionKey:\n");
+            sb.append("                    \"commissioning onto this app's own\"\n");
+            sb.append("                    + \" fabric needs iOS 16.4\"])\n");
+            sb.append("        }\n");
             sb.append("        let payload = try MTRSetupPayload(\n");
             sb.append("            onboardingPayload: onboardingPayload)\n");
             sb.append("        try await CN1MatterSession(\n");
@@ -424,7 +460,13 @@ public final class MatterExtensionBuilder {
             sb.append("//            in home: MatterAddDeviceRequest.Home?,\n");
             sb.append("//            onboardingPayload: String,\n");
             sb.append("//            commissioningID: UUID) async throws {\n");
-            sb.append("//        guard #available(iOS 16.4, *) else { return }\n");
+            sb.append("//        guard #available(iOS 16.4, *) else {\n");
+            sb.append("//            throw NSError(\n");
+            sb.append("//                domain: \"CN1MatterSetup\", code: 1,\n");
+            sb.append("//                userInfo: [NSLocalizedDescriptionKey:\n");
+            sb.append("//                    \"commissioning onto this app's own\"\n");
+            sb.append("//                    + \" fabric needs iOS 16.4\"])\n");
+            sb.append("//        }\n");
             sb.append("//        let payload = try MTRSetupPayload(\n");
             sb.append("//            onboardingPayload: onboardingPayload)\n");
             sb.append("//        try await CN1MatterSession(\n");
