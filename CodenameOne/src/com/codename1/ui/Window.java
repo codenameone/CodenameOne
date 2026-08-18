@@ -1949,6 +1949,17 @@ public class Window extends Container implements TopLevelContainer {
                 return;
             }
         }
+        // A secondary (right / stylus barrel) press is a context menu request first,
+        // exactly as on a Form. Without this a right click in a window never reached
+        // the component's context menu listener, and an unconsumed right press could
+        // then activate the component as an ordinary click.
+        if (Display.getInstance().getPointerButton()
+                == com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY) {
+            Component ctxCmp = resolveComponentAt(x, y);
+            if (ctxCmp != null && ctxCmp.fireContextMenu(x, y)) {
+                return;
+            }
+        }
         initialPressX = x;
         initialPressY = y;
         currentPointerPress = new Object();
@@ -1963,6 +1974,21 @@ public class Window extends Container implements TopLevelContainer {
         // from pressedCmp.
         if (cmp != null && cmp.isEnabled()) {
             pressedCmp = cmp;
+            // Drag and drop has to be primed on the press, as Form does in every one
+            // of its dispatch branches: Component.pointerDragged checks
+            // dragAndDropInitialized and silently does nothing without it, so a
+            // draggable component simply could not be dragged inside a window.
+            cmp.initDragAndDrop(x, y);
+            if (!cmp.isDragAndDropInitialized()) {
+                Container draggableCnt = cmp.getParent();
+                while (draggableCnt != null && !draggableCnt.isDraggable()) {
+                    draggableCnt = draggableCnt.getParent();
+                }
+                if (draggableCnt != null && draggableCnt.isDraggable()
+                        && !(draggableCnt instanceof TopLevelContainer)) {
+                    draggableCnt.initDragAndDrop(x, y);
+                }
+            }
             LeadUtil.pointerPressed(cmp, x, y);
             if (cmp.isFocusable()) {
                 setFocused(cmp);
@@ -1997,6 +2023,16 @@ public class Window extends Container implements TopLevelContainer {
     /// pressed child gets an ordinary one-finger drag and never its `pinch` callbacks.
     @Override
     public void pointerDragged(int[] x, int[] y) {
+        // The same listener block the scalar overload runs. Adding it there only
+        // meant a gesture stopped notifying window listeners the moment it became
+        // multi touch, which is where pull to refresh loses its updates.
+        if (pointerDraggedListeners != null && pointerDraggedListeners.hasListeners()) {
+            ActionEvent e = new ActionEvent(this, ActionEvent.Type.PointerDrag, x[0], y[0]);
+            pointerDraggedListeners.fireActionEvent(e);
+            if (e.isConsumed()) {
+                return;
+            }
+        }
         autoRelease(x[0], y[0]);
         Component target = dragged != null ? dragged : pressedCmp;
         if (target != null) {

@@ -1342,8 +1342,14 @@ class WindowTest extends UITestBase {
     @FormTest
     void aPressInOneWindowDoesNotClearAnothersDragOccurred() {
         implementation.setMultiWindowSupported(true);
+        final boolean[] seen = new boolean[1];
         Window a = new Window("a", new BorderLayout());
-        a.add(BorderLayout.CENTER, new Label("a"));
+        a.add(BorderLayout.CENTER, new Component() {
+            @Override
+            public void pointerReleased(int x, int y) {
+                seen[0] = Display.getInstance().hasDragOccured();
+            }
+        });
         a.setWindowSize(300, 200);
         a.show();
         Window b = new Window("b", new BorderLayout());
@@ -1364,12 +1370,57 @@ class WindowTest extends UITestBase {
         DisplayTest.flushEdt();
         Display.getInstance().windowPointerReleased(a.getWindowId(), px, py2);
         DisplayTest.flushEdt();
-        boolean aDragSeen = Display.getInstance().hasDragOccured();
         b.dispose();
         a.dispose();
 
-        assertTrue(aDragSeen,
+        // Read from inside A's own release dispatch, which is where List and
+        // ContainerList consult it -- and the only context where the answer is
+        // defined, now that the selector is restored when dispatch unwinds.
+        assertTrue(seen[0],
                 "a press in another window must not erase this window's drag state");
+    }
+
+    @FormTest
+    void aDraggableComponentInAWindowGetsDragAndDropPrimed() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("dnd", new BorderLayout());
+        Label draggable = new Label("drag me");
+        draggable.setDraggable(true);
+        w.add(BorderLayout.CENTER, draggable);
+        w.setWindowSize(300, 200);
+        w.show();
+
+        // Component.pointerDragged checks dragAndDropInitialized and silently does
+        // nothing without it, so drag and drop was unusable in a window.
+        w.pointerPressed(150, 120);
+        boolean primed = draggable.isDragAndDropInitialized();
+        w.dispose();
+
+        assertTrue(primed, "a press must prime drag and drop, as Form does");
+    }
+
+    @FormTest
+    void multiTouchDragsStillNotifyWindowListeners() {
+        implementation.setMultiWindowSupported(true);
+        Window w = new Window("multi", new BorderLayout());
+        w.add(BorderLayout.CENTER, new Label("content"));
+        w.setWindowSize(300, 200);
+        w.show();
+        final int[] drags = new int[1];
+        w.addPointerDraggedListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                drags[0]++;
+            }
+        });
+
+        // The listener block was added to the scalar overload only, so a gesture
+        // stopped notifying the moment it became multi touch.
+        w.pointerDragged(new int[]{150, 160}, new int[]{120, 130});
+        int count = drags[0];
+        w.dispose();
+
+        assertEquals(1, count, "a multi touch drag must notify window listeners too");
     }
 
     @FormTest

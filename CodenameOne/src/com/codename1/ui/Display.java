@@ -3579,8 +3579,13 @@ public final class Display extends CN1Constants {
         }
 
         // Which window's samples getDragSpeed should report while this packet's
-        // handlers run.
+        // handlers run. Saved and restored around the dispatch rather than simply
+        // assigned: a listener may call invokeAndBlock, whose nested event loop
+        // dispatches another window's packets, and without restoring it the rest of
+        // *this* release would read the nested window's drag state.
+        final int previousDragHistory = dragHistoryCurrent;
         dragHistoryCurrent = windowId;
+        try {
 
         // no need to synchronize since we are reading only and modifying the stack frame offset
         offset++;
@@ -3773,6 +3778,10 @@ public final class Display extends CN1Constants {
                 break;
         }
         return offset;
+
+        } finally {
+            dragHistoryCurrent = previousDragHistory;
+        }
     }
 
     /// Consumes one event's payload without dispatching it, so that a packet aimed at
